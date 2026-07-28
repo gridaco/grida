@@ -266,6 +266,11 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         });
       }
       let chatgpt: ChatGptProviderRuntime | undefined;
+      if (!caps.providers && opts.chatgpt) {
+        console.warn(
+          "[grida-agent] chatgpt is configured but capabilities.providers is disabled; the provider is unavailable."
+        );
+      }
       if (caps.providers && opts.chatgpt) {
         ChatGptProvider.validate(opts.chatgpt);
         const credentials = new ChatGptCredentialManager(

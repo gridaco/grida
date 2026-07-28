@@ -22,8 +22,44 @@ describe("DesktopPreferences", () => {
     const preferences = await createPreferences();
 
     expect(preferences.isOnboardingComplete()).toBe(false);
+    expect(preferences.needsLegacyRendererOnboardingMigration()).toBe(true);
     await expect(fs.access(filePath())).rejects.toMatchObject({
       code: "ENOENT",
+    });
+  });
+
+  it("migrates renderer onboarding completion exactly once", async () => {
+    const preferences = await createPreferences();
+
+    await preferences.completeLegacyRendererOnboardingMigration(true);
+
+    expect(preferences.isOnboardingComplete()).toBe(true);
+    expect(preferences.needsLegacyRendererOnboardingMigration()).toBe(false);
+    await expect(readPersisted()).resolves.toEqual({
+      schema_version: 1,
+      onboarding: {
+        completed_version: DesktopPreferences.onboarding_version,
+      },
+      migrations: {
+        renderer_onboarding_v1: true,
+      },
+    });
+
+    await preferences.resetOnboarding();
+    expect(preferences.isOnboardingComplete()).toBe(false);
+    expect(preferences.needsLegacyRendererOnboardingMigration()).toBe(false);
+  });
+
+  it("records an absent renderer completion without completing onboarding", async () => {
+    const preferences = await createPreferences();
+
+    await preferences.completeLegacyRendererOnboardingMigration(false);
+
+    expect(preferences.isOnboardingComplete()).toBe(false);
+    expect(preferences.needsLegacyRendererOnboardingMigration()).toBe(false);
+    await expect(readPersisted()).resolves.toMatchObject({
+      onboarding: { completed_version: 0 },
+      migrations: { renderer_onboarding_v1: true },
     });
   });
 
@@ -36,6 +72,9 @@ describe("DesktopPreferences", () => {
       schema_version: 1,
       onboarding: {
         completed_version: DesktopPreferences.onboarding_version,
+      },
+      migrations: {
+        renderer_onboarding_v1: true,
       },
     });
   });
@@ -106,6 +145,9 @@ describe("DesktopPreferences", () => {
         completed_version: 0,
         future_onboarding_field: true,
       },
+      migrations: {
+        renderer_onboarding_v1: true,
+      },
       another_preference: { enabled: true },
     });
   });
@@ -117,6 +159,9 @@ describe("DesktopPreferences", () => {
     );
 
     expect((await createPreferences()).isOnboardingComplete()).toBe(true);
+    expect(
+      (await createPreferences()).needsLegacyRendererOnboardingMigration()
+    ).toBe(false);
 
     const preferences = await createPreferences();
     await preferences.resetOnboarding();
@@ -152,6 +197,7 @@ describe("DesktopPreferences", () => {
     const preferences = await createPreferences();
 
     expect(preferences.isOnboardingComplete()).toBe(true);
+    expect(preferences.needsLegacyRendererOnboardingMigration()).toBe(false);
     await expect(preferences.resetOnboarding()).rejects.toThrow(
       "written by a newer Grida version"
     );
@@ -168,6 +214,7 @@ describe("DesktopPreferences", () => {
     const preferences = await createPreferences();
 
     expect(preferences.isOnboardingComplete()).toBe(true);
+    expect(preferences.needsLegacyRendererOnboardingMigration()).toBe(false);
     await expect(preferences.completeOnboarding()).rejects.toThrow(
       "written by a newer Grida version"
     );

@@ -25,7 +25,8 @@ describe("protocol_router.route", () => {
     expect(protocol_router.route("grida://auth/callback?code=abc-123")).toEqual(
       {
         kind: "auth-callback",
-        callback_url: "https://grida.test/desktop/auth/callback?code=abc-123",
+        callback_url:
+          "https://grida.test/desktop/auth/callback?code=abc-123&native_entry=1",
       }
     );
   });
@@ -34,7 +35,8 @@ describe("protocol_router.route", () => {
     expect(protocol_router.route("grida://Auth/callback?code=abc-123")).toEqual(
       {
         kind: "auth-callback",
-        callback_url: "https://grida.test/desktop/auth/callback?code=abc-123",
+        callback_url:
+          "https://grida.test/desktop/auth/callback?code=abc-123&native_entry=1",
       }
     );
   });
@@ -44,11 +46,12 @@ describe("protocol_router.route", () => {
       protocol_router.route("grida-dev://auth/callback?code=dev-123")
     ).toEqual({
       kind: "auth-callback",
-      callback_url: "https://grida.test/desktop/auth/callback?code=dev-123",
+      callback_url:
+        "https://grida.test/desktop/auth/callback?code=dev-123&native_entry=1",
     });
   });
 
-  it("forwards only known params", () => {
+  it("forwards only known params and adds the native entry marker", () => {
     const route = protocol_router.route(
       "grida://auth/callback?code=abc&evil=payload&error_code=otp_expired"
     );
@@ -59,7 +62,18 @@ describe("protocol_router.route", () => {
     expect(target.pathname).toBe("/desktop/auth/callback");
     expect(target.searchParams.get("code")).toBe("abc");
     expect(target.searchParams.get("error_code")).toBe("otp_expired");
+    expect(target.searchParams.getAll("native_entry")).toEqual(["1"]);
     expect(target.searchParams.has("evil")).toBe(false);
+  });
+
+  it("never forwards or accepts a custom-scheme entry marker", () => {
+    const route = protocol_router.route(
+      "grida://auth/callback?code=abc&native_entry=0&native_entry=attacker"
+    );
+    expect(route.kind).toBe("auth-callback");
+    if (route.kind !== "auth-callback") return;
+    const target = new URL(route.callback_url);
+    expect(target.searchParams.getAll("native_entry")).toEqual(["1"]);
   });
 
   it("forwards provider failure params when no code is present", () => {
@@ -69,7 +83,7 @@ describe("protocol_router.route", () => {
     expect(route).toEqual({
       kind: "auth-callback",
       callback_url:
-        "https://grida.test/desktop/auth/callback?error=access_denied&error_description=no",
+        "https://grida.test/desktop/auth/callback?error=access_denied&error_description=no&native_entry=1",
     });
   });
 

@@ -52,6 +52,7 @@ import {
 } from "@grida/agent";
 import type {
   DesktopBridge,
+  ChatGptConnectResult,
   DesktopHostAppId,
   DesktopHostAppInfo,
   NavigationState,
@@ -111,6 +112,7 @@ export {
 } from "@grida/agent";
 
 export type {
+  ChatGptConnectResult,
   DesktopAgentCapabilities,
   DesktopBridge,
   DesktopCapabilities,
@@ -490,14 +492,15 @@ export namespace onboarding {
 /**
  * Native ChatGPT-subscription provider controls. This is separate from ACP:
  * Grida remains the agent and uses the signed-in account only as a model
- * provider. Every result is a secret-free status object.
+ * provider. Results are secret-free status objects, except for the explicit
+ * normal cancellation outcome returned by connect.
  */
 export namespace chatgpt {
   export function isSupported(): boolean {
     return getDesktopBridge()?.chatgpt != null;
   }
 
-  export async function connect(): Promise<ChatGptSubscriptionStatus> {
+  export async function connect(): Promise<ChatGptConnectResult> {
     const bridge = bridgeOrThrow().chatgpt;
     if (!bridge) throw new DesktopBridgeMissingError();
     return await bridge.connect();

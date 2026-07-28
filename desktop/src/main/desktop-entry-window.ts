@@ -14,13 +14,21 @@ import type { DesktopIpcRole } from "./ipc-admission";
 export type DesktopEntryRole = "booting" | "sign-in" | "onboarding" | "main";
 export type DesktopAuthControlPath = "sign-in" | "complete";
 
+const LEGACY_RENDERER_ONBOARDING_KEY = "grida.desktop.onboarding.completed.v1";
+const LEGACY_RENDERER_ONBOARDING_MIGRATION_PATH =
+  "/desktop/auth/migrate-onboarding";
+
 type DesktopEntryWindowOptions = {
   app: App;
   base_url: string;
   account: Pick<DesktopAccountSession, "status" | "signOut">;
   preferences: Pick<
     DesktopPreferences,
-    "isOnboardingComplete" | "completeOnboarding" | "resetOnboarding"
+    | "isOnboardingComplete"
+    | "needsLegacyRendererOnboardingMigration"
+    | "completeLegacyRendererOnboardingMigration"
+    | "completeOnboarding"
+    | "resetOnboarding"
   >;
   startup_main_path: string;
   before_authenticated_entry?: () => Promise<void>;
@@ -76,6 +84,7 @@ export class DesktopEntryWindow {
   #hasPresentedMain = false;
   #transitioning = false;
   #admissionBlocked = false;
+  #canonicalNavigationRequired = false;
   #authControlNavigationRevision = 0;
   #pendingAuthControlNavigation: {
     revision: number;
@@ -264,10 +273,7 @@ export class DesktopEntryWindow {
           throw new DesktopEntryWindow.AccountUnavailableError();
         }
 
-        const role = DesktopEntryWindow.roleFor(
-          account,
-          this.#options.preferences.isOnboardingComplete()
-        );
+        const role = await this.#roleForAccount(account);
         if (!role) throw new DesktopEntryWindow.AccountUnavailableError();
         if (this.#isAuthControlSuperseded(authControlRevision)) {
           this.#transitioning = false;
@@ -453,7 +459,9 @@ export class DesktopEntryWindow {
 
   focus(): void {
     const window = this.#liveWindow();
-    if (!window || this.#transitioning) return;
+    if (!window || this.#transitioning || this.#canonicalNavigationRequired) {
+      return;
+    }
     if (window.isMinimized()) window.restore();
     window.show();
     window.focus();
@@ -464,18 +472,17 @@ export class DesktopEntryWindow {
     focus,
     auth_control_revision: authControlRevision,
     auth_control_path: authControlPath,
+    force_navigation: forceNavigation = false,
   }: {
     main_path: string;
     focus: boolean;
     auth_control_revision: number;
     auth_control_path?: DesktopAuthControlPath;
+    force_navigation?: boolean;
   }): Promise<void> {
     const account = await this.#options.account.status();
     if (this.#isAuthControlSuperseded(authControlRevision)) return;
-    const role = DesktopEntryWindow.roleFor(
-      account,
-      this.#options.preferences.isOnboardingComplete()
-    );
+    const role = await this.#roleForAccount(account);
     if (!role) throw new DesktopEntryWindow.AccountUnavailableError();
     if (role !== "sign-in") {
       await this.#options.before_authenticated_entry?.();
@@ -489,6 +496,8 @@ export class DesktopEntryWindow {
       role === this.#role &&
       this.#liveWindow() &&
       !this.#transitioning &&
+      !this.#canonicalNavigationRequired &&
+      !forceNavigation &&
       !restoreCanonicalRole
     ) {
       // A failed sign-out request remains fail-closed until an authoritative
@@ -569,6 +578,11 @@ export class DesktopEntryWindow {
       }
       window.webContents.navigationHistory.clear();
 
+      // A controller-owned role load is the only event that releases a window
+      // quarantined after an off-surface in-page navigation. Clear the marker
+      // only after the canonical document loaded and its transition generation
+      // is still current.
+      this.#canonicalNavigationRequired = false;
       this.#role = role;
       this.#transitioning = false;
       this.#clearPendingAuthControlNavigation(authControlRevision);
@@ -596,6 +610,61 @@ export class DesktopEntryWindow {
     return this.#hasPresentedMain ? "/desktop/welcome" : this.#startupMainPath;
   }
 
+  async #roleForAccount(
+    account: DesktopAccountState
+  ): Promise<Exclude<DesktopEntryRole, "booting"> | null> {
+    if (account === "signed-in") {
+      await this.#migrateLegacyRendererOnboarding();
+    }
+    return DesktopEntryWindow.roleFor(
+      account,
+      this.#options.preferences.isOnboardingComplete()
+    );
+  }
+
+  /**
+   * Consume the 0.0.13 renderer completion flag once, before selecting the
+   * authenticated entry role. The fixed hidden same-origin page contributes
+   * one boolean only; main durably records that the migration ran before the
+   * flag can influence a role, then removes the obsolete renderer key.
+   */
+  async #migrateLegacyRendererOnboarding(): Promise<void> {
+    if (!this.#options.preferences.needsLegacyRendererOnboardingMigration()) {
+      return;
+    }
+
+    const window = this.#ensureWindow();
+    this.#transitioning = true;
+    window.hide();
+    let completed: boolean;
+    try {
+      await window.loadURL(
+        new URL(
+          LEGACY_RENDERER_ONBOARDING_MIGRATION_PATH,
+          this.#options.base_url
+        ).toString()
+      );
+      completed =
+        (await window.webContents.executeJavaScript(
+          `window.localStorage.getItem(${JSON.stringify(LEGACY_RENDERER_ONBOARDING_KEY)}) === "1"`
+        )) === true;
+    } catch {
+      throw new DesktopEntryWindow.LegacyOnboardingMigrationError();
+    }
+
+    await this.#options.preferences.completeLegacyRendererOnboardingMigration(
+      completed
+    );
+    try {
+      await window.webContents.executeJavaScript(
+        `window.localStorage.removeItem(${JSON.stringify(LEGACY_RENDERER_ONBOARDING_KEY)})`
+      );
+    } catch {
+      // The native migration marker is authoritative. Removing the obsolete
+      // renderer key is cleanup only and must not undo a durable decision.
+    }
+  }
+
   #isAuthControlSuperseded(revision: number): boolean {
     return revision !== this.#authControlNavigationRevision;
   }
@@ -616,6 +685,9 @@ export class DesktopEntryWindow {
       urlPath: null,
       presentation: "main",
       show: false,
+      on_disallowed_in_page_navigation: () => {
+        this.#recoverDisallowedInPageNavigation();
+      },
     });
     this.#window = window;
     window.once("closed", () => {
@@ -627,6 +699,35 @@ export class DesktopEntryWindow {
   #liveWindow(): BrowserWindow | null {
     if (!this.#window || this.#window.isDestroyed()) return null;
     return this.#window;
+  }
+
+  #recoverDisallowedInPageNavigation(): void {
+    const window = this.#liveWindow();
+    if (!window) return;
+    // `did-navigate-in-page` fires after the URL has already changed. Revoke
+    // admission and quarantine the exact window synchronously, then invalidate
+    // any role transition whose load is still in flight. Only a later
+    // controller-owned canonical role load may clear this marker.
+    this.#canonicalNavigationRequired = true;
+    this.#admissionBlocked = true;
+    window.hide();
+    const authControlRevision = ++this.#authControlNavigationRevision;
+    this.#pendingAuthControlNavigation = null;
+    void this.#enqueue(async () => {
+      await this.#reconcile({
+        main_path: this.#nextMainPath(),
+        focus: true,
+        auth_control_revision: authControlRevision,
+        force_navigation: true,
+      });
+    }).catch(() => {
+      // The off-surface document may still carry a path-scoped preload from
+      // its original page. Keep it hidden and admission-blocked until a later
+      // authoritative account reconciliation restores the exact role.
+      const current = this.#liveWindow();
+      if (current && !current.isDestroyed()) current.hide();
+      console.warn("[grida] entry navigation recovery unavailable");
+    });
   }
 
   #destroySecondaryWindows(): void {
@@ -672,6 +773,10 @@ export class DesktopEntryWindow {
       // navigation error with a secondary native-geometry failure.
     }
     if (window.isDestroyed()) return;
+    if (this.#canonicalNavigationRequired) {
+      window.hide();
+      return;
+    }
     window.show();
     if (focus) window.focus();
   }
@@ -730,6 +835,13 @@ export class DesktopEntryWindow {
     constructor() {
       super("the contained Grida account callback could not be loaded");
       this.name = "DesktopCallbackNavigationError";
+    }
+  };
+
+  static LegacyOnboardingMigrationError = class LegacyOnboardingMigrationError extends Error {
+    constructor() {
+      super("the legacy onboarding preference could not be migrated");
+      this.name = "DesktopLegacyOnboardingMigrationError";
     }
   };
 

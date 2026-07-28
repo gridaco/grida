@@ -547,7 +547,7 @@ async function isModelAvailableFromProvider(
     );
   }
   const endpoint = await deps.endpoints?.get(providerId);
-  return endpoint?.models.some((model) => model.id === modelId) ?? false;
+  return endpoint?.models?.some((model) => model.id === modelId) ?? false;
 }
 
 /**

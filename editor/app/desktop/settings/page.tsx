@@ -169,6 +169,7 @@ function ChatGptProviderRow() {
   };
 
   const handleCancel = async () => {
+    setBusy(true);
     setError(null);
     try {
       await chatgptSubscription.cancel();

@@ -14,6 +14,11 @@ Desktop source files directly.
 - Re-exports shared AgentHost DTOs from `@grida/agent` where the bridge forwards
   package-owned HTTP contracts.
 
+`chatgpt.connect()` preserves the secret-free
+`ChatGptSubscriptionStatus` object on success. An explicit user cancellation
+resolves as `{ outcome: "cancelled" }`; every other failure rejects. Consumers
+must classify the result by `outcome`, never by matching Electron error text.
+
 Desktop still owns Electron IPC channel names, preload implementation, native
 window/dialog/shell behavior, and AgentHost supervision.
 

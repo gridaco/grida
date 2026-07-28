@@ -1292,6 +1292,29 @@ describe("parseRunBody — model/provider gates over the open registry (#806)", 
     }
   });
 
+  it("rejects an endpoint tuple when an alternate store omits models", async () => {
+    const parsed = await parseRunBody(
+      {
+        ...msg,
+        provider_id: "ollama",
+        model_id: "llama3.1:8b",
+      },
+      {
+        ...deps,
+        endpoints: {
+          registeredModels: async () => [{ id: "llama3.1:8b" }],
+          get: async () => ({
+            id: "ollama",
+            base_url: "http://localhost:11434/v1",
+          }),
+        },
+      } as never
+    );
+
+    expect(parsed).toBeInstanceOf(Response);
+    expect(parsed instanceof Response ? parsed.status : 0).toBe(400);
+  });
+
   it("admits the closed subscription model/id pair and rejects a provider mismatch", async () => {
     const ok = await parseRunBody(
       {

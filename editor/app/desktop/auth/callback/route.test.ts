@@ -40,14 +40,23 @@ beforeEach(() => {
 });
 
 describe("GET /desktop/auth/callback", () => {
-  it("exchanges the code and redirects to the fixed completion surface", async () => {
+  it("sends marked native-entry callbacks to the fixed completion surface", async () => {
     exchangeCodeForSession.mockResolvedValue({ error: null });
     const target = redirectTarget(
-      await GET(request("/desktop/auth/callback?code=abc"))
+      await GET(request("/desktop/auth/callback?code=abc&native_entry=1"))
     );
     expect(exchangeCodeForSession).toHaveBeenCalledWith("abc");
     expect(target.origin).toBe(ORIGIN);
     expect(target.pathname).toBe("/desktop/auth/complete");
+  });
+
+  it("preserves the Desktop 0.0.13 welcome handoff for unmarked callbacks", async () => {
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+    const target = redirectTarget(
+      await GET(request("/desktop/auth/callback?code=legacy"))
+    );
+    expect(exchangeCodeForSession).toHaveBeenCalledWith("legacy");
+    expect(target.pathname).toBe("/desktop/welcome");
   });
 
   it("ignores legacy cookies and callback continuation input", async () => {
@@ -55,12 +64,26 @@ describe("GET /desktop/auth/callback", () => {
     const target = redirectTarget(
       await GET(
         request(
-          "/desktop/auth/callback?code=abc&flow=https%3A%2F%2Fevil.test",
+          "/desktop/auth/callback?code=abc&native_entry=1&flow=https%3A%2F%2Fevil.test",
           "grida.desktop.auth.flow=onboarding"
         )
       )
     );
     expect(target.pathname).toBe("/desktop/auth/complete");
+  });
+
+  it("treats malformed native-entry markers as legacy provenance", async () => {
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+    for (const query of [
+      "native_entry=0",
+      "native_entry=1&native_entry=1",
+      "native_entry=attacker&native_entry=1",
+    ]) {
+      const target = redirectTarget(
+        await GET(request(`/desktop/auth/callback?code=abc&${query}`))
+      );
+      expect(target.pathname).toBe("/desktop/welcome");
+    }
   });
 
   it("redirects to sign-in with auth_error when the exchange fails", async () => {

@@ -359,8 +359,8 @@ note in the PR, not a silent regression.
   — the ChatGPT subscription OAuth credential boundary.
 - [Process model](./process-model.md) — what each process owns.
 - [Renderer bridge](./renderer-bridge.md) — path-scoped bridge detail.
-- [Desktop agent authority](./agent-sandbox-wrap.md) — the landed native
-  provider slice and the remaining raw-worker re-scope.
+- [Desktop agent authority](https://github.com/gridaco/grida/blob/main/desktop/docs/agent-authority.md)
+  — the landed native provider slice and the remaining raw-worker re-scope.
 - [Agent storage layout](./agent-storage-layout.md) — secrets and state file map.
 - [Agent system RFC / foundations / watchdog](../ai/agent/foundations.md#watchdog)
   — abstract defense-in-depth model.

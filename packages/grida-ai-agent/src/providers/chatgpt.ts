@@ -114,7 +114,7 @@ export namespace ChatGptProvider {
     runtime: ChatGptProviderRuntime,
     providerHttp: ProviderHttp = new ProviderHttp()
   ): ModelFactory {
-    validate(runtime.config);
+    const providerFetch = makeFetch(runtime, providerHttp);
     const exactResponsesUrl = new URL(runtime.config.responses_url).toString();
     const baseUrl = exactResponsesUrl.slice(0, -RESPONSES_SUFFIX.length);
     const provider = createOpenAI({
@@ -127,61 +127,7 @@ export namespace ChatGptProvider {
       // Prevent ambient OPENAI_API_KEY lookup. This non-secret sentinel is
       // always overwritten by request-time OAuth injection below.
       apiKey: "oauth-managed-by-grida",
-      fetch: (async (input, init) => {
-        const requestUrl = requestUrlOf(input);
-        if (requestUrl !== exactResponsesUrl) {
-          throw new ChatGptProviderError("chatgpt_unexpected_endpoint");
-        }
-        let credential = await runtime.credentials.getAccessCredentials();
-        let response = await requestWithCredential(
-          providerHttp,
-          input,
-          init,
-          runtime.config.originator,
-          credential
-        );
-        if (response.status === 401) {
-          await discardBody(response);
-          credential = await runtime.credentials.refreshAfterUnauthorized(
-            credential.access_token
-          );
-          response = await requestWithCredential(
-            providerHttp,
-            input,
-            init,
-            runtime.config.originator,
-            credential
-          );
-          if (response.status === 401) {
-            await discardBody(response);
-            await runtime.credentials.invalidateAfterUnauthorized(
-              credential.access_token
-            );
-            throw new ChatGptCredentialError(
-              "chatgpt_reauthentication_required"
-            );
-          }
-        }
-        if (response.status === 403) {
-          await discardBody(response);
-          throw new ChatGptProviderError("chatgpt_subscription_unavailable");
-        }
-        if (response.status === 429) {
-          await discardBody(response);
-          throw new ChatGptProviderError("chatgpt_rate_limited");
-        }
-        if (!response.ok) {
-          const code =
-            response.status === 404
-              ? "chatgpt_model_not_available"
-              : response.status >= 400 && response.status < 500
-                ? "chatgpt_request_rejected"
-                : "chatgpt_service_unavailable";
-          await discardBody(response);
-          throw new ChatGptProviderError(code);
-        }
-        return response;
-      }) as typeof fetch,
+      fetch: providerFetch,
     });
 
     return (tier, modelId) => {
@@ -198,6 +144,67 @@ export namespace ChatGptProvider {
         providerId: CHATGPT_PROVIDER_ID,
         modelId: selected,
       });
+    };
+  }
+
+  export function makeFetch(
+    runtime: ChatGptProviderRuntime,
+    providerHttp: ProviderHttp = new ProviderHttp()
+  ): typeof fetch {
+    validate(runtime.config);
+    const exactResponsesUrl = new URL(runtime.config.responses_url).toString();
+    return async (input, init) => {
+      const requestUrl = requestUrlOf(input);
+      if (requestUrl !== exactResponsesUrl) {
+        throw new ChatGptProviderError("chatgpt_unexpected_endpoint");
+      }
+      let credential = await runtime.credentials.getAccessCredentials();
+      let response = await requestWithCredential(
+        providerHttp,
+        input,
+        init,
+        runtime.config.originator,
+        credential
+      );
+      if (response.status === 401) {
+        await discardBody(response);
+        credential = await runtime.credentials.refreshAfterUnauthorized(
+          credential.access_token
+        );
+        response = await requestWithCredential(
+          providerHttp,
+          input,
+          init,
+          runtime.config.originator,
+          credential
+        );
+        if (response.status === 401) {
+          await discardBody(response);
+          await runtime.credentials.invalidateAfterUnauthorized(
+            credential.access_token
+          );
+          throw new ChatGptCredentialError("chatgpt_reauthentication_required");
+        }
+      }
+      if (response.status === 403) {
+        await discardBody(response);
+        throw new ChatGptProviderError("chatgpt_subscription_unavailable");
+      }
+      if (response.status === 429) {
+        await discardBody(response);
+        throw new ChatGptProviderError("chatgpt_rate_limited");
+      }
+      if (!response.ok) {
+        const code =
+          response.status === 404
+            ? "chatgpt_model_not_available"
+            : response.status >= 400 && response.status < 500
+              ? "chatgpt_request_rejected"
+              : "chatgpt_service_unavailable";
+        await discardBody(response);
+        throw new ChatGptProviderError(code);
+      }
+      return response;
     };
   }
 }
@@ -272,7 +279,14 @@ function requestWithCredential(
   originator: string,
   credential: { access_token: string; account_id: string }
 ): Promise<Response> {
-  const headers = new Headers(init?.headers);
+  const headers = new Headers(
+    input instanceof Request ? input.headers : undefined
+  );
+  if (init?.headers) {
+    for (const [name, value] of new Headers(init.headers)) {
+      headers.set(name, value);
+    }
+  }
   headers.set("authorization", `Bearer ${credential.access_token}`);
   headers.set("chatgpt-account-id", credential.account_id);
   headers.set("originator", originator);

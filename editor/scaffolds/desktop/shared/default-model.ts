@@ -5,7 +5,7 @@
  *
  * The renderer's hooks are thin wires; the load-bearing choice lives here
  * so it can be unit-tested in Node without a React render (see
- * `default-model.test.ts`). Three decisions:
+ * `default-model.test.ts`). Four decisions:
  *
  *  - {@link resolveDefaultModelSelection} — the initial provider/model pair.
  *  - {@link resolveNewChatTransition} — reset a past chat's transient picker
@@ -94,21 +94,6 @@ export function resolveDefaultModelSelection(opts: {
     };
   }
   return { model_id: DEFAULT_MODEL_ID };
-}
-
-/** Backwards-compatible model-only projection of the initial decision. */
-export function resolveDefaultModelId(
-  opts: Omit<
-    Parameters<typeof resolveDefaultModelSelection>[0],
-    "initialProviderId" | "chatGptReady"
-  > & {
-    chatGptReady?: boolean;
-  }
-): string {
-  return resolveDefaultModelSelection({
-    ...opts,
-    chatGptReady: opts.chatGptReady ?? false,
-  }).model_id;
 }
 
 /**

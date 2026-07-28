@@ -5,6 +5,7 @@ export {
 } from "@grida/desktop-bridge";
 
 export type {
+  ChatGptConnectResult,
   ConfirmOptions,
   DesktopAgentCapabilities,
   DesktopBridge,

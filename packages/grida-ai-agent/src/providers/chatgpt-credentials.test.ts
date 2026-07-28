@@ -259,6 +259,81 @@ describe("ChatGptCredentialManager", () => {
     });
   });
 
+  it("bounds refresh-token I/O and clears the timeout after abort", async () => {
+    await auth.set(CHATGPT_PROVIDER_ID, {
+      type: "oauth",
+      access: "old-access",
+      refresh: "old-refresh",
+      expires: NOW / 1000,
+      account_id: "account-123",
+    });
+    let entered!: () => void;
+    const requestEntered = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const refreshSignal: { current: AbortSignal | null } = { current: null };
+    const manager = makeManager(async (_input, init) => {
+      refreshSignal.current = init?.signal ?? null;
+      entered();
+      return new Promise<Response>((_resolve, reject) => {
+        refreshSignal.current?.addEventListener(
+          "abort",
+          () => reject(new DOMException("aborted", "AbortError")),
+          { once: true }
+        );
+      });
+    });
+
+    vi.useFakeTimers();
+    try {
+      const refreshResult = manager
+        .getAccessCredentials()
+        .catch((error: unknown) => error);
+      await requestEntered;
+      expect(refreshSignal.current).toBeInstanceOf(AbortSignal);
+      expect(vi.getTimerCount()).toBe(1);
+
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(await refreshResult).toMatchObject({
+        code: "chatgpt_token_refresh_failed",
+      });
+      expect(refreshSignal.current?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears the refresh timeout when the token request settles early", async () => {
+    await auth.set(CHATGPT_PROVIDER_ID, {
+      type: "oauth",
+      access: "old-access",
+      refresh: "old-refresh",
+      expires: NOW / 1000,
+      account_id: "account-123",
+    });
+    const manager = makeManager(async () =>
+      tokenResponse({
+        access_token: "new-access",
+        refresh_token: "new-refresh",
+        expires_in: 3600,
+        account_id: "account-123",
+      })
+    );
+
+    vi.useFakeTimers();
+    try {
+      await expect(manager.getAccessCredentials()).resolves.toEqual({
+        access_token: "new-access",
+        account_id: "account-123",
+      });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("re-reads persisted credentials and does not overwrite a newer access token on reactive refresh", async () => {
     const original: OAuthEntry = {
       type: "oauth",

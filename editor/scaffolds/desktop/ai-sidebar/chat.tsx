@@ -384,14 +384,16 @@ export function AISidebarChat({
     sessions: chatSession.sessions,
     endpoints,
   });
+  const providerId =
+    modelProviderId ?? registered_models.providerIdForModel(modelId, endpoints);
 
   // Exact native image formats come from the catalogue or an explicit custom
   // endpoint declaration. The broad `multimodal` flag never widens this set.
   const providerFileMimes = useMemo(
     () =>
-      registered_models.resolve(modelId, endpoints, modelProviderId)
+      registered_models.resolve(modelId, endpoints, providerId)
         ?.imageInputMimes ?? [],
-    [modelId, modelProviderId, endpoints]
+    [modelId, providerId, endpoints]
   );
   // The active session row carries the rolled-up cost the context meter
   // surfaces alongside the (real) window %. This surface has no mode picker,
@@ -401,8 +403,6 @@ export function AISidebarChat({
     (s) => s.id === chatSession.current_id
   );
   const sessionMode = activeSession?.mode ?? AGENT_DEFAULT_MODE;
-  const providerId =
-    modelProviderId ?? registered_models.providerIdForModel(modelId, endpoints);
 
   // Keep body-less tool/approval resumes in step with the active session.
   runContextRef.current = {
@@ -710,7 +710,7 @@ export function AISidebarChat({
 
       <ModelToolCallNotice
         model_id={modelId}
-        provider_id={modelProviderId}
+        provider_id={providerId}
         endpoints={endpoints}
       />
 
@@ -764,7 +764,7 @@ export function AISidebarChat({
               <DesktopContextMeter
                 messages={messages}
                 modelId={modelId}
-                providerId={modelProviderId}
+                providerId={providerId}
                 costUsd={activeSession?.cost_usd}
                 endpoints={endpoints}
               />

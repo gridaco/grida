@@ -139,7 +139,11 @@ account receives the entry flow. Application activation and account-state
 changes likewise reconcile and focus this same entry window instead of
 creating a competing entry surface.
 
-Renderer storage is neither onboarding authority nor a migration input. The
+Renderer storage is not an ongoing onboarding authority. During the first
+upgrade from the former renderer-owned flow, Electron main may consume the one
+exact legacy completion flag through a fixed hidden same-origin surface. Main
+durably records that the migration ran before the value can affect a role; once
+consumed, renderer storage cannot complete, reset, or suppress onboarding. The
 normal Welcome surface neither renders onboarding nor decides whether it is
 needed.
 

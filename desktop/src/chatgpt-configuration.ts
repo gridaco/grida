@@ -17,9 +17,14 @@ import type { ChatGptProviderConfig } from "@grida/agent/server";
 
 export const CHATGPT_CALLBACK_PATH = "/auth/callback" as const;
 export const CHATGPT_CALLBACK_PORTS = [1455, 1457] as const;
+
+function chatGptCallbackUri(port: (typeof CHATGPT_CALLBACK_PORTS)[number]) {
+  return `http://localhost:${port}${CHATGPT_CALLBACK_PATH}` as const;
+}
+
 export const CHATGPT_CALLBACK_URIS = [
-  "http://localhost:1455/auth/callback",
-  "http://localhost:1457/auth/callback",
+  chatGptCallbackUri(CHATGPT_CALLBACK_PORTS[0]),
+  chatGptCallbackUri(CHATGPT_CALLBACK_PORTS[1]),
 ] as const;
 
 export const CHATGPT_AUTHORIZE_URL =

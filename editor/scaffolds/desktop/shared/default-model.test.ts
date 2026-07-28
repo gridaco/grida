@@ -10,7 +10,6 @@ import {
   DEFAULT_MODEL_ID,
   GG_INCLUDED_MODEL_ID,
   reconcileChatGptSubscriptionDefault,
-  resolveDefaultModelId,
   resolveDefaultModelSelection,
   resolveNewChatTransition,
   shouldUpgradeToIncluded,
@@ -22,7 +21,7 @@ const knows =
   (id: string | undefined | null): id is string =>
     typeof id === "string" && ids.includes(id);
 
-describe("resolveDefaultModelId — the initial default for a new chat", () => {
+describe("resolveDefaultModelSelection", () => {
   it("keeps GPT-5.6 Terra as the generic fallback", () => {
     expect(DEFAULT_MODEL_ID).toBe("openai/gpt-5.6-terra");
   });
@@ -62,9 +61,13 @@ describe("resolveDefaultModelId — the initial default for a new chat", () => {
   });
 
   it("falls back to the hosted catalog default when no GG session is live", () => {
-    expect(resolveDefaultModelId({ ggActive: false, isKnownId: knows() })).toBe(
-      DEFAULT_MODEL_ID
-    );
+    expect(
+      resolveDefaultModelSelection({
+        chatGptReady: false,
+        ggActive: false,
+        isKnownId: knows(),
+      })
+    ).toEqual({ model_id: DEFAULT_MODEL_ID });
   });
 
   it("an explicit caller-seeded initial wins over the GG default", () => {

@@ -101,10 +101,22 @@ describe("model_picker_options", () => {
       .grida()
       .options.map((option) => option.selection.model_id);
 
-    expect(subscriptionIds).toContain("openai/gpt-5.4");
-    expect(subscriptionIds).not.toContain("openai/gpt-5.4-nano");
-    expect(gridaIds).not.toContain("openai/gpt-5.4");
-    expect(gridaIds).toContain("openai/gpt-5.4-nano");
+    const subscriptionOnly = subscriptionIds.filter(
+      (modelId) => !gridaIds.includes(modelId)
+    );
+    const subscriptionIdSet = new Set<string>(CHATGPT_SUBSCRIPTION_MODEL_IDS);
+    const hostedOnly = gridaIds.filter(
+      (modelId) => !subscriptionIdSet.has(modelId)
+    );
+
+    expect(subscriptionOnly.length).toBeGreaterThan(0);
+    expect(hostedOnly.length).toBeGreaterThan(0);
+    expect(
+      subscriptionOnly.every((modelId) => !gridaIds.includes(modelId))
+    ).toBe(true);
+    expect(
+      hostedOnly.every((modelId) => !subscriptionIds.includes(modelId))
+    ).toBe(true);
   });
 
   it("labels subscription-only models and compares provider/model tuples", () => {

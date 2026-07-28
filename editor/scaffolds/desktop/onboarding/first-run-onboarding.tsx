@@ -248,7 +248,7 @@ function ChatGptStep({ next }: OnboardingStepProps) {
             Continue with ChatGPT
           </Button>
         )}
-        {!connected ? (
+        {!ready ? (
           <Button
             variant="link"
             size="sm"

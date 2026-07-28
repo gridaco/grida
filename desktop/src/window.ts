@@ -163,7 +163,13 @@ function get_window_constructor_options(
  */
 function register_window_hooks(
   window: BrowserWindow,
-  { base_url: baseUrl }: { base_url: string }
+  {
+    base_url: baseUrl,
+    on_disallowed_in_page_navigation: onDisallowedInPageNavigation,
+  }: {
+    base_url: string;
+    on_disallowed_in_page_navigation?: () => void;
+  }
 ) {
   window.webContents.on("will-prevent-unload", (event) => {
     // Allow the window to close even if the page tries to block it.
@@ -222,6 +228,10 @@ function register_window_hooks(
     console.warn(
       `[grida] blocked in-page navigation outside /desktop: ${urlWithoutQuery(target)}`
     );
+    if (onDisallowedInPageNavigation) {
+      onDisallowedInPageNavigation();
+      return;
+    }
     void window.loadURL(`${baseUrl}/desktop/welcome`);
   });
 }
@@ -263,6 +273,7 @@ export function create_desktop_window({
   additionalArguments = [],
   presentation = "main",
   show = true,
+  on_disallowed_in_page_navigation: onDisallowedInPageNavigation,
 }: {
   app?: App;
   base_url: string;
@@ -271,6 +282,7 @@ export function create_desktop_window({
   additionalArguments?: string[];
   presentation?: DesktopWindowPresentation;
   show?: boolean;
+  on_disallowed_in_page_navigation?: () => void;
 }) {
   const desktopArguments = app
     ? buildDesktopArguments({ app, extra: additionalArguments })
@@ -312,7 +324,10 @@ export function create_desktop_window({
   // A fast same-origin server redirect (notably Welcome → signed-out sign-in)
   // can complete before a listener attached after `loadURL`, skipping the
   // redirect guard entirely.
-  register_window_hooks(window, { base_url: baseUrl });
+  register_window_hooks(window, {
+    base_url: baseUrl,
+    on_disallowed_in_page_navigation: onDisallowedInPageNavigation,
+  });
 
   // Per-window nav-history push channel must observe the initial load too.
   attachNavigationEvents(window);

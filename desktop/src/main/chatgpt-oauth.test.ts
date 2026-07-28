@@ -104,7 +104,7 @@ describe("ChatGptOAuthCoordinator", () => {
     await coordinator.cancel();
     start.resolve(callback.attempt);
 
-    await expect(connecting).rejects.toThrow(/cancelled/);
+    await expect(connecting).resolves.toEqual({ outcome: "cancelled" });
     expect(requests).toEqual([]);
     expect(callback.attempt.cancel).toHaveBeenCalled();
   });
@@ -119,7 +119,22 @@ describe("ChatGptOAuthCoordinator", () => {
     await browserOpened.promise;
 
     await coordinator.cancel();
-    await expect(connecting).rejects.toThrow(/cancelled/);
+    await expect(connecting).resolves.toEqual({ outcome: "cancelled" });
+    expect(requests.map((request) => request.path)).toEqual([
+      "/auth/chatgpt/start",
+      "/auth/chatgpt/cancel",
+    ]);
+  });
+
+  it("does not classify an unrelated failure from cancellation text", async () => {
+    openExternal.mockRejectedValueOnce(
+      new Error("ChatGPT sign-in was cancelled")
+    );
+    const coordinator = createCoordinator();
+
+    await expect(coordinator.connect()).rejects.toThrow(
+      "ChatGPT sign-in was cancelled"
+    );
     expect(requests.map((request) => request.path)).toEqual([
       "/auth/chatgpt/start",
       "/auth/chatgpt/cancel",
@@ -150,7 +165,7 @@ describe("ChatGptOAuthCoordinator", () => {
     await browserOpened.promise;
 
     await expect(coordinator.signOut()).resolves.toEqual(signedOutStatus);
-    await expect(connecting).rejects.toThrow(/cancelled/);
+    await expect(connecting).resolves.toEqual({ outcome: "cancelled" });
     const paths = requests.map((request) => request.path);
     expect(paths).toContain("/auth/chatgpt/cancel");
     expect(paths).toContain("/auth/chatgpt/sign-out");
@@ -226,6 +241,9 @@ describe("ChatGPT IPC registration", () => {
         new RegExp(`ipcMain.handle\\(\\s*IPC_CHANNELS.${channel}`)
       );
     }
+    expect(source).toMatch(
+      /guarded\(\s*IPC_CHANNELS\.CHATGPT_CONNECT,\s*\(\)\s*=>\s*chatgptOAuth\.connect\(\)\s*\)/
+    );
   });
 });
 

@@ -12,6 +12,7 @@ import type {
   ChatGptSubscriptionAccount,
   ChatGptSubscriptionStatus,
 } from "@grida/agent";
+import type { ChatGptConnectResult } from "@grida/desktop-bridge";
 import {
   CHATGPT_AUTH_ROUTE_PATHS,
   type ChatGptAuthStart,
@@ -40,13 +41,13 @@ export type ChatGptOAuthCoordinatorDeps = {
 
 export class ChatGptOAuthCoordinator {
   private active: ActiveConnect | null = null;
-  private connectInFlight: Promise<ChatGptSubscriptionStatus> | null = null;
+  private connectInFlight: Promise<ChatGptConnectResult> | null = null;
   private cancellationEpoch = 0;
   private closed = false;
 
   constructor(private readonly deps: ChatGptOAuthCoordinatorDeps) {}
 
-  connect(): Promise<ChatGptSubscriptionStatus> {
+  connect(): Promise<ChatGptConnectResult> {
     if (this.closed) {
       return Promise.reject(new Error("ChatGPT sign-in host is closed"));
     }
@@ -91,7 +92,7 @@ export class ChatGptOAuthCoordinator {
     this.deps.callback.close();
   }
 
-  private async runConnect(): Promise<ChatGptSubscriptionStatus> {
+  private async runConnect(): Promise<ChatGptConnectResult> {
     const startedAtCancellationEpoch = this.cancellationEpoch;
     const attempt = await this.deps.callback.start();
     const active: ActiveConnect = {
@@ -158,8 +159,12 @@ export class ChatGptOAuthCoordinator {
       }
       return active.completed_status;
     } catch (error) {
+      const cancelled = active.cancelled;
       attempt.cancel();
       await this.cancelSidecarAttempt(active).catch(() => undefined);
+      if (cancelled) {
+        return { outcome: "cancelled" };
+      }
       throw safeCoordinatorError(error);
     } finally {
       if (this.active === active) this.active = null;

@@ -110,7 +110,7 @@ id with a host override; it never starts Codex or ACP. Account/display claims
 are parsed only from the exact TLS-authenticated token response, without an
 OIDC nonce or independent JWT/JWKS/issuer/audience verification. The complete
 ceremony and cancel/sign-out races are bound in
-[chatgpt-subscription-oauth.md](https://github.com/gridaco/grida/blob/main/desktop/docs/chatgpt-subscription-oauth.md).
+[chatgpt-subscription-oauth.md](./chatgpt-subscription-oauth.md).
 
 The package exposes two construction-time operations: provider requests and
 credential-free provider-asset downloads. The service accepts one of those

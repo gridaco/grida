@@ -100,14 +100,16 @@ export namespace welcome_handoff {
       const raw = window.sessionStorage.getItem(storageKey(workspaceId));
       if (raw == null) return null;
       const parsed = JSON.parse(raw) as unknown;
+      if (typeof parsed !== "object" || parsed === null) return null;
+      const candidate = parsed as Record<string, unknown>;
+      if (typeof candidate.prompt !== "string") return null;
       if (
-        typeof parsed === "object" &&
-        parsed !== null &&
-        typeof (parsed as WelcomeHandoff).prompt === "string"
+        candidate.provider_id !== undefined &&
+        typeof candidate.provider_id !== "string"
       ) {
-        return parsed as WelcomeHandoff;
+        return null;
       }
-      return null;
+      return candidate as WelcomeHandoff;
     } catch {
       return null;
     }

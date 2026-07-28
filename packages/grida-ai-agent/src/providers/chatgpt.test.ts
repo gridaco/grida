@@ -115,6 +115,39 @@ describe("ChatGptProvider", () => {
     expect(JSON.stringify(requestBody)).not.toContain("oauth-managed-by-grida");
   });
 
+  it("preserves Request headers, applies init overrides, and owns credential headers", async () => {
+    let requestHeaders = new Headers();
+    const request = vi.fn<typeof fetch>(async (_input, init) => {
+      requestHeaders = new Headers(init?.headers);
+      return completedResponse("gpt-5.6-terra");
+    });
+    const { providerFetch } = runtime(request);
+
+    await providerFetch(
+      new Request(RESPONSES_URL, {
+        headers: {
+          "x-request-header": "from-request",
+          "x-overridden-header": "from-request",
+          authorization: "Bearer caller-value",
+          originator: "caller-value",
+        },
+      }),
+      {
+        headers: {
+          "x-init-header": "from-init",
+          "x-overridden-header": "from-init",
+        },
+      }
+    );
+
+    expect(requestHeaders.get("x-request-header")).toBe("from-request");
+    expect(requestHeaders.get("x-init-header")).toBe("from-init");
+    expect(requestHeaders.get("x-overridden-header")).toBe("from-init");
+    expect(requestHeaders.get("authorization")).toBe("Bearer access-one");
+    expect(requestHeaders.get("chatgpt-account-id")).toBe("account-123");
+    expect(requestHeaders.get("originator")).toBe("grida-test");
+  });
+
   it("always emits empty instructions for prompt-only auxiliary calls", async () => {
     let requestBody: Record<string, unknown> = {};
     const { factory } = runtime(async (_input, init) => {
@@ -427,6 +460,20 @@ describe("ChatGptProvider", () => {
     );
     expect(request).not.toHaveBeenCalled();
   });
+
+  it("rejects an unexpected endpoint before credentials or upstream I/O", async () => {
+    const request = vi.fn<typeof fetch>();
+    const { credentials, providerFetch } = runtime(request);
+    const readCredentials = vi.spyOn(credentials, "getAccessCredentials");
+
+    await expect(
+      providerFetch("https://chatgpt.example.test/unconfigured")
+    ).rejects.toMatchObject({
+      code: "chatgpt_unexpected_endpoint",
+    });
+    expect(readCredentials).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
 });
 
 function runtime(request: typeof fetch) {
@@ -436,12 +483,11 @@ function runtime(request: typeof fetch) {
     providerHttp,
     CONFIG.oauth
   );
+  const providerRuntime = { config: CONFIG, credentials };
   return {
     credentials,
-    factory: ChatGptProvider.makeFactory(
-      { config: CONFIG, credentials },
-      providerHttp
-    ),
+    providerFetch: ChatGptProvider.makeFetch(providerRuntime, providerHttp),
+    factory: ChatGptProvider.makeFactory(providerRuntime, providerHttp),
   };
 }
 

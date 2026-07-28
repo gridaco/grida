@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import {
   CHATGPT_AUTHORIZE_URL,
+  CHATGPT_CALLBACK_PATH,
+  CHATGPT_CALLBACK_PORTS,
   CHATGPT_CALLBACK_URIS,
   CHATGPT_SUBSCRIPTION_CONFIG,
   validateChatGptAuthorizationUrl,
@@ -36,6 +38,14 @@ function authorizationUrl(overrides: Record<string, string> = {}): string {
 }
 
 describe("validateChatGptAuthorizationUrl", () => {
+  it("derives every registered callback from the port and path contract", () => {
+    expect(CHATGPT_CALLBACK_URIS).toEqual(
+      CHATGPT_CALLBACK_PORTS.map(
+        (port) => `http://localhost:${port}${CHATGPT_CALLBACK_PATH}`
+      )
+    );
+  });
+
   it("accepts the fixed OpenAI authority and an approved callback", () => {
     expect(
       validateChatGptAuthorizationUrl(authorizationUrl(), EXPECTATION).origin

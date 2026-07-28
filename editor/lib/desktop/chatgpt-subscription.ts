@@ -76,18 +76,15 @@ export async function refresh(): Promise<ChatGptSubscriptionState> {
 export async function connect(): Promise<ChatGptSubscriptionState> {
   if (!isSupported()) return setCached(UNSUPPORTED);
   return await mutate(async () => {
-    try {
-      return {
-        kind: "ready",
-        status: await chatgptBridge.connect(),
-      };
-    } catch (error) {
-      // Closing or cancelling the system-browser flow is a normal user choice.
-      // Electron rejects the pending connect IPC call when its loopback waiter
-      // is cancelled; normalize only those known errors back to current status.
-      if (isSignInCancellation(error)) return await readStatus();
-      throw error;
-    }
+    const result = await chatgptBridge.connect();
+    // Closing or cancelling the system-browser flow is a normal user choice.
+    // Main owns the cancellation race and carries this stable outcome through
+    // IPC; renderer behavior never depends on serialized Error prose.
+    if (result.outcome === "cancelled") return await readStatus();
+    return {
+      kind: "ready",
+      status: result,
+    };
   });
 }
 
@@ -149,15 +146,6 @@ function errorState(error: unknown): ChatGptSubscriptionState {
         ? error.message
         : "Could not read ChatGPT sign-in status.",
   };
-}
-
-function isSignInCancellation(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const message = error.message.toLowerCase();
-  return (
-    message.includes("oauth loopback callback was cancelled") ||
-    message.includes("chatgpt sign-in was cancelled")
-  );
 }
 
 function setCached(state: ChatGptSubscriptionState): ChatGptSubscriptionState {

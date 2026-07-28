@@ -49,7 +49,10 @@ renderer receives purpose-specific actions, never a generic preferences
 key/value bridge. `DesktopPreferences` uses a small versioned JSON document
 with owner-only atomic writes. Account cookies remain in Chromium's HttpOnly
 session, while provider credentials and API keys remain in the sidecar's secret
-store.
+store. On the first upgrade from Desktop 0.0.13, main consumes the former
+renderer onboarding-completion flag through one fixed hidden same-origin probe
+and records the migration before selecting an authenticated role. That legacy
+flag is never consulted again.
 
 On macOS and Linux, the sidecar runs under `srt` with no direct external
 destinations and `allow_local_binding: false`; Electron main supplies the two

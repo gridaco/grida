@@ -16,6 +16,7 @@ import { ProviderHttp } from "./http";
 
 const DEFAULT_REFRESH_SKEW_MS = 5 * 60 * 1000;
 const DEFAULT_ATTEMPT_TTL_MS = 10 * 60 * 1000;
+const REFRESH_TOKEN_REQUEST_TIMEOUT_MS = 30 * 1000;
 const MAX_TOKEN_RESPONSE_BYTES = 1024 * 1024;
 const MAX_SAFE_EPOCH_SECONDS = Math.floor(Number.MAX_SAFE_INTEGER / 1000);
 const RESERVED_AUTHORIZATION_PARAMETERS = new Set([
@@ -367,7 +368,7 @@ export class ChatGptCredentialManager {
     force: boolean,
     rejectedAccessToken?: string
   ): Promise<ChatGptAccessCredentials> {
-    if (this.refreshInFlight) return this.refreshInFlight;
+    if (this.refreshInFlight) return await this.refreshInFlight;
     const task = this.refreshOnce(force, rejectedAccessToken);
     this.refreshInFlight = task;
     try {
@@ -400,7 +401,12 @@ export class ChatGptCredentialManager {
       client_id: this.config.client_id,
       refresh_token: entry.refresh,
     });
-    const response = await this.requestToken(form);
+    let response: Response;
+    try {
+      response = await this.requestRefreshToken(form);
+    } catch {
+      throw new ChatGptCredentialError("chatgpt_token_refresh_failed");
+    }
     if (!response.ok) {
       const code =
         response.status === 400 ||
@@ -457,6 +463,19 @@ export class ChatGptCredentialManager {
       body,
       signal,
     });
+  }
+
+  private async requestRefreshToken(body: URLSearchParams): Promise<Response> {
+    const abort = new AbortController();
+    const timeout = setTimeout(
+      () => abort.abort(),
+      REFRESH_TOKEN_REQUEST_TIMEOUT_MS
+    );
+    try {
+      return await this.requestToken(body, abort.signal);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private async requireEntry(): Promise<OAuthEntry> {

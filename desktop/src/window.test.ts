@@ -7,8 +7,36 @@
  */
 import { describe, it, expect, vi } from "vitest";
 
+const { browserWindowInstances } = vi.hoisted(() => ({
+  browserWindowInstances: [] as Array<{
+    webContents: {
+      handlers: Map<string, (...args: unknown[]) => void>;
+      on: ReturnType<typeof vi.fn>;
+      setWindowOpenHandler: ReturnType<typeof vi.fn>;
+    };
+    loadURL: ReturnType<typeof vi.fn>;
+  }>,
+}));
+
 vi.mock("electron", () => ({
-  BrowserWindow: class {},
+  BrowserWindow: class {
+    webContents = {
+      handlers: new Map<string, (...args: unknown[]) => void>(),
+      on: vi.fn<(event: string, handler: (...args: unknown[]) => void) => void>(
+        (event, handler) => {
+          this.webContents.handlers.set(event, handler);
+        }
+      ),
+      setWindowOpenHandler: vi.fn<(handler: unknown) => void>(),
+    };
+    loadURL = vi.fn<(url: string) => Promise<void>>(async () => undefined);
+    once =
+      vi.fn<(event: string, handler: (...args: unknown[]) => void) => void>();
+
+    constructor() {
+      browserWindowInstances.push(this);
+    }
+  },
   screen: {
     getDisplayMatching: vi.fn<
       (_bounds: unknown) => {
@@ -29,6 +57,7 @@ vi.mock("./branding", () => ({
 vi.mock("./env", () => ({ IS_DEV: false }));
 
 import {
+  create_desktop_window,
   isAllowedNavigation,
   isSafeExternalUrl,
   set_desktop_window_presentation,
@@ -62,6 +91,24 @@ describe("isAllowedNavigation", () => {
   it("rejects malformed targets and base URLs", () => {
     expect(isAllowedNavigation(BASE, "not a url")).toBe(false);
     expect(isAllowedNavigation("not a url", `${BASE}/desktop`)).toBe(false);
+  });
+});
+
+describe("create_desktop_window navigation recovery", () => {
+  it("delegates blocked entry-window in-page navigation to its role owner", () => {
+    const recover = vi.fn<() => void>();
+    const window = create_desktop_window({
+      base_url: BASE,
+      urlPath: null,
+      on_disallowed_in_page_navigation: recover,
+    });
+    const instance = browserWindowInstances.at(-1);
+    const handler = instance?.webContents.handlers.get("did-navigate-in-page");
+
+    handler?.({}, `${BASE}/blog`);
+
+    expect(recover).toHaveBeenCalledOnce();
+    expect(window.loadURL).not.toHaveBeenCalled();
   });
 });
 

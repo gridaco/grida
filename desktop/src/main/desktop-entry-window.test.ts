@@ -121,6 +121,83 @@ describe("DesktopEntryWindow lifecycle", () => {
     expect(entry.role).toBe("main");
   });
 
+  it("migrates a completed renderer onboarding flag before choosing the role", async () => {
+    const window = makeWindow();
+    window.webContents.executeJavaScript
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(undefined);
+    const migrate = vi.fn<(completed: boolean) => Promise<void>>(
+      async () => undefined
+    );
+    windowFactory.mockReturnValue(window);
+    const entry = makeController(makeAccount(["signed-in"]), {
+      onboarding_complete: false,
+      legacy_renderer_migration_pending: true,
+      migrate_legacy_renderer_onboarding: migrate,
+    });
+
+    await entry.open();
+
+    expect(migrate).toHaveBeenCalledWith(true);
+    expect(window.loadURL).toHaveBeenNthCalledWith(
+      1,
+      "https://grida.test/desktop/auth/migrate-onboarding"
+    );
+    expect(window.loadURL).toHaveBeenNthCalledWith(
+      2,
+      "https://grida.test/desktop/welcome"
+    );
+    expect(entry.role).toBe("main");
+    expect(windowFactory).toHaveBeenCalledOnce();
+  });
+
+  it("records an absent renderer flag before presenting onboarding", async () => {
+    const window = makeWindow();
+    const migrate = vi.fn<(completed: boolean) => Promise<void>>(
+      async () => undefined
+    );
+    windowFactory.mockReturnValue(window);
+    const entry = makeController(makeAccount(["signed-in"]), {
+      onboarding_complete: false,
+      legacy_renderer_migration_pending: true,
+      migrate_legacy_renderer_onboarding: migrate,
+    });
+
+    await entry.open();
+
+    expect(migrate).toHaveBeenCalledWith(false);
+    expect(window.loadURL).toHaveBeenNthCalledWith(
+      1,
+      "https://grida.test/desktop/auth/migrate-onboarding"
+    );
+    expect(window.loadURL).toHaveBeenNthCalledWith(
+      2,
+      "https://grida.test/desktop/onboarding"
+    );
+    expect(entry.role).toBe("onboarding");
+  });
+
+  it("does not consume the renderer migration when its fixed probe fails", async () => {
+    const window = makeWindow();
+    window.loadURL.mockRejectedValueOnce(new Error("renderer unavailable"));
+    const migrate = vi.fn<(completed: boolean) => Promise<void>>(
+      async () => undefined
+    );
+    windowFactory.mockReturnValue(window);
+    const entry = makeController(makeAccount(["signed-in"]), {
+      onboarding_complete: false,
+      legacy_renderer_migration_pending: true,
+      migrate_legacy_renderer_onboarding: migrate,
+    });
+
+    await expect(entry.open()).rejects.toThrow(
+      "legacy onboarding preference could not be migrated"
+    );
+
+    expect(migrate).not.toHaveBeenCalled();
+    expect(entry.role).toBe("booting");
+  });
+
   it("keeps BrowserWindow identity through sign-in, onboarding, and main", async () => {
     const window = makeWindow();
     const account = makeAccount(["signed-out", "signed-in", "signed-in"]);
@@ -154,6 +231,108 @@ describe("DesktopEntryWindow lifecycle", () => {
       "https://grida.test/desktop/welcome?onboardingWorkspace=workspace-1"
     );
     expect(windowFactory).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers a blocked in-page navigation through the current entry role", async () => {
+    const window = makeWindow();
+    const account = makeAccount(["signed-in", "signed-in"]);
+    windowFactory.mockReturnValue(window);
+    const entry = makeController(account, { onboarding_complete: true });
+    await entry.open();
+    const options = windowFactory.mock.calls[0]?.[0] as {
+      on_disallowed_in_page_navigation?: () => void;
+    };
+
+    options.on_disallowed_in_page_navigation?.();
+
+    expect(entry.ipcRoleFor(window as never)).toBeNull();
+    expect(window.hide).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(window.loadURL).toHaveBeenCalledTimes(2);
+    });
+    expect(window.loadURL).toHaveBeenLastCalledWith(
+      "https://grida.test/desktop/welcome"
+    );
+    expect(entry.role).toBe("main");
+    expect(entry.ipcRoleFor(window as never)).toBe("main");
+  });
+
+  it("keeps a blocked document quarantined until a later reconciliation restores its role", async () => {
+    const window = makeWindow();
+    const account = makeAccount(["signed-in", "unavailable", "signed-in"]);
+    windowFactory.mockReturnValue(window);
+    const entry = makeController(account, { onboarding_complete: true });
+    await entry.open();
+    const options = windowFactory.mock.calls[0]?.[0] as {
+      on_disallowed_in_page_navigation?: () => void;
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    window.show.mockClear();
+    window.focus.mockClear();
+    window.loadURL.mockClear();
+
+    try {
+      options.on_disallowed_in_page_navigation?.();
+      entry.focus();
+
+      expect(window.show).not.toHaveBeenCalled();
+      expect(window.focus).not.toHaveBeenCalled();
+      expect(entry.ipcRoleFor(window as never)).toBeNull();
+
+      await entry.reconcile({ focus: true });
+
+      expect(window.loadURL).toHaveBeenCalledExactlyOnceWith(
+        "https://grida.test/desktop/welcome"
+      );
+      expect(window.show).toHaveBeenCalledOnce();
+      expect(window.focus).toHaveBeenCalledOnce();
+      expect(entry.role).toBe("main");
+      expect(entry.ipcRoleFor(window as never)).toBe("main");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("does not publish a role transition superseded by blocked in-page navigation", async () => {
+    const window = makeWindow();
+    const recoveryProbe = deferred<DesktopAccountState>();
+    const status = vi.fn<() => Promise<DesktopAccountState>>();
+    status
+      .mockResolvedValueOnce("signed-in")
+      .mockResolvedValueOnce("signed-in")
+      .mockImplementationOnce(() => recoveryProbe.promise);
+    const account = {
+      status,
+      signOut: vi.fn<() => Promise<void>>(async () => undefined),
+    };
+    const onRoleChange =
+      vi.fn<(role: DesktopEntryRole, previous: DesktopEntryRole) => void>();
+    windowFactory.mockReturnValue(window);
+    const entry = makeController(account, {
+      onboarding_complete: false,
+      on_role_change: onRoleChange,
+    });
+    await entry.open();
+    onRoleChange.mockClear();
+    const options = windowFactory.mock.calls[0]?.[0] as {
+      on_disallowed_in_page_navigation?: () => void;
+    };
+    window.loadURL.mockImplementationOnce(async () => {
+      options.on_disallowed_in_page_navigation?.();
+    });
+
+    await entry.completeOnboarding(window as never);
+    await vi.waitFor(() => expect(status).toHaveBeenCalledTimes(3));
+
+    expect(entry.role).toBe("onboarding");
+    expect(entry.ipcRoleFor(window as never)).toBeNull();
+    expect(onRoleChange).not.toHaveBeenCalledWith("main", "onboarding");
+
+    recoveryProbe.resolve("signed-in");
+    await vi.waitFor(() => expect(entry.role).toBe("main"));
+
+    expect(entry.ipcRoleFor(window as never)).toBe("main");
+    expect(onRoleChange).toHaveBeenCalledExactlyOnceWith("main", "onboarding");
   });
 
   it("does not complete onboarding after the Grida session expires", async () => {
@@ -941,6 +1120,10 @@ function makeController(
     onboarding_complete: boolean;
     mark_onboarding_complete?: () => Promise<void>;
     reset_onboarding?: () => void | Promise<void>;
+    legacy_renderer_migration_pending?: boolean;
+    migrate_legacy_renderer_onboarding?: (
+      completed: boolean
+    ) => void | Promise<void>;
     startup_main_path?: string;
     clear_hosted_session?: () => Promise<void>;
     before_authenticated_entry?: () => Promise<void>;
@@ -951,8 +1134,17 @@ function makeController(
   }
 ) {
   let onboardingComplete = options.onboarding_complete;
+  let legacyRendererMigrationPending =
+    options.legacy_renderer_migration_pending ?? false;
   const preferences = {
     isOnboardingComplete: () => onboardingComplete,
+    needsLegacyRendererOnboardingMigration: () =>
+      legacyRendererMigrationPending,
+    completeLegacyRendererOnboardingMigration: async (completed: boolean) => {
+      await options.migrate_legacy_renderer_onboarding?.(completed);
+      legacyRendererMigrationPending = false;
+      if (completed) onboardingComplete = true;
+    },
     completeOnboarding: async () => {
       await (options.mark_onboarding_complete ?? (async () => undefined))();
       onboardingComplete = true;
@@ -993,6 +1185,9 @@ function makeWindow({ closeDestroys = true } = {}) {
   const window = {
     webContents: {
       getURL: () => url,
+      executeJavaScript: vi.fn<(source: string) => Promise<unknown>>(
+        async () => false
+      ),
       navigationHistory: { clear: vi.fn<() => void>() },
     },
     isDestroyed: () => destroyed,

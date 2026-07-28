@@ -12,11 +12,24 @@
  * response (same mechanism as the web `(auth)/auth/callback` route) and the
  * wrapped web app is signed in like any browser session. Every redirect out
  * of this route MUST stay under `/desktop/*` (desktop navigation guard).
- * Success always lands on one fixed completion route; the native entry
- * controller decides which authenticated surface comes next.
+ * Current native clients add the fixed `native_entry=1` provenance marker and
+ * land on the inert completion route so the native entry controller can
+ * choose the authenticated surface. Unmarked callbacks preserve the fixed
+ * `/desktop/welcome` handoff required by Desktop 0.0.13. The marker only
+ * selects between those two contained compatibility routes; it is not auth
+ * authority, and the cookie-held PKCE verifier remains the sole authority for
+ * exchange.
  */
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
+
+const NATIVE_ENTRY_MARKER = "native_entry";
+const NATIVE_ENTRY_MARKER_VALUE = "1";
+
+function usesNativeEntryController(url: URL): boolean {
+  const values = url.searchParams.getAll(NATIVE_ENTRY_MARKER);
+  return values.length === 1 && values[0] === NATIVE_ENTRY_MARKER_VALUE;
+}
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -46,7 +59,8 @@ export async function GET(request: NextRequest) {
     return fail(error.code ?? "exchange_failed");
   }
 
-  return NextResponse.redirect(
-    new URL("/desktop/auth/complete", requestUrl.origin)
-  );
+  const successPath = usesNativeEntryController(requestUrl)
+    ? "/desktop/auth/complete"
+    : "/desktop/welcome";
+  return NextResponse.redirect(new URL(successPath, requestUrl.origin));
 }

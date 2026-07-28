@@ -954,8 +954,13 @@ paths, and params are public, so the design must not rely on obscurity.
    and never searches for or navigates a window. It reduces untrusted protocol
    input to a closed native intent whose target is the constant
    `/desktop/auth/callback` path on the configured editor origin, forwarding
-   only the known `code`/`error*` params. Nothing else from the deep link
-   crosses the boundary, and every branch consumes the URL (no re-queue loop).
+   only the known `code`/`error*` params. Main then adds exactly one fixed
+   `native_entry=1` provenance marker so the hosted callback can distinguish
+   the current entry controller from legacy Desktop 0.0.13; custom-scheme
+   input cannot supply, clear, or duplicate it. The marker is compatibility
+   routing only, never authentication authority. Nothing else from the deep
+   link crosses the boundary, and every branch consumes the URL (no re-queue
+   loop).
 4. **Exact entry-window ownership** —
    [desktop/src/main/desktop-entry-window.ts](desktop/src/main/desktop-entry-window.ts)
    owns the one canonical sign-in → onboarding → main `BrowserWindow`.
@@ -967,21 +972,31 @@ paths, and params are public, so the design must not rely on obscurity.
    booting or sign-in they bypass onboarding and work-file admission. Once
    onboarding or main is active, stale/world-invokable account callbacks are
    ignored so they cannot navigate a live workstation away from user work.
-5. **Exchange only at the same-origin callback; fixed native handoff** —
+5. **Exchange only at the same-origin callback; fixed compatibility handoff** —
    [editor/app/desktop/auth/callback/route.ts](editor/app/desktop/auth/callback/route.ts)
    runs `exchangeCodeForSession` with the cookie client (identical
-   mechanism to the web `(auth)/auth/callback`). Success always redirects to
-   the inert [fixed completion route](editor/app/desktop/auth/complete/page.tsx);
-   failure always redirects to the fixed desktop sign-in route. Neither HTTP
-   route chooses onboarding, a workspace, or a caller-supplied destination.
-   After the contained exchange, the controller re-probes the cookie session
-   through [desktop/src/main/account-session.ts](desktop/src/main/account-session.ts)
+   mechanism to the web `(auth)/auth/callback`). A successful marked callback
+   redirects to the inert
+   [fixed completion route](editor/app/desktop/auth/complete/page.tsx), while
+   an unmarked callback preserves Desktop 0.0.13's fixed
+   `/desktop/welcome` handoff. Malformed markers fail to the legacy handoff;
+   failure always redirects to the fixed desktop sign-in route. These are the
+   only success destinations: neither route chooses onboarding, a workspace,
+   or a caller-supplied destination. After a current-client exchange, the
+   controller re-probes the cookie session through
+   [desktop/src/main/account-session.ts](desktop/src/main/account-session.ts)
    and [the fixed `/desktop/auth/me` route](editor/app/desktop/auth/me/route.ts),
    combines only the resulting `signed-in` / `signed-out` state with native
-   non-secret Desktop preferences, and chooses the next role. Renderer storage
-   never participates in that decision. A transport, redirect,
-   upstream-availability, or schema failure is `unavailable`, never evidence
-   that the user is signed out.
+   non-secret Desktop preferences, and chooses the next role. Before its first
+   authenticated role decision, the current controller may load the fixed,
+   hidden
+   [legacy onboarding migration surface](editor/app/desktop/auth/migrate-onboarding/page.tsx)
+   once, read only the exact former onboarding boolean, persist that result
+   and a durable migration marker in native preferences, and remove the
+   renderer key best-effort. Renderer storage is never ongoing authority and
+   is never consulted again. A transport, redirect, migration-probe,
+   upstream-availability, or schema failure fails closed; none is evidence
+   that the user is signed out or that migration completed.
 6. **Redirect containment; non-navigating sign-out** — the `will-redirect` guard in
    [desktop/src/window.ts](desktop/src/window.ts) holds server 302s to
    the same same-origin `/desktop/*` allowlist as user navigations
@@ -1064,25 +1079,27 @@ Today:
 - [editor/app/(untracked)/desktop-auth/page.tsx](<editor/app/(untracked)/desktop-auth/page.tsx>) + [editor/app/(untracked)/layout.tsx](<editor/app/(untracked)/layout.tsx>) — the web launch page and its analytics-free root layout. Shares the sign-in shell ([editor/components/auth/sign-in-shell.tsx](editor/components/auth/sign-in-shell.tsx)) and Google button (`authorize_url` mode); validates the challenge, binds the offered method's GoTrue flow to it, mirrors the web sign-in's insiders routing (`NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH` → redirect to the insiders page with the challenge forwarded). Deliberately NOT a `(site)` sibling: `(site)` loads Google/Vercel analytics that would beacon the challenge-bearing URL. The `(untracked)` group must never gain a URL-reporting script.
 - [editor/host/auth/desktop-auth-flow.ts](editor/host/auth/desktop-auth-flow.ts) — the flow vocabulary shared by the launch page and the insiders route: challenge validation, challenge-bound authorize/OTP builders, verify-link extraction pinned to the Supabase origin (pinned by `desktop-auth-flow.test.ts`).
 - [editor/app/(insiders)/insiders/auth/basic/sign-in/route.ts](<editor/app/(insiders)/insiders/auth/basic/sign-in/route.ts>) (+ the hidden `challenge` passthrough in [basic/page.tsx](<editor/app/(insiders)/insiders/auth/basic/page.tsx>)) — the insiders **email+password** desktop branch: verifies the password exactly like the web insiders flow, then mints the challenge-bound code by firing the GoTrue OTP and consuming the emailed verify link straight from the local Mailpit capture, so the developer keeps email+password and still traverses the production verify → `grida://` → exchange path. A password grant alone can never produce a challenge-bound code (GoTrue returns sessions directly for passwords), which is why the mint rides the OTP-link machinery. Local-only by GRIDA-SEC-002 (`/insiders/*` 404s outside development), which is what makes the Mailpit coupling acceptable (pinned by its `route.test.ts`).
-- [editor/app/desktop/auth/callback/route.ts](editor/app/desktop/auth/callback/route.ts) — the only code-exchange point; `/desktop/*`-contained redirects (pinned by its `route.test.ts`).
+- [editor/app/desktop/auth/callback/route.ts](editor/app/desktop/auth/callback/route.ts) — the only code-exchange point; routes the fixed native-owned provenance marker to completion and preserves the fixed unmarked Desktop 0.0.13 welcome handoff, always within `/desktop/*` (pinned by its `route.test.ts`).
 - [editor/app/desktop/auth/complete/page.tsx](editor/app/desktop/auth/complete/page.tsx) — inert, fixed success handoff; contains no routing choice.
+- [editor/app/desktop/auth/migrate-onboarding/page.tsx](editor/app/desktop/auth/migrate-onboarding/page.tsx) — inert, fixed hidden surface on which main performs the one-time exact-key renderer-to-native onboarding migration; contains no migration logic or native capability.
 - [editor/app/desktop/auth/me/route.ts](editor/app/desktop/auth/me/route.ts) — no-store, same-origin account projection; distinguishes upstream unavailability from signed-out state (pinned by `route.test.ts`).
 - [editor/lib/desktop/account-session-state.ts](editor/lib/desktop/account-session-state.ts) — shared signed-in/signed-out/unavailable classification for the account projection and protected Desktop server routes; retryable or unclassified auth failures fail closed instead of rendering sign-in (pinned by `account-session-state.test.ts`).
 - [editor/app/desktop/\_components/account-required.tsx](editor/app/desktop/_components/account-required.tsx) — defense-in-depth projection of that classification onto authenticated Desktop routes; unavailable fails closed instead of rendering an extra sign-in surface (pinned by `account-required.test.tsx`).
 - [editor/app/desktop/auth/sign-out/route.ts](editor/app/desktop/auth/sign-out/route.ts) — native-Fetch-Metadata-gated, non-redirecting sign-out (never renderer-callable and never the web `/sign-out`; pinned by `route.test.ts`).
 - [desktop/src/deep-link.ts](desktop/src/deep-link.ts), [desktop/src/env.ts](desktop/src/env.ts), [desktop/forge.config.ts](desktop/forge.config.ts), and [desktop/scripts/prepare-dev-electron-branding.mjs](desktop/scripts/prepare-dev-electron-branding.mjs) — closed per-environment scheme vocabulary and registration; production and local/insiders never contend for one handler.
 - [desktop/src/main/open-handoff.ts](desktop/src/main/open-handoff.ts) + [desktop/src/main.ts](desktop/src/main.ts) — collect OS/secondary-instance callback URLs, re-validate them through the parser, and deliver the closed intent only to the canonical entry controller.
-- [desktop/src/main/protocol-router.ts](desktop/src/main/protocol-router.ts) — stateless fixed-target auth arm (pinned by `protocol-router.test.ts`).
+- [desktop/src/main/protocol-router.ts](desktop/src/main/protocol-router.ts) — stateless fixed-target auth arm; forwards only the closed callback allowlist and then adds the constant native-entry provenance marker (pinned by `protocol-router.test.ts`).
 - [desktop/src/main/account-session.ts](desktop/src/main/account-session.ts) — fixed-route, redirect-refusing account projection and native-intent sign-out over Chromium's cookie-owning session (pinned by `account-session.test.ts`).
-- [desktop/src/main/desktop-preferences.ts](desktop/src/main/desktop-preferences.ts) — non-secret, versioned native onboarding authority; writes are serialized and atomic, future schemas are read-only, and no generic renderer preferences capability exists (pinned by `desktop-preferences.test.ts`).
-- [desktop/src/main/desktop-entry-window.ts](desktop/src/main/desktop-entry-window.ts) — exact entry-window ownership, serialized role transitions, callback re-probe, auxiliary-window admission, and close-before-sign-out ordering (pinned by `desktop-entry-window.test.ts`).
+- [desktop/src/main/desktop-preferences.ts](desktop/src/main/desktop-preferences.ts) — non-secret, versioned native onboarding authority; owns the durable one-time renderer-migration marker, writes are serialized and atomic, future schemas are read-only, and no generic renderer preferences capability exists (pinned by `desktop-preferences.test.ts`).
+- [desktop/src/main/desktop-entry-window.ts](desktop/src/main/desktop-entry-window.ts) — exact entry-window ownership, serialized role transitions, one-time fixed-surface onboarding migration, callback re-probe, role-aware blocked-navigation recovery, auxiliary-window admission, and close-before-sign-out ordering (pinned by `desktop-entry-window.test.ts`).
 - [desktop/src/main/ipc-handlers.ts](desktop/src/main/ipc-handlers.ts) + [desktop/src/main/ipc-admission.ts](desktop/src/main/ipc-admission.ts) — exact sender/role/path/channel validation for the one native account-sign-out transition and narrow sign-in/onboarding IPC capability sets (pinned by `ipc-admission.test.ts`).
 - [desktop/src/window.ts](desktop/src/window.ts) — `will-redirect` guard; `isAllowedNavigation` predicate (pinned by `window.test.ts`).
 
 **What does NOT belong here.** A code exchange in the Electron main
 process. A PKCE verifier carried on the deep link, the bridge, or argv.
-A router that navigates to a path taken from deep-link input, or that
-forwards params beyond `code`/`error*`. A desktop webview navigation to
+A router that navigates to a path taken from deep-link input, forwards params
+beyond `code`/`error*`, or treats the native-added provenance marker as
+authentication authority. A desktop webview navigation to
 `(auth)` routes or the web `/sign-out`. Sidecar- or main-held SESSION
 tokens (the scoped hosted-AI token is the one sanctioned exception,
 registered under GRIDA-SEC-006 and the GRIDA-SEC-004 hosted-AI

@@ -1,10 +1,11 @@
 // GRIDA-SEC-008 — stale status reads cannot restore an older account state.
 import type { ChatGptSubscriptionStatus } from "@grida/agent";
+import type { ChatGptConnectResult } from "@grida/desktop-bridge";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   status: vi.fn<() => Promise<ChatGptSubscriptionStatus>>(),
-  connect: vi.fn<() => Promise<ChatGptSubscriptionStatus>>(),
+  connect: vi.fn<() => Promise<ChatGptConnectResult>>(),
   cancel: vi.fn<() => Promise<void>>(),
   signOut: vi.fn<() => Promise<ChatGptSubscriptionStatus>>(),
   state: { supported: true },
@@ -63,11 +64,7 @@ describe("ChatGPT subscription state", () => {
   });
 
   it("treats a cancelled browser sign-in as a normal signed-out state", async () => {
-    mocks.connect.mockRejectedValueOnce(
-      new Error(
-        "Error invoking remote method 'grida:chatgpt:connect': OAuthLoopbackCallbackError: OAuth loopback callback was cancelled"
-      )
-    );
+    mocks.connect.mockResolvedValueOnce({ outcome: "cancelled" });
 
     await expect(subscription.connect()).resolves.toEqual({
       kind: "ready",

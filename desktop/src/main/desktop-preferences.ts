@@ -8,6 +8,9 @@ type PersistedDesktopPreferences = Record<string, unknown> & {
   onboarding: Record<string, unknown> & {
     completed_version: number;
   };
+  migrations?: Record<string, unknown> & {
+    renderer_onboarding_v1?: boolean;
+  };
 };
 
 const SCHEMA_VERSION = 1;
@@ -57,8 +60,9 @@ export class DesktopPreferences {
       writable: loaded.writable,
     });
 
-    // One-way native migration only. Renderer localStorage is intentionally
-    // not consulted: startup state has exactly one process owner.
+    // Migrate the former native file here. The entry controller separately
+    // consumes the old renderer flag through one fixed hidden probe, then
+    // records that migration in this same main-owned store.
     if (
       loaded.missing &&
       (await readLegacyOnboardingCompletion(user_data_path))
@@ -73,15 +77,42 @@ export class DesktopPreferences {
     return this.#value.onboarding.completed_version >= ONBOARDING_VERSION;
   }
 
+  needsLegacyRendererOnboardingMigration(): boolean {
+    return (
+      this.#writable && this.#value.migrations?.renderer_onboarding_v1 !== true
+    );
+  }
+
+  completeLegacyRendererOnboardingMigration(completed: boolean): Promise<void> {
+    return this.#setOnboardingState({
+      completed_version: completed
+        ? ONBOARDING_VERSION
+        : this.#value.onboarding.completed_version,
+      renderer_migration_complete: true,
+    });
+  }
+
   completeOnboarding(): Promise<void> {
-    return this.#setOnboardingCompletion(ONBOARDING_VERSION);
+    return this.#setOnboardingState({
+      completed_version: ONBOARDING_VERSION,
+      renderer_migration_complete: true,
+    });
   }
 
   resetOnboarding(): Promise<void> {
-    return this.#setOnboardingCompletion(0);
+    return this.#setOnboardingState({
+      completed_version: 0,
+      renderer_migration_complete: true,
+    });
   }
 
-  #setOnboardingCompletion(completedVersion: number): Promise<void> {
+  #setOnboardingState({
+    completed_version: completedVersion,
+    renderer_migration_complete: rendererMigrationComplete,
+  }: {
+    completed_version: number;
+    renderer_migration_complete?: boolean;
+  }): Promise<void> {
     const operation = this.#writeQueue.then(async () => {
       if (!this.#writable) {
         throw new Error(
@@ -95,6 +126,14 @@ export class DesktopPreferences {
           ...this.#value.onboarding,
           completed_version: completedVersion,
         },
+        ...(rendererMigrationComplete === undefined
+          ? {}
+          : {
+              migrations: {
+                ...this.#value.migrations,
+                renderer_onboarding_v1: rendererMigrationComplete,
+              },
+            }),
       };
       await atomicWrite(this.#filePath, `${JSON.stringify(next, null, 2)}\n`);
       this.#value = next;
@@ -204,6 +243,14 @@ function validatedPreferences(
     typeof value.onboarding.completed_version !== "number" ||
     !Number.isInteger(value.onboarding.completed_version) ||
     value.onboarding.completed_version < 0
+  ) {
+    return null;
+  }
+  if (
+    value.migrations !== undefined &&
+    (!isRecord(value.migrations) ||
+      (value.migrations.renderer_onboarding_v1 !== undefined &&
+        typeof value.migrations.renderer_onboarding_v1 !== "boolean"))
   ) {
     return null;
   }

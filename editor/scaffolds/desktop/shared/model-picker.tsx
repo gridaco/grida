@@ -15,6 +15,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useId,
@@ -181,7 +182,7 @@ export function DesktopModelPicker({
             <CommandEmpty>No models found.</CommandEmpty>
 
             {groups.map((group, index) => (
-              <div key={group.id}>
+              <Fragment key={group.id}>
                 {index > 0 && <CommandSeparator />}
                 <CommandGroup
                   heading={
@@ -200,7 +201,7 @@ export function DesktopModelPicker({
                     onChoose={choose}
                   />
                 </CommandGroup>
-              </div>
+              </Fragment>
             ))}
           </CommandList>
         </Command>
@@ -463,7 +464,7 @@ export function useModelPickerState({
         storedSeeded: seededFor.current != null,
       })
     );
-  }, [chatGptReady, currentId, initialProvided]);
+  }, [chatGptReady, currentId]);
 
   // GRIDA-SEC-006 / issue #942 — when a Grida Gateway session is live and
   // the user hasn't otherwise chosen a model, keep the keyless default on the

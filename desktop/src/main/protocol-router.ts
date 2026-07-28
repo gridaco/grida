@@ -9,7 +9,9 @@
  * succeeds solely against the PKCE verifier cookie already held by the
  * Electron cookie jar (minted by `/desktop/auth/start`). An unsolicited,
  * replayed, or attacker-crafted link therefore fails safe: at worst the app
- * focuses and lands on its own sign-in error page.
+ * focuses and lands on its own sign-in error page. This native generation adds
+ * the fixed `native_entry=1` provenance marker so the hosted callback can
+ * distinguish it from older binaries without trusting custom-scheme input.
  *
  * Future deep links (`grida://open/...`, provider callbacks, etc.) land here
  * as explicit switch arms with their own trust-boundary review.
@@ -33,6 +35,7 @@ const AUTH_CALLBACK_FORWARDED_PARAMS = [
   "error_code",
   "error_description",
 ] as const;
+const AUTH_CALLBACK_NATIVE_ENTRY_MARKER = ["native_entry", "1"] as const;
 
 function authCallbackTarget(parsed: URL): string {
   const target = new URL("/desktop/auth/callback", EDITOR_BASE_URL);
@@ -40,6 +43,9 @@ function authCallbackTarget(parsed: URL): string {
     const value = parsed.searchParams.get(key);
     if (value) target.searchParams.set(key, value);
   }
+  // Set this after forwarding so even a future allowlist mistake cannot let
+  // custom-scheme input choose or clear the native capability marker.
+  target.searchParams.set(...AUTH_CALLBACK_NATIVE_ENTRY_MARKER);
   return target.toString();
 }
 

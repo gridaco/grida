@@ -143,6 +143,22 @@ export type DesktopHostAppInfo = {
 };
 
 /**
+ * Result of starting the native ChatGPT sign-in ceremony.
+ *
+ * A completed connection preserves the existing secret-free status shape.
+ * An explicit user cancellation resolves as the closed `cancelled` outcome;
+ * every other failure still rejects the operation.
+ */
+export type ChatGptConnectResult =
+  | (ChatGptSubscriptionStatus &
+      Readonly<{
+        outcome?: never;
+      }>)
+  | Readonly<{
+      outcome: "cancelled";
+    }>;
+
+/**
  * A single coalesced external change under a watched workspace root
  * (issue #805). `kind` is intentionally coarse — the renderer reacts by
  * re-reading the affected path / re-listing its parent, so it doesn't
@@ -395,7 +411,7 @@ export type DesktopBridge = {
    * the renderer. Optional because protocol-1 Desktop builds predate it.
    */
   chatgpt?: {
-    connect: () => Promise<ChatGptSubscriptionStatus>;
+    connect: () => Promise<ChatGptConnectResult>;
     cancel: () => Promise<void>;
     status: () => Promise<ChatGptSubscriptionStatus>;
     sign_out: () => Promise<ChatGptSubscriptionStatus>;
