@@ -166,6 +166,19 @@ For each individual package, refer to the README of its own.
 
 We use turborepo (except few isolated packages).
 
+### Authenticated local feature development
+
+For feature development and UI verification that needs authentication, use
+local Supabase with insiders auth unless authentication itself is the subject
+under test. Do not use a hosted Supabase project as the default development
+backend.
+
+This requires both local Supabase values in `editor/.env.local` and
+`NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH=1`. The default seeded account is
+`insider@grida.co` / `password`. Follow
+[`CONTRIBUTING.md`](./CONTRIBUTING.md#authenticated-local-development) for the
+complete setup.
+
 **Manual test cases** for UX behaviors that are impractical to automate live in [`test/`](./test). When fixing a UX bug or implementing interaction-heavy features, check for relevant TCs there and add new ones when appropriate (see [`test/AGENTS.md`](./test/AGENTS.md)).
 
 To run test, build, and dev, use below commands.

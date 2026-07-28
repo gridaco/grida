@@ -88,6 +88,16 @@ Four invariants:
 
 ## Running Locally
 
+Authenticated renderer flows use the repository's default
+[local development setup](../../../CONTRIBUTING.md#authenticated-local-development):
+local Supabase plus `NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH=1` in
+`editor/.env.local`. Do not point the editor at hosted Supabase unless
+authentication itself is under test.
+
+The editor flag selects the insiders sign-in path. The Electron
+`dev:insiders` command selects Insiders app branding; it does not configure
+renderer authentication.
+
 Use two terminals:
 
 ```sh
@@ -95,9 +105,9 @@ Use two terminals:
 pnpm --filter editor dev
 
 # Terminal 2 - Electron shell
-cd desktop && pnpm dev
-# Insiders build:
-cd desktop && pnpm dev -- --insiders
+pnpm --dir desktop dev
+# Optional Insiders-branded shell:
+pnpm --dir desktop dev:insiders
 ```
 
 `EDITOR_BASE_URL` lives in `desktop/src/env.ts`. It resolves to
