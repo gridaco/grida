@@ -35,6 +35,8 @@ import { type BundledLanguage, codeToHtml } from "shiki";
 import { cn } from "@app/ui/lib/utils";
 import { ZoomableImage } from "@/components/zoomable-image";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
+import { useWorkspaceChanges } from "./workspace-changes";
+import { WorkspaceMediaRevision } from "./workspace-media-revision";
 
 /* ─────────────────────── shared load helpers ──────────────────── */
 
@@ -73,7 +75,11 @@ type BytesState =
   | { kind: "ready"; base64: string }
   | { kind: "error"; message: string };
 
-function useFileBytes(workspaceId: string, relPath: string): BytesState {
+function useFileBytes(
+  workspaceId: string,
+  relPath: string,
+  revision: number
+): BytesState {
   const [state, setState] = useState<BytesState>({ kind: "loading" });
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +100,7 @@ function useFileBytes(workspaceId: string, relPath: string): BytesState {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, relPath]);
+  }, [workspaceId, relPath, revision]);
   return state;
 }
 
@@ -203,12 +209,33 @@ export function ImageViewer({
   workspaceId: string;
   relPath: string;
 }) {
-  const src = workspacesNs.mediaUrl(workspaceId, relPath);
+  const revision = useMediaRevision(relPath);
+  const direct = workspacesNs.mediaUrl(workspaceId, relPath);
+  const src = direct ? WorkspaceMediaRevision.url(direct, revision) : undefined;
   return src ? (
     <StreamedImage src={src} relPath={relPath} />
   ) : (
-    <Base64ImageViewer workspaceId={workspaceId} relPath={relPath} />
+    <Base64ImageViewer
+      workspaceId={workspaceId}
+      relPath={relPath}
+      revision={revision}
+    />
   );
+}
+
+/**
+ * Workspace tabs deliberately stay mounted while inactive. Translate an exact
+ * file-watch match into the request revision that makes the media element load
+ * the new bytes at the same path.
+ */
+function useMediaRevision(relPath: string): number {
+  const [revision, setRevision] = useState(0);
+  useWorkspaceChanges((events) => {
+    if (WorkspaceMediaRevision.matches(events, relPath)) {
+      setRevision((current) => current + 1);
+    }
+  });
+  return revision;
 }
 
 /** View-local "did the media element fail to load" flag, reset whenever `src`
@@ -240,11 +267,13 @@ function StreamedImage({ src, relPath }: { src: string; relPath: string }) {
 function Base64ImageViewer({
   workspaceId,
   relPath,
+  revision,
 }: {
   workspaceId: string;
   relPath: string;
+  revision: number;
 }) {
-  const state = useFileBytes(workspaceId, relPath);
+  const state = useFileBytes(workspaceId, relPath, revision);
   const src =
     state.kind === "ready"
       ? `data:${inferMime(relPath)};base64,${state.base64}`
@@ -269,11 +298,17 @@ export function VideoViewer({
   workspaceId: string;
   relPath: string;
 }) {
-  const src = workspacesNs.mediaUrl(workspaceId, relPath);
+  const revision = useMediaRevision(relPath);
+  const direct = workspacesNs.mediaUrl(workspaceId, relPath);
+  const src = direct ? WorkspaceMediaRevision.url(direct, revision) : undefined;
   return src ? (
     <StreamedVideo src={src} />
   ) : (
-    <Base64VideoViewer workspaceId={workspaceId} relPath={relPath} />
+    <Base64VideoViewer
+      workspaceId={workspaceId}
+      relPath={relPath}
+      revision={revision}
+    />
   );
 }
 
@@ -297,11 +332,13 @@ function StreamedVideo({ src }: { src: string }) {
 function Base64VideoViewer({
   workspaceId,
   relPath,
+  revision,
 }: {
   workspaceId: string;
   relPath: string;
+  revision: number;
 }) {
-  const state = useFileBytes(workspaceId, relPath);
+  const state = useFileBytes(workspaceId, relPath, revision);
   const src =
     state.kind === "ready"
       ? `data:${inferMime(relPath)};base64,${state.base64}`
