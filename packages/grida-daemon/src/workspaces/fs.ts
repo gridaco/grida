@@ -117,10 +117,10 @@ export namespace workspaceFs {
    * `relPath` lists the workspace root.
    *
    * Sort: directories first, then files, both alphabetical
-   * case-insensitive. Dotfiles ARE included — hiding them would be a
-   * surprise for users opening source repos (`.git`, `.gitignore`,
-   * `.env.example` etc. all matter at a glance). The client can fold
-   * them visually if it wants.
+   * case-insensitive. Useful dotfiles remain visible (`.gitignore`,
+   * `.env.example`, `.vscode`, etc.); narrow OS and VCS implementation
+   * metadata is omitted from every listing. Direct reads by an explicit
+   * relative path remain available.
    *
    * Symlinks are reported with `kind: 'symlink'` and a best-effort
    * target classification — clicking them in the tree is allowed but
@@ -150,7 +150,9 @@ export namespace workspaceFs {
       }
       throw err;
     }
-    const entries = dirents.map((dirent) => directoryEntry(relPath, dirent));
+    const entries = dirents
+      .filter((dirent) => isListableEntry(dirent.name))
+      .map((dirent) => directoryEntry(relPath, dirent));
     entries.sort((a, b) => {
       if (a.kind === "directory" && b.kind !== "directory") return -1;
       if (b.kind === "directory" && a.kind !== "directory") return 1;
@@ -195,6 +197,7 @@ export namespace workspaceFs {
       while (true) {
         const dirent = await dir.read();
         if (dirent === null) return;
+        if (!isListableEntry(dirent.name)) continue;
         yield directoryEntry(relPath, dirent);
       }
     } finally {
@@ -494,6 +497,29 @@ export namespace workspaceFs {
 }
 
 // ──────────────────────────── private helpers ────────────────────────────
+
+/**
+ * Metadata owned by an operating system, archive tool, or VCS should not
+ * become product content. Keep this deliberately narrow: editor settings,
+ * environment examples, dependency folders, and build output are legitimate
+ * workspace entries and remain listable.
+ */
+const NON_LISTABLE_ENTRY_NAMES = new Set([
+  ".ds_store",
+  ".git",
+  ".hg",
+  ".svn",
+  "__macosx",
+  "cvs",
+  "desktop.ini",
+  "thumbs.db",
+]);
+
+function isListableEntry(name: string): boolean {
+  return (
+    !NON_LISTABLE_ENTRY_NAMES.has(name.toLowerCase()) && !name.startsWith("._")
+  );
+}
 
 function directoryEntry(relPath: string, dirent: Dirent): workspaceFs.Entry {
   let kind: workspaceFs.Entry["kind"];

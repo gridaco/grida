@@ -31,6 +31,50 @@ describe("workspaceFs", () => {
     ]);
   });
 
+  it("directory listings omit OS and VCS metadata but keep useful dotfiles", async () => {
+    await Promise.all([
+      fixture.write_workspace_file(".DS_Store", "metadata"),
+      fixture.write_workspace_file("._notes.md", "metadata"),
+      fixture.write_workspace_file("Thumbs.db", "metadata"),
+      fixture.write_workspace_file("desktop.ini", "metadata"),
+      fixture.write_workspace_file(".git/config", "metadata"),
+      fixture.write_workspace_file(".hg/requires", "metadata"),
+      fixture.write_workspace_file(".svn/wc.db", "metadata"),
+      fixture.write_workspace_file("CVS/Root", "metadata"),
+      fixture.write_workspace_file("__MACOSX/._notes.md", "metadata"),
+      fixture.write_workspace_file(".env.example", "visible"),
+      fixture.write_workspace_file(".gitignore", "visible"),
+      fixture.write_workspace_file(".vscode/settings.json", "visible"),
+      fixture.write_workspace_file("node_modules/package/index.js", "visible"),
+    ]);
+
+    const readEntries = await workspaceFs.readDir(fixture.workspace, "");
+    const iteratedEntries = [];
+    for await (const entry of workspaceFs.iterateDir(fixture.workspace, "")) {
+      iteratedEntries.push(entry);
+    }
+
+    const expectedNames = [
+      ".env.example",
+      ".gitignore",
+      ".vscode",
+      "node_modules",
+    ];
+    expect(readEntries.map((entry) => entry.name)).toEqual([
+      ".vscode",
+      "node_modules",
+      ".env.example",
+      ".gitignore",
+    ]);
+    expect(iteratedEntries.map((entry) => entry.name).sort()).toEqual(
+      [...expectedNames].sort()
+    );
+
+    await expect(
+      workspaceFs.readFile(fixture.workspace, ".DS_Store")
+    ).resolves.toMatchObject({ content: "metadata" });
+  });
+
   it("iterateDir stops OS enumeration and closes the handle on early return", async () => {
     for (let index = 0; index < 20; index += 1) {
       await fixture.write_workspace_file(`entry-${index}.txt`, String(index));
