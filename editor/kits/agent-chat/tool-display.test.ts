@@ -92,7 +92,7 @@ describe("toolDisplay", () => {
           input: { path: "/src/c.ts" },
         } as ToolCallEntry,
       ])
-    ).toBe("Edited 1 file, 1 tool running, 1 tool failed");
+    ).toBe("Edited 1 file, reading 1 file, 1 tool failed");
   });
 
   it("labels tool protocol errors as failures", () => {
@@ -135,6 +135,76 @@ describe("toolDisplay", () => {
     });
   });
 
+  it("summarizes parallel image generation as the work being done", () => {
+    expect(
+      toolDisplay.summarize([
+        runningTool("1", "generate_image", { prompt: "A product still life" }),
+        runningTool("2", "generate_image", { prompt: "An editorial poster" }),
+      ])
+    ).toBe("Generating 2 images");
+  });
+
+  it("labels host presentation tools as tabs", () => {
+    expect(
+      toolDisplay.describe(
+        tool(
+          "1",
+          "surface_open",
+          { path: "/campaign.canvas" },
+          {
+            path: "/campaign.canvas",
+            requested: true,
+            reason: "requested",
+          }
+        )
+      )
+    ).toMatchObject({
+      action: "open_tab",
+      title: "Opened tab",
+      detail: "campaign.canvas",
+    });
+
+    expect(
+      toolDisplay.describe(
+        tool(
+          "2",
+          "surface_list_open",
+          {},
+          {
+            interactive: true,
+            active: "/campaign.canvas",
+            open: ["/campaign.canvas", "/brief.md"],
+          }
+        )
+      )
+    ).toMatchObject({
+      action: "list_tabs",
+      title: "Checked open tabs",
+      detail: "2 tabs",
+    });
+  });
+
+  it("does not claim a tab opened when no presentation host is attached", () => {
+    expect(
+      toolDisplay.describe(
+        tool(
+          "1",
+          "surface_open",
+          { path: "/campaign.canvas" },
+          {
+            path: "/campaign.canvas",
+            requested: false,
+            reason: "not_interactive",
+          }
+        )
+      )
+    ).toMatchObject({
+      action: "open_tab",
+      title: "Couldn’t open tab",
+      tone: "warn",
+    });
+  });
+
   it("labels skill loading as a dedicated action", () => {
     expect(
       toolDisplay.describe(tool("1", "skill", { name: "slides" }))
@@ -165,5 +235,18 @@ function tool(
     input,
     output,
     state: "output-available",
+  } as ToolCallEntry;
+}
+
+function runningTool(
+  id: string,
+  toolName: string,
+  input: unknown
+): ToolCallEntry {
+  return {
+    type: `tool-${toolName}`,
+    toolCallId: id,
+    input,
+    state: "input-available",
   } as ToolCallEntry;
 }

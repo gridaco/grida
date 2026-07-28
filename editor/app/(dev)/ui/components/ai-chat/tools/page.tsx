@@ -22,9 +22,9 @@ export default function AiChatToolsDemoPage() {
           </p>
           <h1 className="text-3xl font-bold">AI Chat Tool Cards</h1>
           <p className="max-w-2xl text-muted-foreground text-sm">
-            Static settled examples for every agent tool renderer. These use the
-            same <code>ChatMessageView</code> path as the chat panel, but render
-            all tool calls at once for visual review.
+            Static examples for every agent tool renderer and its key active
+            states. These use the same <code>ChatMessageView</code> path as the
+            chat panel, but render all tool calls at once for visual review.
           </p>
         </div>
 
