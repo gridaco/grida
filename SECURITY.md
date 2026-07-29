@@ -1469,10 +1469,13 @@ json`, run at the discovered repository root.
    `127.0.0.1` endpoint shapes. `localhost`, IPv6 and alternate loopback
    addresses, wrong schemes/ports/paths, URL overrides, queries/fragments, and
    remote or lookalike hosts are rejected.
-4. The destination is validated before archive resolution or download and
+4. Local service-role HTTP requests use a proxy-disabled opener and reject
+   redirects. Direct SQL strips inherited libpq `PG*` connection settings, so
+   neither environment can redirect a validated loopback URL.
+5. The destination is validated before archive resolution or download and
    before the Storage/SQL writer accepts it.
-5. Adjacent tests pin the accepted local shape, negative cases, write-layer
-   revalidation, and fail-before-download ordering.
+6. Adjacent tests pin the accepted local shape, negative cases, write-layer
+   revalidation, transport isolation, and fail-before-download ordering.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-009 .` to enumerate.
 Today:
@@ -1480,8 +1483,9 @@ Today:
 - [.agents/skills/opt-library/SKILL.md](.agents/skills/opt-library/SKILL.md) —
   operator contract.
 - [.agents/skills/opt-library/scripts/seed.py](.agents/skills/opt-library/scripts/seed.py)
-  — configuration parsing, exact endpoint checks, command ordering, and
-  write-layer revalidation.
+  — configuration parsing, exact endpoint checks, command ordering,
+  proxy/redirect isolation, libpq environment isolation, and write-layer
+  revalidation.
 - [.agents/skills/opt-library/scripts/test_seed.py](.agents/skills/opt-library/scripts/test_seed.py)
   — positive, negative, and ordering regression tests.
 

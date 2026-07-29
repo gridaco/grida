@@ -61,6 +61,8 @@ The product surfaces are the [Library](https://grida.co/library) and its
 > `supabase/config.toml`. It rejects `localhost`, IPv6 and alternate loopback
 > hosts, remote/lookalike hosts, wrong ports or URL shapes, and all
 > caller-provided destination URLs and keys before downloading or writing.
+> Local service-role HTTP requests bypass system proxies and reject redirects;
+> direct SQL strips inherited libpq `PG*` connection overrides.
 
 Run from the `gridaco/grida` repository root:
 

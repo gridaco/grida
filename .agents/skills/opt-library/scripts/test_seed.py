@@ -137,6 +137,89 @@ class LocalSupabaseStatusTest(unittest.TestCase):
             seed.LocalLibrary(status)
 
 
+class LocalLibraryTransportTest(unittest.TestCase):
+    def setUp(self) -> None:
+        config = seed.LocalSupabaseConfig(
+            api_port=54_321,
+            db_port=54_322,
+            api_tls=False,
+        )
+        self.status = seed.LocalSupabaseStatus(
+            api_url="http://127.0.0.1:54321",
+            db_url="postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+            service_role_key="local-test-key",
+            config=config,
+        )
+
+    def test_local_http_writer_disables_proxies_and_redirects(self) -> None:
+        opener = mock.MagicMock()
+        with mock.patch.object(
+            seed.urllib.request,
+            "build_opener",
+            return_value=opener,
+        ) as build_opener:
+            library = seed.LocalLibrary(self.status)
+
+        handlers = build_opener.call_args.args
+        proxy_handler = next(
+            handler
+            for handler in handlers
+            if isinstance(handler, seed.urllib.request.ProxyHandler)
+        )
+        self.assertEqual(proxy_handler.proxies, {})
+        redirect_handler = next(
+            handler
+            for handler in handlers
+            if isinstance(handler, seed.LocalOnlyRedirectHandler)
+        )
+        self.assertIsNone(
+            redirect_handler.redirect_request(
+                mock.MagicMock(),
+                mock.MagicMock(),
+                302,
+                "Found",
+                mock.MagicMock(),
+                "https://example.com/",
+            )
+        )
+
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b"[]"
+        opener.open.return_value = response
+        with mock.patch.object(seed.urllib.request, "urlopen") as global_urlopen:
+            self.assertEqual(
+                library._request_json("GET", "/rest/v1/object"),
+                [],
+            )
+        global_urlopen.assert_not_called()
+        opener.open.assert_called_once()
+
+    def test_psql_cannot_inherit_connection_overrides(self) -> None:
+        library = seed.LocalLibrary(self.status)
+        environment = {
+            "PATH": "/usr/bin",
+            "LANG": "C",
+            "PGHOSTADDR": "203.0.113.10",
+            "PGSERVICE": "production",
+            "PGOPTIONS": "-c search_path=public",
+            "pgpassword": "must-also-be-removed",
+        }
+        with (
+            mock.patch.dict(seed.os.environ, environment, clear=True),
+            mock.patch.object(seed.subprocess, "run") as run,
+        ):
+            library._import_database([], [], [])
+
+        child_environment = run.call_args.kwargs["env"]
+        self.assertEqual(
+            child_environment,
+            {
+                "PATH": "/usr/bin",
+                "LANG": "C",
+            },
+        )
+
+
 class SeedOrderingTest(unittest.TestCase):
     def test_destination_is_rejected_before_archive_download(self) -> None:
         rejection = seed.SeedError("not the configured local stack")

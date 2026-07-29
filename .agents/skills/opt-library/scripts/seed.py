@@ -84,6 +84,21 @@ class SeedError(RuntimeError):
     """A safe, user-facing failure in the optional seed workflow."""
 
 
+class LocalOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Reject redirects so local service-role requests stay on loopback."""
+
+    def redirect_request(
+        self,
+        request: urllib.request.Request,
+        file_pointer: Any,
+        code: int,
+        message: str,
+        headers: Any,
+        new_url: str,
+    ) -> None:
+        return None
+
+
 @dataclass(frozen=True)
 class CorpusObject:
     ref: str
@@ -535,6 +550,12 @@ class LocalLibrary:
         self._api_url = status.api_url
         self._db_url = status.db_url
         self._key = status.service_role_key
+        # Local service-role requests must never inherit system proxy settings
+        # or follow redirects away from the validated loopback endpoint.
+        self._local_opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}),
+            LocalOnlyRedirectHandler(),
+        )
 
     def seed(
         self,
@@ -697,6 +718,14 @@ class LocalLibrary:
                 check=True,
                 capture_output=True,
                 text=True,
+                # libpq accepts connection-affecting PG* environment defaults
+                # in addition to the validated URI (notably PGHOSTADDR). Strip
+                # the whole namespace so the URI remains the sole authority.
+                env={
+                    key: value
+                    for key, value in os.environ.items()
+                    if not key.upper().startswith("PG")
+                },
             )
         except FileNotFoundError as error:
             raise SeedError("PostgreSQL psql is not installed") from error
@@ -714,7 +743,7 @@ class LocalLibrary:
             headers={"User-Agent": "gridaco-grida-opt-library/1"},
         )
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:
+            with self._local_opener.open(request, timeout=60) as response:
                 digest = hashlib.sha256(response.read()).hexdigest()
         except (urllib.error.URLError, OSError) as error:
             raise SeedError(
@@ -750,7 +779,7 @@ class LocalLibrary:
             method=method,
         )
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:
+            with self._local_opener.open(request, timeout=60) as response:
                 payload = response.read()
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace")
