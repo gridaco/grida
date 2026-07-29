@@ -4,10 +4,10 @@ title: Inspect and save a chat image in the fullscreen preview
 module: desktop
 area: agent-chat
 tags: [agent-chat, image, preview, zoom, pan, clipboard, download]
-status: verified
+status: untested
 severity: medium
 date: 2026-07-28
-updated: 2026-07-28
+updated: 2026-07-29
 automatable: false
 covered_by: []
 ---
