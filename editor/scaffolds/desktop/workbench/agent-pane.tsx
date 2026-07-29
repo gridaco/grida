@@ -797,13 +797,18 @@ function AgentPaneContent({
       const resolved = resolvedDesignSearchCallsRef.current;
       if (!chat || resolved.has(toolCallId)) return;
       resolved.add(toolCallId);
-      void chat
-        .addToolResult({
+      try {
+        const result = chat.addToolResult({
           tool: "design_search",
           toolCallId,
           output,
-        })
-        .catch(() => resolved.delete(toolCallId));
+        });
+        // AI SDK permits synchronous void or an async thenable here. Normalize
+        // both forms so an async enqueue failure releases the claim for retry.
+        void Promise.resolve(result).catch(() => resolved.delete(toolCallId));
+      } catch {
+        resolved.delete(toolCallId);
+      }
     },
     []
   );

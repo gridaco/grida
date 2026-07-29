@@ -223,7 +223,7 @@ function DesignSearchPickForm({
                   draggable={false}
                   className="size-full select-none object-cover"
                 />
-                <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100 group-focus-within:bg-black/45 group-focus-within:opacity-100">
                   <XIcon className="size-3" />
                 </span>
               </button>
