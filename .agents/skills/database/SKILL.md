@@ -2,7 +2,7 @@
 name: database
 description: >
   Use BEFORE editing any file in `supabase/migrations/` or
-  `supabase/schemas/`, OR when the user runs `/database <subcommand>`
+  `supabase/schemas/`, OR when the user runs a `/database` subcommand
   (`compact local migration`, `rls scenarios`, `align`). Encodes the
   three contracts that protect the Grida database layer: applied
   migrations are immutable, RLS implementation mirrors tests (never
@@ -20,6 +20,10 @@ Three contracts this skill protects:
 
 `supabase/AGENTS.md` is the harder rule layer (RLS, grants, security
 boundaries). This skill covers the recurring workflow tasks. Read both.
+
+For realistic optional Library data without changing schema history or the
+canonical base seed, use the [opt-library skill](../opt-library/SKILL.md).
+Return here when that work changes migrations, schemas, RLS, or grants.
 
 ---
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Optional Library"
+  short_description: "Seed realistic Library data for local development"
+  default_prompt: "Use $opt-library to set up and seed the optional local Grida Library corpus."
