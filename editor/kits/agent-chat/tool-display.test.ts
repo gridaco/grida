@@ -135,6 +135,20 @@ describe("toolDisplay", () => {
     });
   });
 
+  it("shows the reference picker's initial Library search", () => {
+    expect(
+      toolDisplay.describe(
+        tool("1", "design_search", {
+          initial_search_query: "vivid editorial poster",
+        })
+      )
+    ).toMatchObject({
+      action: "search",
+      title: "Searched library",
+      detail: "vivid editorial poster",
+    });
+  });
+
   it("summarizes parallel image generation as the work being done", () => {
     expect(
       toolDisplay.summarize([

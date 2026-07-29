@@ -43,6 +43,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@app/ui/ai-elements/conversation";
+import { Button } from "@app/ui/components/button";
 import { ImagesIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 import {
@@ -91,7 +92,11 @@ import {
   type AnswerQuestionHandler,
   type PickReferencesHandler,
 } from "@/kits/agent-chat";
-import { pickQuery, type DesignSearchSession } from "./design-search-tab";
+import {
+  pickQuery,
+  pickToolCallId,
+  type DesignSearchSession,
+} from "./design-search-tab";
 import { QueuedMessages } from "../shared/queued-messages";
 import { ChatSessionPicker } from "../shared/chat-session-picker";
 import {
@@ -940,20 +945,37 @@ function AgentPaneContent({
           the tab if the user closed it. */}
       {pendingPick && (
         <div className="shrink-0 p-3">
-          <button
-            type="button"
-            onClick={() => onOpenPicker?.()}
-            className="flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-xs text-muted-foreground shadow-sm transition hover:border-foreground/20 hover:text-foreground"
-          >
-            <ImagesIcon className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">
-              Pick references
-              {pickQuery(pendingPick)
-                ? ` for “${pickQuery(pendingPick)}”`
-                : ""}{" "}
-              — open the picker
-            </span>
-          </button>
+          <div className="flex w-full items-center rounded-lg border border-border bg-background shadow-sm transition hover:border-foreground/20">
+            <button
+              type="button"
+              onClick={() => onOpenPicker?.()}
+              className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground transition hover:text-foreground"
+            >
+              <ImagesIcon className="size-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">
+                Pick references
+                {pickQuery(pendingPick)
+                  ? ` for “${pickQuery(pendingPick)}”`
+                  : ""}{" "}
+                — open the picker
+              </span>
+            </button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={busy}
+              className="mr-1.5 shrink-0"
+              onClick={() =>
+                onPickReferences(pickToolCallId(pendingPick), {
+                  picked: [],
+                  skipped: true,
+                })
+              }
+            >
+              Skip
+            </Button>
+          </div>
         </div>
       )}
 

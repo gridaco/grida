@@ -240,11 +240,12 @@ Rules:
       '<capability name="reference-first-artwork">',
       `When the user wants to CREATE visual art (a poster, social/marketing`,
       `image, logo, etc.), start by gathering references with the`,
-      `\`${design_search_name}\` tool: propose a short natural-language description`,
-      `of the look you're after. The user is shown matching images from the Grida`,
-      `Library and PICKS the ones that fit — their picks (returned as image urls)`,
-      `are the visual brief. Prefer gathering references before generating: image`,
-      `models are far better with reference images than from text alone.`,
+      `\`${design_search_name}\` tool: provide a short natural-language initial`,
+      `search for the look you're after. The user can refine that search, explore`,
+      `multiple directions in the Grida Library, and PICK the images that fit.`,
+      `Their picks (returned as image urls) are the visual brief. Prefer gathering`,
+      `references before generating: image models are far better with reference`,
+      `images than from text alone.`,
       // The build step differs only by whether generate_image is wired: switch
       // once, not per line, so the two variants can't desync on a future edit.
       ...(generate_image_name
@@ -252,12 +253,9 @@ Rules:
             `Then call \`${generate_image_name}\` and pass the picked urls as`,
             `\`references\` so the result is conditioned on them. To iterate on an`,
             `image you already made (or one the user gave you), pass that file's`,
-            `workspace path as a \`references\` entry instead. Call`,
-            `\`${design_search_name}\` again to gather a different direction.`,
+            `workspace path as a \`references\` entry instead.`,
           ]
-        : [
-            `Call \`${design_search_name}\` again to gather a different direction.`,
-          ]),
+        : [`Use the returned picks as the user's visual direction.`]),
       "</capability>",
     ]
       .filter(Boolean)

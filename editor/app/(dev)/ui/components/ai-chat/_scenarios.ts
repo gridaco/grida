@@ -458,7 +458,7 @@ export const TOOL_CARD_DEMOS: ToolCardDemo[] = [
     message: toolMessage({
       id: "design-search",
       toolName: "design_search",
-      input: { query: "minimal gradient poster" },
+      input: { initial_search_query: "minimal gradient poster" },
       output: {
         picked: [
           {

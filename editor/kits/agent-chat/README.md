@@ -54,6 +54,15 @@ UI state as the collapsibles); the **committed** answer leaves through `onAnswer
 the transport. `AnsweredQuestionSummary` is the read-only echo the transcript
 shows once answered.
 
+## Library reference picker
+
+`design_search` is another session-global human-input tool. The model supplies
+an initial Library query; `DesignSearchPickCard` lets the user refine it and
+retain selections across searches before committing one result. The
+framework-agnostic `DesignSearchExplorer` owns the query revision and selected
+pins so delayed search responses and multi-query selection are testable without
+React. Workbench surfaces may render the same explorer in a dedicated tab.
+
 ## Contract (kit rules)
 
 - **Render-only / consumer-stateless**: you pass `message` + `isStreaming`; the kit
@@ -66,6 +75,9 @@ shows once answered.
   - The session-global question prompt: `findPendingQuestion`, `QuestionCard`,
     `AnsweredQuestionSummary`, and the `AnswerQuestionHandler` /
     `QuestionAnswerOutput` types.
+  - The session-global Library prompt: `findPendingDesignSearch`,
+    `DesignSearchPickCard`, `DesignSearchExplorer`, and the
+    `PickReferencesHandler` / `FetchReferences` types.
   - The `ChatMessage` / `ToolCallEntry` types. `toolDisplay` (label/summary
     formatting) is internal.
 - Shared message/tool types live in `@/lib/agent-chat` (the bridge transport +

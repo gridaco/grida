@@ -1,9 +1,10 @@
 /**
  * The dedicated **editor-pane** `design_search` picker — the artwork-station
- * gather+curate step, given room to breathe. The agent proposes a keyword and
- * pauses; the workbench auto-opens this as a virtual tab. The user browses a
- * large, staggered gallery of library references (multi-select) and commits the
- * picks (or skips), which resolves the paused tool call.
+ * gather+curate step, given room to breathe. The agent proposes an initial
+ * search and pauses; the workbench auto-opens this as a virtual tab. The user
+ * may refine that search, browse multiple directions, and select references
+ * across them before committing the picks (or skipping), which resolves the
+ * paused tool call.
  *
  * Same engine as the real `/library` gallery: **`masonic`** for the staggered
  * masonry (row-major, best-first reading order) + virtualization, and
@@ -15,12 +16,15 @@
  *
  * Library pins are URLs — nothing is downloaded; a pick carries its image url
  * straight through to image-to-image (see `design-search-card.tsx`).
+ *
+ * Manual regression: `test/desktop-agent-chat-library-search-refinement.md`.
  */
 
 "use client";
 
 import {
   createContext,
+  type FormEvent,
   useCallback,
   useContext,
   useEffect,
@@ -37,8 +41,10 @@ import {
 } from "masonic";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
-import { CheckIcon, ImagesIcon, Loader2Icon } from "lucide-react";
+import { Input } from "@app/ui/components/input";
+import { CheckIcon, Loader2Icon, SearchIcon, XIcon } from "lucide-react";
 import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import { DesignSearchExplorer } from "@/kits/agent-chat";
 import {
   DESIGN_SEARCH_PAGE,
   resolveDesignSearchPage,
@@ -58,16 +64,20 @@ const GRID_PAD = 12;
 /** Selection passed to masonic-rendered cells via context (not props): masonic
  *  memoizes cells, but a consumed context still re-renders them on toggle. */
 const SelectionContext = createContext<{
-  selected: ReadonlySet<string>;
-  toggle: (id: string) => void;
+  explorer: DesignSearchExplorer;
+  toggle: (pin: Pin) => void;
   disabled: boolean;
-}>({ selected: new Set(), toggle: () => {}, disabled: false });
+}>({
+  explorer: DesignSearchExplorer.create(""),
+  toggle: () => {},
+  disabled: false,
+});
 
 /** One masonry cell — masonic passes `{ index, data, width }`; we size the cell
  *  to the pin's aspect ratio (no per-item measurement). */
 function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
-  const { selected, toggle, disabled } = useContext(SelectionContext);
-  const on = selected.has(pin.id);
+  const { explorer, toggle, disabled } = useContext(SelectionContext);
+  const on = explorer.isSelected(pin.id);
   const aspect = pin.width && pin.height ? pin.width / pin.height : 1;
   const height = width / aspect;
   return (
@@ -75,7 +85,7 @@ function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
       type="button"
       disabled={disabled}
       aria-pressed={on}
-      onClick={() => toggle(pin.id)}
+      onClick={() => toggle(pin)}
       title={pin.title}
       style={{ width, height }}
       className={cn(
@@ -99,29 +109,89 @@ function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
   );
 }
 
+function SelectedReferences({
+  pins,
+  disabled,
+  onRemove,
+}: {
+  pins: Pin[];
+  disabled: boolean;
+  onRemove: (id: string) => void;
+}) {
+  if (pins.length === 0) return null;
+  return (
+    <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
+      <span className="shrink-0 text-xs text-muted-foreground">
+        {pins.length} selected
+      </span>
+      <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
+        {pins.map((pin) => (
+          <button
+            key={pin.id}
+            type="button"
+            disabled={disabled}
+            onClick={() => onRemove(pin.id)}
+            aria-label={`Remove ${pin.title}`}
+            title={`Remove ${pin.title}`}
+            className="group relative size-9 shrink-0 overflow-hidden rounded-md border border-border"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={pin.url}
+              alt=""
+              draggable={false}
+              className="size-full select-none object-cover"
+            />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+              <XIcon className="size-3.5" />
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function EditorPaneDesignSearch({
   session,
 }: {
   session: DesignSearchSession;
 }) {
-  const { entry, onPick, busy } = session;
-  const toolCallId = pickToolCallId(entry);
-  const query = pickQuery(entry);
+  const toolCallId = pickToolCallId(session.entry);
+  return (
+    <DesignSearchPicker
+      key={toolCallId}
+      session={session}
+      toolCallId={toolCallId}
+      initialQuery={pickQuery(session.entry)}
+    />
+  );
+}
+
+function DesignSearchPicker({
+  session,
+  toolCallId,
+  initialQuery,
+}: {
+  session: DesignSearchSession;
+  toolCallId: string;
+  initialQuery: string;
+}) {
+  const { onPick, busy } = session;
+  const [draftQuery, setDraftQuery] = useState(initialQuery);
+  const [explorer, setExplorer] = useState(() =>
+    DesignSearchExplorer.create(initialQuery)
+  );
+  const explorerRef = useRef(explorer);
 
   const [items, setItems] = useState<Pin[]>([]);
   const [count, setCount] = useState<number | undefined>(undefined);
   const [seeded, setSeeded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [submitted, setSubmitted] = useState(false);
 
   const loadingRef = useRef(false);
-  // Monotonic epoch bumped every time the pending pick/query changes. Both the
-  // seed and the paginated loads capture it and drop their results if it moved
-  // while they were in flight — so a late page from tool call/query A can't merge
-  // into B's grid (the seed's `live` flag alone doesn't cover the loader).
-  const epochRef = useRef(0);
 
   // Append a page, de-duped by id (a relevance window can repeat across ranges).
   const appendPage = useCallback((page: Pin[]) => {
@@ -131,20 +201,19 @@ export function EditorPaneDesignSearch({
     });
   }, []);
 
-  // Seed the first page on a new pending call (new toolCallId) or new keyword.
+  // Seed the first page on the initial or user-refined query.
   // masonic's loader can't pull page 0 (nothing renders from an empty grid), so
   // we fetch it; the loader pages from there.
   useEffect(() => {
-    const epoch = ++epochRef.current;
-    const fresh = () => epochRef.current === epoch;
+    const ticket = explorer.ticket();
+    const fresh = () => explorerRef.current.accepts(ticket);
     setItems([]);
     setCount(undefined);
     setSeeded(false);
     setError(false);
-    setSelected(new Set());
-    setSubmitted(false);
+    setLoadingMore(false);
     loadingRef.current = true;
-    void resolveDesignSearchPage(query, [0, DESIGN_SEARCH_PAGE - 1])
+    void resolveDesignSearchPage(ticket.query, [0, DESIGN_SEARCH_PAGE - 1])
       .then(({ items: page, count: total }) => {
         if (!fresh()) return;
         setCount(total);
@@ -160,30 +229,30 @@ export function EditorPaneDesignSearch({
         }
       });
     return () => {
-      // A newer seed bumps the epoch; nothing else to tear down.
+      // A newer query revision invalidates the ticket; nothing else to tear down.
     };
-  }, [toolCallId, query, appendPage]);
+  }, [explorer.query, explorer.revision, appendPage]);
 
   // Subsequent pages — masonic's infinite loader, mirroring the `/library`
   // gallery (inclusive `[start, stop - 1]` range; batch = page size).
   const maybeLoadMore = useInfiniteLoader<Pin, LoadMoreItemsCallback<Pin>>(
     async (startIndex, stopIndex) => {
       if (loadingRef.current) return;
-      const epoch = epochRef.current;
+      const ticket = explorer.ticket();
       loadingRef.current = true;
       setLoadingMore(true);
       try {
         const { items: page, count: total } = await resolveDesignSearchPage(
-          query,
+          ticket.query,
           [startIndex, stopIndex - 1]
         );
-        if (epochRef.current !== epoch) return; // pick/query changed — drop it
+        if (!explorerRef.current.accepts(ticket)) return;
         setCount(total);
         appendPage(page);
       } catch {
         /* a transient page error just stops paging; the seed/grid stay. */
       } finally {
-        if (epochRef.current === epoch) {
+        if (explorerRef.current.accepts(ticket)) {
           loadingRef.current = false;
           setLoadingMore(false);
         }
@@ -223,24 +292,26 @@ export function EditorPaneDesignSearch({
     scrollStop.current = setTimeout(() => setIsScrolling(false), 120);
   }, []);
 
-  const positioner = usePositioner({
-    width: Math.max(0, size.width - GRID_PAD * 2),
-    columnWidth: 180,
-    columnGutter: 12,
-    rowGutter: 12,
-    maxColumnCount: 6,
-  });
+  const positioner = usePositioner(
+    {
+      width: Math.max(0, size.width - GRID_PAD * 2),
+      columnWidth: 180,
+      columnGutter: 12,
+      rowGutter: 12,
+      maxColumnCount: 6,
+    },
+    // Query refinement replaces the item list. Clear masonic's index cache at
+    // the same boundary so it never renders a prior index against the new list.
+    [explorer.revision]
+  );
   const resizeObserver = useResizeObserver(positioner);
 
   const toggle = useCallback(
-    (id: string) => {
+    (pin: Pin) => {
       if (busy || submitted) return;
-      setSelected((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      });
+      const next = explorerRef.current.toggle(pin);
+      explorerRef.current = next;
+      setExplorer(next);
     },
     [busy, submitted]
   );
@@ -253,12 +324,41 @@ export function EditorPaneDesignSearch({
 
   const disabled = busy || submitted;
 
+  function search(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (disabled) return;
+    const current = explorerRef.current;
+    const next = current.refine(draftQuery);
+    setDraftQuery(next.query);
+    if (next === current) return;
+
+    // Publish the new revision to the async guard before React commits it, so a
+    // page from the old query cannot win the event/effect timing gap.
+    explorerRef.current = next;
+    setExplorer(next);
+    setItems([]);
+    setCount(undefined);
+    setSeeded(false);
+    setError(false);
+    setLoadingMore(false);
+    loadingRef.current = false;
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    setScrollTop(0);
+  }
+
+  function removeSelected(id: string) {
+    if (disabled) return;
+    const next = explorerRef.current.remove(id);
+    explorerRef.current = next;
+    setExplorer(next);
+  }
+
   // Stable context identity so a scroll tick (setScrollTop/setIsScrolling fire
   // on every scroll frame) doesn't push a new value to every masonry cell and
   // defeat its memoization — only an actual selection/disabled change should.
   const selectionContext = useMemo(
-    () => ({ selected, toggle, disabled }),
-    [selected, toggle, disabled]
+    () => ({ explorer, toggle, disabled }),
+    [explorer, toggle, disabled]
   );
 
   const grid = useMasonry<Pin>({
@@ -276,20 +376,36 @@ export function EditorPaneDesignSearch({
 
   return (
     <div className="flex h-full w-full flex-col bg-background">
-      {/* Sticky action header — the brief + commit controls stay in reach while
-          the gallery scrolls. */}
-      <header className="flex shrink-0 items-center gap-3 border-b px-4 py-2.5">
-        <ImagesIcon className="size-4 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">
-            Pick references{query ? ` for “${query}”` : ""}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {selected.size > 0
-              ? `${selected.size} selected`
-              : "Select the references that fit the brief."}
-          </p>
-        </div>
+      <header className="flex shrink-0 items-center gap-2 border-b px-3 py-2.5">
+        <form
+          onSubmit={search}
+          className="flex min-w-0 flex-1 items-center gap-2"
+        >
+          <div className="relative min-w-0 flex-1">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              aria-label="Search the Library"
+              value={draftQuery}
+              onChange={(event) => setDraftQuery(event.target.value)}
+              placeholder="Search the Library"
+              disabled={disabled}
+              className="h-8 pl-8"
+            />
+          </div>
+          <Button
+            type="submit"
+            variant="secondary"
+            size="sm"
+            disabled={
+              disabled ||
+              !draftQuery.trim() ||
+              draftQuery.trim() === explorer.query
+            }
+          >
+            Search
+          </Button>
+        </form>
         <Button
           type="button"
           variant="ghost"
@@ -302,15 +418,20 @@ export function EditorPaneDesignSearch({
         <Button
           type="button"
           size="sm"
-          disabled={disabled || selected.size === 0}
-          onClick={() =>
-            submit({ picked: items.filter((p) => selected.has(p.id)) })
-          }
+          disabled={disabled || explorer.selectedCount === 0}
+          onClick={() => submit({ picked: explorer.selectedPins })}
         >
-          Use {selected.size > 0 ? selected.size : ""} reference
-          {selected.size === 1 ? "" : "s"}
+          Use {explorer.selectedCount > 0 ? explorer.selectedCount : ""}{" "}
+          reference
+          {explorer.selectedCount === 1 ? "" : "s"}
         </Button>
       </header>
+
+      <SelectedReferences
+        pins={explorer.selectedPins}
+        disabled={disabled}
+        onRemove={removeSelected}
+      />
 
       <div
         ref={scrollRef}
@@ -325,7 +446,7 @@ export function EditorPaneDesignSearch({
 
         {!error && seeded && items.length === 0 && (
           <p className="py-20 text-center text-sm text-muted-foreground">
-            No matching references. Skip, or ask for a different look.
+            No matching references. Try another search.
           </p>
         )}
 

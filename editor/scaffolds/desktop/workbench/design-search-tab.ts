@@ -41,10 +41,13 @@ export function pickToolCallId(entry: ToolCallEntry): string {
   return e.toolCallId ?? e.tool_call_id ?? "";
 }
 
-/** The agent's proposed keyword for this pick. */
+/** The agent's proposed initial search for this pick. */
 export function pickQuery(entry: ToolCallEntry): string {
   const input = ("input" in entry ? entry.input : undefined) as
-    | { query?: unknown }
+    | { initial_search_query?: unknown; query?: unknown }
     | undefined;
+  if (typeof input?.initial_search_query === "string") {
+    return input.initial_search_query;
+  }
   return typeof input?.query === "string" ? input.query : "";
 }

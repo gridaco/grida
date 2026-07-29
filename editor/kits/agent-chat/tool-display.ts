@@ -201,7 +201,7 @@ export namespace toolDisplay {
             "Searched library",
             "Failed to search library"
           ),
-          detail: stringValue(args.query),
+          detail: AgentDesignSearch.initialSearchQuery(args),
           tone,
         };
 

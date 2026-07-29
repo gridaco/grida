@@ -1,8 +1,9 @@
 /**
  * `design_search` — the artwork-station gather+curate step, in one human-input
- * turn. The agent proposes a natural-language KEYWORD; the renderer runs the
- * Grida Library search and shows the results; the USER picks the references that
- * fit. The picked pins (image URLs) are the tool result — the visual brief.
+ * turn. The agent proposes an INITIAL natural-language search; the renderer
+ * opens the Grida Library picker, where the USER may refine the search, explore
+ * multiple directions, and pick references across them. The picked pins (image
+ * URLs) are the tool result — the visual brief.
  *
  * HUMAN-INPUT (joins `HUMAN_INPUT_TOOL_NAMES`): the call pauses at
  * `input-available` until the user submits their picks, exactly like `question`.
@@ -15,7 +16,8 @@
  * fetches it), so there is no byte-copy and no `.canvas` materialization for v1.
  *
  * Per the TOOL-DESIGN doctrine (`tools/index.ts`): a single natural-language
- * `query`. Result count + collection scoping are host concerns, not agent knobs.
+ * initial query. Result count, later user searches, and collection scoping are
+ * host concerns, not agent knobs.
  */
 
 import { tool } from "ai";
@@ -25,18 +27,30 @@ export namespace AgentDesignSearch {
   export const TOOL_NAME = "design_search" as const;
   export type ToolName = typeof TOOL_NAME;
 
-  const INPUT = z.object({
-    query: z
-      .string()
-      .trim()
-      .min(1)
-      .describe(
-        "What kind of reference to gather, in natural language — describe the " +
-          'subject, mood, style, palette, or composition (e.g. "calm minimal ' +
-          'abstract background, warm earth tones", "bold retro concert poster ' +
-          'typography"). The user picks from the results; call again for a new angle.'
-      ),
-  });
+  const QUERY = z
+    .string()
+    .trim()
+    .min(1)
+    .describe(
+      "The initial Library search, in natural language. Describe the subject, " +
+        'mood, style, palette, or composition (e.g. "calm minimal abstract ' +
+        'background, warm earth tones", "bold retro concert poster typography").'
+    );
+
+  // Keep the provider-visible function schema object-rooted. Some providers
+  // reject a root `anyOf`, even though Zod can represent it.
+  const INPUT = z.object({ initial_search_query: QUERY }).strict();
+  const LEGACY_INPUT = z.object({ query: QUERY }).strict();
+
+  export type DesignSearchInput = z.infer<typeof INPUT>;
+
+  /** Read the initial seed from either the current or persisted legacy shape. */
+  export function initialSearchQuery(input: unknown): string {
+    const current = INPUT.safeParse(input);
+    if (current.success) return current.data.initial_search_query;
+    const legacy = LEGACY_INPUT.safeParse(input);
+    return legacy.success ? legacy.data.query : "";
+  }
 
   /** One reference pin (a library object). Used for both the searched results
    *  the renderer shows and the subset the user picks. */
@@ -82,11 +96,11 @@ export namespace AgentDesignSearch {
   export function createTool(opts: { interactive: boolean }) {
     const base = {
       description:
-        "Gather visual references: SEARCH the Grida Library for a description, " +
-        "then the USER picks the ones that fit (a reference/mood board). Returns " +
-        "the picked references (id, title, image url). Use the picked images as " +
-        "inputs when you generate — they condition the result. Call again with a " +
-        "new description to gather a different direction.",
+        "Open a visual-reference picker for the USER, initialized with " +
+        "`initial_search_query`. The user may refine the search, explore multiple " +
+        "directions, and pick references across them. This call waits for their " +
+        "selection and returns the picked references (id, title, image url). Use " +
+        "the picked images as inputs when you generate — they condition the result.",
       inputSchema: INPUT,
       outputSchema,
       toModelOutput: ({ output }: { output: unknown }) =>
@@ -116,9 +130,7 @@ export namespace AgentDesignSearch {
     if (output.skipped || output.picked.length === 0) {
       return {
         type: "text",
-        value:
-          "The user picked no references. Proceed from the prompt alone, or " +
-          "search again with a different description.",
+        value: "The user picked no references. Proceed from the prompt alone.",
       };
     }
     const lines = output.picked.map((r, i) => `${i + 1}. [${r.id}] ${r.url}`);

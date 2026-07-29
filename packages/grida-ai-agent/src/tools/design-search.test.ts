@@ -14,18 +14,33 @@ describe("AgentDesignSearch.createTool", () => {
     expect(tool.execute).toBeTypeOf("function");
     await expect(
       (tool.execute as (input: unknown, ctx: unknown) => Promise<unknown>)(
-        { query: "x" },
+        { initial_search_query: "x" },
         {}
       )
     ).rejects.toThrow(AgentDesignSearch.HEADLESS_REFUSAL);
   });
 
-  it("requires a non-empty query", () => {
+  it("exposes one object-rooted, non-empty initial query to providers", () => {
     const schema = AgentDesignSearch.createTool({ interactive: true })
       .inputSchema as { safeParse: (v: unknown) => { success: boolean } };
-    expect(schema.safeParse({ query: "calm abstract bg" }).success).toBe(true);
-    expect(schema.safeParse({ query: "" }).success).toBe(false);
+    expect(
+      schema.safeParse({ initial_search_query: "calm abstract bg" }).success
+    ).toBe(true);
+    expect(schema.safeParse({ query: "calm abstract bg" }).success).toBe(false);
+    expect(schema.safeParse({ initial_search_query: "" }).success).toBe(false);
     expect(schema.safeParse({}).success).toBe(false);
+  });
+
+  it("reads the current and legacy initial-query shapes", () => {
+    expect(
+      AgentDesignSearch.initialSearchQuery({
+        initial_search_query: "new query",
+      })
+    ).toBe("new query");
+    expect(
+      AgentDesignSearch.initialSearchQuery({ query: "legacy query" })
+    ).toBe("legacy query");
+    expect(AgentDesignSearch.initialSearchQuery({})).toBe("");
   });
 });
 

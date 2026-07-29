@@ -42,7 +42,9 @@ function pickedPins(entry: ToolCallEntry): Pin[] {
 }
 
 export function DesignSearchContent({ entry }: { entry: ToolCallEntry }) {
-  const query = str(asRecord("input" in entry ? entry.input : undefined).query);
+  const initialQuery = AgentDesignSearch.initialSearchQuery(
+    "input" in entry ? entry.input : undefined
+  );
 
   // Pending — the pick card above the composer is handling it.
   if (entry.state === "input-streaming" || entry.state === "input-available") {
@@ -50,7 +52,9 @@ export function DesignSearchContent({ entry }: { entry: ToolCallEntry }) {
       <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
         <Loader2Icon className="size-3.5 animate-spin" />
         <span>
-          Gathering references{query ? ` for “${query}”` : ""} — pick above.
+          Gathering references
+          {initialQuery ? `, starting with “${initialQuery}”` : ""} — pick
+          above.
         </span>
       </div>
     );
@@ -68,7 +72,7 @@ export function DesignSearchContent({ entry }: { entry: ToolCallEntry }) {
   if (picked.length === 0) {
     return (
       <p className="py-2 text-xs text-muted-foreground">
-        No references picked{query ? ` for “${query}”` : ""}.
+        No references picked.
       </p>
     );
   }
@@ -77,7 +81,6 @@ export function DesignSearchContent({ entry }: { entry: ToolCallEntry }) {
     <div className="py-1">
       <p className="mb-1.5 text-xs text-muted-foreground">
         Picked {picked.length} reference{picked.length === 1 ? "" : "s"}
-        {query ? ` for “${query}”` : ""}
       </p>
       <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
         {picked.map((pin) => (

@@ -1,14 +1,14 @@
 /**
  * `design_search` pick UI — the artwork-station gather+curate step.
  *
- * Mental model: the agent proposes a keyword; this is a SESSION-GLOBAL prompt the
- * host pins above its composer (like the `question` card). The run is paused on
- * the human: {@link findPendingDesignSearch} finds the open call, the surface
- * mounts {@link DesignSearchPickCard}, which runs the library search (via the
- * `fetchResults` the surface injects — the library client is app-side), shows the
- * results, and lets the user MULTI-SELECT. The picked references leave through
- * `onPick` → `chat.addToolResult({ tool: "design_search", toolCallId, output })`,
- * and the paused run resumes conditioned on the picks.
+ * Mental model: the agent proposes an initial search; this is a SESSION-GLOBAL
+ * prompt the host pins above its composer (like the `question` card). The run is
+ * paused on the human: {@link findPendingDesignSearch} finds the open call, the
+ * surface mounts {@link DesignSearchPickCard}, and the user may refine the
+ * app-side Library search and select across multiple searches. The picked
+ * references leave through `onPick` → `chat.addToolResult({ tool:
+ * "design_search", toolCallId, output })`, and the paused run resumes
+ * conditioned on the picks.
  *
  * Library pins are URLs — nothing is downloaded here; a pick carries its image
  * url straight through to image-to-image.
@@ -16,12 +16,14 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
-import { Loader2Icon, CheckIcon } from "lucide-react";
+import { Input } from "@app/ui/components/input";
+import { CheckIcon, Loader2Icon, SearchIcon, XIcon } from "lucide-react";
 import { AgentDesignSearch } from "@grida/agent/tools/design-search";
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
+import { DesignSearchExplorer } from "./design-search-explorer";
 
 type Pin = AgentDesignSearch.DesignSearchResult;
 type Output = AgentDesignSearch.DesignSearchOutput;
@@ -42,15 +44,9 @@ function toolCallIdOf(entry: ToolCallEntry): string {
 }
 
 function queryOf(entry: ToolCallEntry): string {
-  const input = ("input" in entry ? entry.input : undefined) as
-    | { query?: unknown }
-    | undefined;
-  return typeof input?.query === "string" ? input.query : "";
-}
-
-/** The pins to return, in result order, for the selected ids. Pure + testable. */
-export function selectedPins(results: Pin[], ids: ReadonlySet<string>): Pin[] {
-  return results.filter((r) => ids.has(r.id));
+  return AgentDesignSearch.initialSearchQuery(
+    "input" in entry ? entry.input : undefined
+  );
 }
 
 /**
@@ -94,38 +90,67 @@ export function DesignSearchPickCard({
   disabled?: boolean;
 }) {
   const toolCallId = toolCallIdOf(entry);
-  const query = queryOf(entry);
+  return (
+    <DesignSearchPickForm
+      key={toolCallId}
+      toolCallId={toolCallId}
+      initialQuery={queryOf(entry)}
+      onPick={onPick}
+      fetchResults={fetchResults}
+      disabled={disabled}
+    />
+  );
+}
+
+function DesignSearchPickForm({
+  toolCallId,
+  initialQuery,
+  onPick,
+  fetchResults,
+  disabled,
+}: {
+  toolCallId: string;
+  initialQuery: string;
+  onPick: PickReferencesHandler;
+  fetchResults: FetchReferences;
+  disabled?: boolean;
+}) {
+  const [draftQuery, setDraftQuery] = useState(initialQuery);
+  const [explorer, setExplorer] = useState(() =>
+    DesignSearchExplorer.create(initialQuery)
+  );
+  const explorerRef = useRef(explorer);
   const [results, setResults] = useState<Pin[] | null>(null);
   const [error, setError] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
 
-  // Fetch once per pending call. A new call (new toolCallId) reruns it.
+  // Fetch once for the initial query and again for each committed refinement.
   useEffect(() => {
-    let live = true;
+    const ticket = explorer.ticket();
+    const fresh = () => explorerRef.current.accepts(ticket);
     setResults(null);
     setError(false);
-    setSelected(new Set());
-    setSubmitted(false);
-    fetchResults(query)
+    void fetchResults(ticket.query)
       .then((pins) => {
-        if (live) setResults(pins);
+        if (fresh()) setResults(pins);
       })
       .catch(() => {
-        if (live) setError(true);
+        if (fresh()) setError(true);
       });
-    return () => {
-      live = false;
-    };
-  }, [toolCallId, query, fetchResults]);
+  }, [explorer.query, explorer.revision, fetchResults]);
 
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  function toggle(pin: Pin) {
+    if (busy) return;
+    const next = explorerRef.current.toggle(pin);
+    explorerRef.current = next;
+    setExplorer(next);
+  }
+
+  function removeSelected(id: string) {
+    if (busy) return;
+    const next = explorerRef.current.remove(id);
+    explorerRef.current = next;
+    setExplorer(next);
   }
 
   function submit(output: Output) {
@@ -136,18 +161,77 @@ export function DesignSearchPickCard({
 
   const busy = disabled || submitted;
 
+  function search(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    const current = explorerRef.current;
+    const next = current.refine(draftQuery);
+    setDraftQuery(next.query);
+    if (next === current) return;
+    explorerRef.current = next;
+    setExplorer(next);
+    setResults(null);
+    setError(false);
+  }
+
   return (
     <div className="rounded-lg border border-border bg-background p-3 shadow-sm">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          Pick references{query ? ` for “${query}”` : ""}
-        </p>
-        {selected.size > 0 && (
-          <span className="text-xs text-muted-foreground">
-            {selected.size} selected
+      <form onSubmit={search} className="mb-2 flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            aria-label="Search the Library"
+            value={draftQuery}
+            onChange={(event) => setDraftQuery(event.target.value)}
+            placeholder="Search the Library"
+            disabled={busy}
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
+        <Button
+          type="submit"
+          variant="secondary"
+          size="sm"
+          disabled={
+            busy || !draftQuery.trim() || draftQuery.trim() === explorer.query
+          }
+        >
+          Search
+        </Button>
+      </form>
+
+      {explorer.selectedCount > 0 && (
+        <div className="mb-2 flex items-center gap-2">
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {explorer.selectedCount} selected
           </span>
-        )}
-      </div>
+          <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+            {explorer.selectedPins.map((pin) => (
+              <button
+                key={pin.id}
+                type="button"
+                disabled={busy}
+                onClick={() => removeSelected(pin.id)}
+                aria-label={`Remove ${pin.title}`}
+                title={`Remove ${pin.title}`}
+                className="group relative size-8 shrink-0 overflow-hidden rounded border border-border"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pin.url}
+                  alt=""
+                  draggable={false}
+                  className="size-full select-none object-cover"
+                />
+                <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
+                  <XIcon className="size-3" />
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {results === null && !error && (
         <div className="flex items-center gap-2 py-6 text-xs text-muted-foreground">
@@ -164,21 +248,21 @@ export function DesignSearchPickCard({
 
       {results && results.length === 0 && (
         <p className="py-4 text-xs text-muted-foreground">
-          No matching references. Skip, or ask for a different look.
+          No matching references. Try another search.
         </p>
       )}
 
       {results && results.length > 0 && (
         <div className="grid max-h-72 grid-cols-3 gap-1.5 overflow-y-auto sm:grid-cols-4">
           {results.map((pin) => {
-            const on = selected.has(pin.id);
+            const on = explorer.isSelected(pin.id);
             return (
               <button
                 key={pin.id}
                 type="button"
                 disabled={busy}
                 aria-pressed={on}
-                onClick={() => toggle(pin.id)}
+                onClick={() => toggle(pin)}
                 title={pin.title}
                 className={cn(
                   "relative aspect-square overflow-hidden rounded-md border-2 transition",
@@ -218,13 +302,12 @@ export function DesignSearchPickCard({
         <Button
           type="button"
           size="sm"
-          disabled={busy || selected.size === 0}
-          onClick={() =>
-            submit({ picked: selectedPins(results ?? [], selected) })
-          }
+          disabled={busy || explorer.selectedCount === 0}
+          onClick={() => submit({ picked: explorer.selectedPins })}
         >
-          Use {selected.size > 0 ? selected.size : ""} reference
-          {selected.size === 1 ? "" : "s"}
+          Use {explorer.selectedCount > 0 ? explorer.selectedCount : ""}{" "}
+          reference
+          {explorer.selectedCount === 1 ? "" : "s"}
         </Button>
       </div>
     </div>
