@@ -22,6 +22,10 @@ export const uiNavGroups: NavGroup[] = [
       { name: "Rich Text Editor", href: "/ui/components/rich-text-editor" },
       { name: "Code Editor (CodeMirror)", href: "/ui/components/codemirror" },
       { name: "Timeline", href: "/ui/components/timeline" },
+      {
+        name: "Memory Navigator",
+        href: "/ui/components/memory-navigator",
+      },
       { name: "Property Controls", href: "/ui/components/property" },
       { name: "Flex Align", href: "/ui/components/controls-flex-align" },
     ],
