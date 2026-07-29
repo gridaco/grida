@@ -9,9 +9,13 @@
  * downloaded; a picked pin's url is fed straight into image-to-image.
  */
 
-import { browse, search } from "@/app/(library)/library/actions";
+import { browse, search, similar } from "@/app/(library)/library/actions";
 import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
 import { IMAGE_ATTACHMENT_POLICY } from "@/lib/agent-chat";
+import type {
+  LibraryExplorerPage,
+  LibraryExplorerSource,
+} from "@/kits/library-explorer";
 
 /** A first-party Library pin carries the source MIME in addition to the agent
  *  tool's provider-neutral result shape. Composer attachments need it to build
@@ -64,33 +68,40 @@ export async function resolveDesignSearch(
   return data.map(toPin);
 }
 
-/** A page of results for the infinite-scroll picker surface. `count` is the
- *  candidate universe (total pickable rows) the loader pages through; it may be
- *  undefined when the backend can't estimate it. */
-export type DesignSearchPage = {
-  items: AgentDesignSearch.DesignSearchResult[];
-  count: number | undefined;
-};
-
 export type DesignLibraryPage = {
   items: DesignLibraryPin[];
   count: number | undefined;
 };
 
-/** Fetch one inclusive `[start, end]` range of results — the dedicated
- *  editor-pane picker's paginated fetch (`search` paginates semantic queries via
- *  match_count/match_offset; see `(library)/library/actions.ts`). */
-export async function resolveDesignSearchPage(
-  query: string,
+/**
+ * One injected page source for the embedded Library explorer. The kit stays
+ * route/I/O agnostic; this Desktop seam binds its source values to the existing
+ * public Library actions. Their PostgREST totals are estimates (and semantic
+ * search's candidate count is narrower than its RPC), so they are not exposed
+ * as terminal bounds; a short page is the authoritative end of this feed.
+ */
+export async function resolveLibraryExplorerPage(
+  source: LibraryExplorerSource,
   range: [number, number]
-): Promise<DesignSearchPage> {
-  const { data, count } = await search({ text: query, range });
-  return { items: data.map(toPin), count: count ?? undefined };
+): Promise<LibraryExplorerPage> {
+  if (source.kind === "browse") {
+    const { data } = await browse({ range });
+    return { items: data.map(toLibraryPin), exactCount: undefined };
+  }
+
+  if (source.kind === "search") {
+    const { data } = await search({ text: source.query, range });
+    return { items: data.map(toLibraryPin), exactCount: undefined };
+  }
+
+  const { data, error } = await similar(source.objectId, { range });
+  if (error) throw error;
+  return { items: (data ?? []).map(toLibraryPin), exactCount: undefined };
 }
 
 /** Cold-browse a page of the curated corpus (no query) — the home reference
- *  gallery's fetch. Same {@link DesignSearchPage} shape as the query path so a
- *  gallery can page through either identically. */
+ *  gallery's fetch. It uses the same page shape as the embedded explorer so
+ *  both paths paginate identically. */
 export async function resolveDesignBrowsePage(
   range: [number, number],
   options: { attachmentImagesOnly?: boolean } = {}

@@ -23,12 +23,13 @@
  * minted `~/Documents/Grida/<prompt>` folders per session and pre-picked where
  * to work; that's the legacy this replaces.)
  *
- * Clicking a gallery reference OR a slides template doesn't start anything — it
- * drops the pick into the composer's tray (references multi-select; a template
- * is single-select, like choosing one Keynote theme). The user can add a prompt,
- * then start ONE session. References fold into the first-turn prompt as plain
- * URLs; a picked template's unzipped `.canvas` bundle rides the handoff into the
- * session's SCRATCH dir — agent-only reference, like an attachment (WG
+ * A reference card opens related Library ideas; its Add action drops that
+ * reference into the composer's tray. A slides template is selected directly
+ * (references multi-select; a template is single-select, like choosing one
+ * Keynote theme). Neither action starts work on its own. The user can add a
+ * prompt, then start ONE session. References fold into the first-turn prompt as
+ * plain URLs; a picked template's unzipped `.canvas` bundle rides the handoff
+ * into the session's SCRATCH dir — agent-only reference, like an attachment (WG
  * `scratch.md`), never the user's workspace — and the prompt tells the agent to
  * read it from scratch and build the adapted deck. Every start opens the MAIN
  * workbench (`/desktop/workspace`) — the full surface with the file tree,
@@ -66,8 +67,12 @@ import {
 } from "@/scaffolds/desktop/shared/model-picker";
 import { useEndpointProviders } from "@/scaffolds/desktop/shared/registered-models";
 import type { ComposerCatalog } from "@/kits/composer";
+import {
+  LibraryExplorerView,
+  type LibraryExplorerViewHandle,
+} from "@/kits/library-explorer";
 import { workspaceWorkbenchHref } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
-import { ReferenceGallery } from "@/scaffolds/desktop/home/reference-gallery";
+import { resolveLibraryExplorerPage } from "@/scaffolds/desktop/shared/design-search";
 import { SlidesTemplateGallery } from "@/scaffolds/desktop/home/slides-template-gallery";
 // `import type` is erased at build — it does NOT pull the loader (and its
 // fflate/dotcanvas deps) into the home chunk; the gallery's dynamic `import()`
@@ -86,6 +91,7 @@ import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
 import { last_workspace } from "@/lib/desktop/last-workspace";
 
 const NOOP = () => {};
+const WELCOME_LIBRARY_SOURCE = { kind: "browse" } as const;
 
 /**
  * The native host adds `?startup=restore-last-workspace` only to the cold-start
@@ -183,6 +189,7 @@ function WelcomeSurface({
   // The home's single page-scroll container — everything (composer, gallery)
   // scrolls together inside it; the gallery virtualizes against it.
   const scrollRef = useRef<HTMLDivElement>(null);
+  const libraryRef = useRef<LibraryExplorerViewHandle>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The active `application_preset` (SPIKE). Mutated by the icon rail and the
@@ -487,7 +494,7 @@ function WelcomeSurface({
     [busy, pickedTemplate, pickedRefs, target, handoffAndGo, startFresh]
   );
 
-  // Clicking a gallery reference toggles it in the composer's tray (multi-select)
+  // A Library card's Add action toggles it in the composer's tray (multi-select)
   // instead of starting a board on its own — the user gathers several, then
   // starts one board from all of them via the composer / the tray's Start button.
   const togglePick = useCallback(
@@ -648,17 +655,27 @@ function WelcomeSurface({
                           key={p.id}
                           className="group relative size-14 shrink-0 overflow-hidden rounded-lg border bg-background shadow-sm"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={p.url}
-                            alt={p.title}
-                            className="size-full object-cover"
-                          />
                           <button
                             type="button"
+                            disabled={busy}
+                            onClick={() => libraryRef.current?.navigate(p)}
+                            aria-label={`Show ${p.title}`}
+                            className="block size-full cursor-pointer disabled:cursor-default"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={p.url}
+                              alt=""
+                              draggable={false}
+                              className="size-full select-none object-cover"
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
                             onClick={() => togglePick(p)}
                             aria-label={`Remove ${p.title}`}
-                            className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 shadow transition group-hover:opacity-100"
+                            className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 shadow transition group-hover:opacity-100 disabled:opacity-50"
                           >
                             <XIcon className="size-3" />
                           </button>
@@ -746,8 +763,11 @@ function WelcomeSurface({
                   disabled={busy}
                 />
               ) : (
-                <ReferenceGallery
-                  onPick={togglePick}
+                <LibraryExplorerView
+                  ref={libraryRef}
+                  initialSource={WELCOME_LIBRARY_SOURCE}
+                  loadPage={resolveLibraryExplorerPage}
+                  onToggle={togglePick}
                   selectedIds={selectedRefIds}
                   disabled={busy}
                   scrollContainerRef={scrollRef}

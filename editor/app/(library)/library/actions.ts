@@ -164,7 +164,7 @@ export async function _similar(
       {
         ref_id: id,
       },
-      { count: "estimated", get: true }
+      { get: true }
     )
     .select(__select_object_with_author)
     .range(options.range[0], options.range[1]);
