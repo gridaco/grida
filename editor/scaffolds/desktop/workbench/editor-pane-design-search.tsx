@@ -37,12 +37,20 @@ import {
   useMasonry,
   usePositioner,
   useResizeObserver,
+  useScrollToIndex,
   type LoadMoreItemsCallback,
 } from "masonic";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
-import { CheckIcon, Loader2Icon, SearchIcon, XIcon } from "lucide-react";
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  Loader2Icon,
+  PlusIcon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react";
 import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
 import { DesignSearchExplorer } from "@/kits/agent-chat";
 import {
@@ -54,6 +62,7 @@ import {
   pickToolCallId,
   type DesignSearchSession,
 } from "./design-search-tab";
+import { DesignSearchFocusFeedback } from "./design-search-focus-feedback";
 
 type Pin = AgentDesignSearch.DesignSearchResult;
 
@@ -67,86 +76,187 @@ const SelectionContext = createContext<{
   explorer: DesignSearchExplorer;
   toggle: (pin: Pin) => void;
   disabled: boolean;
+  focusFeedback: DesignSearchFocusFeedback | null;
 }>({
   explorer: DesignSearchExplorer.create(""),
   toggle: () => {},
   disabled: false,
+  focusFeedback: null,
 });
 
 /** One masonry cell — masonic passes `{ index, data, width }`; we size the cell
  *  to the pin's aspect ratio (no per-item measurement). */
 function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
-  const { explorer, toggle, disabled } = useContext(SelectionContext);
-  const on = explorer.isSelected(pin.id);
+  const { explorer, toggle, disabled, focusFeedback } =
+    useContext(SelectionContext);
+  const selected = explorer.isSelected(pin.id);
+  const [showAddedLabel, setShowAddedLabel] = useState(false);
+  const addedLabelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aspect = pin.width && pin.height ? pin.width / pin.height : 1;
   const height = width / aspect;
+
+  useEffect(() => {
+    return () => {
+      if (addedLabelTimerRef.current !== null) {
+        clearTimeout(addedLabelTimerRef.current);
+      }
+    };
+  }, []);
+
+  const toggleSelection = () => {
+    if (addedLabelTimerRef.current !== null) {
+      clearTimeout(addedLabelTimerRef.current);
+      addedLabelTimerRef.current = null;
+    }
+
+    if (selected) {
+      setShowAddedLabel(false);
+    } else {
+      setShowAddedLabel(true);
+      addedLabelTimerRef.current = setTimeout(() => {
+        setShowAddedLabel(false);
+        addedLabelTimerRef.current = null;
+      }, 100);
+    }
+
+    toggle(pin);
+  };
+
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      aria-pressed={on}
-      onClick={() => toggle(pin)}
-      title={pin.title}
+    <div
+      ref={focusFeedback?.ref(pin.id)}
       style={{ width, height }}
       className={cn(
-        "group relative block overflow-hidden rounded-lg border-2 transition",
-        on ? "border-primary" : "border-transparent hover:border-border"
+        "group relative block rounded-lg border-2 border-transparent transition",
+        selected && "ring-2 ring-primary/25"
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={pin.url}
-        alt={pin.title}
-        loading="lazy"
-        className="size-full object-cover"
-      />
-      {on && (
-        <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
-          <CheckIcon className="size-3.5" />
-        </span>
-      )}
-    </button>
+      <div className="relative size-full overflow-hidden rounded-[inherit]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={pin.url}
+          alt={pin.title}
+          loading="lazy"
+          className={cn(
+            "size-full object-cover transition",
+            selected && "brightness-90"
+          )}
+        />
+        <button
+          type="button"
+          disabled={disabled}
+          aria-pressed={selected}
+          onClick={toggleSelection}
+          title={selected ? "Remove from selection" : "Add to selection"}
+          className={cn(
+            "group/action absolute right-1.5 top-1.5 z-20 flex items-center justify-center rounded-full px-2 py-1 text-xs font-medium shadow transition-all disabled:opacity-50",
+            selected
+              ? cn(
+                  "bg-primary text-primary-foreground",
+                  showAddedLabel
+                    ? "gap-1"
+                    : "gap-0 hover:gap-1 focus-visible:gap-1"
+                )
+              : "bg-background/90 text-foreground opacity-0 hover:bg-background group-hover:opacity-100 focus-visible:opacity-100"
+          )}
+        >
+          {selected ? (
+            <>
+              <CheckIcon className="size-3.5" />
+              <span
+                className={cn(
+                  "overflow-hidden whitespace-nowrap transition-all duration-150",
+                  showAddedLabel
+                    ? "max-w-12 opacity-100"
+                    : "max-w-0 opacity-0 group-hover/action:max-w-12 group-hover/action:opacity-100 group-focus-visible/action:max-w-12 group-focus-visible/action:opacity-100"
+                )}
+              >
+                Added
+              </span>
+            </>
+          ) : (
+            <>
+              <PlusIcon className="size-3.5" />
+              Add
+            </>
+          )}
+        </button>
+      </div>
+    </div>
   );
 }
 
-function SelectedReferences({
+function SelectionBar({
   pins,
   disabled,
   onRemove,
+  onUse,
+  resultIndexById,
+  onNavigate,
 }: {
   pins: Pin[];
   disabled: boolean;
   onRemove: (id: string) => void;
+  onUse: () => void;
+  resultIndexById: ReadonlyMap<string, number>;
+  onNavigate: (id: string, index: number) => void;
 }) {
   if (pins.length === 0) return null;
   return (
-    <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
-      <span className="shrink-0 text-xs text-muted-foreground">
-        {pins.length} selected
-      </span>
-      <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
-        {pins.map((pin) => (
-          <button
-            key={pin.id}
-            type="button"
-            disabled={disabled}
-            onClick={() => onRemove(pin.id)}
-            aria-label={`Remove ${pin.title}`}
-            title={`Remove ${pin.title}`}
-            className="group relative size-9 shrink-0 overflow-hidden rounded-md border border-border"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={pin.url}
-              alt=""
-              draggable={false}
-              className="size-full select-none object-cover"
-            />
-            <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/45 group-hover:opacity-100">
-              <XIcon className="size-3.5" />
-            </span>
-          </button>
-        ))}
+    <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+      <div className="pointer-events-auto flex min-w-64 max-w-[min(30rem,100%)] items-center gap-2 rounded-xl border border-background/10 bg-foreground/95 p-1.5 shadow-lg backdrop-blur">
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1.5 overflow-visible">
+          {pins.map((pin) => {
+            const resultIndex = resultIndexById.get(pin.id);
+            return (
+              <div
+                key={pin.id}
+                className="group relative size-11 shrink-0 rounded-md border border-background/15"
+              >
+                <button
+                  type="button"
+                  disabled={disabled || resultIndex === undefined}
+                  onClick={() => {
+                    if (resultIndex !== undefined) {
+                      onNavigate(pin.id, resultIndex);
+                    }
+                  }}
+                  aria-label={`Show ${pin.title} in results`}
+                  className="block size-full cursor-pointer overflow-hidden rounded-[inherit] disabled:cursor-default"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={pin.url}
+                    alt=""
+                    draggable={false}
+                    className="size-full select-none object-cover"
+                  />
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onRemove(pin.id)}
+                  aria-label={`Remove ${pin.title}`}
+                  className="pointer-events-none absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-background text-foreground opacity-0 shadow ring-1 ring-foreground/10 transition hover:scale-105 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:opacity-50"
+                >
+                  <XIcon className="size-2.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="xs"
+          disabled={disabled}
+          onClick={onUse}
+          aria-label={`Use ${pins.length} reference${pins.length === 1 ? "" : "s"}`}
+          className="mx-4 h-8 shrink-0 rounded-full px-4 py-2 has-[>svg]:px-4"
+        >
+          Use
+          <ArrowRightIcon />
+        </Button>
       </div>
     </div>
   );
@@ -183,6 +293,9 @@ function DesignSearchPicker({
     DesignSearchExplorer.create(initialQuery)
   );
   const explorerRef = useRef(explorer);
+  const focusFeedback = useMemo(() => new DesignSearchFocusFeedback(), []);
+
+  useEffect(() => () => focusFeedback.dispose(), [focusFeedback]);
 
   const [items, setItems] = useState<Pin[]>([]);
   const [count, setCount] = useState<number | undefined>(undefined);
@@ -305,6 +418,18 @@ function DesignSearchPicker({
     [explorer.revision]
   );
   const resizeObserver = useResizeObserver(positioner);
+  const scrollToResult = useScrollToIndex(positioner, {
+    element: scrollRef,
+    height: size.height,
+    align: "center",
+  });
+  const navigateToResult = useCallback(
+    (id: string, index: number) => {
+      scrollToResult(index);
+      focusFeedback.flash(id);
+    },
+    [focusFeedback, scrollToResult]
+  );
 
   const toggle = useCallback(
     (pin: Pin) => {
@@ -326,6 +451,9 @@ function DesignSearchPicker({
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    event.currentTarget
+      .querySelector<HTMLInputElement>('input[type="search"]')
+      ?.blur();
     if (disabled) return;
     const current = explorerRef.current;
     const next = current.refine(draftQuery);
@@ -357,8 +485,16 @@ function DesignSearchPicker({
   // on every scroll frame) doesn't push a new value to every masonry cell and
   // defeat its memoization — only an actual selection/disabled change should.
   const selectionContext = useMemo(
-    () => ({ explorer, toggle, disabled }),
-    [explorer, toggle, disabled]
+    () => ({ explorer, toggle, disabled, focusFeedback }),
+    [explorer, toggle, disabled, focusFeedback]
+  );
+
+  // TODO: Preserve per-query results before navigating selections from earlier
+  // searches. For now, only thumbnails still present in `items` are navigable,
+  // and Masonic's index helper scrolls to them immediately rather than smoothly.
+  const resultIndexById = useMemo(
+    () => new Map(items.map((item, index) => [item.id, index])),
+    [items]
   );
 
   const grid = useMasonry<Pin>({
@@ -375,12 +511,9 @@ function DesignSearchPicker({
   });
 
   return (
-    <div className="flex h-full w-full flex-col bg-background">
+    <div className="relative flex h-full w-full flex-col bg-background">
       <header className="flex shrink-0 items-center gap-2 border-b px-3 py-2.5">
-        <form
-          onSubmit={search}
-          className="flex min-w-0 flex-1 items-center gap-2"
-        >
+        <form onSubmit={search} className="min-w-0 flex-1">
           <div className="relative min-w-0 flex-1">
             <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -393,50 +526,13 @@ function DesignSearchPicker({
               className="h-8 pl-8"
             />
           </div>
-          <Button
-            type="submit"
-            variant="secondary"
-            size="sm"
-            disabled={
-              disabled ||
-              !draftQuery.trim() ||
-              draftQuery.trim() === explorer.query
-            }
-          >
-            Search
-          </Button>
         </form>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={disabled}
-          onClick={() => submit({ picked: [], skipped: true })}
-        >
-          Skip
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          disabled={disabled || explorer.selectedCount === 0}
-          onClick={() => submit({ picked: explorer.selectedPins })}
-        >
-          Use {explorer.selectedCount > 0 ? explorer.selectedCount : ""}{" "}
-          reference
-          {explorer.selectedCount === 1 ? "" : "s"}
-        </Button>
       </header>
-
-      <SelectedReferences
-        pins={explorer.selectedPins}
-        disabled={disabled}
-        onRemove={removeSelected}
-      />
 
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="min-h-0 flex-1 overflow-y-auto p-3"
+        className="min-h-0 flex-1 overflow-y-auto p-3 pb-24"
       >
         {error && items.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-center text-sm text-muted-foreground">
@@ -468,6 +564,15 @@ function DesignSearchPicker({
           </div>
         )}
       </div>
+
+      <SelectionBar
+        pins={explorer.selectedPins}
+        disabled={disabled}
+        onRemove={removeSelected}
+        onUse={() => submit({ picked: explorer.selectedPins })}
+        resultIndexById={resultIndexById}
+        onNavigate={navigateToResult}
+      />
     </div>
   );
 }

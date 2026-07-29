@@ -84,7 +84,6 @@ function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
   const height = width / aspect;
   return (
     <div
-      title={pin.title}
       style={{ width, height }}
       className={cn(
         "group relative block overflow-hidden transition",

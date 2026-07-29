@@ -412,13 +412,15 @@ export function WorkspaceWorkbench({
     [group]
   );
   const closeTab = useCallback(
-    (relPath: string) => group.close(relPath),
-    [group]
+    (relPath: string) => {
+      if (relPath === DESIGN_SEARCH_TAB_ID) designSearch?.onSkip();
+      group.close(relPath);
+    },
+    [group, designSearch]
   );
   const reopenClosedTab = useCallback(() => group.reopenClosed(), [group]);
 
-  // Reopen/focus the picker for the current pending pick (the agent-pane note's
-  // affordance after a manual close). Only meaningful while a pick is pending.
+  // Focus the picker for the current pending pick from the agent-pane note.
   const focusDesignSearchTab = useCallback(() => {
     if (designSearch) group.open(DESIGN_SEARCH_TAB_ID);
   }, [group, designSearch]);

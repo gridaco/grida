@@ -20,7 +20,13 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
-import { CheckIcon, Loader2Icon, SearchIcon, XIcon } from "lucide-react";
+import {
+  CheckIcon,
+  Loader2Icon,
+  PlusIcon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react";
 import { AgentDesignSearch } from "@grida/agent/tools/design-search";
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
 import { DesignSearchExplorer } from "./design-search-explorer";
@@ -163,6 +169,9 @@ function DesignSearchPickForm({
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    event.currentTarget
+      .querySelector<HTMLInputElement>('input[type="search"]')
+      ?.blur();
     if (busy) return;
     const current = explorerRef.current;
     const next = current.refine(draftQuery);
@@ -176,7 +185,7 @@ function DesignSearchPickForm({
 
   return (
     <div className="rounded-lg border border-border bg-background p-3 shadow-sm">
-      <form onSubmit={search} className="mb-2 flex items-center gap-2">
+      <form onSubmit={search} className="mb-2">
         <div className="relative min-w-0 flex-1">
           <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -189,16 +198,6 @@ function DesignSearchPickForm({
             className="h-8 pl-8 text-xs"
           />
         </div>
-        <Button
-          type="submit"
-          variant="secondary"
-          size="sm"
-          disabled={
-            busy || !draftQuery.trim() || draftQuery.trim() === explorer.query
-          }
-        >
-          Search
-        </Button>
       </form>
 
       {explorer.selectedCount > 0 && (
@@ -255,20 +254,14 @@ function DesignSearchPickForm({
       {results && results.length > 0 && (
         <div className="grid max-h-72 grid-cols-3 gap-1.5 overflow-y-auto sm:grid-cols-4">
           {results.map((pin) => {
-            const on = explorer.isSelected(pin.id);
+            const selected = explorer.isSelected(pin.id);
             return (
-              <button
+              <div
                 key={pin.id}
-                type="button"
-                disabled={busy}
-                aria-pressed={on}
-                onClick={() => toggle(pin)}
-                title={pin.title}
                 className={cn(
-                  "relative aspect-square overflow-hidden rounded-md border-2 transition",
-                  on
-                    ? "border-primary"
-                    : "border-transparent hover:border-border"
+                  "group relative aspect-square overflow-hidden rounded-md transition",
+                  selected &&
+                    "ring-2 ring-primary ring-offset-2 ring-offset-background"
                 )}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -276,14 +269,33 @@ function DesignSearchPickForm({
                   src={pin.url}
                   alt={pin.title}
                   loading="lazy"
-                  className="size-full object-cover"
+                  className={cn(
+                    "size-full object-cover transition",
+                    selected && "brightness-90"
+                  )}
                 />
-                {on && (
-                  <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    <CheckIcon className="size-3" />
-                  </span>
-                )}
-              </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  aria-pressed={selected}
+                  onClick={() => toggle(pin)}
+                  title={
+                    selected ? "Remove from selection" : "Add to selection"
+                  }
+                  className={cn(
+                    "absolute right-1 top-1 flex size-6 items-center justify-center rounded-full text-xs font-medium shadow transition disabled:opacity-50",
+                    selected
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background/90 text-foreground opacity-0 hover:bg-background group-hover:opacity-100 focus-visible:opacity-100"
+                  )}
+                >
+                  {selected ? (
+                    <CheckIcon className="size-3.5" />
+                  ) : (
+                    <PlusIcon className="size-3.5" />
+                  )}
+                </button>
+              </div>
             );
           })}
         </div>

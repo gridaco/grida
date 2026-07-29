@@ -32,6 +32,9 @@ export function isVirtualTab(id: string): boolean {
 export type DesignSearchSession = {
   entry: ToolCallEntry;
   onPick: PickReferencesHandler;
+  /** Resolve the pending call as skipped. Shared by every cancellation surface,
+   * including the agent-pane affordance and an explicit picker-tab close. */
+  onSkip: () => void;
   busy: boolean;
 };
 
