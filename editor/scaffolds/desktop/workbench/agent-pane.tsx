@@ -43,6 +43,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@app/ui/ai-elements/conversation";
+import { Button } from "@app/ui/components/button";
 import { ImagesIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 import {
@@ -91,7 +92,11 @@ import {
   type AnswerQuestionHandler,
   type PickReferencesHandler,
 } from "@/kits/agent-chat";
-import { pickQuery, type DesignSearchSession } from "./design-search-tab";
+import {
+  pickQuery,
+  pickToolCallId,
+  type DesignSearchSession,
+} from "./design-search-tab";
 import { QueuedMessages } from "../shared/queued-messages";
 import { ChatSessionPicker } from "../shared/chat-session-picker";
 import {
@@ -134,8 +139,7 @@ export type AgentPaneProps = {
   /** Pushes the live `design_search` pick up to the workbench, which hosts the
    * picker as a dedicated editor-pane tab. null when no pick is pending. */
   onDesignSearchChange?: (session: DesignSearchSession | null) => void;
-  /** Reopen/focus the picker tab — the affordance behind the in-pane note when
-   * a pick is pending (e.g. after the user closed the tab). */
+  /** Focus the picker tab from the in-pane note while a pick is pending. */
   onOpenPicker?: () => void;
 };
 
@@ -781,16 +785,41 @@ function AgentPaneContent({
   // the tool result and `sendAutomaticallyWhen` resumes the paused run, now
   // conditioned on the picked references. Same stable-instance reasoning as
   // `onAnswerQuestion`.
+  // A human-input tool call may be resolved from more than one surface (the
+  // picker, its chat affordance, or closing the virtual tab). Claim its id
+  // before enqueueing the AI-SDK update so two near-simultaneous intents cannot
+  // produce two tool results / resume attempts. A failed enqueue releases the
+  // claim so the user can retry.
+  const resolvedDesignSearchCallsRef = useRef(new Set<string>());
   const onPickReferences = useCallback<PickReferencesHandler>(
     (toolCallId, output) => {
-      void chatRef.current?.addToolResult({
-        tool: "design_search",
-        toolCallId,
-        output,
-      });
+      const chat = chatRef.current;
+      const resolved = resolvedDesignSearchCallsRef.current;
+      if (!chat || resolved.has(toolCallId)) return;
+      resolved.add(toolCallId);
+      try {
+        const result = chat.addToolResult({
+          tool: "design_search",
+          toolCallId,
+          output,
+        });
+        // AI SDK permits synchronous void or an async thenable here. Normalize
+        // both forms so an async enqueue failure releases the claim for retry.
+        void Promise.resolve(result).catch(() => resolved.delete(toolCallId));
+      } catch {
+        resolved.delete(toolCallId);
+      }
     },
     []
   );
+
+  const onSkipReferences = useCallback(() => {
+    if (!pendingPick) return;
+    onPickReferences(pickToolCallId(pendingPick), {
+      picked: [],
+      skipped: true,
+    });
+  }, [pendingPick, onPickReferences]);
 
   const onAnswerQuestion = useCallback<AnswerQuestionHandler>(
     (toolCallId, output) => {
@@ -823,10 +852,21 @@ function AgentPaneContent({
   useEffect(() => {
     onDesignSearchChange?.(
       pendingPick
-        ? { entry: pendingPick, onPick: onPickReferences, busy }
+        ? {
+            entry: pendingPick,
+            onPick: onPickReferences,
+            onSkip: onSkipReferences,
+            busy,
+          }
         : null
     );
-  }, [pendingPick, busy, onPickReferences, onDesignSearchChange]);
+  }, [
+    pendingPick,
+    busy,
+    onPickReferences,
+    onSkipReferences,
+    onDesignSearchChange,
+  ]);
 
   // Clear the lifted session if this pane unmounts mid-pick (closes the tab).
   useEffect(() => {
@@ -936,24 +976,36 @@ function AgentPaneContent({
       )}
 
       {/* The agent gathered references — the picker opens in the editor pane as
-          a dedicated tab. This note keeps the request visible here and reopens
-          the tab if the user closed it. */}
+          a dedicated tab. This note keeps the request visible and focuses the
+          picker if the user navigated to another tab. */}
       {pendingPick && (
         <div className="shrink-0 p-3">
-          <button
-            type="button"
-            onClick={() => onOpenPicker?.()}
-            className="flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-xs text-muted-foreground shadow-sm transition hover:border-foreground/20 hover:text-foreground"
-          >
-            <ImagesIcon className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">
-              Pick references
-              {pickQuery(pendingPick)
-                ? ` for “${pickQuery(pendingPick)}”`
-                : ""}{" "}
-              — open the picker
-            </span>
-          </button>
+          <div className="flex w-full items-center rounded-lg border border-border bg-background shadow-sm transition hover:border-foreground/20">
+            <button
+              type="button"
+              onClick={() => onOpenPicker?.()}
+              className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground transition hover:text-foreground"
+            >
+              <ImagesIcon className="size-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">
+                Pick references
+                {pickQuery(pendingPick)
+                  ? ` for “${pickQuery(pendingPick)}”`
+                  : ""}{" "}
+                — open the picker
+              </span>
+            </button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={busy}
+              className="mr-1.5 shrink-0"
+              onClick={onSkipReferences}
+            >
+              Skip
+            </Button>
+          </div>
         </div>
       )}
 

@@ -58,6 +58,8 @@ General conventions:
 | `composer`                 | Prompt composer kit (Tiptap-based).              | `@/kits/composer`                 |
 | `minimal-tiptap`           | Opinionated rich-text editor kit (Tiptap-based). | `@/kits/minimal-tiptap`           |
 | `email-template-authoring` | Email-client-style template authoring UI.        | `@/kits/email-template-authoring` |
+| `library-explorer`         | Embedded infinite Library browser.               | `@/kits/library-explorer`         |
+| `memory-navigator`         | Scoped, typed in-memory navigation stack.        | `@/kits/memory-navigator`         |
 
 ## API design guidelines
 

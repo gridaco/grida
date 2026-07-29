@@ -1,29 +1,16 @@
 "use client";
 
 /**
- * The home's infinite reference gallery — the second way in (alongside typing).
- * Scrolls the curated Grida Library best-first (by score); each card's Add button
- * drops the pin into the composer's picked-references tray (multi-select).
+ * The selection-only Library gallery used by the agent attachment picker.
+ * Scrolls the curated Grida Library best-first (by score); each card's Add
+ * button toggles it into the host's controlled selection.
  *
- * Same engine as the agent's `design_search` picker: **`masonic`**'s lower-level
- * `useMasonry`. But here the gallery is NOT its own scroll box — it shares the
- * home's single page scroll (the whole page scrolls as one; no nested scroll).
- * The desktop shell locks `<body>` to `h-svh overflow-hidden`, so the home owns
- * one `overflow-y-auto` container and passes it in as `scrollContainerRef`; the
- * gallery feeds masonic that container's `scrollTop` MINUS the gallery's own
- * offset within it (the composer sits above), so virtualization lines up with the
- * page scroll. Page 0 is seeded client-side (an empty grid renders
- * nothing, so the loader can't pull it); the loader pages from there. Library
- * pins stay URLs — nothing is downloaded; the picked url rides straight into the
- * seeded board.
+ * This bounded picker intentionally remains selection-only. Desktop Welcome
+ * and the agent's `design_search` picker use `@/kits/library-explorer` for
+ * focused-object and nested-similarity navigation.
  *
- * Picking is a **toggle into the composer** (multi-select) via each card's Add
- * button, revealed on hover: it adds the pin to the home's picked-references tray
- * (Added → click to remove), so the user can gather several references before
- * starting one board from all of them. The card body itself is intentionally
- * NOT the add target — clicking it will later open a details / similar-images
- * view (planned), so only the Add button mutates the tray today. The pick handler
- * + selected-set ride a context so masonic's memoized cells stay stable.
+ * The pick handler + selected set ride a context so masonic's memoized cells
+ * stay stable.
  */
 
 import {
@@ -54,8 +41,8 @@ import {
 
 type Pin = DesignLibraryPin;
 
-/** Stop paging past this many thumbnails — the home gallery is a starting point,
- *  not the full library browser, and unbounded DOM would bloat the page. */
+/** Stop paging past this many thumbnails — this is a bounded picker, not the
+ *  full Library explorer. */
 const MAX_ITEMS = 300;
 
 /** Pick handler + selected-set passed to masonic-rendered cells via context
@@ -73,10 +60,10 @@ const PickContext = createContext<{
 });
 
 /** One masonry cell — masonic passes `{ data, width }`; we size to the pin's
- *  aspect ratio (no per-item measurement). The card body is a plain container
- *  (its click is reserved for a future details view); only the hover-revealed
- *  Add button toggles the pick. A selected cell gets a primary ring, and its Add
- *  button stays visible as "Added" so multi-select is legible. */
+ *  aspect ratio (no per-item measurement). The card body is a plain container;
+ *  only the hover-revealed Add button toggles the pick. A selected cell gets a
+ *  primary ring, and its Add button stays visible as "Added" so multi-select is
+ *  legible. */
 function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
   const { onPick, selectedIds, disabled, compact } = useContext(PickContext);
   const selected = selectedIds.has(pin.id);
@@ -84,7 +71,6 @@ function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
   const height = width / aspect;
   return (
     <div
-      title={pin.title}
       style={{ width, height }}
       className={cn(
         "group relative block overflow-hidden transition",
@@ -106,8 +92,7 @@ function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
         )}
       />
       {/* Add / Added toggle — revealed on hover; stays put once added so a second
-          click removes it. The ONLY add target (card click is reserved for a
-          planned details / similar-images view). */}
+          click removes it. */}
       <button
         type="button"
         disabled={disabled}
@@ -180,10 +165,8 @@ function GallerySkeleton({ compact }: { compact: boolean }) {
   );
 }
 
-/** `memo`-wrapped: the home page re-renders on every composer keystroke/resize
- *  (`heroHeight`, `docked`, picker state…), and all props here are already
- *  referentially stable — so the up-to-300-cell masonry only re-renders on a
- *  real pick/selection change. */
+/** `memo`-wrapped so the up-to-300-cell masonry only re-renders on a real
+ *  pick/selection change when its host updates. */
 export const ReferenceGallery = memo(function ReferenceGallery({
   onPick,
   selectedIds,
@@ -193,15 +176,12 @@ export const ReferenceGallery = memo(function ReferenceGallery({
   attachmentImagesOnly = false,
 }: {
   onPick: (pin: Pin) => void;
-  /** Ids currently in the composer's picked-references tray — selected cells
-   *  render a check badge so multi-select reads at a glance. */
+  /** Selected ids — selected cells render a check badge. */
   selectedIds: Set<string>;
   disabled?: boolean;
-  /** The home's single page-scroll container — the gallery virtualizes against
-   *  it (offset by the content above) instead of owning its own scroll. */
+  /** The host's scroll container; the gallery virtualizes against it. */
   scrollContainerRef: RefObject<HTMLDivElement | null>;
-  /** Dense, borderless cards for bounded picker dialogs. Home keeps the larger
-   *  editorial cards by default. */
+  /** Dense, borderless cards for bounded picker dialogs. */
   compact?: boolean;
   /** Query only model-attachable raster images. Filtering at the Library query
    *  keeps pagination/counts honest; filtering rendered pages would skip rows
@@ -275,8 +255,8 @@ export const ReferenceGallery = memo(function ReferenceGallery({
     }
   );
 
-  // ── share the page's scroll: feed masonic the container's scrollTop minus
-  //    this grid's offset within it (the composer sits above) ──
+  // ── share the host's scroll: feed masonic the container's scrollTop minus
+  //    this grid's offset within it ──
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
   const [viewportH, setViewportH] = useState(0);

@@ -135,6 +135,48 @@ describe("toolDisplay", () => {
     });
   });
 
+  it("treats design search as a user-driven reference picker", () => {
+    expect(
+      toolDisplay.describe(
+        runningTool("1", "design_search", {
+          initial_search_query: "vivid editorial poster",
+        })
+      )
+    ).toMatchObject({
+      action: "pick_references",
+      title: "Picking references",
+      detail: "vivid editorial poster",
+    });
+
+    expect(
+      toolDisplay.describe(
+        tool("2", "design_search", {
+          initial_search_query: "vivid editorial poster",
+        })
+      )
+    ).toMatchObject({
+      action: "pick_references",
+      title: "Picked references",
+      detail: undefined,
+    });
+
+    expect(
+      toolDisplay.summarize([
+        runningTool("3", "design_search", {
+          initial_search_query: "vivid editorial poster",
+        }),
+      ])
+    ).toBe("Picking references");
+
+    expect(
+      toolDisplay.summarize([
+        tool("4", "design_search", {
+          initial_search_query: "vivid editorial poster",
+        }),
+      ])
+    ).toBe("Picked references");
+  });
+
   it("summarizes parallel image generation as the work being done", () => {
     expect(
       toolDisplay.summarize([

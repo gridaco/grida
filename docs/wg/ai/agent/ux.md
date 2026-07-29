@@ -1,7 +1,16 @@
 ---
 title: UX Patterns
-description: UX patterns that ride on top of the compositor and push back into the protocol. Queued sends, sidecar chat as ephemeral fork, and memory as a built-on-top layer. The compositor itself, file refs, attachments, mentions, commands, editor context, and the user-view-vs-model-view lowering rules live in compositor.md.
-keywords: [agent-system, ux, queued-sends, sidecar, memory]
+description: UX patterns that ride on top of the compositor and push back into the protocol. Queued sends, open-interaction supersession, sidecar chat as ephemeral fork, and memory as a built-on-top layer. The compositor itself, file refs, attachments, mentions, commands, editor context, and the user-view-vs-model-view lowering rules live in compositor.md.
+keywords:
+  [
+    agent-system,
+    ux,
+    queued-sends,
+    human-input,
+    interaction-supersession,
+    sidecar,
+    memory,
+  ]
 format: md
 tags:
   - internal
@@ -81,6 +90,33 @@ queue serves for non-compositor sources (scheduled wakeups, webhooks,
 API calls, MCP-pushed events, agent self-schedules) as well. See
 [`triggers`](./triggers.md) for those sources' envelope and per-source
 semantics.
+
+## Open-interaction supersession
+
+A session waiting on a human-input tool has an incomplete turn but no
+active model run. An ordinary user message in that state is therefore
+neither an answer to the tool nor steering of a running model. The
+[turn queue](./queue.md) owns the current behavior: the message queues
+behind the open interaction and does not cancel, replace, or answer it.
+
+Some optional interactions expose a distinct product need: the user may
+want to abandon the interaction and start a new turn immediately. This
+operation is **open-interaction supersession**. It is not stream
+steering, run interruption, queue editing, or a tool-input rewrite.
+
+This guide does not yet standardize supersession. A future contract
+must preserve the model-authored tool call and settle its open result
+before admitting the new user turn; otherwise replay contains an
+unpaired invocation. It must also define correlation when one assistant
+turn has multiple open interactions, make the settlement and new-turn
+admission one authoritative transition, and distinguish optional
+interaction cancellation from supervised approval, where arbitrary
+text cannot imply Allow or Deny.
+
+The interaction's UI may disappear only after the authoritative
+supersession succeeds. An independent presentation surface that is not
+the pending interaction itself has no such lifecycle coupling and may
+remain open across later turns.
 
 ## Sidecar chat
 

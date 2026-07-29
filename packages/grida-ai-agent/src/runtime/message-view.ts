@@ -33,6 +33,7 @@
 
 import type { ChatMessageWithParts } from "../session/rows";
 import { compactionBoundary } from "../session/boundary";
+import { AgentDesignSearch } from "../tools/design-search";
 import { AgentVision } from "../vision";
 import {
   CONTEXT_MARKERS,
@@ -249,7 +250,10 @@ function lowerParts(
       // the image — the bytes remain in the persisted row for re-view.
       out.push(
         toSdkToolPart(
-          maybeElideImageTool(data, type, opts.elideImages),
+          maybeCanonicalizeToolInput(
+            maybeElideImageTool(data, type, opts.elideImages),
+            type
+          ),
           p.tool_call_id
         )
       );
@@ -292,6 +296,37 @@ function lowerContextPayload(
         available: typeof id === "string" && availableDirectoryScopeIds.has(id),
       };
     }),
+  };
+}
+
+const DESIGN_SEARCH_PART_TYPE = `tool-${AgentDesignSearch.TOOL_NAME}`;
+
+/**
+ * Model-view migration for the original `design_search` wire shape.
+ *
+ * Persisted history remains immutable (`{ query }`); only the view fed through
+ * AI SDK validation is upgraded to the current `{ initial_search_query }`
+ * schema. This keeps old completed and just-resolved pending calls replayable
+ * without exposing a provider-hostile union in the current function schema.
+ */
+function maybeCanonicalizeToolInput(
+  data: Record<string, unknown>,
+  type: string
+): Record<string, unknown> {
+  if (type !== DESIGN_SEARCH_PART_TYPE) return data;
+  const input = data.input;
+  if (
+    input !== null &&
+    typeof input === "object" &&
+    "initial_search_query" in input
+  ) {
+    return data;
+  }
+  const initialSearchQuery = AgentDesignSearch.initialSearchQuery(input);
+  if (!initialSearchQuery) return data;
+  return {
+    ...data,
+    input: { initial_search_query: initialSearchQuery },
   };
 }
 

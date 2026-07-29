@@ -4,10 +4,10 @@ title: Inspect and save a chat image in the fullscreen preview
 module: desktop
 area: agent-chat
 tags: [agent-chat, image, preview, zoom, pan, clipboard, download]
-status: verified
+status: untested
 severity: medium
 date: 2026-07-28
-updated: 2026-07-28
+updated: 2026-07-29
 automatable: false
 covered_by: []
 ---
@@ -26,7 +26,10 @@ viewport.
 1. Open a Desktop workspace with a viewed or generated image in its agent
    transcript, then click the image.
    - Expected: the image opens fitted in a fullscreen dark translucent preview
-     with Copy, Download, and Close actions.
+     with even spacing on opposite sides and Copy, Download, and Close actions.
+     The backdrop fades in without scaling while the image and controls use the
+     dialog's scale transition. In Desktop, each top-right action responds to a
+     click without dragging the window.
 2. Pinch or hold **⌘** while scrolling over the image, then double-click it.
    - Expected: zoom stays anchored near the pointer; double-click toggles
      between fitted and magnified views.
@@ -43,7 +46,8 @@ viewport.
    - Expected: the original image downloads with an image extension and opens
      normally.
 8. Reopen it and verify both Escape and Close.
-   - Expected: either action closes the preview.
+   - Expected: either action closes the preview. The backdrop fades out without
+     scaling while the image and controls use the dialog's scale transition.
 
 ## Notes
 

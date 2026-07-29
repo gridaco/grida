@@ -412,13 +412,15 @@ export function WorkspaceWorkbench({
     [group]
   );
   const closeTab = useCallback(
-    (relPath: string) => group.close(relPath),
-    [group]
+    (relPath: string) => {
+      if (relPath === DESIGN_SEARCH_TAB_ID) designSearch?.onSkip();
+      group.close(relPath);
+    },
+    [group, designSearch]
   );
   const reopenClosedTab = useCallback(() => group.reopenClosed(), [group]);
 
-  // Reopen/focus the picker for the current pending pick (the agent-pane note's
-  // affordance after a manual close). Only meaningful while a pick is pending.
+  // Focus the picker for the current pending pick from the agent-pane note.
   const focusDesignSearchTab = useCallback(() => {
     if (designSearch) group.open(DESIGN_SEARCH_TAB_ID);
   }, [group, designSearch]);
@@ -456,7 +458,9 @@ export function WorkspaceWorkbench({
                 className="border-b-0"
                 reserveRightWindowControls={false}
               >
-                <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+                {/* The menu owns name truncation; keep this wrapper unclipped so
+                    its external keyboard-focus ring can paint in full. */}
+                <div className="flex min-w-0 flex-1 items-center">
                   <WorkspaceTitleMenu workspace={workspace} />
                 </div>
               </TitleBar>

@@ -2,9 +2,9 @@
 
 /**
  * `SlidesTemplateGallery` — the slides preset's stand-in for the reference
- * gallery. The home's library corpus is image/video pins (see
- * {@link ReferenceGallery}), which isn't meaningful for decks, so slides mode
- * shows a small grid of starting templates instead.
+ * gallery. The home's Library explorer contains image/video pins, which aren't
+ * meaningful for decks, so slides mode shows a small grid of starting
+ * templates instead.
  *
  * Templates are the real bundled `.canvas` decks served from
  * `/templates/slides/` (see `@/lib/slides-templates` — loaded via dynamic

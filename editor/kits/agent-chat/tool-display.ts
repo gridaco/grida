@@ -16,6 +16,7 @@ export type ToolDisplayAction =
   | "write"
   | "list"
   | "search"
+  | "pick_references"
   | "view_image"
   | "generate_image"
   | "plan"
@@ -194,14 +195,20 @@ export namespace toolDisplay {
 
       case AgentDesignSearch.TOOL_NAME:
         return {
-          action: "search",
+          action: "pick_references",
           title: describeTitle(
             tone,
-            "Searching library",
-            "Searched library",
-            "Failed to search library"
+            "Picking references",
+            "Picked references",
+            "Failed to pick references"
           ),
-          detail: stringValue(args.query),
+          // The tool input is only the picker's starting point: the user may
+          // refine it repeatedly before choosing references. Keep that context
+          // while pending, but don't attribute the final picks to that query.
+          detail:
+            tone === "running"
+              ? AgentDesignSearch.initialSearchQuery(args)
+              : undefined,
           tone,
         };
 
@@ -299,6 +306,7 @@ export namespace toolDisplay {
     pushClause(clauses, counts, "read", "read");
     pushClause(clauses, counts, "generate_image", "generated", "image");
     pushClause(clauses, counts, "view_image", "viewed", "image");
+    pushReferencePickerClause(clauses, counts, "picked");
     pushClause(clauses, counts, "search", "searched");
     pushClause(clauses, counts, "list", "listed");
     pushClause(clauses, counts, "command", "ran");
@@ -313,6 +321,7 @@ export namespace toolDisplay {
     pushClause(clauses, runningCounts, "read", "reading");
     pushClause(clauses, runningCounts, "generate_image", "generating", "image");
     pushClause(clauses, runningCounts, "view_image", "viewing", "image");
+    pushReferencePickerClause(clauses, runningCounts, "picking");
     pushClause(clauses, runningCounts, "search", "searching");
     pushClause(clauses, runningCounts, "list", "listing");
     pushClause(clauses, runningCounts, "command", "running");
@@ -326,6 +335,15 @@ export namespace toolDisplay {
 
     return capitalize(clauses.join(", "));
   }
+}
+
+function pushReferencePickerClause(
+  clauses: string[],
+  counts: Map<ToolDisplayAction, number>,
+  verb: "picked" | "picking"
+) {
+  if (!counts.has("pick_references")) return;
+  clauses.push(`${verb} references`);
 }
 
 function pushTabsCheckClause(
@@ -384,6 +402,8 @@ function nounForAction(action: ToolDisplayAction): string {
       return "file";
     case "search":
       return "search";
+    case "pick_references":
+      return "reference";
     case "view_image":
     case "generate_image":
       return "image";

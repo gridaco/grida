@@ -72,9 +72,15 @@ export function ZoomableImage({
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
-    const observer = new ResizeObserver(() => {
-      const rect = element.getBoundingClientRect();
-      sizeRef.current = { width: rect.width, height: rect.height };
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      // Measure the layout box, not transformed visual bounds. Dialogs animate
+      // through a scale transform, and fitting to getBoundingClientRect() during
+      // that animation leaves the settled image offset toward the top-left.
+      sizeRef.current = {
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      };
       const measured = geometry();
       if (measured) {
         setCamera((previous) =>
@@ -94,8 +100,10 @@ export function ZoomableImage({
       height: image.naturalHeight,
     };
     if (!sizeRef.current && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      sizeRef.current = { width: rect.width, height: rect.height };
+      sizeRef.current = {
+        width: containerRef.current.clientWidth,
+        height: containerRef.current.clientHeight,
+      };
     }
     const measured = geometry();
     if (measured) setCamera(ImageCamera.fit(measured));

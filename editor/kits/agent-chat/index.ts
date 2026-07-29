@@ -17,9 +17,10 @@ export type {
 export {
   DesignSearchPickCard,
   findPendingDesignSearch,
-  selectedPins,
 } from "./design-search-card";
 export type {
   PickReferencesHandler,
   FetchReferences,
 } from "./design-search-card";
+export { DesignSearchExplorer } from "./design-search-explorer";
+export type { DesignSearchTicket } from "./design-search-explorer";

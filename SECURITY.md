@@ -1439,11 +1439,61 @@ sidecar egress, silent provider fallback, unbounded/replayed callbacks,
 upstream response bodies in errors, or treating ChatGPT sign-in as Grida
 account sign-in, an OpenAI API key, Codex app-server, or ACP.
 
+### `GRIDA-SEC-009` — Optional Library seed local-destination boundary
+
+**What it protects.** The optional Library importer holds a Supabase
+service-role key and executes SQL through `psql`. It may target only the
+Supabase stack started for this checkout: exact host `127.0.0.1`, the API and
+database ports declared in `supabase/config.toml`, and each endpoint's expected
+scheme and shape. Environment variables, command-line URLs, and caller-supplied
+keys are never destination authority.
+
+**Vulnerable scenario (prevented).** A developer has production Supabase
+values in the shell or copies a hosted DSN and key into a seed command. The
+fixture importer then writes hundreds of assets and catalog/vector rows into
+production with RLS-bypassing authority.
+
+**Why it's specifically risky here.** This is a bulk,
+idempotent-by-content-hash fixture importer, not an application request. It
+uses service-role Storage calls and direct SQL, so an accidental remote
+destination would have a large blast radius and ordinary RLS would not contain
+it.
+
+**How the code prevents it.**
+
+1. Destination credentials and endpoints come only from `supabase status -o
+json`, run at the discovered repository root.
+2. The expected API and database ports come from that checkout's
+   `supabase/config.toml`; missing or malformed configuration fails closed.
+3. API and database URLs are validated independently against canonical
+   `127.0.0.1` endpoint shapes. `localhost`, IPv6 and alternate loopback
+   addresses, wrong schemes/ports/paths, URL overrides, queries/fragments, and
+   remote or lookalike hosts are rejected.
+4. Local service-role HTTP requests use a proxy-disabled opener and reject
+   redirects. Direct SQL strips inherited libpq `PG*` connection settings, so
+   neither environment can redirect a validated loopback URL.
+5. The destination is validated before archive resolution or download and
+   before the Storage/SQL writer accepts it.
+6. Adjacent tests pin the accepted local shape, negative cases, write-layer
+   revalidation, transport isolation, and fail-before-download ordering.
+
+**Files bound by this id.** Run `grep -rn GRIDA-SEC-009 .` to enumerate.
+Today:
+
+- [.agents/skills/opt-library/SKILL.md](.agents/skills/opt-library/SKILL.md) —
+  operator contract.
+- [.agents/skills/opt-library/scripts/seed.py](.agents/skills/opt-library/scripts/seed.py)
+  — configuration parsing, exact endpoint checks, command ordering,
+  proxy/redirect isolation, libpq environment isolation, and write-layer
+  revalidation.
+- [.agents/skills/opt-library/scripts/test_seed.py](.agents/skills/opt-library/scripts/test_seed.py)
+  — positive, negative, and ordering regression tests.
+
 ---
 
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-009` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-010` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

@@ -48,6 +48,7 @@ import {
   FolderTreeIcon,
   GitBranchIcon,
   ImageIcon,
+  ImagesIcon,
   LayoutTemplateIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
@@ -812,6 +813,8 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return FolderTreeIcon;
     case "search":
       return SearchIcon;
+    case "pick_references":
+      return ImagesIcon;
     case "view_image":
       return ImageIcon;
     case "generate_image":

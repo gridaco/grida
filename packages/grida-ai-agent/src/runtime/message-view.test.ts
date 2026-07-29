@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { tool, validateUIMessages } from "ai";
 import { z } from "zod";
 import { buildModelMessages, type ModelUIMessage } from "./message-view";
+import { AgentDesignSearch } from "../tools/design-search";
 import { AgentVision } from "../vision";
 import type { ChatMessageWithParts, ChatPartRow } from "../session/rows";
 
@@ -16,6 +17,7 @@ const TOOLS = {
     description: "",
     inputSchema: z.object({ path: z.string() }),
   }),
+  design_search: AgentDesignSearch.createTool({ interactive: true }),
   view_image: AgentVision.tools.view_image,
 };
 
@@ -394,6 +396,41 @@ describe("buildModelMessages", () => {
     expect((out[1].parts[0] as { input?: unknown }).input).toEqual({
       path: "/",
     });
+    await expect(validateView(out)).resolves.toBeDefined();
+  });
+
+  it("upgrades a persisted design_search query in the model view only", async () => {
+    const persisted = [
+      msg("m1", "user", [
+        part("text", { type: "text", text: "find references" }),
+      ]),
+      msg("m2", "assistant", [
+        part(
+          "tool-design_search",
+          {
+            type: "tool-design_search",
+            tool_call_id: "tc-design",
+            state: "output-available",
+            input: { query: "legacy gradient poster" },
+            output: { picked: [], skipped: true },
+          },
+          {
+            tool_call_id: "tc-design",
+            tool_state: "output-available",
+          }
+        ),
+      ]),
+    ];
+
+    const out = buildModelMessages(persisted);
+
+    expect((out[1].parts[0] as { input?: unknown }).input).toEqual({
+      initial_search_query: "legacy gradient poster",
+    });
+    expect(JSON.stringify(persisted)).toContain(
+      '"query":"legacy gradient poster"'
+    );
+    expect(JSON.stringify(persisted)).not.toContain("initial_search_query");
     await expect(validateView(out)).resolves.toBeDefined();
   });
 
