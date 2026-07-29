@@ -21,8 +21,10 @@ describe("AgentDesignSearch.createTool", () => {
   });
 
   it("exposes one object-rooted, non-empty initial query to providers", () => {
-    const schema = AgentDesignSearch.createTool({ interactive: true })
-      .inputSchema as { safeParse: (v: unknown) => { success: boolean } };
+    const { inputSchema } = AgentDesignSearch.createTool({ interactive: true });
+    const schema = inputSchema as {
+      safeParse: (value: unknown) => { success: boolean };
+    };
     expect(
       schema.safeParse({ initial_search_query: "calm abstract bg" }).success
     ).toBe(true);

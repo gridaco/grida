@@ -354,10 +354,16 @@ class CorpusArchive:
                 raise SeedError(f"{ref}: asset path is not content-addressed")
             if metadata.get("category") not in category_ids:
                 raise SeedError(f"{ref}: category is not declared")
-            if metadata.get("bytes") != archive.getinfo(asset_path).file_size:
-                raise SeedError(f"{ref}: asset byte size is invalid")
-            if sha256_archive_entry(archive, asset_path) != digest:
-                raise SeedError(f"{ref}: asset bytes do not match their address")
+            try:
+                info = archive.getinfo(asset_path)
+                if metadata.get("bytes") != info.file_size:
+                    raise SeedError(f"{ref}: asset byte size is invalid")
+                if sha256_archive_entry(archive, asset_path) != digest:
+                    raise SeedError(f"{ref}: asset bytes do not match their address")
+            except KeyError as error:
+                raise SeedError(
+                    f"{ref}: asset is missing from the corpus archive"
+                ) from error
             if not OBJECT_METADATA_FIELDS.issuperset(metadata):
                 raise SeedError(f"{ref}: object metadata has unsupported fields")
             license_id = metadata.get("license")
@@ -937,6 +943,7 @@ CROSS JOIN LATERAL jsonb_to_record(source.payload) AS row(
   name text,
   description text
 )
+WHERE source.payload IS NOT NULL
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description;
@@ -1040,6 +1047,7 @@ CROSS JOIN LATERAL jsonb_to_record(source.payload) AS row(
   transparency boolean,
   public_domain boolean
 )
+WHERE source.payload IS NOT NULL
 ON CONFLICT (id) DO UPDATE SET
   path = EXCLUDED.path,
   sha256 = EXCLUDED.sha256,
@@ -1084,6 +1092,7 @@ SELECT
   (source.payload->>'gemini_embedding_2__image')::vector(1536),
   (source.payload->>'gemini_embedding_2__text')::vector(1536)
 FROM opt_library_embeddings source
+WHERE source.payload IS NOT NULL
 ON CONFLICT (object_id) DO UPDATE SET
   gemini_embedding_2__image = EXCLUDED.gemini_embedding_2__image,
   gemini_embedding_2__text = EXCLUDED.gemini_embedding_2__text;
@@ -1099,14 +1108,18 @@ BEGIN
     ON target.id = (source.payload->>'id')::uuid
    AND target.sha256 = source.payload->>'sha256'
    AND target.path = source.payload->>'path'
-  WHERE target.id IS NULL;
+  WHERE source.payload IS NOT NULL
+    AND target.id IS NULL;
 
   SELECT count(*) INTO missing_embeddings
   FROM opt_library_embeddings source
   LEFT JOIN grida_library.object_embedding target
     ON target.object_id = (source.payload->>'object_id')::uuid
-  WHERE target.object_id IS NULL
-     OR target.gemini_embedding_2__image IS NULL;
+  WHERE source.payload IS NOT NULL
+    AND (
+      target.object_id IS NULL
+      OR target.gemini_embedding_2__image IS NULL
+    );
 
   IF missing_objects <> 0 OR missing_embeddings <> 0 THEN
     RAISE EXCEPTION

@@ -6,6 +6,9 @@ import { cn } from "@app/ui/lib/utils";
 import type { LibraryExplorerItem } from "./library-explorer";
 import type { LibraryFocusFeedback } from "./library-focus-feedback";
 
+// Let the initial "Added" acknowledgement settle before collapsing to the icon.
+const ADDED_LABEL_HANDOFF_MS = 100;
+
 export function LibrarySelectionAction({
   selected,
   disabled,
@@ -42,7 +45,7 @@ export function LibrarySelectionAction({
       addedLabelTimerRef.current = setTimeout(() => {
         setShowAddedLabel(false);
         addedLabelTimerRef.current = null;
-      }, 100);
+      }, ADDED_LABEL_HANDOFF_MS);
     }
     onToggle();
   };

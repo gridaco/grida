@@ -119,7 +119,7 @@ export const LibraryExplorerView = memo(
         explorer.getSnapshot
       );
       const { route, state } = snapshot.current;
-      const focusFeedback = useMemo(() => new LibraryFocusFeedback(), []);
+      const [focusFeedback] = useState(() => new LibraryFocusFeedback());
       const [viewport] = useState(() => new LibraryExplorerViewport());
       const viewportSnapshot = useSyncExternalStore(
         viewport.subscribe,

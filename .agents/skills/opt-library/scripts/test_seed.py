@@ -8,9 +8,9 @@ import json
 import subprocess
 import sys
 import tempfile
-import unittest
+import unittest.mock
+import zipfile
 from pathlib import Path
-from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import seed
@@ -115,8 +115,12 @@ class LocalSupabaseStatusTest(unittest.TestCase):
                 stderr="",
             )
             with (
-                mock.patch.object(seed.shutil, "which", return_value="/usr/bin/psql"),
-                mock.patch.object(seed.subprocess, "run", return_value=result),
+                unittest.mock.patch.object(
+                    seed.shutil, "which", return_value="/usr/bin/psql"
+                ),
+                unittest.mock.patch.object(
+                    seed.subprocess, "run", return_value=result
+                ),
                 self.assertRaises(seed.SeedError),
             ):
                 seed.LocalSupabaseStatus.discover(root)
@@ -152,8 +156,8 @@ class LocalLibraryTransportTest(unittest.TestCase):
         )
 
     def test_local_http_writer_disables_proxies_and_redirects(self) -> None:
-        opener = mock.MagicMock()
-        with mock.patch.object(
+        opener = unittest.mock.MagicMock()
+        with unittest.mock.patch.object(
             seed.urllib.request,
             "build_opener",
             return_value=opener,
@@ -174,19 +178,21 @@ class LocalLibraryTransportTest(unittest.TestCase):
         )
         self.assertIsNone(
             redirect_handler.redirect_request(
-                mock.MagicMock(),
-                mock.MagicMock(),
+                unittest.mock.MagicMock(),
+                unittest.mock.MagicMock(),
                 302,
                 "Found",
-                mock.MagicMock(),
+                unittest.mock.MagicMock(),
                 "https://example.com/",
             )
         )
 
-        response = mock.MagicMock()
+        response = unittest.mock.MagicMock()
         response.__enter__.return_value.read.return_value = b"[]"
         opener.open.return_value = response
-        with mock.patch.object(seed.urllib.request, "urlopen") as global_urlopen:
+        with unittest.mock.patch.object(
+            seed.urllib.request, "urlopen"
+        ) as global_urlopen:
             self.assertEqual(
                 library._request_json("GET", "/rest/v1/object"),
                 [],
@@ -205,8 +211,8 @@ class LocalLibraryTransportTest(unittest.TestCase):
             "pgpassword": "must-also-be-removed",
         }
         with (
-            mock.patch.dict(seed.os.environ, environment, clear=True),
-            mock.patch.object(seed.subprocess, "run") as run,
+            unittest.mock.patch.dict(seed.os.environ, environment, clear=True),
+            unittest.mock.patch.object(seed.subprocess, "run") as run,
         ):
             library._import_database([], [], [])
 
@@ -219,17 +225,59 @@ class LocalLibraryTransportTest(unittest.TestCase):
             },
         )
 
+    def test_empty_import_has_no_null_source_rows(self) -> None:
+        sql = seed.build_import_sql([], [], [])
+
+        self.assertEqual(sql.count("WHERE source.payload IS NOT NULL"), 5)
+
+
+class CorpusVerificationTest(unittest.TestCase):
+    def test_missing_asset_is_a_seed_error(self) -> None:
+        digest = "a" * 64
+        ref = f"sha256:{digest}"
+        manifest = {
+            "category": {"id": "home"},
+            "object_count": 1,
+            "licenses": {},
+        }
+        records = [
+            {
+                "ref": ref,
+                "sha256": digest,
+                "asset_path": f"assets/{digest}.png",
+                "metadata": {
+                    "category": "home",
+                    "bytes": 1,
+                },
+            }
+        ]
+
+        with tempfile.SpooledTemporaryFile() as buffer:
+            with (
+                zipfile.ZipFile(buffer, mode="w") as archive,
+                self.assertRaisesRegex(
+                    seed.SeedError,
+                    f"{ref}: asset is missing from the corpus archive",
+                ),
+            ):
+                seed.CorpusArchive._verify_objects(
+                    archive,
+                    manifest,
+                    [{"id": "home"}],
+                    records,
+                )
+
 
 class SeedOrderingTest(unittest.TestCase):
     def test_destination_is_rejected_before_archive_download(self) -> None:
         rejection = seed.SeedError("not the configured local stack")
         with (
-            mock.patch.object(
+            unittest.mock.patch.object(
                 seed.LocalSupabaseStatus,
                 "discover",
                 side_effect=rejection,
             ),
-            mock.patch.object(seed.CorpusRelease, "download") as download,
+            unittest.mock.patch.object(seed.CorpusRelease, "download") as download,
             self.assertRaisesRegex(seed.SeedError, str(rejection)),
         ):
             seed.run(["seed"])
