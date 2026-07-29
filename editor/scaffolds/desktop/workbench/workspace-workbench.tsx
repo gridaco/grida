@@ -458,7 +458,9 @@ export function WorkspaceWorkbench({
                 className="border-b-0"
                 reserveRightWindowControls={false}
               >
-                <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+                {/* The menu owns name truncation; keep this wrapper unclipped so
+                    its external keyboard-focus ring can paint in full. */}
+                <div className="flex min-w-0 flex-1 items-center">
                   <WorkspaceTitleMenu workspace={workspace} />
                 </div>
               </TitleBar>
