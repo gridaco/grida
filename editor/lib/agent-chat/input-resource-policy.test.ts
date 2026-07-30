@@ -240,7 +240,65 @@ describe("InputResourcePolicy.CURRENT", () => {
 
     expect(decision).toMatchObject({
       status: "reject",
-      reason: "scratch-unavailable",
+      reason: "scratch-binary-tools-required",
+    });
+  });
+
+  it.each([
+    { name: "segment.ts", mimeType: undefined },
+    { name: "segment.ts", mimeType: "video/mp2t" },
+  ])(
+    "does not infer TypeScript text safety from $name with MIME $mimeType",
+    ({ name, mimeType }) => {
+      const decision = InputResourcePolicy.decide(
+        resource({
+          id: mimeType ?? "bare-ts",
+          name,
+          mimeType,
+          available: { bytes: true },
+        }),
+        {
+          ...capable,
+          attachment: {
+            ...capable.attachment,
+            scratch: {
+              ...capable.attachment.scratch!,
+              binaryTools: false,
+            },
+          },
+        }
+      );
+
+      expect(decision).toMatchObject({
+        status: "reject",
+        reason: "scratch-binary-tools-required",
+      });
+    }
+  );
+
+  it("accepts .ts as structured text with an explicit TypeScript MIME", () => {
+    const decision = InputResourcePolicy.decide(
+      resource({
+        id: "typescript",
+        name: "source.ts",
+        mimeType: "application/typescript",
+        available: { bytes: true },
+      }),
+      {
+        ...capable,
+        attachment: {
+          ...capable.attachment,
+          scratch: {
+            ...capable.attachment.scratch!,
+            binaryTools: false,
+          },
+        },
+      }
+    );
+
+    expect(decision).toMatchObject({
+      status: "accept",
+      route: { kind: "attachment", via: "scratch", from: "bytes" },
     });
   });
 

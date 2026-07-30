@@ -116,9 +116,8 @@ function buildHost(
   baseDir: string,
   opts?: { bundled_dir?: string; registry?: WorkspaceRegistry }
 ): Host {
-  const auth = new AuthStore(
-    PROVIDER_KEY ? baseDir : (LIVE_AUTH_DIR ?? baseDir)
-  );
+  const authDir = PROVIDER_KEY ? baseDir : (LIVE_AUTH_DIR ?? baseDir);
+  const auth = new AuthStore(authDir);
   const secrets = new SecretsStore(auth);
   const db = openSessionsDb({ user_data_path: baseDir });
   const store = new SessionsStore(db);
@@ -132,6 +131,7 @@ function buildHost(
     workspace_registry: registry,
     sessions_store: store,
     streams: new StreamRegistry(),
+    secrets_root: authDir,
     drain_cooldown_ms: 20,
     // Mirror the shipped desktop: per-session scratch + shell, so a workspace
     // turn has the full toolset (a deck run writes files + may run the shell).

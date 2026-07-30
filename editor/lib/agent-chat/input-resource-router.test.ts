@@ -324,6 +324,36 @@ describe("InputResourceRouter.prepare", () => {
     expect(encodeOperableFile).not.toHaveBeenCalled();
   });
 
+  it("does not read opaque bytes when scratch lacks binary command tools", async () => {
+    const encodeOperableFile =
+      vi.fn<InputResourceRouter.Effects["encodeOperableFile"]>();
+    const result = await InputResourceRouter.prepare(
+      {
+        kind: "browser-file",
+        id: "transport-stream-1",
+        source: "picker",
+        file: file({ name: "segment.ts", type: "video/mp2t" }),
+      },
+      environment({
+        attachment: {
+          scratch: {
+            maxFileBytes: 8 * 1024 * 1024,
+            maxFiles: 64,
+            maxTotalBytes: 8 * 1024 * 1024,
+            binaryTools: false,
+          },
+        },
+        effects: { encodeOperableFile },
+      })
+    );
+
+    expect(result).toMatchObject({
+      status: "reject",
+      reason: "scratch-binary-tools-required",
+    });
+    expect(encodeOperableFile).not.toHaveBeenCalled();
+  });
+
   it("rejects scratch output whose declared size differs from its bytes", async () => {
     const encodeOperableFile = vi.fn<
       InputResourceRouter.Effects["encodeOperableFile"]

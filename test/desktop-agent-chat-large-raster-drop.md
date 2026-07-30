@@ -25,11 +25,15 @@ provider limits do not silently make the attachment unusable.
 ## Steps
 
 1. Open the desktop app, open a workspace, and focus the agent composer.
-2. From Finder, drop a large, high-resolution raster image such as a file over
-   5 MB or 2000 pixels on one side.
+2. From Finder, drop the checked-in asset `editor/public/west/poster.png`
+   (2,910 × 4,338 px; 303,282 bytes; SHA-256
+   `4439944baae26bd9895274f50445d9f16036457626714bb3297fee189e7b2c99`).
+   Its 4,338 px longest edge deterministically exceeds the 1,568 px provider
+   representation ceiling while its original bytes fit the scratch budget.
    - Expected: a thumbnail chip appears without an attachment error.
-3. Send a prompt asking for one visually verifiable detail from the image.
-   - Expected: the model describes the image without a provider size error.
+3. Send "What is shown in this black-and-white image?"
+   - Expected: the model identifies multiple cowboys riding horses (and may
+     mention birds or smoke) without a provider size error.
 
 ## Notes
 
@@ -38,5 +42,7 @@ provider limits do not silently make the attachment unusable.
 - The byte caps and provider representation are covered by
   `image-attachment.test.ts` and `input-resource-router.test.ts`; the operating
   system drop gesture remains manual.
-- 2026-07-30: Manually verified in local Grida Desktop. The large raster
-  produced a thumbnail and remained perceivable without a provider size error.
+- 2026-07-30: Manually verified in local Grida Desktop with an oversized
+  raster; it produced a thumbnail and remained perceivable without a provider
+  size error. The checked-in high-resolution asset above makes future runs
+  deterministic without modifying the engine-owned image fixture snapshot.

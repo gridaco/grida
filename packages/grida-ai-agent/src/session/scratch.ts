@@ -598,6 +598,9 @@ export async function removeScratch(
  * The authority is established BEFORE listing or deletion. A symlinked base or
  * `sessions` root therefore fails closed without touching its target. Child
  * symlink entries are unlinked directly, never passed to recursive removal.
+ * Once that shared authority is validated, one stale entry that cannot be
+ * removed is logged and left in place without preventing reclamation of the
+ * remaining independent session entries.
  */
 export function sweepScratch(base: string, secretsRoot?: string): void {
   const resolvedBase = resolveAuthorityBase(base);
@@ -605,6 +608,13 @@ export function sweepScratch(base: string, secretsRoot?: string): void {
   const sessionsDir = path.join(resolvedBase, SESSIONS_DIRNAME);
   const entries = readdirSync(sessionsDir);
   for (const name of entries) {
-    removeAuthorityEntrySync(path.join(sessionsDir, name));
+    try {
+      removeAuthorityEntrySync(path.join(sessionsDir, name));
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      console.warn(
+        `[agent] scratch sweep failed for ${JSON.stringify(name)} (${code ?? "unknown filesystem error"}); continuing`
+      );
+    }
   }
 }

@@ -452,6 +452,42 @@ describe("scratch I/O helpers", () => {
     await expect(fs.readFile(keep, "utf8")).resolves.toBe("keep");
   });
 
+  it("sweepScratch logs an entry deletion failure and continues reclaiming siblings", async () => {
+    if (
+      process.platform === "win32" ||
+      process.getuid === undefined ||
+      process.getuid() === 0
+    ) {
+      return;
+    }
+    prepareScratchAuthority(base);
+    const sessionsDir = path.join(base, "sessions");
+    for (const name of ["ses_one", "ses_two"]) {
+      const nested = path.join(sessionsDir, name, "nested");
+      await fs.mkdir(nested, { recursive: true });
+      await fs.writeFile(path.join(nested, "artifact.txt"), "bytes");
+    }
+    const entries = await fs.readdir(sessionsDir);
+    expect(entries).toHaveLength(2);
+    const [blockedName, reclaimableName] = entries as [string, string];
+    const blocked = path.join(sessionsDir, blockedName);
+    const reclaimable = path.join(sessionsDir, reclaimableName);
+    await fs.chmod(blocked, 0);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      expect(() => sweepScratch(base)).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(JSON.stringify(blockedName))
+      );
+      await expect(fs.lstat(blocked)).resolves.toBeDefined();
+      await expect(fs.lstat(reclaimable)).rejects.toThrow(/ENOENT/);
+    } finally {
+      warn.mockRestore();
+      await fs.chmod(blocked, 0o700).catch(() => undefined);
+    }
+  });
+
   it("prepareScratchAuthority secures base and sessions without sweeping", async () => {
     if (process.platform === "win32") return;
     const authority = path.join(base, "prepare-only");

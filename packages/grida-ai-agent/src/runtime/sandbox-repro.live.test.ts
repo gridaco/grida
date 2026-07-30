@@ -237,9 +237,9 @@ function buildShellHost(baseDir: string, registry: WorkspaceRegistry): Host {
     sessions_store: store,
     streams: new StreamRegistry(),
     secrets_root: baseDir,
-    // The shipped macOS desktop sets this true (srt confines the tree). With it
-    // true, run_command IS registered — so we exercise the real allowlist gate,
-    // not the fail-closed "no shell at all" gate.
+    // Desktop registers run_command by injecting an OS-confined shell_executor.
+    // This live harness injects the raw runner so it exercises the same
+    // permission-mode gate without claiming Desktop confinement.
     shell_executor: runUnsandboxedShell,
     drain_cooldown_ms: 20,
   });

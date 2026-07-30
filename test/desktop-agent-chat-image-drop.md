@@ -29,14 +29,20 @@ where the file lives.
 ## Steps
 
 1. Open the desktop app, open a workspace, focus the agent composer.
-2. From Finder, drag a supported raster image such as a `.png` or `.jpg` onto
-   the composer and drop. Note its filename extension.
+2. In Terminal, run `shasum -a 256 "<source-image-path>"` and
+   `wc -c < "<source-image-path>"`, then record the source image's SHA-256
+   digest, byte count, and filename extension.
+3. From Finder, drag that supported raster image (such as a `.png` or `.jpg`)
+   onto the composer and drop.
    - Expected: a thumbnail chip appears; the editor text is unchanged.
-3. Send "what is this?" → the model describes the dropped image's content.
-4. Send "Use the attachment's scratch path to make a byte-for-byte copy named
-   `dropped-copy` with the same filename extension, then tell me its byte count."
+4. Send "what is this?" → the model describes the dropped image's content.
+5. Send "Use the attachment's scratch path to make a byte-for-byte copy named
+   `dropped-copy` with the same filename extension. Compute and report the
+   SHA-256 digest and byte count of both the attachment and the copy."
    - Expected: the agent operates on the scratch copy without asking for a path
-     or reattachment, and the copy preserves the original extension.
+     or reattachment. Both reported digests and byte counts are identical to
+     each other and to the values recorded in step 2, and the copy preserves
+     the original extension.
 
 ## Notes
 

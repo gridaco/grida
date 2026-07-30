@@ -122,6 +122,7 @@ export namespace InputResourcePolicy {
     | "reference-capability-unavailable"
     | "provider-capability-unavailable"
     | "scratch-unavailable"
+    | "scratch-binary-tools-required"
     | "file-too-large"
     | "scratch-file-count-exceeded"
     | "scratch-budget-exceeded"
@@ -401,7 +402,7 @@ export namespace InputResourcePolicy {
     const scratch = capabilities.attachment.scratch;
     if (!scratch) return { reason: "scratch-unavailable" };
     if (scratch.binaryTools === false && requiresScratchBinaryTools(resource)) {
-      return { reason: "scratch-unavailable" };
+      return { reason: "scratch-binary-tools-required" };
     }
     if (resource.size !== undefined && resource.size > scratch.maxFileBytes) {
       return { reason: "file-too-large" };
@@ -480,7 +481,7 @@ export namespace InputResourcePolicy {
       return false;
     }
 
-    return !/\.(?:c|cc|cpp|css|csv|go|h|hpp|html?|ini|java|js|jsx|json|jsonl|md|mdx|mjs|py|rb|rs|sh|sql|svg|toml|ts|tsx|txt|xml|ya?ml)$/i.test(
+    return !/\.(?:c|cc|cpp|css|csv|go|h|hpp|html?|ini|java|js|jsx|json|jsonl|md|mdx|mjs|py|rb|rs|sh|sql|svg|toml|tsx|txt|xml|ya?ml)$/i.test(
       resource.name
     );
   }

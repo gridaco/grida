@@ -353,6 +353,10 @@ export async function runShell(
     ) => {
       if (settled) return;
       settled = true;
+      // Report command lifetime through the child exit/error event. Process-
+      // group revocation below is a host cleanup barrier, not command work,
+      // and can consume one or two grace windows independently.
+      const durationMs = Date.now() - startedAt;
       cleanupListeners();
 
       // A shell wrapper can exit successfully after launching a background
@@ -363,7 +367,14 @@ export async function runShell(
           terminationStarted = true;
           signalProcessTree(child.pid, child, true, "SIGTERM");
         }
-        if (!(await waitForProcessGroupExit(child.pid, SIGTERM_GRACE_MS))) {
+        const afterTerm = await waitForProcessGroupExit(
+          child.pid,
+          SIGTERM_GRACE_MS
+        );
+        if (afterTerm !== "exited") {
+          // An unknown status (for example EPERM from kill(-pgid, 0)) cannot
+          // prove revocation. Escalate immediately rather than spending a
+          // grace window repeatedly making an unverifiable probe.
           signalProcessTree(child.pid, child, true, "SIGKILL");
           await waitForProcessGroupExit(child.pid, SIGTERM_GRACE_MS);
         }
@@ -380,7 +391,7 @@ export async function runShell(
         stderr: spawnError
           ? stderr + `\n[spawn error] ${spawnError.message}`
           : stderr,
-        duration_ms: Date.now() - startedAt,
+        duration_ms: durationMs,
         timed_out: timedOut,
         truncated,
       });
@@ -445,21 +456,24 @@ function signalProcessTree(
 async function waitForProcessGroupExit(
   pid: number,
   timeoutMs: number
-): Promise<boolean> {
+): Promise<ProcessGroupStatus> {
   const deadline = Date.now() + timeoutMs;
-  while (processGroupExists(pid)) {
-    if (Date.now() >= deadline) return false;
+  while (true) {
+    const status = processGroupStatus(pid);
+    if (status !== "alive") return status;
+    if (Date.now() >= deadline) return "alive";
     await new Promise((resolve) => setTimeout(resolve, PROCESS_GROUP_POLL_MS));
   }
-  return true;
 }
 
-function processGroupExists(pid: number): boolean {
+type ProcessGroupStatus = "alive" | "exited" | "unknown";
+
+function processGroupStatus(pid: number): ProcessGroupStatus {
   try {
     process.kill(-pid, 0);
-    return true;
+    return "alive";
   } catch (error) {
-    return !isNoSuchProcess(error);
+    return isNoSuchProcess(error) ? "exited" : "unknown";
   }
 }
 

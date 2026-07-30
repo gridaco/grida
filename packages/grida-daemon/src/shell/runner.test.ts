@@ -24,7 +24,7 @@
  * The temp dir lives under `os.tmpdir()` so tests do not touch the checkout.
  */
 /* eslint-disable jest/no-conditional-expect */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -280,6 +280,7 @@ describe("runShell", () => {
     fixture = await makeFixture();
   });
   afterEach(async () => {
+    vi.restoreAllMocks();
     await fixture.cleanup();
   });
 
@@ -386,5 +387,62 @@ describe("runShell", () => {
     expect(result.exit_code).toBe(0);
     await new Promise((resolve) => setTimeout(resolve, 650));
     await expect(fs.stat(lateWrite)).rejects.toThrow(/ENOENT/);
+  });
+
+  it("excludes process-group teardown polling from command duration", async () => {
+    if (process.platform === "win32") return;
+    const processKill = process.kill.bind(process);
+    let existenceProbes = 0;
+    vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+      if (pid >= 0) return processKill(pid, signal);
+      if (signal !== 0) return true;
+      existenceProbes += 1;
+      if (existenceProbes <= 20) return true;
+      throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+    });
+
+    const wallStartedAt = Date.now();
+    const result = await runShell({
+      cmd: "echo",
+      args: ["done"],
+      cwd: fixture.workspace_root,
+    });
+    const wallDurationMs = Date.now() - wallStartedAt;
+
+    expect(existenceProbes).toBe(21);
+    expect(wallDurationMs - result.duration_ms).toBeGreaterThanOrEqual(100);
+  });
+
+  it("escalates immediately when process-group exit cannot be observed", async () => {
+    if (process.platform === "win32") return;
+    const processKill = process.kill.bind(process);
+    const groupSignals: Array<{
+      signal: Parameters<typeof process.kill>[1];
+      at: number;
+    }> = [];
+    vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+      if (pid >= 0) return processKill(pid, signal);
+      groupSignals.push({ signal, at: Date.now() });
+      if (signal === 0) {
+        throw Object.assign(new Error("operation not permitted"), {
+          code: "EPERM",
+        });
+      }
+      return true;
+    });
+
+    await runShell({
+      cmd: "echo",
+      args: ["done"],
+      cwd: fixture.workspace_root,
+    });
+
+    expect(groupSignals.map(({ signal }) => signal)).toEqual([
+      "SIGTERM",
+      0,
+      "SIGKILL",
+      0,
+    ]);
+    expect(groupSignals[2]!.at - groupSignals[0]!.at).toBeLessThan(100);
   });
 });

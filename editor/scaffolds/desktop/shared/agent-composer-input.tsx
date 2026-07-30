@@ -808,6 +808,11 @@ function resourcePreparationNotice(
       ? "Some files weren't added because this chat has no scratch space."
       : "This chat can only attach images.";
   }
+  if (reasons.size === 1 && reasons.has("scratch-binary-tools-required")) {
+    return some
+      ? "Some files weren't added because their formats need binary tools that aren't available in this chat."
+      : "This file's format needs binary tools that aren't available in this chat.";
+  }
   if (
     reasons.size === 1 &&
     reasons.has("reference-capability-unavailable") &&
@@ -873,6 +878,9 @@ function resourceLoweringNotice(
   }
   if (reasons.has("scratch-unavailable")) {
     return "These files need scratch space, which isn't available in this chat.";
+  }
+  if (reasons.has("scratch-binary-tools-required")) {
+    return "These files need binary tools, which aren't available in this chat.";
   }
   if (reasons.has("file-too-large")) {
     return "An attached file is too large — remove it and try again.";
