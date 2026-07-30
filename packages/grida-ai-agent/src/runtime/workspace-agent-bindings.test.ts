@@ -359,9 +359,136 @@ describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
     const needsApproval = bindings?.command?.needs_approval;
     expect(needsApproval).toBeDefined();
     // A mutating/executing command requires approval...
-    expect(needsApproval!({ command: "python3", args: ["x.py"] })).toBe(true);
+    expect(
+      needsApproval!({
+        command: "python3",
+        args: ["x.py"],
+        workdir: workspaceRoot,
+      })
+    ).toBe(true);
     // ...a read-only inspection command does not.
-    expect(needsApproval!({ command: "ls", args: ["-la"] })).toBe(false);
+    expect(
+      needsApproval!({
+        command: "ls",
+        args: ["-la"],
+        workdir: workspaceRoot,
+      })
+    ).toBe(false);
+  });
+
+  it("accept-edits: scratch-local copy/move is pre-authorized, promotion is not", async () => {
+    const scratchDir = path.join(baseDir, "scratch");
+    await fs.mkdir(scratchDir);
+    const scratchRoot = await fs.realpath(scratchDir);
+    const bindings = await createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "accept-edits" },
+      {
+        workspace_registry: registry,
+        shell_execution_allowed: true,
+        scratch_dir: scratchRoot,
+      }
+    );
+    const needsApproval = bindings!.command!.needs_approval!;
+    await fs.writeFile(path.join(scratchRoot, "source.png"), "source");
+    expect(
+      needsApproval({
+        command: "cp",
+        args: ["source.png", "copy.png"],
+        workdir: scratchRoot,
+      })
+    ).toBe(false);
+    await fs.writeFile(path.join(scratchRoot, "copy.png"), "copy");
+    expect(
+      needsApproval({
+        command: "mv",
+        args: [
+          path.join(scratchRoot, "copy.png"),
+          path.join(scratchRoot, "renamed.png"),
+        ],
+        workdir: scratchRoot,
+      })
+    ).toBe(false);
+    await fs.rm(path.join(scratchRoot, "copy.png"));
+    expect(
+      needsApproval({
+        command: "cp",
+        args: [
+          path.join(scratchRoot, "source.png"),
+          path.join(scratchRoot, "copy.png"),
+        ],
+        // Absolute scratch operands stay scratch-local even when the omitted
+        // tool workdir resolves to its workspace default.
+        workdir: workspaceRoot,
+      })
+    ).toBe(false);
+    expect(
+      needsApproval({
+        command: "cp",
+        args: ["source.png", path.join(workspaceRoot, "kept.png")],
+        workdir: scratchRoot,
+      })
+    ).toBe(true);
+    expect(
+      needsApproval({
+        command: "cp",
+        args: ["source.png", "copy.png"],
+        workdir: workspaceRoot,
+      })
+    ).toBe(true);
+    await fs.writeFile(path.join(scratchRoot, "existing.png"), "existing");
+    expect(
+      needsApproval({
+        command: "cp",
+        args: ["source.png", "existing.png"],
+        workdir: scratchRoot,
+      })
+    ).toBe(true);
+    expect(
+      needsApproval({
+        command: "cp",
+        args: ["--recursive", "source", "copy"],
+        workdir: scratchRoot,
+      })
+    ).toBe(true);
+  });
+
+  it("accept-edits: symlinked scratch operands cannot bypass workspace approval", async () => {
+    if (process.platform === "win32") return;
+    const scratchDir = path.join(baseDir, "scratch");
+    await fs.mkdir(scratchDir);
+    const scratchRoot = await fs.realpath(scratchDir);
+    await fs.writeFile(path.join(scratchRoot, "source.png"), "source");
+    await fs.writeFile(path.join(workspaceRoot, "workspace.png"), "workspace");
+    const bindings = await createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "accept-edits" },
+      {
+        workspace_registry: registry,
+        shell_execution_allowed: true,
+        scratch_dir: scratchRoot,
+      }
+    );
+    // Plant these after fs hydration; they exercise only the synchronous
+    // approval classifier and should not produce unrelated hydrate warnings.
+    await fs.symlink(workspaceRoot, path.join(scratchRoot, "workspace-link"));
+    await fs.symlink(
+      path.join(workspaceRoot, "workspace.png"),
+      path.join(scratchRoot, "file-link.png")
+    );
+    const needsApproval = bindings!.command!.needs_approval!;
+    expect(
+      needsApproval({
+        command: "cp",
+        args: ["source.png", "workspace-link/copied.png"],
+        workdir: scratchRoot,
+      })
+    ).toBe(true);
+    expect(
+      needsApproval({
+        command: "cp",
+        args: ["file-link.png", "copied.png"],
+        workdir: scratchRoot,
+      })
+    ).toBe(true);
   });
 
   it("auto: supplies no approval predicate (every command auto-runs)", async () => {
@@ -373,12 +500,24 @@ describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
     expect(bindings?.command?.needs_approval).toBeUndefined();
   });
 
-  it("no shell containment: no command capability at all", async () => {
+  it("no shell containment: scratch remains a structured-fs capability", async () => {
+    const scratchDir = path.join(baseDir, "scratch");
+    await fs.mkdir(scratchDir);
+    const scratchRoot = await fs.realpath(scratchDir);
+    await fs.writeFile(path.join(scratchRoot, "seeded.txt"), "from scratch");
     const bindings = await createWorkspaceAgentBindings(
       { workspace_root: workspaceRoot, mode: "accept-edits" },
-      { workspace_registry: registry, shell_execution_allowed: false }
+      {
+        workspace_registry: registry,
+        shell_execution_allowed: false,
+        scratch_dir: scratchRoot,
+      }
     );
     expect(bindings?.command).toBeUndefined();
+    expect(bindings?.scratch_dir).toBe(scratchRoot);
+    expect(
+      await bindings?.fs.readBytes(path.join(scratchRoot, "seeded.txt"))
+    ).toEqual(new TextEncoder().encode("from scratch"));
   });
 
   it("serializes a concurrent write before a later command reads it", async () => {

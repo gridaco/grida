@@ -4,8 +4,8 @@
  *
  * Both surfaces (the workspace `agent-pane.tsx` and the standalone-doc
  * `ai-sidebar/chat.tsx`) had near-identical inline send closures. Centralizing
- * it keeps the two in lockstep and is the one spot that threads inline image
- * `files` (perceive-only `file` parts) AND registered context token parts (a
+ * it keeps the two in lockstep and is the one spot that threads provider-native
+ * `files` AND registered context token parts (an operable upload descriptor, a
  * picked template, …) onto the message. (Skills are no longer per-send: the
  * agent discovers them from disk and advertises them itself.)
  */

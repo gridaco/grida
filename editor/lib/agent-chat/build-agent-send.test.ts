@@ -215,35 +215,48 @@ describe("buildAgentSend — context token parts (WG compositor.md §templating)
       contexts: buildTemplateContext({ title: "Pitch", slides: 4 }),
     });
 
-    send("inspect it", undefined, {
-      scratchSeed: [{ path: "upload-report.pdf", base64: "AQID" }],
-      contexts: [
+    send(
+      "inspect it",
+      [
         {
-          type: USER_FILE_ATTACHMENTS,
-          data: {
-            location: "scratch",
-            files: [
-              {
-                name: "Report.pdf",
-                mime: "application/pdf",
-                size: 3,
-                path: "upload-report.pdf",
-              },
-            ],
-          },
+          type: "file",
+          filename: "preview.png",
+          mediaType: "image/png",
+          url: "data:image/png;base64,AAAA",
         },
       ],
-    });
+      {
+        scratchSeed: [{ path: "upload-report.pdf", base64: "AQID" }],
+        contexts: [
+          {
+            type: USER_FILE_ATTACHMENTS,
+            data: {
+              location: "scratch",
+              files: [
+                {
+                  name: "Report.pdf",
+                  mime: "application/pdf",
+                  size: 3,
+                  path: "upload-report.pdf",
+                },
+              ],
+            },
+          },
+        ],
+      }
+    );
 
     const message = sendMessage.mock.calls[0][0] as {
       role: string;
-      parts: Array<{ type: string }>;
+      parts: Array<{ type: string; filename?: string }>;
     };
     expect(message.parts.map((part) => part.type)).toEqual([
       "text",
+      "file",
       USER_TEMPLATE_SELECTION,
       USER_FILE_ATTACHMENTS,
     ]);
+    expect(message.parts[1]).toMatchObject({ filename: "preview.png" });
     expect(sendMessage.mock.calls[0][1]?.body?.scratch_seed).toEqual([
       { path: "template.canvas", text: "{}" },
       { path: "upload-report.pdf", base64: "AQID" },

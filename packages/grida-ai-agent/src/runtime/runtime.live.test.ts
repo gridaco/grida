@@ -1,8 +1,8 @@
 /**
  * LIVE end-to-end — real provider, real model. The durability bar for inline
- * image input: prove the agent actually SEES a pasted/dropped image, that the
- * image survives into later turns (DB rebuild), and that it survives a process
- * restart (resume).
+ * image input: prove the agent actually SEES a pasted/dropped image, can
+ * operate on its byte-exact scratch twin by path, that the image survives into
+ * later turns (DB rebuild), and that it survives a process restart (resume).
  *
  * Gated + excluded from CI. Run explicitly with a real BYOK key:
  *
@@ -12,18 +12,25 @@
  * Env knobs:
  *   GRIDA_LIVE_AGENT=1        — required, opts in.
  *   OPENROUTER_API_KEY / GRIDA_BYOK_KEY — the BYOK key.
+ *   GRIDA_LIVE_AUTH_DIR       — alternatively, an existing agent auth-store
+ *                               directory (the key is read in place, not
+ *                               copied into the test fixture).
  *   GRIDA_BYOK_PROVIDER       — "openrouter" (default) | "vercel".
  *   GRIDA_LIVE_MODEL          — a multimodal catalog model id (default below).
  *
- * Perception probe: a solid RED square (generated in-process, no fixture
- * binary) + "name the dominant color". A model cannot answer "red" without
- * seeing the pixels, so a correct answer is real multimodal delivery — and the
- * multi-turn / resume variants prove the image came from the DB, not the
- * request payload.
+ * Perception probe: solid-color squares (generated in-process, no fixture
+ * binary). A model cannot name the color without seeing the pixels. The
+ * operability probe sends contrasting images so selecting the BLUE
+ * provider-native image and copying its correlated scratch twin proves the two
+ * delivery routes still identify the same resource.
  */
 
 import fs from "node:fs/promises";
-import { assistantTextFromSse, sessionIdFromSse } from "../testing/sse";
+import {
+  assistantTextFromSse,
+  chunksOf,
+  sessionIdFromSse,
+} from "../testing/sse";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,6 +43,7 @@ import { WorkspaceRegistry } from "@grida/daemon/server";
 import { openSessionsDb } from "../session/db";
 import { SessionsStore } from "../session/store";
 import { AGENT_SESSION_AGENT } from "../protocol/run";
+import { scratchRootFor } from "../session/scratch";
 import { AgentRuntime } from ".";
 import { StreamRegistry } from "./stream-registry";
 import { registerAgentRoutes } from "../http/routes/agent";
@@ -43,6 +51,7 @@ import { registerAgentRoutes } from "../http/routes/agent";
 const LIVE = process.env.GRIDA_LIVE_AGENT === "1";
 const PROVIDER_KEY =
   process.env.OPENROUTER_API_KEY ?? process.env.GRIDA_BYOK_KEY ?? "";
+const LIVE_AUTH_DIR = process.env.GRIDA_LIVE_AUTH_DIR?.trim() || undefined;
 const PROVIDER_ID = (process.env.GRIDA_BYOK_PROVIDER ?? "openrouter") as
   | "openrouter"
   | "vercel";
@@ -55,7 +64,8 @@ const BUNDLED_SKILLS_DIR = path.resolve(
   "../../../../skills"
 );
 
-const liveDescribe = LIVE && PROVIDER_KEY ? describe : describe.skip;
+const liveDescribe =
+  LIVE && (PROVIDER_KEY || LIVE_AUTH_DIR) ? describe : describe.skip;
 
 // --- minimal solid-color PNG encoder (no deps; in-process fixture) ---------
 function pngChunk(type: string, data: Buffer): Buffer {
@@ -106,7 +116,9 @@ function buildHost(
   baseDir: string,
   opts?: { bundled_dir?: string; registry?: WorkspaceRegistry }
 ): Host {
-  const auth = new AuthStore(baseDir);
+  const auth = new AuthStore(
+    PROVIDER_KEY ? baseDir : (LIVE_AUTH_DIR ?? baseDir)
+  );
   const secrets = new SecretsStore(auth);
   const db = openSessionsDb({ user_data_path: baseDir });
   const store = new SessionsStore(db);
@@ -140,6 +152,7 @@ async function setKey(baseDir: string): Promise<void> {
 }
 
 const RED: [number, number, number] = [220, 30, 30];
+const BLUE: [number, number, number] = [30, 70, 220];
 
 liveDescribe("LIVE — inline image perception + durability", () => {
   let baseDir: string;
@@ -147,7 +160,7 @@ liveDescribe("LIVE — inline image perception + durability", () => {
 
   beforeEach(async () => {
     baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-agent-live-"));
-    await setKey(baseDir);
+    if (PROVIDER_KEY) await setKey(baseDir);
     host = buildHost(baseDir);
   });
 
@@ -194,7 +207,151 @@ liveDescribe("LIVE — inline image perception + durability", () => {
   );
 
   it(
-    "(b) multi-turn durability: a later text-only turn still sees the image",
+    "(b) scratch operability: the model copies the staged image byte-for-byte",
+    async () => {
+      const workspaceDir = path.join(baseDir, "ingress-workspace");
+      await fs.mkdir(workspaceDir);
+      const workspace = await host.registry.open(workspaceDir);
+      const redDataUrl = solidPngDataUrl(RED);
+      const blueDataUrl = solidPngDataUrl(BLUE);
+      const redBase64 = redDataUrl.slice(redDataUrl.indexOf(",") + 1);
+      const blueBase64 = blueDataUrl.slice(blueDataUrl.indexOf(",") + 1);
+      const blueOriginal = Buffer.from(blueBase64, "base64");
+      const res = await host.app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          model_id: MODEL_ID,
+          workspace_id: workspace.id,
+          // S4: a copy wholly inside scratch is pre-authorized even in the
+          // supervised default posture; this turn must not pause for Allow.
+          mode: "accept-edits",
+          messages: [
+            {
+              id: "u-operable-image",
+              role: "user",
+              parts: [
+                {
+                  type: "text",
+                  text: "Look at the two attached provider images, identify the BLUE one, then use provider_file_index in the attachment metadata to copy that same resource's scratch file byte-for-byte to blue-copy.png in the same scratch directory. Do not reconstruct it from pixels and do not inspect the scratch images to choose. Reply ONLY BLUE after the copy exists.",
+                },
+                {
+                  type: "file",
+                  mediaType: "image/png",
+                  url: redDataUrl,
+                  filename: "attachment-a.png",
+                },
+                {
+                  type: "file",
+                  mediaType: "image/png",
+                  url: blueDataUrl,
+                  filename: "attachment-b.png",
+                },
+                {
+                  type: "data-user_file_attachments",
+                  data: {
+                    location: "scratch",
+                    files: [
+                      {
+                        name: "attachment-a.png",
+                        mime: "image/png",
+                        size: Buffer.from(redBase64, "base64").byteLength,
+                        path: "attachment-a.png",
+                        provider_file_index: 0,
+                      },
+                      {
+                        name: "attachment-b.png",
+                        mime: "image/png",
+                        size: blueOriginal.byteLength,
+                        path: "attachment-b.png",
+                        provider_file_index: 1,
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+          scratch_seed: [
+            { path: "attachment-a.png", base64: redBase64 },
+            { path: "attachment-b.png", base64: blueBase64 },
+          ],
+        }),
+      });
+      expect(res.status).toBe(200);
+      const sse = await res.text();
+      const sessionId = sessionIdFromSse(sse);
+      expect(sessionId).toBeTruthy();
+      const scratchDir = scratchRootFor(
+        path.join(baseDir, "scratch"),
+        sessionId
+      );
+      const chunks = chunksOf(sse);
+      expect(
+        chunks.some(
+          (chunk) =>
+            chunk.type === "tool-input-available" &&
+            chunk.toolName === "view_image"
+        )
+      ).toBe(false);
+      const commandInput = chunks.find(
+        (chunk) =>
+          chunk.type === "tool-input-available" &&
+          chunk.toolName === "run_command"
+      );
+      const commandTrace = commandInput
+        ? chunks.filter((chunk) => chunk.toolCallId === commandInput.toolCallId)
+        : [];
+      expect(commandInput).toBeDefined();
+      if (
+        commandTrace.some((chunk) => chunk.type === "tool-approval-request")
+      ) {
+        throw new Error(
+          `scratch-local command unexpectedly requested approval; trace=${JSON.stringify(commandTrace)}`
+        );
+      }
+      const command = commandInput?.input as
+        | { command?: unknown; args?: unknown; workdir?: unknown }
+        | undefined;
+      expect(command?.command).toBe("cp");
+      const commandArgs = command?.args;
+      if (
+        !Array.isArray(commandArgs) ||
+        !commandArgs.every(
+          (operand): operand is string => typeof operand === "string"
+        )
+      ) {
+        throw new Error(`run_command args were not strings`);
+      }
+      expect(commandArgs).toHaveLength(2);
+      const effectiveWorkdir =
+        typeof command?.workdir === "string" ? command.workdir : workspaceDir;
+      const resolvedCommandPaths = await Promise.all(
+        commandArgs.map((operand) =>
+          fs.realpath(path.resolve(effectiveWorkdir, operand))
+        )
+      );
+      const expectedCommandPaths = await Promise.all(
+        ["attachment-b.png", "blue-copy.png"].map((name) =>
+          fs.realpath(path.join(scratchDir, name))
+        )
+      );
+      expect(resolvedCommandPaths).toEqual(expectedCommandPaths);
+      expect(assistantTextFromSse(sse).toLowerCase()).toContain("blue");
+
+      const copiedPath = path.join(scratchDir, "blue-copy.png");
+      const copied = await fs.readFile(copiedPath).catch((cause) => {
+        throw new Error(
+          `run_command did not create ${copiedPath}; trace=${JSON.stringify(commandTrace)}`,
+          { cause }
+        );
+      });
+      expect(copied).toEqual(blueOriginal);
+    },
+    TIMEOUT_MS
+  );
+
+  it(
+    "(c) multi-turn durability: a later text-only turn still sees the image",
     async () => {
       const t1 = await host.app.request("/agent/run", {
         method: "POST",
@@ -254,7 +411,7 @@ liveDescribe("LIVE — inline image perception + durability", () => {
   );
 
   it(
-    "(c) resume durability: the image survives a process restart",
+    "(d) resume durability: the image survives a process restart",
     async () => {
       const t1 = await host.app.request("/agent/run", {
         method: "POST",
@@ -603,8 +760,4 @@ describe("image input — still-deferred capabilities (not yet implemented)", ()
   // The agent DISCOVERS images on its own: list_files surfaces binary files so
   // the agent can pick one to view without the user naming the path.
   it.todo("discovers and views a workspace image without being given the path");
-
-  // A pasted/dropped image becomes OPERABLE ("convert this to .gif"): staged to
-  // scratch → file-ref so the agent has a path + shell, not just pixels.
-  it.todo("operates on a pasted image as a file (scratch-staging → file-ref)");
 });

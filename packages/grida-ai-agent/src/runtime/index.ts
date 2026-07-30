@@ -19,6 +19,7 @@
  */
 
 import crypto from "node:crypto";
+import { unlink } from "node:fs/promises";
 import { AGENT_SESSION_AGENT } from "../protocol/run";
 import { AGENT_DEFAULT_MODE } from "../protocol/mode";
 import {
@@ -94,6 +95,7 @@ import { runAgent, type AgentStepUsage } from "./run-agent";
 import {
   scratchRootFor,
   ensureScratch,
+  listScratchFilePaths,
   removeScratch,
   writeScratchFile,
 } from "../session/scratch";
@@ -380,18 +382,56 @@ async function prepareScratchForTurn(
   scratchDir: string,
   secretsRoot: string | undefined,
   scratchSeed: NonNullable<RunRequest["scratch_seed"]>
-): Promise<void> {
+): Promise<string[]> {
   await ensureScratch(scratchDir, secretsRoot);
   // Sequential by contract: duplicate paths are rejected at the run boundary,
   // and deterministic order keeps future seed-source extensions honest.
-  for (const file of scratchSeed) {
-    await writeScratchFile(
-      scratchDir,
-      file.path,
-      "text" in file
-        ? new TextEncoder().encode(file.text)
-        : Buffer.from(file.base64, "base64")
-    );
+  const created: string[] = [];
+  try {
+    for (const file of scratchSeed) {
+      created.push(
+        await writeScratchFile(
+          scratchDir,
+          file.path,
+          "text" in file
+            ? new TextEncoder().encode(file.text)
+            : Buffer.from(file.base64, "base64"),
+          { overwrite: false }
+        )
+      );
+    }
+  } catch (cause) {
+    try {
+      await rollbackScratchSeeds(created);
+    } catch (rollbackCause) {
+      throw new AggregateError(
+        [cause, rollbackCause],
+        "scratch seed staging and rollback failed"
+      );
+    }
+    throw cause;
+  }
+  return created;
+}
+
+/** Remove only files this request created, never a pre-existing collision. */
+async function rollbackScratchSeeds(created: readonly string[]): Promise<void> {
+  const cleanup = await Promise.allSettled(
+    [...created].reverse().map(async (file) => {
+      try {
+        await unlink(file);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+      }
+    })
+  );
+  const cleanupFailures = cleanup
+    .filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected"
+    )
+    .map((result) => result.reason);
+  if (cleanupFailures.length > 0) {
+    throw new AggregateError(cleanupFailures, "scratch seed rollback failed");
   }
 }
 
@@ -1056,16 +1096,21 @@ export class AgentRuntime {
       // when scratch staging or incoming persistence rejects the request.
       const pendingHumanInputKind =
         await this.deps.sessions_store.pendingHumanInputKind(sessionId);
+      const assistantTail = messages.at(-1)?.role === "assistant";
+      const continuationHasUnpersistedCallerHistory =
+        approvalAnswer !== undefined ||
+        pendingHumanInputKind !== null ||
+        assistantTail
+          ? await hasUnpersistedCallerMessage(
+              this.deps.sessions_store,
+              sessionId,
+              messages
+            )
+          : false;
       let approvalContinuation: HumanInputContinuation | undefined;
       let incomingHumanInputResult: IncomingHumanInputResult | undefined;
       if (approvalAnswer) {
-        if (
-          await hasUnpersistedCallerMessage(
-            this.deps.sessions_store,
-            sessionId,
-            messages
-          )
-        ) {
+        if (continuationHasUnpersistedCallerHistory) {
           return Response.json(
             {
               error:
@@ -1094,13 +1139,7 @@ export class AgentRuntime {
           );
         }
       } else if (pendingHumanInputKind !== null) {
-        if (
-          await hasUnpersistedCallerMessage(
-            this.deps.sessions_store,
-            sessionId,
-            messages
-          )
-        ) {
+        if (continuationHasUnpersistedCallerHistory) {
           return humanInputPendingResponse(sessionId);
         }
         const matches = await findIncomingHumanInputResults(
@@ -1120,6 +1159,21 @@ export class AgentRuntime {
           return humanInputPendingResponse(sessionId);
         }
         incomingHumanInputResult = matches[0];
+      }
+      if (
+        pendingHumanInputKind === null &&
+        assistantTail &&
+        continuationHasUnpersistedCallerHistory
+      ) {
+        return Response.json(
+          {
+            error:
+              "an assistant-tail continuation cannot add a new user or system message",
+            code: "assistant-continuation-with-new-message",
+            session_id: sessionId,
+          },
+          { status: 409 }
+        );
       }
 
       // GRIDA-SEC-004 — a persisted `directory-ref` is NOT authority. Claim the
@@ -1162,6 +1216,7 @@ export class AgentRuntime {
         req.scratch_seed.length > 0
           ? scratchRootFor(this.deps.scratch_base, sessionId)
           : undefined;
+      let stagedScratchFiles: string[] = [];
       if (req.scratch_seed && req.scratch_seed.length > 0) {
         if (!scratchDir) {
           return Response.json(
@@ -1175,7 +1230,7 @@ export class AgentRuntime {
           );
         }
         try {
-          await prepareScratchForTurn(
+          stagedScratchFiles = await prepareScratchForTurn(
             scratchDir,
             this.deps.secrets_root,
             req.scratch_seed
@@ -1200,19 +1255,41 @@ export class AgentRuntime {
       // turn can publish a late human block underneath the commit. A 409 from
       // this boundary is therefore mutation-free and safe for the renderer to
       // retry as a durable queued message.
-      if (
-        pendingHumanInputKind === null &&
-        (await this.deps.sessions_store.hasPendingHumanInput(sessionId))
-      ) {
-        return humanInputPendingResponse(sessionId);
-      }
+      try {
+        if (
+          pendingHumanInputKind === null &&
+          (await this.deps.sessions_store.hasPendingHumanInput(sessionId))
+        ) {
+          await rollbackScratchSeeds(stagedScratchFiles);
+          stagedScratchFiles = [];
+          return humanInputPendingResponse(sessionId);
+        }
 
-      // Persist only caller-owned non-assistant rows first. Assistant tool
-      // results are the continuation commit and deliberately remain untouched
-      // until every fallible preparation step above has succeeded.
-      await persistIncomingTail(this.deps.sessions_store, sessionId, messages, {
-        resolveAssistantToolResults: false,
-      });
+        // Persist only caller-owned non-assistant rows first. Assistant tool
+        // results are the continuation commit and deliberately remain untouched
+        // until every fallible preparation step above has succeeded.
+        await persistIncomingTail(
+          this.deps.sessions_store,
+          sessionId,
+          messages,
+          {
+            resolveAssistantToolResults: false,
+          }
+        );
+        // The durable descriptor now owns these bytes. Later turn-start failures
+        // leave both intact so the accepted message remains operable.
+        stagedScratchFiles = [];
+      } catch (cause) {
+        try {
+          await rollbackScratchSeeds(stagedScratchFiles);
+        } catch (rollbackCause) {
+          throw new AggregateError(
+            [cause, rollbackCause],
+            "pre-persistence failure and scratch seed rollback failed"
+          );
+        }
+        throw cause;
+      }
 
       // Fill every non-blocking client tool result first. Human-input results
       // are excluded as a class; for a question/design-search continuation,
@@ -1574,14 +1651,12 @@ export class AgentRuntime {
     } = this.deps;
     // Per-session scratch dir (WG `scratch.md`). Derived (pure) here so it can
     // ride `runDeps`; the dir is created on disk just before the model turn
-    // (below). Scratch is the sink for the shell (an allowed cwd root) AND for
-    // `generate_image` (its output dir), so derive it when EITHER is enabled —
-    // an images-only host that keeps the shell off still needs it (#920 review).
+    // (below). Structured filesystem tools are the baseline operability path,
+    // independent of optional shell/image generation, so every workspace-bound
+    // Grida turn gets scratch when the host supplies a base.
     const scratchDir =
       preparedScratchDir ??
-      (scratchBase &&
-      workspaceRoot &&
-      (shellExecutionAllowed || this.deps.image_gen_enabled === true)
+      (scratchBase && workspaceRoot
         ? scratchRootFor(scratchBase, sessionId)
         : undefined);
     // Bindings deps for the run. Typed (not an inline literal) so the
@@ -1625,6 +1700,9 @@ export class AgentRuntime {
         if (scratchDir && !preparedScratchDir) {
           await ensureScratch(scratchDir, secretsRoot);
         }
+        const availableScratchAttachmentPaths = scratchDir
+          ? await listScratchFilePaths(scratchDir)
+          : new Set<string>();
 
         // Agent-provider class (issue #813): the external agent owns the loop.
         // Skip compaction/model-factory/tool-injection entirely — just run one
@@ -1639,6 +1717,7 @@ export class AgentRuntime {
             // External agents do not receive our structured fs binding. A
             // durable historical descriptor remains inspectable but inert.
             availableDirectoryScopeIds: new Set(),
+            availableScratchAttachmentPaths: new Set(),
           });
           // Continuity (issue #813): resume the external agent's prior session
           // so it keeps the conversation. Read the id stored last turn, pass it
@@ -1707,6 +1786,7 @@ export class AgentRuntime {
             : await sessionsStore.listVisibleMessages(sessionId);
         const preparedMessages = buildModelMessages(visible, {
           availableDirectoryScopeIds,
+          availableScratchAttachmentPaths,
         });
 
         // Session-static skills + project instructions (discovered once).

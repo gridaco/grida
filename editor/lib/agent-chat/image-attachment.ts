@@ -3,9 +3,9 @@
  *
  * Turns a user pasted/dropped image `File` into an inline base64 data-URL
  * attachment the model can actually SEE — a provider-native multimodal `file`
- * part. Perceive-only (Claude-Code-style): no path is surfaced to the agent,
- * so the model sees pixels, not a file it can operate on. This is the
- * `file-attachment` shape from `docs/wg/ai/agent/compositor.md`.
+ * part. This module owns only that bounded perception representation. The
+ * resource router separately preserves the original bytes in session scratch,
+ * yielding both pixels and an operable path when scratch is available.
  *
  * The pure helpers (policy, dimension math, byte accounting, part mapping) are
  * framework-free and unit-tested. `encodeImageFile` is the single DOM/canvas

@@ -46,9 +46,9 @@ export type UseTurnQueueControllerArgs = {
   /**
    * Start a brand-new turn NOW (the session is idle). The surface owns the
    * request body (model, skills, session id). Called by {@link submit} when
-   * the session is not busy. `files` carries inline image attachments
-   * (perceive-only) and `extras` carries operable "+"-uploads (scratch bytes +
-   * their marker) — both on the immediate-send path only.
+   * the session is not busy. `files` carries provider-native attachments and
+   * `extras` carries operable scratch copies + their marker — a raster upload
+   * may intentionally appear in both. Both use the immediate-send path only.
    */
   send: (
     text: string,
@@ -71,8 +71,8 @@ export type UseTurnQueueControllerResult = {
    *  the transcript (atomic move, no server delete). */
   drop: (messageId: string) => void;
   /** The composer's submit handler: enqueue while busy/human-blocked, else send.
-   *  `files` (inline images) and `extras` (operable uploads) only flow on the
-   *  send-now path — the queue is text-only. */
+   *  `files` (provider-native media) and `extras` (operable scratch copies)
+   *  only flow on the send-now path — the queue is text-only. */
   submit: (
     text: string,
     files?: FileUIPart[],

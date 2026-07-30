@@ -107,7 +107,7 @@ describe("InputResourcePolicy.CURRENT", () => {
       }),
       route: {
         kind: "attachment",
-        via: "provider",
+        via: "provider-and-scratch",
         from: "bytes",
         representation: "inline-bytes",
       },
@@ -133,7 +133,7 @@ describe("InputResourcePolicy.CURRENT", () => {
     expect(decision.route).toEqual(route);
   });
 
-  it("rejects image bytes when the model cannot perceive their MIME", () => {
+  it("keeps image bytes operable when the model cannot perceive their MIME", () => {
     const decision = InputResourcePolicy.decide(
       resource({
         id: "image",
@@ -151,9 +151,82 @@ describe("InputResourcePolicy.CURRENT", () => {
       }
     );
     expect(decision).toMatchObject({
-      status: "reject",
+      status: "accept",
       ruleId: "byte-image",
-      reason: "provider-capability-unavailable",
+      route: { kind: "attachment", via: "scratch", from: "bytes" },
+      trace: [
+        {
+          preference: "provider-and-scratch-bytes-attachment",
+          available: false,
+          reason: "provider-capability-unavailable",
+        },
+        {
+          preference: "provider-bytes-attachment",
+          available: false,
+          reason: "provider-capability-unavailable",
+        },
+        { preference: "scratch-attachment", available: true },
+      ],
+    });
+  });
+
+  it("falls back to provider-only image delivery without session scratch", () => {
+    const decision = InputResourcePolicy.decide(
+      resource({
+        id: "image",
+        name: "image.png",
+        media: "raster-image",
+        mimeType: "image/png",
+        available: providerBytes("image/png"),
+      }),
+      {
+        ...capable,
+        attachment: { provider: capable.attachment.provider },
+      }
+    );
+    expect(decision).toMatchObject({
+      status: "accept",
+      ruleId: "byte-image",
+      route: {
+        kind: "attachment",
+        via: "provider",
+        from: "bytes",
+        representation: "inline-bytes",
+      },
+      trace: [
+        {
+          preference: "provider-and-scratch-bytes-attachment",
+          available: false,
+          reason: "scratch-unavailable",
+        },
+        { preference: "provider-bytes-attachment", available: true },
+      ],
+    });
+  });
+
+  it("falls back to provider-only image delivery above the scratch file cap", () => {
+    const decision = InputResourcePolicy.decide(
+      resource({
+        id: "large-image",
+        name: "large.png",
+        media: "raster-image",
+        mimeType: "image/png",
+        size: 9 * 1024 * 1024,
+        available: providerBytes("image/png"),
+      }),
+      capable
+    );
+    expect(decision).toMatchObject({
+      status: "accept",
+      route: { kind: "attachment", via: "provider", from: "bytes" },
+      trace: [
+        {
+          preference: "provider-and-scratch-bytes-attachment",
+          available: false,
+          reason: "file-too-large",
+        },
+        { preference: "provider-bytes-attachment", available: true },
+      ],
     });
   });
 
@@ -202,17 +275,30 @@ describe("InputResourcePolicy.CURRENT", () => {
       mimeType: "image/webp",
       available: providerBytes("image/webp", "image/png"),
     });
+    const providerOnly: InputResourcePolicy.Config = {
+      id: "provider-only",
+      rules: [
+        {
+          id: "bytes",
+          when: () => true,
+          prefer: ["provider-bytes-attachment"],
+        },
+      ],
+    };
     expect(
-      InputResourcePolicy.decide(input, {
-        ...capable,
-        attachment: {
-          ...capable.attachment,
-          provider: {
-            ...capable.attachment.provider,
-            inlineMimes: ["image/png"],
+      InputResourcePolicy.decide(
+        input,
+        {
+          ...capable,
+          attachment: {
+            provider: {
+              ...capable.attachment.provider,
+              inlineMimes: ["image/png"],
+            },
           },
         },
-      })
+        providerOnly
+      )
     ).toMatchObject({
       status: "accept",
       route: { kind: "attachment", via: "provider", from: "bytes" },
@@ -223,13 +309,13 @@ describe("InputResourcePolicy.CURRENT", () => {
         {
           ...capable,
           attachment: {
-            ...capable.attachment,
             provider: {
               ...capable.attachment.provider,
               inlineMimes: ["image/png"],
             },
           },
-        }
+        },
+        providerOnly
       )
     ).toMatchObject({
       status: "reject",
@@ -320,7 +406,7 @@ describe("InputResourcePolicy.REFERENCE_FIRST", () => {
       status: "accept",
       route: {
         kind: "attachment",
-        via: "provider",
+        via: "provider-and-scratch",
         from: "bytes",
         representation: "inline-bytes",
       },
@@ -413,7 +499,11 @@ describe("InputResourcePolicy invariants", () => {
         {
           id: "directory-as-bytes",
           when: () => true,
-          prefer: ["scratch-attachment", "provider-bytes-attachment"],
+          prefer: [
+            "scratch-attachment",
+            "provider-and-scratch-bytes-attachment",
+            "provider-bytes-attachment",
+          ],
         },
       ],
     };

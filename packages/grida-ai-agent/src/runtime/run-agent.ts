@@ -219,6 +219,11 @@ export async function runAgent(
       // host enabled it, a scratch sink exists, and a provider key is present.
       image_gen: bindings?.image_gen,
       command: bindings?.command,
+      // Scratch is a structured-filesystem capability even when the fail-closed
+      // host posture withholds shell execution. The binding exposes only the
+      // exact real root it already mounted into `fs`; this is prompt metadata,
+      // not an additional path grant.
+      scratch_dir: bindings?.scratch_dir,
       // RFC skills + project instructions are session-static context the
       // runtime discovered once and threads through every turn. When scratch is
       // wired (workspace path), the loader MATERIALIZES a loaded skill's tree into

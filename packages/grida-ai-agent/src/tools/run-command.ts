@@ -69,6 +69,15 @@ export type RunCommandFailure = {
 
 export type RunCommandOutcome = RunCommandResult | RunCommandFailure;
 
+export type RunCommandApprovalInput = {
+  command: string;
+  args: string[];
+  /** Effective workdir after applying the tool's default. Approval policy
+   * needs the resolved value to distinguish a scratch-local operation from a
+   * workspace mutation. */
+  workdir: string;
+};
+
 export type RunCommandBackend = (input: {
   command: string;
   args: string[];
@@ -96,7 +105,7 @@ export function createRunCommandTool(opts: {
    * an approved call from an un-approved one — by the time `execute` runs, the
    * SDK has already cleared the call (auto, or user-approved).
    */
-  needs_approval?: (input: { command: string; args: string[] }) => boolean;
+  needs_approval?: (input: RunCommandApprovalInput) => boolean;
 }) {
   const policy =
     opts.policy_description ??
@@ -104,7 +113,7 @@ export function createRunCommandTool(opts: {
       "validation, timeout caps, and process isolation.";
   return tool({
     description:
-      "Run a host-approved command in the workspace. This directly " +
+      "Run a host-approved command in an authorized working directory. This directly " +
       "spawns an executable with argv arguments; it is not a shell, " +
       "so pipes, redirects, glob expansion, env assignment, and `&&` " +
       `are not interpreted. ${policy} ` +
@@ -126,7 +135,7 @@ export function createRunCommandTool(opts: {
         .optional()
         .describe(
           "Optional absolute path. Defaults to the workspace root. " +
-            "Must resolve inside the workspace."
+            "Must resolve inside a host-authorized root."
         ),
       timeout_ms: z
         .number()
@@ -162,6 +171,7 @@ export function createRunCommandTool(opts: {
           opts.needs_approval!({
             command: input.command,
             args: input.args ?? [],
+            workdir: input.workdir ?? opts.default_workdir,
           })
       : false,
     execute: async ({

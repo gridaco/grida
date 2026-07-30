@@ -170,26 +170,43 @@ Rules:
       '<capability name="command">',
       `You have command execution access via the \`${run_command_name}\` tool.`,
       `The default workdir is \`${default_workdir}\`. The agent host enforces`,
-      "an allowlist on the command and checks that the workdir is inside the",
-      "workspace.",
+      "an allowlist on the command and checks that the workdir is inside a",
+      "host-authorized root.",
       "</capability>",
     ].join("\n"),
 
   /**
    * Session-scratch capability hint (WG `scratch.md`). Built per-run (the
    * scratch path is per-session runtime state) and appended by
-   * `buildCapabilityHints` (`agent/index.ts`) only when scratch is wired
-   * alongside command execution — the agent reaches scratch through the shell.
+   * `buildCapabilityHints` (`agent/index.ts`) when the host attests that scratch
+   * is wired. Structured filesystem reach remains discoverable when command
+   * execution is withheld; the optional command sentence is emitted only when
+   * that tool is actually present.
    */
-  scratch_capability: (run_command_name: string, scratch_dir: string): string =>
+  scratch_capability: (
+    scratch_dir: string,
+    options: {
+      filesystem: boolean;
+      run_command_name?: string;
+    }
+  ): string =>
     [
       '<capability name="scratch">',
       `You have a scratch directory at \`${scratch_dir}\`. It is an ephemeral,`,
       "system-managed working area, separate from the user's workspace.",
-      "It is readable and writable. Use `view_image` on its absolute paths to",
-      "SEE images you produced there, and the",
-      `\`${run_command_name}\` tool to read, list, move, copy, or extract files`,
-      "(you may `cd` into it).",
+      ...(options.filesystem
+        ? [
+            "It is readable and writable through your filesystem tools. Use",
+            "absolute paths under this exact root to read or write files there,",
+            "and use `view_image` on an image's absolute path to SEE it.",
+          ]
+        : []),
+      ...(options.run_command_name
+        ? [
+            `The \`${options.run_command_name}\` tool can read, list, move, or`,
+            "copy files there (you may `cd` into it).",
+          ]
+        : []),
       "It is the default place for files you PRODUCE or for intermediates",
       "(extracted archives, downloads, conversions): keep throwaway output out",
       "of the user's project.",

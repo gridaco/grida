@@ -22,7 +22,7 @@
  * is both outside the secret root and naturally ephemeral.
  */
 
-import { chmod, mkdir, rm, realpath, open } from "node:fs/promises";
+import { chmod, mkdir, rm, realpath, open, readdir } from "node:fs/promises";
 import { readdirSync, rmSync, constants as fsConstants } from "node:fs";
 import crypto from "node:crypto";
 import os from "node:os";
@@ -206,22 +206,30 @@ function assertSafeFilename(filename: string): void {
  * outside the session tree — a TOCTOU that the lexical checks above can't catch
  * (#920 review). `O_NOFOLLOW` is POSIX-only; on Windows it is absent (the `?? 0`
  * fallback), where scratch's owner-only model is already a no-op.
+ *
+ * Generated artifacts keep the default overwrite behavior. Caller-supplied
+ * turn seeds pass `{ overwrite: false }`, which adds `O_EXCL`: a replay or
+ * colliding upload then fails before it can truncate a path already correlated
+ * with durable history.
  */
 export async function writeScratchFile(
   scratchDir: string,
   filename: string,
-  bytes: Uint8Array
+  bytes: Uint8Array,
+  opts: { overwrite?: boolean } = {}
 ): Promise<string> {
   assertSafeFilename(filename);
   const full = path.join(scratchDir, filename);
   if (path.dirname(path.resolve(full)) !== path.resolve(scratchDir)) {
     throw new Error(`scratch filename escapes the scratch dir: ${filename}`);
   }
+  const collisionFlag =
+    opts.overwrite === false ? fsConstants.O_EXCL : fsConstants.O_TRUNC;
   const handle = await open(
     full,
     fsConstants.O_WRONLY |
       fsConstants.O_CREAT |
-      fsConstants.O_TRUNC |
+      collisionFlag |
       (fsConstants.O_NOFOLLOW ?? 0),
     SCRATCH_FILE_MODE
   );
@@ -231,6 +239,26 @@ export async function writeScratchFile(
     await handle.close();
   }
   return full;
+}
+
+/**
+ * Snapshot the currently live flat scratch paths for model-view liveness.
+ * Direct regular files only: directories and symlinks are not operable
+ * attachment bodies. Missing or unreadable scratch fails closed to an empty
+ * set, because persisted descriptors are facts about a prior turn, not proof
+ * that ephemeral bytes survived.
+ */
+export async function listScratchFilePaths(
+  scratchDir: string
+): Promise<ReadonlySet<string>> {
+  try {
+    const entries = await readdir(scratchDir, { withFileTypes: true });
+    return new Set(
+      entries.filter((entry) => entry.isFile()).map((entry) => entry.name)
+    );
+  } catch {
+    return new Set();
+  }
 }
 
 /**

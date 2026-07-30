@@ -157,9 +157,10 @@ export function ChatMessageView({
       .filter(isTextUIPart)
       .map((part) => part.text)
       .join("");
-    // Inline image attachments the user pasted/dropped (perceive-only `file`
-    // parts). Rendered as thumbnails in the bubble so the sent message mirrors
-    // what the model received.
+    // Provider-native image parts the user pasted/dropped. Rendered as
+    // thumbnails in the bubble so the sent message mirrors what the model
+    // perceived; an operable scratch twin, when present, is a separate context
+    // part.
     const images = message.parts.filter(
       (part): part is FileUIPart =>
         isFileUIPart(part) && part.mediaType.startsWith("image/")

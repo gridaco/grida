@@ -1,28 +1,35 @@
 ---
 id: TC-DESKTOP-AGENT-CHAT-001
-title: Paste a clipboard image into the agent composer (perceive-only)
+title: Paste a clipboard image into the agent composer
 module: desktop
 area: agent-chat
 tags: [agent-chat, composer, image, paste, multimodal, vision]
 status: untested
 severity: high
 date: 2026-06-07
-updated: 2026-06-07
+updated: 2026-07-30
 automatable: false
-covered_by: []
+covered_by:
+  - editor/kits/composer/composer-transfer.test.ts
+  - editor/lib/agent-chat/image-attachment.test.ts
+  - editor/lib/agent-chat/input-resource-router.test.ts
+  - packages/grida-ai-agent/src/http/routes/agent.test.ts
+  - packages/grida-ai-agent/src/runtime/runtime.live.test.ts
 ---
 
 ## Behavior
 
-Pasting a copied image into the desktop agent composer attaches it as an
-**inline, perceive-only** image: it is downscaled/encoded client-side to a
-base64 data-URL `file` part and sent to the model so the model literally sees
-the pixels. No filesystem path is surfaced to the agent (Claude-Code-style) —
-the agent can describe the image but cannot operate on it as a file.
+Pasting a copied image into the desktop agent composer gives the agent two
+representations of one attachment:
 
-The image rides the message as an AI-SDK `file` part. The pipeline already
-forwards + persists `file` parts, so a later turn (even text-only) still has the
-image in context — the model view is rebuilt from the DB each turn.
+- a bounded, possibly resized/transcoded base64 `file` part, so a vision model
+  sees the pixels immediately; and
+- the byte-exact original staged into session scratch, plus a descriptor naming
+  its scratch-relative path, so filesystem and shell tools can operate on it.
+
+Immediate perception and tool addressability are complementary rather than
+mutually exclusive. If scratch is unavailable or its bounded seed budget is
+full, provider-native perception remains the fallback.
 
 A pasted image must NOT be inserted as text (no base64 blob in the editor): the
 composer intercepts image clipboard data and turns it into an attachment chip
@@ -39,7 +46,12 @@ instead.
 4. Type "what's in this image?" and send.
    - Expected: the model's reply describes the actual image content (the
      specific shape/word), proving it saw the pixels — not a generic guess.
-5. Without attaching anything, send a follow-up: "describe it again in one line."
+5. Send: "Use the attachment's scratch path to make a byte-for-byte copy named
+   `pasted-copy.png`, then report its byte count."
+   - Expected: the agent uses the scratch path from the attachment descriptor;
+     the copy exists and it does not ask the user to save or attach the image
+     again.
+6. Without attaching anything, send a follow-up: "describe it again in one line."
    - Expected: the model still references the same image (durability — it was
      persisted and re-sent from the DB on this turn).
 
@@ -47,12 +59,16 @@ instead.
 
 - Encoding/policy: `editor/lib/agent-chat/image-attachment.ts`
   (`encodeImageFile`, downscale to ~1568px / ~5 MB, PNG→JPEG ladder).
-- Paste/drop hook is a generic passthrough on the composer kit
-  (`editor/kits/composer/composer-react.tsx` → `onImageFiles`); the desktop
-  wiring + chip render is in
+- Paste/drop enters through `ComposerContent.onTransfer`; `ComposerTransfer`
+  preserves the gesture provenance and original browser files. The desktop
+  wiring and chip render are in
   `editor/scaffolds/desktop/shared/agent-composer-input.tsx`.
 - The model→image round-trip (incl. multi-turn + resume) is automated against a
   real model in `packages/grida-ai-agent/src/runtime/runtime.live.test.ts`
   (gated `GRIDA_LIVE_AGENT=1`); this TC covers the UI gesture that test can't.
+- Dual routing, raw-byte preservation, scratch budgeting, and provider-only
+  fallback are automated in `input-resource-policy.test.ts` and
+  `input-resource-router.test.ts`; the clipboard gesture and rendered chip
+  remain manual.
 - A server-side size guard rejects inline images >~8 MB before persistence
   (`run-input.ts` `normalizeWireParts`).

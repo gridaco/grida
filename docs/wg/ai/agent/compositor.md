@@ -106,9 +106,18 @@ separate inputs:
 
 The generating rule is: **describe the available representations,
 evaluate the configured preferences in order, reject infeasible routes,
-then materialize exactly one typed route**. User-interface cards are a
-view of that result; their incidental fields MUST NOT be inspected later
-to rediscover whether the resource was an attachment or a reference.
+then materialize exactly one typed route**. A route may explicitly be
+composite when one ingress body must serve two distinct consumers. For
+example, a byte-backed raster can pair provider-native perception with a
+byte-exact scratch copy for file operations. That is one declared
+attachment route, not an attachment plus a source reference: scratch is
+host materialization and grants no authority over the source location.
+The two legs MUST carry an unambiguous shared identity or provider-part
+index so duplicate names, transcoding, and asymmetric fallback cannot detach
+the perceived image from its operable path.
+User-interface cards are a view of the result; their incidental fields MUST
+NOT be inspected later to rediscover whether the resource was an attachment
+or a reference.
 
 Preference is configurable because different agent surfaces have
 different useful defaults. A design surface may prefer provider-native
@@ -135,10 +144,21 @@ The following constraints override every preference configuration:
 - Scratch delivery is admitted against the final turn's aggregate byte, file,
   and path budget. Every seed source merged into that turn reserves capacity;
   an implementation SHOULD reject an impossible batch before reading all of
-  its bodies and MUST keep the user's draft when final preflight fails.
-- One resource has one primary route. A compositor MUST NOT silently
-  duplicate it as both attachment and reference, or silently switch to a
-  semantically different route after materialization fails.
+  its bodies and MUST keep the user's draft when final preflight fails. Under
+  scarce capacity, resources with no surviving provider leg reserve scratch
+  before optional scratch twins that can still fall back to perception only.
+- A compositor that retains raw operable twins before submit MUST enforce a
+  separate bounded draft-memory budget. Capacity under that stable bound may be
+  reallocated when draft resources or turn reservations change; once it is
+  exhausted, later rasters use an explicit provider-only fallback rather than
+  accumulating unbounded retained raw byte bodies.
+- One resource has one primary route. A compositor MUST NOT silently duplicate
+  it as both attachment and reference, or silently switch to a semantically
+  different route after materialization fails. A declared provider-and-scratch
+  raster route counts as one route. When its scratch leg is unavailable or
+  cannot fit the aggregate budget, provider-only is the fallback; when provider
+  perception is unavailable, scratch-only is the fallback. The selected
+  fallback MUST remain explicit in the routing result.
 
 This separation keeps source provenance useful without making source
 labels magical. A drop can carry evidence that a trusted host may mint a
@@ -441,15 +461,15 @@ entity into the compositor.
 The compositor MUST handle, at minimum, the following attachment
 classes:
 
-| Class          | Default treatment                                                                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Text           | Inlined as text part if small (< host threshold); path-ref otherwise.                                               |
-| Image          | Multi-modal part if the provider supports it; descriptor + a [`view_image`](./vision.md) perception path otherwise. |
-| PDF            | Multi-modal part if supported; PDF-to-text tool route otherwise.                                                    |
-| Audio          | Multi-modal where supported; transcription tool route otherwise.                                                    |
-| Video          | Multi-modal where supported; descriptor + frame-extractor tool otherwise.                                           |
-| Binary unknown | Always a path-ref or descriptor, never inlined. The model sees a name, mime, size.                                  |
-| Directory      | Always a `directory-ref`; never recursively copied, archived, or staged into scratch by implication.                |
+| Class          | Default treatment                                                                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Text           | Inlined as text part if small (< host threshold); path-ref otherwise.                                                                                 |
+| Image          | Multi-modal part if supported, plus a live scratch descriptor when tool-visible scratch and its budget permit; [`view_image`](./vision.md) otherwise. |
+| PDF            | Multi-modal part if supported; PDF-to-text tool route otherwise.                                                                                      |
+| Audio          | Multi-modal where supported; transcription tool route otherwise.                                                                                      |
+| Video          | Multi-modal where supported; descriptor + frame-extractor tool otherwise.                                                                             |
+| Binary unknown | Always a path-ref or descriptor, never inlined. The model sees a name, mime, size.                                                                    |
+| Directory      | Always a `directory-ref`; never recursively copied, archived, or staged into scratch by implication.                                                  |
 
 The agent always has a fallback path. Any attachment the model
 cannot read directly SHOULD still be reachable through `read` or
@@ -503,7 +523,7 @@ Per part type:
 | `text`            | Inline text                                      | `{ type: "text", text }`                                         | Text, verbatim.                                                                                                                                                                                                            |
 | `file-ref`        | Chip / link with file name and optional `:lines` | `{ type: "file-ref", ref }`                                      | A tool-addressable descriptor by default. A range-carrying ref lowers only the selected range; a deliberately resolved image MAY become a provider-native image block. The model never sees the literal `@path`.           |
 | `directory-ref`   | Folder chip / link                               | `{ type: "directory-ref", ref }`                                 | A compact descriptor naming the tool-addressable directory scope. Descendant contents are never inlined by lowering.                                                                                                       |
-| `file-attachment` | Thumbnail or file chip                           | `{ type: "file-attachment", data?, url?, mime, name, … }`        | Provider-native multi-modal block when the delivery encoder and provider declare support for the MIME and representation; descriptor placeholder otherwise.                                                                |
+| `file-attachment` | Thumbnail or file chip                           | `{ type: "file-attachment", data?, url?, mime, name, … }`        | The declared route's provider-native block, tool-addressable staged-copy descriptor, or explicit composite of both. Either leg may appear alone only when the routing result selected that fallback.                       |
 | `command`         | Resolved chip / palette result                   | `{ type: "command", id, args }`                                  | **Nothing** when the command is host-action-only. Otherwise the command's result lowered as text/file parts (e.g. `/read foo.ts` → the file's contents). The literal `/foo` is never sent.                                 |
 | `mention` (skill) | Chip / pill in the input                         | `{ type: "mention", target }`                                    | **Nothing** in the user message; the [skill body](./skills.md) loads via the normal `skill` tool flow.                                                                                                                     |
 | `mention` (file)  | Same                                             | Same                                                             | Lowered as a `file-ref` (and from there per the file-ref row).                                                                                                                                                             |
@@ -615,9 +635,10 @@ A conforming compositor MUST:
   documents, recent actions) as `editor-context` parts rather than
   inlining it into the user's text.
 - Carry a schema version on user message metadata.
-- Lower attachments to provider-native multimodal blocks at the
-  provider boundary; fall back to descriptor parts when the model
-  has no native support.
+- Lower attachments according to the declared route: a provider-native
+  multimodal block, a tool-addressable staged-copy descriptor, or an explicit
+  composite of both. Apply only capability-governed fallbacks recorded by the
+  routing result, and correlate the two legs of a composite explicitly.
 - Persist user messages **before** they reach the model.
 
 ## What this guide does not specify

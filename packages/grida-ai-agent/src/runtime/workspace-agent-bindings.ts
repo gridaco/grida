@@ -9,6 +9,7 @@
 
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { lstatSync, realpathSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { generateImage } from "ai";
 import { AgentFs } from "../fs";
@@ -39,6 +40,7 @@ import {
 } from "@grida/daemon/server";
 import type { Workspace, WorkspaceRegistry } from "@grida/daemon/server";
 import type { ProviderHttp } from "../providers/http";
+import type { RunCommandApprovalInput } from "../tools";
 
 export type WorkspaceAgentBindingRequest = {
   workspace_root?: string;
@@ -161,8 +163,12 @@ export async function createWorkspaceAgentBindings(
     /** Real path of the session scratch dir, when wired — the agent reaches it
      *  via the shell and is told it through the scratch capability hint. */
     scratch_dir?: string;
-    needs_approval?: (input: { command: string; args: string[] }) => boolean;
+    needs_approval?: (input: RunCommandApprovalInput) => boolean;
   };
+  /** Real, host-provisioned session scratch root already included in `fs`.
+   * Independent of command exposure so a fail-closed shell posture can still
+   * advertise the structured filesystem's scratch reach. */
+  scratch_dir?: string;
   /** Image generator backing `generate_image`, when a provider key + scratch
    *  sink are available (S3: produced files land in scratch). */
   image_gen?: AgentGen.ImageGenerator;
@@ -247,8 +253,9 @@ export async function createWorkspaceAgentBindings(
           // `auto` the predicate is absent — every command runs without asking.
           needs_approval:
             mode === "accept-edits"
-              ? ({ command, args }: { command: string; args: string[] }) =>
-                  !isReadOnlyCommand(command, args)
+              ? (input: RunCommandApprovalInput) =>
+                  !isReadOnlyCommand(input.command, input.args) &&
+                  !isScratchLocalCopyOrMove(input, scratchDir)
               : undefined,
         }
       : undefined;
@@ -286,7 +293,81 @@ export async function createWorkspaceAgentBindings(
   const skill_load_body = scratchDir
     ? createMaterializingSkillLoader(scratchDir)
     : undefined;
-  return { fs, todos, command, image_gen, skill_load_body };
+  return {
+    fs,
+    todos,
+    command,
+    scratch_dir: scratchDir,
+    image_gen,
+    skill_load_body,
+  };
+}
+
+/**
+ * Scratch is a pre-authorized working area (WG scratch S4). In supervised
+ * mode, a plain two-path `cp` or `mv` that stays wholly inside that area must
+ * not pause for approval. Keep this deliberately narrow: flags, another cwd,
+ * promotion into the workspace, or any unknown command retain the ordinary
+ * mutating-command approval.
+ *
+ * This is an approval-UX classifier, not the containment boundary. The command
+ * backend and OS sandbox still validate and confine the actual process.
+ */
+function isScratchLocalCopyOrMove(
+  input: RunCommandApprovalInput,
+  scratchDir: string | undefined
+): boolean {
+  if (
+    !scratchDir ||
+    (input.command !== "cp" && input.command !== "mv") ||
+    input.args.length !== 2 ||
+    input.args.some((arg) => arg.length === 0 || arg.startsWith("-"))
+  ) {
+    return false;
+  }
+  const workdir = path.resolve(input.workdir);
+  let resolvedWorkdir: string | undefined;
+  try {
+    resolvedWorkdir = realpathSync(workdir);
+  } catch {
+    // Absolute operands do not need cwd; relative operands fail closed below.
+  }
+  const operands = input.args.map((arg) => {
+    if (!path.isAbsolute(arg)) {
+      if (!resolvedWorkdir || !containsPath(scratchDir, resolvedWorkdir)) {
+        return null;
+      }
+    }
+    const resolved = path.resolve(workdir, arg);
+    return containsPath(scratchDir, resolved) ? resolved : null;
+  });
+  if (operands.some((operand) => operand === null)) return false;
+  const [source, destination] = operands as [string, string];
+
+  try {
+    // Copy/move only an existing regular file whose canonical target remains
+    // in scratch. This rejects a scratch symlink that points into the workspace.
+    const sourceStat = lstatSync(source);
+    if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) return false;
+    if (!containsPath(scratchDir, realpathSync(source))) return false;
+
+    // Never auto-approve an overwrite. Besides preserving the scratch input,
+    // this avoids truncating a workspace file through a scratch hard link.
+    try {
+      lstatSync(destination);
+      return false;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") return false;
+    }
+
+    // The destination itself is new, so canonicalize its existing parent.
+    // A lexical `<scratch>/link/file` whose `link` targets the workspace then
+    // fails containment instead of bypassing supervised approval.
+    const destinationParent = realpathSync(path.dirname(destination));
+    return containsPath(scratchDir, destinationParent);
+  } catch {
+    return false;
+  }
 }
 
 /** File extension for a produced image's media type (best-effort). */

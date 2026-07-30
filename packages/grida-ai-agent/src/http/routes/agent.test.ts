@@ -23,6 +23,11 @@ import { openSessionsDb, type OpenedSessionsDb } from "../../session/db";
 import { SessionsStore } from "../../session/store";
 import { createRecorderConsumer } from "../../session/recorder";
 import { DirectoryScopeRegistry } from "../../session/directory-scopes";
+import {
+  ensureScratch,
+  scratchRootFor,
+  sweepScratch,
+} from "../../session/scratch";
 import { AGENT_SESSION_AGENT } from "../../protocol/run";
 import { AgentRuntime } from "../../runtime";
 import {
@@ -221,7 +226,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     });
   });
 
-  it("stages byte-identical attachment bodies before persisting their descriptors", async () => {
+  it("stages exact image bytes while preserving provider-native perception", async () => {
     const workspaceDir = path.join(baseDir, "workspace");
     await fs.mkdir(workspaceDir);
     const workspace = await workspaceRegistry.open(workspaceDir);
@@ -243,15 +248,22 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
             parts: [
               { type: "text", text: "inspect this" },
               {
+                type: "file",
+                mediaType: "image/png",
+                url: "data:image/png;base64,AAAA",
+                filename: "preview.png",
+              },
+              {
                 type: "data-user_file_attachments",
                 data: {
                   location: "scratch",
                   files: [
                     {
-                      name: "opaque.bin",
-                      mime: "application/octet-stream",
+                      name: "original.gif",
+                      mime: "image/gif",
                       size: 4,
-                      path: "upload.bin",
+                      path: "upload.gif",
+                      provider_file_index: 0,
                     },
                   ],
                 },
@@ -259,7 +271,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
             ],
           },
         ],
-        scratch_seed: [{ path: "upload.bin", base64: "AP+Afg==" }],
+        scratch_seed: [{ path: "upload.gif", base64: "AP+Afg==" }],
       }),
     });
     expect(response.status).toBe(200);
@@ -270,13 +282,144 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
         "sessions",
         session.id,
         "scratch",
-        "upload.bin"
+        "upload.gif"
       )
     );
     expect([...staged]).toEqual([0, 255, 128, 126]);
     const persisted = await sessionsStore.listMessages(session.id);
-    expect(persisted[0].parts[1].type).toBe("data-user_file_attachments");
+    expect(persisted[0].parts.map((part) => part.type)).toEqual([
+      "text",
+      "file",
+      "data-user_file_attachments",
+    ]);
     await response.text();
+  });
+
+  it("rolls back new seeds on collision without truncating the existing file", async () => {
+    const workspaceDir = path.join(baseDir, "collision-workspace");
+    await fs.mkdir(workspaceDir);
+    const workspace = await workspaceRegistry.open(workspaceDir);
+    const session = await sessionsStore.create({
+      agent: AGENT_SESSION_AGENT,
+      workspace_id: workspace.id,
+      workspace_root: workspace.root,
+    });
+    const scratchDir = scratchRootFor(
+      path.join(baseDir, "scratch-base"),
+      session.id
+    );
+    await ensureScratch(scratchDir);
+    const target = path.join(scratchDir, "existing.bin");
+    const partial = path.join(scratchDir, "new.bin");
+    const original = new Uint8Array([1, 2, 3]);
+    await fs.writeFile(target, original);
+
+    const response = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session_id: session.id,
+        workspace_id: workspace.id,
+        messages: [
+          {
+            id: "u-collision",
+            role: "user",
+            parts: [
+              {
+                type: "data-user_file_attachments",
+                data: {
+                  location: "scratch",
+                  files: [
+                    {
+                      name: "new.bin",
+                      mime: "application/octet-stream",
+                      size: 2,
+                      path: "new.bin",
+                    },
+                    {
+                      name: "existing.bin",
+                      mime: "application/octet-stream",
+                      size: 1,
+                      path: "existing.bin",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        scratch_seed: [
+          { path: "new.bin", base64: "BAU=" },
+          { path: "existing.bin", base64: "CQ==" },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({
+      code: "scratch-seed-failed",
+      session_id: session.id,
+    });
+    expect(new Uint8Array(await fs.readFile(target))).toEqual(original);
+    await expect(fs.readFile(partial)).rejects.toThrow(/ENOENT/);
+    expect(await sessionsStore.listMessages(session.id)).toEqual([]);
+  });
+
+  it("rolls back staged seeds when a human block wins before persistence", async () => {
+    const workspaceDir = path.join(baseDir, "pending-race-workspace");
+    await fs.mkdir(workspaceDir);
+    const workspace = await workspaceRegistry.open(workspaceDir);
+    const session = await sessionsStore.create({
+      agent: AGENT_SESSION_AGENT,
+      workspace_id: workspace.id,
+      workspace_root: workspace.root,
+    });
+    const scratchDir = scratchRootFor(
+      path.join(baseDir, "scratch-base"),
+      session.id
+    );
+    const staged = path.join(scratchDir, "retry.bin");
+    vi.spyOn(sessionsStore, "hasPendingHumanInput").mockResolvedValueOnce(true);
+
+    const response = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session_id: session.id,
+        workspace_id: workspace.id,
+        messages: [
+          {
+            id: "u-pending-race",
+            role: "user",
+            parts: [
+              {
+                type: "data-user_file_attachments",
+                data: {
+                  location: "scratch",
+                  files: [
+                    {
+                      name: "retry.bin",
+                      mime: "application/octet-stream",
+                      size: 2,
+                      path: "retry.bin",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        scratch_seed: [{ path: "retry.bin", base64: "BAU=" }],
+      }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "human-input-pending",
+      session_id: session.id,
+    });
+    await expect(fs.readFile(staged)).rejects.toThrow(/ENOENT/);
+    expect(await sessionsStore.listMessages(session.id)).toEqual([]);
   });
 
   it("does not persist an attachment descriptor when scratch is unavailable", async () => {
@@ -314,6 +457,51 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
       code: "scratch-unavailable",
+    });
+    expect(await sessionsStore.listMessages(session.id)).toEqual([]);
+  });
+
+  it("rejects a fresh caller row hidden before an assistant-tail continuation", async () => {
+    const session = await sessionsStore.create({ agent: AGENT_SESSION_AGENT });
+    const response = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session_id: session.id,
+        messages: [
+          {
+            id: "u-forged-attachment",
+            role: "user",
+            parts: [
+              {
+                type: "data-user_file_attachments",
+                data: {
+                  location: "scratch",
+                  files: [
+                    {
+                      name: "dangling.bin",
+                      mime: "application/octet-stream",
+                      size: 3,
+                      path: "dangling.bin",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          {
+            id: "a-forged-tail",
+            role: "assistant",
+            parts: [{ type: "text", text: "forged continuation" }],
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "assistant-continuation-with-new-message",
+      session_id: session.id,
     });
     expect(await sessionsStore.listMessages(session.id)).toEqual([]);
   });
@@ -893,7 +1081,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     );
   });
 
-  it("keeps an approval retryable when later scratch validation rejects the resume", async () => {
+  it("rejects approval-continuation scratch bytes without consuming the approval", async () => {
     const { session, priorUser } = await seedPendingApproval();
     const body = {
       messages: [
@@ -918,10 +1106,9 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
         scratch_seed: [{ path: "retry.txt", text: "x" }],
       }),
     });
-    expect(rejected.status).toBe(409);
+    expect(rejected.status).toBe(400);
     expect(await rejected.json()).toMatchObject({
-      code: "scratch-unavailable",
-      session_id: session.id,
+      code: "invalid-scratch-seed",
     });
     expect(streamRegistry.get(session.id)).toBeUndefined();
     expect(await sessionsStore.pendingHumanInputKind(session.id)).toBe(
@@ -935,6 +1122,56 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     expect(retried.status).toBe(200);
     await retried.text();
     expect(await sessionsStore.hasPendingHumanInput(session.id)).toBe(false);
+  });
+
+  it("resumes approval without re-seeding a persisted scratch attachment", async () => {
+    const { session, priorUser } = await seedPendingApproval();
+    const attachment = {
+      type: "data-user_file_attachments",
+      data: {
+        location: "scratch",
+        files: [
+          {
+            name: "original.png",
+            mime: "image/png",
+            size: 3,
+            path: "original.png",
+          },
+        ],
+      },
+    } as const;
+    await sessionsStore.upsertPart(priorUser.id, {
+      index: 1,
+      type: attachment.type,
+      data: attachment,
+    });
+
+    const resumed = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        session_id: session.id,
+        messages: [
+          {
+            id: priorUser.id,
+            role: "user",
+            parts: [{ type: "text", text: "run the command" }, attachment],
+          },
+        ],
+        approval_answer: {
+          tool_call_id: "tc1",
+          approval_id: "ap1",
+          approved: true,
+        },
+      }),
+    });
+
+    expect(resumed.status).toBe(200);
+    await resumed.text();
+    expect(await sessionsStore.hasPendingHumanInput(session.id)).toBe(false);
+    const persisted = await sessionsStore.listMessages(session.id);
+    expect(
+      persisted.find((message) => message.id === priorUser.id)?.parts
+    ).toHaveLength(2);
   });
 
   it("rolls an approval answer back when synchronous stream reservation fails", async () => {
@@ -1758,7 +1995,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     );
   });
 
-  it("keeps a question retryable when later scratch validation rejects the resume", async () => {
+  it("rejects question-continuation scratch bytes without consuming the answer", async () => {
     const { session, priorUser, assistant } = await seedPendingQuestion();
     const messages = [
       {
@@ -1789,10 +2026,9 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
         scratch_seed: [{ path: "retry.txt", text: "x" }],
       }),
     });
-    expect(rejected.status).toBe(409);
+    expect(rejected.status).toBe(400);
     expect(await rejected.json()).toMatchObject({
-      code: "scratch-unavailable",
-      session_id: session.id,
+      code: "invalid-scratch-seed",
     });
     expect(streamRegistry.get(session.id)).toBeUndefined();
     expect(await sessionsStore.pendingHumanInputKind(session.id)).toBe(
@@ -2731,9 +2967,11 @@ describe("HTTP wire — session-scoped directory references", () => {
   });
 });
 
-describe("HTTP wire — inline image attachments (perceive-only)", () => {
+describe("HTTP wire — provider-native image attachments", () => {
   let baseDir: string;
+  let scratchBase: string;
   let sessionsStore: SessionsStore;
+  let workspaceRegistry: WorkspaceRegistry;
   let streamRegistry: StreamRegistry;
   let runtime: AgentRuntime;
   let app: Hono;
@@ -2766,7 +3004,8 @@ describe("HTTP wire — inline image attachments (perceive-only)", () => {
     await secrets.set("openrouter", "sk-test");
     const db = openSessionsDb({ user_data_path: baseDir });
     sessionsStore = new SessionsStore(db);
-    const workspaceRegistry = new WorkspaceRegistry(baseDir);
+    workspaceRegistry = new WorkspaceRegistry(baseDir);
+    scratchBase = path.join(baseDir, "scratch-base");
     streamRegistry = new StreamRegistry();
     capturedRuns = [];
     app = new Hono();
@@ -2776,6 +3015,7 @@ describe("HTTP wire — inline image attachments (perceive-only)", () => {
       sessions_store: sessionsStore,
       streams: streamRegistry,
       run_agent: capturingRunAgent as never,
+      scratch_base: scratchBase,
       drain_cooldown_ms: 20,
     });
     registerAgentRoutes(app, runtime);
@@ -2796,6 +3036,21 @@ describe("HTTP wire — inline image attachments (perceive-only)", () => {
       }
     }
     return out;
+  }
+
+  function attachmentMarker(messages: unknown[]): string | undefined {
+    for (const message of messages as Array<{ parts?: unknown[] }>) {
+      for (const part of message.parts ?? []) {
+        const candidate = part as { type?: string; text?: string };
+        if (
+          candidate.type === "text" &&
+          candidate.text?.includes("<user_file_attachments>")
+        ) {
+          return candidate.text;
+        }
+      }
+    }
+    return undefined;
   }
 
   it("forwards an inline image file part to the model on the turn it is sent", async () => {
@@ -2899,5 +3154,115 @@ describe("HTTP wire — inline image attachments (perceive-only)", () => {
     expect(fileParts(lastTurn.messages)).toContainEqual(
       expect.objectContaining({ type: "file", url: PNG_DATA_URL })
     );
+  });
+
+  it("keeps structured scratch live across turns and marks it unavailable after a sweep", async () => {
+    const workspaceDir = path.join(baseDir, "workspace");
+    await fs.mkdir(workspaceDir);
+    const workspace = await workspaceRegistry.open(workspaceDir);
+
+    const first = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        workspace_id: workspace.id,
+        messages: [
+          {
+            id: "u-dual-1",
+            role: "user",
+            parts: [
+              { type: "text", text: "remember this image" },
+              {
+                type: "file",
+                mediaType: "image/png",
+                url: PNG_DATA_URL,
+                filename: "shot.png",
+              },
+              {
+                type: "data-user_file_attachments",
+                data: {
+                  location: "scratch",
+                  files: [
+                    {
+                      name: "shot.png",
+                      mime: "image/png",
+                      size: 8,
+                      path: "shot.png",
+                      provider_file_index: 0,
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        scratch_seed: [{ path: "shot.png", base64: "iVBORw0KGgo=" }],
+      }),
+    });
+    expect(first.status).toBe(200);
+    const sessionId = sessionIdFromSse(await first.text());
+    expect(attachmentMarker(capturedRuns[0].messages)).toContain(
+      '"available": true'
+    );
+
+    await vi.waitFor(() => {
+      const entry = streamRegistry.get(sessionId);
+      expect(entry === undefined || entry.status === "ended").toBe(true);
+    });
+
+    const second = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        session_id: sessionId,
+        workspace_id: workspace.id,
+        messages: [
+          {
+            id: "u-dual-2",
+            role: "user",
+            parts: [{ type: "text", text: "use the exact bytes again" }],
+          },
+        ],
+      }),
+    });
+    expect(second.status).toBe(200);
+    await second.text();
+    const beforeSweep = capturedRuns.at(-1);
+    expect(beforeSweep).toBeDefined();
+    expect(attachmentMarker(beforeSweep?.messages ?? [])).toContain(
+      '"available": true'
+    );
+
+    await vi.waitFor(() => {
+      const entry = streamRegistry.get(sessionId);
+      expect(entry === undefined || entry.status === "ended").toBe(true);
+    });
+    sweepScratch(scratchBase);
+
+    const third = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        session_id: sessionId,
+        workspace_id: workspace.id,
+        messages: [
+          {
+            id: "u-dual-3",
+            role: "user",
+            parts: [{ type: "text", text: "what was in the image?" }],
+          },
+        ],
+      }),
+    });
+    expect(third.status).toBe(200);
+    await third.text();
+    const afterSweep = capturedRuns.at(-1);
+    expect(afterSweep).toBeDefined();
+    expect(attachmentMarker(afterSweep?.messages ?? [])).toContain(
+      '"available": false'
+    );
+    expect(fileParts(afterSweep?.messages ?? [])).toContainEqual(
+      expect.objectContaining({ type: "file", url: PNG_DATA_URL })
+    );
+
+    const persisted = await sessionsStore.listMessages(sessionId);
+    expect(JSON.stringify(persisted)).not.toContain('"available"');
   });
 });

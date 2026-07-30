@@ -107,9 +107,10 @@ injects, not a new tool and not a renamed one.
 > attachments the model _cannot read at all_ (a `.psd`, a `.zip`) and the
 > routes that make them useful. Visual perception is about sources the model
 > _could_ read as text but where the agent wants the **rendering** instead
-> (an svg, a screenshot). A raster bitmap is the overlap: binary treats a
-> pasted image as a native-multimodal attachment; this page is how the agent
-> reaches one that lives at a path, by choice, through a tool.
+> (an svg, a screenshot). A raster bitmap is the overlap: binary can deliver
+> it natively for immediate perception, while this page defines how the agent
+> re-perceives the same image when ingress also supplied or materialized a
+> live reference.
 
 ## Result-to-image lowering
 
@@ -173,15 +174,19 @@ policy bounds this.
 
 ### Asymmetry: only re-viewable perceptions are auto-evicted
 
-A tool-produced perception is **re-viewable** — there is a reference and a
-tool to call again. An inline image the user pasted into a message is
-**not**: there is no path to re-fetch it, so eliding it is lossy and
-irreversible. Retention therefore auto-evicts re-viewable perceptions but
-leaves user-attached images in place (they are already bounded by the
-attachment-storage policy in [`compositor`](./compositor.md#attachment-storage)).
-The unifying rule is **evict only what perception can restore** — not "evict
-all images." A host that later gives pasted images a re-view reference can
-bring them under the same policy.
+A tool-produced perception is **re-viewable** when there is still a live
+reference and a tool that can resolve it. A user-attached image has the same
+status only when the host materialized its bytes at ingress and paired the
+inline media with that reference. A pathless attachment is not re-viewable, so
+eliding it is lossy and irreversible.
+
+Retention therefore auto-evicts only images whose references remain live. A
+session-scratch path qualifies only while the host can prove, at lowering time,
+that it remains live and correlated with the attachment; a declared retention
+window alone is not proof. When that liveness cannot be established, the host
+must either rematerialize the attachment or treat it as non-re-viewable. The
+unifying rule is **evict only what perception can restore** — not "evict all
+images."
 
 ## Implementor checklist
 
@@ -199,8 +204,8 @@ A conforming implementation SHOULD:
   Anthropic-native); stage-and-reattach on Chat Completions / openai-compatible.
   Verify perception **end-to-end through a real provider**, not just the
   media-block shape.
-- Evict stale **re-viewable** perceptions to a naming descriptor; leave
-  non-re-viewable images (pasted attachments) intact.
+- Evict stale **re-viewable** perceptions to a naming descriptor; leave any
+  image without a live, correlated re-view reference intact.
 - Declare only a read capability for bitmap perception; gate the rendered
   (svg / text) path behind a render capability when it lands.
 

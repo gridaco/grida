@@ -216,6 +216,44 @@ describe("buildModelMessages", () => {
     expect(JSON.stringify(rows)).not.toContain('"available"');
   });
 
+  it("annotates scratch attachments from live files without mutating persistence", () => {
+    const rows = [
+      msg("m-attachments", "user", [
+        part("data-user_file_attachments", {
+          type: "data-user_file_attachments",
+          data: {
+            location: "scratch",
+            files: [
+              {
+                name: "live.bin",
+                mime: "application/octet-stream",
+                size: 3,
+                path: "live.bin",
+              },
+              {
+                name: "expired.bin",
+                mime: "application/octet-stream",
+                size: 4,
+                path: "expired.bin",
+              },
+            ],
+          },
+        }),
+      ]),
+    ];
+
+    const out = buildModelMessages(rows, {
+      availableScratchAttachmentPaths: new Set(["live.bin"]),
+    });
+    const marker = out[0].parts[0] as { text: string };
+    expect(marker.text).toContain('"name": "live.bin"');
+    expect(marker.text).toContain('"available": true');
+    expect(marker.text).toContain('"name": "expired.bin"');
+    expect(marker.text).toContain('"available": false');
+    // Liveness is a turn-time model fact, never durable chat state.
+    expect(JSON.stringify(rows)).not.toContain('"available"');
+  });
+
   it("resolves a bottom summary: drops the head, reorders the summary to the front", () => {
     // New model: the marker sorts LAST. The boundary is read from tail_start_id,
     // the head before it is dropped, and the summary leads.

@@ -140,6 +140,24 @@ authority over a workspace file. The edit operation's own current-content match
 still applies wherever that operation is used; it is intrinsic conflict
 detection, not a workspace-authorization rule.
 
+## Input staging
+
+An attachment-routing policy MAY select a route that gives tool operability to
+byte-backed input with no authorized live reference. Once selected, the host
+MUST materialize a working copy in scratch or select an explicit fallback
+allowed by the routing result. This is ingress staging, not promotion: the
+resulting descriptor names the host-owned scratch copy and grants no authority
+over any source path. A provider-native representation of the same attachment
+MAY coexist for immediate perception; the
+[compositor's routing policy](./compositor.md#resource-routing-policy) owns that
+choice and its fallbacks.
+
+The host MUST admit staged inputs against the turn's aggregate byte, file, and
+path budgets before materialization. The staged copy has scratch's ephemeral
+lifetime; if durable replay depends on those bytes, the host MUST retain or
+rematerialize them outside scratch rather than treating the descriptor as
+durable storage.
+
 ## Lifecycle
 
 - **Creation** is on demand — at session start or first use. An idle session

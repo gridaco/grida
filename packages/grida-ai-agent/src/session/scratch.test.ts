@@ -13,6 +13,7 @@ import {
   assertOutsideSecretsRoot,
   defaultScratchBase,
   ensureScratch,
+  listScratchFilePaths,
   removeScratch,
   scratchRootFor,
   sweepScratch,
@@ -147,6 +148,34 @@ describe("scratch I/O helpers", () => {
     expect(new Uint8Array(await fs.readFile(out))).toEqual(bytes);
   });
 
+  it("writeScratchFile preserves generated-artifact overwrite behavior", async () => {
+    const root = scratchRootFor(base, "ses_overwrite");
+    await ensureScratch(root);
+    const target = await writeScratchFile(
+      root,
+      "image.png",
+      new Uint8Array([1, 2, 3])
+    );
+    await writeScratchFile(root, "image.png", new Uint8Array([4, 5]));
+    expect(new Uint8Array(await fs.readFile(target))).toEqual(
+      new Uint8Array([4, 5])
+    );
+  });
+
+  it("writeScratchFile can reject a seed collision without truncating the original", async () => {
+    const root = scratchRootFor(base, "ses_no_clobber");
+    await ensureScratch(root);
+    const original = new Uint8Array([1, 2, 3]);
+    const target = await writeScratchFile(root, "input.bin", original);
+
+    await expect(
+      writeScratchFile(root, "input.bin", new Uint8Array([9]), {
+        overwrite: false,
+      })
+    ).rejects.toThrow(/EEXIST/);
+    expect(new Uint8Array(await fs.readFile(target))).toEqual(original);
+  });
+
   it("writeScratchFile writes the produced file owner-only (0600)", async () => {
     // Shared-machine reasoning, same as the dir mode. Skip on Windows (no POSIX
     // mode bits).
@@ -187,6 +216,25 @@ describe("scratch I/O helpers", () => {
     ).rejects.toThrow(/ELOOP/);
     // The escape target was never created — the write did not follow the link.
     await expect(fs.stat(outside)).rejects.toThrow(/ENOENT/);
+  });
+
+  it("listScratchFilePaths reports only live direct regular files and fails closed", async () => {
+    const root = scratchRootFor(base, "ses_list");
+    await ensureScratch(root);
+    await fs.writeFile(path.join(root, "live.bin"), "bytes");
+    await fs.mkdir(path.join(root, "nested"));
+    await fs.writeFile(path.join(root, "nested", "hidden.bin"), "bytes");
+    if (process.platform !== "win32") {
+      await fs.symlink(
+        path.join(root, "live.bin"),
+        path.join(root, "linked.bin")
+      );
+    }
+
+    expect(await listScratchFilePaths(root)).toEqual(new Set(["live.bin"]));
+    expect(await listScratchFilePaths(path.join(root, "missing"))).toEqual(
+      new Set()
+    );
   });
 
   it("removeScratch is recursive and idempotent (S2)", async () => {

@@ -16,12 +16,18 @@ const directory = {
   access: "read",
 } as const;
 
-function file(input: { name: string; type?: string; size?: number }): File {
+function file(input: {
+  name: string;
+  type?: string;
+  size?: number;
+  bytes?: readonly number[];
+}): File {
+  const bytes = Uint8Array.from(input.bytes ?? [0, 0, 0]);
   return {
     name: input.name,
     type: input.type ?? "",
-    size: input.size ?? 3,
-    arrayBuffer: async () => new Uint8Array([0, 0, 0]).buffer,
+    size: input.size ?? bytes.byteLength,
+    arrayBuffer: async () => bytes.buffer,
   } as File;
 }
 
@@ -85,7 +91,11 @@ describe("InputResourceRouter.prepare", () => {
         kind: "browser-file",
         id: "paste-1",
         source: "paste",
-        file: file({ name: "paste.png", type: "image/png" }),
+        file: file({
+          name: "paste.png",
+          type: "image/png",
+          bytes: [1, 2, 3],
+        }),
       },
       environment({ effects: { encodeProviderFile } })
     );
@@ -94,14 +104,37 @@ describe("InputResourceRouter.prepare", () => {
       status: "accept",
       decision: {
         ruleId: "byte-image",
-        route: { kind: "attachment", via: "provider", from: "bytes" },
+        route: {
+          kind: "attachment",
+          via: "provider-and-scratch",
+          from: "bytes",
+        },
       },
-      resource: { kind: "provider-file", source: "paste" },
+      materializedRoute: {
+        kind: "attachment",
+        via: "provider-and-scratch",
+        from: "bytes",
+      },
+      resource: {
+        kind: "provider-and-scratch-file",
+        source: "paste",
+        name: "paste.png",
+        mimeType: "image/png",
+        size: 3,
+        base64: "AQID",
+        provider: {
+          name: "paste.png",
+          mimeType: "image/png",
+          size: 3,
+          url: "data:image/png;base64,AAAA",
+          representation: "inline-bytes",
+        },
+      },
     });
     expect(encodeProviderFile).toHaveBeenCalledOnce();
   });
 
-  it("rejects an encoder output MIME outside the active provider capability", async () => {
+  it("keeps the scratch fallback when provider output violates capability", async () => {
     const encodeProviderFile = vi.fn<
       InputResourceRouter.Effects["encodeProviderFile"]
     >(async () => ({
@@ -126,13 +159,127 @@ describe("InputResourceRouter.prepare", () => {
     );
 
     expect(result).toMatchObject({
-      status: "reject",
-      reason: "preparation-failed",
+      status: "accept",
+      decision: { route: { via: "provider-and-scratch" } },
+      materializedRoute: {
+        kind: "attachment",
+        via: "scratch",
+        from: "bytes",
+      },
+      resource: {
+        kind: "scratch-file",
+        name: "source.webp",
+        mimeType: "image/webp",
+        size: 3,
+        base64: "AAAA",
+      },
     });
     expect(encodeProviderFile).toHaveBeenCalledWith(expect.anything(), {
       outputMimes: ["image/png"],
     });
   });
+
+  it.each(["null", "throw"] as const)(
+    "keeps the scratch fallback when provider preparation returns %s",
+    async (failure) => {
+      const encodeProviderFile = vi.fn<
+        InputResourceRouter.Effects["encodeProviderFile"]
+      >(async () => {
+        if (failure === "throw") throw new Error("provider decode failed");
+        return null;
+      });
+      const encodeOperableFile = vi.fn<
+        InputResourceRouter.Effects["encodeOperableFile"]
+      >(async () => ({
+        name: "original.gif",
+        mime: "image/gif",
+        size: 3,
+        base64: "AQID",
+      }));
+      const result = await InputResourceRouter.prepare(
+        {
+          kind: "browser-file",
+          id: "gif-1",
+          source: "drop",
+          file: file({
+            name: "original.gif",
+            type: "image/gif",
+            bytes: [1, 2, 3],
+          }),
+        },
+        environment({
+          attachment: {
+            provider: { inlineMimes: ["image/png"], remoteUrlMimes: [] },
+          },
+          effects: { encodeProviderFile, encodeOperableFile },
+        })
+      );
+
+      expect(result).toMatchObject({
+        status: "accept",
+        decision: { route: { via: "provider-and-scratch" } },
+        materializedRoute: { kind: "attachment", via: "scratch" },
+        resource: {
+          kind: "scratch-file",
+          name: "original.gif",
+          base64: "AQID",
+        },
+      });
+    }
+  );
+
+  it.each(["null", "throw"] as const)(
+    "keeps provider perception when scratch preparation returns %s",
+    async (failure) => {
+      const encodeProviderFile = vi.fn<
+        InputResourceRouter.Effects["encodeProviderFile"]
+      >(async () => ({
+        name: "preview.png",
+        mime: "image/png",
+        size: 3,
+        url: "data:image/png;base64,AAAA",
+      }));
+      const encodeOperableFile = vi.fn<
+        InputResourceRouter.Effects["encodeOperableFile"]
+      >(async () => {
+        if (failure === "throw") throw new Error("raw read failed");
+        return null;
+      });
+      const result = await InputResourceRouter.prepare(
+        {
+          kind: "browser-file",
+          id: "gif-1",
+          source: "drop",
+          file: file({
+            name: "original.gif",
+            type: "image/gif",
+            bytes: [1, 2, 3],
+          }),
+        },
+        environment({
+          attachment: {
+            provider: { inlineMimes: ["image/png"], remoteUrlMimes: [] },
+          },
+          effects: { encodeProviderFile, encodeOperableFile },
+        })
+      );
+
+      expect(result).toMatchObject({
+        status: "accept",
+        decision: { route: { via: "provider-and-scratch" } },
+        materializedRoute: {
+          kind: "attachment",
+          via: "provider",
+          from: "bytes",
+        },
+        resource: {
+          kind: "provider-file",
+          name: "preview.png",
+          mimeType: "image/png",
+        },
+      });
+    }
+  );
 
   it("rejects an oversized scratch file before reading it", async () => {
     const encodeOperableFile =
@@ -379,6 +526,287 @@ describe("InputResourceRouter.prepare", () => {
     });
   });
 
+  it("bounds raw draft twins independently of final scratch capacity", async () => {
+    const encodeProviderFile = vi.fn<
+      InputResourceRouter.Effects["encodeProviderFile"]
+    >(async (source) => ({
+      name: source.name,
+      mime: source.type,
+      size: 3,
+      url: `data:${source.type};base64,AAAA`,
+    }));
+    const encodeOperableFile = vi.fn<
+      InputResourceRouter.Effects["encodeOperableFile"]
+    >(async (source) => ({
+      name: source.name,
+      mime: source.type,
+      size: source.size,
+      base64: "AQIDBAU=",
+    }));
+    const results = await InputResourceRouter.prepareBatch(
+      ["one", "two"].map(
+        (name) =>
+          ({
+            kind: "browser-file",
+            id: name,
+            source: "drop",
+            file: file({
+              name: `${name}.png`,
+              type: "image/png",
+              bytes: [1, 2, 3, 4, 5],
+            }),
+          }) as const
+      ),
+      environment({
+        attachment: {
+          operableTwinRetention: { maxFiles: 64, maxTotalBytes: 8 },
+        },
+        effects: { encodeProviderFile, encodeOperableFile },
+      })
+    );
+
+    expect(results).toMatchObject([
+      {
+        status: "accept",
+        decision: { route: { via: "provider-and-scratch" } },
+        resource: { kind: "provider-and-scratch-file" },
+      },
+      {
+        status: "accept",
+        decision: {
+          route: { via: "provider" },
+          trace: [
+            {
+              preference: "provider-and-scratch-bytes-attachment",
+              available: false,
+              reason: "draft-operable-copy-budget-exceeded",
+            },
+            { preference: "provider-bytes-attachment", available: true },
+          ],
+        },
+        materializedRoute: { via: "provider" },
+        resource: { kind: "provider-file" },
+      },
+    ]);
+    expect(encodeProviderFile).toHaveBeenCalledTimes(2);
+    expect(encodeOperableFile).toHaveBeenCalledOnce();
+  });
+
+  it("retains admitted raster twins until final lowering can allocate current capacity", async () => {
+    const encodeProviderFile = vi.fn<
+      InputResourceRouter.Effects["encodeProviderFile"]
+    >(async (source) => ({
+      name: source.name,
+      mime: source.type,
+      size: 3,
+      url: `data:${source.type};base64,AAAA`,
+    }));
+    const encodeOperableFile = vi.fn<
+      InputResourceRouter.Effects["encodeOperableFile"]
+    >(async (source) => ({
+      name: source.name,
+      mime: source.type,
+      size: source.size,
+      base64: "AQIDBAU=",
+    }));
+    const results = await InputResourceRouter.prepareBatch(
+      ["one", "two"].map(
+        (name) =>
+          ({
+            kind: "browser-file",
+            id: name,
+            source: "drop",
+            file: file({
+              name: `${name}.png`,
+              type: "image/png",
+              bytes: [1, 2, 3, 4, 5],
+            }),
+          }) as const
+      ),
+      environment({
+        attachment: {
+          scratch: { maxFileBytes: 8, maxFiles: 64, maxTotalBytes: 8 },
+        },
+        effects: { encodeProviderFile, encodeOperableFile },
+      })
+    );
+
+    expect(results).toMatchObject([
+      {
+        status: "accept",
+        decision: { route: { via: "provider-and-scratch" } },
+        resource: { kind: "provider-and-scratch-file", base64: "AQIDBAU=" },
+      },
+      {
+        status: "accept",
+        decision: { route: { via: "provider-and-scratch" } },
+        resource: { kind: "provider-and-scratch-file", base64: "AQIDBAU=" },
+      },
+    ]);
+    expect(encodeProviderFile).toHaveBeenCalledTimes(2);
+    expect(encodeOperableFile).toHaveBeenCalledTimes(2);
+
+    const bound = results.flatMap((result) =>
+      result.status === "accept"
+        ? [
+            {
+              attachmentId: result.resource.sourceId,
+              resource: result.resource,
+            },
+          ]
+        : []
+    );
+    const both = InputResourceRouter.lower(bound, {
+      provider: provider(["image/png"]),
+      scratch: { maxFileBytes: 8, maxFiles: 64, maxTotalBytes: 8 },
+    });
+    expect(both.files).toHaveLength(2);
+    expect(both.extras).toMatchObject({
+      scratchSeed: [{ path: "upload-one-one.png", base64: "AQIDBAU=" }],
+      contexts: [
+        {
+          type: USER_FILE_ATTACHMENTS,
+          data: {
+            files: [{ name: "one.png", provider_file_index: 0 }],
+          },
+        },
+      ],
+    });
+    expect(both.rejected).toEqual([]);
+    expect(both.routes).toMatchObject([
+      {
+        attachmentId: "one",
+        route: { via: "provider-and-scratch" },
+      },
+      {
+        attachmentId: "two",
+        route: { via: "provider" },
+      },
+    ]);
+
+    // Capacity is a submit-time fact. Removing the first attachment lets the
+    // retained raw twin of the second image become operable immediately.
+    const afterRemoval = InputResourceRouter.lower(bound.slice(1), {
+      provider: provider(["image/png"]),
+      scratch: { maxFileBytes: 8, maxFiles: 64, maxTotalBytes: 8 },
+    });
+    expect(afterRemoval.extras).toMatchObject({
+      scratchSeed: [{ path: "upload-two-two.png", base64: "AQIDBAU=" }],
+      contexts: [
+        {
+          type: USER_FILE_ATTACHMENTS,
+          data: {
+            files: [{ name: "two.png", provider_file_index: 0 }],
+          },
+        },
+      ],
+    });
+    expect(afterRemoval.routes).toMatchObject([
+      {
+        attachmentId: "two",
+        route: { via: "provider-and-scratch" },
+      },
+    ]);
+  });
+
+  it("allocates mandatory scratch-only files before optional raster twins", async () => {
+    const encodeProviderFile = vi.fn<
+      InputResourceRouter.Effects["encodeProviderFile"]
+    >(async (source) => ({
+      name: source.name,
+      mime: source.type,
+      size: 3,
+      url: `data:${source.type};base64,AAAA`,
+    }));
+    const encodeOperableFile = vi.fn<
+      InputResourceRouter.Effects["encodeOperableFile"]
+    >(async (source) => ({
+      name: source.name,
+      mime: source.type || "application/octet-stream",
+      size: source.size,
+      base64: "AQIDBAU=",
+    }));
+    const results = await InputResourceRouter.prepareBatch(
+      [
+        {
+          kind: "browser-file",
+          id: "image",
+          source: "drop",
+          file: file({
+            name: "image.png",
+            type: "image/png",
+            bytes: [1, 2, 3, 4, 5],
+          }),
+        },
+        {
+          kind: "browser-file",
+          id: "archive",
+          source: "drop",
+          file: file({
+            name: "archive.zip",
+            type: "application/zip",
+            bytes: [1, 2, 3, 4, 5],
+          }),
+        },
+      ],
+      environment({
+        attachment: {
+          scratch: { maxFileBytes: 8, maxFiles: 64, maxTotalBytes: 8 },
+        },
+        effects: { encodeProviderFile, encodeOperableFile },
+      })
+    );
+
+    expect(results).toMatchObject([
+      {
+        status: "accept",
+        decision: { route: { via: "provider-and-scratch" } },
+        resource: { kind: "provider-and-scratch-file" },
+      },
+      {
+        status: "accept",
+        decision: { route: { via: "scratch" } },
+        resource: { kind: "scratch-file", base64: "AQIDBAU=" },
+      },
+    ]);
+    expect(encodeProviderFile).toHaveBeenCalledOnce();
+    expect(encodeOperableFile).toHaveBeenCalledTimes(2);
+    expect(encodeOperableFile).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "archive.zip" }),
+      { maxBytes: 8 }
+    );
+
+    const bound = results.flatMap((result) =>
+      result.status === "accept"
+        ? [
+            {
+              attachmentId: result.resource.sourceId,
+              resource: result.resource,
+            },
+          ]
+        : []
+    );
+    const lowered = InputResourceRouter.lower(bound, {
+      provider: provider(["image/png"]),
+      scratch: { maxFileBytes: 8, maxFiles: 64, maxTotalBytes: 8 },
+    });
+    expect(lowered.files).toHaveLength(1);
+    expect(lowered.extras).toMatchObject({
+      scratchSeed: [{ path: "upload-archive-archive.zip", base64: "AQIDBAU=" }],
+      contexts: [
+        {
+          type: USER_FILE_ATTACHMENTS,
+          data: { files: [{ name: "archive.zip" }] },
+        },
+      ],
+    });
+    expect(lowered.rejected).toEqual([]);
+    expect(lowered.routes).toMatchObject([
+      { attachmentId: "image", route: { via: "provider" } },
+      { attachmentId: "archive", route: { via: "scratch" } },
+    ]);
+  });
+
   it("rejects an over-budget scratch batch before reading any bytes", async () => {
     const encodeOperableFile =
       vi.fn<InputResourceRouter.Effects["encodeOperableFile"]>();
@@ -474,11 +902,41 @@ describe("InputResourceRouter.card", () => {
 
     expect(card).toEqual({
       kind: "file",
+      id: "file-1",
       name: "brief.pdf",
       mime: "application/pdf",
       size: 3,
     });
     expect(card).not.toHaveProperty("payload");
+  });
+
+  it("shows one preview card for a dual-delivery image without exposing bytes", () => {
+    const card = InputResourceRouter.card({
+      kind: "provider-and-scratch-file",
+      source: "paste",
+      sourceId: "paste-1",
+      name: "original.gif",
+      mimeType: "image/gif",
+      size: 5,
+      base64: "AQIDBAU=",
+      provider: {
+        name: "original.png",
+        mimeType: "image/png",
+        size: 3,
+        url: "data:image/png;base64,AAAA",
+        representation: "inline-bytes",
+      },
+    });
+
+    expect(card).toEqual({
+      kind: "file",
+      id: "paste-1",
+      name: "original.gif",
+      mime: "image/gif",
+      size: 5,
+      url: "data:image/png;base64,AAAA",
+    });
+    expect(card).not.toHaveProperty("base64");
   });
 });
 
@@ -489,13 +947,20 @@ describe("InputResourceRouter.lower", () => {
         {
           attachmentId: "image-1",
           resource: {
-            kind: "provider-file",
-            source: "library",
-            sourceId: "pin-1",
-            name: "hero.png",
-            mimeType: "image/png",
-            url: "data:image/png;base64,AAAA",
-            representation: "inline-bytes",
+            kind: "provider-and-scratch-file",
+            source: "paste",
+            sourceId: "paste-1",
+            name: "original.gif",
+            mimeType: "image/gif",
+            size: 5,
+            base64: "AQIDBAU=",
+            provider: {
+              name: "original.png",
+              mimeType: "image/png",
+              size: 3,
+              url: "data:image/png;base64,AAAA",
+              representation: "inline-bytes",
+            },
           },
         },
         {
@@ -547,7 +1012,7 @@ describe("InputResourceRouter.lower", () => {
         type: "file",
         url: "data:image/png;base64,AAAA",
         mediaType: "image/png",
-        filename: "hero.png",
+        filename: "original.png",
       },
     ]);
     expect(lowered.references).toEqual([
@@ -558,13 +1023,118 @@ describe("InputResourceRouter.lower", () => {
       },
     ]);
     expect(lowered.extras).toMatchObject({
-      scratchSeed: [{ path: "upload-file-1-brief.pdf", base64: "AAAA" }],
+      scratchSeed: [
+        { path: "upload-image-1-original.gif", base64: "AQIDBAU=" },
+        { path: "upload-file-1-brief.pdf", base64: "AAAA" },
+      ],
       contexts: [
-        { type: USER_FILE_ATTACHMENTS },
+        {
+          type: USER_FILE_ATTACHMENTS,
+          data: {
+            location: "scratch",
+            files: [
+              {
+                name: "original.gif",
+                mime: "image/gif",
+                size: 5,
+                path: "upload-image-1-original.gif",
+                provider_file_index: 0,
+              },
+              {
+                name: "brief.pdf",
+                mime: "application/pdf",
+                size: 3,
+                path: "upload-file-1-brief.pdf",
+              },
+            ],
+          },
+        },
         { type: USER_DIRECTORY_REFERENCES },
       ],
     });
     expect(lowered.rejected).toEqual([]);
+  });
+
+  it("correlates same-named scratch twins to exact provider file indices", () => {
+    const dual = (
+      attachmentId: string,
+      sourceId: string,
+      providerName: string,
+      base64: string
+    ): InputResourceRouter.BoundResource => ({
+      attachmentId,
+      resource: {
+        kind: "provider-and-scratch-file",
+        source: "drop",
+        sourceId,
+        name: "duplicate.gif",
+        mimeType: "image/gif",
+        size: 3,
+        base64,
+        provider: {
+          name: providerName,
+          mimeType: "image/png",
+          size: 3,
+          url: "data:image/png;base64,AAAA",
+          representation: "inline-bytes",
+        },
+      },
+    });
+    const lowered = InputResourceRouter.lower(
+      [
+        {
+          attachmentId: "preview-only",
+          resource: {
+            kind: "provider-file",
+            source: "library",
+            sourceId: "library-1",
+            name: "duplicate.gif",
+            mimeType: "image/png",
+            size: 3,
+            url: "data:image/png;base64,AAAA",
+            representation: "inline-bytes",
+          },
+        },
+        dual("dual-a", "drop-a", "preview-a.png", "AQID"),
+        dual("dual-b", "drop-b", "preview-b.png", "BAUG"),
+        {
+          attachmentId: "notes",
+          resource: {
+            kind: "scratch-file",
+            source: "drop",
+            sourceId: "drop-notes",
+            name: "duplicate.gif",
+            mimeType: "application/octet-stream",
+            size: 3,
+            base64: "BwgJ",
+          },
+        },
+      ],
+      {
+        provider: provider(["image/png"]),
+        scratch: { maxFileBytes: 8, maxFiles: 8, maxTotalBytes: 16 },
+      }
+    );
+
+    expect(lowered.files.map((part) => part.filename)).toEqual([
+      "duplicate.gif",
+      "preview-a.png",
+      "preview-b.png",
+    ]);
+    expect(lowered.extras).toMatchObject({
+      contexts: [
+        {
+          type: USER_FILE_ATTACHMENTS,
+          data: {
+            files: [
+              { path: "upload-dual-a-duplicate.gif", provider_file_index: 1 },
+              { path: "upload-dual-b-duplicate.gif", provider_file_index: 2 },
+              { path: "upload-notes-duplicate.gif" },
+            ],
+          },
+        },
+      ],
+    });
   });
 
   it("rejects a provider file if the active model changed", () => {
@@ -593,6 +1163,147 @@ describe("InputResourceRouter.lower", () => {
         reason: "provider-capability-unavailable",
       },
     ]);
+  });
+
+  it("keeps a dual image operable when the active model loses vision support", () => {
+    const lowered = InputResourceRouter.lower(
+      [
+        {
+          attachmentId: "image-1",
+          resource: {
+            kind: "provider-and-scratch-file",
+            source: "paste",
+            sourceId: "paste-1",
+            name: "paste.png",
+            mimeType: "image/png",
+            size: 3,
+            base64: "AQID",
+            provider: {
+              name: "paste.png",
+              mimeType: "image/png",
+              size: 3,
+              url: "data:image/png;base64,AAAA",
+              representation: "inline-bytes",
+            },
+          },
+        },
+      ],
+      {
+        provider: provider(),
+        scratch: { maxFileBytes: 8, maxFiles: 1, maxTotalBytes: 8 },
+      }
+    );
+
+    expect(lowered.files).toEqual([]);
+    expect(lowered.extras).toMatchObject({
+      scratchSeed: [{ path: "upload-image-1-paste.png", base64: "AQID" }],
+      contexts: [{ type: USER_FILE_ATTACHMENTS }],
+    });
+    expect(lowered.rejected).toEqual([]);
+  });
+
+  it("reserves scratch for a provider-failed twin before optional twins", () => {
+    const dual = (
+      attachmentId: string,
+      providerMime: string,
+      base64: string
+    ): InputResourceRouter.BoundResource => ({
+      attachmentId,
+      resource: {
+        kind: "provider-and-scratch-file",
+        source: "drop",
+        sourceId: attachmentId,
+        name: `${attachmentId}.gif`,
+        mimeType: "image/gif",
+        size: 3,
+        base64,
+        provider: {
+          name: `${attachmentId}.preview`,
+          mimeType: providerMime,
+          size: 3,
+          url: `data:${providerMime};base64,AAAA`,
+          representation: "inline-bytes",
+        },
+      },
+    });
+    const lowered = InputResourceRouter.lower(
+      [
+        dual("provider-ok", "image/png", "AQID"),
+        dual("scratch-required", "image/jpeg", "BAUG"),
+      ],
+      {
+        provider: provider(["image/png"]),
+        scratch: { maxFileBytes: 3, maxFiles: 1, maxTotalBytes: 3 },
+      }
+    );
+
+    expect(lowered.files.map((part) => part.filename)).toEqual([
+      "provider-ok.preview",
+    ]);
+    expect(lowered.extras).toMatchObject({
+      scratchSeed: [
+        {
+          path: "upload-scratch-required-scratch-required.gif",
+          base64: "BAUG",
+        },
+      ],
+      contexts: [
+        {
+          type: USER_FILE_ATTACHMENTS,
+          data: {
+            files: [
+              {
+                name: "scratch-required.gif",
+                path: "upload-scratch-required-scratch-required.gif",
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(lowered.routes).toMatchObject([
+      { attachmentId: "provider-ok", route: { via: "provider" } },
+      { attachmentId: "scratch-required", route: { via: "scratch" } },
+    ]);
+    expect(lowered.rejected).toEqual([]);
+  });
+
+  it("keeps provider perception when a dual image loses scratch support", () => {
+    const lowered = InputResourceRouter.lower(
+      [
+        {
+          attachmentId: "image-1",
+          resource: {
+            kind: "provider-and-scratch-file",
+            source: "drop",
+            sourceId: "drop-1",
+            name: "original.gif",
+            mimeType: "image/gif",
+            size: 5,
+            base64: "AQIDBAU=",
+            provider: {
+              name: "preview.png",
+              mimeType: "image/png",
+              size: 3,
+              url: "data:image/png;base64,AAAA",
+              representation: "inline-bytes",
+            },
+          },
+        },
+      ],
+      { provider: provider(["image/png"]) }
+    );
+
+    expect(lowered.files).toEqual([
+      {
+        type: "file",
+        url: "data:image/png;base64,AAAA",
+        mediaType: "image/png",
+        filename: "preview.png",
+      },
+    ]);
+    expect(lowered.extras).toBeUndefined();
+    expect(lowered.rejected).toEqual([]);
   });
 
   it("rejects an already-prepared scratch file when the host capability is absent", () => {
