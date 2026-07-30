@@ -1,9 +1,9 @@
 /**
  * GRIDA-SEC-004 — agent command backend.
  *
- * Bridges the agent's `run_command` tool to the agent-host shell
- * policy. This file is the whole command execution adapter: validate
- * workdir + secret-arg, then run through the host shell runner.
+ * Bridges the agent's `run_command` tool to a host-owned finite-command
+ * capability. This file validates the exact session roots, flushes pending fs
+ * writes, then delegates execution. It never raw-spawns on its own.
  *
  * The supervised mode gate (RFC `permission modes`) is NOT here — it lives in
  * the tool's `needsApproval` (`createRunCommandTool`), wired from the session
@@ -16,51 +16,65 @@
  */
 
 import type { RunCommandBackend } from "../agent";
-import type { WorkspaceRegistry } from "@grida/daemon/server";
 import {
   validateShellRequest,
-  runShell,
+  type ShellExecutionScope,
+  type ShellExecutor,
   type ProtectedReadRoots,
-  type AdditionalAllowedRoots,
   type ShellRunError,
 } from "@grida/daemon/server";
 
-/**
- * @param protectedReadRoots Secret roots (the agent host's `userData`) the
- *   shell child must not read through an arg (GRIDA-SEC-004). Threaded down
- *   from the runtime; empty for the no-bindings/standalone path.
- * @param additionalAllowedRoots Roots — beyond the registered workspaces — a
- *   cwd may sit inside (the session scratch dir, WG `scratch.md`). Empty when no
- *   scratch is wired.
- * @param beforeRun Optional hook awaited just before a command spawns — used to
- *   flush the agent fs's pending (debounced) writes to disk, so a command that
- *   reads the workspace sees files the agent just wrote via the fs tools.
- * @param runExclusive Optional shared workspace-operation FIFO. When present,
- *   the whole command (not only its pre-run flush) is serialized with
- *   server-bound read/write/edit tool calls.
- */
+export type AgentCommandBackendOptions = Readonly<{
+  /** Exact real workspace root granted to this session. */
+  workspace_root: string;
+  /** Exact real scratch root granted to this session, when present. */
+  scratch_root?: string;
+  /** Shared scratch base. The host uses it to deny sibling session roots. */
+  scratch_base?: string;
+  /** Host secret roots denied to finite command workers. */
+  protected_read_roots?: ProtectedReadRoots;
+  /** Host-injected execution boundary. */
+  executor: ShellExecutor;
+  /** Flush pending AgentFs writes before execution. */
+  before_run?: () => Promise<void>;
+  /** Shared workspace-operation FIFO. */
+  run_exclusive?: <T>(action: () => Promise<T>) => Promise<T>;
+  /**
+   * Bind an executing command to its owning run's terminal-settlement barrier.
+   * Desktop uses this so abort cannot admit a replacement until main confirms
+   * the confined worker and its per-command authority are gone.
+   */
+  track_execution?: (task: Promise<unknown>) => void;
+}>;
+
 export function createAgentCommandBackend(
-  registry: WorkspaceRegistry,
-  protectedReadRoots: ProtectedReadRoots = [],
-  additionalAllowedRoots: AdditionalAllowedRoots = [],
-  beforeRun?: () => Promise<void>,
-  runExclusive?: <T>(action: () => Promise<T>) => Promise<T>
+  options: AgentCommandBackendOptions
 ): RunCommandBackend {
-  const execute: RunCommandBackend = async ({
-    command,
-    args,
-    workdir,
-    timeout_ms: timeoutMs,
-  }) => {
+  const protectedReadRoots = Object.freeze([
+    ...(options.protected_read_roots ?? []),
+  ]);
+  const allowedCwdRoots = Object.freeze([
+    options.workspace_root,
+    ...(options.scratch_root ? [options.scratch_root] : []),
+  ]);
+  const scope: ShellExecutionScope = Object.freeze({
+    workspace_root: options.workspace_root,
+    scratch_root: options.scratch_root,
+    scratch_base: options.scratch_base,
+    protected_read_roots: protectedReadRoots,
+  });
+  const execute: RunCommandBackend = async (
+    { command, args, workdir, timeout_ms: timeoutMs },
+    signal
+  ) => {
     // Make the agent's just-written files visible on disk before the command
     // reads them (the fs tools flush on a debounce; a command bypasses the fs
     // and reads the backing store directly).
-    if (beforeRun) await beforeRun();
+    if (options.before_run) await options.before_run();
     const validation = await validateShellRequest(
       { cmd: command, args, cwd: workdir, timeout_ms: timeoutMs },
-      registry,
-      protectedReadRoots,
-      additionalAllowedRoots
+      allowedCwdRoots,
+      protectedReadRoots
     );
     if (!validation.ok) {
       return {
@@ -69,7 +83,7 @@ export function createAgentCommandBackend(
         message: describeError(validation.error),
       };
     }
-    const r = await runShell(validation.request);
+    const r = await options.executor(validation.request, scope, signal);
     return {
       stdout: r.truncated ? r.stdout + "\n[stdout truncated]" : r.stdout,
       stderr: r.truncated ? r.stderr + "\n[stderr truncated]" : r.stderr,
@@ -80,8 +94,13 @@ export function createAgentCommandBackend(
       duration_ms: r.duration_ms,
     };
   };
-  return (input) =>
-    runExclusive ? runExclusive(() => execute(input)) : execute(input);
+  return (input, signal) => {
+    const task = options.run_exclusive
+      ? options.run_exclusive(() => execute(input, signal))
+      : execute(input, signal);
+    options.track_execution?.(task);
+    return task;
+  };
 }
 
 function describeError(err: ShellRunError): string {

@@ -90,13 +90,9 @@ export function registerSessionsRoutes(
 
   app.delete("/sessions/:id", async (c: Context) => {
     const id = c.req.param("id");
+    if (runtime) return runtime.deleteSession(id);
+
     await store.delete(id);
-    // Drop any cached session-static context (skill index + body cache).
-    runtime?.forgetSession(id);
-    // Reclaim the session's scratch subtree (WG `scratch.md` S2). Best-effort
-    // and non-throwing inside the runtime, so a cleanup hiccup never fails the
-    // delete.
-    await runtime?.removeSessionScratch(id);
     return c.json({ ok: true });
   });
 

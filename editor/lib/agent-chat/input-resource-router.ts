@@ -84,6 +84,7 @@ export namespace InputResourceRouter {
       /** Present only when this chat has a tool-visible scratch binding. */
       scratch?: ScratchSeedBudget.Limits & {
         reservation?: ScratchSeedBudget.Reservation;
+        binaryTools?: boolean;
       };
       /**
        * Renderer-memory admission for raw operable twins retained in a draft.

@@ -2660,6 +2660,114 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     }
   });
 
+  it("rejects replacement until an aborted command and its owning pump settle", async () => {
+    runtime.dispose();
+    streamRegistry = new StreamRegistry();
+
+    let releaseCommandCleanup!: () => void;
+    const commandCleanup = new Promise<void>((resolve) => {
+      releaseCommandCleanup = resolve;
+    });
+    let releasePump!: () => void;
+    const pumpGate = new Promise<void>((resolve) => {
+      releasePump = resolve;
+    });
+    let commandStarted!: () => void;
+    const commandStartedGate = new Promise<void>((resolve) => {
+      commandStarted = resolve;
+    });
+    let runCount = 0;
+    runtime = new AgentRuntime({
+      secrets,
+      workspace_registry: workspaceRegistry,
+      sessions_store: sessionsStore,
+      streams: streamRegistry,
+      run_agent: async (_provider, _request, deps) => {
+        runCount += 1;
+        if (runCount === 1) {
+          // This task models the sidecar command promise: abort does not settle
+          // it until main has observed worker exit and released its authority.
+          deps.track_command_execution?.(commandCleanup);
+          commandStarted();
+          // Model an AI SDK pump that consumes the command's terminal abort only
+          // after host cleanup has acknowledged it.
+          await pumpGate;
+        }
+        return await fakeRunAgent();
+      },
+      scratch_base: path.join(baseDir, "scratch-base"),
+      external_agent_execution: "sandboxed",
+      drain_cooldown_ms: 20,
+    });
+    app = new Hono();
+    registerAgentRoutes(app, runtime);
+
+    const session = await sessionsStore.create({
+      agent: AGENT_SESSION_AGENT,
+    });
+    let firstBody: Promise<string> | undefined;
+    try {
+      const firstResponse = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          session_id: session.id,
+          messages: [
+            { id: "command-turn", role: "user", content: "run a command" },
+          ],
+        }),
+      });
+      expect(firstResponse.status).toBe(200);
+      firstBody = firstResponse.text();
+      await commandStartedGate;
+
+      const aborted = await app.request("/agent/abort", {
+        method: "POST",
+        body: JSON.stringify({ session_id: session.id }),
+      });
+      expect(aborted.status).toBe(200);
+      await firstBody;
+
+      const replacementBody = JSON.stringify({
+        session_id: session.id,
+        messages: [
+          { id: "replacement-turn", role: "user", content: "replacement" },
+        ],
+      });
+      const beforeCleanup = await app.request("/agent/run", {
+        method: "POST",
+        body: replacementBody,
+      });
+      expect(beforeCleanup.status).toBe(409);
+
+      releaseCommandCleanup();
+      await commandCleanup;
+      // Host cleanup has acknowledged abort, but the owning pump has not yet
+      // consumed that terminal result. Admission must remain closed across
+      // this smaller lifecycle gap too.
+      const beforePumpSettlement = await app.request("/agent/run", {
+        method: "POST",
+        body: replacementBody,
+      });
+      expect(beforePumpSettlement.status).toBe(409);
+
+      releasePump();
+      await vi.waitFor(() =>
+        expect(streamRegistry.isOccupied(session.id)).toBe(false)
+      );
+
+      const replacement = await app.request("/agent/run", {
+        method: "POST",
+        body: replacementBody,
+      });
+      expect(replacement.status).toBe(200);
+      await replacement.text();
+    } finally {
+      releaseCommandCleanup();
+      releasePump();
+      await firstBody?.catch(() => undefined);
+    }
+  });
+
   it.each(["late-response", "late-error"] as const)(
     "does not let an aborted turn's %s contaminate its queued replacement",
     async (lateOutcome) => {

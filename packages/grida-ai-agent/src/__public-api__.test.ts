@@ -50,6 +50,8 @@ import {
   AGENT_DAEMON_DEFAULT_CAPABILITIES,
   createAgentDaemon,
   createAgentTenant,
+  defaultScratchBase,
+  prepareScratchAuthority,
   Daemon,
   DaemonServer,
   DAEMON_PROTOCOL,
@@ -60,6 +62,9 @@ import {
   type DaemonHandshakeResponse,
   type DaemonHttpAccess,
   type DaemonTenant,
+  type ShellExecutionScope,
+  type ShellExecutor,
+  type ShellRunOptions,
 } from "./server";
 import {
   AcpAgentAdapter,
@@ -256,12 +261,34 @@ describe("@grida/agent public API", () => {
         request: globalThis.fetch,
         download: globalThis.fetch,
       };
+      const shellExecutor: ShellExecutor = async (request) => ({
+        ...request,
+        exit_code: 0,
+        signal: null,
+        stdout: "",
+        stderr: "",
+        duration_ms: 0,
+        timed_out: false,
+        truncated: false,
+      });
       const tenantOpts: AgentTenantOptions = {
         interactive: true,
         provider_http: providerHttp,
+        shell_executor: shellExecutor,
       };
+      const scope: ShellExecutionScope = {
+        workspace_root: "/workspace",
+        protected_read_roots: [],
+      };
+      const runOptions: ShellRunOptions = {};
       const tenant: DaemonTenant = createAgentTenant(tenantOpts);
       expect(typeof tenant.register).toBe("function");
+      expect(scope.workspace_root).toBe("/workspace");
+      expect(runOptions).toEqual({});
+      expect(defaultScratchBase("/agent", "/native-temp")).toMatch(
+        /^[/\\]native-temp[/\\]grida-agent-[0-9a-f]{16}$/
+      );
+      expect(typeof prepareScratchAuthority).toBe("function");
       expect(tenant.sse_query_token_paths?.length).toBe(2);
       expect(typeof createAgentDaemon).toBe("function");
       // Host HTTP stays behind the Node-only server entry. Neither the raw

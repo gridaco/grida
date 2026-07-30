@@ -15,6 +15,7 @@ import {
   WorkspaceAgentFsBackend,
 } from "./workspace-agent-bindings";
 import { ProviderHttp } from "../providers/http";
+import { runUnsandboxedShell } from "@grida/daemon/server";
 
 const symlinkIt = process.platform === "win32" ? it.skip : it;
 
@@ -90,7 +91,7 @@ describe("agent workspace bindings", () => {
   it("GRIDA-SEC-004: withholds the command capability unless shell execution is allowed (fail-closed)", async () => {
     await fixture.write_workspace_file("canvas.svg", "<svg/>");
 
-    // Default (no shell_execution_allowed) — fs + todos, but NO command.
+    // Default (no shell executor) — fs + todos, but NO command.
     const denied = await createWorkspaceAgentBindings(
       { workspace_root: fixture.workspace_root },
       { workspace_registry: fixture.registry }
@@ -102,7 +103,10 @@ describe("agent workspace bindings", () => {
     // Explicit opt-in — command capability is wired.
     const allowed = await createWorkspaceAgentBindings(
       { workspace_root: fixture.workspace_root },
-      { workspace_registry: fixture.registry, shell_execution_allowed: true }
+      {
+        workspace_registry: fixture.registry,
+        shell_executor: runUnsandboxedShell,
+      }
     );
     expect(allowed!.command).toBeDefined();
     expect(allowed!.command!.default_workdir).toBe(fixture.workspace_root);

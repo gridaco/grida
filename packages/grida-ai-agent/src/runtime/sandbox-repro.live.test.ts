@@ -4,17 +4,19 @@
  * too strict" reproduction (the hardcoded allowlist blocked `python3`/`node`);
  * now it pins the fix.
  *
- * Mirrors the shipped macOS desktop: `shell_execution_allowed` is TRUE and
- * `run_command` IS in the tool registry. There is no command allowlist anymore —
- * a per-session MODE gates the shell:
+ * Injects the explicit raw shell executor, so `run_command` is in the tool
+ * registry without making a Desktop confinement claim. A per-session MODE
+ * gates the shell:
  *
  *   - `auto`: every command runs. The agent writes a script and runs it
  *     (`python3`/`node`), producing `chart.svg`. (Headline: the fix works.)
- *   - `accept-edits`: only read-only commands auto-run; a mutating/executing
- *     command **pauses for a supervised Allow/Deny** (a `tool-approval-request`
- *     chunk; the SDK's native `needsApproval`). This harness never approves, so
- *     the interpreter never runs here. The answer/resume boundary is unit-pinned
- *     in `store.test.ts` (`answerApproval`) + `workspace-agent-bindings.test.ts`.
+ *   - `accept-edits`: read-only commands and the narrow scratch-local `cp`/`mv`
+ *     exception auto-run; other mutating/executing commands **pause for a
+ *     supervised Allow/Deny** (a `tool-approval-request` chunk; the SDK's native
+ *     `needsApproval`). This harness never approves, so the interpreter never
+ *     runs here. The answer/resume boundary and scratch exception are
+ *     unit-pinned in `store.test.ts` (`answerApproval`) +
+ *     `workspace-agent-bindings.test.ts`.
  *
  * NOT exercised here: the srt Seatbelt OUTER wrap (this test runs unsandboxed —
  * it pins the in-process mode gate + shell runner, the agent-visible behavior).
@@ -34,7 +36,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { AuthStore } from "@grida/daemon/server";
 import { SecretsStore } from "@grida/daemon/server";
-import { WorkspaceRegistry } from "@grida/daemon/server";
+import { runUnsandboxedShell, WorkspaceRegistry } from "@grida/daemon/server";
 import { openSessionsDb } from "../session/db";
 import { SessionsStore } from "../session/store";
 import { AgentRuntime } from ".";
@@ -238,7 +240,7 @@ function buildShellHost(baseDir: string, registry: WorkspaceRegistry): Host {
     // The shipped macOS desktop sets this true (srt confines the tree). With it
     // true, run_command IS registered — so we exercise the real allowlist gate,
     // not the fail-closed "no shell at all" gate.
-    shell_execution_allowed: true,
+    shell_executor: runUnsandboxedShell,
     drain_cooldown_ms: 20,
   });
   registerAgentRoutes(app, runtime);

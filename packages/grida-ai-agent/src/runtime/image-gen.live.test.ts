@@ -8,9 +8,10 @@
  * result is the saved path + metadata, never the image bytes (a tool result
  * can't deliver pixels on the openai-compatible wire format — see AgentGen).
  *
- * Mirrors the shipped macOS desktop: `image_gen_enabled` + `shell_execution_
- * allowed` TRUE, mode `auto`, `scratch_base` wired. The same BYOK key drives the
- * text loop AND image generation (OpenRouter serves both /chat and /v1/images).
+ * Uses `image_gen_enabled` + the explicit raw shell executor, mode `auto`, and
+ * a wired `scratch_base`. The same BYOK key drives the text loop AND image
+ * generation (OpenRouter serves both /chat and /v1/images). Desktop confinement
+ * is not exercised here.
  *
  * Gated + excluded from CI. Run with a real BYOK key (source the gitignored env
  * file so process.env carries the key — vitest does NOT auto-load it):
@@ -26,7 +27,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { AuthStore } from "@grida/daemon/server";
 import { SecretsStore } from "@grida/daemon/server";
-import { WorkspaceRegistry } from "@grida/daemon/server";
+import { runUnsandboxedShell, WorkspaceRegistry } from "@grida/daemon/server";
 import { openSessionsDb } from "../session/db";
 import { SessionsStore } from "../session/store";
 import { AgentRuntime } from ".";
@@ -133,7 +134,7 @@ function buildHost(
     streams: new StreamRegistry(),
     secrets_root: baseDir,
     scratch_base: scratchBase,
-    shell_execution_allowed: true,
+    shell_executor: runUnsandboxedShell,
     image_gen_enabled: true,
     image_model_id: IMAGE_MODEL_ID,
     drain_cooldown_ms: 20,

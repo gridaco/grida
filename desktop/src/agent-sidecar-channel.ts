@@ -1,4 +1,4 @@
-/** GRIDA-SEC-004 — private host/sidecar provider transport framing. */
+/** GRIDA-SEC-004 — private host/sidecar capability transport framing. */
 import type { Writable } from "node:stream";
 import { TextDecoder } from "node:util";
 
@@ -8,15 +8,19 @@ import { TextDecoder } from "node:util";
  * frames, and stderr remains the sidecar's human-readable log stream.
  *
  * Framing is deliberately independent of Node IPC because the channels carry
- * different authority. This stdio protocol carries provider/control frames;
- * the per-spawn Node IPC descriptor carries only already-connected daemon
- * sockets. Neither channel is a fallback for the other.
+ * different authority. This stdio protocol carries provider, finite-command,
+ * and control frames; the per-spawn Node IPC descriptor carries only
+ * already-connected daemon sockets. Neither channel is a fallback for the
+ * other.
  */
 export namespace AgentSidecarChannel {
   export const VERSION = 1 as const;
   export const MAX_FRAME_BYTES = 256 * 1024;
   export const MAX_BINARY_CHUNK_BYTES = 64 * 1024;
   export const MAX_RESPONSE_CREDIT_BYTES = 16 * 1024 * 1024;
+  export const MAX_COMMAND_ARGS = 256;
+  export const MAX_COMMAND_OUTPUT_CHUNK_BYTES = 64 * 1024;
+  export const MAX_COMMAND_OUTPUT_BYTES = 1024 * 1024;
 
   export type Header = readonly [name: string, value: string];
 
@@ -143,6 +147,74 @@ export namespace AgentSidecarChannel {
     bytes: number;
   }>;
 
+  /**
+   * Ask Electron main to execute one command inside a tenant-derived
+   * filesystem scope. The model supplies only command/args/workdir; the
+   * sidecar runtime supplies the workspace and scratch roots. Main treats the
+   * path bytes as untrusted and independently canonicalizes their shape and
+   * containment before spawning. This frame does not authenticate those roots
+   * against a fully compromised sidecar.
+   */
+  export type CommandRequestFrame = Readonly<{
+    v: typeof VERSION;
+    type: "command.request";
+    requestId: string;
+    command: string;
+    args: readonly string[];
+    workdir: string;
+    timeoutMs?: number;
+    workspaceRoot: string;
+    scratchDir?: string;
+  }>;
+
+  /** Cancel one still-active command request. */
+  export type CommandAbortFrame = Readonly<{
+    v: typeof VERSION;
+    type: "command.abort";
+    requestId: string;
+    reason?: string;
+  }>;
+
+  /** One bounded UTF-8 stdout or stderr fragment, ordered within its stream. */
+  export type CommandOutputFrame = Readonly<{
+    v: typeof VERSION;
+    type: "command.output";
+    requestId: string;
+    stream: "stdout" | "stderr";
+    sequence: number;
+    data: string;
+  }>;
+
+  export type CommandEndFrame = Readonly<{
+    v: typeof VERSION;
+    type: "command.end";
+    requestId: string;
+    sequence: number;
+    exitCode: number | null;
+    signal: string | null;
+    timedOut: boolean;
+    truncated: boolean;
+    durationMs: number;
+  }>;
+
+  /**
+   * Terminal acknowledgement for command.abort. Main emits this only after the
+   * confined executor has returned and released its per-command authority.
+   */
+  export type CommandAbortedFrame = Readonly<{
+    v: typeof VERSION;
+    type: "command.aborted";
+    requestId: string;
+  }>;
+
+  /** A host-side validation or launch failure, before a run result exists. */
+  export type CommandErrorFrame = Readonly<{
+    v: typeof VERSION;
+    type: "command.error";
+    requestId: string;
+    message: string;
+  }>;
+
   export type ShutdownFrame = Readonly<{
     v: typeof VERSION;
     type: "shutdown";
@@ -155,6 +227,10 @@ export namespace AgentSidecarChannel {
     | ResponseChunkFrame
     | ResponseEndFrame
     | ResponseErrorFrame
+    | CommandOutputFrame
+    | CommandEndFrame
+    | CommandAbortedFrame
+    | CommandErrorFrame
     | ShutdownFrame;
 
   export type SidecarToHostFrame =
@@ -164,7 +240,9 @@ export namespace AgentSidecarChannel {
     | RequestChunkFrame
     | RequestEndFrame
     | RequestAbortFrame
-    | ResponseCreditFrame;
+    | ResponseCreditFrame
+    | CommandRequestFrame
+    | CommandAbortFrame;
 
   export type Frame = HostToSidecarFrame | SidecarToHostFrame;
 
@@ -275,6 +353,103 @@ export namespace AgentSidecarChannel {
         expectExactKeys(frame, ["v", "type", "requestId", "bytes"]);
         expectIdentifier(frame.requestId, "requestId");
         expectInteger(frame.bytes, "bytes", 1, MAX_RESPONSE_CREDIT_BYTES);
+        break;
+      case "command.request":
+        expectExactKeys(
+          frame,
+          [
+            "v",
+            "type",
+            "requestId",
+            "command",
+            "args",
+            "workdir",
+            "workspaceRoot",
+          ],
+          ["timeoutMs", "scratchDir"]
+        );
+        expectIdentifier(frame.requestId, "requestId");
+        expectCommandString(frame.command, "command", false);
+        expectCommandArgs(frame.args);
+        expectCommandString(frame.workdir, "workdir", false);
+        if (frame.timeoutMs !== undefined) {
+          expectInteger(
+            frame.timeoutMs,
+            "timeoutMs",
+            1,
+            Number.MAX_SAFE_INTEGER
+          );
+        }
+        expectCommandString(frame.workspaceRoot, "workspaceRoot", false);
+        if (frame.scratchDir !== undefined) {
+          expectCommandString(frame.scratchDir, "scratchDir", false);
+        }
+        break;
+      case "command.abort":
+        expectExactKeys(frame, ["v", "type", "requestId"], ["reason"]);
+        expectIdentifier(frame.requestId, "requestId");
+        if (frame.reason !== undefined) {
+          expectBoundedString(frame.reason, "reason", 1, 1024);
+        }
+        break;
+      case "command.output":
+        expectExactKeys(frame, [
+          "v",
+          "type",
+          "requestId",
+          "stream",
+          "sequence",
+          "data",
+        ]);
+        expectIdentifier(frame.requestId, "requestId");
+        if (frame.stream !== "stdout" && frame.stream !== "stderr") {
+          throw protocolError("invalid command output stream");
+        }
+        expectSequence(frame.sequence);
+        expectUtf8Chunk(frame.data);
+        break;
+      case "command.end":
+        expectExactKeys(frame, [
+          "v",
+          "type",
+          "requestId",
+          "sequence",
+          "exitCode",
+          "signal",
+          "timedOut",
+          "truncated",
+          "durationMs",
+        ]);
+        expectIdentifier(frame.requestId, "requestId");
+        expectSequence(frame.sequence);
+        if (frame.exitCode !== null) {
+          expectInteger(
+            frame.exitCode,
+            "exitCode",
+            Number.MIN_SAFE_INTEGER,
+            Number.MAX_SAFE_INTEGER
+          );
+        }
+        if (frame.signal !== null) {
+          expectBoundedString(frame.signal, "signal", 1, 64);
+        }
+        expectBoolean(frame.timedOut, "timedOut");
+        expectBoolean(frame.truncated, "truncated");
+        expectInteger(
+          frame.durationMs,
+          "durationMs",
+          0,
+          Number.MAX_SAFE_INTEGER
+        );
+        break;
+      case "command.aborted":
+        expectExactKeys(frame, ["v", "type", "requestId"]);
+        expectIdentifier(frame.requestId, "requestId");
+        break;
+      case "command.error":
+        expectExactKeys(frame, ["v", "type", "requestId", "message"]);
+        expectIdentifier(frame.requestId, "requestId");
+        expectBoundedString(frame.message, "message", 1, 2048);
         break;
       case "shutdown":
         expectExactKeys(frame, ["v", "type"]);
@@ -681,6 +856,40 @@ function expectBase64Chunk(value: unknown): asserts value is string {
       AgentSidecarChannel.MAX_BINARY_CHUNK_BYTES
   ) {
     throw protocolError("data must be a non-empty bounded base64 chunk");
+  }
+}
+
+function expectCommandString(
+  value: unknown,
+  field: string,
+  allowEmpty: boolean
+): asserts value is string {
+  expectBoundedString(value, field, allowEmpty ? 0 : 1, 32 * 1024);
+  if (value.includes("\0")) {
+    throw protocolError(`${field} must not contain a null byte`);
+  }
+}
+
+function expectCommandArgs(value: unknown): asserts value is string[] {
+  if (
+    !Array.isArray(value) ||
+    value.length > AgentSidecarChannel.MAX_COMMAND_ARGS
+  ) {
+    throw protocolError(
+      `args must be an array with at most ${AgentSidecarChannel.MAX_COMMAND_ARGS} entries`
+    );
+  }
+  for (const arg of value) expectCommandString(arg, "arg", true);
+}
+
+function expectUtf8Chunk(value: unknown): asserts value is string {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    Buffer.byteLength(value, "utf8") >
+      AgentSidecarChannel.MAX_COMMAND_OUTPUT_CHUNK_BYTES
+  ) {
+    throw protocolError("data must be a non-empty bounded UTF-8 chunk");
   }
 }
 

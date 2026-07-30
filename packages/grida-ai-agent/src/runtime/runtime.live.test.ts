@@ -39,7 +39,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { AuthStore } from "@grida/daemon/server";
 import { SecretsStore } from "@grida/daemon/server";
-import { WorkspaceRegistry } from "@grida/daemon/server";
+import { runUnsandboxedShell, WorkspaceRegistry } from "@grida/daemon/server";
 import { openSessionsDb } from "../session/db";
 import { SessionsStore } from "../session/store";
 import { AGENT_SESSION_AGENT } from "../protocol/run";
@@ -136,7 +136,7 @@ function buildHost(
     // Mirror the shipped desktop: per-session scratch + shell, so a workspace
     // turn has the full toolset (a deck run writes files + may run the shell).
     scratch_base: path.join(baseDir, "scratch"),
-    shell_execution_allowed: true,
+    shell_executor: runUnsandboxedShell,
     // Wire the host-bundled skills tree so built-ins are discovered + advertised.
     skill_discovery: opts?.bundled_dir
       ? { bundled_dir: opts.bundled_dir, include_user_scoped: false }
@@ -296,7 +296,10 @@ liveDescribe("LIVE — inline image perception + durability", () => {
       const commandInput = chunks.find(
         (chunk) =>
           chunk.type === "tool-input-available" &&
-          chunk.toolName === "run_command"
+          chunk.toolName === "run_command" &&
+          typeof chunk.input === "object" &&
+          chunk.input !== null &&
+          (chunk.input as { command?: unknown }).command === "cp"
       );
       const commandTrace = commandInput
         ? chunks.filter((chunk) => chunk.toolCallId === commandInput.toolCallId)

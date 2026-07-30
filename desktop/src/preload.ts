@@ -303,6 +303,9 @@ const bridge: DesktopBridge = {
     agent: {
       // This host accepts `{ path, base64 }` scratch seeds on agent runs.
       scratch_seed_base64: true,
+      // Windows intentionally withholds confined run_command; a scratch-only
+      // PDF/archive would therefore be a path the agent cannot operate on.
+      scratch_binary_tools: process.platform !== "win32",
     },
     native: {
       host_apps: true,

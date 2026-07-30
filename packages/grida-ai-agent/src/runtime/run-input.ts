@@ -666,40 +666,42 @@ export async function persistIncomingTail(
   incoming: NormalizedMessage[],
   options: { resolveAssistantToolResults?: boolean } = {}
 ): Promise<void> {
-  // Ids already persisted for this session. The AI SDK client resends
-  // the full history with stable ids every turn, so most incoming ids
-  // are already here and skip below. Doubles as the intra-request dedup
-  // set — a client DB-hydration race can place the same user message in
-  // one outgoing array twice — so we record each id as we go.
-  const seen = new Set(await store.listMessageIds(sessionId));
-  for (const m of incoming) {
-    if (m.role === "assistant") {
-      // The recorder owns assistant messages — it writes them from the model
-      // stream. The ONE thing the stream can't carry is a CLIENT-resolved tool
-      // result: a session with no server-side fs (the desktop file window's
-      // single-file sidebar) resolves fs tools in the renderer, and the result
-      // arrives only on the next request's assistant message. Fill just those
-      // into the existing (recorder-written) tool row so the server-authoritative
-      // model view (`buildModelMessages`) stops dropping the call as incomplete.
-      if (options.resolveAssistantToolResults !== false) {
-        await persistResolvedToolResults(store, sessionId, m);
+  await store.withTransaction(async () => {
+    // Ids already persisted for this session. The AI SDK client resends
+    // the full history with stable ids every turn, so most incoming ids
+    // are already here and skip below. Doubles as the intra-request dedup
+    // set — a client DB-hydration race can place the same user message in
+    // one outgoing array twice — so we record each id as we go.
+    const seen = new Set(await store.listMessageIds(sessionId));
+    for (const m of incoming) {
+      if (m.role === "assistant") {
+        // The recorder owns assistant messages — it writes them from the model
+        // stream. The ONE thing the stream can't carry is a CLIENT-resolved tool
+        // result: a session with no server-side fs (the desktop file window's
+        // single-file sidebar) resolves fs tools in the renderer, and the result
+        // arrives only on the next request's assistant message. Fill just those
+        // into the existing (recorder-written) tool row so the server-authoritative
+        // model view (`buildModelMessages`) stops dropping the call as incomplete.
+        if (options.resolveAssistantToolResults !== false) {
+          await persistResolvedToolResults(store, sessionId, m);
+        }
+        continue;
       }
-      continue;
+      if (seen.has(m.id)) continue;
+      seen.add(m.id);
+      // Idempotent insert: a concurrent run on the same session can land
+      // this id between the snapshot above and now (the client may re-POST
+      // /agent/run while one is still in flight). ON CONFLICT DO NOTHING
+      // turns that race into a no-op instead of a UNIQUE-constraint 500.
+      await store.appendMessageIfAbsent(sessionId, { id: m.id, role: m.role });
+      // Parts are keyed by (messageId, index) — upsert is idempotent, so a
+      // re-send refreshes content without duplicating rows.
+      for (let i = 0; i < m.parts.length; i += 1) {
+        const part = m.parts[i];
+        await store.upsertPart(m.id, { index: i, type: part.type, data: part });
+      }
     }
-    if (seen.has(m.id)) continue;
-    seen.add(m.id);
-    // Idempotent insert: a concurrent run on the same session can land
-    // this id between the snapshot above and now (the client may re-POST
-    // /agent/run while one is still in flight). ON CONFLICT DO NOTHING
-    // turns that race into a no-op instead of a UNIQUE-constraint 500.
-    await store.appendMessageIfAbsent(sessionId, { id: m.id, role: m.role });
-    // Parts are keyed by (messageId, index) — upsert is idempotent, so a
-    // re-send refreshes content without duplicating rows.
-    for (let i = 0; i < m.parts.length; i += 1) {
-      const part = m.parts[i];
-      await store.upsertPart(m.id, { index: i, type: part.type, data: part });
-    }
-  }
+  });
 }
 
 /**

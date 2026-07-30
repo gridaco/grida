@@ -4,8 +4,9 @@ This document binds the language-agnostic
 [execution-authority model](https://github.com/gridaco/grida/blob/main/docs/wg/ai/agent/execution-authority.md)
 to Grida Desktop. Issue
 [#974](https://github.com/gridaco/grida/issues/974) lands the native provider
-transport slice described below; supervisor-owned raw execution workers remain
-the target architecture, not a claim about the current sidecar.
+transport slice described below; issue
+[#916](https://github.com/gridaco/grida/issues/916) binds finite shell workers
+to supervisor-owned per-command confinement.
 
 On macOS and Linux, the implementation wraps the entire AgentSidecar with
 `@anthropic-ai/sandbox-runtime` (`srt`) 0.0.65 and one global destination
@@ -14,9 +15,12 @@ policy. Its direct external destination set is empty and
 transfers only already-accepted connected sockets to the socketless sidecar,
 and routes trusted provider HTTP through a separate private stdio channel.
 BYOK/GG hosts are absent from the outer policy. The wrap remains the shipping
-filesystem/process boundary until every raw-worker replacement gate in this
-document exists. Removing it first would expose raw shell without an equivalent
-kernel boundary; Desktop already withholds the external ACP agent.
+backstop for the sidecar's structured capabilities and in-process state.
+Model-selected finite commands no longer spawn inside that coarse authority:
+the sidecar requests them over the same inherited capability channel and main
+creates a fresh SRT filesystem profile for each command. Removing the outer
+wrap would still expose the sidecar itself and is not implied by this narrower
+worker boundary; Desktop continues to withhold the external ACP agent.
 
 Windows currently starts AgentSidecar unwrapped. Shell and external ACP are
 withheld, but
@@ -24,6 +28,10 @@ structured local filesystem capabilities remain available; that is a known
 nonconformance with the target fail-closed posture below, not a sandbox claim.
 The package-level empty destination intent is not a Windows kernel egress
 fence; an AgentSidecar compromise there retains ambient process networking.
+Base64 scratch staging remains available there for raster perception and
+structured text/SVG filesystem access. The renderer refuses a scratch-only
+arbitrary binary file when no provider route exists, because Windows withholds
+the confined binary command capability and a bare path would be inoperable.
 
 ## Decision
 
@@ -212,9 +220,12 @@ updates carry monotonically increasing revisions and main does not report them
 published until the sidecar acknowledges application; the host re-authorizes a
 completed upload against its current grant snapshot immediately before I/O.
 Unknown, stale, out-of-order, oversized, or grant-mismatched messages terminate
-the channel. A bounded cancellation tombstone accepts only the late response
-frames that an in-flight abort can legitimately race. Channel failure exits the
-sidecar so supervision restarts a fresh pair. The renderer can invoke the
+the channel. A bounded network-cancellation tombstone accepts only the late
+response frames that an in-flight abort can legitimately race. A finite command
+instead has a terminal handshake: `command.abort` keeps its tool promise pending
+until main has joined the worker and completed per-command cleanup, then
+`command.aborted` releases the turn's settlement barrier. Channel failure exits
+the sidecar so supervision restarts a fresh pair. The renderer can invoke the
 existing typed product bridge, but never receives the channel or a service
 credential.
 
@@ -249,32 +260,67 @@ capabilities:
 - generic local bind/connect authority is denied; daemon access arrives only as
   a main-accepted connected-socket capability;
 - model-selected commands reach process creation only through the structured
-  `run_command` and approval path; external ACP is absent; and
+  `run_command` and approval path; the sidecar delegates each finite command
+  back to Electron main for a fresh exact-root SRT profile; external ACP is
+  absent; and
 - fixed helpers, if any, have host-fixed executable and argument shapes.
 
-This boundary cannot hide sidecar-owned BYOK/session data from a compromise in
-the same process, and it cannot distinguish two workspace roots held by one
-sidecar. A capability that must resist that compromise belongs in its own
-worker or must receive capability-safe handles rather than ambient paths.
+This outer boundary cannot hide sidecar-owned BYOK/session data from a
+compromise in the same process, and by itself cannot distinguish roots held by
+one sidecar. The per-command host closes the model-selected ambient-path gap
+for scratch and secrets: main denies the shared scratch parent and `userData`,
+then re-allows only the request's own scratch and private temp. Workspace reads
+retain SRT's default broad-read posture; the exact workspace is the command's
+cwd/write grant, not its exclusive readable tree.
+
+The sidecar runtime—not the model—supplies those roots, but the current private
+frame still names them as paths. Main canonicalizes their shape and overlap; it
+does not authenticate them against a fully compromised sidecar. A capability
+that must resist that threat belongs in its own worker or must receive a
+main-issued opaque workspace/session grant rather than caller-named paths.
 
 ## Raw execution and extensions
 
-The runtime never supplies `sandbox_enforced: true` as evidence of authority.
-The capability is the supervisor binding itself: a workload request plus an
-opaque, host-issued grant. The supervisor independently canonicalizes the
-executable, arguments, environment, working directory, roots, and requested
-network subset before launch.
+The runtime never treats `sandbox_enforced: true` as command authority. The
+capability is the injected `ShellExecutor`: the sidecar emits a bounded private
+request, and main independently canonicalizes the working directory, named
+workspace, session-shaped scratch, shared scratch authority root, host secret
+root, and command temp before launch. The command and arguments remain
+structured until main shell-quotes the complete argv solely for SRT's wrapper;
+the resulting wrapper is spawned with `shell: false`.
 
 One-shot shell, long-lived ACP stdio, and managed MCP/extension lifecycle are
 separate behavioral contracts. A private launcher may serve all three, but no
 public shared API is promoted until these consumers have proved the common
 shape.
 
-The installed srt `0.0.65` manager has process-global proxy and network-policy
-state. Per-command custom configuration does not provide per-command network
-identity. Desktop must therefore use one manager-owning worker per concurrent
-authority domain, add an attributable mediator, or replace the enforcer. It
-must not mutate one global allowlist as grants come and go.
+`runShell` owns a fresh POSIX process group and terminates that group before
+main removes command temp or releases SRT's per-command bookkeeping. This
+reclaims ordinary background descendants. It is not a macOS kernel job object:
+model-selected code that deliberately creates a new session with `setsid(2)`
+can leave the original group while retaining its inherited Seatbelt profile.
+The current command surface therefore does not claim hard process revocation
+against deliberate daemonization on macOS. Any workload requiring that
+guarantee needs a dedicated worker/job mechanism; Linux Bubblewrap's PID
+namespace is stronger, but its packaged end-to-end evidence remains pending.
+
+Turn cancellation observes the same ordering. The sidecar forwards the AI SDK
+tool abort as `command.abort`; main does not acknowledge it until the executor
+returns and the cleanup above has finished. The agent runtime keeps the session
+occupied through both that acknowledgement and the model pump consuming the
+aborted tool result. A replacement run or session deletion therefore remains
+busy rather than overlapping a command whose authority is still being
+reclaimed. This does not make a deliberately detached macOS process revocable;
+it only closes the lifecycle gap for the process group and SRT worker the host
+still owns.
+
+The installed srt `0.0.65` manager has process-global proxy state. Desktop
+therefore gives every finite command the same empty external-domain set and
+never mutates a global command allowlist as requests come and go. Per-command
+custom filesystem configuration supplies exact scratch/workspace grants. A
+future feature that needs distinct command network identities must use one
+manager-owning worker per concurrent authority domain, add an attributable
+mediator, or replace the enforcer.
 
 Raw networking follows these postures:
 
@@ -377,7 +423,8 @@ The implementation must prove at least:
 - a structured file-tool validation defect still hits the outer filesystem
   boundary;
 - shell and ACP workers cannot read sidecar state or write outside their grant;
-- two simultaneous workers cannot use each other's roots or destinations;
+- two simultaneous workers cannot write through each other's grants or use
+  each other's scratch/network destinations;
 - unsupported route/trust clients fail with a specific diagnostic;
 - Windows exposes no falsely labeled sandboxed capability; and
 - GG mint preserves the renderer-transient scoped-token handoff without

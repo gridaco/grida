@@ -649,6 +649,17 @@ export namespace ai {
   }
 
   /**
+   * Whether scratch-backed arbitrary bytes have an actual operability tool.
+   * A base64 staging transport alone is insufficient: without this capability
+   * a PDF/archive would become only an inert path in the prompt.
+   */
+  export function supportsScratchBinaryTools(
+    bridge: DesktopBridge | null
+  ): boolean {
+    return bridge?.caps.agent?.scratch_binary_tools === true;
+  }
+
+  /**
    * Start an agent run. Resolves with `{streamId, done}` as
    * soon as the SSE connection is established; `onChunk` is invoked
    * once per `AgentUIMessageChunk` until the stream ends. `done` settles when

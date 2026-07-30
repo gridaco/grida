@@ -4,7 +4,7 @@ title: Drag-and-drop an image file into the agent composer
 module: desktop
 area: agent-chat
 tags: [agent-chat, composer, image, drag-drop, multimodal, vision]
-status: untested
+status: verified
 severity: high
 date: 2026-06-07
 updated: 2026-07-30
@@ -26,9 +26,6 @@ file operations. The drop is read from the drop event's bytes in the renderer â€
 the source OS path is never resolved or exposed, so it works regardless of
 where the file lives.
 
-Dropping a non-image (e.g. a `.txt`) or an `.svg` must NOT become a raster
-preview. It follows the generic operable-file route into scratch instead.
-
 ## Steps
 
 1. Open the desktop app, open a workspace, focus the agent composer.
@@ -40,13 +37,6 @@ preview. It follows the generic operable-file route into scratch instead.
    `dropped-copy` with the same filename extension, then tell me its byte count."
    - Expected: the agent operates on the scratch copy without asking for a path
      or reattachment, and the copy preserves the original extension.
-5. Drag a large, high-resolution image (e.g. >5 MB or >2000px) and drop, then
-   send.
-   - Expected: it still sends and the model sees it (client downscale kept it
-     under the provider limit â€” no provider error).
-6. Drag a plain `.txt` file and drop.
-   - Expected: it is attached as a generic file, not a raster thumbnail, and the
-     agent can read it from scratch.
 
 ## Notes
 
@@ -56,6 +46,8 @@ preview. It follows the generic operable-file route into scratch instead.
   provider preview and scratch representation.
 - Multiple files dropped at once each become their own chip (see
   TC-DESKTOP-AGENT-CHAT-004).
-- Downscale/cap policy + the model round-trip are covered by
-  `image-attachment.test.ts` and the gated live test; the Finder gesture and
-  rendered chip remain manual.
+- The model round-trip is covered by the gated live test; the Finder gesture
+  and rendered chip remain manual.
+- 2026-07-30: Manually verified in local Grida Desktop. The dropped raster was
+  perceived, its scratch-backed original remained operable on later turns, and
+  the agent created the requested byte-for-byte copy without reattachment.

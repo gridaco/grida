@@ -73,6 +73,13 @@ export type DesktopAgentCapabilities = {
    * as an old host that accepts text-only scratch seeds.
    */
   scratch_seed_base64?: boolean;
+  /**
+   * The host exposes binary-operable tools for scratch-backed files (today,
+   * the confined `run_command` capability). Omission/false means a path-only
+   * PDF/archive/etc. would be inert, so renderers must not offer scratch-only
+   * arbitrary-byte attachments.
+   */
+  scratch_binary_tools?: boolean;
 };
 
 export type DesktopCapabilities = {

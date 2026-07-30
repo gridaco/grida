@@ -6,9 +6,10 @@
  * extract an archive into scratch (not the project), inspect it, then PROMOTE
  * the wanted file out into the workspace.
  *
- * Mirrors the shipped macOS desktop: `shell_execution_allowed` is TRUE, mode is
- * `auto` (commands run without a supervised pause), and `scratch_base` is wired
- * (the runtime derives + creates the per-session dir and tells the agent).
+ * Injects the explicit raw shell executor, uses `auto` mode (commands run
+ * without a supervised pause), and wires `scratch_base` (the runtime derives +
+ * creates the per-session dir and tells the agent). Desktop confinement is not
+ * exercised here.
  *
  * Gated + excluded from CI. Run with a real BYOK key (source the gitignored env
  * file so process.env carries the key — vitest does NOT auto-load it):
@@ -26,7 +27,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { AuthStore } from "@grida/daemon/server";
 import { SecretsStore } from "@grida/daemon/server";
-import { WorkspaceRegistry } from "@grida/daemon/server";
+import { runUnsandboxedShell, WorkspaceRegistry } from "@grida/daemon/server";
 import { openSessionsDb } from "../session/db";
 import { SessionsStore } from "../session/store";
 import { AgentRuntime } from ".";
@@ -132,7 +133,7 @@ function buildHost(
     streams: new StreamRegistry(),
     secrets_root: baseDir,
     scratch_base: scratchBase,
-    shell_execution_allowed: true,
+    shell_executor: runUnsandboxedShell,
     drain_cooldown_ms: 20,
   });
   registerAgentRoutes(app, runtime);

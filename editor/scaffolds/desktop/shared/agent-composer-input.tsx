@@ -280,6 +280,8 @@ function AgentComposerInner({
     : undefined;
   const scratchSeedBase64Supported =
     desktopAi.supportsScratchSeedBase64(desktopBridge);
+  const scratchBinaryToolsSupported =
+    desktopAi.supportsScratchBinaryTools(desktopBridge);
   const resourceEnvironment = useMemo<InputResourceRouter.Environment>(
     () => ({
       // The runtime has path-aware filesystem tools but no general URL reader.
@@ -296,6 +298,7 @@ function AgentComposerInner({
                 maxFiles: OPERABLE_FILE_POLICY.maxFiles,
                 maxTotalBytes: OPERABLE_FILE_POLICY.maxTotalBytes,
                 reservation: scratchReservation,
+                binaryTools: scratchBinaryToolsSupported,
               },
             }
           : {}),
@@ -303,6 +306,7 @@ function AgentComposerInner({
     }),
     [
       attachDirectory,
+      scratchBinaryToolsSupported,
       scratchSeedBase64Supported,
       operableFiles,
       providerFileMimes,

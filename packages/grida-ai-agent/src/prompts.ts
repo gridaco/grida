@@ -169,9 +169,8 @@ Rules:
     [
       '<capability name="command">',
       `You have command execution access via the \`${run_command_name}\` tool.`,
-      `The default workdir is \`${default_workdir}\`. The agent host enforces`,
-      "an allowlist on the command and checks that the workdir is inside a",
-      "host-authorized root.",
+      `The default workdir is \`${default_workdir}\`. The agent host validates`,
+      "the workdir and confines the process to its host-authorized scope.",
       "</capability>",
     ].join("\n"),
 

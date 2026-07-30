@@ -13,7 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { workspaceFs, WorkspaceRegistry } from "@grida/daemon/server";
+import {
+  runUnsandboxedShell,
+  workspaceFs,
+  WorkspaceRegistry,
+} from "@grida/daemon/server";
 import type { SecretsStore } from "@grida/daemon/server";
 import { AgentFs } from "../fs";
 import { AgentVision } from "../vision";
@@ -354,7 +358,7 @@ describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
   it("accept-edits: pauses a mutating command, auto-runs a read-only one", async () => {
     const bindings = await createWorkspaceAgentBindings(
       { workspace_root: workspaceRoot, mode: "accept-edits" },
-      { workspace_registry: registry, shell_execution_allowed: true }
+      { workspace_registry: registry, shell_executor: runUnsandboxedShell }
     );
     const needsApproval = bindings?.command?.needs_approval;
     expect(needsApproval).toBeDefined();
@@ -384,7 +388,7 @@ describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
       { workspace_root: workspaceRoot, mode: "accept-edits" },
       {
         workspace_registry: registry,
-        shell_execution_allowed: true,
+        shell_executor: runUnsandboxedShell,
         scratch_dir: scratchRoot,
       }
     );
@@ -463,7 +467,7 @@ describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
       { workspace_root: workspaceRoot, mode: "accept-edits" },
       {
         workspace_registry: registry,
-        shell_execution_allowed: true,
+        shell_executor: runUnsandboxedShell,
         scratch_dir: scratchRoot,
       }
     );
@@ -494,7 +498,7 @@ describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
   it("auto: supplies no approval predicate (every command auto-runs)", async () => {
     const bindings = await createWorkspaceAgentBindings(
       { workspace_root: workspaceRoot, mode: "auto" },
-      { workspace_registry: registry, shell_execution_allowed: true }
+      { workspace_registry: registry, shell_executor: runUnsandboxedShell }
     );
     expect(bindings?.command).toBeDefined();
     expect(bindings?.command?.needs_approval).toBeUndefined();
@@ -509,7 +513,6 @@ describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
       { workspace_root: workspaceRoot, mode: "accept-edits" },
       {
         workspace_registry: registry,
-        shell_execution_allowed: false,
         scratch_dir: scratchRoot,
       }
     );
@@ -523,7 +526,7 @@ describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
   it("serializes a concurrent write before a later command reads it", async () => {
     const bindings = await createWorkspaceAgentBindings(
       { workspace_root: workspaceRoot, mode: "auto" },
-      { workspace_registry: registry, shell_execution_allowed: true }
+      { workspace_registry: registry, shell_executor: runUnsandboxedShell }
     );
     expect(bindings?.command).toBeDefined();
 
@@ -589,7 +592,7 @@ describe("createWorkspaceAgentBindings — scratch reach", () => {
       { workspace_root: workspaceRoot, mode: "auto" },
       {
         workspace_registry: registry,
-        shell_execution_allowed: true,
+        shell_executor: runUnsandboxedShell,
         secrets_root: secretsRoot,
         scratch_dir: scratchRoot,
       }
@@ -619,7 +622,7 @@ describe("createWorkspaceAgentBindings — scratch reach", () => {
       { workspace_root: workspaceRoot, mode: "auto" },
       {
         workspace_registry: registry,
-        shell_execution_allowed: true,
+        shell_executor: runUnsandboxedShell,
         secrets_root: secretsRoot,
         scratch_dir: linkScratch, // raw, symlinked — realpath ≠ this
       }
@@ -642,7 +645,7 @@ describe("createWorkspaceAgentBindings — scratch reach", () => {
       { workspace_root: workspaceRoot, mode: "auto" },
       {
         workspace_registry: registry,
-        shell_execution_allowed: true,
+        shell_executor: runUnsandboxedShell,
         secrets_root: secretsRoot,
         scratch_dir: scratchRoot,
       }
@@ -685,7 +688,7 @@ describe("createWorkspaceAgentBindings — scratch reach", () => {
       { workspace_root: workspaceRoot, mode: "auto" },
       {
         workspace_registry: registry,
-        shell_execution_allowed: true,
+        shell_executor: runUnsandboxedShell,
         secrets_root: secretsRoot,
         // no scratch_dir
       }
@@ -748,7 +751,7 @@ describe("createWorkspaceAgentBindings — image_gen gating", () => {
       { workspace_root: workspaceRoot, mode: "auto" },
       {
         workspace_registry: registry,
-        shell_execution_allowed: true,
+        shell_executor: runUnsandboxedShell,
         ...deps,
       }
     );
@@ -915,7 +918,7 @@ describe("createWorkspaceAgentBindings — read-only directory references", () =
         ],
         mode: "auto",
       },
-      { workspace_registry: registry, shell_execution_allowed: true }
+      { workspace_registry: registry, shell_executor: runUnsandboxedShell }
     );
   }
 

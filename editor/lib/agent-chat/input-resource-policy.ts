@@ -69,7 +69,15 @@ export namespace InputResourcePolicy {
         remoteUrlMimes: readonly string[];
       };
       /** Absent when the surface has no tool-visible scratch. */
-      scratch?: ScratchSeedBudget.Limits;
+      scratch?: ScratchSeedBudget.Limits & {
+        /**
+         * Whether scratch has a confined byte-oriented tool such as
+         * `run_command`. False still permits raster images (`view_image`) and
+         * structured text (`read_file`); arbitrary binary paths would be
+         * inoperable and are rejected.
+         */
+        binaryTools?: boolean;
+      };
     };
   };
 
@@ -392,6 +400,9 @@ export namespace InputResourcePolicy {
     }
     const scratch = capabilities.attachment.scratch;
     if (!scratch) return { reason: "scratch-unavailable" };
+    if (scratch.binaryTools === false && requiresScratchBinaryTools(resource)) {
+      return { reason: "scratch-unavailable" };
+    }
     if (resource.size !== undefined && resource.size > scratch.maxFileBytes) {
       return { reason: "file-too-large" };
     }
@@ -444,6 +455,34 @@ export namespace InputResourcePolicy {
         representation,
       },
     };
+  }
+
+  function requiresScratchBinaryTools(
+    resource: Readonly<ResourceFacts>
+  ): boolean {
+    if (resource.media === "raster-image") return false;
+
+    const mime = resource.mimeType?.split(";", 1)[0]?.trim().toLowerCase();
+    if (
+      mime?.startsWith("text/") ||
+      mime === "image/svg+xml" ||
+      mime === "application/json" ||
+      mime?.endsWith("+json") ||
+      mime === "application/xml" ||
+      mime?.endsWith("+xml") ||
+      mime === "application/javascript" ||
+      mime === "application/typescript" ||
+      mime === "application/yaml" ||
+      mime === "application/x-yaml" ||
+      mime === "application/toml" ||
+      mime === "application/sql"
+    ) {
+      return false;
+    }
+
+    return !/\.(?:c|cc|cpp|css|csv|go|h|hpp|html?|ini|java|js|jsx|json|jsonl|md|mdx|mjs|py|rb|rs|sh|sql|svg|toml|ts|tsx|txt|xml|ya?ml)$/i.test(
+      resource.name
+    );
   }
 }
 import type { ScratchSeedBudget } from "./scratch-seed-budget";

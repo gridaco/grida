@@ -30,7 +30,9 @@ import {
   containsPath,
   Daemon,
   DaemonServer,
+  runUnsandboxedShell,
   SecretsStore,
+  validateShellRequest,
   WorkspaceRegistry,
   workspaceFs,
   type BuiltServer,
@@ -39,6 +41,9 @@ import {
   type DaemonServices,
   type DaemonTenant,
   type DaemonTenantHandle,
+  type ShellExecutionScope,
+  type ShellExecutor,
+  type ShellRunOptions,
 } from "./server";
 import {
   buildDaemonSandboxPolicy,
@@ -147,6 +152,16 @@ describe("@grida/daemon public API", () => {
       expect(typeof workspaceFs.readDir).toBe("function");
       expect(typeof workspaceFs.iterateDir).toBe("function");
       expect(containsPath("/a", "/a/b")).toBe(true);
+      const executor: ShellExecutor = runUnsandboxedShell;
+      const scope: ShellExecutionScope = {
+        workspace_root: "/workspace",
+        protected_read_roots: [],
+      };
+      const runOptions: ShellRunOptions = {};
+      expect(typeof executor).toBe("function");
+      expect(typeof validateShellRequest).toBe("function");
+      expect(scope.workspace_root).toBe("/workspace");
+      expect(runOptions).toEqual({});
     });
   });
 

@@ -1,5 +1,5 @@
 // GRIDA-SEC-008 — explicit native-provider input validation pins.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -184,6 +184,42 @@ describe("persistIncomingTail", () => {
     expect(messages.length).toBe(1);
     expect(messages[0].id).toBe("u1");
     expect((messages[0].parts[0].data as { text: string }).text).toBe("hello");
+  });
+
+  it("rolls back the whole incoming message when a part write fails", async () => {
+    const s = await store.create({ agent: "grida" });
+    const originalUpsertPart = store.upsertPart.bind(store);
+    let calls = 0;
+    const upsertSpy = vi
+      .spyOn(store, "upsertPart")
+      .mockImplementation(async (...args) => {
+        calls += 1;
+        if (calls === 2) throw new Error("injected part persistence failure");
+        return await originalUpsertPart(...args);
+      });
+
+    try {
+      await expect(
+        persistIncomingTail(store, s.id, [
+          {
+            id: "atomic-user",
+            role: "user",
+            parts: [
+              { type: "text", text: "persist neither part" },
+              {
+                type: "data-test-descriptor",
+                data: { location: "scratch", path: "/attachment.bin" },
+              },
+            ],
+          },
+        ])
+      ).rejects.toThrow("injected part persistence failure");
+      expect(calls).toBe(2);
+      expect(await store.getMessage("atomic-user")).toBeNull();
+      expect(await store.listMessageIds(s.id)).not.toContain("atomic-user");
+    } finally {
+      upsertSpy.mockRestore();
+    }
   });
 
   it("skips assistant text/reasoning (the recorder owns those)", async () => {

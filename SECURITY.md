@@ -544,15 +544,22 @@ interpolation). There is **no command allowlist** — the OS sandbox (`srt`,
 see the supervisor) is the structural boundary, and a per-session
 **permission mode** governs the surface (`protocol/mode.ts`):
 
-- `accept-edits` (default): only read-only/inspection commands auto-run
-  (`permissions.ts` `isReadOnlyCommand`); a mutating/executing command **pauses
-  for a supervised Allow/Deny approval** before it runs. The gate is the AI
-  SDK's native `needsApproval` on the tool (`tools/run-command.ts`), wired from
-  the session mode at `workspace-agent-bindings.ts` (`needs_approval =
-!isReadOnlyCommand` in `accept-edits`, absent in `auto`). The gate is the
-  tool's, NOT the backend's: by the time the command backend's `execute` runs,
-  the call is already cleared (auto, or user-approved), so the backend cannot
-  re-gate on mode without refusing an approved command.
+- `accept-edits` (default): read-only/inspection commands auto-run
+  (`permissions.ts` `isReadOnlyCommand`). The only mutating exception is a
+  plain, two-path `cp` or `mv` whose existing regular-file source and absent
+  destination both canonicalize inside the same session scratch root; flags,
+  symlinks, overwrites, missing parents, or any path outside scratch fail closed
+  to the ordinary supervised Allow/Deny approval. This exception lets the agent
+  organize pre-authorized ephemeral working bytes without treating promotion
+  into the workspace as pre-authorized. Every other mutating/executing command
+  **pauses for approval** before it runs. The gate is the AI SDK's native
+  `needsApproval` on the tool (`tools/run-command.ts`), wired from the session
+  mode at `workspace-agent-bindings.ts` (`needs_approval = !isReadOnlyCommand &&
+!isScratchLocalCopyOrMove` in `accept-edits`, absent in `auto`). The gate is
+  the tool's, NOT the backend's: by the time the command backend's `execute`
+  runs, the call is already cleared (auto, pre-authorized scratch-local
+  operation, or user-approved), so the backend cannot re-gate on mode without
+  refusing an approved command.
 - `auto`: every command runs; the OS sandbox is the sole guard. The semantic
   safety classifier that would judge intent is **deferred** — `auto` is an
   opt-in, informed-consent posture.
@@ -613,13 +620,36 @@ output is converted to `output-error` before queue recovery: the host cannot
 prove whether its side effect completed before the crash, so it must not replay
 the approved operation.
 
-Three structural checks hold regardless of mode: the
-cwd-must-be-inside-an-opened-workspace check, the in-process secret-arg
-containment check (below), and a no-clobber protected-path guard on the
-fs-edit tools (`fs/scope.ts`: `.git`, rc/env files, lockfiles, agent config).
-The OS-level outer sandbox confines the _whole_ sidecar; a per-command fs/net
-sub-policy that would constrain each spawned child (the kernel-level finish of
-the secret-dir guard below) does not exist yet and is the deferred hardening.
+Three structural checks hold regardless of mode: cwd must be inside the exact
+current workspace or the current session's scratch (never another registered
+workspace or session), command args receive a defense-in-depth secret-root
+check, and fs-edit tools retain their no-clobber protected-path guard
+(`fs/scope.ts`: `.git`, rc/env files, lockfiles, agent config).
+
+The long-lived sidecar's outer sandbox is only a coarse backstop. It does not
+raw-spawn model commands: `@grida/agent` calls a host-injected `ShellExecutor`,
+the sidecar sends one bounded `command.request` over its inherited private
+channel, and Electron main independently canonicalizes the exact workspace,
+session scratch, cwd, and host-owned scratch base. Main then asks `srt` for a
+fresh kernel profile for that finite command. The profile denies the entire
+shared scratch base and the daemon's secret `userData`, re-allows only this
+session's scratch, and grants writes only to the exact workspace, exact
+scratch, and a private per-command temp directory. It also denies SRT's shared
+compatibility temp/log write defaults and gives the command no direct network
+destination or local-bind authority. An interpreter that computes a sibling
+scratch or `userData` path at runtime is therefore denied by the kernel, not
+merely by argv inspection.
+
+- **Abort is a cleanup barrier, not just a UI edge.** A turn abort propagates
+  through the AI SDK tool signal as `command.abort`. Main keeps that command
+  active until the executor has terminated the ordinary process group and
+  `AgentCommandHost` has removed its private temp and released SRT bookkeeping;
+  only then does it return the terminal `command.aborted` acknowledgement.
+  The agent runtime tracks both that command promise and the model-stream pump
+  in the turn's settlement barrier, so replacement admission and session
+  deletion remain HTTP 409 until the acknowledgement has been consumed and
+  the aborted pump has settled. This orders cleanup for the authority the host
+  actually owns; it does not strengthen the macOS `setsid(2)` limitation below.
 
 - **Network (allow-only, enumerated).** `srt` denies all outbound except a
   host-set domain allowlist and **forbids `*` / broad patterns by design** —
@@ -636,48 +666,35 @@ the secret-dir guard below) does not exist yet and is the deferred hardening.
   the package's allowlisted defaults unless they explicitly choose the same
   strict construction mode.
 
-- **Fail-closed exposure (no sandbox ⇒ no shell).** The shell tool is not
-  registered at all unless the host affirms containment. The decision is
-  computed once at the tenant boundary (`createAgentTenant`,
-  `packages/grida-ai-agent/src/server.ts`) as
-  `sandbox_enforced || allow_unsandboxed_shell` and threaded to the tool
-  registry; the default is off. The desktop supervisor sets `sandbox_enforced`
-  true only when it actually wrapped the sidecar spawn with `srt`, so on
-  platforms where Desktop does not enable the wrapper (Windows today) the agent
-  gets fs/todos/skills but **no** `run_command` and no external ACP agent. The
-  `grida-agent` CLI — a local, user-invoked tool
-  with no OS sandbox — sets the explicit `allow_unsandboxed_shell` opt-in
-  instead, which logs a warning. New privileged tools added later inherit the
-  same gate: a capability that needs containment is born behind this switch,
-  so the system's default posture is "no containment, no capability."
+- **Fail-closed exposure (no executor ⇒ no shell).** `sandbox_enforced` is an
+  attestation about the coarse sidecar boundary, not command authority. The
+  tenant registers `run_command` only when its host injects a `ShellExecutor`;
+  omission is the default. Desktop injects the private main-owned executor only
+  on platforms where SRT is enabled, so Windows gets fs/todos/skills but **no**
+  `run_command` and no external ACP agent. The `grida-agent` CLI — a local,
+  user-invoked tool with no OS sandbox — uses the separately named
+  `allow_unsandboxed_shell` opt-in, which explicitly injects the raw runner and
+  logs a warning. A boolean claim alone can never cause raw execution.
 
-- **Secret-dir containment (in-process).** The daemon's own secret dir —
+- **Secret-dir containment (per command).** The daemon's own secret dir —
   its `userData`, where BYOK `auth.json`, `workspaces.json`, `recent.json`,
   and the sessions db live — is deliberately **not** in the `srt`
-  `deny_read` policy, because the host process itself must read `auth.json`
-  for provider calls. Denying it at the kernel level would break host auth.
-  Instead the shell _child_ is kept out of it in-process: `validateShellRequest`
-  rejects any command arg that resolves (after realpath of the nearest
-  existing ancestor, mirroring the cwd discipline so a symlink can't bypass it)
-  inside that protected root. HOME secrets (`~/.ssh`, `~/.aws`, shell rc files)
-  remain denied for the entire tree by the `srt` policy, where the host has no
-  legitimate read. This ownership split is the responsibility-and-reconciliation
-  rule: `srt` owns HOME secrets, the in-process runner owns the host's own
-  `userData`. **Caveat (`auto`):** the in-process arg check only inspects
-  top-level argv, so an interpreter or shell (`bash -c`, `python3 -c`) reachable
-  in `auto` can read `userData` by a computed path. Closing that for the shell
-  _child_ needs the kernel-level per-call `deny_read` (the deferred per-command
-  sub-policy). Desktop's empty direct external allowlist blocks network
-  exfiltration from that child, but does not make the in-process read itself
-  acceptable. The fs-edit tools (`read_file`) remain workspace-scoped and never
-  serve `userData`.
+  **outer** policy, because the sidecar itself must read `auth.json` for
+  provider calls. Electron main does not need that authority to execute a
+  command, so every finite-command profile adds a kernel `deny_read` and
+  `deny_write` for `userData`. `validateShellRequest` still rejects an explicit
+  arg resolving there as defense in depth, but computed interpreter paths are
+  covered as well. HOME secrets (`~/.ssh`, `~/.aws`, shell rc files) remain
+  denied in both outer and command profiles. The fs-edit tools (`read_file`)
+  remain workspace/scratch-scoped and never serve `userData`.
 
 - **`auto` is informed-consent.** `auto` removes command-identity gating; the
   sandbox still bounds the blast radius (writes confined to writable roots,
   direct external network denied), but it does not judge _intent_ — an injected or confused
   agent can read broadly and run anything within those bounds. Restoring intent
   judgment is the classifier/watchdog layer, named and deferred. `auto` is
-  opt-in; the default `accept-edits` keeps a read-only-only shell.
+  opt-in; the default `accept-edits` requires approval for mutations except
+  the narrow scratch-local copy/move operation described above.
 
 **Human terminal (deliberate contrast to the agent shell).** The
 workbench's Terminal pane (`bridge.terminal.*`) is a real, **unsandboxed**
@@ -778,10 +795,11 @@ registry writes nothing but the directory, so the earlier manifest-injection
 surface is removed outright rather than field-constrained — whatever document
 the workspace eventually holds is created by the AGENT through its own
 already-bound (and separately-gated) fs write capability, not by this route.
-The sidecar's own `fs` writes and every child process are inside the same coarse
-whole-sidecar `srt` profile; no narrower per-command filesystem profile exists
-yet. A created project becomes an in-process workspace root for structured
-tools, while shell cwd authorization is checked separately by the runner.
+The sidecar's structured `fs` writes remain inside its coarse outer `srt`
+profile. A created project becomes an in-process workspace root for structured
+tools; a shell command receives that exact canonical root again through the
+main-owned per-command SRT profile rather than inheriting the union of every
+opened workspace.
 `workspaces.create.test.ts` pins traversal-name containment,
 that the created project is empty (an unexpected `seed` body is inert), and the
 no-managed-root refusal.
@@ -821,10 +839,10 @@ Today:
 - [packages/grida-ai-agent/src/runtime/index.ts](packages/grida-ai-agent/src/runtime/index.ts) — agent run orchestration; owns run / stream / abort behavior and binds a consumed human-input result to the exact resumed run through terminal recorder settlement.
 - [packages/grida-ai-agent/src/runtime/stream-registry.ts](packages/grida-ai-agent/src/runtime/stream-registry.ts) — in-flight run replay/abort registry; async model producers append and finish only through their exact `StreamEntry` generation, so a late response or error from aborted turn A cannot mutate queued replacement B under the same session id. Explicit human abort remains session-keyed so it targets whichever turn is current.
 - [packages/grida-ai-agent/src/runtime/session-scheduler.ts](packages/grida-ai-agent/src/runtime/session-scheduler.ts), [status-sse.ts](packages/grida-ai-agent/src/runtime/status-sse.ts), and [the scheduler contract tests](packages/grida-ai-agent/src/runtime/session-scheduler.test.ts) — authoritative per-session run-state machine and its observation channel; classifies persisted approvals/questions, projects explicit waiting states after restart, and pauses/rechecks queue drain so an ordinary queued turn cannot run ahead of unresolved human input. Status-SSE hydration is deliberately read-only: only trusted lifecycle/mutation edges, host-start recovery, and provider-ready retries can schedule a queued turn.
-- [packages/grida-ai-agent/src/runtime/command-backend.ts](packages/grida-ai-agent/src/runtime/command-backend.ts) — agent `run_command` adapter through shell policy (structural gates only; the supervised mode gate is the tool's `needsApproval`).
+- [packages/grida-ai-agent/src/runtime/command-backend.ts](packages/grida-ai-agent/src/runtime/command-backend.ts) — agent `run_command` adapter: validates cwd against only the current canonical workspace/own scratch, flushes structured writes, and delegates the exact immutable scope to a host-injected executor. It never raw-spawns.
 - [packages/grida-ai-agent/src/tools/run-command.ts](packages/grida-ai-agent/src/tools/run-command.ts) — the supervised-approval gate itself: the AI SDK `needsApproval` predicate that pauses a mutating command before `execute` in `accept-edits` (absent in `auto`). The decision lives on the tool, not the backend.
-- [packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts](packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts) — opened workspace to agent fs/todos/command bindings; wires the `accept-edits` supervised-approval predicate. The session scratch dir is wired as an additional sanctioned root for BOTH surfaces from one source (`deps.scratch_dir`): the shell's allowed cwd roots AND the fs backend's reachable roots (so `view_image`/`read_file`/`write_file` reach scratch, not just the shell). Containment is preserved per root — a path under no reachable root falls back contained to the workspace, and the secrets root is never a reachable root. Also builds the `generate_image` binding: it reads BYOK keys via `SecretsStore` to call the image provider in-process and returns the saved scratch path + metadata + base64 `data` (the bytes are for the CLIENT to render; `AgentGen.toModelOutput` is text-only, so they are NEVER lowered to the model — no context bloat, no perception claim). The complementary `view_image` perception path DOES deliver bytes to the model, but only ones already read under the agent's existing fs read capability: `agent/hoist-tool-result-images.ts` (wired at `agent/index.ts` `prepareStep`, #923) relocates an image tool-result into a synthetic user-message image part so the model can actually see it on the openai-compatible wire — a model-view lowering that moves bytes already inside the prompt, never persisted, with no new read, no new egress, and no boundary change. The key never leaves the host, and the call omits `providerOptions.grida` so it is BYOK-paid, never Grida-billed (mirrors the `/images/generate` route).
-- [packages/grida-ai-agent/src/session/scratch.ts](packages/grida-ai-agent/src/session/scratch.ts) — per-session ephemeral scratch dir (WG `scratch.md`): asserts the shell-writable scratch tree sits OUTSIDE `userData` (the secret root), creates it owner-only (`0700`), and reclaims it (per-session delete + synchronous host-start sweep). `writeScratchFile` lands produced bytes (e.g. `generate_image`) owner-only (`0600`) within the session tree, rejecting any filename that is not a single safe path segment AND opening `O_NOFOLLOW` so a symlink planted at the basename (e.g. by an auto-approved scratch-cwd `run_command`) fails the write instead of redirecting it outside the tree — closing the lexical-check TOCTOU.
+- [packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts](packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts) — opened workspace to agent fs/todos/command bindings; wires the `accept-edits` supervised-approval predicate. The session scratch dir is wired into BOTH surfaces from one source (`deps.scratch_dir`): the shell executor's exact scope and the fs backend's reachable roots (so `view_image`/`read_file`/`write_file` reach scratch, not just the shell). Containment is preserved per root — a path under no reachable root falls back contained to the workspace, and the secrets root is never a reachable root. Also builds the `generate_image` binding: it reads BYOK keys via `SecretsStore` to call the image provider in-process and returns the saved scratch path + metadata + base64 `data` (the bytes are for the CLIENT to render; `AgentGen.toModelOutput` is text-only, so they are NEVER lowered to the model — no context bloat, no perception claim). The complementary `view_image` perception path DOES deliver bytes to the model, but only ones already read under the agent's existing fs read capability: `agent/hoist-tool-result-images.ts` (wired at `agent/index.ts` `prepareStep`, #923) relocates an image tool-result into a synthetic user-message image part so the model can actually see it on the openai-compatible wire — a model-view lowering that moves bytes already inside the prompt, never persisted, with no new read, no new egress, and no boundary change. The key never leaves the host, and the call omits `providerOptions.grida` so it is BYOK-paid, never Grida-billed (mirrors the `/images/generate` route).
+- [packages/grida-ai-agent/src/session/scratch.ts](packages/grida-ai-agent/src/session/scratch.ts) — per-session ephemeral scratch dir (WG `scratch.md`): derives a host-namespaced base under a host-injected temp root and rejects lexical or physical overlap with `userData` in either direction before mutation. Authority creation is non-recursive; every predictable base/session level must be a non-symlink current-uid-owned directory and is tightened/verified to `0700` on POSIX, while an unsafe parent fails closed. Reclamation holds session admission, revalidates the authority before listing, and unlinks child symlinks rather than following them (per-session delete + synchronous host-start sweep). Desktop resolves that temp root in main before SRT can replace the sidecar's `TMPDIR` with a shared compatibility directory. `writeScratchFile` lands produced bytes (e.g. `generate_image`) owner-only (`0600`) within the session tree, rejecting any filename that is not a single safe path segment AND opening `O_NOFOLLOW` so a symlink planted at the basename (e.g. by an auto-approved scratch-cwd `run_command`) fails the write instead of redirecting it outside the tree — closing the lexical-check TOCTOU.
 - [packages/grida-daemon/src/path-contains.ts](packages/grida-daemon/src/path-contains.ts) — shared `path.sep`-prefix containment used by the shell runner's workspace/secret-root gates, the scratch containment assert, and `createProject`'s managed-root assert (one source so the discipline can't drift).
 - [packages/grida-ai-agent/src/runtime/run-input.ts](packages/grida-ai-agent/src/runtime/run-input.ts) and [tools/human-input-result.ts](packages/grida-ai-agent/src/tools/human-input-result.ts) — wire-message normalization + `coerceApprovalAnswer`/`applyApprovalAnswer` (shape-gates the explicit `approval_answer` body field and atomically binds a valid answer to its exact consuming run), plus exact correlation and canonical output-schema validation before a renderer-authored question/design-search result can consume a pending interaction.
 - [packages/grida-ai-agent/src/protocol/context.ts](packages/grida-ai-agent/src/protocol/context.ts) — renderer-safe, persistable directory-reference descriptor vocabulary; the virtual path and read-only access are fixed by the host contract, while the descriptor itself carries no authority.
@@ -841,9 +859,10 @@ Today:
 - `desktop/src/window.ts` — blocks exposed desktop windows from navigating outside `/desktop/*`; injects non-secret preload arguments.
 - `desktop/src/agent-sidecar.ts` — sidecar entrypoint; constructs the composed agent daemon (`createAgentDaemon`) in socketless mode and accepts only main-transferred daemon sockets.
 - `desktop/src/agent-sidecar-daemon-sockets.ts` — injects only validated, already-connected socket capabilities into the unbound HTTP server; it exposes no listen, bind, connect, or target-selection operation.
-- `desktop/src/agent-sidecar-channel.ts`, `agent-network-policy.ts`, and `agent-sidecar-network.ts` — strict private stdio framing, destination/header policy, and the sidecar's explicit provider/provider-asset transport client.
+- `desktop/src/agent-sidecar-channel.ts`, `agent-network-policy.ts`, and `agent-sidecar-network.ts` — strict private stdio framing, destination/header policy, the sidecar's explicit provider/provider-asset transport client, and the bounded finite-command request/result client. Command output is sequenced and capped; abort remains pending until main returns `command.aborted` after worker cleanup; malformed or unknown frames fail the channel.
 - `desktop/src/main/agent-daemon-socket-host.ts` — owns the exact loopback listener, pauses accepted sockets, rejects non-loopback peers, and transfers the bounded connected capability over per-spawn Node IPC.
-- `desktop/src/main/agent-network-host.ts` and `agent-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization, and per-spawn built-in/custom grant state.
+- `desktop/src/main/agent-network-host.ts` and `agent-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization, per-spawn built-in/custom grant state, and the capped private dispatch seam into the command host.
+- `desktop/src/main/agent-command-host.ts` and `main/sandbox/manager.ts` — main-owned finite-command execution: canonical exact-root validation, shared-scratch/secret denies, own-scratch/workspace/private-temp grants, a fixed no-network policy, fresh per-command SRT wrapping, raw spawn only after the wrapper succeeds, and terminal cleanup before abort acknowledgement.
 - `desktop/src/main/agent-sandbox-policy.ts` — binds Desktop's strict sandbox posture: empty direct external egress, host-routed provider HTTP, and no generic local bind/connect authority.
 - `desktop/src/main/agent-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; initializes the OS sandbox wrapper when supported; owns both private channels and removes direct provider hosts from the sidecar policy (Desktop deliberately withholds srt's alpha Windows backend pending a supported lifecycle).
 - `desktop/src/main/desktop-entry-window.ts` — owns the exact bridge-attached entry window and admits auxiliary native windows only while the authenticated main role is active; the Grida-account transition is additionally bound by GRIDA-SEC-005.

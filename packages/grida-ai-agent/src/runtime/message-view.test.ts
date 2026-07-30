@@ -246,10 +246,10 @@ describe("buildModelMessages", () => {
       availableScratchAttachmentPaths: new Set(["live.bin"]),
     });
     const marker = out[0].parts[0] as { text: string };
-    expect(marker.text).toContain('"name": "live.bin"');
-    expect(marker.text).toContain('"available": true');
-    expect(marker.text).toContain('"name": "expired.bin"');
-    expect(marker.text).toContain('"available": false');
+    expect(marker.text).toMatch(/"name": "live\.bin"[^}]*"available": true/);
+    expect(marker.text).toMatch(
+      /"name": "expired\.bin"[^}]*"available": false/
+    );
     // Liveness is a turn-time model fact, never durable chat state.
     expect(JSON.stringify(rows)).not.toContain('"available"');
   });

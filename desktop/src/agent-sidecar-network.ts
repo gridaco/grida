@@ -2,6 +2,12 @@
 import crypto from "node:crypto";
 import type { Readable, Writable } from "node:stream";
 import type { ProviderHttpTransport } from "@grida/agent/server";
+import type {
+  ShellExecutionScope,
+  ShellExecutor,
+  ShellRunRequest,
+  ShellRunResult,
+} from "@grida/daemon/server";
 import { AgentNetworkPolicy } from "./agent-network-policy";
 import { AgentSidecarChannel } from "./agent-sidecar-channel";
 
@@ -28,17 +34,32 @@ type PendingResponse = {
   abortCleanup: () => void;
 };
 
+type PendingCommand = {
+  request: ShellRunRequest;
+  resolve: (result: ShellRunResult) => void;
+  reject: (error: Error) => void;
+  sequence: number;
+  outputBytes: number;
+  stdout: string[];
+  stderr: string[];
+  abortCleanup: () => void;
+  abortError: Error | null;
+};
+
 /**
- * Sidecar half of the private provider-HTTP channel. This is the only object
- * handed to `@grida/agent`; model tools and spawned children receive neither
- * the object nor a channel address/token in argv or environment.
+ * Sidecar half of the private provider-HTTP and host-command channel. These
+ * are the only capabilities handed to `@grida/agent`; model tools and spawned
+ * children receive neither the objects nor a channel address/token in argv or
+ * environment.
  */
 export class AgentSidecarNetwork {
   readonly providerHttp: ProviderHttpTransport;
+  readonly shellExecutor: ShellExecutor;
 
   private readonly decoder = new AgentSidecarChannel.Decoder();
   private readonly writer: AgentSidecarChannel.Writer;
   private readonly pending = new Map<string, PendingResponse>();
+  private readonly pendingCommands = new Map<string, PendingCommand>();
   private readonly cancelled = new Set<string>();
   private grants: AgentSidecarChannel.NetworkGrant[] = [];
   private revision = -1;
@@ -59,6 +80,8 @@ export class AgentSidecarNetwork {
       request: (input, init) => this.fetch("provider", input, init),
       download: (input, init) => this.fetch("download", input, init),
     });
+    this.shellExecutor = (request, scope, signal) =>
+      this.executeCommand(request, scope, signal);
 
     input.on("data", (chunk: Buffer | string) => {
       try {
@@ -118,6 +141,88 @@ export class AgentSidecarNetwork {
 
   close(reason = "agent network channel closed"): void {
     this.fail(new Error(reason));
+  }
+
+  private async executeCommand(
+    request: ShellRunRequest,
+    scope: ShellExecutionScope,
+    signal?: AbortSignal
+  ): Promise<ShellRunResult> {
+    if (!this.bootstrapped || this.closed) {
+      throw new Error("agent host command execution is not available");
+    }
+    if (signal?.aborted) throw abortError(signal.reason);
+
+    const requestSnapshot: ShellRunRequest = {
+      cmd: request.cmd,
+      args: [...request.args],
+      cwd: request.cwd,
+      ...(request.timeout_ms === undefined
+        ? {}
+        : { timeout_ms: request.timeout_ms }),
+    };
+    const requestId = crypto.randomUUID();
+    const result = new Promise<ShellRunResult>((resolve, reject) => {
+      const abort = () => {
+        const pending = this.pendingCommands.get(requestId);
+        if (!pending || pending.abortError) return;
+        // Keep the tool promise pending until main confirms that the confined
+        // worker returned and AgentCommandHost's finally cleanup completed.
+        pending.abortError = abortError(signal?.reason);
+        void this.send({
+          v: 1,
+          type: "command.abort",
+          requestId,
+          reason: "caller aborted",
+        }).catch((error) => this.fail(asError(error)));
+      };
+      signal?.addEventListener("abort", abort, { once: true });
+      this.pendingCommands.set(requestId, {
+        request: requestSnapshot,
+        resolve,
+        reject,
+        sequence: 0,
+        outputBytes: 0,
+        stdout: [],
+        stderr: [],
+        abortCleanup: () => signal?.removeEventListener("abort", abort),
+        abortError: null,
+      });
+    });
+    // A host can reject as soon as it decodes command.request, before the
+    // Writer's callback/backpressure promise resolves. Observe that result
+    // synchronously and return the original rejection below.
+    void result.catch(() => undefined);
+
+    try {
+      await this.send({
+        v: 1,
+        type: "command.request",
+        requestId,
+        command: requestSnapshot.cmd,
+        args: requestSnapshot.args,
+        workdir: requestSnapshot.cwd,
+        ...(requestSnapshot.timeout_ms === undefined
+          ? {}
+          : { timeoutMs: requestSnapshot.timeout_ms }),
+        workspaceRoot: scope.workspace_root,
+        ...(scope.scratch_root === undefined
+          ? {}
+          : { scratchDir: scope.scratch_root }),
+      });
+    } catch (error) {
+      // A failed write is ambiguous: main may already have decoded the frame
+      // and launched a confined worker before the pipe reported failure.
+      // Only generation-fatal supervision can own that worker's cleanup; an
+      // ordinary tool rejection would let this runtime admit replacement work
+      // without the terminal cleanup acknowledgement.
+      this.fail(
+        new Error(
+          `host command request delivery failed: ${asError(error).message}`
+        )
+      );
+    }
+    return await result;
   }
 
   private async fetch(
@@ -287,6 +392,18 @@ export class AgentSidecarNetwork {
         if (this.ignoreCancelledResponse(frame)) return;
         this.onResponseError(frame);
         return;
+      case "command.output":
+        this.onCommandOutput(frame);
+        return;
+      case "command.end":
+        this.onCommandEnd(frame);
+        return;
+      case "command.aborted":
+        this.onCommandAborted(frame);
+        return;
+      case "command.error":
+        this.onCommandError(frame);
+        return;
       case "shutdown":
         this.shutdownRequested = true;
         this.deliverShutdown();
@@ -379,6 +496,78 @@ export class AgentSidecarNetwork {
     this.rejectPending(frame.requestId, error);
   }
 
+  private onCommandOutput(frame: AgentSidecarChannel.CommandOutputFrame): void {
+    const pending = this.requirePendingCommand(frame.requestId);
+    if (pending.abortError) return;
+    if (frame.sequence !== pending.sequence) {
+      throw new Error("command output sequence mismatch");
+    }
+    const bytes = Buffer.byteLength(frame.data, "utf8");
+    if (
+      pending.outputBytes + bytes >
+      AgentSidecarChannel.MAX_COMMAND_OUTPUT_BYTES
+    ) {
+      throw new Error("command output exceeded the sidecar limit");
+    }
+    pending.sequence += 1;
+    pending.outputBytes += bytes;
+    pending[frame.stream].push(frame.data);
+  }
+
+  private onCommandEnd(frame: AgentSidecarChannel.CommandEndFrame): void {
+    const pending = this.requirePendingCommand(frame.requestId);
+    if (pending.abortError) return;
+    if (frame.sequence !== pending.sequence) {
+      throw new Error("command end sequence mismatch");
+    }
+    this.pendingCommands.delete(frame.requestId);
+    pending.abortCleanup();
+    pending.resolve({
+      cmd: pending.request.cmd,
+      args: [...pending.request.args],
+      cwd: pending.request.cwd,
+      exit_code: frame.exitCode,
+      signal: frame.signal,
+      stdout: pending.stdout.join(""),
+      stderr: pending.stderr.join(""),
+      duration_ms: frame.durationMs,
+      timed_out: frame.timedOut,
+      truncated: frame.truncated,
+    });
+  }
+
+  private onCommandAborted(
+    frame: AgentSidecarChannel.CommandAbortedFrame
+  ): void {
+    const pending = this.requirePendingCommand(frame.requestId);
+    if (!pending.abortError) {
+      throw new Error("command.aborted arrived without a caller abort");
+    }
+    this.pendingCommands.delete(frame.requestId);
+    pending.abortCleanup();
+    pending.reject(pending.abortError);
+  }
+
+  private onCommandError(frame: AgentSidecarChannel.CommandErrorFrame): void {
+    const pending = this.requirePendingCommand(frame.requestId);
+    if (pending.abortError) return;
+    this.rejectPendingCommand(frame.requestId, new Error(frame.message));
+  }
+
+  private requirePendingCommand(requestId: string): PendingCommand {
+    const pending = this.pendingCommands.get(requestId);
+    if (!pending) throw new Error("command response names an unknown request");
+    return pending;
+  }
+
+  private rejectPendingCommand(requestId: string, error: Error): void {
+    const pending = this.pendingCommands.get(requestId);
+    if (!pending) return;
+    this.pendingCommands.delete(requestId);
+    pending.abortCleanup();
+    pending.reject(error);
+  }
+
   private requirePending(requestId: string): PendingResponse {
     const pending = this.pending.get(requestId);
     if (!pending) throw new Error("response names an unknown request");
@@ -454,6 +643,9 @@ export class AgentSidecarNetwork {
     this.bootstrapReject = null;
     for (const requestId of this.pending.keys()) {
       this.rejectPending(requestId, error);
+    }
+    for (const requestId of this.pendingCommands.keys()) {
+      this.rejectPendingCommand(requestId, error);
     }
     this.cancelled.clear();
     if (this.fatalHandler) this.fatalHandler(error);

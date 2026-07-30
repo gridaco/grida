@@ -10,12 +10,10 @@
  *
  * Two layers, increasing scope:
  *
- *   1. `validateShellRequest` — touches real fs (`realpath`, `stat`)
- *      and a real `WorkspaceRegistry` pointed at a temp userData
- *      dir. Covers the structural gates the agent server route runs before
- *      spawning: cwd-resolve, cwd-is-directory, cwd-in-workspace, and the
- *      secret-arg containment check. (Command identity is gated upstream by
- *      mode — see `permissions.test.ts`.)
+ *   1. `validateShellRequest` — touches real fs (`realpath`, `stat`). Covers
+ *      cwd resolution, exact granted-root containment, and the secret-arg
+ *      check. (Command identity is gated upstream by mode — see
+ *      `permissions.test.ts`.)
  *   2. `runShell` — actually spawns child processes via
  *      `child_process.spawn`. Uses `echo`, `pwd`, `ls`, `sleep` from
  *      the host PATH; the runner uses `shell: false` so these
@@ -23,10 +21,7 @@
  *      is the same code path the agent host takes in production.
  *
  * All cases are deterministic: fixed inputs, fixed expected outputs.
- * The temp dir lives under `os.tmpdir()` so the registry's git-root
- * walk doesn't pick up the grida repo root by accident — `os.tmpdir()`
- * resolves to `/private/var/folders/…` on macOS and `/tmp` on Linux,
- * neither of which is inside a git tree.
+ * The temp dir lives under `os.tmpdir()` so tests do not touch the checkout.
  */
 /* eslint-disable jest/no-conditional-expect */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -34,32 +29,32 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { runShell, validateShellRequest } from "./runner";
-import { WorkspaceRegistry } from "../workspaces";
 
 /* ────────────────────── validate + runShell scaffold ───────────── */
 
 /**
- * Per-test fixture: a temp dir with a real `WorkspaceRegistry` that
- * has registered a child of the temp dir as its single workspace.
- * `workspaceRoot` is already `realpath`'d so tests can compare
- * against it without doing the macOS `/var` → `/private/var` dance.
+ * Per-test fixture with two sibling workspace-shaped roots. The validator is
+ * handed exactly one; the other proves global/open-workspace authority cannot
+ * bleed into the current command. Roots are already `realpath`'d so tests can
+ * compare without doing the macOS `/var` → `/private/var` dance.
  */
 async function makeFixture(): Promise<{
   workspace_root: string;
-  registry: WorkspaceRegistry;
+  other_workspace_root: string;
   cleanup: () => Promise<void>;
 }> {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), "grida-shell-test-"));
   const workspaceDir = path.join(base, "workspace");
+  const otherWorkspaceDir = path.join(base, "other-workspace");
   const userDataDir = path.join(base, "userdata");
   await fs.mkdir(workspaceDir);
+  await fs.mkdir(otherWorkspaceDir);
   await fs.mkdir(userDataDir);
   const workspaceRoot = await fs.realpath(workspaceDir);
-  const registry = new WorkspaceRegistry(userDataDir);
-  await registry.open(workspaceRoot);
+  const otherWorkspaceRoot = await fs.realpath(otherWorkspaceDir);
   return {
     workspace_root: workspaceRoot,
-    registry,
+    other_workspace_root: otherWorkspaceRoot,
     cleanup: async () => {
       await fs.rm(base, { recursive: true, force: true });
     },
@@ -77,10 +72,10 @@ describe("validateShellRequest", () => {
     await fixture.cleanup();
   });
 
-  it("accepts an allowlisted cmd with an in-workspace cwd", async () => {
+  it("accepts a request with a cwd inside the exact workspace root", async () => {
     const result = await validateShellRequest(
       { cmd: "echo", args: ["hi"], cwd: fixture.workspace_root },
-      fixture.registry
+      [fixture.workspace_root]
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -89,13 +84,23 @@ describe("validateShellRequest", () => {
     }
   });
 
-  it("rejects cwd outside any registered workspace", async () => {
-    // The OS tmpdir itself is the *parent* of our registered
-    // workspace; `containsPath` does a prefix-with-separator check,
-    // so the parent is correctly rejected.
+  it("rejects cwd outside the exact granted root", async () => {
+    // The OS tmpdir itself is the *parent* of our workspace; `containsPath`
+    // does a prefix-with-separator check, so the parent is correctly rejected.
     const result = await validateShellRequest(
       { cmd: "echo", args: [], cwd: os.tmpdir() },
-      fixture.registry
+      [fixture.workspace_root]
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("cwd-not-in-workspace");
+    }
+  });
+
+  it("rejects a sibling workspace when only the current workspace is granted", async () => {
+    const result = await validateShellRequest(
+      { cmd: "echo", args: [], cwd: fixture.other_workspace_root },
+      [fixture.workspace_root]
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -110,7 +115,7 @@ describe("validateShellRequest", () => {
         args: [],
         cwd: path.join(fixture.workspace_root, "no-such-dir"),
       },
-      fixture.registry
+      [fixture.workspace_root]
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -123,7 +128,7 @@ describe("validateShellRequest", () => {
     await fs.writeFile(filePath, "x");
     const result = await validateShellRequest(
       { cmd: "echo", args: [], cwd: filePath },
-      fixture.registry
+      [fixture.workspace_root]
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -162,7 +167,7 @@ describe("validateShellRequest — protected secret roots", () => {
   it("rejects an absolute arg inside the secrets root", async () => {
     const result = await validateShellRequest(
       { cmd: "cat", args: [authJsonAbs], cwd: fixture.workspace_root },
-      fixture.registry,
+      [fixture.workspace_root],
       [secretsRoot]
     );
     expect(result.ok).toBe(false);
@@ -180,7 +185,7 @@ describe("validateShellRequest — protected secret roots", () => {
         args: ["../userdata/auth.json"],
         cwd: fixture.workspace_root,
       },
-      fixture.registry,
+      [fixture.workspace_root],
       [secretsRoot]
     );
     expect(result.ok).toBe(false);
@@ -193,7 +198,7 @@ describe("validateShellRequest — protected secret roots", () => {
     await fs.writeFile(path.join(fixture.workspace_root, "file.txt"), "ok");
     const result = await validateShellRequest(
       { cmd: "cat", args: ["./file.txt"], cwd: fixture.workspace_root },
-      fixture.registry,
+      [fixture.workspace_root],
       [secretsRoot]
     );
     expect(result.ok).toBe(true);
@@ -202,23 +207,22 @@ describe("validateShellRequest — protected secret roots", () => {
   it("does not treat flags or plain text as paths", async () => {
     const result = await validateShellRequest(
       { cmd: "grep", args: ["-n", "needle"], cwd: fixture.workspace_root },
-      fixture.registry,
+      [fixture.workspace_root],
       [secretsRoot]
     );
     expect(result.ok).toBe(true);
   });
 });
 
-/* ───────────── additional allowed roots (session scratch) ──────── */
+/* ───────────────── exact roots (session scratch) ───────────────── */
 
 /**
  * WG `scratch.md` S4: the session scratch dir is a sanctioned cwd root even
- * though it is NOT a registered workspace (S5). It is supplied via
- * `additionalAllowedRoots`; without it, a cwd in scratch is rejected exactly
- * like any other out-of-workspace path. The scratch dir lives in its own temp
- * dir here (outside both the workspace and the secrets root).
+ * though it is NOT a workspace (S5). It is one of this session's exact roots;
+ * without it, a cwd in scratch is rejected like any other ungranted path. The
+ * scratch dir lives outside both the workspace and the secrets root.
  */
-describe("validateShellRequest — additional allowed roots (scratch)", () => {
+describe("validateShellRequest — exact scratch root", () => {
   let fixture: Awaited<ReturnType<typeof makeFixture>>;
   let scratchRoot: string;
   beforeEach(async () => {
@@ -235,9 +239,7 @@ describe("validateShellRequest — additional allowed roots (scratch)", () => {
   it("cwd inside scratch passes when scratch is an allowed root (S4)", async () => {
     const result = await validateShellRequest(
       { cmd: "ls", args: [], cwd: scratchRoot },
-      fixture.registry,
-      [],
-      [scratchRoot]
+      [fixture.workspace_root, scratchRoot]
     );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.request.cwd).toBe(scratchRoot);
@@ -246,7 +248,7 @@ describe("validateShellRequest — additional allowed roots (scratch)", () => {
   it("cwd inside scratch fails when scratch is not an allowed root", async () => {
     const result = await validateShellRequest(
       { cmd: "ls", args: [], cwd: scratchRoot },
-      fixture.registry
+      [fixture.workspace_root]
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("cwd-not-in-workspace");
@@ -263,9 +265,8 @@ describe("validateShellRequest — additional allowed roots (scratch)", () => {
         args: ["a.zip", "-d", path.join(scratchRoot, "out")],
         cwd: fixture.workspace_root,
       },
-      fixture.registry,
-      [secretsRoot],
-      [scratchRoot]
+      [fixture.workspace_root, scratchRoot],
+      [secretsRoot]
     );
     expect(result.ok).toBe(true);
   });
@@ -353,5 +354,37 @@ describe("runShell", () => {
     expect(result.timed_out).toBe(true);
     expect(result.signal).not.toBeNull();
     expect(result.duration_ms).toBeLessThan(2000);
+  });
+
+  it("kills the child when its host generation is aborted", async () => {
+    const controller = new AbortController();
+    const pending = runShell(
+      {
+        cmd: "sleep",
+        args: ["5"],
+        cwd: fixture.workspace_root,
+      },
+      { signal: controller.signal }
+    );
+    controller.abort();
+
+    const result = await pending;
+    expect(result.timed_out).toBe(false);
+    expect(result.signal).not.toBeNull();
+    expect(result.duration_ms).toBeLessThan(2000);
+  });
+
+  it("kills background descendants before releasing command authority", async () => {
+    if (process.platform === "win32") return;
+    const lateWrite = path.join(fixture.workspace_root, "late-write.txt");
+    const result = await runShell({
+      cmd: "/bin/sh",
+      args: ["-c", `(sleep 0.4; echo escaped > '${lateWrite}') &`],
+      cwd: fixture.workspace_root,
+    });
+
+    expect(result.exit_code).toBe(0);
+    await new Promise((resolve) => setTimeout(resolve, 650));
+    await expect(fs.stat(lateWrite)).rejects.toThrow(/ENOENT/);
   });
 });

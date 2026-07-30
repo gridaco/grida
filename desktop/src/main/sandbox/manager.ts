@@ -70,6 +70,40 @@ export async function wrap(command: string): Promise<string> {
 }
 
 /**
+ * Wrap one supervisor-owned raw command with a call-specific policy and return
+ * an argv descriptor suitable for `spawn(..., { shell: false })`.
+ *
+ * Unlike {@link wrap}, this is used for finite agent shell workers, not the
+ * long-lived sidecar. The caller supplies the exact workspace/session roots in
+ * `customConfig`; SRT therefore emits a fresh kernel profile for every command
+ * instead of inheriting the sidecar's coarse, all-session filesystem view.
+ */
+export async function wrapArgv(
+  command: string,
+  customConfig: Partial<SandboxRuntimeConfig>,
+  abortSignal?: AbortSignal
+): Promise<{ argv: string[]; env: NodeJS.ProcessEnv }> {
+  if (!initialized) {
+    throw new Error(
+      "[agent-sidecar:srt] wrapArgv() called before ensureInitialized() - refusing to run an unwrapped command"
+    );
+  }
+  return await SandboxManager.wrapWithSandboxArgv(
+    command,
+    undefined,
+    customConfig,
+    abortSignal
+  );
+}
+
+/** Release per-command Linux bind-mount placeholders after a wrapped worker
+ * exits. Safe and intentionally a no-op on macOS. */
+export function cleanupAfterCommand(): void {
+  if (!initialized) return;
+  SandboxManager.cleanupAfterCommand();
+}
+
+/**
  * `before-quit` cleanup. Tears down srt's proxy servers; safe to
  * call even if `ensureInitialized` was never called (no-ops).
  */

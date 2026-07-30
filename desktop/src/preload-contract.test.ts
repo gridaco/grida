@@ -20,6 +20,9 @@ describe("Desktop preload agent seam", () => {
     expect(preloadSource).toContain("protocol: DESKTOP_BRIDGE_PROTOCOL");
     expect(preloadSource).toContain("native:");
     expect(preloadSource).toContain("scratch_seed_base64: true");
+    expect(preloadSource).toContain(
+      'scratch_binary_tools: process.platform !== "win32"'
+    );
     expect(preloadSource).not.toContain("agentServer:");
   });
 

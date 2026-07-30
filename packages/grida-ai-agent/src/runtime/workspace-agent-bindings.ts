@@ -38,7 +38,11 @@ import {
   SCAN_MAX_DEPTH,
   SCAN_MAX_FILES,
 } from "@grida/daemon/server";
-import type { Workspace, WorkspaceRegistry } from "@grida/daemon/server";
+import type {
+  ShellExecutor,
+  Workspace,
+  WorkspaceRegistry,
+} from "@grida/daemon/server";
 import type { ProviderHttp } from "../providers/http";
 import type { RunCommandApprovalInput } from "../tools";
 
@@ -114,21 +118,24 @@ export async function createWorkspaceAgentBindings(
      */
     secrets_root?: string;
     /**
-     * GRIDA-SEC-004 — fail-closed shell gate. When falsy (the default), the
-     * `command` capability is NOT returned, so `run_command` never enters the
-     * tool registry and the model cannot run a shell. The host sets this true
-     * only when an OS sandbox confines the process tree (srt) or it has
-     * explicitly opted into an unsandboxed shell. "No containment ⇒ no shell."
+     * GRIDA-SEC-004 — host-owned finite-command capability. When absent,
+     * `run_command` is withheld. A Desktop host supplies an OS-confined
+     * executor; an explicitly unsandboxed host may supply the raw runner.
      */
-    shell_execution_allowed?: boolean;
+    shell_executor?: ShellExecutor;
+    /** Register each live command with the owning turn's settlement barrier. */
+    track_command_execution?: (task: Promise<unknown>) => void;
     /**
      * The session's scratch dir (WG `scratch.md`): a per-session ephemeral
      * working area the shell may `cd`/write into though it is NOT a workspace
-     * (S5). Threaded onto the command backend as an additional allowed cwd root
-     * and surfaced on the returned `command` binding so the agent can be told
-     * its path. Absent ⇒ no scratch reach (the command stays workspace-only).
+     * (S5). Threaded into the exact command scope and surfaced on the returned
+     * `command` binding so the agent can be told its path. Absent ⇒ no scratch
+     * reach (the command stays workspace-only).
      */
     scratch_dir?: string;
+    /** Shared scratch base threaded into the executor scope so the host can
+     * deny every sibling session root while allowing this session's scratch. */
+    scratch_base?: string;
     /**
      * The host's `SecretsStore` (BYOK keys). Needed to build the image
      * generator (`generate_image`); credentials never leave the package. Absent
@@ -197,6 +204,10 @@ export async function createWorkspaceAgentBindings(
     workspace && deps.scratch_dir
       ? await realpath(deps.scratch_dir).catch(() => deps.scratch_dir!)
       : undefined;
+  const scratchBase =
+    workspace && deps.scratch_base
+      ? await realpath(deps.scratch_base).catch(() => deps.scratch_base!)
+      : undefined;
   // GRIDA-SEC-004 — the workspace-bound agent fs refuses no-clobber writes
   // (`.git`, lockfiles, rc files, …). The standalone/client-resolved fs gets no
   // guard, so its behavior is unchanged.
@@ -224,33 +235,35 @@ export async function createWorkspaceAgentBindings(
   );
   await fs.hydrate();
   const todos = new AgentTodos();
-  // GRIDA-SEC-004 fail-closed: only wire shell execution when the host
-  // affirmed containment (or an explicit unsandboxed opt-in). Otherwise the
-  // workspace still gets fs + todos, but no `run_command`.
+  // GRIDA-SEC-004 fail-closed: only wire shell execution when the host supplied
+  // a finite-command capability. Otherwise the workspace still gets fs + todos,
+  // but no `run_command`.
   const mode = req.mode ?? AGENT_DEFAULT_MODE;
   const command =
-    workspace && req.workspace_root && deps.shell_execution_allowed
+    workspace && req.workspace_root && deps.shell_executor
       ? {
-          backend: createAgentCommandBackend(
-            deps.workspace_registry,
-            deps.secrets_root ? [deps.secrets_root] : [],
-            // Scratch is a sanctioned cwd root though it is not a workspace (S5).
-            scratchDir ? [scratchDir] : [],
+          backend: createAgentCommandBackend({
+            workspace_root: workspace.root,
+            scratch_root: scratchDir,
+            scratch_base: scratchBase,
+            protected_read_roots: deps.secrets_root ? [deps.secrets_root] : [],
+            executor: deps.shell_executor,
             // Flush the agent fs's pending writes before a command runs, so a
             // script the agent just wrote via write_file is on disk when the
             // shell reads it (closes the debounced-write vs immediate-read race).
-            () => fs.flush(),
+            before_run: () => fs.flush(),
             // Tool calls in one model step may execute concurrently. Share the
             // fs FIFO across the entire command so call order, persistence, and
             // subsequent operation-time reads agree.
-            (action) => fs.runExclusive(action)
-          ),
-          default_workdir: req.workspace_root,
+            run_exclusive: (action) => fs.runExclusive(action),
+            track_execution: deps.track_command_execution,
+          }),
+          default_workdir: workspace.root,
           scratch_dir: scratchDir,
           // Supervised gate (RFC `permission modes`, Phase 2). In `accept-edits`
-          // a non-read-only command pauses for Allow/Deny (the tool's
-          // `needsApproval`); a read-only inspection command still auto-runs. In
-          // `auto` the predicate is absent — every command runs without asking.
+          // a command pauses unless it is read-only or a narrowly constrained
+          // scratch-local copy/move. In `auto` the predicate is absent — every
+          // command runs without asking.
           needs_approval:
             mode === "accept-edits"
               ? (input: RunCommandApprovalInput) =>

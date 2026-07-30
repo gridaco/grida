@@ -192,6 +192,11 @@ export async function runAgent(
     library?: boolean;
     /** In-process provider HTTP. Used here only for AI SDK URL-part downloads. */
     provider_http?: ProviderHttp;
+    /**
+     * Register a finite command with the owning runtime turn's terminal
+     * settlement. Omitted by callers that do not own a run registry.
+     */
+    track_command_execution?: (task: Promise<unknown>) => void;
   }
 ): Promise<Response> {
   // Wire bindings when the request carries workspace context OR host-authorized
