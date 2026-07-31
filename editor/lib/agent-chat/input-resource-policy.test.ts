@@ -245,14 +245,14 @@ describe("InputResourcePolicy.CURRENT", () => {
   });
 
   it.each([
-    { name: "segment.ts", mimeType: undefined },
     { name: "segment.ts", mimeType: "video/mp2t" },
+    { name: "report.txt", mimeType: "application/pdf" },
   ])(
-    "does not infer TypeScript text safety from $name with MIME $mimeType",
+    "does not override explicit binary MIME $mimeType from $name",
     ({ name, mimeType }) => {
       const decision = InputResourcePolicy.decide(
         resource({
-          id: mimeType ?? "bare-ts",
+          id: mimeType,
           name,
           mimeType,
           available: { bytes: true },
@@ -276,31 +276,34 @@ describe("InputResourcePolicy.CURRENT", () => {
     }
   );
 
-  it("accepts .ts as structured text with an explicit TypeScript MIME", () => {
-    const decision = InputResourcePolicy.decide(
-      resource({
-        id: "typescript",
-        name: "source.ts",
-        mimeType: "application/typescript",
-        available: { bytes: true },
-      }),
-      {
-        ...capable,
-        attachment: {
-          ...capable.attachment,
-          scratch: {
-            ...capable.attachment.scratch!,
-            binaryTools: false,
+  it.each([undefined, "application/typescript", "text/typescript"])(
+    "accepts .ts as structured text with MIME %s",
+    (mimeType) => {
+      const decision = InputResourcePolicy.decide(
+        resource({
+          id: mimeType ?? "bare-ts",
+          name: "source.ts",
+          mimeType,
+          available: { bytes: true },
+        }),
+        {
+          ...capable,
+          attachment: {
+            ...capable.attachment,
+            scratch: {
+              ...capable.attachment.scratch!,
+              binaryTools: false,
+            },
           },
-        },
-      }
-    );
+        }
+      );
 
-    expect(decision).toMatchObject({
-      status: "accept",
-      route: { kind: "attachment", via: "scratch", from: "bytes" },
-    });
-  });
+      expect(decision).toMatchObject({
+        status: "accept",
+        route: { kind: "attachment", via: "scratch", from: "bytes" },
+      });
+    }
+  );
 
   it("falls back to provider-only image delivery without session scratch", () => {
     const decision = InputResourcePolicy.decide(

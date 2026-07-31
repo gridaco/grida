@@ -481,7 +481,9 @@ export namespace InputResourcePolicy {
       return false;
     }
 
-    return !/\.(?:c|cc|cpp|css|csv|go|h|hpp|html?|ini|java|js|jsx|json|jsonl|md|mdx|mjs|py|rb|rs|sh|sql|svg|toml|tsx|txt|xml|ya?ml)$/i.test(
+    if (mime) return true;
+
+    return !/\.(?:c|cc|cpp|css|csv|go|h|hpp|html?|ini|java|js|jsx|json|jsonl|md|mdx|mjs|py|rb|rs|sh|sql|svg|toml|ts|tsx|txt|xml|ya?ml)$/i.test(
       resource.name
     );
   }
