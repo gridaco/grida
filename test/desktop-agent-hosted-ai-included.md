@@ -7,7 +7,7 @@ tags: [hosted-ai, no-byok, billing, credits, token, degraded-mode, sandbox]
 status: untested
 severity: high
 date: 2026-07-03
-updated: 2026-07-03
+updated: 2026-07-31
 automatable: false
 covered_by:
   - editor/lib/desktop/gg-session.test.ts
@@ -45,10 +45,10 @@ backstop for anything in flight.
    set). Remove all BYOK keys in desktop Settings. Sign in. Seed org
    credits (web `/insiders/billing`, complimentary commit).
 2. In the workspace agent pane, pick a catalog model (e.g. GPT-5.4
-   Mini — the model picker shows "Grida — included") and send a prompt.
+   Mini under the "Grida" provider group) and send a prompt.
 3. Expected: the reply streams; the sidecar log shows
    `providerId=gg kind=gg`; the settings Credits card balance
-   drops after the run.
+   drops after the metered run. No plan-included-credit claim appears.
 4. Add an OpenRouter key and send again. Expected: the run uses
    `providerId=openrouter` (BYOK wins implicitly).
 5. Remove the key; generate in the Images playground. Expected: hosted

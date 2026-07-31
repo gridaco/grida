@@ -39,7 +39,8 @@ type CreditsState =
 const PLAN_LABELS: Record<ReadySummary["plan"], string> = {
   free: "Free",
   pro: "Pro",
-  team: "Team",
+  team: "Team (legacy)",
+  custom: "Custom",
 };
 
 const BLOCKED_HINTS: Record<

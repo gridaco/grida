@@ -3,7 +3,7 @@ name: ai-models
 description: >
   Research, compare, and update AI model configurations.
   Covers text model tiers, image and video generation models, image tool models,
-  pricing data sourcing, and the budget/rate-limit system.
+  pricing data sourcing, and provider-cost metering against prepaid org credit.
   Use when bumping model versions, adding new models, updating pricing, or
   auditing model specs against provider documentation.
 ---
@@ -16,7 +16,7 @@ description: >
 - Adding a new image/video generation model or provider (Vercel gateway, Replicate, fal.ai)
 - Updating pricing data (per-token, per-image flat, per-image tiered, per-second)
 - Verifying model specs (context window, output limit, cost) against providers
-- Auditing the budget/rate-limit system
+- Auditing hosted usage metering against prepaid organization credit
 
 ---
 
@@ -27,8 +27,9 @@ description: >
 | `packages/grida-ai-models/src/models.ts`   | Central catalogue. Sole export is the `models` namespace: `models.text` (`ModelSpec`, `catalog`, `byTier`, `modelSpecById`), `models.image`, `models.audio`, `models.video`, `models.image_tools` |
 | `packages/grida-ai-models/src/tiers.ts`    | `ModelTier` set + `TIER_MODEL_IDS` (type-uses `models.text.CatalogId` from `models.ts`)                                                                                                           |
 | `editor/lib/ai/models.ts`                  | AI Gateway + BYOK provider seam (catalogue is re-exported from `@grida/ai-models`)                                                                                                                |
-| `editor/lib/ai/ai.ts`                      | `toMills()` + Replicate call shapes; re-aggregates catalogue under `models.*`                                                                                                                     |
-| `editor/app/(api)/private/ai/ratelimit.ts` | Budget enforcement (Upstash sliding window, mills)                                                                                                                                                |
+| `editor/lib/ai/ai.ts`                      | `toMills()` + Replicate call shapes; re-aggregates the shared catalogue under `ai.*`                                                                                                              |
+| `editor/lib/ai/server.ts`                  | AI seam: prepaid-credit gate, provider call, and post-flight usage ingest                                                                                                                         |
+| `editor/lib/billing/metronome.ts`          | Organization credit entitlement, cached balance gate, and Metronome usage ledger                                                                                                                  |
 | `editor/app/(www)/(ai)/ai/models/page.tsx` | Public models catalog page                                                                                                                                                                        |
 | `docs/models/index.md`                     | User-facing models & pricing documentation                                                                                                                                                        |
 
@@ -120,7 +121,7 @@ per_token         — charged by token (e.g. Google Gemini)
 ### Fields per model
 
 - `pricing` — real provider data, one of the three types above
-- `avg_cost_usd` — rate limiter budget cost only, not displayed to users. Mid-tier for tiered, flat rate for flat, conservative estimate for per-token.
+- `avg_cost_usd` — fallback billable-cost estimate, not displayed to users. Mid-tier for tiered, flat rate for flat, conservative estimate for per-token.
 - `min_width`, `max_width`, `min_height`, `max_height`, `sizes` — dimension constraints
 - Add new model IDs to the `ImageModelId` type union
 
@@ -147,7 +148,7 @@ Cards catalogue the **image-to-video** route only (canvas-relevant; Grok's sole 
 
 ### Cost
 
-`avg_cost_usd` (per binding) = its rate at the model's default `(resolution, audio)` × default duration. **Video dwarfs image costs** (Veo 3.1 ≈ `$3.20` for an 8s 1080p clip) and a single clip exceeds the current `$1.00`/window budget — revisit `ratelimit.ts` before wiring video into the editor.
+`avg_cost_usd` (per binding) = its rate at the model's default `(resolution, audio)` × default duration. **Video dwarfs image costs** (Veo 3.1 ≈ `$3.20` for an 8s 1080p clip). The current prepaid-credit gate checks a global balance floor, not an estimated per-request ceiling, so audit metering and bounded-overspend exposure before serving a new video route.
 
 ### Pricing (lives on the binding)
 
@@ -172,15 +173,22 @@ Cards catalogue the **image-to-video** route only (canvas-relevant; Grok's sole 
 
 Live in `models.image_tools.models` in `packages/grida-ai-models/src/models.ts`. Flat `cost_usd` pricing via Replicate.
 
-## Budget System
+## Hosted Usage Metering
 
-Upstash sliding-window rate limiting. Unit: **mills** (1 mill = $0.001 USD).
+Grida Gateway (GG) usage is metered against the organization's prepaid AI
+credit. Unit: **mills** (1 mill = $0.001 USD).
 
-- Budget: `1000` mills = $1.00 per 30-day window
-- Configured in `editor/app/(api)/private/ai/ratelimit.ts`
-- `ai.toMills(cost_usd)` converts USD to mills
-
-Currently deducts `avg_cost_usd` before generation. TODO: switch to real cost tracking post-generation.
+- `ai.toMills(cost_usd)` converts a provider cost to the integer usage unit.
+- The AI seam checks the organization's cached credit entitlement before the
+  provider call and ingests usage into Metronome after the call.
+- Text uses observed token usage. Media routes use verified catalogue pricing
+  for the served request, with `avg_cost_usd` only where the provider does not
+  expose a more exact billable dimension.
+- The current gate is a global balance floor. There is no per-model
+  provider-cost budget; do not invent one when updating a card.
+- BYOK text calls bypass GG metering because the user pays the provider
+  directly. Hosted media remains billable unless its route explicitly uses a
+  supported BYOK provider.
 
 ## After Any Update
 

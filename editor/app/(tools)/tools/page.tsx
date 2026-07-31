@@ -19,9 +19,9 @@ import { FigmaLogoIcon } from "@radix-ui/react-icons";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Grida Tools | Free Developer & Design Tools",
+  title: "Grida Tools | Developer, Design & AI Utilities",
   description:
-    "Free tools for developers and designers. Remove image backgrounds, generate server secrets, blob designs, halftone patterns, format phone numbers, inspect Figma files, and test AI image models.",
+    "Free design and developer utilities, plus AI tools billed from prepaid organization credit. Generate secrets, blobs, halftones, and more.",
   keywords: [
     "free tools",
     "developer tools",
@@ -39,9 +39,9 @@ export const metadata: Metadata = {
     "matrix visualizer",
   ],
   openGraph: {
-    title: "Grida Tools | Free Developer & Design Tools",
+    title: "Grida Tools | Developer, Design & AI Utilities",
     description:
-      "Free tools for developers and designers. Remove image backgrounds, generate server secrets, blob designs, halftone patterns, format phone numbers, inspect Figma files, and test AI image models.",
+      "Free design and developer utilities, plus AI tools billed from prepaid organization credit.",
     type: "website",
     url: "https://grida.co/tools",
   },
@@ -109,7 +109,7 @@ const categories: { name: string; tools: Tool[] }[] = [
       {
         title: "Remove Background",
         description:
-          "Remove image backgrounds with AI. Free monthly budget — sign in to use.",
+          "Remove image backgrounds with AI using prepaid organization credit. Sign in to use.",
         link: "/tools/remove-bg",
         icon: EraserIcon,
       },
@@ -134,7 +134,7 @@ export default function ToolsPage() {
               Grida Tools
             </h1>
             <p className="text-muted-foreground text-sm font-light">
-              Free tools for developers and designers
+              Free design and developer utilities, plus prepaid AI tools
             </p>
           </header>
 

@@ -15,7 +15,7 @@ import { Matrix } from "@/www/ui/matrix";
 export const metadata: Metadata = {
   title: "AI Music Generator — Powered by Google Lyria 3 | Grida",
   description:
-    "Generate original music with Google Lyria 3 and Lyria 3 Pro. Turn a text prompt or reference image into 48kHz stereo audio. Free monthly budget — no credit card.",
+    "Generate original music with Google Lyria 3 and Lyria 3 Pro. Turn a text prompt or reference image into 48kHz stereo audio using prepaid organization credit.",
   keywords: [
     "ai music generator",
     "ai music",
@@ -26,7 +26,6 @@ export const metadata: Metadata = {
     "image to music",
     "ai song generator",
     "music generation api",
-    "free ai music",
   ],
   alternates: {
     canonical: "https://grida.co/ai/music",
@@ -34,7 +33,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "AI Music Generator — Powered by Google Lyria 3 | Grida",
     description:
-      "Generate original music with Lyria 3 and Lyria 3 Pro. Text-to-music and image-to-music, free to try.",
+      "Generate original music with Lyria 3 and Lyria 3 Pro using prepaid organization credit.",
     type: "website",
     url: "https://grida.co/ai/music",
   },
@@ -42,7 +41,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "AI Music Generator — Powered by Google Lyria 3 | Grida",
     description:
-      "Generate original music with Lyria 3 and Lyria 3 Pro. Free to try.",
+      "Generate original music with Lyria 3 and Lyria 3 Pro using prepaid organization credit.",
   },
 };
 
@@ -58,8 +57,8 @@ const FAQS: { q: string; a: string }[] = [
     a: "Lyria 3 generates 30-second clips in seconds. Lyria 3 Pro produces full-length tracks up to roughly three minutes with verses, choruses, and bridges.",
   },
   {
-    q: "Do I have to pay?",
-    a: "No. Sign in with Google and you get a free monthly budget that covers many generations. You only need to upgrade if you go beyond it.",
+    q: "How is music generation billed?",
+    a: "Grida-hosted music generation uses prepaid credit purchased separately for your organization. Each generation deducts the model cost from that balance; pricing plans do not include recurring AI credit.",
   },
   {
     q: "Can I use the audio commercially?",
@@ -98,7 +97,6 @@ export default function MusicLandingPage() {
     url: "https://grida.co/ai/music",
     description:
       "Generate music with Google Lyria 3 and Lyria 3 Pro from a text prompt or reference image.",
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     creator: { "@type": "Organization", name: "Grida" },
   };
 

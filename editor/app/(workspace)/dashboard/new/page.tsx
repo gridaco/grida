@@ -1,52 +1,27 @@
-import { createClient } from "@/lib/supabase/server";
+// GRIDA-EE: billing — compatibility shim for retired pricing intents.
+
 import { redirect } from "next/navigation";
 
-const prices = {
-  free: {
-    monthly: false,
-    yearly: false,
-  },
-  // TODO: get from db
-  pro: {
-    monthly: "price_1P10PJAvR3geCh5rTIJJ4S0G",
-    yearly: "price_1P10OgAvR3geCh5rMkl3O0GJ",
-  },
-  team: {
-    monthly: "price_1P10QUAvR3geCh5rLrRd7wuM",
-    yearly: "price_1P10QKAvR3geCh5r4kTphqOy",
-  },
-} as const;
-
 type SearchParams = {
-  plan?: keyof typeof prices;
-  period?: "monthly" | "yearly";
+  plan?: string;
+  period?: string;
 };
 
-export default async function OnboardWithNewFormPage({
+export default async function LegacyPricingIntentPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
   const { plan, period } = await searchParams;
-  const price = prices[plan || "free"][period || "monthly"];
 
-  const client = await createClient();
-
-  const { data: auth } = await client.auth.getUser();
-  // if no auth, sign in, redirect back here
-  if (!auth.user) {
-    const search = new URLSearchParams(await searchParams).toString();
-    const uri = encodeURIComponent("/dashboard/new?" + search);
-    redirect("/sign-in?redirect_uri=" + uri);
+  // Compatibility for old public pricing links. New links go directly to the
+  // universal billing route, which handles auth and organization selection.
+  if (!plan || plan === "free") redirect("/dashboard");
+  if (plan === "pro" && (!period || period === "monthly")) {
+    redirect("/_/settings/billing/upgrade");
   }
 
-  // FIXME:
-  redirect("/dashboard");
-
-  if (price) {
-    // if has price, create checkout session
-    //
-  }
-
-  return <main></main>;
+  // Retired or malformed offers must never be silently substituted with the
+  // current paid offer.
+  redirect("/pricing");
 }

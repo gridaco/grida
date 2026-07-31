@@ -227,10 +227,11 @@ API key. It presents two contract styles:
 - **Image and video: Grida-native generation surfaces** — request/response
   shapes owned by our own protocol, returning inline results.
 
-### 3. Metering (deferred to the billing rail)
+### 3. Metering against prepaid organization credit
 
-Every hosted call runs the existing server-side AI seam, so the gateway
-carries **no billing logic of its own**:
+Every GG call is metered against the organization's prepaid AI credit. It runs
+the existing server-side AI seam, so the gateway carries **no billing logic of
+its own**:
 
 - **Pre-flight gate** — the org's entitlement is read before the upstream
   call opens. No credit ⇒ a hard, pre-stream refusal. There is never a
@@ -322,10 +323,11 @@ later, and the honest risks:
   Bounded by per-step request granularity; standard industry behavior.
 - **Org-membership revocation lags by up to a token lifetime** (~15 min) —
   an accepted consequence of stateless, expiry-based revocation.
-- **Plan-included credit grants are not wired** (billing Phase 5) — today
-  only explicit top-ups create balance, so the revenue path for bundled
-  AI is a prerequisite tracked in [AI Credits](./billing/ai-credits.md), not
-  here.
+- **No recurring plan-credit grant.** Free and Pro include no recurring AI
+  credit; GG spends prepaid organization credit purchased separately. Adding
+  a plan grant would require a new commercial decision before any product or
+  implementation design. The earlier grant concept remains future research in
+  [AI Credits](./billing/ai-credits.md), not a deferred shipping phase.
 - **ChatGPT stable activation** — subscription-first onboarding and sticky
   provider-qualified sessions are implemented experimentally. A stable
   legal/support contract with OpenAI, including the native client and

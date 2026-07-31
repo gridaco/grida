@@ -20,7 +20,7 @@ export function PricingCard({
   price: {
     primary: string;
     secondary?: string;
-    /** Small muted note under price (e.g. "Starts from $599/mo") */
+    /** Optional small muted note under the primary price. */
     note?: string;
   };
   excerpt: string;
@@ -36,7 +36,7 @@ export function PricingCard({
         bg-background
         dark:bg-muted/50
         flex-1 flex flex-col p-6 border gap-4 rounded-lg
-        min-h-[480px] md:h-[570px]
+        min-h-[420px]
         hover:scale-[1.02]
         duration-300
         transition-all
@@ -82,11 +82,17 @@ export function PricingCard({
 export function PricingCardButton({
   children,
   inverted,
+  asChild,
 }: React.PropsWithChildren<{
   inverted?: boolean;
+  asChild?: boolean;
 }>) {
   return (
-    <Button variant={inverted ? "default" : "outline"} className="w-full">
+    <Button
+      asChild={asChild}
+      variant={inverted ? "default" : "outline"}
+      className="w-full"
+    >
       {children}
     </Button>
   );

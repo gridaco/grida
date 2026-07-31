@@ -6,13 +6,13 @@
 import _catalog from "@grida/ai-models";
 
 export namespace ai {
+  // GRIDA-EE: billing — usage denomination for prepaid organization credit.
   /**
    * Convert a USD cost to mills (thousandths of a dollar).
    *
-   * The Upstash rate limiter requires integer tokens. We use mills as the
-   * budget unit so that 1000 mills = $1.00. All model cards store
-   * {@link cost_usd}; this helper converts to the integer unit consumed
-   * by the rate limiter.
+   * The billing seam meters provider cost in integer mills, where 1000 mills
+   * equals $1.00. Call sites use this helper when recording usage against an
+   * organization's prepaid credit.
    */
   export function toMills(cost_usd: number): number {
     return Math.ceil(cost_usd * 1000);

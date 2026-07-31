@@ -1,3 +1,5 @@
+// GRIDA-EE: billing — intercepted standard Pro upgrade entry point.
+
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import UpgradeView from "../../upgrade/_view";
@@ -17,16 +19,17 @@ export default async function UpgradeModalIntercept({
 
   const { data: org } = await client
     .from("organization")
-    .select("id, name")
+    .select("id, name, is_enterprise")
     .eq("name", organization_name)
     .single();
 
   if (!org) return notFound();
+  if (org.is_enterprise) return redirect("/contact");
 
   return (
     <BillingModal
-      title="Plans"
-      description="Pick a plan that scales with your team."
+      title="Pro"
+      description="Review Grida's monthly subscription for this organization."
     >
       <UpgradeView orgId={org.id} orgName={org.name} embedded />
     </BillingModal>

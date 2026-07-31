@@ -1,5 +1,6 @@
 "use client";
 
+// GRIDA-EE: billing — insiders QA harness for prepaid AI credit.
 // Insiders dev harness for billing.
 //
 // Two-column layout:
@@ -770,7 +771,7 @@ export default function BillingDevView() {
                 <div className="space-y-2 border border-border rounded p-3">
                   <div className="text-xs font-semibold">Top-up</div>
                   <div className="text-xs text-muted-foreground">
-                    Real Stripe charge. $5–$1000. Drains last (TOPUP, prio 90).
+                    Real Stripe charge. $10–$500. Drains last (TOPUP, prio 90).
                   </div>
                   <DollarInput
                     value={topUpAmount}

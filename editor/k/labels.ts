@@ -13,7 +13,7 @@ export namespace Labels {
   const plan_labels = {
     free: "Free",
     pro: "Pro",
-    team: "Team",
+    team: "Team (legacy)",
   } as const satisfies Record<PlanTier, string>;
 
   export function doctype(dt: GDocumentType) {
@@ -21,7 +21,7 @@ export namespace Labels {
   }
 
   export function planTier(plan: PlanTier, is_enterprise = false): string {
-    if (is_enterprise) return "Enterprise";
+    if (is_enterprise) return "Custom";
     return plan_labels[plan];
   }
 

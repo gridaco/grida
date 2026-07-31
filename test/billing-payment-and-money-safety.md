@@ -4,13 +4,18 @@ title: Payment failure, dunning, fraud, topups, refunds
 module: billing
 area: payment
 tags: [stripe, dunning, past_due, fraud, abuse, money-safety, topup, refund]
-status: untested
+status: deprecated
 severity: critical
 date: 2026-05-05
-updated: 2026-05-05
+updated: 2026-07-31
 automatable: partial
 covered_by: []
 ---
+
+> Deprecated on 2026-07-31. This composite suite assumes the retired plan and
+> recurring-credit model and is not current acceptance criteria. Use the
+> approved billing contract in `docs/wg/platform/billing/plans.md` and add new
+> one-behavior-per-file cases under `test/`.
 
 ## Behavior
 

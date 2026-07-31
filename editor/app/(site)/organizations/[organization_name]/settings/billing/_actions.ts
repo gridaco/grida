@@ -1,5 +1,7 @@
 "use server";
 
+// GRIDA-EE: billing — organization billing reads and Stripe mutations.
+
 // Reads use `createClient()` (user-authed, RLS-aware) against `v_billing_*`.
 // Mutations and Stripe-side reads go through `service_role.workspace`.
 
@@ -23,16 +25,27 @@ import {
   TOPUP_MIN_CENTS,
   totalChargeForCredit,
 } from "@/lib/billing/fees";
-import {
-  price_catalogue_id,
-  type Interval,
-  type PaidPlanId,
-  type PlanId,
-} from "@/lib/billing/plans";
+import { BillingOffers } from "@/lib/billing/offers";
+import type { Interval, PaidPlanId, PlanId } from "@/lib/billing/plans";
 import { headers } from "next/headers";
 
 function asPlanId(raw: string | null | undefined): PlanId {
   return raw === "pro" || raw === "team" ? raw : "free";
+}
+
+function requireSaleableOffer(
+  plan: unknown,
+  interval: unknown
+): BillingOffers.Saleable {
+  const offer = BillingOffers.find(plan, interval);
+  if (!offer) {
+    throw new BillingError(
+      "This billing offer is no longer available.",
+      "offer_retired",
+      410
+    );
+  }
+  return offer;
 }
 
 async function requireUserId(): Promise<string> {
@@ -42,6 +55,25 @@ async function requireUserId(): Promise<string> {
     throw new BillingError("unauthorized", "unauthorized", 401);
   }
   return data.user.id;
+}
+
+async function assertSelfServiceBillingAllowed(org_id: number): Promise<void> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("organization")
+    .select("is_enterprise")
+    .eq("id", org_id)
+    .single();
+  if (error || !data) {
+    throw new BillingError("organization not found", "not_found", 404);
+  }
+  if (data.is_enterprise) {
+    throw new BillingError(
+      "Custom plan billing is managed directly with Grida.",
+      "custom_managed",
+      409
+    );
+  }
 }
 
 async function getOrigin(): Promise<string> {
@@ -148,6 +180,7 @@ export type InvoicesPayload = {
   past: PastInvoice[];
   payment_method: PaymentMethodSummary;
   billing_email: string | null;
+  has_stripe_customer: boolean;
 };
 
 const TTL_MS = 30_000;
@@ -168,6 +201,7 @@ export async function listInvoices(org_id: number): Promise<InvoicesPayload> {
       past: [],
       payment_method: null,
       billing_email: null,
+      has_stripe_customer: false,
     };
     invoicesCache.set(org_id, { at: now, data: empty });
     return empty;
@@ -227,6 +261,7 @@ export async function listInvoices(org_id: number): Promise<InvoicesPayload> {
     past: pastList,
     payment_method,
     billing_email,
+    has_stripe_customer: true,
   };
   invoicesCache.set(org_id, { at: now, data });
   return data;
@@ -292,8 +327,9 @@ export async function startPaymentMethodUpdate(
 // Existing-subscription mutation via Stripe Portal's `flow_data` deep link.
 // Server picks the target price; Stripe shows a single confirm page (no
 // plan picker) with the prorated total. After completion, redirects back.
-// Used for paid→paid transitions: plan switch (Pro↔Team) and/or interval
-// switch (monthly↔annual).
+// Used to move an existing paid subscription onto a currently saleable
+// offer. Historical Team and annual subscriptions remain readable, but can
+// only target an offer accepted by `BillingOffers`.
 // ---------------------------------------------------------------------------
 
 export type PlanChangeConfirmResult = { portal_url: string };
@@ -309,20 +345,8 @@ export async function startPlanChangeConfirm(
   const user_id = await requireUserId();
   await assertOrgOwner(user_id, org_id);
 
-  if (params.plan !== "pro" && params.plan !== "team") {
-    throw new BillingError(
-      `plan must be 'pro' or 'team' (got '${params.plan}').`,
-      "invalid_plan",
-      400
-    );
-  }
-  if (params.interval !== "month" && params.interval !== "year") {
-    throw new BillingError(
-      `interval must be 'month' or 'year' (got '${params.interval}').`,
-      "invalid_interval",
-      400
-    );
-  }
+  const offer = requireSaleableOffer(params.plan, params.interval);
+  await assertSelfServiceBillingAllowed(org_id);
 
   const origin = await getOrigin();
   const return_url = assertAllowedRedirect(params.return_url, origin);
@@ -359,7 +383,7 @@ export async function startPlanChangeConfirm(
     );
   }
 
-  const id = price_catalogue_id(params.plan, params.interval);
+  const id = offer.catalogue_id;
   const cat = await getCatalogueStripeIds(id);
   if (!cat) {
     throw new BillingError(
@@ -430,21 +454,9 @@ export async function startSubscribeCheckout(
   const user_id = await requireUserId();
   await assertOrgOwner(user_id, org_id);
 
-  if (params.plan !== "pro" && params.plan !== "team") {
-    throw new BillingError(
-      `plan must be 'pro' or 'team' (got '${params.plan}').`,
-      "invalid_plan",
-      400
-    );
-  }
   const interval: Interval = params.interval ?? "month";
-  if (interval !== "month" && interval !== "year") {
-    throw new BillingError(
-      `interval must be 'month' or 'year' (got '${params.interval}').`,
-      "invalid_interval",
-      400
-    );
-  }
+  const offer = requireSaleableOffer(params.plan, interval);
+  await assertSelfServiceBillingAllowed(org_id);
 
   if (await getActivePaidSubscription(org_id)) {
     throw new BillingError(
@@ -458,7 +470,7 @@ export async function startSubscribeCheckout(
   const success_url = assertAllowedRedirect(params.success_url, origin);
   const cancel_url = assertAllowedRedirect(params.cancel_url, origin);
 
-  const id = price_catalogue_id(params.plan, interval);
+  const id = offer.catalogue_id;
   const cat = await getCatalogueStripeIds(id);
   if (!cat) {
     throw new BillingError(
@@ -482,7 +494,7 @@ export async function startSubscribeCheckout(
   // refund manually), not the customer. Closure tracked in GRIDA-60.
 
   const customer = await resolveOrCreateStripeCustomer(org_id);
-  const idempotencyKey = `subscribe:${org_id}:${params.plan}:${interval}:${Math.floor(Date.now() / 60000)}`;
+  const idempotencyKey = `subscribe:${org_id}:${offer.id}:${Math.floor(Date.now() / 60000)}`;
 
   const session = await stripe.checkout.sessions.create(
     {
@@ -492,8 +504,8 @@ export async function startSubscribeCheckout(
       subscription_data: {
         metadata: {
           grida_organization_id: String(org_id),
-          grida_plan: params.plan,
-          grida_interval: interval,
+          grida_plan: offer.plan,
+          grida_interval: offer.interval,
         },
       },
       success_url,
@@ -501,8 +513,9 @@ export async function startSubscribeCheckout(
       metadata: {
         grida_organization_id: String(org_id),
         kind: "subscribe",
-        plan: params.plan,
-        interval,
+        offer_id: offer.id,
+        plan: offer.plan,
+        interval: offer.interval,
       },
       allow_promotion_codes: true,
     },
@@ -530,6 +543,7 @@ export async function startCancelSubscription(
 ): Promise<PortalFlowResult> {
   const user_id = await requireUserId();
   await assertOrgOwner(user_id, org_id);
+  await assertSelfServiceBillingAllowed(org_id);
 
   const origin = await getOrigin();
   const return_url = assertAllowedRedirect(params.return_url, origin);
@@ -589,6 +603,7 @@ export async function startCancelSubscription(
 export async function resumeSubscription(org_id: number): Promise<void> {
   const user_id = await requireUserId();
   await assertOrgOwner(user_id, org_id);
+  await assertSelfServiceBillingAllowed(org_id);
 
   const sub = await getActivePaidSubscription(org_id);
   if (!sub) {

@@ -4,13 +4,18 @@ title: Quota tracking, periods, AI gate, and usage recording
 module: billing
 area: ai
 tags: [quota, period, ai, gate, idempotency, race, provider, cost]
-status: untested
+status: deprecated
 severity: critical
 date: 2026-05-05
-updated: 2026-05-05
+updated: 2026-07-31
 automatable: partial
 covered_by: []
 ---
+
+> Deprecated on 2026-07-31. This composite suite assumes recurring plan AI
+> allowances, which the current commercial contract does not provide. Use
+> `docs/wg/platform/billing/plans.md` and add new one-behavior-per-file cases
+> under `test/`.
 
 ## Behavior
 

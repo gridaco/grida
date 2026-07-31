@@ -6,8 +6,25 @@ import PricingFAQ from "./_sections/faq";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Grida Pricing",
-  description: "Choose a plan that fits your needs.",
+  title: "Pricing — Grida",
+  description:
+    "Start free, upgrade to Grida Pro for $20 per month, or contact us for a Custom plan.",
+  alternates: {
+    canonical: "https://grida.co/pricing",
+  },
+  openGraph: {
+    title: "Pricing — Grida",
+    description:
+      "Start free, upgrade to Grida Pro for $20 per month, or contact us for a Custom plan.",
+    url: "https://grida.co/pricing",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Pricing — Grida",
+    description:
+      "Start free, upgrade to Grida Pro for $20 per month, or contact us for a Custom plan.",
+  },
 };
 
 export default function WWWPricingPage() {

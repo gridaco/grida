@@ -161,6 +161,20 @@ describe("getDesktopBillingSummary", () => {
     });
   });
 
+  it("presents a Custom agreement over the underlying Stripe plan", async () => {
+    getEntitlement.mockResolvedValue(ENTITLED);
+    tables.organization = {
+      data: { display_name: ORG.display_name, is_enterprise: true },
+      error: null,
+    };
+    tables.v_billing_subscription = { data: { plan: "pro" }, error: null };
+
+    expect(await getDesktopBillingSummary("user-1")).toMatchObject({
+      state: "ready",
+      plan: "custom",
+    });
+  });
+
   it("falls back to the slug when the org display row is unavailable", async () => {
     getEntitlement.mockResolvedValue(ENTITLED);
     tables.organization = { data: null, error: null };

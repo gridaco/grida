@@ -4,13 +4,18 @@ title: Subscription lifecycle, seats, and Stripe consistency
 module: billing
 area: subscription
 tags: [stripe, subscription, seats, webhook, consistency, money-safety]
-status: untested
+status: deprecated
 severity: critical
 date: 2026-05-05
-updated: 2026-05-05
+updated: 2026-07-31
 automatable: partial
 covered_by: []
 ---
+
+> Deprecated on 2026-07-31. This composite suite assumes saleable Team and
+> annual offers plus seat-scaled plan allowances. Use the approved contract in
+> `docs/wg/platform/billing/plans.md` and add new one-behavior-per-file cases
+> under `test/`.
 
 ## Behavior
 

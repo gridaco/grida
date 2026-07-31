@@ -1,18 +1,23 @@
 // Idempotent substrate setup for Stripe (test mode) and Metronome.
+// GRIDA-EE: billing — test-only external billing substrate setup.
 // Both match-or-create by stable id; safe to re-run after `supabase db reset`.
 //
 // Env loading + the explicit confirmation prompt live in `cli.ts`. These
 // functions assume `process.env` is already populated.
 
+import type {
+  CatalogueId,
+  Interval,
+  PaidPlanId,
+} from "../../lib/billing/plans";
 import { requireEnv, requireStripeTestKey } from "./_env";
 
 // ---------------------------------------------------------------------------
 // Stripe — products + prices + Customer Portal config
 //
-// One Stripe product per plan; two prices per product (monthly + annual).
-// Annual prices encode the 20% discount in `unit_amount` (no separate
-// coupon line). Catalogue gets one row per (plan, interval) pair, keyed
-// `plan.<name>` for monthly and `plan.<name>.annual` for annual.
+// Provision only offers that are saleable now. Historical Team / annual
+// definitions remain readable through `plans.ts`, existing Stripe resources,
+// and existing catalogue rows; setup never archives or deletes them.
 // ---------------------------------------------------------------------------
 
 export async function setupStripe(): Promise<void> {
@@ -20,55 +25,48 @@ export async function setupStripe(): Promise<void> {
 
   const { stripe } = await import("../../lib/billing");
   const { service_role } = await import("../../lib/supabase/server");
-  const { PAID_PLAN_LIST, price_catalogue_id } =
-    await import("../../lib/billing/plans");
-  type Interval = "month" | "year";
-  type CatalogueId =
-    | "plan.pro"
-    | "plan.team"
-    | "plan.pro.annual"
-    | "plan.team.annual";
+  const { BillingOffers } = await import("../../lib/billing/offers");
+  const { PAID_PLANS, price_cents } = await import("../../lib/billing/plans");
+  type ProductSpec = {
+    plan: PaidPlanId;
+    name: string;
+    description: string;
+    product_grida_id: `plan.${PaidPlanId}`;
+  };
+  type PriceSpec = {
+    offer_id: string;
+    plan: PaidPlanId;
+    catalogue_id: CatalogueId;
+    interval: Interval;
+    unit_amount_cents: number;
+    nickname: string;
+  };
 
-  const PRODUCTS = Object.fromEntries(
-    PAID_PLAN_LIST.map((p) => [
-      p.id,
-      {
-        name: `Grida ${p.name}`,
-        description: `Grida ${p.name}: $${p.monthly_cents / 100}/mo or $${p.annual_cents / 100}/yr (20% off).`,
-        product_grida_id: `plan.${p.id}` as `plan.${"pro" | "team"}`,
-      },
-    ])
-  ) as Record<
-    "pro" | "team",
-    {
-      name: string;
-      description: string;
-      product_grida_id: `plan.${"pro" | "team"}`;
-    }
-  >;
+  const saleablePlans = [
+    ...new Set(BillingOffers.saleable.map((offer) => offer.plan)),
+  ];
+  const PRODUCTS: ProductSpec[] = saleablePlans.map((planId) => {
+    const plan = PAID_PLANS[planId];
+    return {
+      plan: plan.id,
+      name: `Grida ${plan.name}`,
+      description: `Grida ${plan.name} subscription.`,
+      product_grida_id: `plan.${plan.id}`,
+    };
+  });
 
-  const PRICES = PAID_PLAN_LIST.flatMap((p) => [
-    {
-      product: PRODUCTS[p.id],
-      catalogue_id: price_catalogue_id(p.id, "month") as CatalogueId,
-      interval: "month" as Interval,
-      unit_amount_cents: p.monthly_cents,
-      nickname: `${p.name} monthly`,
-    },
-    {
-      product: PRODUCTS[p.id],
-      catalogue_id: price_catalogue_id(p.id, "year") as CatalogueId,
-      interval: "year" as Interval,
-      unit_amount_cents: p.annual_cents,
-      nickname: `${p.name} annual`,
-    },
-  ]);
+  const PRICES: PriceSpec[] = BillingOffers.saleable.map((offer) => ({
+    offer_id: offer.id,
+    plan: offer.plan,
+    catalogue_id: offer.catalogue_id,
+    interval: offer.interval,
+    unit_amount_cents: price_cents(offer.plan, offer.interval),
+    nickname: `${PAID_PLANS[offer.plan].name} ${offer.interval === "month" ? "monthly" : "annual"}`,
+  }));
 
   // We list+filter rather than products.search because search is eventually
   // consistent and can miss a product we created seconds ago.
-  const ensureProduct = async (
-    p: (typeof PRODUCTS)["pro"]
-  ): Promise<string> => {
+  const ensureProduct = async (p: ProductSpec): Promise<string> => {
     const list = await stripe.products.list({ active: true, limit: 100 });
     const existing = list.data.find(
       (x) => x.metadata?.grida_billing_id === p.product_grida_id
@@ -92,7 +90,7 @@ export async function setupStripe(): Promise<void> {
 
   const ensurePrice = async (
     product_id: string,
-    spec: (typeof PRICES)[number]
+    spec: PriceSpec
   ): Promise<string> => {
     const list = await stripe.prices.list({
       product: product_id,
@@ -145,20 +143,33 @@ export async function setupStripe(): Promise<void> {
 
   // `proration_behavior=always_invoice` immediately invoices the prorated
   // difference on a price change rather than deferring to next invoice.
-  const setupPortal = async (wired: {
-    pro: {
+  const setupPortal = async (
+    wired: Array<{
       product_id: string;
-      monthly_price_id: string;
-      annual_price_id: string;
-    };
-    team: {
-      product_id: string;
-      monthly_price_id: string;
-      annual_price_id: string;
-    };
-  }): Promise<string> => {
+      price_id: string;
+    }>
+  ): Promise<string> => {
+    const portalProducts: Array<{ product: string; prices: string[] }> = [];
+    for (const offer of wired) {
+      const existing = portalProducts.find(
+        (product) => product.product === offer.product_id
+      );
+      if (existing) {
+        existing.prices.push(offer.price_id);
+      } else {
+        portalProducts.push({
+          product: offer.product_id,
+          prices: [offer.price_id],
+        });
+      }
+    }
+
     const config = {
       business_profile: { headline: "Grida billing" },
+      // Disable Stripe's shareable no-code login URL. Portal access must start
+      // from an owner-authorized, intent-scoped app action so Custom agreement
+      // lifecycle cannot bypass the server-side `custom_managed` guard.
+      login_page: { enabled: false },
       features: {
         // Every portal session we open is a deep-link `flow_data` session
         // scoped to one intent — the user never reaches the dashboard.
@@ -176,16 +187,7 @@ export async function setupStripe(): Promise<void> {
           enabled: true,
           default_allowed_updates: ["price" as const],
           proration_behavior: "always_invoice" as const,
-          products: [
-            {
-              product: wired.pro.product_id,
-              prices: [wired.pro.monthly_price_id, wired.pro.annual_price_id],
-            },
-            {
-              product: wired.team.product_id,
-              prices: [wired.team.monthly_price_id, wired.team.annual_price_id],
-            },
-          ],
+          products: portalProducts,
         },
       },
       metadata: { grida_billing_id: "portal.v1" },
@@ -213,43 +215,38 @@ export async function setupStripe(): Promise<void> {
   };
 
   console.log("[stripe] starting");
-  const [pro_product_id, team_product_id] = await Promise.all([
-    ensureProduct(PRODUCTS.pro),
-    ensureProduct(PRODUCTS.team),
-  ]);
-  const productIdFor = (p: (typeof PRODUCTS)["pro"]) =>
-    p === PRODUCTS.pro ? pro_product_id : team_product_id;
+  const productIds = new Map<PaidPlanId, string>();
+  await Promise.all(
+    PRODUCTS.map(async (product) => {
+      productIds.set(product.plan, await ensureProduct(product));
+    })
+  );
+  const productIdFor = (plan: PaidPlanId): string => {
+    const id = productIds.get(plan);
+    if (!id) throw new Error(`missing Stripe product for ${plan}`);
+    return id;
+  };
 
-  const priceIds = await Promise.all(
+  const wiredOffers = await Promise.all(
     PRICES.map(async (spec) => {
-      const id = await ensurePrice(productIdFor(spec.product), spec);
-      await writeCatalogue(spec.catalogue_id, productIdFor(spec.product), id);
-      return { catalogue_id: spec.catalogue_id, price_id: id };
+      const product_id = productIdFor(spec.plan);
+      const price_id = await ensurePrice(product_id, spec);
+      await writeCatalogue(spec.catalogue_id, product_id, price_id);
+      return {
+        offer_id: spec.offer_id,
+        plan: spec.plan,
+        catalogue_id: spec.catalogue_id,
+        product_id,
+        price_id,
+      };
     })
   );
 
-  const idByCatalogue = (id: CatalogueId) => {
-    const found = priceIds.find((p) => p.catalogue_id === id);
-    if (!found) throw new Error(`missing price for ${id}`);
-    return found.price_id;
-  };
-
-  const wired = {
-    pro: {
-      product_id: pro_product_id,
-      monthly_price_id: idByCatalogue("plan.pro"),
-      annual_price_id: idByCatalogue("plan.pro.annual"),
-    },
-    team: {
-      product_id: team_product_id,
-      monthly_price_id: idByCatalogue("plan.team"),
-      annual_price_id: idByCatalogue("plan.team.annual"),
-    },
-  };
-
-  const portal_config_id = await setupPortal(wired);
+  const portal_config_id = await setupPortal(wiredOffers);
   console.log("[stripe] done");
-  console.log(JSON.stringify({ ...wired, portal_config_id }, null, 2));
+  console.log(
+    JSON.stringify({ offers: wiredOffers, portal_config_id }, null, 2)
+  );
 }
 
 // ---------------------------------------------------------------------------

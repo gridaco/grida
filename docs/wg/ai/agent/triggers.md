@@ -216,8 +216,8 @@ Triggers run forever unless bounded. Three load-bearing bounds:
   fire-rate (e.g. "at most 10 / hour"). Excess fires are dropped
   per the queue-drop rule above. This bounds an upstream firehose.
 - **Per-account quota.** The host SHOULD cap total trigger-fired
-  turns per user per day. This bounds runaway loops and aligns with
-  product tier shapes (free / pro / team / enterprise).
+  turns per user per day. This bounds runaway loops and may align with
+  the Free, Pro, and Custom commercial contracts.
 
 Revocation paths the protocol assumes:
 
