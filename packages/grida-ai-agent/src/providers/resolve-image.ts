@@ -26,6 +26,7 @@ import { GridaGatewayImageModel } from "./gg-media";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
 import type { ProviderHttp } from "./http";
+import type { ModelCatalogStore } from "./model-catalog";
 
 type ImageProvider = models.image.ImageProvider;
 
@@ -92,15 +93,19 @@ export class ImageModelUnavailableError extends Error {
  * reads the catalog so the error message stays honest as bindings are added.
  */
 function referenceCapableProviders(
-  card: models.image.ImageModelCard
+  card: models.image.ImageModelCard,
+  view: models.snapshot.View
 ): ImageProvider[] {
-  return IMAGE_PROVIDERS.filter(
-    (p) => models.image.binding(card, p)?.references
-  );
+  return IMAGE_PROVIDERS.filter((p) => view.image.binding(card, p)?.references);
 }
 
 export type ResolveImageDeps = {
   secrets: SecretsStore;
+  /**
+   * The image catalogue to resolve against. Absent ⇒ the bundled one,
+   * which is what this file read directly before the store existed.
+   */
+  catalog?: ModelCatalogStore;
   /** Host-fed provider HTTP, resolved at the server construction edge. */
   provider_http?: ProviderHttp;
   /** Grida Cloud session (GRIDA-SEC-006) — optional; absent or token-less
@@ -133,11 +138,18 @@ export type ResolveImageOptions = {
  * pin were ever dropped/unlisted, a connected key can still serve *some* default
  * rather than 404. `undefined` only if the catalog ships no listed image card.
  */
-export function defaultImageModelId(): string | undefined {
-  if (models.image.models[DEFAULT_IMAGE_MODEL_ID]?.listed) {
+export function defaultImageModelId(
+  view: models.snapshot.View = models.snapshot.view()
+): string | undefined {
+  if (view.image.cardById(DEFAULT_IMAGE_MODEL_ID)?.listed) {
     return DEFAULT_IMAGE_MODEL_ID;
   }
-  return models.image.listed_models()[0]?.id;
+  return view.image.listed()[0]?.id;
+}
+
+/** The catalogue backing a resolution — the host's if wired, else bundled. */
+function catalogView(deps: ResolveImageDeps): models.snapshot.View {
+  return deps.catalog?.view() ?? models.snapshot.view();
 }
 
 /**
@@ -186,7 +198,10 @@ export async function resolveImageModel(
   modelId: string,
   options: ResolveImageOptions = {}
 ): Promise<ResolvedImageModel> {
-  const card = models.image.models[modelId];
+  // One read for the whole resolution: a mid-resolution refresh must not
+  // let the listed-gate and the binding lookup disagree.
+  const view = catalogView(deps);
+  const card = view.image.cardById(modelId);
   // Unknown id, or a non-curated card (legacy / not universal) — not part of
   // the v1 BYOK image surface.
   if (!card || !card.listed) {
@@ -198,7 +213,7 @@ export async function resolveImageModel(
   // has no references field, so i2i must ride a BYOK route.
   if (options.explicit === GG_PROVIDER_ID) {
     const hosted = !options.references && liveGgMediaDeps(deps);
-    if (!hosted || !models.image.binding(card, "vercel")) {
+    if (!hosted || !view.image.binding(card, "vercel")) {
       throw new ImageModelUnavailableError(modelId, GG_PROVIDER_ID);
     }
     return resolvedGgImage(modelId, card, hosted, deps.provider_http);
@@ -211,7 +226,7 @@ export async function resolveImageModel(
         .filter(isImageProvider);
 
   for (const provider of order) {
-    const binding = models.image.binding(card, provider);
+    const binding = view.image.binding(card, provider);
     if (!binding) continue;
     // For an image-to-image resolution, the provider must serve the edit route.
     // Skip t2i-only bindings so references never land where they're ignored.
@@ -239,7 +254,7 @@ export async function resolveImageModel(
   // any card the hosted gateway can (a vercel binding), t2i only.
   if (!options.explicit && !options.references) {
     const hosted = liveGgMediaDeps(deps);
-    if (hosted && models.image.binding(card, "vercel")) {
+    if (hosted && view.image.binding(card, "vercel")) {
       return resolvedGgImage(modelId, card, hosted, deps.provider_http);
     }
   }
@@ -252,7 +267,7 @@ export async function resolveImageModel(
     modelId,
     options.explicit,
     options.references
-      ? { capable_providers: referenceCapableProviders(card) }
+      ? { capable_providers: referenceCapableProviders(card, view) }
       : undefined
   );
 }

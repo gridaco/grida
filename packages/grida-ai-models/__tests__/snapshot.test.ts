@@ -95,15 +95,31 @@ describe("models.snapshot.parse — acceptance", () => {
     const base = snapshotOf([spec("acme/one")]) as Record<string, unknown>;
     const parsed = snapshot.parse({
       ...base,
-      // The reserved media keys and anything else a later schema adds.
-      image: { models: { "acme/img": { nonsense: true } } },
-      video: { models: {} },
       something_from_the_future: [1, 2, 3],
+      another: { nested: true },
     });
     expect(parsed).not.toBeNull();
-    expect(parsed).not.toHaveProperty("image");
-    expect(parsed).not.toHaveProperty("video");
     expect(parsed).not.toHaveProperty("something_from_the_future");
+    expect(parsed).not.toHaveProperty("another");
+  });
+
+  it("drops an unusable media section without losing the text catalogue", () => {
+    // Sections are independently fallible on purpose: a broken image
+    // catalogue must not cost a host its text catalogue — or its ability
+    // to run a turn at all.
+    const base = snapshotOf([spec("acme/one")]) as Record<string, unknown>;
+    const parsed = snapshot.parse({
+      ...base,
+      image: { models: { "acme/img": { nonsense: true } } },
+      video: { models: {} },
+    });
+    expect(parsed).not.toBeNull();
+    expect(parsed!.text.catalog["acme/one"]).toBeDefined();
+    expect(parsed!.image).toBeUndefined();
+    expect(parsed!.video).toBeUndefined();
+    // And the view falls back to the bundled media catalogue for that
+    // modality rather than serving nothing.
+    expect(snapshot.view(parsed!).image.models).toEqual(models.image.models);
   });
 
   it("accepts every optional spec and cost field", () => {
@@ -346,5 +362,419 @@ describe("models.snapshot.view", () => {
         models.text.registry.resolve(id, custom)
       );
     }
+  });
+});
+
+// ── media sections ──────────────────────────────────────────────────
+
+/** The seed's own image/video cards, as the wire delivers them. */
+function seedMedia(): {
+  image: Record<string, models.image.ImageModelCard>;
+  video: Record<string, models.video.VideoModelCard>;
+} {
+  const s = wire(snapshot.seed()) as {
+    image: { models: Record<string, models.image.ImageModelCard> };
+    video: { models: Record<string, models.video.VideoModelCard> };
+  };
+  return { image: s.image.models, video: s.video.models };
+}
+
+/** A whole snapshot with the given media models spliced in. */
+function withMedia(over: {
+  image?: Record<string, unknown>;
+  video?: Record<string, unknown>;
+}): unknown {
+  const base = wire(snapshot.seed()) as Record<string, unknown>;
+  if (over.image) base.image = { models: over.image };
+  if (over.video) base.video = { models: over.video };
+  return base;
+}
+
+describe("models.snapshot media — seed and round-trip", () => {
+  it("seed() publishes the bundled image and video catalogues", () => {
+    const s = snapshot.seed();
+    expect(s.image!.models).toEqual(models.image.models);
+    expect(s.video!.models).toEqual(models.video.models);
+    expect(s.image!.models).not.toBe(models.image.models);
+  });
+
+  it("parse(wire(seed())) reconstructs both media sections exactly", () => {
+    // Same anti-drift guard as the text round-trip: a field added to a
+    // card but not to its parser is silently dropped in transit, and this
+    // catches it without anyone maintaining a field list.
+    const seeded = snapshot.seed({ version: "media" });
+    const parsed = snapshot.parse(wire(seeded));
+    expect(parsed).not.toBeNull();
+    expect(parsed!.image).toEqual(seeded.image);
+    expect(parsed!.video).toEqual(seeded.video);
+  });
+
+  it("preserves the fields whose loss would be silent", () => {
+    const parsed = snapshot.parse(wire(snapshot.seed()))!;
+    const gpt = parsed.image!.models["openai/gpt-image-2"]!;
+    // references drives image-to-image routing; dropping it disables i2i
+    // without any error.
+    expect(gpt.providers.openrouter!.references).toEqual({
+      id: "openai/gpt-image-2",
+      max: 16,
+    });
+    expect(gpt.listed).toBe(true);
+    expect(gpt.providers.vercel!.id).toBe("openai/gpt-image-2");
+    const veo = parsed.video!.models["google/veo-3.1"]!;
+    expect(veo.providers.fal!.id).toBe("fal-ai/veo3.1/image-to-video");
+    expect(veo.providers.fal!.pricing.usd_per_second["4k"]).toEqual({
+      audio: 0.6,
+      silent: 0.4,
+    });
+  });
+});
+
+describe("models.snapshot media — image validation", () => {
+  const seedImage = () => seedMedia().image;
+
+  function mutateCard(id: string, over: Record<string, unknown>): unknown {
+    const image = seedImage();
+    image[id] = { ...(image[id] as object), ...over } as never;
+    return withMedia({ image });
+  }
+
+  it("accepts the catalogue as-is", () => {
+    expect(
+      snapshot.parse(withMedia({ image: seedImage() }))!.image
+    ).toBeDefined();
+  });
+
+  it.each([
+    ["a key/id mismatch", { id: "acme/other" }],
+    ["a missing label", { label: "" }],
+    ["a non-boolean listed", { listed: "yes" }],
+    ["a non-boolean deprecated", { deprecated: 1 }],
+    ["a negative avg_cost_usd", { avg_cost_usd: -1 }],
+    ["a missing styles key", { styles: undefined }],
+    ["a missing sizes key", { sizes: undefined }],
+    ["a missing constraints key", { constraints: undefined }],
+    ["a malformed size tuple", { sizes: [[1024, 1024]] }],
+    [
+      "a bad aspect ratio in default",
+      { default: { width: 1, height: 1, aspect_ratio: "square" } },
+    ],
+    ["an unknown pricing arm", { pricing: { type: "per_furlong", usd: 1 } }],
+    ["no provider bindings", { providers: {} }],
+  ])("rejects %s", (_label, over) => {
+    const parsed = snapshot.parse(mutateCard("openai/gpt-image-2", over));
+    // The text catalogue survives; only the media section is dropped.
+    expect(parsed!.text.catalog).toBeDefined();
+    expect(parsed!.image).toBeUndefined();
+  });
+
+  it("rejects a listed card missing a binding — the one-key promise", () => {
+    // A curated card is servable by EVERY provider, so one connected key
+    // serves the whole list. resolve-image.ts relies on it.
+    const image = seedImage();
+    const card = image["openai/gpt-image-2"] as Record<string, unknown>;
+    const providers = { ...(card.providers as object) } as Record<
+      string,
+      unknown
+    >;
+    delete providers.fal;
+    image["openai/gpt-image-2"] = { ...card, providers } as never;
+    expect(snapshot.parse(withMedia({ image }))!.image).toBeUndefined();
+  });
+
+  it("allows an UNLISTED card to be missing bindings", () => {
+    const image = seedImage();
+    const card = image["openai/gpt-image-2"] as Record<string, unknown>;
+    const providers = { ...(card.providers as object) } as Record<
+      string,
+      unknown
+    >;
+    delete providers.fal;
+    image["openai/gpt-image-2"] = {
+      ...card,
+      listed: false,
+      providers,
+    } as never;
+    expect(snapshot.parse(withMedia({ image }))!.image).toBeDefined();
+  });
+
+  it("rejects a card whose primary provider has no binding", () => {
+    const image = seedImage();
+    const card = image["bfl/flux-kontext-max"] as Record<string, unknown>;
+    const providers = { ...(card.providers as object) } as Record<
+      string,
+      unknown
+    >;
+    delete providers.vercel;
+    image["bfl/flux-kontext-max"] = { ...card, providers } as never;
+    expect(snapshot.parse(withMedia({ image }))!.image).toBeUndefined();
+  });
+
+  it("rejects a binding whose provider field disagrees with its key", () => {
+    const image = seedImage();
+    const card = image["openai/gpt-image-2"] as Record<string, unknown>;
+    const providers = { ...(card.providers as object) } as Record<
+      string,
+      unknown
+    >;
+    providers.fal = { ...(providers.fal as object), provider: "vercel" };
+    image["openai/gpt-image-2"] = { ...card, providers } as never;
+    expect(snapshot.parse(withMedia({ image }))!.image).toBeUndefined();
+  });
+
+  it("drops an unknown provider binding instead of rejecting the card", () => {
+    // A provider this client has no adapter for is a route it cannot
+    // take, not an error. Rejecting would make adding a provider a
+    // breaking publish — the failure mode this whole system exists to
+    // remove.
+    const image = seedImage();
+    const card = image["openai/gpt-image-2"] as Record<string, unknown>;
+    image["openai/gpt-image-2"] = {
+      ...card,
+      providers: {
+        ...(card.providers as object),
+        futureprovider: {
+          provider: "futureprovider",
+          id: "x",
+          pricing: { type: "per_image_flat", usd: 1 },
+          avg_cost_usd: 1,
+        },
+      },
+    } as never;
+    const parsed = snapshot.parse(withMedia({ image }));
+    const out = parsed!.image!.models["openai/gpt-image-2"]!;
+    expect(Object.keys(out.providers).sort()).toEqual([
+      "fal",
+      "openrouter",
+      "vercel",
+    ]);
+  });
+
+  it("accepts a new vendor without a client release", () => {
+    // `vendor` and `speed_label` are closed unions in TypeScript but are
+    // validated as text on the wire — publishing a model from a vendor
+    // this binary has never heard of must not require shipping one.
+    const image = seedImage();
+    const card = image["openai/gpt-image-2"] as Record<string, unknown>;
+    image["openai/gpt-image-2"] = { ...card, vendor: "midjourney" } as never;
+    const parsed = snapshot.parse(withMedia({ image }));
+    expect(parsed!.image!.models["openai/gpt-image-2"]!.vendor).toBe(
+      "midjourney"
+    );
+  });
+});
+
+describe("models.snapshot media — video validation", () => {
+  const seedVideo = () => seedMedia().video;
+
+  it("accepts the catalogue as-is", () => {
+    expect(
+      snapshot.parse(withMedia({ video: seedVideo() }))!.video
+    ).toBeDefined();
+  });
+
+  it("rejects a binding that cannot price the model's default config", () => {
+    // Provider selection is deferred, so the contract is route-agnostic:
+    // whichever provider the runtime later picks must serve the default.
+    const video = seedVideo();
+    const card = video["google/veo-3.1"] as Record<string, unknown>;
+    const providers = { ...(card.providers as object) } as Record<
+      string,
+      unknown
+    >;
+    const fal = providers.fal as { pricing: { usd_per_second: object } };
+    providers.fal = {
+      ...fal,
+      pricing: {
+        type: "per_second",
+        usd_per_second: { "480p": { audio: 0.1 } },
+      },
+    };
+    video["google/veo-3.1"] = { ...card, providers } as never;
+    expect(snapshot.parse(withMedia({ video }))!.video).toBeUndefined();
+  });
+
+  it("rejects a zero rate at the default config", () => {
+    const video = seedVideo();
+    const card = video["google/veo-3.1"] as Record<string, unknown>;
+    const providers = { ...(card.providers as object) } as Record<
+      string,
+      unknown
+    >;
+    providers.vercel = {
+      ...(providers.vercel as object),
+      pricing: {
+        type: "per_second",
+        // 1080p IS the card's default resolution.
+        usd_per_second: { "720p": { audio: 0.4 }, "1080p": { audio: 0 } },
+      },
+    };
+    video["google/veo-3.1"] = { ...card, providers } as never;
+    expect(snapshot.parse(withMedia({ video }))!.video).toBeUndefined();
+  });
+
+  it("does NOT require every provider — the video ecosystem is fragmented", () => {
+    const video = seedVideo();
+    const card = video["google/veo-3.1"] as Record<string, unknown>;
+    const providers = { ...(card.providers as object) } as Record<
+      string,
+      unknown
+    >;
+    delete providers.openrouter;
+    delete providers.fal;
+    video["google/veo-3.1"] = { ...card, providers } as never;
+    expect(snapshot.parse(withMedia({ video }))!.video).toBeDefined();
+  });
+
+  it.each([
+    ["min_duration above max_duration", { min_duration: 20, max_duration: 4 }],
+    [
+      "a default duration outside the bounds",
+      {
+        min_duration: 4,
+        max_duration: 6,
+        default: {
+          resolution: "720p",
+          aspect_ratio: "16:9",
+          duration: 99,
+          audio: true,
+        },
+      },
+    ],
+    ["a missing url", { url: "" }],
+    ["a bad aspect ratio", { aspect_ratios: ["wide"] }],
+    ["a non-boolean audio", { audio: "yes" }],
+  ])("rejects %s", (_label, over) => {
+    const video = seedVideo();
+    video["google/veo-3.1"] = {
+      ...(video["google/veo-3.1"] as object),
+      ...over,
+    } as never;
+    expect(snapshot.parse(withMedia({ video }))!.video).toBeUndefined();
+  });
+});
+
+describe("models.snapshot media — prototype-safe price maps", () => {
+  // MODEL_ID_PATTERN guards the CARD-key position. Media pricing adds two
+  // free-form key maps it does not cover: image `tiers` and video
+  // `usd_per_second`. Copying a JSON-parsed `__proto__` key onto a plain
+  // object replaces that object's prototype, so a later lookup resolves
+  // through the chain — `tiers["anything"]` returns an attacker-chosen
+  // number while Object.keys() still looks clean. `image-cost.ts` bills on
+  // exactly that lookup behind a `!== undefined` guard.
+  it("rejects a polluting key in image pricing tiers", () => {
+    const image = seedMedia().image;
+    const hostile = JSON.parse(
+      `{"type":"per_image_tiered","tiers":{"__proto__":{"medium/1024x1024":999},"low/1024x1024":2}}`
+    ) as Record<string, unknown>;
+    expect(Object.hasOwn(hostile.tiers as object, "__proto__")).toBe(true);
+    image["openai/gpt-image-2"] = {
+      ...(image["openai/gpt-image-2"] as object),
+      pricing: hostile,
+    } as never;
+    expect(snapshot.parse(withMedia({ image }))!.image).toBeUndefined();
+  });
+
+  it("rejects a polluting resolution key in video pricing", () => {
+    const video = seedMedia().video;
+    const card = video["google/veo-3.1"] as Record<string, unknown>;
+    const providers = { ...(card.providers as object) } as Record<
+      string,
+      unknown
+    >;
+    providers.vercel = {
+      ...(providers.vercel as object),
+      pricing: JSON.parse(
+        `{"type":"per_second","usd_per_second":{"__proto__":{"audio":9},"720p":{"audio":0.4}}}`
+      ),
+    };
+    video["google/veo-3.1"] = { ...card, providers } as never;
+    expect(snapshot.parse(withMedia({ video }))!.video).toBeUndefined();
+  });
+
+  it("never lets a parsed price map inherit a rate", () => {
+    const parsed = snapshot.parse(wire(snapshot.seed()))!;
+    const gpt = parsed.image!.models["openai/gpt-image-2"]!;
+    const tiers = (gpt.pricing as models.image.PerImageTieredPricing).tiers;
+    expect(tiers["no/such-tier"]).toBeUndefined();
+    expect((tiers as Record<string, unknown>).toString).toBeDefined();
+  });
+});
+
+describe("models.snapshot media — the view", () => {
+  it("mirrors the bundled lookups on the seed", () => {
+    const view = snapshot.view();
+    expect(view.image.models).toEqual(models.image.models);
+    expect(
+      view.image
+        .listed()
+        .map((c) => c.id)
+        .sort()
+    ).toEqual(
+      models.image
+        .listed_models()
+        .map((c) => c.id)
+        .sort()
+    );
+    expect(
+      view.video
+        .listed()
+        .map((c) => c.id)
+        .sort()
+    ).toEqual(
+      models.video
+        .listed_models()
+        .map((c) => c.id)
+        .sort()
+    );
+  });
+
+  it("matches findImageModelCard's id rules — exact and bare, no prefix", () => {
+    const view = snapshot.view();
+    expect(view.image.cardById("openai/gpt-image-2")?.id).toBe(
+      "openai/gpt-image-2"
+    );
+    expect(view.image.cardById("gpt-image-2")?.id).toBe("openai/gpt-image-2");
+    // "must refuse rather than guess"
+    expect(view.image.cardById("gpt-image")).toBeUndefined();
+    expect(view.image.cardById("acme/nope")).toBeUndefined();
+    expect(view.image.cardById("")).toBeUndefined();
+  });
+
+  it("resolves bindings", () => {
+    const view = snapshot.view();
+    const card = view.image.cardById("openai/gpt-image-2")!;
+    expect(view.image.binding(card, "fal")?.id).toBe("fal-ai/gpt-image-2");
+    const kontext = view.image.cardById("bfl/flux-kontext-max")!;
+    expect(view.image.binding(kontext, "openrouter")).toBeNull();
+  });
+
+  it("serves a media catalogue the bundle has never seen", () => {
+    // The point of the whole mechanism, for media.
+    const image = seedMedia().image;
+    const fresh = {
+      ...(image["openai/gpt-image-2"] as object),
+      id: "acme/brand-new-image",
+    };
+    const parsed = snapshot.parse(
+      withMedia({ image: { "acme/brand-new-image": fresh } })
+    )!;
+    const view = snapshot.view(parsed);
+    expect(
+      models.image.models["acme/brand-new-image" as never]
+    ).toBeUndefined();
+    expect(view.image.cardById("acme/brand-new-image")).toBeDefined();
+    // Wholesale replacement: a withdrawn model stops resolving.
+    expect(view.image.cardById("openai/gpt-image-2")).toBeUndefined();
+  });
+
+  it("memoizes listed() per view, not on the bundled catalogue", () => {
+    // models.image.listed_models() memoizes over the bundled dict and can
+    // never observe a published one — the memo has to live on the view.
+    const image = seedMedia().image;
+    const only = { "bfl/flux-2-pro": image["bfl/flux-2-pro"]! };
+    const view = snapshot.view(snapshot.parse(withMedia({ image: only }))!);
+    expect(view.image.listed()).toBe(view.image.listed());
+    expect(view.image.listed().map((c) => c.id)).toEqual(["bfl/flux-2-pro"]);
+    expect(models.image.listed_models().length).toBeGreaterThan(1);
   });
 });

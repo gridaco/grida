@@ -11,6 +11,12 @@ import { describe, expect, it, vi } from "vitest";
 import { models } from "@grida/ai-models";
 import { ModelCatalogStore } from "./model-catalog";
 import { resolveProvider, type ResolveDeps } from "./index";
+import {
+  ImageModelUnavailableError,
+  defaultImageModelId,
+  resolveImageModel,
+} from "./resolve-image";
+import { VideoModelUnavailableError, resolveVideoModel } from "./resolve-video";
 import { GridaGatewaySessionStore } from "./gg-session";
 import { parseRunBody, type ParseRunBodyDeps } from "../runtime/run-input";
 import { baseCostUsdFromMessageUsage } from "../session/cost";
@@ -72,6 +78,17 @@ async function fetchedStore(): Promise<ModelCatalogStore> {
 const noSecrets = {
   _getKey: async () => undefined,
 } as unknown as SecretsStore;
+
+/** A secrets store holding a key for exactly one provider. */
+function keyFor(provider: string): SecretsStore {
+  return {
+    _getKey: async (id: string) => (id === provider ? "test-key" : undefined),
+  } as unknown as SecretsStore;
+}
+
+// openrouter is the image provider that carries `references` bindings.
+const fakeImageKey = () => keyFor("openrouter");
+const fakeVideoKey = () => keyFor("vercel");
 
 /** A signed-in hosted session, so the `gg` provider resolves. */
 function liveGgSession(): GridaGatewaySessionStore {
@@ -305,6 +322,138 @@ describe("a model withdrawn from the published catalogue", () => {
         { model_id: "openai/gpt-5.6-luna" }
       )
     ).rejects.toMatchObject({ provider_id: "chatgpt" });
+    store.dispose();
+  });
+});
+
+// ── media ───────────────────────────────────────────────────────────
+
+const NEW_IMAGE = "acme/published-image";
+const NEW_VIDEO = "acme/published-video";
+
+/** The seed's media, with one added model each and the rest intact. */
+function publishedMedia(): models.snapshot.Snapshot {
+  const seeded = models.snapshot.seed({ version: "media" });
+  const image = { ...seeded.image!.models };
+  const video = { ...seeded.video!.models };
+  image[NEW_IMAGE] = {
+    ...image["openai/gpt-image-2"]!,
+    id: NEW_IMAGE,
+    label: "Published Image",
+  };
+  video[NEW_VIDEO] = {
+    ...video["google/veo-3.1"]!,
+    id: NEW_VIDEO,
+    label: "Published Video",
+  };
+  return {
+    ...seeded,
+    image: { models: image },
+    video: { models: video },
+  };
+}
+
+async function mediaStore(): Promise<ModelCatalogStore> {
+  const store = new ModelCatalogStore({
+    base_url: BASE_URL,
+    fetch: serve(() => publishedMedia()),
+  });
+  expect(await store.refresh("boot")).toBe(true);
+  return store;
+}
+
+describe("an image model published after this binary shipped", () => {
+  it("is unresolvable on the bundled catalogue", async () => {
+    await expect(
+      resolveImageModel({ secrets: fakeImageKey() }, NEW_IMAGE)
+    ).rejects.toThrow(ImageModelUnavailableError);
+  });
+
+  it("resolves once the published catalogue is applied", async () => {
+    const store = await mediaStore();
+    const resolved = await resolveImageModel(
+      { secrets: fakeImageKey(), catalog: store },
+      NEW_IMAGE
+    );
+    expect(resolved.model_id).toBe(NEW_IMAGE);
+    expect(resolved.provider_id).toBe("openrouter");
+    store.dispose();
+  });
+
+  it("keeps image-to-image routing across the wire", async () => {
+    // `binding.references` is the field whose loss is silent: i2i would
+    // simply stop being offered, with no error anywhere.
+    const store = await mediaStore();
+    const resolved = await resolveImageModel(
+      { secrets: fakeImageKey(), catalog: store },
+      NEW_IMAGE,
+      { references: true }
+    );
+    expect(resolved.references_max).toBe(16);
+    store.dispose();
+  });
+
+  it("moves the default model the desktop actually generates against", async () => {
+    // The desktop host never sets image_model_id, so every real session
+    // falls to this default.
+    const seeded = models.snapshot.seed();
+    const image = { ...seeded.image!.models };
+    // Unlist the pinned default; the fallback must come from the PUBLISHED
+    // list, not the bundled one.
+    image["openai/gpt-image-2"] = {
+      ...image["openai/gpt-image-2"]!,
+      listed: false,
+    };
+    const store = new ModelCatalogStore({
+      base_url: BASE_URL,
+      fetch: serve(() => ({ ...seeded, image: { models: image } })),
+    });
+    await store.refresh("boot");
+
+    expect(defaultImageModelId()).toBe("openai/gpt-image-2");
+    const moved = defaultImageModelId(store.view());
+    expect(moved).not.toBe("openai/gpt-image-2");
+    expect(moved).toBeDefined();
+    store.dispose();
+  });
+});
+
+describe("a video model published after this binary shipped", () => {
+  it("is unresolvable on the bundled catalogue", async () => {
+    await expect(
+      resolveVideoModel({ secrets: fakeVideoKey() }, NEW_VIDEO)
+    ).rejects.toThrow(VideoModelUnavailableError);
+  });
+
+  it("resolves once the published catalogue is applied", async () => {
+    const store = await mediaStore();
+    const resolved = await resolveVideoModel(
+      { secrets: fakeVideoKey(), catalog: store },
+      NEW_VIDEO
+    );
+    expect(resolved.model_id).toBe(NEW_VIDEO);
+    // The provider-specific call id survived the wire.
+    expect(resolved.binding_id).toBe("google/veo-3.1-generate-001");
+    store.dispose();
+  });
+});
+
+describe("a media model withdrawn from the published catalogue", () => {
+  it("stops resolving — removal is the kill switch for media too", async () => {
+    const seeded = models.snapshot.seed();
+    const image = { ...seeded.image!.models };
+    delete image["openai/gpt-image-2"];
+    const store = new ModelCatalogStore({
+      base_url: BASE_URL,
+      fetch: serve(() => ({ ...seeded, image: { models: image } })),
+    });
+    await store.refresh("boot");
+    await expect(
+      resolveImageModel(
+        { secrets: fakeImageKey(), catalog: store },
+        "openai/gpt-image-2"
+      )
+    ).rejects.toThrow(ImageModelUnavailableError);
     store.dispose();
   });
 });

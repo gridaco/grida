@@ -297,9 +297,22 @@ never be published into an existing schema, because old clients will
 accept its data and then fail to drive it. Ordinary models are pure data
 and need no accompanying release.
 
-`image` and `video` are reserved keys for the deferred media phase; today
-only `text` (catalogue + tier map) is published or consumed, so new image
-and video models still require a release.
+**Sections are independently fallible.** `text`, `image`, and `video` are
+validated separately: an unusable media section is dropped on its own and
+the consumer falls back to its bundled catalogue for that modality only.
+Only `text` is load-bearing enough to reject the whole payload, because a
+host with no text catalogue cannot run a turn at all. A broken image
+catalogue must never cost a host its ability to answer.
+
+**Closed vocabularies are validated as text on the wire.** Model vendor,
+speed label, and the like are closed unions in TypeScript but are accepted
+as plain strings when parsed, and an unknown _provider_ binding is dropped
+rather than rejecting its card. Otherwise publishing a model from a new
+vendor, or adding a provider, would be a breaking publish requiring a
+client release — the exact failure this system exists to remove. (Vercel's
+AI Gateway learned this in public: it validated its model-kind field as a
+hard enum, so the day a new kind shipped the entire listing failed to
+parse for every client. It now accepts loosely and filters unknown rows.)
 
 ### 5. Relationship to provider selection
 
@@ -362,8 +375,11 @@ gates and meters through the live billing rail; BYOK
 continues to bypass everything. The model catalogue is published at
 `/api/v1/models/catalog` and agent hosts resolve through it — seeded from
 their bundled copy, refreshed at boot, on an interval, and once on a run-gate
-miss — so a text model added or a tier retargeted on the server reaches an
-already-installed binary without a release. The experimental ChatGPT subscription
+miss — so a model added or a tier retargeted on the server reaches an
+already-installed binary without a release. Text, image, and video are all
+published and consumed; `audio`, `image_tools`, and `embedding` deliberately
+are not (no agent-host reader, and the embedding card is a compile-time
+consistency pin against a database column, not distributable data). The experimental ChatGPT subscription
 provider now participates in the native resolver and provider-qualified
 session persistence described above. That local implementation does not make
 it a stable OpenAI-supported integration: its legal/support contract remains
@@ -399,9 +415,6 @@ later, and the honest risks:
   the hosted host from a _packaged_ build; the dev loop cannot prove the
   packaged allowlist. This now also covers the catalogue fetch, which
   rides the same provider lane.
-- **Catalogue distribution is text-only.** The `image` and `video` keys are
-  reserved but neither published nor consumed, so a new image or video
-  model still requires a desktop release.
 - **A published catalogue is not persisted.** A host holds it in memory
   only, so an offline start falls back to the bundled seed rather than the
   last catalogue it saw. Accepted: it also means a bad-but-valid snapshot

@@ -1735,6 +1735,7 @@ export class AgentRuntime {
       provider_http: this.deps.provider_http,
       image_gen_enabled: this.deps.image_gen_enabled === true,
       image_model_id: this.deps.image_model_id,
+      catalog: this.deps.catalog,
       // Host-level default for question resolution.
       interactive: this.deps.interactive === true,
       // Host-level default for design_search; per-run `req.library` overrides.

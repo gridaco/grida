@@ -2564,10 +2564,10 @@ export namespace models {
     /**
      * A published catalogue.
      *
-     * RESERVED KEYS: `image` and `video` are reserved for the deferred
-     * media phase — v1 neither publishes nor reads them, and unknown keys
-     * are ignored, so adding them later is additive. Do not reuse those
-     * names for anything else.
+     * Sections are independent: a media section that fails validation is
+     * dropped on its own and the rest of the snapshot still applies. Only
+     * `text` is load-bearing enough to reject the whole payload, because a
+     * host with no text catalogue cannot run a turn at all.
      */
     export interface Snapshot {
       /** Always {@link SCHEMA} on a parsed value. */
@@ -2577,7 +2577,48 @@ export namespace models {
       /** Informational only; never drives resolution. */
       generated_at?: string;
       text: TextSection;
+      /** Absent ⇒ the consumer keeps its bundled image catalogue. */
+      image?: ImageSection;
+      /** Absent ⇒ the consumer keeps its bundled video catalogue. */
+      video?: VideoSection;
     }
+
+    /** Image catalogue. Replaces `models.image.models` wholesale. */
+    export interface ImageSection {
+      models: Record<string, image.ImageModelCard>;
+    }
+
+    /** Video catalogue. Replaces `models.video.models` wholesale. */
+    export interface VideoSection {
+      models: Record<string, video.VideoModelCard>;
+    }
+
+    /**
+     * The read surface for one media catalogue. Mirrors the lookups the
+     * corresponding namespace exports, so a call site reads the same
+     * whether it is on the bundled catalogue or a published one.
+     */
+    export interface MediaView<Card, Provider extends string, Binding> {
+      readonly models: Readonly<Record<string, Card>>;
+      /** Cards in the curated user-facing list (`listed: true`). */
+      listed(): readonly Card[];
+      /** Exact namespaced id, or a bare post-slash name. No date tolerance. */
+      cardById(modelId: string): Card | undefined;
+      /** That provider's binding, or `null` if it does not serve the model. */
+      binding(card: Card, provider: Provider): Binding | null;
+    }
+
+    export type ImageView = MediaView<
+      image.ImageModelCard,
+      image.ImageProvider,
+      image.ImageProviderBinding
+    >;
+
+    export type VideoView = MediaView<
+      video.VideoModelCard,
+      video.VideoProvider,
+      video.VideoProviderBinding
+    >;
 
     /**
      * Resolution surface over one snapshot — the read API a host swaps
@@ -2598,6 +2639,8 @@ export namespace models {
         modelId: string,
         custom?: readonly text.registry.CustomModelSpec[]
       ): text.registry.ResolvedModelSpec | undefined;
+      readonly image: ImageView;
+      readonly video: VideoView;
     }
 
     const TIERS: readonly ModelTier[] = ["nano", "mini", "pro", "max"];
@@ -2705,6 +2748,478 @@ export namespace models {
       return spec;
     }
 
+    // ── media validation ──────────────────────────────────────────────
+
+    /** Bounds on the free-form key maps inside media pricing. */
+    const MAX_PRICE_KEYS = 64;
+
+    /**
+     * Keys that mutate an object instead of adding an entry.
+     *
+     * Media pricing carries FREE-FORM key maps — image `tiers`
+     * (`"medium/1024x1024"`) and video `usd_per_second` (`"720p"`) — which
+     * {@link MODEL_ID_PATTERN} does not cover. Copying a JSON-parsed
+     * `__proto__` key onto a plain object replaces that object's prototype
+     * rather than adding a key, and a later lookup then resolves through
+     * the prototype chain: `tiers["anything"]` would return an
+     * attacker-chosen number while `Object.keys(tiers)` still looks clean.
+     * That reads as a real price to a `!== undefined` billing guard.
+     */
+    const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+    /** A bounded map of free-form keys to validated values, or undefined. */
+    function parseKeyedMap<T>(
+      v: unknown,
+      parseValue: (value: unknown) => T | undefined
+    ): Record<string, T> | undefined {
+      if (!isRecord(v)) return undefined;
+      const entries = Object.entries(v);
+      if (entries.length === 0 || entries.length > MAX_PRICE_KEYS) {
+        return undefined;
+      }
+      const out: Record<string, T> = {};
+      for (const [key, value] of entries) {
+        if (!isText(key) || UNSAFE_KEYS.has(key)) return undefined;
+        const parsed = parseValue(value);
+        if (parsed === undefined) return undefined;
+        out[key] = parsed;
+      }
+      return out;
+    }
+
+    function parseRate(v: unknown): number | undefined {
+      return isRate(v) ? v : undefined;
+    }
+
+    /** Copy `key` from `src` onto `dst` only when present and valid. */
+    function optional<T extends object>(
+      dst: T,
+      src: Record<string, unknown>,
+      key: string & keyof T,
+      ok: (v: unknown) => boolean
+    ): boolean {
+      const value = src[key];
+      if (value === undefined) return true;
+      if (!ok(value)) return false;
+      // Conditional assign, never `{ k: src[k] }` — an own key holding
+      // `undefined` is dropped by JSON.stringify and breaks round-trip.
+      (dst as Record<string, unknown>)[key] = value;
+      return true;
+    }
+
+    function parsePerTokenRates(
+      v: Record<string, unknown>,
+      into: Record<string, unknown>
+    ): boolean {
+      if (!isRate(v.input) || !isRate(v.output)) return false;
+      into.input = v.input;
+      into.output = v.output;
+      for (const key of ["cached_input", "image_input", "cached_image_input"]) {
+        if (v[key] === undefined) continue;
+        if (!isRate(v[key])) return false;
+        into[key] = v[key];
+      }
+      return true;
+    }
+
+    function parseImagePricing(
+      v: unknown
+    ): image.ImageModelPricing | undefined {
+      if (!isRecord(v)) return undefined;
+      if (v.type === "per_image_flat") {
+        // Free is legal — `image-cost.ts` distinguishes an absent tier
+        // from a $0 one.
+        return isRate(v.usd)
+          ? { type: "per_image_flat", usd: v.usd }
+          : undefined;
+      }
+      if (v.type === "per_token") {
+        const out: Record<string, unknown> = { type: "per_token" };
+        return parsePerTokenRates(v, out)
+          ? (out as image.PerTokenPricing)
+          : undefined;
+      }
+      if (v.type === "per_image_tiered") {
+        const tiers = parseKeyedMap(v.tiers, parseRate);
+        if (!tiers) return undefined;
+        const out: image.PerImageTieredPricing = {
+          type: "per_image_tiered",
+          tiers,
+        };
+        if (v.tokens !== undefined) {
+          if (!isRecord(v.tokens)) return undefined;
+          const tokens: Record<string, unknown> = {};
+          if (!parsePerTokenRates(v.tokens, tokens)) return undefined;
+          out.tokens = tokens as image.PerTokenRates;
+        }
+        return out;
+      }
+      // An arm this client cannot price. `image-cost.ts` switches on the
+      // three known ones and would fall through to `undefined`.
+      return undefined;
+    }
+
+    function parseVideoPricing(v: unknown): video.PerSecondPricing | undefined {
+      if (!isRecord(v) || v.type !== "per_second") return undefined;
+      const usd_per_second = parseKeyedMap(v.usd_per_second, (modes) => {
+        if (!isRecord(modes)) return undefined;
+        const out: Partial<Record<video.AudioMode, number>> = {};
+        for (const mode of ["audio", "silent"] as const) {
+          if (modes[mode] === undefined) continue;
+          if (!isRate(modes[mode])) return undefined;
+          out[mode] = modes[mode];
+        }
+        // Absence IS the capability statement, but an empty entry states
+        // nothing and would make a resolution label unpriceable.
+        return Object.keys(out).length > 0 ? out : undefined;
+      });
+      if (!usd_per_second) return undefined;
+      const pricing: video.PerSecondPricing = {
+        type: "per_second",
+        usd_per_second,
+      };
+      if (!optional(pricing, v, "usd_per_input_image", isRate))
+        return undefined;
+      return pricing;
+    }
+
+    /**
+     * Provider bindings, keyed by provider.
+     *
+     * UNKNOWN PROVIDER KEYS ARE DROPPED rather than rejecting the card.
+     * A provider this client has no adapter for is not an error — it is a
+     * route it cannot take — and rejecting would make adding a provider a
+     * breaking publish. (The AI SDK gateway learned this the hard way: it
+     * validated its model-kind field as a hard enum, so the day a new kind
+     * shipped the whole listing failed to parse; it now accepts loosely
+     * and filters unknown rows.)
+     */
+    function parseBindings<P extends string, B>(
+      v: unknown,
+      known: readonly P[],
+      parseBinding: (provider: P, value: unknown) => B | undefined
+    ): Partial<Record<P, B>> | undefined {
+      if (!isRecord(v)) return undefined;
+      const out: Partial<Record<P, B>> = {};
+      for (const provider of known) {
+        const value = v[provider];
+        if (value === undefined) continue;
+        const binding = parseBinding(provider, value);
+        if (!binding) return undefined;
+        out[provider] = binding;
+      }
+      // Every card must be servable by something.
+      return Object.keys(out).length > 0 ? out : undefined;
+    }
+
+    const IMAGE_PROVIDERS: readonly image.ImageProvider[] = [
+      "vercel",
+      "fal",
+      "openrouter",
+    ];
+    const VIDEO_PROVIDERS: readonly video.VideoProvider[] = [
+      "vercel",
+      "fal",
+      "openrouter",
+    ];
+
+    function parseImageBinding(
+      provider: image.ImageProvider,
+      v: unknown
+    ): image.ImageProviderBinding | undefined {
+      if (!isRecord(v)) return undefined;
+      // The `provider` field is redundant with its key by design; validate
+      // the redundancy rather than normalising it away.
+      if (v.provider !== provider) return undefined;
+      if (!isText(v.id) || !isRate(v.avg_cost_usd)) return undefined;
+      const pricing = parseImagePricing(v.pricing);
+      if (!pricing) return undefined;
+      const out: image.ImageProviderBinding = {
+        provider,
+        id: v.id,
+        pricing,
+        avg_cost_usd: v.avg_cost_usd,
+      };
+      if (!optional(out, v, "deprecated", (x) => typeof x === "boolean")) {
+        return undefined;
+      }
+      if (!optional(out, v, "url", isText)) return undefined;
+      if (v.references !== undefined) {
+        const refs = v.references;
+        // Dropping this silently disables image-to-image routing.
+        if (!isRecord(refs) || !isText(refs.id) || !isCount(refs.max)) {
+          return undefined;
+        }
+        out.references = { id: refs.id, max: refs.max };
+      }
+      return out;
+    }
+
+    function parseVideoBinding(
+      provider: video.VideoProvider,
+      v: unknown
+    ): video.VideoProviderBinding | undefined {
+      if (!isRecord(v)) return undefined;
+      if (v.provider !== provider) return undefined;
+      if (!isText(v.id) || !isRate(v.avg_cost_usd)) return undefined;
+      const pricing = parseVideoPricing(v.pricing);
+      if (!pricing) return undefined;
+      const out: video.VideoProviderBinding = {
+        provider,
+        id: v.id,
+        pricing,
+        avg_cost_usd: v.avg_cost_usd,
+      };
+      if (!optional(out, v, "deprecated", (x) => typeof x === "boolean")) {
+        return undefined;
+      }
+      if (!optional(out, v, "url", isText)) return undefined;
+      return out;
+    }
+
+    /** `T | null` — null is meaningful here, a missing key is not. */
+    function nullable<T>(
+      v: unknown,
+      parseValue: (value: unknown) => T | undefined
+    ): T | null | undefined {
+      if (v === null) return null;
+      return parseValue(v);
+    }
+
+    function parseSizes(v: unknown): image.SizeSpec[] | undefined {
+      if (!Array.isArray(v)) return undefined;
+      const out: image.SizeSpec[] = [];
+      for (const size of v) {
+        if (
+          !Array.isArray(size) ||
+          size.length !== 3 ||
+          !isCount(size[0]) ||
+          !isCount(size[1]) ||
+          typeof size[2] !== "string" ||
+          !/^\d+:\d+$/.test(size[2])
+        ) {
+          return undefined;
+        }
+        out.push([size[0], size[1], size[2] as image.AspectRatioString]);
+      }
+      return out;
+    }
+
+    function parseConstraints(
+      v: unknown
+    ): image.ImageSizeConstraints | undefined {
+      if (!isRecord(v)) return undefined;
+      const out: image.ImageSizeConstraints = {};
+      for (const key of [
+        "step",
+        "min_edge",
+        "max_edge",
+        "min_pixels",
+        "max_pixels",
+      ] as const) {
+        if (v[key] === undefined) continue;
+        if (!isCount(v[key])) return undefined;
+        out[key] = v[key];
+      }
+      if (v.aspect_ratio !== undefined) {
+        const ar = v.aspect_ratio;
+        if (!isRecord(ar)) return undefined;
+        const bounds: { min?: number; max?: number } = {};
+        for (const key of ["min", "max"] as const) {
+          if (ar[key] === undefined) continue;
+          if (!isRate(ar[key])) return undefined;
+          bounds[key] = ar[key];
+        }
+        out.aspect_ratio = bounds;
+      }
+      return out;
+    }
+
+    function isAspectRatio(v: unknown): v is image.AspectRatioString {
+      return typeof v === "string" && /^\d+:\d+$/.test(v);
+    }
+
+    function parseImageCard(
+      key: string,
+      v: unknown
+    ): image.ImageModelCard | undefined {
+      if (!MODEL_ID_PATTERN.test(key)) return undefined;
+      if (!isRecord(v) || v.id !== key) return undefined;
+      if (!isText(v.label) || !isText(v.short_description)) return undefined;
+      // `vendor` and `speed_label` are closed unions in TypeScript but are
+      // validated as text on the wire: a model from a new vendor must not
+      // require a client release, which is the whole point of publishing.
+      if (!isText(v.vendor) || !isText(v.speed_label)) return undefined;
+      if (!isText(v.speed_max)) return undefined;
+      if (typeof v.deprecated !== "boolean") return undefined;
+      if (typeof v.listed !== "boolean") return undefined;
+      if (!isRate(v.avg_cost_usd)) return undefined;
+
+      const pricing = parseImagePricing(v.pricing);
+      if (!pricing) return undefined;
+
+      const styles = nullable(v.styles, (x) =>
+        Array.isArray(x) && x.every(isText) ? (x as string[]) : undefined
+      );
+      if (styles === undefined) return undefined;
+      const sizes = nullable(v.sizes, parseSizes);
+      if (sizes === undefined) return undefined;
+      const constraints = nullable(v.constraints, parseConstraints);
+      if (constraints === undefined) return undefined;
+
+      if (!isRecord(v.default)) return undefined;
+      if (!isCount(v.default.width) || !isCount(v.default.height)) {
+        return undefined;
+      }
+      if (!isAspectRatio(v.default.aspect_ratio)) return undefined;
+
+      const providers = parseBindings(
+        v.providers,
+        IMAGE_PROVIDERS,
+        parseImageBinding
+      );
+      if (!providers) return undefined;
+      // The card's primary provider must actually be bound — the hosted
+      // arm and `/api/v1/ai/models` both filter on it.
+      if (v.provider !== "vercel" || !providers.vercel) return undefined;
+      // The one-key promise: a curated card is servable by EVERY provider,
+      // so one connected key serves the whole list. `resolve-image.ts`
+      // relies on it, and a listed card missing a binding is a silent
+      // capability hole.
+      if (v.listed && IMAGE_PROVIDERS.some((p) => !providers[p])) {
+        return undefined;
+      }
+
+      const card: image.ImageModelCard = {
+        id: key,
+        label: v.label,
+        deprecated: v.deprecated,
+        short_description: v.short_description,
+        vendor: v.vendor as Vendor,
+        provider: "vercel",
+        listed: v.listed,
+        providers,
+        styles,
+        speed_label: v.speed_label as image.SpeedLabel,
+        speed_max: v.speed_max,
+        sizes,
+        constraints,
+        pricing,
+        avg_cost_usd: v.avg_cost_usd,
+        default: {
+          width: v.default.width,
+          height: v.default.height,
+          aspect_ratio: v.default.aspect_ratio,
+        },
+      };
+      if (!optional(card, v, "listed_reason", isText)) return undefined;
+      return card;
+    }
+
+    function parseVideoCard(
+      key: string,
+      v: unknown
+    ): video.VideoModelCard | undefined {
+      if (!MODEL_ID_PATTERN.test(key)) return undefined;
+      if (!isRecord(v) || v.id !== key) return undefined;
+      if (!isText(v.label) || !isText(v.short_description)) return undefined;
+      if (!isText(v.vendor) || !isText(v.speed_label) || !isText(v.url)) {
+        return undefined;
+      }
+      if (typeof v.deprecated !== "boolean") return undefined;
+      // Not `typeof === "boolean"`: a video card exists ONLY for a model in
+      // Grida selection, so the type pins `listed: true`. A payload saying
+      // otherwise is malformed, not a hidden card.
+      if (v.listed !== true) return undefined;
+      if (typeof v.audio !== "boolean") return undefined;
+      if (!isCount(v.min_duration) || !isCount(v.max_duration))
+        return undefined;
+      if (v.min_duration > v.max_duration) return undefined;
+      if (
+        !Array.isArray(v.aspect_ratios) ||
+        !v.aspect_ratios.every(isAspectRatio)
+      ) {
+        return undefined;
+      }
+
+      if (!isRecord(v.default)) return undefined;
+      const dflt = v.default;
+      if (!isText(dflt.resolution) || !isAspectRatio(dflt.aspect_ratio)) {
+        return undefined;
+      }
+      if (!isCount(dflt.duration) || typeof dflt.audio !== "boolean") {
+        return undefined;
+      }
+      if (dflt.duration < v.min_duration || dflt.duration > v.max_duration) {
+        return undefined;
+      }
+
+      const providers = parseBindings(
+        v.providers,
+        VIDEO_PROVIDERS,
+        parseVideoBinding
+      );
+      if (!providers) return undefined;
+      // Provider selection is deferred to the runtime, so the contract is
+      // route-agnostic: whichever provider it later picks must be able to
+      // serve the model's DEFAULT config. Deliberately NOT the image
+      // one-key rule — the video ecosystem is fragmented and no model is
+      // on every provider.
+      const mode: video.AudioMode = dflt.audio ? "audio" : "silent";
+      for (const binding of Object.values(providers)) {
+        const rate = binding.pricing.usd_per_second[dflt.resolution]?.[mode];
+        if (!(typeof rate === "number" && rate > 0)) return undefined;
+      }
+
+      const card: video.VideoModelCard = {
+        id: key,
+        label: v.label,
+        deprecated: v.deprecated,
+        short_description: v.short_description,
+        vendor: v.vendor as Vendor,
+        listed: true,
+        aspect_ratios: v.aspect_ratios as image.AspectRatioString[],
+        min_duration: v.min_duration,
+        max_duration: v.max_duration,
+        audio: v.audio,
+        speed_label: v.speed_label as image.SpeedLabel,
+        default: {
+          resolution: dflt.resolution,
+          aspect_ratio: dflt.aspect_ratio,
+          duration: dflt.duration,
+          audio: dflt.audio,
+        },
+        url: v.url,
+        providers,
+      };
+      return card;
+    }
+
+    /**
+     * A media section, or `undefined` when absent or unusable.
+     *
+     * Unusable is not fatal: the caller drops just this section and keeps
+     * the rest of the snapshot, so a bad image catalogue can never take
+     * the text catalogue — or the whole daemon — down with it.
+     */
+    function parseMediaSection<Card>(
+      v: unknown,
+      parseCard: (key: string, value: unknown) => Card | undefined
+    ): { models: Record<string, Card> } | undefined {
+      if (!isRecord(v) || !isRecord(v.models)) return undefined;
+      const entries = Object.entries(v.models);
+      if (entries.length === 0 || entries.length > MAX_CATALOG_ENTRIES) {
+        return undefined;
+      }
+      const out: Record<string, Card> = {};
+      for (const [key, value] of entries) {
+        const card = parseCard(key, value);
+        if (!card) return undefined;
+        out[key] = card;
+      }
+      return { models: out };
+    }
+
     /**
      * The bundled catalogue expressed as a snapshot — the seed a host
      * starts from and falls back to. Also what the publishing endpoint
@@ -2718,6 +3233,12 @@ export namespace models {
         text: {
           catalog: { ...text.catalog },
           tier_model_ids: { ...TIER_MODEL_IDS },
+        },
+        image: {
+          models: { ...(image.models as Record<string, image.ImageModelCard>) },
+        },
+        video: {
+          models: { ...(video.models as Record<string, video.VideoModelCard>) },
         },
       };
     }
@@ -2767,7 +3288,57 @@ export namespace models {
         if (!isText(data.generated_at)) return null;
         parsed.generated_at = data.generated_at;
       }
+
+      // Media sections are optional and independently fallible. An absent
+      // one leaves the consumer on its bundled media catalogue; an invalid
+      // one is dropped the same way, because a broken image catalogue must
+      // not cost a host its text catalogue too.
+      if (data.image !== undefined) {
+        const section = parseMediaSection(data.image, parseImageCard);
+        if (section) parsed.image = section;
+      }
+      if (data.video !== undefined) {
+        const section = parseMediaSection(data.video, parseVideoCard);
+        if (section) parsed.video = section;
+      }
       return parsed;
+    }
+
+    /**
+     * A media read surface over one card table.
+     *
+     * The `listed` memo lives HERE, on the view, not on the catalogue —
+     * `models.image.listed_models()` memoizes over the bundled dict and
+     * can never observe a published one, so a swappable catalogue has to
+     * own its own lazily-computed list.
+     */
+    function buildMediaView<
+      Card extends { id: string; listed: boolean; providers: object },
+      Provider extends string,
+      Binding,
+    >(models: Record<string, Card>): MediaView<Card, Provider, Binding> {
+      let listed: readonly Card[] | undefined;
+      return {
+        models,
+        listed: () =>
+          (listed ??= Object.freeze(
+            Object.values(models).filter((card) => card.listed)
+          )),
+        cardById: (modelId) => {
+          if (!modelId) return undefined;
+          // Same rules as `models.image.findImageModelCard`: exact when
+          // namespaced, else an exact post-slash name. No date tolerance —
+          // media providers don't snapshot ids the way text ones do.
+          if (modelId.includes("/")) return models[modelId];
+          for (const card of Object.values(models)) {
+            const slash = card.id.indexOf("/");
+            if (slash >= 0 && card.id.slice(slash + 1) === modelId) return card;
+          }
+          return undefined;
+        },
+        binding: (card, provider) =>
+          (card.providers as Record<string, Binding>)[provider] ?? null,
+      };
     }
 
     function build(s: Snapshot): View {
@@ -2785,6 +3356,16 @@ export namespace models {
         },
         modelSpecById: (modelId) => specByIdOver(specs, modelId),
         resolve: (modelId, custom) => resolveOver(specs, modelId, custom),
+        // A snapshot without a media section falls back to the bundled
+        // catalogue for that modality only.
+        image: buildMediaView(
+          s.image?.models ??
+            (image.models as Record<string, image.ImageModelCard>)
+        ),
+        video: buildMediaView(
+          s.video?.models ??
+            (video.models as Record<string, video.VideoModelCard>)
+        ),
       };
     }
 

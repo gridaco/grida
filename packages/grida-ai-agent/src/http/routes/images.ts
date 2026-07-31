@@ -26,6 +26,7 @@
 import type { Hono } from "hono";
 import { generateImage } from "ai";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
+import type { ModelCatalogStore } from "../../providers/model-catalog";
 import {
   ImageModelUnavailableError,
   resolveImageModel,
@@ -41,6 +42,8 @@ const IMAGE_PROVIDERS = ["vercel", "fal", "openrouter", "gg"] as const;
 export type ImagesRoutesDeps = {
   secrets: SecretsStore;
   media?: MediaPersistence | null;
+  /** Image catalogue for resolution; absent ⇒ the bundled one. */
+  catalog?: ModelCatalogStore;
   // GRIDA-GG: provider — the optional hosted image arm.
   /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
   gg?: import("../../providers/gg-session").GridaGatewaySessionStore;
@@ -49,7 +52,7 @@ export type ImagesRoutesDeps = {
 };
 
 export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
-  const { secrets, gg, gg_base_url, provider_http } = deps;
+  const { secrets, gg, gg_base_url, provider_http, catalog } = deps;
 
   app.post("/images/generate", async (c) => {
     const r = await body(c, {
@@ -79,7 +82,7 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
     let resolved;
     try {
       resolved = await resolveImageModel(
-        { secrets, gg, gg_base_url, provider_http },
+        { secrets, gg, gg_base_url, provider_http, catalog },
         model_id,
         provider ? { explicit: provider } : {}
       );

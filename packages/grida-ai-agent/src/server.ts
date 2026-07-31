@@ -389,6 +389,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           gg: gridaSession,
           gg_base_url: gridaGatewayBaseUrl,
           provider_http: providerHttp,
+          catalog: modelCatalog,
         });
       }
       if (caps.video) {
@@ -398,6 +399,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           gg: gridaSession,
           gg_base_url: gridaGatewayBaseUrl,
           provider_http: providerHttp,
+          catalog: modelCatalog,
         });
       }
       if (caps.three_d) {

@@ -27,6 +27,7 @@ import type { Hono } from "hono";
 import { DownloadError } from "ai";
 import type { Experimental_VideoModelV3CallOptions as VideoModelV3CallOptions } from "@ai-sdk/provider";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
+import type { ModelCatalogStore } from "../../providers/model-catalog";
 import {
   VideoModelUnavailableError,
   resolveVideoModel,
@@ -106,6 +107,8 @@ function videoFetchFailureMessage(error: unknown): string {
 export type VideoRoutesDeps = {
   secrets: SecretsStore;
   media?: MediaPersistence | null;
+  /** Video catalogue for resolution; absent ⇒ the bundled one. */
+  catalog?: ModelCatalogStore;
   // GRIDA-GG: provider — the optional hosted video arm.
   /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
   gg?: import("../../providers/gg-session").GridaGatewaySessionStore;
@@ -114,7 +117,7 @@ export type VideoRoutesDeps = {
 };
 
 export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
-  const { secrets, gg, gg_base_url } = deps;
+  const { secrets, gg, gg_base_url, catalog } = deps;
   const providerHttp = deps.provider_http ?? new ProviderHttp();
 
   app.post("/video/generate", async (c) => {
@@ -139,7 +142,7 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
     let resolved;
     try {
       resolved = await resolveVideoModel(
-        { secrets, gg, gg_base_url, provider_http: providerHttp },
+        { secrets, gg, gg_base_url, provider_http: providerHttp, catalog },
         d.model_id,
         // `image` skips the t2v-only hosted `gg` arm for i2v requests so the
         // start frame isn't silently dropped — falls back to a BYOK route.
