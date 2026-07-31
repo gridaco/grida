@@ -33,13 +33,22 @@ Models are organized into **tiers** based on capability and cost:
 
 | Tier   | Model                                  | Context | Max Output | Input (per 1M) | Output (per 1M) |
 | ------ | -------------------------------------- | ------- | ---------- | -------------- | --------------- |
-| `nano` | GPT-5.4 Nano (`openai/gpt-5.4-nano`)   | 400K    | 128K       | $0.20          | $1.25           |
-| `mini` | GPT-5.6 Luna (`openai/gpt-5.6-luna`)   | 1.05M   | 128K       | $1.00          | $6.00           |
-| `pro`  | GPT-5.6 Terra (`openai/gpt-5.6-terra`) | 1.05M   | 128K       | $2.50          | $15.00          |
+| `nano` | GPT-5.6 Luna (`openai/gpt-5.6-luna`)   | 1.05M   | 128K       | $0.20          | $1.20           |
+| `mini` | GPT-5.6 Luna (`openai/gpt-5.6-luna`)   | 1.05M   | 128K       | $0.20          | $1.20           |
+| `pro`  | GPT-5.6 Terra (`openai/gpt-5.6-terra`) | 1.05M   | 128K       | $2.00          | $12.00          |
 | `max`  | GPT-5.6 Sol (`openai/gpt-5.6-sol`)     | 1.05M   | 128K       | $5.00          | $30.00          |
 
 All tier models support **multimodal** inputs (text + images).
 Claude Fable 5 and Claude Opus 5 remain active, non-tiered catalogue models.
+
+`nano` and `mini` currently resolve to the same model. `nano` is a floor —
+the cheapest model still good enough for background work (title generation,
+summarisation, compaction) — so it is never more expensive than `mini`, but
+it is not guaranteed to be strictly cheaper. OpenAI's 2026-07-30 price cut
+dropped GPT-5.6 Luna below the older GPT-5.4 Nano while giving it more
+context, leaving nothing that is both cheaper and adequate. Expect the two
+tiers to separate again as new models are released; picking `nano` is always
+safe for cost-sensitive work regardless.
 
 ### Cache Pricing
 
@@ -47,9 +56,9 @@ All tiers support prompt caching, which reduces cost for repeated context:
 
 | Tier   | Cache Read (per 1M) | Cache Write (per 1M) |
 | ------ | ------------------- | -------------------- |
-| `nano` | $0.02               | —                    |
-| `mini` | $0.10               | $1.25                |
-| `pro`  | $0.25               | $3.125               |
+| `nano` | $0.02               | $0.25                |
+| `mini` | $0.02               | $0.25                |
+| `pro`  | $0.20               | $2.50                |
 | `max`  | $0.50               | $6.25                |
 
 ### All Models
@@ -67,8 +76,8 @@ Per 1M tokens.
 | Claude Opus 4.8 (`anthropic/claude-opus-4.8`) _(legacy)_     | $5.00  | $6.25       | $0.50      | $25.00  |
 | Claude Opus 4.7 (`anthropic/claude-opus-4.7`) _(legacy)_     | $5.00  | $6.25       | $0.50      | $25.00  |
 | GPT-5.6 Sol (`openai/gpt-5.6-sol`)                           | $5.00  | $6.25       | $0.50      | $30.00  |
-| GPT-5.6 Terra (`openai/gpt-5.6-terra`)                       | $2.50  | $3.125      | $0.25      | $15.00  |
-| GPT-5.6 Luna (`openai/gpt-5.6-luna`)                         | $1.00  | $1.25       | $0.10      | $6.00   |
+| GPT-5.6 Terra (`openai/gpt-5.6-terra`)                       | $2.00  | $2.50       | $0.20      | $12.00  |
+| GPT-5.6 Luna (`openai/gpt-5.6-luna`)                         | $0.20  | $0.25       | $0.02      | $1.20   |
 | GPT-5.5 (`openai/gpt-5.5`) _(legacy)_                        | $5.00  | —           | $0.50      | $30.00  |
 | GPT-5.5 Pro (`openai/gpt-5.5-pro`)                           | $30.00 | —           | —          | $180.00 |
 | Gemini 3.5 Flash (`google/gemini-3.5-flash`)                 | $1.50  | —           | $0.15      | $9.00   |

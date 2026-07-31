@@ -34,9 +34,27 @@ export type ModelTier = "nano" | "mini" | "pro" | "max";
  * Constrained to `models.text.CatalogId` so the compiler rejects any
  * tier mapped to an id that lacks a matching entry in the text
  * catalogue (see `./models`).
+ *
+ * `nano` is a floor, not a price point: it holds the cheapest model
+ * still good enough for background work. So it is **never more
+ * expensive than `mini`**, but it is *not* guaranteed to be strictly
+ * cheaper — when one model is both the lowest reasonable choice and
+ * the best value at `mini`, the two tiers collapse onto the same id.
+ *
+ * That is the state today. OpenAI's 2026-07-30 cut dropped GPT-5.6
+ * Luna to $0.20 in / $1.20 out, past the older GPT-5.4 Nano ($0.20 in
+ * / $1.25 out) while carrying 1.05M context against Nano's 400K —
+ * leaving nothing that is both cheaper and adequate. OpenAI positions
+ * Luna as the 5.6 generation's nano-class model, so this is one model
+ * serving two tiers, not a tier being over-served.
+ * See https://github.com/gridaco/grida/pull/1009.
+ *
+ * Expect the tiers to separate again as new models land. The invariant
+ * that survives either way is `nano <= mini` on every cost bucket,
+ * pinned by a catalogue test in `__tests__/models.test.ts`.
  */
 export const TIER_MODEL_IDS = {
-  nano: "openai/gpt-5.4-nano",
+  nano: "openai/gpt-5.6-luna",
   mini: "openai/gpt-5.6-luna",
   pro: "openai/gpt-5.6-terra",
   max: "openai/gpt-5.6-sol",

@@ -187,11 +187,40 @@ describe("models.video catalogue invariants", () => {
 describe("models.text.byTier", () => {
   it("pins the accepted capability and cost topology", () => {
     expect(TIER_MODEL_IDS).toEqual({
-      nano: "openai/gpt-5.4-nano",
+      nano: "openai/gpt-5.6-luna",
       mini: "openai/gpt-5.6-luna",
       pro: "openai/gpt-5.6-terra",
       max: "openai/gpt-5.6-sol",
     });
+  });
+
+  // `nano` is the cheapest model still good enough for background work,
+  // so it may equal `mini` (it does today — see TIER_MODEL_IDS in
+  // ../src/tiers.ts) but must never cost more. Guards the tier order
+  // against a repoint that quietly makes cheap work expensive.
+  it("keeps nano at or below mini on every cost bucket", () => {
+    const nano = models.text.byTier.nano.cost;
+    const mini = models.text.byTier.mini.cost;
+
+    // Cache buckets are optional per card. An absent bucket bills
+    // nothing, so it normalises to 0 — which keeps the comparison
+    // unconditional and still catches a nano card that bills for a
+    // bucket mini does not.
+    const buckets = [
+      ["input", nano.input, mini.input],
+      ["output", nano.output, mini.output],
+      ["cacheRead", nano.cacheRead ?? 0, mini.cacheRead ?? 0],
+      ["cacheWrite", nano.cacheWrite ?? 0, mini.cacheWrite ?? 0],
+    ] as const;
+
+    const violations = buckets
+      .filter(([, nanoRate, miniRate]) => nanoRate > miniRate)
+      .map(
+        ([bucket, nanoRate, miniRate]) =>
+          `${bucket}: nano ${nanoRate} > mini ${miniRate}`
+      );
+
+    expect(violations).toEqual([]);
   });
 
   it("exposes a spec for every tier", () => {
@@ -233,10 +262,10 @@ describe("models.text current catalogue", () => {
       contextWindow: 1_050_000,
       outputLimit: 128_000,
       cost: {
-        input: 2.5,
-        output: 15,
-        cacheRead: 0.25,
-        cacheWrite: 3.125,
+        input: 2,
+        output: 12,
+        cacheRead: 0.2,
+        cacheWrite: 2.5,
         longContext,
       },
     },
@@ -245,10 +274,10 @@ describe("models.text current catalogue", () => {
       contextWindow: 1_050_000,
       outputLimit: 128_000,
       cost: {
-        input: 1,
-        output: 6,
-        cacheRead: 0.1,
-        cacheWrite: 1.25,
+        input: 0.2,
+        output: 1.2,
+        cacheRead: 0.02,
+        cacheWrite: 0.25,
         longContext,
       },
     },

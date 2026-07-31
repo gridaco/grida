@@ -237,8 +237,14 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
 
     expect(mockedIngest).toHaveBeenCalledTimes(1);
     expect(mockedIngest.mock.calls[0]![0]).toBe(ORG);
-    // Terra above 272K: all input buckets ×2, all output ×1.5.
-    expect(mockedIngest.mock.calls[0]![1]).toBeCloseTo(1070.005, 10);
+    // Terra above 272K: all input buckets ×2, all output ×1.5. Kept as a
+    // literal so it fails independently of the catalogue — the arithmetic
+    // is spelled out so a rate change is greppable by rate, not just by
+    // this total (Terra: $2 in / $0.20 cacheRead / $2.50 cacheWrite / $12 out):
+    //   input  (200_001×2 + 70_000×0.2 + 2_000×2.5) × 2 = 838_004
+    //   output (1_000×12) × 1.5                         =  18_000
+    //   856_004 / 1e6 USD → 856.004 mills
+    expect(mockedIngest.mock.calls[0]![1]).toBeCloseTo(856.004, 10);
   });
 
   it("stream: tool-call arguments reassemble byte-for-byte; usage arrives; ingest fires", async () => {

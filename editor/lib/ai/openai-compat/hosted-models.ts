@@ -38,12 +38,34 @@ export function isHostedTextModel(modelId: string): boolean {
   return Object.prototype.hasOwnProperty.call(catalog, modelId);
 }
 
-const TIER_BY_MODEL_ID: Readonly<Record<string, ModelTier>> =
-  Object.fromEntries(
-    (Object.entries(TIER_MODEL_IDS) as [ModelTier, string][]).map(
-      ([tier, id]) => [id, tier]
-    )
-  );
+/** Ascending capability order — lowest tier first. */
+const TIER_ORDER = [
+  "nano",
+  "mini",
+  "pro",
+  "max",
+] as const satisfies readonly ModelTier[];
+
+/**
+ * Reverse of `TIER_MODEL_IDS`.
+ *
+ * Tiers can collapse onto one id: `nano` is a floor (the cheapest model
+ * still good enough), so when that model is also the best value at
+ * `mini`, both tiers name it — the state today. See `TIER_MODEL_IDS` in
+ * `@grida/ai-models` for why.
+ *
+ * The payload carries one tier per model, so a collapsed id is reported
+ * at the LOWEST tier it serves. Walking `TIER_ORDER` ascending with
+ * first-write-wins makes that explicit rather than leaving it to
+ * `Object.fromEntries` last-write-wins, which would silently report the
+ * highest instead. Selection is unaffected either way — every collapsed
+ * tier resolves through `TIER_MODEL_IDS` to this same id.
+ */
+const TIER_BY_MODEL_ID: Readonly<Record<string, ModelTier>> = (() => {
+  const out: Record<string, ModelTier> = {};
+  for (const tier of TIER_ORDER) out[TIER_MODEL_IDS[tier]] ??= tier;
+  return out;
+})();
 
 function ownerOf(modelId: string): string {
   const slash = modelId.indexOf("/");
