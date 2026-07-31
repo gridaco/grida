@@ -26,46 +26,48 @@ export interface PricingInformation {
 
 const proMonthlyDollars = price_dollars(PAID_PLANS.pro.id, "month");
 
-export const plans: PricingInformation[] = [
-  {
-    id: "tier_free",
-    name: "Free",
-    href: "/dashboard",
-    priceMonthly: "$0",
-    description: "Create and publish with Grida at no cost.",
-    features: [
-      { name: "Core editor, projects, and sites" },
-      { name: "File uploads" },
-      { name: "AI models with prepaid credit" },
-    ],
-    cta: "Start for free",
-  },
-  {
-    id: "tier_pro",
-    name: "Pro",
-    highlight: true,
-    costUnit: "per month",
-    href: "/_/settings/billing/upgrade",
-    priceMonthly: `$${proMonthlyDollars}`,
-    description: "Keep AI credit ready for ongoing work.",
-    features: [
-      { name: "Everything available on Free" },
-      { name: "AI credit auto-reload" },
-      { name: "Organization billing and invoices" },
-    ],
-    cta: "Upgrade to Pro",
-  },
-  {
-    id: "tier_custom",
-    name: "Custom",
-    href: "/contact",
-    priceMonthly: "Custom",
-    description: "Tailored terms for your organization.",
-    features: [
-      { name: "Bespoke pricing" },
-      { name: "Deployment and integrations" },
-      { name: "Security, limits, and support" },
-    ],
-    cta: "Contact Sales",
-  },
-];
+const freePlan: PricingInformation = {
+  id: "tier_free",
+  name: "Free",
+  href: "/dashboard",
+  priceMonthly: "$0",
+  description: "Create and publish with Grida at no cost.",
+  features: [
+    { name: "Core editor, projects, and sites" },
+    { name: "File uploads" },
+    { name: "AI models with prepaid credit" },
+  ],
+  cta: "Start for free",
+};
+
+export const proPlan: PricingInformation = {
+  id: "tier_pro",
+  name: "Pro",
+  highlight: true,
+  costUnit: "per month",
+  href: "/_/settings/billing/upgrade",
+  priceMonthly: `$${proMonthlyDollars}`,
+  description: "Keep AI credit ready for ongoing work.",
+  features: [
+    { name: "Everything available on Free" },
+    { name: "AI credit auto-reload" },
+    { name: "Organization billing and invoices" },
+  ],
+  cta: "Upgrade to Pro",
+};
+
+const customPlan: PricingInformation = {
+  id: "tier_custom",
+  name: "Custom",
+  href: "/contact",
+  priceMonthly: "Custom",
+  description: "Tailored terms for your organization.",
+  features: [
+    { name: "Bespoke pricing" },
+    { name: "Deployment and integrations" },
+    { name: "Security, limits, and support" },
+  ],
+  cta: "Contact Sales",
+};
+
+export const plans: PricingInformation[] = [freePlan, proPlan, customPlan];

@@ -872,7 +872,8 @@ export async function topUpAiCredits(
  *
  * NEW enables go through `startEnableAutoReloadCheckout`, not this fn.
  *
- * Requires an active paid subscription — see assertAutoReloadAllowed.
+ * Requires an active self-service paid subscription — see
+ * assertAutoReloadAllowed. Custom configuration is agreement-managed.
  */
 export async function setAiAutoReload(
   org_id: number,
@@ -889,7 +890,9 @@ export async function setAiAutoReload(
 }
 
 /**
- * Auto-reload is gated behind an active paid subscription.
+ * Auto-reload is gated behind an active self-service paid subscription.
+ * Custom configuration is agreement-managed, while manual top-up remains
+ * available to every organization.
  *
  * Why: Metronome's `prepaid_balance_threshold_configuration` runs silent
  * recharges at-cost (the primitive can't separate "charged amount" from
@@ -902,6 +905,7 @@ export async function setAiAutoReload(
  * and pays the full markup. See docs/wg/platform/billing/known-issues.md.
  */
 async function assertAutoReloadAllowed(org_id: number): Promise<void> {
+  await assertSelfServiceBillingAllowed(org_id);
   const sub = await getActivePaidSubscription(org_id);
   const ok =
     !!sub?.stripe_subscription_id &&
@@ -922,6 +926,7 @@ export async function disableAiAutoReload(
 ): Promise<{ ok: true }> {
   const user_id = await requireUserId();
   await assertOrgOwner(user_id, org_id);
+  await assertSelfServiceBillingAllowed(org_id);
   await disableAutoReload(org_id);
   return { ok: true };
 }

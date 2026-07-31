@@ -62,14 +62,18 @@ silent recharge fires at-cost: Stripe takes its 2.9–4.4% + $0.30 + optional
   | Intl card, $100      | $100.00  | $4.20  |
   | Intl card + FX, $100 | $100.00  | $5.20  |
 
-**Mitigation (shipped, v1).** Auto-reload is gated behind an active paid
-subscription (`assertAutoReloadAllowed` in
-`editor/app/(site)/organizations/[organization_name]/settings/billing/_actions.ts`).
+**Mitigation (shipped, v1).** Self-service auto-reload is gated behind an
+active standard subscription—Pro or a historical Team subscription—by
+`assertAutoReloadAllowed` in
+`editor/app/(site)/organizations/[organization_name]/settings/billing/_actions.ts`.
 
 - Free orgs cannot enable auto-reload at all. The UI hides the toggle
   behind a "Pro plan required" badge with an Upgrade CTA.
-- Paid orgs can enable it; the silent-recharge loss is then bounded and
-  recovered from the base-plan margin.
+- Pro orgs can enable it. Existing Team subscribers keep access while they
+  transition to Pro monthly. The silent-recharge loss is bounded and recovered
+  from the base-plan margin.
+- Custom configuration follows the organization's agreement rather than this
+  self-service path.
 - Manual top-up is unaffected — it always goes through Checkout, always
   pays the markup. Free users have full access to manual top-up.
 
@@ -159,6 +163,8 @@ convenience.
 This issue is resolved by removing the unsupported promise, not by silently
 adding a financial entitlement. A future recurring grant requires a new
 commercial contract and an implemented grant lifecycle before it is advertised.
+
+**Closed by.** [PR #1010](https://github.com/gridaco/grida/pull/1010).
 
 ---
 

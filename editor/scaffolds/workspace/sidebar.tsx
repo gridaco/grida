@@ -217,20 +217,20 @@ function PricingTierCard({
       </div>
       <p className="mb-3 text-xs text-muted-foreground">{message}</p>
       {planActionLabel && (
-        <Link
-          href={`/organizations/${organization.name}/settings/billing/upgrade`}
-        >
-          <Button size="xs" variant="outline">
+        <Button size="xs" variant="outline" asChild>
+          <Link
+            href={`/organizations/${organization.name}/settings/billing/upgrade`}
+          >
             {planActionLabel}
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       )}
       {isCustom && (
-        <Link href={sitemap.links.contact} target="_blank">
-          <Button size="xs" variant="outline">
+        <Button size="xs" variant="outline" asChild>
+          <Link href={sitemap.links.contact} target="_blank">
             Contact Grida
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       )}
     </div>
   );

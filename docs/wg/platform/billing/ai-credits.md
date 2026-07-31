@@ -21,7 +21,7 @@ status: implementation
 > user-facing promise). This doc says **how** we implement AI credits.
 > v1.0 wires the prepaid-credit ledger, entitlement gate, and AI metering
 > seam. Reconciliation jobs remain separate work.
-
+>
 > **Scope note.** The current billing-plan contract includes no recurring
 > plan credit. Free and Pro use purchased organization credit. A recurring
 > grant would require a new commercial decision before its product and
@@ -78,9 +78,10 @@ changes.
   threshold. Same markup formula applies on the _initial_ setup
   Checkout. **Silent recharges thereafter run at-cost** — see
   [KI-BILL-001](./known-issues.md#ki-bill-001--silent-auto-recharge-runs-at-cost-markup-gap)
-  for cause + planned fix. v1 mitigation: **auto-reload is gated behind
-  an active paid subscription** so the loss is bounded by base-plan
-  margin. Manual top-up is unaffected and remains free-tier accessible.
+  for cause + planned fix. v1 mitigation: **self-service auto-reload is gated
+  behind an active standard subscription (Pro or legacy Team)** so the loss is
+  bounded by base-plan margin. Custom configuration follows its agreement.
+  Manual top-up is unaffected and remains available to every organization.
 - Top-up credits never expire.
 - A recurring plan grant, if commercially approved in the future, would need
   an explicit expiration policy. No such grant exists today.
@@ -287,7 +288,7 @@ none of its proposed symbols or flows belongs to the current contract.
 
 ### AI call flow
 
-```
+```text
 [billed AI route handler]
        ↓
 billing seam ({ organizationId, feature, model_id }, op)

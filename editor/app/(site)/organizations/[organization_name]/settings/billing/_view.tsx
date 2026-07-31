@@ -971,7 +971,7 @@ function AiCreditsSection({
                   className={`size-4 transition-transform ${autoReloadOpen ? "" : "-rotate-90"}`}
                 />
                 Auto-reload
-                {!summary.has_active_subscription && (
+                {(isCustom || !summary.has_active_subscription) && (
                   <Badge variant="outline" className="ml-2 font-normal">
                     {isCustom ? "Agreement-managed" : "Pro required"}
                   </Badge>
@@ -979,7 +979,7 @@ function AiCreditsSection({
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-4 space-y-4">
-              {!summary.has_active_subscription && !savedOn && (
+              {(isCustom || (!summary.has_active_subscription && !savedOn)) && (
                 <div className="flex items-start gap-3 rounded-lg border bg-muted/40 p-3">
                   <InfoIcon className="size-4 shrink-0 text-muted-foreground mt-0.5" />
                   <div className="flex-1 space-y-2">
@@ -1005,6 +1005,7 @@ function AiCreditsSection({
                   checked={autoReloadOn}
                   onCheckedChange={setAutoReloadOn}
                   disabled={
+                    isCustom ||
                     busy !== null ||
                     (!summary.has_active_subscription && !savedOn)
                   }
@@ -1020,9 +1021,10 @@ function AiCreditsSection({
                     <UsdInput
                       value={thresholdInput}
                       onChange={setThresholdInput}
-                      disabled={busy !== null}
+                      disabled={isCustom || busy !== null}
                     />
                     {(() => {
+                      if (isCustom) return null;
                       const validThreshold =
                         Number.isFinite(localThresholdCents) &&
                         localThresholdCents >=
@@ -1045,9 +1047,10 @@ function AiCreditsSection({
                     <UsdInput
                       value={rechargeInput}
                       onChange={setRechargeInput}
-                      disabled={busy !== null}
+                      disabled={isCustom || busy !== null}
                     />
                     {(() => {
+                      if (isCustom) return null;
                       const validRecharge =
                         Number.isFinite(localRechargeCents) &&
                         localRechargeCents >= AUTO_RELOAD_RECHARGE_MIN_CENTS &&
@@ -1085,13 +1088,13 @@ function AiCreditsSection({
                 <Button
                   variant="outline"
                   onClick={cancelAutoReload}
-                  disabled={!dirty || busy !== null}
+                  disabled={isCustom || !dirty || busy !== null}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={saveAutoReload}
-                  disabled={!dirty || busy !== null}
+                  disabled={isCustom || !dirty || busy !== null}
                 >
                   {busy === "auto-reload-checkout"
                     ? "Opening Checkout…"
