@@ -18,13 +18,13 @@ covered_by:
 The read-only Credits card uses the organization's commercial classification
 when it labels the current plan. An organization with `is_enterprise=true` is
 shown as **Custom**, regardless of any underlying Stripe tier. A historical
-Team subscription remains readable as **Team (legacy)** without presenting
-Team as an offer that can still be purchased.
+Team subscription is shown as **Team (legacy)**.
 
 ## Steps
 
 1. In the local test environment, open Desktop Settings with an organization
-   whose `is_enterprise` flag is true.
+   whose `is_enterprise` flag is true and whose underlying projected plan is
+   Pro.
 2. Expected: the Credits card plan badge is **Custom** and does not imply a
    fixed price or seat allowance.
 3. Repeat with `is_enterprise=false` and a historical Team subscription.
