@@ -31,6 +31,57 @@
 
 import { TIER_MODEL_IDS, type ModelTier } from "./tiers";
 
+/**
+ * The id-matching rules, over an arbitrary spec table.
+ *
+ * Private to this file and parameterized rather than closed over
+ * `catalogSpecs` so that `models.text.modelSpecById` (the bundled
+ * catalogue) and a `models.snapshot` view (a published catalogue) match
+ * ids identically. Two copies of these rules would drift the day a
+ * provider changes its id convention.
+ *
+ * Accepts an exact namespaced id, a bare id, or a date-suffixed id —
+ * see {@link models.text.modelSpecById} for the contract.
+ */
+function specByIdOver(
+  specs: readonly models.text.ModelSpec[],
+  modelId: string
+): models.text.ModelSpec | undefined {
+  for (const spec of specs) {
+    if (spec.id === modelId) return spec;
+
+    const baseName = spec.id.includes("/")
+      ? spec.id.split("/").slice(1).join("/")
+      : spec.id;
+
+    if (modelId === baseName) return spec;
+    if (
+      modelId.startsWith(baseName) &&
+      /^-\d/.test(modelId.slice(baseName.length))
+    ) {
+      return spec;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Open-registry resolution over an arbitrary spec table ∪ `custom`.
+ * The table wins on a collision; custom ids match exactly. Shared by
+ * `models.text.registry.resolve` and `models.snapshot` views so the
+ * precedence is stated once.
+ */
+function resolveOver(
+  specs: readonly models.text.ModelSpec[],
+  modelId: string,
+  custom?: readonly models.text.registry.CustomModelSpec[]
+): models.text.registry.ResolvedModelSpec | undefined {
+  const fromTable = specByIdOver(specs, modelId);
+  if (fromTable) return { ...fromTable, custom: false };
+  const fromCustom = custom?.find((m) => m.id === modelId);
+  return fromCustom ? models.text.registry.normalize(fromCustom) : undefined;
+}
+
 export namespace models {
   // ── Shared discriminators ─────────────────────────────────────────
 
@@ -405,22 +456,7 @@ export namespace models {
      *   append a snapshot date in their API responses)
      */
     export function modelSpecById(modelId: string): ModelSpec | undefined {
-      for (const spec of Object.values(catalogSpecs)) {
-        if (spec.id === modelId) return spec;
-
-        const baseName = spec.id.includes("/")
-          ? spec.id.split("/").slice(1).join("/")
-          : spec.id;
-
-        if (modelId === baseName) return spec;
-        if (
-          modelId.startsWith(baseName) &&
-          /^-\d/.test(modelId.slice(baseName.length))
-        ) {
-          return spec;
-        }
-      }
-      return undefined;
+      return specByIdOver(Object.values(catalogSpecs), modelId);
     }
 
     /**
@@ -535,10 +571,7 @@ export namespace models {
         modelId: string,
         custom?: readonly CustomModelSpec[]
       ): ResolvedModelSpec | undefined {
-        const fromCatalog = modelSpecById(modelId);
-        if (fromCatalog) return { ...fromCatalog, custom: false };
-        const fromCustom = custom?.find((m) => m.id === modelId);
-        return fromCustom ? normalize(fromCustom) : undefined;
+        return resolveOver(Object.values(catalogSpecs), modelId, custom);
       }
     }
   }
@@ -2490,6 +2523,281 @@ export namespace models {
     export const LIBRARY_EMBEDDING_MODEL_ID: EmbeddingModelId =
       "google/gemini-embedding-2";
     export const LIBRARY_EMBEDDING_DIMENSIONS = 1536;
+  }
+
+  // ── models.snapshot ───────────────────────────────────────────────
+  //
+  // Catalogue distribution — see docs/wg/platform/hosted-ai.md.
+  //
+  // The bundled catalogue is a SEED, not the authority. A host may fetch
+  // a published snapshot and resolve against that instead, so a model
+  // added on the server reaches an already-installed binary without a
+  // release. This namespace is pure data + pure resolution: fetching,
+  // caching, and scheduling belong to the host (`ModelCatalogStore` in
+  // `@grida/agent`).
+
+  export namespace snapshot {
+    /**
+     * Wire schema major. {@link parse} rejects anything else.
+     *
+     * Additive evolution does NOT bump this — v1 parsers ignore fields
+     * they do not know, so publishing a new optional field is safe. A
+     * breaking shape change publishes at a NEW route path and bumps this,
+     * leaving old clients on the old path (or rejecting the body and
+     * falling back to the seed — fail-safe either way).
+     */
+    export const SCHEMA = 1;
+
+    /** Text catalogue + tier map. Replaces the seed's wholesale. */
+    export interface TextSection {
+      /**
+       * Full replacement for `models.text.catalog`. Each key equals its
+       * entry's `id`. Deliberately NOT merged with the seed: removing a
+       * model from the catalogue is the kill switch, and a merge would
+       * defeat it on every installed client.
+       */
+      catalog: Record<string, text.ModelSpec>;
+      /** Full replacement for `TIER_MODEL_IDS`. Every id is a `catalog` key. */
+      tier_model_ids: Record<ModelTier, string>;
+    }
+
+    /**
+     * A published catalogue.
+     *
+     * RESERVED KEYS: `image` and `video` are reserved for the deferred
+     * media phase — v1 neither publishes nor reads them, and unknown keys
+     * are ignored, so adding them later is additive. Do not reuse those
+     * names for anything else.
+     */
+    export interface Snapshot {
+      /** Always {@link SCHEMA} on a parsed value. */
+      schema: number;
+      /** Opaque publisher version (a deploy sha; `"seed"` for the bundle). */
+      version: string;
+      /** Informational only; never drives resolution. */
+      generated_at?: string;
+      text: TextSection;
+    }
+
+    /**
+     * Resolution surface over one snapshot — the read API a host swaps
+     * atomically on refresh. Mirrors the `models.text.*` shape so a call
+     * site reads the same either way.
+     *
+     * Build only from {@link seed} or a {@link parse} result: `by_tier`
+     * assumes tier ids resolve, which is exactly what `parse` validates.
+     */
+    export interface View {
+      readonly catalog: Readonly<Record<string, text.ModelSpec>>;
+      readonly tier_model_ids: Readonly<Record<ModelTier, string>>;
+      readonly by_tier: Readonly<Record<ModelTier, text.ModelSpec>>;
+      /** Same matching rules as {@link models.text.modelSpecById}. */
+      modelSpecById(modelId: string): text.ModelSpec | undefined;
+      /** Same precedence as {@link models.text.registry.resolve}. */
+      resolve(
+        modelId: string,
+        custom?: readonly text.registry.CustomModelSpec[]
+      ): text.registry.ResolvedModelSpec | undefined;
+    }
+
+    const TIERS: readonly ModelTier[] = ["nano", "mini", "pro", "max"];
+
+    /** Bounds on untrusted input. Generous — the real catalogue is ~15. */
+    const MAX_CATALOG_ENTRIES = 256;
+
+    /**
+     * Plausible model-id shape. Also the reason a catalogue key can never
+     * be `__proto__`: assigning that key to an object literal would
+     * mutate its prototype instead of adding an entry.
+     */
+    const MODEL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+
+    function isRecord(v: unknown): v is Record<string, unknown> {
+      return typeof v === "object" && v !== null && !Array.isArray(v);
+    }
+
+    function isText(v: unknown): v is string {
+      return typeof v === "string" && v.length > 0;
+    }
+
+    /** A token count: positive and exactly representable. */
+    function isCount(v: unknown): v is number {
+      return typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+    }
+
+    /** A price or multiplier: finite and non-negative (free is legal). */
+    function isRate(v: unknown): v is number {
+      return typeof v === "number" && Number.isFinite(v) && v >= 0;
+    }
+
+    function parseCost(v: unknown): text.ModelCostPerMillion | undefined {
+      if (!isRecord(v) || !isRate(v.input) || !isRate(v.output)) {
+        return undefined;
+      }
+      const cost: text.ModelCostPerMillion = {
+        input: v.input,
+        output: v.output,
+      };
+      if (v.cacheRead !== undefined) {
+        if (!isRate(v.cacheRead)) return undefined;
+        cost.cacheRead = v.cacheRead;
+      }
+      if (v.cacheWrite !== undefined) {
+        if (!isRate(v.cacheWrite)) return undefined;
+        cost.cacheWrite = v.cacheWrite;
+      }
+      if (v.longContext !== undefined) {
+        const lc = v.longContext;
+        if (
+          !isRecord(lc) ||
+          !isCount(lc.inputTokensAbove) ||
+          !isRate(lc.inputMultiplier) ||
+          !isRate(lc.outputMultiplier)
+        ) {
+          return undefined;
+        }
+        cost.longContext = {
+          inputTokensAbove: lc.inputTokensAbove,
+          inputMultiplier: lc.inputMultiplier,
+          outputMultiplier: lc.outputMultiplier,
+        };
+      }
+      return cost;
+    }
+
+    function parseSpec(key: string, v: unknown): text.ModelSpec | undefined {
+      if (!MODEL_ID_PATTERN.test(key)) return undefined;
+      if (!isRecord(v) || v.id !== key) return undefined;
+      if (!isText(v.label)) return undefined;
+      if (typeof v.multimodal !== "boolean") return undefined;
+      if (typeof v.tool_call !== "boolean") return undefined;
+      if (!isCount(v.contextWindow) || !isCount(v.outputLimit))
+        return undefined;
+      if (!Array.isArray(v.imageInputMimes)) return undefined;
+      const imageInputMimes: text.ImageInputMime[] = [];
+      for (const mime of v.imageInputMimes) {
+        if (typeof mime !== "string" || !mime.startsWith("image/")) {
+          return undefined;
+        }
+        imageInputMimes.push(mime as text.ImageInputMime);
+      }
+      const cost = parseCost(v.cost);
+      if (!cost) return undefined;
+
+      const spec: text.ModelSpec = {
+        id: key,
+        label: v.label,
+        multimodal: v.multimodal,
+        imageInputMimes,
+        tool_call: v.tool_call,
+        contextWindow: v.contextWindow,
+        outputLimit: v.outputLimit,
+        cost,
+      };
+      if (v.short_label !== undefined) {
+        if (!isText(v.short_label)) return undefined;
+        spec.short_label = v.short_label;
+      }
+      if (v.deprecated !== undefined) {
+        if (typeof v.deprecated !== "boolean") return undefined;
+        spec.deprecated = v.deprecated;
+      }
+      return spec;
+    }
+
+    /**
+     * The bundled catalogue expressed as a snapshot — the seed a host
+     * starts from and falls back to. Also what the publishing endpoint
+     * serves, which is why `parse(JSON.parse(JSON.stringify(seed())))`
+     * round-trips exactly (pinned in `__tests__/snapshot.test.ts`).
+     */
+    export function seed(opts?: { version?: string }): Snapshot {
+      return {
+        schema: SCHEMA,
+        version: opts?.version ?? "seed",
+        text: {
+          catalog: { ...text.catalog },
+          tier_model_ids: { ...TIER_MODEL_IDS },
+        },
+      };
+    }
+
+    /**
+     * Validate an untrusted published catalogue. Returns `null` rather
+     * than throwing — a host must be able to keep serving on a bad
+     * payload, and whole-or-reject is what keeps a half-applied
+     * catalogue from ever existing.
+     *
+     * Strict on shape and on the invariants resolution depends on;
+     * lenient on unknown fields, so a newer publisher stays readable.
+     */
+    export function parse(data: unknown): Snapshot | null {
+      if (!isRecord(data) || data.schema !== SCHEMA) return null;
+      if (!isText(data.version)) return null;
+      if (!isRecord(data.text) || !isRecord(data.text.catalog)) return null;
+
+      const entries = Object.entries(data.text.catalog);
+      if (entries.length === 0 || entries.length > MAX_CATALOG_ENTRIES) {
+        return null;
+      }
+      const catalog: Record<string, text.ModelSpec> = {};
+      for (const [key, value] of entries) {
+        const spec = parseSpec(key, value);
+        if (!spec) return null;
+        catalog[key] = spec;
+      }
+
+      const rawTiers = data.text.tier_model_ids;
+      if (!isRecord(rawTiers)) return null;
+      const tier_model_ids = {} as Record<ModelTier, string>;
+      for (const tier of TIERS) {
+        const id = rawTiers[tier];
+        // A tier pointing outside the catalogue would leave `by_tier`
+        // dangling, which every compaction limit reads.
+        if (!isText(id) || !Object.hasOwn(catalog, id)) return null;
+        tier_model_ids[tier] = id;
+      }
+
+      const parsed: Snapshot = {
+        schema: SCHEMA,
+        version: data.version,
+        text: { catalog, tier_model_ids },
+      };
+      if (data.generated_at !== undefined) {
+        if (!isText(data.generated_at)) return null;
+        parsed.generated_at = data.generated_at;
+      }
+      return parsed;
+    }
+
+    function build(s: Snapshot): View {
+      const catalog = s.text.catalog;
+      const specs = Object.values(catalog);
+      const tier_model_ids = s.text.tier_model_ids;
+      return {
+        catalog,
+        tier_model_ids,
+        by_tier: {
+          nano: catalog[tier_model_ids.nano],
+          mini: catalog[tier_model_ids.mini],
+          pro: catalog[tier_model_ids.pro],
+          max: catalog[tier_model_ids.max],
+        },
+        modelSpecById: (modelId) => specByIdOver(specs, modelId),
+        resolve: (modelId, custom) => resolveOver(specs, modelId, custom),
+      };
+    }
+
+    let seedView: View | undefined;
+
+    /**
+     * A resolution surface. With no argument, the bundled catalogue's —
+     * built once, so a host that never fetches pays nothing.
+     */
+    export function view(s?: Snapshot): View {
+      if (s) return build(s);
+      return (seedView ??= build(seed()));
+    }
   }
 }
 
