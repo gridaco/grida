@@ -11,6 +11,7 @@
 import crypto from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { models } from "@grida/ai-models";
+import type { ModelCatalogStore } from "../providers/model-catalog";
 import {
   SCRATCH_SEED_LIMITS,
   type AgentModelId,
@@ -55,7 +56,6 @@ import { isAgentProviderModel } from "../agent-provider/types";
 import { AgentSurface } from "../surface";
 
 const ALLOWED_TIERS = new Set<string>(AGENT_TIERS);
-const CATALOG_MODEL_IDS = new Set<string>(Object.keys(models.text.catalog));
 const TEXT_BYOK_PROVIDER_IDS = new Set<string>(
   byokProvidersFor("text").map((provider) => provider.id)
 );
@@ -115,7 +115,37 @@ export type ParseRunBodyDeps = {
   endpoints?: EndpointProvidersStore;
   /** Closed model list of the optional native ChatGPT provider. */
   chatgpt?: ChatGptProviderRuntime;
+  /** The catalogue this gate admits from. Absent ⇒ the bundled one. */
+  catalog?: ModelCatalogStore;
 };
+
+/** The catalogue backing the gate — the host's if wired, else bundled. */
+function catalogView(deps: ParseRunBodyDeps): models.snapshot.View {
+  return deps.catalog?.view() ?? models.snapshot.view();
+}
+
+/**
+ * Whether this host's catalogue carries `modelId`, refreshing once if it
+ * does not.
+ *
+ * This is where the distribution mechanism pays off. The client offering
+ * the model is served fresh from grida.co; this host's catalogue was
+ * fetched at boot and may predate it by up to a refresh interval. Without
+ * the retry, the FIRST run of a newly published model 400s and the user
+ * sees a model their own picker just offered them rejected as unknown.
+ *
+ * The store rate-limits and de-duplicates the attempt, so an id that is
+ * genuinely unknown costs at most one request per window, not one per run.
+ */
+async function isCatalogueModelId(
+  modelId: string,
+  deps: ParseRunBodyDeps
+): Promise<boolean> {
+  if (catalogView(deps).modelSpecById(modelId) !== undefined) return true;
+  if (!deps.catalog?.refreshable) return false;
+  await deps.catalog.refreshOnMiss(modelId);
+  return catalogView(deps).modelSpecById(modelId) !== undefined;
+}
 
 export async function parseRunBody(
   body: unknown,
@@ -192,12 +222,12 @@ export async function parseRunBody(
       : AGENT_DEFAULT_TIER;
   let modelId: AgentModelId | undefined;
   if (b.model_id !== undefined) {
-    // Allowed model ids = static catalog ∪ user-registered endpoint
-    // models (the open-registry seam, issue #806). Still a closed gate:
-    // an id neither table knows 400s.
+    // Allowed model ids = this host's catalogue ∪ user-registered
+    // endpoint models (the open-registry seam, issue #806). Still a
+    // closed gate: an id neither table knows 400s.
     const allowed =
       typeof b.model_id === "string" &&
-      (CATALOG_MODEL_IDS.has(b.model_id) ||
+      ((await isCatalogueModelId(b.model_id, deps)) ||
         isAgentProviderModel(b.model_id) || // issue #813 agent-provider class
         (deps.chatgpt !== undefined &&
           isChatGptSubscriptionModelId(b.model_id)) ||
@@ -582,11 +612,14 @@ async function isModelAvailableFromProvider(
     return deps.chatgpt !== undefined && isChatGptSubscriptionModelId(modelId);
   }
   if (isGgProviderId(providerId)) {
-    return CATALOG_MODEL_IDS.has(modelId);
+    // No refresh here: the model gate above already ran, and a second
+    // miss on the same request means the tuple is wrong, not stale.
+    return catalogView(deps).modelSpecById(modelId) !== undefined;
   }
   if (isByokProviderId(providerId)) {
     return (
-      TEXT_BYOK_PROVIDER_IDS.has(providerId) && CATALOG_MODEL_IDS.has(modelId)
+      TEXT_BYOK_PROVIDER_IDS.has(providerId) &&
+      catalogView(deps).modelSpecById(modelId) !== undefined
     );
   }
   const endpoint = await deps.endpoints?.get(providerId);

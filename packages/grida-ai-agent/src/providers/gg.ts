@@ -18,8 +18,10 @@ import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
 import type { GridaGatewaySessionStore } from "./gg-session";
 import { ProviderHttp } from "./http";
+import type { TierModelIds } from "./byok";
 
-const MODEL_BY_TIER: Record<ModelTier, TierModelId> = TIER_MODEL_IDS;
+const BUNDLED_TIER_MODEL_IDS: TierModelIds = () =>
+  TIER_MODEL_IDS as Record<ModelTier, TierModelId>;
 
 /**
  * The hosted session is missing or expired. The literal code LEADS the
@@ -77,7 +79,8 @@ export async function throwOnGgHttpError(res: Response): Promise<void> {
 export function makeGridaGatewayFactory(
   session: GridaGatewaySessionStore,
   baseUrl: string,
-  providerHttp: ProviderHttp = new ProviderHttp()
+  providerHttp: ProviderHttp = new ProviderHttp(),
+  tierModelIds: TierModelIds = BUNDLED_TIER_MODEL_IDS
 ): ModelFactory {
   const provider = createOpenAICompatible({
     name: "gg",
@@ -99,5 +102,5 @@ export function makeGridaGatewayFactory(
   // same catalog) — explicit picks hand straight through, tiers resolve
   // via the canonical table. Deliberately NOT the endpoint factory's
   // collapse-to-default: Grida Cloud serves the catalog.
-  return (tier, modelId) => provider(modelId ?? MODEL_BY_TIER[tier]);
+  return (tier, modelId) => provider(modelId ?? tierModelIds()[tier]);
 }

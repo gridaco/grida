@@ -809,9 +809,15 @@ export class AgentRuntime {
    * snapshot instead of re-reading the store.
    */
   private async limitsResolver(): Promise<LimitsResolution> {
+    // One read for the whole resolution, so every limit in a single
+    // compaction decision comes from the same catalogue.
+    const view = this.catalogView();
     const endpoints = this.deps.endpoints;
     if (!endpoints) {
-      return { resolve: (model) => resolveModelLimits(model), configs: [] };
+      return {
+        resolve: (model) => resolveModelLimits(model, undefined, view),
+        configs: [],
+      };
     }
     const configs = await endpoints.list();
     const custom = configs.flatMap(resolveEndpointModels);
@@ -835,9 +841,14 @@ export class AgentRuntime {
           effective = { ...model, model_id: defaultId };
         }
       }
-      return resolveModelLimits(effective, applicableCustom);
+      return resolveModelLimits(effective, applicableCustom, view);
     };
     return { resolve, configs };
+  }
+
+  /** The catalogue this runtime resolves against; bundled when unwired. */
+  private catalogView(): models.snapshot.View {
+    return this.deps.catalog?.view() ?? models.snapshot.view();
   }
 
   /**
@@ -864,14 +875,22 @@ export class AgentRuntime {
     if (isChatGptProviderId(providerId)) {
       const config = this.deps.chatgpt?.config;
       if (!config) return undefined;
-      const spec = models.text.modelSpecById(
+      const spec = this.catalogView().modelSpecById(
         chatGptTierModelId(config, COMPACTOR_TIER)
       );
       // A subscription id the catalogue doesn't carry has no window to cap
       // against; the compaction default is no worse than a guess.
       return spec ? clampSummarizerCap(spec.contextWindow) : undefined;
     }
-    if (!limits.configs.some((e) => e.id === providerId)) return undefined;
+    if (!limits.configs.some((e) => e.id === providerId)) {
+      // Everything else resolves the compactor's tier through the
+      // catalogue. Supplying the cap explicitly (rather than leaning on
+      // compaction's bundled default) is what lets a published tier
+      // retarget resize the summarizer on an already-shipped binary.
+      return clampSummarizerCap(
+        this.catalogView().by_tier[COMPACTOR_TIER].contextWindow
+      );
+    }
     // Limits of the endpoint's DEFAULT model (what `nano` resolves to):
     // a model_id-less ChatModel routes through the resolver's default-
     // model substitution above.

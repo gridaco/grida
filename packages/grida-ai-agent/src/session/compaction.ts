@@ -82,14 +82,17 @@ export type ResolveModelLimits = (model: ChatModel | null) => ModelLimits;
  */
 export function resolveModelLimits(
   model: ChatModel | null,
-  custom?: readonly models.text.registry.CustomModelSpec[]
+  custom?: readonly models.text.registry.CustomModelSpec[],
+  // The catalogue to size against. Defaults to the bundled one; a host
+  // that refreshes passes its live view, so a model published after this
+  // binary shipped is sized by its REAL window rather than falling
+  // through to the frontier-sized default below.
+  view: models.snapshot.View = models.snapshot.view()
 ): ModelLimits {
   let spec: { contextWindow: number; outputLimit: number } | undefined =
-    model?.model_id
-      ? models.text.registry.resolve(model.model_id, custom)
-      : undefined;
-  if (!spec && model?.tier) spec = models.text.byTier[model.tier];
-  if (!spec) spec = models.text.byTier.pro;
+    model?.model_id ? view.resolve(model.model_id, custom) : undefined;
+  if (!spec && model?.tier) spec = view.by_tier[model.tier];
+  if (!spec) spec = view.by_tier.pro;
   return { context_window: spec.contextWindow, output_limit: spec.outputLimit };
 }
 

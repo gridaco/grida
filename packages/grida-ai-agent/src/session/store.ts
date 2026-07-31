@@ -53,6 +53,7 @@ import type {
   SessionListFilter,
   SessionListPage,
 } from "./rows";
+import { models } from "@grida/ai-models";
 import { baseCostUsdFromMessageUsage, usageTokenTotal } from "./cost";
 
 export type AppendMessageInput = {
@@ -147,7 +148,15 @@ export type CreateSessionInput = CreateSessionOptions & {
 export class SessionsStore {
   private readonly db: OpenedSessionsDb["db"];
 
-  constructor(private readonly opened: OpenedSessionsDb) {
+  /**
+   * `catalog_view` supplies the catalogue costs are estimated against.
+   * Optional — omitted, rollups price from the bundled catalogue exactly
+   * as they did before the store existed.
+   */
+  constructor(
+    private readonly opened: OpenedSessionsDb,
+    private readonly opts?: { catalog_view?: () => models.snapshot.View }
+  ) {
     this.db = opened.db;
   }
 
@@ -1283,7 +1292,11 @@ export class SessionsStore {
       costs.set(
         row.session_id,
         (costs.get(row.session_id) ?? 0) +
-          (baseCostUsdFromMessageUsage(meta.model, meta.usage) ?? 0)
+          (baseCostUsdFromMessageUsage(
+            meta.model,
+            meta.usage,
+            this.opts?.catalog_view?.()
+          ) ?? 0)
       );
     }
     return costs;

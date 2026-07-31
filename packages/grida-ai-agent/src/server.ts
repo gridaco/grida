@@ -347,7 +347,9 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       const sessionsDb = openSessionsDb({
         user_data_path: services.user_data_path,
       });
-      const sessionsStore = new SessionsStore(sessionsDb);
+      const sessionsStore = new SessionsStore(sessionsDb, {
+        catalog_view: () => modelCatalog.view(),
+      });
       // GRIDA-SEC-004 — directory refs are in-memory host capabilities, not
       // workspace registrations. Preserve the SAME sensitive-read denies as
       // the outer sandbox in-process so unsupported/unsandboxed hosts cannot
@@ -456,6 +458,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         gg: gridaSession,
         gg_base_url: gridaGatewayBaseUrl,
         chatgpt,
+        catalog: modelCatalog,
         provider_http: providerHttp,
         workspace_registry: services.workspaces,
         sessions_store: sessionsStore,
