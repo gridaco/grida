@@ -8,6 +8,7 @@ import { SessionsStore } from "./store";
 import type { ModelFactory } from "../agent";
 import {
   DEFAULT_COMPACTION_CONFIG,
+  clampSummarizerCap,
   compactSession,
   estimateTokens,
   pruneToolOutputs,
@@ -471,5 +472,20 @@ describe("estimateTokens", () => {
     expect(estimateTokens("")).toBe(0);
     expect(estimateTokens("abcd")).toBe(1);
     expect(estimateTokens("a".repeat(400))).toBe(100);
+  });
+});
+
+describe("clampSummarizerCap", () => {
+  it("reserves room for the summary output on a roomy window", () => {
+    expect(clampSummarizerCap(400_000)).toBe(395_904);
+    expect(clampSummarizerCap(1_050_000)).toBe(1_045_904);
+  });
+
+  it("never hands a small model more input than its window", () => {
+    // Below the 4k reserve the subtraction would go negative, and below
+    // the 1k floor the clamp would exceed the window itself.
+    expect(clampSummarizerCap(5_000)).toBe(1_024);
+    expect(clampSummarizerCap(2_000)).toBe(1_024);
+    expect(clampSummarizerCap(512)).toBe(512);
   });
 });

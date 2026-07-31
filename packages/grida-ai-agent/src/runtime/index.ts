@@ -50,13 +50,14 @@ import type { ChatModel, ChatSessionRow, MessageUsage } from "../session/rows";
 import { usageTokenTotal } from "../session/cost";
 import {
   DEFAULT_COMPACTION_CONFIG,
+  clampSummarizerCap,
   compactSession,
   resolveModelLimits,
   shouldCompact,
   type CompactionConfig,
   type ResolveModelLimits,
 } from "../session/compaction";
-import type { compactor } from "../session/compactor";
+import { COMPACTOR_TIER, type compactor } from "../session/compactor";
 import {
   endpointDefaultModelId,
   resolveEndpointModels,
@@ -104,6 +105,9 @@ import { buildReplayPrefix } from "./replay-prefix";
 import type { ChatMessageWithParts } from "../session/rows";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
+import { models } from "@grida/ai-models";
+import { isChatGptProviderId } from "../protocol/chatgpt";
+import { tierModelId as chatGptTierModelId } from "../providers/chatgpt";
 
 /** Session-static agent context (RFC `skills`: discovered once per session). */
 type SessionContext = {
@@ -838,10 +842,18 @@ export class AgentRuntime {
 
   /**
    * The summarizer's input cap for a session (issue #806). The compactor
-   * subagent asks for the `nano` tier, but an endpoint factory maps every
-   * tier to the endpoint's default model — so when the session runs on a
-   * configured endpoint, the cap must be that model's window, not the
-   * catalog nano model's. `undefined` keeps the compaction default.
+   * subagent asks for the `nano` tier, but the model a tier resolves to is
+   * a PER-PROVIDER decision — so the cap must be the window of the model
+   * the summarizer will actually run on, not the catalog nano model's:
+   *
+   *  - endpoint providers map every tier to the endpoint's default model;
+   *  - the ChatGPT subscription has its own `tier_model_ids` table, which
+   *    may legitimately name a different (smaller-window) model than the
+   *    catalogue when the subscription does not serve the catalogue's;
+   *  - catalog/gg/byok resolve `nano` through the catalogue, which is the
+   *    compaction default, so they need no override here.
+   *
+   * `undefined` keeps the compaction default (`byTier.nano.contextWindow`).
    */
   private summarizerInputCap(
     model: ChatModel | null,
@@ -849,14 +861,23 @@ export class AgentRuntime {
   ): number | undefined {
     const providerId = model?.provider_id;
     if (!providerId) return undefined;
+    if (isChatGptProviderId(providerId)) {
+      const config = this.deps.chatgpt?.config;
+      if (!config) return undefined;
+      const spec = models.text.modelSpecById(
+        chatGptTierModelId(config, COMPACTOR_TIER)
+      );
+      // A subscription id the catalogue doesn't carry has no window to cap
+      // against; the compaction default is no worse than a guess.
+      return spec ? clampSummarizerCap(spec.contextWindow) : undefined;
+    }
     if (!limits.configs.some((e) => e.id === providerId)) return undefined;
     // Limits of the endpoint's DEFAULT model (what `nano` resolves to):
     // a model_id-less ChatModel routes through the resolver's default-
-    // model substitution above. Reserve room for the summary output —
-    // clamped to the window itself so a sub-5k model never gets handed
-    // more input than it can hold.
-    const window = limits.resolve({ provider_id: providerId }).context_window;
-    return Math.min(window, Math.max(1_024, window - 4_096));
+    // model substitution above.
+    return clampSummarizerCap(
+      limits.resolve({ provider_id: providerId }).context_window
+    );
   }
 
   /**

@@ -93,6 +93,21 @@ export function resolveModelLimits(
   return { context_window: spec.contextWindow, output_limit: spec.outputLimit };
 }
 
+/**
+ * The summarizer's input cap for a model of the given window: reserve room
+ * for the summary output, clamped to the window itself so a sub-5k model is
+ * never handed more input than it can hold.
+ *
+ * Lives here (not at the call site) because this file owns the compaction
+ * default the cap overrides — `opts.summarizer_input_cap ??
+ * models.text.byTier.nano.contextWindow`. Callers that know the summarizer
+ * will NOT run on the catalogue's nano model resolve its real window and
+ * pass it through here; see `summarizerInputCap` in `runtime/index.ts`.
+ */
+export function clampSummarizerCap(contextWindow: number): number {
+  return Math.min(contextWindow, Math.max(1_024, contextWindow - 4_096));
+}
+
 /** Usable context = window − reserve. `reserve` is capped at the model's
  *  output limit (no point reserving more than it can emit). */
 export function usableContext(

@@ -12,7 +12,11 @@ import {
   isChatGptSubscriptionModelId,
 } from "../protocol/chatgpt";
 import { ChatGptCredentialManager } from "./chatgpt-credentials";
-import { ChatGptProvider, type ChatGptProviderConfig } from "./chatgpt";
+import {
+  ChatGptProvider,
+  tierModelId,
+  type ChatGptProviderConfig,
+} from "./chatgpt";
 import { ProviderHttp } from "./http";
 
 const RESPONSES_URL =
@@ -543,3 +547,28 @@ function completedStreamEvent(): Record<string, unknown> {
     },
   };
 }
+
+// The subscription's tier table is separate from the catalogue's, and the
+// model factory is not its only reader — the compactor sizes the
+// summarizer's input cap off the SAME tier. Pinned here so the fallback
+// chain has one definition.
+describe("tierModelId", () => {
+  it("prefers the configured tier entry", () => {
+    expect(tierModelId(CONFIG, "nano")).toBe("openai/gpt-5.4-mini");
+    expect(tierModelId(CONFIG, "max")).toBe("openai/gpt-5.6-sol");
+  });
+
+  it("falls back to the default model for an unconfigured tier", () => {
+    // CONFIG has no `mini` entry.
+    expect(CONFIG.tier_model_ids?.mini).toBeUndefined();
+    expect(tierModelId(CONFIG, "mini")).toBe(CONFIG.default_model_id);
+  });
+
+  it("falls back to the default model when there is no table at all", () => {
+    const bare: ChatGptProviderConfig = {
+      ...CONFIG,
+      tier_model_ids: undefined,
+    };
+    expect(tierModelId(bare, "nano")).toBe(bare.default_model_id);
+  });
+});
