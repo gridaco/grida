@@ -32,6 +32,9 @@
  *                          the agent home dir (`~/.grida/agent`, resolved
  *                          via `@grida/home`). We can't import that (or
  *                          `electron`) here, so the supervisor forwards it.
+ *                        --scratch-base=<absolute path>
+ *                          Electron-main-resolved temp authority root. This is
+ *                          intentionally resolved before SRT rewrites TMPDIR.
  *
  * Stdout contract: framed sidecar→host control and provider requests only.
  * Human-readable logs always use stderr.
@@ -96,6 +99,12 @@ if (!userDataPath) {
   process.exit(1);
 }
 const requiredUserDataPath = userDataPath;
+const scratchBase = getCliArg("scratch-base");
+if (!scratchBase) {
+  console.error("[agent-sidecar] fatal: missing --scratch-base");
+  process.exit(1);
+}
+const requiredScratchBase = scratchBase;
 const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
 // GRIDA-SEC-004 — the supervisor tells us whether it wrapped this spawn with
 // srt. Trusted: argv is set by the trusted main process, not the renderer.
@@ -158,16 +167,18 @@ async function main() {
   const host = createAgentDaemon({
     password,
     user_data_path: requiredUserDataPath,
+    scratch_base: requiredScratchBase,
     projects_root: projectsRoot,
     skills_root: skillsRoot,
     http_access: {
       allowed_origins: [editorOrigin],
       allowed_referer_paths: ["/desktop"],
     },
-    // GRIDA-SEC-004 — fail-closed shell: `run_command` is exposed only when
-    // srt actually confines this process tree. On platforms srt can't wrap
-    // (Windows), this is false and the agent gets fs/todos/skills but no shell.
+    // GRIDA-SEC-004 — the boolean attests the coarse outer process wrap; the
+    // private callback below is the actual finite-command capability. Both are
+    // present only when main can enforce SRT on this platform.
     sandbox_enforced: sandboxEnforced,
+    shell_executor: sandboxEnforced ? network.shellExecutor : undefined,
     // External ACP owns a subprocess and network stack that cannot consume the
     // host-routed provider transport. Keep it unavailable in Desktop until it
     // has a separately confined, route-compatible authority domain.

@@ -142,9 +142,13 @@ The `run_command` agent tool spawns child processes through the shell
 runner (`packages/grida-daemon/src/shell/runner.ts`) with `shell: false`.
 There is **no command allowlist** — a per-session **permission mode**
 (`protocol/mode.ts`) governs the surface: `accept-edits` (default — read-only
-inspection commands auto-run; a mutating/executing command **pauses for a
-supervised Allow/Deny prompt** and runs only on approval) or `auto` (every
-command runs; the OS sandbox is the guard, the semantic classifier deferred).
+inspection commands auto-run; so does a narrow, non-overwriting two-path
+`cp`/`mv` whose source and destination stay canonically inside session scratch;
+every other mutating/executing command **pauses for a supervised Allow/Deny
+prompt** and runs only on approval) or `auto` (every command runs; the OS
+sandbox is the guard, the semantic classifier deferred). Scratch-local
+pre-authorization rejects flags, symlinks, overwrites, and paths outside
+scratch, so promotion into the workspace remains supervised.
 The supervised gate is the AI SDK's native `needsApproval` on the tool
 (`tools/run-command.ts`), wired from the mode at `workspace-agent-bindings.ts` —
 not the command backend, which only runs an already-cleared call. The
@@ -153,13 +157,29 @@ explicit `approval_answer` body field (the host owns message state, so the answe
 is not smuggled in a client-mutated message) and `store.answerApproval` (via
 `run-input.ts` `applyApprovalAnswer`) flips a part to `approval-responded` only
 when it was a real pending approval, so the renderer can answer but never forge a
-call. Two
-structural gates hold in every mode: the cwd-must-be-inside-an-opened-workspace
-check and the in-process secret-arg containment check (below); the fs-edit tools
-additionally refuse no-clobber paths (`fs/scope.ts`). The OS sandbox confines the
-whole sidecar; the full per-command fs/net sub-policy that would constrain each
-spawned child (the kernel-level finish of the secret-dir guard) is deferred — see
-[Desktop authority binding / raw execution and extensions](https://github.com/gridaco/grida/blob/main/desktop/docs/agent-authority.md#raw-execution-and-extensions).
+call. Two structural gates hold in every mode: cwd must be inside this
+session's exact workspace or scratch root, and explicit secret-root args are
+rejected before host execution; the fs-edit tools additionally refuse
+no-clobber paths (`fs/scope.ts`).
+
+The sidecar never raw-spawns a model command. It sends one bounded request over
+its inherited private capability channel; Electron main canonicalizes the
+exact roots and asks SRT for a fresh kernel profile for that process tree. The
+profile denies the shared scratch parent and host-secret directory, re-allows
+only this session's scratch, grants writes only to that scratch, the exact
+workspace, and a private command temp directory, and grants no direct network
+destination or local binding. The whole-sidecar profile remains a coarse
+backstop; per-command confinement is the command boundary. See the
+[Desktop authority binding](https://github.com/gridaco/grida/blob/main/desktop/docs/agent-authority.md).
+
+Cancellation is also host-acknowledged. `command.abort` does not settle the
+tool immediately: main first waits for the confined executor to return, remove
+its private temp, and release per-command SRT state, then replies
+`command.aborted`. The agent runtime holds turn settlement through that
+acknowledgement and through the model pump consuming the aborted tool result,
+so another turn or session deletion cannot overlap cleanup. POSIX process-group
+termination reclaims ordinary descendants; a macOS process that deliberately
+escapes with `setsid(2)` remains outside that hard-revocation claim.
 
 **Secret-dir containment — the srt / in-process split.** There are two
 classes of secret on disk, owned by two different gates:
@@ -169,23 +189,14 @@ classes of secret on disk, owned by two different gates:
   there, so a kernel-level deny is safe.
 - **The agent host's own secret dir** — its `userData`, where BYOK
   `auth.json`, `workspaces.json`, `recent.json`, and the sessions db live —
-  is **not** in srt `deny_read`. srt confines the whole sidecar including the
-  host process, and the host process must read `auth.json` for provider
-  calls. Denying it at the kernel level would break host auth. Instead the
-  shell _child_ is kept out of it in-process: `validateShellRequest` rejects
-  any command arg that resolves (after realpath of the nearest existing
-  ancestor, mirroring the cwd discipline so a symlink can't bypass it) inside
-  that protected root, threaded down from the runtime.
+  is **not** in the whole-sidecar `deny_read`, because that process must read
+  provider credentials. Electron main executes finite commands separately, so
+  their per-command profiles do deny `userData` at the kernel. The argv check
+  remains defense in depth; an interpreter-computed path is denied as well.
 
-This is the responsibility-and-reconciliation rule for secret reads: srt owns
-HOME secrets at the kernel; the in-process runner owns the host's own
-`userData`. **Caveat (`auto`):** the in-process arg check only inspects
-top-level argv, so an interpreter/shell reachable in `auto` (`bash -c`,
-`python3 -c`) can read `userData` by a computed path. Closing that for the
-shell child needs the kernel-level per-call `deny_read` (the deferred
-sub-policy). Desktop's empty direct external allowlist prevents that child
-from exfiltrating it over the network; local disclosure within the contained
-process tree remains the gap.
+The responsibility split is therefore: the outer profile protects HOME
+secrets from the entire sidecar, while each finite-command profile additionally
+protects the sidecar-owned secret directory and every sibling scratch root.
 
 **`auto` is informed-consent, not a guarantee.** `auto` removes
 command-identity gating; the sandbox still bounds the blast radius (writable
@@ -193,7 +204,8 @@ roots and no direct external networking) but does not judge intent — an
 injected or confused agent can read broadly and run anything within those
 bounds. Intent judgment is the
 [watchdog](../ai/agent/foundations.md#watchdog) layer, deferred.
-`auto` is opt-in; the default `accept-edits` keeps a read-only-only shell.
+`auto` is opt-in; the default `accept-edits` requires approval for mutations
+except the narrow scratch-local copy/move operation described above.
 
 ## Secrets discipline
 

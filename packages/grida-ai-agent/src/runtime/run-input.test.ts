@@ -1,5 +1,5 @@
 // GRIDA-SEC-008 — explicit native-provider input validation pins.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -184,6 +184,42 @@ describe("persistIncomingTail", () => {
     expect(messages.length).toBe(1);
     expect(messages[0].id).toBe("u1");
     expect((messages[0].parts[0].data as { text: string }).text).toBe("hello");
+  });
+
+  it("rolls back the whole incoming message when a part write fails", async () => {
+    const s = await store.create({ agent: "grida" });
+    const originalUpsertPart = store.upsertPart.bind(store);
+    let calls = 0;
+    const upsertSpy = vi
+      .spyOn(store, "upsertPart")
+      .mockImplementation(async (...args) => {
+        calls += 1;
+        if (calls === 2) throw new Error("injected part persistence failure");
+        return await originalUpsertPart(...args);
+      });
+
+    try {
+      await expect(
+        persistIncomingTail(store, s.id, [
+          {
+            id: "atomic-user",
+            role: "user",
+            parts: [
+              { type: "text", text: "persist neither part" },
+              {
+                type: "data-test-descriptor",
+                data: { location: "scratch", path: "/attachment.bin" },
+              },
+            ],
+          },
+        ])
+      ).rejects.toThrow("injected part persistence failure");
+      expect(calls).toBe(2);
+      expect(await store.getMessage("atomic-user")).toBeNull();
+      expect(await store.listMessageIds(s.id)).not.toContain("atomic-user");
+    } finally {
+      upsertSpy.mockRestore();
+    }
   });
 
   it("skips assistant text/reasoning (the recorder owns those)", async () => {
@@ -636,6 +672,66 @@ describe("parseRunBody", () => {
     expect(parsed.directory_scopes).toEqual([descriptor]);
   });
 
+  it("does not re-fire durable resource facts on an assistant-tail continuation", async () => {
+    const directoryId = "dir_11111111-1111-4111-8111-111111111111";
+    const parsed = await parseRunBody(
+      {
+        messages: [
+          {
+            id: "u-resource",
+            role: "user",
+            parts: [
+              {
+                type: "file",
+                mediaType: "image/png",
+                url: "data:image/png;base64,AAAA",
+                filename: "preview.png",
+              },
+              {
+                type: "data-user_file_attachments",
+                data: {
+                  location: "scratch",
+                  files: [
+                    {
+                      name: "original.gif",
+                      mime: "image/gif",
+                      size: 3,
+                      path: "upload.gif",
+                    },
+                  ],
+                },
+              },
+              {
+                type: "data-user_directory_references",
+                data: {
+                  directories: [
+                    {
+                      kind: "scope",
+                      id: directoryId,
+                      name: "references",
+                      path: `/__references__/${directoryId}`,
+                      access: "read",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          {
+            id: "a-continuation",
+            role: "assistant",
+            parts: [clientTool("question", "q1", { answers: [["continue"]] })],
+          },
+        ],
+      },
+      deps as never
+    );
+
+    if (parsed instanceof Response) throw new Error("unexpected rejection");
+    expect(parsed.scratch_seed).toBeUndefined();
+    expect(parsed.directory_scopes).toBeUndefined();
+  });
+
   it.each([
     {
       id: "dir_11111111-1111-4111-8111-111111111111",
@@ -796,6 +892,42 @@ describe("parseRunBody", () => {
     ]);
   });
 
+  it.each([
+    {
+      label: "an assistant-tail continuation",
+      messages: [
+        { role: "user", parts: [{ type: "text", text: "earlier" }] },
+        { role: "assistant", parts: [{ type: "text", text: "continuing" }] },
+      ],
+    },
+    {
+      label: "an explicit approval continuation",
+      messages: [
+        { role: "user", parts: [{ type: "text", text: "run the command" }] },
+      ],
+      approval_answer: {
+        tool_call_id: "tc1",
+        approval_id: "ap1",
+        approved: true,
+      },
+    },
+  ])("rejects scratch_seed on $label", async (body) => {
+    const parsed = await parseRunBody(
+      {
+        ...body,
+        scratch_seed: [{ path: "persisted-input.txt", text: "replacement" }],
+      },
+      deps as never
+    );
+
+    expect(parsed).toBeInstanceOf(Response);
+    if (!(parsed instanceof Response)) return;
+    expect(parsed.status).toBe(400);
+    expect(await parsed.json()).toMatchObject({
+      code: "invalid-scratch-seed",
+    });
+  });
+
   it("accepts the canonical scratch_seed file-count limit and rejects one more", async () => {
     const messages = [{ role: "user", parts: [{ type: "text", text: "hi" }] }];
     const entries = Array.from(
@@ -908,15 +1040,22 @@ describe("parseRunBody", () => {
             parts: [
               { type: "text", text: "inspect these" },
               {
+                type: "file",
+                mediaType: "image/png",
+                url: "data:image/png;base64,AAAA",
+                filename: "preview.png",
+              },
+              {
                 type: "data-user_file_attachments",
                 data: {
                   location: "scratch",
                   files: [
                     {
-                      name: "Document.pdf",
-                      mime: "application/pdf",
+                      name: "Original.gif",
+                      mime: "image/gif",
                       size: 3,
-                      path: "upload-1.pdf",
+                      path: "upload-1.gif",
+                      provider_file_index: 0,
                     },
                     {
                       name: "Notes.txt",
@@ -931,7 +1070,7 @@ describe("parseRunBody", () => {
           },
         ],
         scratch_seed: [
-          { path: "upload-1.pdf", base64: "AQID" },
+          { path: "upload-1.gif", base64: "AQID" },
           { path: "upload-2.txt", text: "hello" },
         ],
       },
@@ -941,15 +1080,78 @@ describe("parseRunBody", () => {
     const s = await store.create({ agent: "grida" });
     await persistIncomingTail(store, s.id, parsed.messages);
     const persisted = await store.listVisibleMessages(s.id);
-    expect(persisted[0].parts[1].type).toBe("data-user_file_attachments");
+    expect(persisted[0].parts.map((part) => part.type)).toEqual([
+      "text",
+      "file",
+      "data-user_file_attachments",
+    ]);
     const model = buildModelMessages(persisted);
-    const marker = model[0].parts[1] as { type: string; text: string };
+    const marker = model[0].parts.find(
+      (part): part is { type: "text"; text: string } =>
+        typeof part === "object" &&
+        part !== null &&
+        "type" in part &&
+        part.type === "text" &&
+        "text" in part &&
+        typeof part.text === "string" &&
+        part.text.includes("<user_file_attachments>")
+    );
+    expect(marker).toBeDefined();
+    if (!marker) throw new Error("missing user_file_attachments marker");
     expect(marker.text).toContain("<user_file_attachments>");
-    expect(marker.text).toContain('"path": "upload-1.pdf"');
-    expect(marker.text.indexOf("Document.pdf")).toBeLessThan(
+    expect(marker.text).toContain('"path": "upload-1.gif"');
+    expect(marker.text).toContain('"provider_file_index": 0');
+    expect(marker.text.indexOf("Original.gif")).toBeLessThan(
       marker.text.indexOf("Notes.txt")
     );
   });
+
+  it.each([
+    [[-1], "malformed"],
+    [[1], "out of range"],
+    [[0, 0], "duplicated"],
+  ])(
+    "rejects attachment provider-file correlation when it is %s",
+    async (indices) => {
+      const parsed = await parseRunBody(
+        {
+          messages: [
+            {
+              role: "user",
+              parts: [
+                {
+                  type: "file",
+                  mediaType: "image/png",
+                  url: "data:image/png;base64,AAAA",
+                },
+                {
+                  type: "data-user_file_attachments",
+                  data: {
+                    location: "scratch",
+                    files: indices.map((provider_file_index, index) => ({
+                      name: `image-${index}.png`,
+                      mime: "image/png",
+                      size: 3,
+                      path: `upload-${index}.png`,
+                      provider_file_index,
+                    })),
+                  },
+                },
+              ],
+            },
+          ],
+          scratch_seed: indices.map((_, index) => ({
+            path: `upload-${index}.png`,
+            base64: "AQID",
+          })),
+        },
+        deps as never
+      );
+
+      expect(parsed).toBeInstanceOf(Response);
+      expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
+    }
+  );
 
   it.each([
     [undefined, "missing body"],

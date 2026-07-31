@@ -146,6 +146,13 @@ export async function parseRunBody(
       { status: 400 }
     );
   }
+  // Approval answers are explicit request fields rather than assistant tool
+  // results. Like any assistant-tail continuation, they fire no new user
+  // message even when the client resends an older user row as the array tail.
+  // The runtime later proves every caller-owned row already belongs to the
+  // session before accepting the continuation.
+  const approvalAnswer = coerceApprovalAnswer(b.approval_answer);
+  const firedUser = approvalAnswer ? undefined : tailUserMessage(messages);
   const scratchSeed = parseScratchSeed(b.scratch_seed);
   if (scratchSeed.error) {
     return Response.json(
@@ -153,14 +160,23 @@ export async function parseRunBody(
       { status: 400 }
     );
   }
-  const attachmentError = validateAttachmentSeeds(messages, scratchSeed.value);
+  if (scratchSeed.value && !firedUser) {
+    return Response.json(
+      {
+        error: "scratch_seed requires a fired tail user message",
+        code: "invalid-scratch-seed",
+      },
+      { status: 400 }
+    );
+  }
+  const attachmentError = validateAttachmentSeeds(firedUser, scratchSeed.value);
   if (attachmentError) {
     return Response.json(
       { error: attachmentError, code: "invalid-file-attachments" },
       { status: 400 }
     );
   }
-  const directoryReferences = parseDirectoryReferences(messages);
+  const directoryReferences = parseDirectoryReferences(firedUser);
   if (directoryReferences.error) {
     return Response.json(
       {
@@ -285,7 +301,7 @@ export async function parseRunBody(
     // 400. A well-formed answer is still matched against the persisted pending
     // approval; the runtime rejects the request when that authoritative match
     // returns false.
-    approval_answer: coerceApprovalAnswer(b.approval_answer),
+    approval_answer: approvalAnswer,
     scratch_seed: scratchSeed.value,
     directory_scopes: directoryReferences.value,
     session_id:
@@ -296,17 +312,28 @@ export async function parseRunBody(
 }
 
 /**
- * Validate and collect directory descriptors from the LAST user message only.
+ * The tail user candidate. Resent history can contain older user rows, while a
+ * question continuation ends in an assistant tool result. The caller also
+ * suppresses this candidate for a valid explicit approval continuation.
+ */
+function tailUserMessage(
+  messages: NormalizedMessage[]
+): NormalizedMessage | undefined {
+  const tail = messages.at(-1);
+  return tail?.role === "user" ? tail : undefined;
+}
+
+/**
+ * Validate and collect directory descriptors from the fired tail user only.
  * The client resends history; old/forked reference parts are durable facts but
  * must never be reinterpreted as fresh authority. Exact descriptor validation
  * also prevents a raw host path or write access from being smuggled into the
  * model-visible marker before the registry compares it to canonical facts.
  */
-function parseDirectoryReferences(messages: NormalizedMessage[]): {
+function parseDirectoryReferences(user: NormalizedMessage | undefined): {
   value?: DirectoryScopeDescriptor[];
   error?: string;
 } {
-  const user = messages.findLast((message) => message.role === "user");
   if (!user) return {};
   const directories: DirectoryScopeDescriptor[] = [];
   const ids = new Set<string>();
@@ -437,15 +464,18 @@ function isSafeScratchPath(path: string): boolean {
  * remain durable while their session scratch was seeded on the original turn.
  */
 function validateAttachmentSeeds(
-  messages: NormalizedMessage[],
+  user: NormalizedMessage | undefined,
   scratchSeed: ScratchSeedEntry[] | undefined
 ): string | null {
-  const user = messages.findLast((message) => message.role === "user");
   if (!user) return null;
+  const providerFileCount = user.parts.filter(
+    (part) => part.type === "file"
+  ).length;
   const seedByPath = new Map(
     (scratchSeed ?? []).map((seed) => [seed.path, seed])
   );
   const described = new Set<string>();
+  const providerFileIndices = new Set<number>();
   for (const part of user.parts) {
     if (part.type !== USER_FILE_ATTACHMENTS) continue;
     const payload = part.data;
@@ -457,6 +487,15 @@ function validateAttachmentSeeds(
         return `attachment path is described more than once: ${file.path}`;
       }
       described.add(file.path);
+      if (file.provider_file_index !== undefined) {
+        if (file.provider_file_index >= providerFileCount) {
+          return `attachment provider_file_index is out of range: ${file.provider_file_index}`;
+        }
+        if (providerFileIndices.has(file.provider_file_index)) {
+          return `attachment provider_file_index is described more than once: ${file.provider_file_index}`;
+        }
+        providerFileIndices.add(file.provider_file_index);
+      }
       const seed = seedByPath.get(file.path);
       if (!seed)
         return `attachment body is missing from scratch_seed: ${file.path}`;
@@ -496,7 +535,11 @@ function isUserFileAttachmentsData(
       Number.isSafeInteger(f.size) &&
       f.size >= 0 &&
       typeof f.path === "string" &&
-      isSafeScratchPath(f.path)
+      isSafeScratchPath(f.path) &&
+      (f.provider_file_index === undefined ||
+        (typeof f.provider_file_index === "number" &&
+          Number.isSafeInteger(f.provider_file_index) &&
+          f.provider_file_index >= 0))
     );
   });
 }
@@ -561,8 +604,7 @@ async function isModelAvailableFromProvider(
 export function extractTailUserMessageId(
   msgs: NormalizedMessage[]
 ): string | undefined {
-  const tail = msgs.at(-1);
-  return tail?.role === "user" ? tail.id : undefined;
+  return tailUserMessage(msgs)?.id;
 }
 
 /**
@@ -624,40 +666,42 @@ export async function persistIncomingTail(
   incoming: NormalizedMessage[],
   options: { resolveAssistantToolResults?: boolean } = {}
 ): Promise<void> {
-  // Ids already persisted for this session. The AI SDK client resends
-  // the full history with stable ids every turn, so most incoming ids
-  // are already here and skip below. Doubles as the intra-request dedup
-  // set — a client DB-hydration race can place the same user message in
-  // one outgoing array twice — so we record each id as we go.
-  const seen = new Set(await store.listMessageIds(sessionId));
-  for (const m of incoming) {
-    if (m.role === "assistant") {
-      // The recorder owns assistant messages — it writes them from the model
-      // stream. The ONE thing the stream can't carry is a CLIENT-resolved tool
-      // result: a session with no server-side fs (the desktop file window's
-      // single-file sidebar) resolves fs tools in the renderer, and the result
-      // arrives only on the next request's assistant message. Fill just those
-      // into the existing (recorder-written) tool row so the server-authoritative
-      // model view (`buildModelMessages`) stops dropping the call as incomplete.
-      if (options.resolveAssistantToolResults !== false) {
-        await persistResolvedToolResults(store, sessionId, m);
+  await store.withTransaction(async () => {
+    // Ids already persisted for this session. The AI SDK client resends
+    // the full history with stable ids every turn, so most incoming ids
+    // are already here and skip below. Doubles as the intra-request dedup
+    // set — a client DB-hydration race can place the same user message in
+    // one outgoing array twice — so we record each id as we go.
+    const seen = new Set(await store.listMessageIds(sessionId));
+    for (const m of incoming) {
+      if (m.role === "assistant") {
+        // The recorder owns assistant messages — it writes them from the model
+        // stream. The ONE thing the stream can't carry is a CLIENT-resolved tool
+        // result: a session with no server-side fs (the desktop file window's
+        // single-file sidebar) resolves fs tools in the renderer, and the result
+        // arrives only on the next request's assistant message. Fill just those
+        // into the existing (recorder-written) tool row so the server-authoritative
+        // model view (`buildModelMessages`) stops dropping the call as incomplete.
+        if (options.resolveAssistantToolResults !== false) {
+          await persistResolvedToolResults(store, sessionId, m);
+        }
+        continue;
       }
-      continue;
+      if (seen.has(m.id)) continue;
+      seen.add(m.id);
+      // Idempotent insert: a concurrent run on the same session can land
+      // this id between the snapshot above and now (the client may re-POST
+      // /agent/run while one is still in flight). ON CONFLICT DO NOTHING
+      // turns that race into a no-op instead of a UNIQUE-constraint 500.
+      await store.appendMessageIfAbsent(sessionId, { id: m.id, role: m.role });
+      // Parts are keyed by (messageId, index) — upsert is idempotent, so a
+      // re-send refreshes content without duplicating rows.
+      for (let i = 0; i < m.parts.length; i += 1) {
+        const part = m.parts[i];
+        await store.upsertPart(m.id, { index: i, type: part.type, data: part });
+      }
     }
-    if (seen.has(m.id)) continue;
-    seen.add(m.id);
-    // Idempotent insert: a concurrent run on the same session can land
-    // this id between the snapshot above and now (the client may re-POST
-    // /agent/run while one is still in flight). ON CONFLICT DO NOTHING
-    // turns that race into a no-op instead of a UNIQUE-constraint 500.
-    await store.appendMessageIfAbsent(sessionId, { id: m.id, role: m.role });
-    // Parts are keyed by (messageId, index) — upsert is idempotent, so a
-    // re-send refreshes content without duplicating rows.
-    for (let i = 0; i < m.parts.length; i += 1) {
-      const part = m.parts[i];
-      await store.upsertPart(m.id, { index: i, type: part.type, data: part });
-    }
-  }
+  });
 }
 
 /**

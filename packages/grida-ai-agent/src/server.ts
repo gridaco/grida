@@ -20,10 +20,12 @@ import os from "node:os";
 import type { Hono } from "hono";
 import {
   DaemonServer,
+  runUnsandboxedShell,
   type DaemonCapabilities,
   type DaemonHttpAccess,
   type DaemonServices,
   type DaemonTenant,
+  type ShellExecutor,
 } from "@grida/daemon/server";
 import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
 import { registerSecretsRoutes } from "./http/routes/secrets";
@@ -65,6 +67,7 @@ export type {
   ChatGptOAuthConfig,
 } from "./providers/chatgpt-credentials";
 export type { ChatGptProviderConfig } from "./providers/chatgpt";
+export { defaultScratchBase, prepareScratchAuthority } from "./session/scratch";
 
 // Re-exported for hosts that compose or probe the daemon through this
 // package (the CLI, tests). The daemon package is the owner.
@@ -78,6 +81,9 @@ export {
   type DaemonHttpAccess,
   type DaemonServices,
   type DaemonTenant,
+  type ShellExecutionScope,
+  type ShellExecutor,
+  type ShellRunOptions,
 } from "@grida/daemon/server";
 
 /**
@@ -144,11 +150,21 @@ export type AgentTenantOptions = {
    */
   image_model_id?: string;
   /**
+   * GRIDA-SEC-004 — host-owned finite-command capability. The executor receives
+   * the exact current workspace/scratch scope for every invocation and must
+   * enforce it at the process boundary. Omission withholds `run_command`.
+   *
+   * `sandbox_enforced` is not an executor: wrapping the multi-session daemon
+   * once cannot isolate sibling session scratch roots. Standalone hosts that
+   * deliberately accept ambient filesystem authority use
+   * {@link allow_unsandboxed_shell}, which injects the raw runner explicitly.
+   */
+  shell_executor?: ShellExecutor;
+  /**
    * GRIDA-SEC-004 — whether this host's process tree is confined by an OS
-   * sandbox (srt Seatbelt/bubblewrap). Default `false`: with no explicit
-   * shell-only opt-in the `run_command` tool is withheld, and an external ACP
-   * mode of `"sandboxed"` is unavailable. The desktop supervisor sets this
-   * true only when it actually wrapped the sidecar spawn.
+   * sandbox (srt Seatbelt/bubblewrap). This attests only the coarse outer
+   * process tree for external ACP's `"sandboxed"` disposition; it does not
+   * expose `run_command`. Finite commands require {@link shell_executor}.
    */
   sandbox_enforced?: boolean;
   /**
@@ -164,11 +180,12 @@ export type AgentTenantOptions = {
    */
   external_agent_execution?: "enabled" | "sandboxed" | "disabled";
   /**
-   * GRIDA-SEC-004 — deliberate escape hatch for hosts that run WITHOUT an OS
-   * sandbox (the `grida-agent` CLI, local dev). When true, `run_command` is
-   * exposed even though `sandbox_enforced` is false. Off by default; enabling
-   * it is an explicit, logged decision by the host author who accepts that the
-   * shell child has no kernel-level fs/network containment.
+   * GRIDA-SEC-004 — deliberate raw-execution escape hatch (the `grida-agent`
+   * CLI, local dev). When true and no {@link shell_executor} is supplied, the
+   * package injects {@link runUnsandboxedShell}. Off by default; enabling it is
+   * an
+   * explicit, logged decision by the host author who accepts that the shell
+   * child has no session-bound kernel-level filesystem containment.
    *
    * This does not affect external ACP agents; their independent disposition is
    * controlled by `external_agent_execution`.
@@ -340,20 +357,22 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           provider_http: providerHttp,
         });
       }
-      // GRIDA-SEC-004 — the single fail-closed shell decision. Shell execution
-      // is off unless the host confirmed an OS sandbox confines the tree, or it
-      // explicitly opted into an unsandboxed shell. Computed here (one auditable
-      // place) and threaded to the runtime → bindings → tool registry.
-      const shellExecutionAllowed =
-        opts.sandbox_enforced === true || opts.allow_unsandboxed_shell === true;
+      // GRIDA-SEC-004 — a finite command is a host capability, not a boolean
+      // attestation about the daemon's broad process tree. Standalone/CLI hosts
+      // retain raw execution only through the explicit unsandboxed switch.
+      const shellExecutor =
+        opts.shell_executor ??
+        (opts.allow_unsandboxed_shell === true
+          ? runUnsandboxedShell
+          : undefined);
       if (
         opts.allow_unsandboxed_shell === true &&
-        opts.sandbox_enforced !== true
+        opts.shell_executor === undefined
       ) {
         console.warn(
-          "[grida-agent] GRIDA-SEC-004: run_command exposed WITHOUT an OS sandbox " +
-            "(allow_unsandboxed_shell). The shell child has no kernel-level " +
-            "fs/network containment — only the in-process allowlist + arg checks."
+          "[grida-agent] GRIDA-SEC-004: run_command exposed with the raw executor " +
+            "(allow_unsandboxed_shell). The shell child has no session-bound " +
+            "kernel-level filesystem containment — only exact-cwd + arg checks."
         );
       }
       // Per-session scratch base (WG `scratch.md`). Host-injected; default at
@@ -365,7 +384,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       // underneath a running command by a still-in-flight async sweep.
       const scratchBase =
         opts.scratch_base ?? defaultScratchBase(services.user_data_path);
-      sweepScratch(scratchBase);
+      sweepScratch(scratchBase, services.user_data_path);
       const runtime = new AgentRuntime({
         secrets: services.secrets,
         endpoints: endpointsStore,
@@ -380,12 +399,11 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         directory_scopes: directoryScopes,
         streams,
         // GRIDA-SEC-004: the daemon's own secret dir (auth.json, sessions.db,
-        // workspaces.json, recent.json). Threaded to the shell runner so the
-        // agent's `run_command` cannot read it back into the transcript. NOT
-        // added to the srt deny_read policy — the daemon itself reads auth.json.
+        // workspaces.json, recent.json). Threaded into exact command scope so a
+        // confined executor can deny it while the daemon itself retains access.
         secrets_root: services.user_data_path,
         scratch_base: scratchBase,
-        shell_execution_allowed: shellExecutionAllowed,
+        shell_executor: shellExecutor,
         // GRIDA-SEC-004 — the sandboxed ACP disposition consumes this host
         // attestation; the explicit `enabled` disposition does not.
         sandbox_enforced: opts.sandbox_enforced === true,

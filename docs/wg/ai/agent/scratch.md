@@ -98,6 +98,13 @@ scratch lives; it receives a handle the same way it receives its working root.
 A consequence: scratch isolation is structural. One session cannot reach
 another's working files because each is handed only its own.
 
+Giving the model only one path is not sufficient when an ambient-path tool
+(such as a shell or interpreter) runs inside a host that can see the shared
+scratch parent. That tool's execution boundary MUST deny the shared parent and
+grant back only the current session's subtree, or provide an equivalent
+capability-safe mount/handle. Session isolation is an enforced authority fact,
+not prompt secrecy or cwd validation.
+
 ### S2 — Ephemeral; durability only by promotion
 
 Scratch MUST have a **bounded lifetime** and the agent MUST NOT rely on it as
@@ -140,6 +147,24 @@ authority over a workspace file. The edit operation's own current-content match
 still applies wherever that operation is used; it is intrinsic conflict
 detection, not a workspace-authorization rule.
 
+## Input staging
+
+An attachment-routing policy MAY select a route that gives tool operability to
+byte-backed input with no authorized live reference. Once selected, the host
+MUST materialize a working copy in scratch or select an explicit fallback
+allowed by the routing result. This is ingress staging, not promotion: the
+resulting descriptor names the host-owned scratch copy and grants no authority
+over any source path. A provider-native representation of the same attachment
+MAY coexist for immediate perception; the
+[compositor's routing policy](./compositor.md#resource-routing-policy) owns that
+choice and its fallbacks.
+
+The host MUST admit staged inputs against the turn's aggregate byte, file, and
+path budgets before materialization. The staged copy has scratch's ephemeral
+lifetime; if durable replay depends on those bytes, the host MUST retain or
+rematerialize them outside scratch rather than treating the descriptor as
+durable storage.
+
 ## Lifecycle
 
 - **Creation** is on demand — at session start or first use. An idle session
@@ -148,6 +173,10 @@ detection, not a workspace-authorization rule.
   retention window, or on a coarser sweep. The invariant is only that the
   lifetime is bounded and that S2 holds — nothing of value is lost, because
   value lives outside scratch by promotion.
+- **Cleanup authority** is verified before traversal. A predictable shared
+  base MUST fail closed when it is a symlink, is owned by another local
+  principal, or can be replaced through an unsafe parent. A sweep MUST NOT
+  follow session-entry symlinks into another tree; it removes the link itself.
 - **Promotion** is explicit and agent-driven: there is no implicit "scratch is
   saved" step. To keep an artifact, the agent moves it.
 

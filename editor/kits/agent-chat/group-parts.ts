@@ -8,12 +8,13 @@ import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
  * dropped. Reasoning tokens remain transport/session data, but they are not
  * user-facing transcript content.
  *
- * Note on `file` parts: user-message images render inline via a dedicated
- * branch in `message.tsx` (perceive-only attachments), NOT through this
- * grouping. Assistant `file` parts are intentionally dropped here — the agent
- * produces none in the current scope. If assistant-emitted files ever need
- * rendering, promote `file` to a first-class `RenderGroup` rather than adding
- * another ad-hoc branch.
+ * Note on `file` parts: provider-native user-message images render inline via
+ * a dedicated branch in `message.tsx`, NOT through this grouping. Their
+ * optional operable scratch descriptors remain ordinary context parts.
+ * Assistant `file` parts are intentionally dropped here — the agent produces
+ * none in the current scope. If assistant-emitted files ever need rendering,
+ * promote `file` to a first-class `RenderGroup` rather than adding another
+ * ad-hoc branch.
  */
 export type RenderGroup =
   | { type: "text"; key: string; text: string }

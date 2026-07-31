@@ -88,6 +88,7 @@ describe("desktop bridge client contract", () => {
     });
 
     expect(ai.supportsScratchSeedBase64(getDesktopBridge())).toBe(false);
+    expect(ai.supportsScratchBinaryTools(getDesktopBridge())).toBe(false);
   });
 
   it("accepts base64 scratch seeds only from an explicit host capability", () => {
@@ -97,12 +98,16 @@ describe("desktop bridge client contract", () => {
         app: { version: "0.0.0", platform: "darwin" },
         caps: {
           native: {},
-          agent: { scratch_seed_base64: true },
+          agent: {
+            scratch_seed_base64: true,
+            scratch_binary_tools: true,
+          },
         },
       } as unknown as DesktopBridge,
     });
 
     expect(ai.supportsScratchSeedBase64(getDesktopBridge())).toBe(true);
+    expect(ai.supportsScratchBinaryTools(getDesktopBridge())).toBe(true);
   });
 
   it("refuses base64 scratch seeds before calling an old host", async () => {

@@ -19,6 +19,7 @@
  */
 
 import crypto from "node:crypto";
+import { unlink } from "node:fs/promises";
 import { AGENT_SESSION_AGENT } from "../protocol/run";
 import { AGENT_DEFAULT_MODE } from "../protocol/mode";
 import {
@@ -64,7 +65,7 @@ import {
 import { discoverSkills } from "../skills/discovery";
 import { discoverProjectInstructions } from "../skills/project-instructions";
 import type { SkillBodyCache, SkillIndex } from "../skills/types";
-import type { WorkspaceRegistry } from "@grida/daemon/server";
+import type { ShellExecutor, WorkspaceRegistry } from "@grida/daemon/server";
 import {
   RunInFlightError,
   StreamRegistry,
@@ -94,6 +95,7 @@ import { runAgent, type AgentStepUsage } from "./run-agent";
 import {
   scratchRootFor,
   ensureScratch,
+  listScratchFilePaths,
   removeScratch,
   writeScratchFile,
 } from "../session/scratch";
@@ -211,15 +213,11 @@ export type AgentRuntimeDeps = ResolveDeps & {
    */
   secrets_root?: string;
   /**
-   * GRIDA-SEC-004 — whether the `run_command` shell tool may be exposed to
-   * the model. Default (undefined/false) is FAIL-CLOSED: no shell tool. The
-   * host sets this true only when the process tree is confined by an OS
-   * sandbox (srt), or when it has deliberately opted into an unsandboxed
-   * shell (the CLI). Computed once at the HTTP-server boundary from
-   * `sandbox_enforced || allow_unsandboxed_shell`; the gate itself lives in
-   * `createWorkspaceAgentBindings`. No sandbox (or no opt-in) ⇒ no shell.
+   * GRIDA-SEC-004 — host-owned finite-command capability. Omission is
+   * FAIL-CLOSED: no `run_command` tool. A Desktop host injects an OS-confined
+   * executor; explicit unsandboxed hosts inject the raw runner.
    */
-  shell_execution_allowed?: boolean;
+  shell_executor?: ShellExecutor;
   /**
    * GRIDA-SEC-004 — whether the whole process tree is confined by an OS
    * sandbox. This is an attestation consumed by the external-agent
@@ -380,18 +378,56 @@ async function prepareScratchForTurn(
   scratchDir: string,
   secretsRoot: string | undefined,
   scratchSeed: NonNullable<RunRequest["scratch_seed"]>
-): Promise<void> {
+): Promise<string[]> {
   await ensureScratch(scratchDir, secretsRoot);
   // Sequential by contract: duplicate paths are rejected at the run boundary,
   // and deterministic order keeps future seed-source extensions honest.
-  for (const file of scratchSeed) {
-    await writeScratchFile(
-      scratchDir,
-      file.path,
-      "text" in file
-        ? new TextEncoder().encode(file.text)
-        : Buffer.from(file.base64, "base64")
-    );
+  const created: string[] = [];
+  try {
+    for (const file of scratchSeed) {
+      created.push(
+        await writeScratchFile(
+          scratchDir,
+          file.path,
+          "text" in file
+            ? new TextEncoder().encode(file.text)
+            : Buffer.from(file.base64, "base64"),
+          { overwrite: false }
+        )
+      );
+    }
+  } catch (cause) {
+    try {
+      await rollbackScratchSeeds(created);
+    } catch (rollbackCause) {
+      throw new AggregateError(
+        [cause, rollbackCause],
+        "scratch seed staging and rollback failed"
+      );
+    }
+    throw cause;
+  }
+  return created;
+}
+
+/** Remove only files this request created, never a pre-existing collision. */
+async function rollbackScratchSeeds(created: readonly string[]): Promise<void> {
+  const cleanup = await Promise.allSettled(
+    created.map(async (file) => {
+      try {
+        await unlink(file);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+      }
+    })
+  );
+  const cleanupFailures = cleanup
+    .filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected"
+    )
+    .map((result) => result.reason);
+  if (cleanupFailures.length > 0) {
+    throw new AggregateError(cleanupFailures, "scratch seed rollback failed");
   }
 }
 
@@ -1056,16 +1092,21 @@ export class AgentRuntime {
       // when scratch staging or incoming persistence rejects the request.
       const pendingHumanInputKind =
         await this.deps.sessions_store.pendingHumanInputKind(sessionId);
+      const assistantTail = messages.at(-1)?.role === "assistant";
+      const continuationHasUnpersistedCallerHistory =
+        approvalAnswer !== undefined ||
+        pendingHumanInputKind !== null ||
+        assistantTail
+          ? await hasUnpersistedCallerMessage(
+              this.deps.sessions_store,
+              sessionId,
+              messages
+            )
+          : false;
       let approvalContinuation: HumanInputContinuation | undefined;
       let incomingHumanInputResult: IncomingHumanInputResult | undefined;
       if (approvalAnswer) {
-        if (
-          await hasUnpersistedCallerMessage(
-            this.deps.sessions_store,
-            sessionId,
-            messages
-          )
-        ) {
+        if (continuationHasUnpersistedCallerHistory) {
           return Response.json(
             {
               error:
@@ -1094,13 +1135,7 @@ export class AgentRuntime {
           );
         }
       } else if (pendingHumanInputKind !== null) {
-        if (
-          await hasUnpersistedCallerMessage(
-            this.deps.sessions_store,
-            sessionId,
-            messages
-          )
-        ) {
+        if (continuationHasUnpersistedCallerHistory) {
           return humanInputPendingResponse(sessionId);
         }
         const matches = await findIncomingHumanInputResults(
@@ -1120,6 +1155,21 @@ export class AgentRuntime {
           return humanInputPendingResponse(sessionId);
         }
         incomingHumanInputResult = matches[0];
+      }
+      if (
+        pendingHumanInputKind === null &&
+        assistantTail &&
+        continuationHasUnpersistedCallerHistory
+      ) {
+        return Response.json(
+          {
+            error:
+              "an assistant-tail continuation cannot add a new user or system message",
+            code: "assistant-continuation-with-new-message",
+            session_id: sessionId,
+          },
+          { status: 409 }
+        );
       }
 
       // GRIDA-SEC-004 — a persisted `directory-ref` is NOT authority. Claim the
@@ -1162,6 +1212,7 @@ export class AgentRuntime {
         req.scratch_seed.length > 0
           ? scratchRootFor(this.deps.scratch_base, sessionId)
           : undefined;
+      let stagedScratchFiles: string[] = [];
       if (req.scratch_seed && req.scratch_seed.length > 0) {
         if (!scratchDir) {
           return Response.json(
@@ -1175,7 +1226,7 @@ export class AgentRuntime {
           );
         }
         try {
-          await prepareScratchForTurn(
+          stagedScratchFiles = await prepareScratchForTurn(
             scratchDir,
             this.deps.secrets_root,
             req.scratch_seed
@@ -1200,19 +1251,40 @@ export class AgentRuntime {
       // turn can publish a late human block underneath the commit. A 409 from
       // this boundary is therefore mutation-free and safe for the renderer to
       // retry as a durable queued message.
-      if (
-        pendingHumanInputKind === null &&
-        (await this.deps.sessions_store.hasPendingHumanInput(sessionId))
-      ) {
-        return humanInputPendingResponse(sessionId);
-      }
+      try {
+        if (
+          pendingHumanInputKind === null &&
+          (await this.deps.sessions_store.hasPendingHumanInput(sessionId))
+        ) {
+          await rollbackScratchSeeds(stagedScratchFiles);
+          stagedScratchFiles = [];
+          return humanInputPendingResponse(sessionId);
+        }
 
-      // Persist only caller-owned non-assistant rows first. Assistant tool
-      // results are the continuation commit and deliberately remain untouched
-      // until every fallible preparation step above has succeeded.
-      await persistIncomingTail(this.deps.sessions_store, sessionId, messages, {
-        resolveAssistantToolResults: false,
-      });
+        // Persist only caller-owned non-assistant rows first. Assistant tool
+        // results are the continuation commit and deliberately remain untouched
+        // until every fallible preparation step above has succeeded.
+        await persistIncomingTail(
+          this.deps.sessions_store,
+          sessionId,
+          messages,
+          {
+            resolveAssistantToolResults: false,
+          }
+        );
+        // The durable descriptor now owns these bytes. Later turn-start failures
+        // leave both intact so the accepted message remains operable.
+      } catch (cause) {
+        try {
+          await rollbackScratchSeeds(stagedScratchFiles);
+        } catch (rollbackCause) {
+          throw new AggregateError(
+            [cause, rollbackCause],
+            "pre-persistence failure and scratch seed rollback failed"
+          );
+        }
+        throw cause;
+      }
 
       // Fill every non-blocking client tool result first. Human-input results
       // are excluded as a class; for a question/design-search continuation,
@@ -1569,30 +1641,50 @@ export class AgentRuntime {
     const {
       workspace_registry: workspaceRegistry,
       secrets_root: secretsRoot,
-      shell_execution_allowed: shellExecutionAllowed,
+      shell_executor: shellExecutor,
       scratch_base: scratchBase,
     } = this.deps;
+    let pumpTask: Promise<void> | undefined;
+    let commandPumpTracked = false;
     // Per-session scratch dir (WG `scratch.md`). Derived (pure) here so it can
     // ride `runDeps`; the dir is created on disk just before the model turn
-    // (below). Scratch is the sink for the shell (an allowed cwd root) AND for
-    // `generate_image` (its output dir), so derive it when EITHER is enabled —
-    // an images-only host that keeps the shell off still needs it (#920 review).
+    // (below). Structured filesystem tools are the baseline operability path,
+    // independent of optional shell/image generation, so every workspace-bound
+    // Grida turn gets scratch when the host supplies a base.
     const scratchDir =
       preparedScratchDir ??
-      (scratchBase &&
-      workspaceRoot &&
-      (shellExecutionAllowed || this.deps.image_gen_enabled === true)
+      (scratchBase && workspaceRoot
         ? scratchRootFor(scratchBase, sessionId)
         : undefined);
     // Bindings deps for the run. Typed (not an inline literal) so the
-    // GRIDA-SEC-004 `secrets_root` + `shell_execution_allowed` (and `scratch_dir`)
+    // GRIDA-SEC-004 `secrets_root` + `shell_executor` + exact scratch scope
     // thread through `runAgent`'s narrower `{ workspace_registry }` param into
     // `createWorkspaceAgentBindings`.
     const runDeps = {
       workspace_registry: workspaceRegistry,
       secrets_root: secretsRoot,
-      shell_execution_allowed: shellExecutionAllowed,
+      shell_executor: shellExecutor,
+      track_command_execution: (task: Promise<unknown>) => {
+        // The command task ends only after the host's terminal abort ACK, which
+        // follows worker exit and per-command cleanup. The pump task closes the
+        // smaller gap between that ACK and the AI SDK consuming the aborted tool
+        // promise. Runs that never execute a command keep the existing policy:
+        // an uncooperative model promise does not block replacement forever.
+        this.streams.trackSettlementTask(entry, task);
+        if (!commandPumpTracked) {
+          if (!pumpTask) {
+            throw new Error(
+              "command execution started before pump registration"
+            );
+          }
+          commandPumpTracked = this.streams.trackSettlementTask(
+            entry,
+            pumpTask
+          );
+        }
+      },
       scratch_dir: scratchDir,
+      scratch_base: scratchBase,
       // BYOK keys + the host's image-modality switch — together with scratchDir
       // they let `createWorkspaceAgentBindings` build the `generate_image`
       // binding (the produced bytes sink to scratch).
@@ -1611,7 +1703,7 @@ export class AgentRuntime {
     // Pump: open the upstream model call, forward each SSE frame into the
     // registry. Doesn't block the caller; a client attaches as another
     // consumer (HTTP) or reconnects later (a core drain has no live consumer).
-    void (async () => {
+    pumpTask = (async () => {
       try {
         // Ordering invariant for the continuation prefix: the snapshot
         // completes before ANY of this turn's frames can reach the recorder.
@@ -1625,6 +1717,9 @@ export class AgentRuntime {
         if (scratchDir && !preparedScratchDir) {
           await ensureScratch(scratchDir, secretsRoot);
         }
+        const availableScratchAttachmentPaths = scratchDir
+          ? await listScratchFilePaths(scratchDir)
+          : new Set<string>();
 
         // Agent-provider class (issue #813): the external agent owns the loop.
         // Skip compaction/model-factory/tool-injection entirely — just run one
@@ -1639,6 +1734,7 @@ export class AgentRuntime {
             // External agents do not receive our structured fs binding. A
             // durable historical descriptor remains inspectable but inert.
             availableDirectoryScopeIds: new Set(),
+            availableScratchAttachmentPaths: new Set(),
           });
           // Continuity (issue #813): resume the external agent's prior session
           // so it keeps the conversation. Read the id stored last turn, pass it
@@ -1707,6 +1803,7 @@ export class AgentRuntime {
             : await sessionsStore.listVisibleMessages(sessionId);
         const preparedMessages = buildModelMessages(visible, {
           availableDirectoryScopeIds,
+          availableScratchAttachmentPaths,
         });
 
         // Session-static skills + project instructions (discovered once).
@@ -1804,6 +1901,7 @@ export class AgentRuntime {
         streams.finishEntry(entry, reason);
       }
     })();
+    void pumpTask;
 
     return entry;
   }
@@ -1876,6 +1974,25 @@ export class AgentRuntime {
       return Response.json({ ok: true });
     }
     return Response.json({ error: "sessionId required" }, { status: 400 });
+  }
+
+  /**
+   * `DELETE /sessions/:id` — remove an idle session and its ephemeral
+   * runtime state. The admission lease spans the durable delete and scratch
+   * cleanup so a new run cannot resolve or recreate session state midway
+   * through teardown.
+   */
+  async deleteSession(sessionId: string): Promise<Response> {
+    const admission = this.acquireIdleAdmission(sessionId);
+    if (admission instanceof Response) return admission;
+    try {
+      await this.deps.sessions_store.delete(sessionId);
+      this.forgetSession(sessionId);
+      await this.removeSessionScratch(sessionId);
+      return Response.json({ ok: true });
+    } finally {
+      this.streams.releaseAdmission(admission);
+    }
   }
 
   /**
@@ -2148,7 +2265,7 @@ export class AgentRuntime {
     const base = this.deps.scratch_base;
     if (!base) return;
     try {
-      await removeScratch(base, sessionId);
+      await removeScratch(base, sessionId, this.deps.secrets_root);
     } catch (err) {
       console.warn(`[agent] scratch cleanup failed for ${sessionId}:`, err);
     }

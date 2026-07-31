@@ -26,6 +26,7 @@ import { readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
 import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import {
   AuthStore,
+  runUnsandboxedShell,
   SecretsStore,
   WorkspaceRegistry,
 } from "@grida/daemon/server";
@@ -154,7 +155,7 @@ beforeEach(async () => {
     skill_discovery: { include_user_scoped: false, stop_at: workspaceRoot },
     // Mirror the production sidecar: the host affirmed containment, so the
     // `run_command` tool is wired (GRIDA-SEC-004 fail-closed gate).
-    shell_execution_allowed: true,
+    shell_executor: runUnsandboxedShell,
   });
   registerAgentRoutes(app, runtime);
   registerSessionsRoutes(app, { store, runtime });

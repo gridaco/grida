@@ -15,28 +15,25 @@
  * gone — the OS sandbox (srt) is the structural boundary, and the supervised
  * mode's read-only-vs-mutating gate lives upstream in the command backend
  * (`runtime/command-backend.ts`, via `permissions.ts`). What remains here are
- * the two STRUCTURAL gates that hold in every mode:
+ * the request-validation gates that hold in every mode:
  *
  *   1. cwd must be `realpath`-resolvable AND contained by a
- *      currently-registered workspace OR by one of the caller-supplied
- *      `additionalAllowedRoots` (the session's scratch dir — a sanctioned
- *      ephemeral working area outside the workspace; see WG `scratch.md`).
- *      Without an opened workspace and no allowed root, the call fails.
+ *      caller-supplied exact allowed root. The agent tenant supplies only the
+ *      current session's workspace and scratch roots; a global workspace
+ *      registry is deliberately not accepted here.
  *   2. No arg may resolve to a path inside a protected-secret root
  *      (the agent host's own `userData`, where BYOK `auth.json` and
  *      the sessions db live). The srt outer policy can't deny that
  *      root — the host process itself reads it for provider auth — so
  *      this in-process arg check keeps `cat ${userData}/auth.json`
- *      from leaking the key to the shell child. See `sandbox/policy.ts`.
- *      (A kernel-level per-call deny is the planned hardening; until then
- *      this is the load-bearing guard for the host's own key — though an
- *      interpreter in `auto` can read by a computed path, which is why the
- *      per-call sub-policy is the real fix.)
+ *      from leaking the key through a direct arg. A confined
+ *      {@link ShellExecutor} also receives the protected roots and must deny
+ *      them at the finite child-process boundary. See `sandbox/policy.ts`.
  *
- * GRIDA-SEC-004: gate 2 is NOT general arg containment (deferred to the
- * srt per-cmd sub-policy). It denies exactly the secret root, nothing
- * more — so an arg's "is this a path?" guess only ever costs the secret
- * dir, never a false rejection of normal in-workspace work.
+ * GRIDA-SEC-004: gate 2 is defense-in-depth, NOT general arg containment. It
+ * denies exactly the secret root, nothing more — so an arg's "is this a path?"
+ * guess only ever costs the secret dir, never a false rejection of normal
+ * in-workspace work. Computed paths are contained by the host executor.
  *
  * Timeout: 30s hard cap. Long-running processes are killed (SIGKILL
  * after a SIGTERM grace). The route returns `exitCode: null,
@@ -50,12 +47,12 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { WorkspaceRegistry } from "../workspaces";
 import { containsPath } from "../path-contains";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_BUFFER_BYTES = 1 * 1024 * 1024; // 1 MiB combined
 const SIGTERM_GRACE_MS = 250;
+const PROCESS_GROUP_POLL_MS = 10;
 
 export type ShellRunRequest = {
   cmd: string;
@@ -78,6 +75,37 @@ export type ShellRunResult = {
   truncated: boolean;
 };
 
+export type ShellRunOptions = Readonly<{
+  /** Host-lifecycle cancellation (for example, a retired sidecar generation). */
+  signal?: AbortSignal;
+}>;
+
+/**
+ * Immutable authority the host must enforce around one finite command.
+ *
+ * The tenant derives this from server-owned session state. A confined host
+ * executor must independently bind and validate the roots before spawning;
+ * the in-process cwd/arg validation below is defense-in-depth, not the
+ * filesystem sandbox.
+ */
+export type ShellExecutionScope = Readonly<{
+  workspace_root: string;
+  scratch_root?: string;
+  scratch_base?: string;
+  protected_read_roots: ProtectedReadRoots;
+}>;
+
+/**
+ * Host-owned finite-command capability. Desktop implementations confine each
+ * invocation at the OS boundary; deliberately unsandboxed hosts may inject
+ * {@link runUnsandboxedShell} explicitly.
+ */
+export type ShellExecutor = (
+  request: ShellRunRequest,
+  scope: ShellExecutionScope,
+  signal?: AbortSignal
+) => Promise<ShellRunResult>;
+
 export type ShellRunError =
   | { code: "cwd-not-in-workspace"; cwd: string }
   | { code: "cwd-not-a-directory"; cwd: string }
@@ -93,30 +121,26 @@ export type ShellRunError =
 export type ProtectedReadRoots = readonly string[];
 
 /**
- * Absolute roots — beyond the registered workspaces — a cwd is allowed to sit
- * inside. The session's scratch dir (WG `scratch.md`): a sanctioned ephemeral
- * working area the agent may `cd`/write into without it being a workspace.
+ * Exact absolute roots a cwd may sit inside. For a workspace-bound agent this
+ * is the current session's workspace plus, when present, its own scratch root.
  * Realpath'd here for symlink stability, same as the protected roots.
  */
-export type AdditionalAllowedRoots = readonly string[];
+export type AllowedCwdRoots = readonly string[];
 
 /**
- * Validates a shell-run request against the workspace registry and the
- * protected-secret roots (the two structural gates; command identity is gated
- * upstream by mode — see the module header). Returns either `{ok, request}`
- * with the cwd-`realpath`'d request, or `{ok:false, error}` with a structured
- * error the route handler can return as 400/403.
+ * Validates a shell-run request against exact allowed cwd roots and the
+ * protected-secret roots. Command identity is gated upstream by mode — see the
+ * module header. Returns either `{ok, request}` with the cwd-`realpath`'d
+ * request, or `{ok:false, error}` with a structured error.
  *
  * `protectedReadRoots` are absolute secret roots (the agent host's
  * `userData`) the shell child must not read through any arg — see the
  * module header's gate (2). Omit for the no-bindings path.
- * `additionalAllowedRoots` are extra cwd roots (the session scratch dir).
  */
 export async function validateShellRequest(
   req: ShellRunRequest,
-  registry: WorkspaceRegistry,
-  protectedReadRoots: ProtectedReadRoots = [],
-  additionalAllowedRoots: AdditionalAllowedRoots = []
+  allowedCwdRoots: AllowedCwdRoots,
+  protectedReadRoots: ProtectedReadRoots = []
 ): Promise<
   { ok: true; request: ShellRunRequest } | { ok: false; error: ShellRunError }
 > {
@@ -149,22 +173,15 @@ export async function validateShellRequest(
   if (!stat.isDirectory()) {
     return { ok: false, error: { code: "cwd-not-a-directory", cwd: req.cwd } };
   }
-  // Force the registry to be loaded — the route handler calls
-  // `registry.list()` upstream so this is usually warm, but the sync
-  // `containsPath` requires it.
-  await registry.list();
-  // cwd is allowed inside a registered workspace OR a caller-supplied extra
-  // root (the session scratch dir). Scratch is NOT a workspace (WG `scratch.md`
-  // S5), so it goes through this separate allowance — keeping the workspace
-  // registry and its semantics untouched.
-  const inWorkspace = registry.containsPath(realCwd);
+  // Bind cwd to THIS command grant, never the process-global registry. A
+  // daemon can have many opened workspaces and many session scratch roots; the
+  // current command receives exactly one workspace and at most one scratch.
   const inAllowedRoot =
-    !inWorkspace &&
-    additionalAllowedRoots.length > 0 &&
-    (await realpathRoots(additionalAllowedRoots)).some((r) =>
-      containsPath(r, realCwd)
+    allowedCwdRoots.length > 0 &&
+    (await realpathRoots(allowedCwdRoots)).some((root) =>
+      containsPath(root, realCwd)
     );
-  if (!inWorkspace && !inAllowedRoot) {
+  if (!inAllowedRoot) {
     return {
       ok: false,
       error: { code: "cwd-not-in-workspace", cwd: realCwd },
@@ -255,17 +272,22 @@ async function realpathNearest(abs: string): Promise<string> {
 }
 
 /**
- * Runs the validated request. The caller is expected to have run
- * `validateShellRequest` first; this function does NOT re-validate
- * (passing an unvalidated request is a programming error).
+ * Low-level raw process runner. It does NOT validate or confine the request:
+ * callers either run `validateShellRequest` first under an explicit
+ * unsandboxed posture, or pass an already sandbox-wrapped command from a
+ * trusted host executor.
  *
  * Always resolves — never rejects on child failure. Non-zero exit,
  * signal kill, and timeout are all expressed in the returned
  * `ShellRunResult`.
  */
-export async function runShell(req: ShellRunRequest): Promise<ShellRunResult> {
+export async function runShell(
+  req: ShellRunRequest,
+  options: ShellRunOptions = {}
+): Promise<ShellRunResult> {
   const timeoutMs = Math.min(req.timeout_ms ?? DEFAULT_TIMEOUT_MS, 60_000);
   const startedAt = Date.now();
+  const ownsProcessGroup = process.platform !== "win32";
 
   return await new Promise<ShellRunResult>((resolve) => {
     // `shell: false` is critical — args are passed straight to the
@@ -275,6 +297,12 @@ export async function runShell(req: ShellRunRequest): Promise<ShellRunResult> {
     const child = spawn(req.cmd, req.args, {
       cwd: req.cwd,
       shell: false,
+      // A finite command owns a fresh POSIX process group. Timeout, host abort,
+      // and even a normally exiting wrapper terminate the whole group before
+      // the caller releases command-scoped filesystem authority. Windows
+      // Desktop withholds run_command; the raw CLI fallback retains direct
+      // child termination there.
+      detached: ownsProcessGroup,
       // Fresh-ish env — keep PATH so the shell can find binaries, but
       // strip anything the agent host might have set that shouldn't leak
       // into a user-issued command. A fuller env scrub waits for srt.
@@ -295,25 +323,79 @@ export async function runShell(req: ShellRunRequest): Promise<ShellRunResult> {
     let truncated = false;
     let timedOut = false;
     let killTimer: NodeJS.Timeout | null = null;
+    let terminationStarted = false;
+    let settled = false;
 
-    const timeout = setTimeout(() => {
-      timedOut = true;
+    const terminate = (fromTimeout: boolean) => {
+      if (terminationStarted) return;
+      terminationStarted = true;
+      if (fromTimeout) timedOut = true;
       // SIGTERM first, then SIGKILL after a short grace if the child
       // hasn't exited. Matches Unix convention; gives well-behaved
       // children a chance to clean up.
-      try {
-        child.kill("SIGTERM");
-      } catch {
-        // already dead
-      }
+      signalProcessTree(child.pid, child, ownsProcessGroup, "SIGTERM");
       killTimer = setTimeout(() => {
-        try {
-          child.kill("SIGKILL");
-        } catch {
-          // already dead
-        }
+        signalProcessTree(child.pid, child, ownsProcessGroup, "SIGKILL");
       }, SIGTERM_GRACE_MS);
-    }, timeoutMs);
+    };
+    const timeout = setTimeout(() => terminate(true), timeoutMs);
+    const abort = () => terminate(false);
+
+    const cleanupListeners = () => {
+      clearTimeout(timeout);
+      options.signal?.removeEventListener("abort", abort);
+    };
+
+    const finish = async (
+      exitCode: number | null,
+      exitSignal: NodeJS.Signals | null,
+      spawnError?: Error
+    ) => {
+      if (settled) return;
+      settled = true;
+      // Report command lifetime through the child exit/error event. Process-
+      // group revocation below is a host cleanup barrier, not command work,
+      // and can consume one or two grace windows independently.
+      const durationMs = Date.now() - startedAt;
+      cleanupListeners();
+
+      // A shell wrapper can exit successfully after launching a background
+      // descendant. Revoke that group's lifetime before the host removes its
+      // private temp or releases SRT's per-command state.
+      if (ownsProcessGroup && child.pid) {
+        if (!terminationStarted) {
+          terminationStarted = true;
+          signalProcessTree(child.pid, child, true, "SIGTERM");
+        }
+        const afterTerm = await waitForProcessGroupExit(
+          child.pid,
+          SIGTERM_GRACE_MS
+        );
+        if (afterTerm !== "exited") {
+          // An unknown status (for example EPERM from kill(-pgid, 0)) cannot
+          // prove revocation. Escalate immediately rather than spending a
+          // grace window repeatedly making an unverifiable probe.
+          signalProcessTree(child.pid, child, true, "SIGKILL");
+          await waitForProcessGroupExit(child.pid, SIGTERM_GRACE_MS);
+        }
+      }
+      if (killTimer) clearTimeout(killTimer);
+
+      resolve({
+        cmd: req.cmd,
+        args: req.args,
+        cwd: req.cwd,
+        exit_code: spawnError ? -1 : exitCode,
+        signal: exitSignal ?? null,
+        stdout,
+        stderr: spawnError
+          ? stderr + `\n[spawn error] ${spawnError.message}`
+          : stderr,
+        duration_ms: durationMs,
+        timed_out: timedOut,
+        truncated,
+      });
+    };
 
     const append = (which: "stdout" | "stderr", chunk: Buffer) => {
       if (truncated) return;
@@ -337,37 +419,79 @@ export async function runShell(req: ShellRunRequest): Promise<ShellRunResult> {
       // Spawn-time errors (ENOENT etc.) surface here. Treat as
       // exit code -1 with the error message in stderr so the client
       // gets a meaningful response.
-      clearTimeout(timeout);
-      if (killTimer) clearTimeout(killTimer);
-      resolve({
-        cmd: req.cmd,
-        args: req.args,
-        cwd: req.cwd,
-        exit_code: -1,
-        signal: null,
-        stdout,
-        stderr: stderr + `\n[spawn error] ${err.message}`,
-        duration_ms: Date.now() - startedAt,
-        timed_out: timedOut,
-        truncated,
-      });
+      void finish(null, null, err);
     });
 
     child.on("exit", (code, signal) => {
-      clearTimeout(timeout);
-      if (killTimer) clearTimeout(killTimer);
-      resolve({
-        cmd: req.cmd,
-        args: req.args,
-        cwd: req.cwd,
-        exit_code: code,
-        signal: signal ?? null,
-        stdout,
-        stderr,
-        duration_ms: Date.now() - startedAt,
-        timed_out: timedOut,
-        truncated,
-      });
+      void finish(code, signal);
     });
+
+    if (options.signal?.aborted) abort();
+    else options.signal?.addEventListener("abort", abort, { once: true });
   });
 }
+
+function signalProcessTree(
+  pid: number | undefined,
+  child: ReturnType<typeof spawn>,
+  ownsProcessGroup: boolean,
+  signal: NodeJS.Signals
+): void {
+  if (ownsProcessGroup && pid) {
+    try {
+      process.kill(-pid, signal);
+      return;
+    } catch (error) {
+      if (isNoSuchProcess(error)) return;
+      // Fall through to the direct child as defense in depth.
+    }
+  }
+  try {
+    child.kill(signal);
+  } catch {
+    // already dead
+  }
+}
+
+async function waitForProcessGroupExit(
+  pid: number,
+  timeoutMs: number
+): Promise<ProcessGroupStatus> {
+  const deadline = Date.now() + timeoutMs;
+  while (true) {
+    const status = processGroupStatus(pid);
+    if (status !== "alive") return status;
+    if (Date.now() >= deadline) return "alive";
+    await new Promise((resolve) => setTimeout(resolve, PROCESS_GROUP_POLL_MS));
+  }
+}
+
+type ProcessGroupStatus = "alive" | "exited" | "unknown";
+
+function processGroupStatus(pid: number): ProcessGroupStatus {
+  try {
+    process.kill(-pid, 0);
+    return "alive";
+  } catch (error) {
+    return isNoSuchProcess(error) ? "exited" : "unknown";
+  }
+}
+
+function isNoSuchProcess(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "ESRCH"
+  );
+}
+
+/**
+ * Explicitly unsafe adapter for hosts that intentionally expose the raw
+ * process runner without an OS confinement layer.
+ *
+ * Keeping this separate from {@link runShell} prevents the low-level runner
+ * from being accidentally assigned as a {@link ShellExecutor}: the latter
+ * receives a security scope that a real host executor must enforce.
+ */
+export const runUnsandboxedShell: ShellExecutor = (request, _scope, signal) =>
+  runShell(request, { signal });

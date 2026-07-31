@@ -69,7 +69,15 @@ export namespace InputResourcePolicy {
         remoteUrlMimes: readonly string[];
       };
       /** Absent when the surface has no tool-visible scratch. */
-      scratch?: ScratchSeedBudget.Limits;
+      scratch?: ScratchSeedBudget.Limits & {
+        /**
+         * Whether scratch has a confined byte-oriented tool such as
+         * `run_command`. False still permits raster images (`view_image`) and
+         * structured text (`read_file`); arbitrary binary paths would be
+         * inoperable and are rejected.
+         */
+        binaryTools?: boolean;
+      };
     };
   };
 
@@ -79,6 +87,7 @@ export namespace InputResourcePolicy {
     | "host-scope-reference"
     | "provider-url-inline-attachment"
     | "provider-url-remote-attachment"
+    | "provider-and-scratch-bytes-attachment"
     | "provider-bytes-attachment"
     | "scratch-attachment";
 
@@ -100,6 +109,12 @@ export namespace InputResourcePolicy {
         from: "url" | "bytes";
         representation: "inline-bytes" | "remote-url";
       }
+    | {
+        kind: "attachment";
+        via: "provider-and-scratch";
+        from: "bytes";
+        representation: "inline-bytes";
+      }
     | { kind: "attachment"; via: "scratch"; from: "bytes" };
 
   export type UnavailableReason =
@@ -107,9 +122,11 @@ export namespace InputResourcePolicy {
     | "reference-capability-unavailable"
     | "provider-capability-unavailable"
     | "scratch-unavailable"
+    | "scratch-binary-tools-required"
     | "file-too-large"
     | "scratch-file-count-exceeded"
     | "scratch-budget-exceeded"
+    | "draft-operable-copy-budget-exceeded"
     | "directory-cannot-be-attached"
     | "directory-reference-required";
 
@@ -148,7 +165,8 @@ export namespace InputResourcePolicy {
 
   /** Today's product behavior, expressed centrally rather than in React:
    * existing paths stay references; directories become host scopes; Library
-   * images and byte images become provider parts; other bytes go to scratch. */
+   * images become provider parts; byte images use provider-native perception
+   * plus a byte-exact scratch copy; other bytes go to scratch. */
   export const CURRENT: Config = {
     id: "current",
     rules: [
@@ -179,7 +197,11 @@ export namespace InputResourcePolicy {
           resource.kind === "file" &&
           resource.media === "raster-image" &&
           resource.available.bytes === true,
-        prefer: ["provider-bytes-attachment"],
+        prefer: [
+          "provider-and-scratch-bytes-attachment",
+          "provider-bytes-attachment",
+          "scratch-attachment",
+        ],
       },
       {
         id: "byte-file",
@@ -223,7 +245,11 @@ export namespace InputResourcePolicy {
           resource.kind === "file" &&
           resource.media === "raster-image" &&
           resource.available.bytes === true,
-        prefer: ["provider-bytes-attachment"],
+        prefer: [
+          "provider-and-scratch-bytes-attachment",
+          "provider-bytes-attachment",
+          "scratch-attachment",
+        ],
       },
       {
         id: "byte-file",
@@ -337,28 +363,53 @@ export namespace InputResourcePolicy {
         return providerRoute("url", "inline-bytes", resource, capabilities);
       case "provider-url-remote-attachment":
         return providerRoute("url", "remote-url", resource, capabilities);
-      case "provider-bytes-attachment":
-        return providerRoute("bytes", "inline-bytes", resource, capabilities);
-      case "scratch-attachment": {
-        if (resource.kind === "directory") {
-          return { reason: "directory-cannot-be-attached" };
-        }
-        if (!resource.available.bytes) {
-          return { reason: "representation-unavailable" };
-        }
-        const scratch = capabilities.attachment.scratch;
-        if (!scratch) return { reason: "scratch-unavailable" };
-        if (
-          resource.size !== undefined &&
-          resource.size > scratch.maxFileBytes
-        ) {
-          return { reason: "file-too-large" };
-        }
+      case "provider-and-scratch-bytes-attachment": {
+        const provider = providerRoute(
+          "bytes",
+          "inline-bytes",
+          resource,
+          capabilities
+        );
+        if (!provider.route) return { reason: provider.reason };
+        const scratch = scratchRoute(resource, capabilities);
+        if (!scratch.route) return { reason: scratch.reason };
         return {
-          route: { kind: "attachment", via: "scratch", from: "bytes" },
+          route: {
+            kind: "attachment",
+            via: "provider-and-scratch",
+            from: "bytes",
+            representation: "inline-bytes",
+          },
         };
       }
+      case "provider-bytes-attachment":
+        return providerRoute("bytes", "inline-bytes", resource, capabilities);
+      case "scratch-attachment":
+        return scratchRoute(resource, capabilities);
     }
+  }
+
+  function scratchRoute(
+    resource: Readonly<ResourceFacts>,
+    capabilities: Readonly<Capabilities>
+  ): { route?: Route; reason?: UnavailableReason } {
+    if (resource.kind === "directory") {
+      return { reason: "directory-cannot-be-attached" };
+    }
+    if (!resource.available.bytes) {
+      return { reason: "representation-unavailable" };
+    }
+    const scratch = capabilities.attachment.scratch;
+    if (!scratch) return { reason: "scratch-unavailable" };
+    if (scratch.binaryTools === false && requiresScratchBinaryTools(resource)) {
+      return { reason: "scratch-binary-tools-required" };
+    }
+    if (resource.size !== undefined && resource.size > scratch.maxFileBytes) {
+      return { reason: "file-too-large" };
+    }
+    return {
+      route: { kind: "attachment", via: "scratch", from: "bytes" },
+    };
   }
 
   function providerRoute(
@@ -405,6 +456,36 @@ export namespace InputResourcePolicy {
         representation,
       },
     };
+  }
+
+  function requiresScratchBinaryTools(
+    resource: Readonly<ResourceFacts>
+  ): boolean {
+    if (resource.media === "raster-image") return false;
+
+    const mime = resource.mimeType?.split(";", 1)[0]?.trim().toLowerCase();
+    if (
+      mime?.startsWith("text/") ||
+      mime === "image/svg+xml" ||
+      mime === "application/json" ||
+      mime?.endsWith("+json") ||
+      mime === "application/xml" ||
+      mime?.endsWith("+xml") ||
+      mime === "application/javascript" ||
+      mime === "application/typescript" ||
+      mime === "application/yaml" ||
+      mime === "application/x-yaml" ||
+      mime === "application/toml" ||
+      mime === "application/sql"
+    ) {
+      return false;
+    }
+
+    if (mime) return true;
+
+    return !/\.(?:c|cc|cpp|css|csv|go|h|hpp|html?|ini|java|js|jsx|json|jsonl|md|mdx|mjs|py|rb|rs|sh|sql|svg|toml|ts|tsx|txt|xml|ya?ml)$/i.test(
+      resource.name
+    );
   }
 }
 import type { ScratchSeedBudget } from "./scratch-seed-budget";

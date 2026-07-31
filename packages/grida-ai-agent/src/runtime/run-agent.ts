@@ -192,6 +192,11 @@ export async function runAgent(
     library?: boolean;
     /** In-process provider HTTP. Used here only for AI SDK URL-part downloads. */
     provider_http?: ProviderHttp;
+    /**
+     * Register a finite command with the owning runtime turn's terminal
+     * settlement. Omitted by callers that do not own a run registry.
+     */
+    track_command_execution?: (task: Promise<unknown>) => void;
   }
 ): Promise<Response> {
   // Wire bindings when the request carries workspace context OR host-authorized
@@ -219,6 +224,11 @@ export async function runAgent(
       // host enabled it, a scratch sink exists, and a provider key is present.
       image_gen: bindings?.image_gen,
       command: bindings?.command,
+      // Scratch is a structured-filesystem capability even when the fail-closed
+      // host posture withholds shell execution. The binding exposes only the
+      // exact real root it already mounted into `fs`; this is prompt metadata,
+      // not an additional path grant.
+      scratch_dir: bindings?.scratch_dir,
       // RFC skills + project instructions are session-static context the
       // runtime discovered once and threads through every turn. When scratch is
       // wired (workspace path), the loader MATERIALIZES a loaded skill's tree into

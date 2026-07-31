@@ -284,6 +284,93 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
     expect(res.status).toBe(409);
   });
 
+  it("DELETE refuses while a run is in flight and preserves the session", async () => {
+    const { id } = await seed(1);
+    streams.create(id);
+
+    const res = await app.request(`/sessions/${id}`, { method: "DELETE" });
+
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe(
+      "run_in_flight"
+    );
+    expect(await store.get(id)).not.toBeNull();
+  });
+
+  it("DELETE holds admission across the DB delete and scratch cleanup", async () => {
+    const { id } = await seed(1);
+    const originalDelete = store.delete.bind(store);
+    let enteredDelete!: () => void;
+    const insideDelete = new Promise<void>((resolve) => {
+      enteredDelete = resolve;
+    });
+    let releaseDelete!: () => void;
+    const deleteGate = new Promise<void>((resolve) => {
+      releaseDelete = resolve;
+    });
+    let enteredCleanup!: () => void;
+    const insideCleanup = new Promise<void>((resolve) => {
+      enteredCleanup = resolve;
+    });
+    let releaseCleanup!: () => void;
+    const cleanupGate = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    const deleteSpy = vi
+      .spyOn(store, "delete")
+      .mockImplementation(async (sid) => {
+        if (sid === id) {
+          enteredDelete();
+          await deleteGate;
+        }
+        await originalDelete(sid);
+      });
+    const cleanupSpy = vi
+      .spyOn(runtime, "removeSessionScratch")
+      .mockImplementation(async (sid) => {
+        if (sid === id) {
+          enteredCleanup();
+          await cleanupGate;
+        }
+      });
+
+    const expectRunRejected = async (messageId: string) => {
+      const loser = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          session_id: id,
+          messages: [{ id: messageId, role: "user", content: "race" }],
+        }),
+      });
+      expect(loser.status).toBe(409);
+      expect(((await loser.json()) as { code?: string }).code).toBe(
+        "run_in_flight"
+      );
+      expect(await store.getMessage(messageId)).toBeNull();
+    };
+
+    try {
+      const deletion = app.request(`/sessions/${id}`, { method: "DELETE" });
+      await insideDelete;
+      await expectRunRejected("user-during-session-delete");
+
+      releaseDelete();
+      await insideCleanup;
+      expect(await store.get(id)).toBeNull();
+      await expectRunRejected("user-during-scratch-cleanup");
+
+      releaseCleanup();
+      const res = await deletion;
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+    } finally {
+      releaseDelete();
+      releaseCleanup();
+      deleteSpy.mockRestore();
+      cleanupSpy.mockRestore();
+    }
+  });
+
   it("rewind 404s for an unknown session", async () => {
     const res = await app.request(`/sessions/ses_nope/rewind`, {
       method: "POST",

@@ -151,6 +151,15 @@ export class SessionsStore {
     this.db = opened.db;
   }
 
+  /**
+   * Run a short store mutation as one SQLite transaction. The opened DB's
+   * re-entrant owner gate lets ordinary store methods be called inside `fn`
+   * without interleaving another operation on the shared connection.
+   */
+  async withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+    return await this.opened.withTx(fn);
+  }
+
   // ──────────────────────────── sessions ────────────────────────────
 
   async create(input: CreateSessionInput): Promise<ChatSessionRow> {

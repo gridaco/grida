@@ -1,12 +1,11 @@
 /**
- * Operable (non-image) file attachments for the agent composer.
+ * Operable file representations for the agent composer.
  *
- * The sibling of {@link ./image-attachment}, for the OTHER half of "+ upload":
- * an arbitrary file (PDF, zip, docx, code, …) the model cannot perceive as
- * pixels. Instead of an inline `file` part, the bytes ride `scratch_seed` into
- * the session scratch dir (WG `scratch.md` / `binary.md`) and the agent reads or
- * extracts them there BY PATH via its shell — so it works for every file type,
- * not just what a provider natively decodes.
+ * An arbitrary upload (PDF, zip, docx, code, image, …) can ride `scratch_seed`
+ * into the session scratch dir (WG `scratch.md` / `binary.md`) so the agent can
+ * read, convert, or extract it there BY PATH. Raster images additionally keep
+ * the provider-native representation from {@link ./image-attachment}; the
+ * resource router deliberately delivers both whenever scratch is available.
  *
  * Two pure steps, framework-free and unit-tested:
  *   - {@link readFileAsBase64} — a `File` → base64 (no downscale; a raw byte
@@ -63,6 +62,12 @@ export type EncodedOperableFile = {
 export type EncodedOperableResource = EncodedOperableFile & {
   /** Stable within the composer message; used to derive a collision-safe path. */
   id: string;
+  /**
+   * Zero-based index among provider-native `file` parts in the same user
+   * message. Present when this scratch body is the operable twin of an inline
+   * provider image.
+   */
+  providerFileIndex?: number;
 };
 
 /**
@@ -150,6 +155,9 @@ export function lowerOperableFiles(
       mime: file.mime || "application/octet-stream",
       size: file.size,
       path,
+      ...(file.providerFileIndex !== undefined
+        ? { provider_file_index: file.providerFileIndex }
+        : {}),
     });
   }
   if (scratchSeed.length === 0) return { scratchSeed: [], context: null };
@@ -165,10 +173,10 @@ export function lowerOperableFiles(
 /**
  * Split a composer message's `file-attachment` parts into scratch-upload entries
  * + the context part that names them for the model. Only parts carrying
- * `payload.base64` (operable files) are claimed; perceive images (inline `url`)
- * are left for `toFileUiParts`. Scratch paths are sanitized to one safe segment
- * and deduped within the batch. Compatibility adapter; new code should use
- * {@link lowerOperableFiles}. Pure.
+ * `payload.base64` (operable files) are claimed; legacy inline-only images
+ * (`url` with no raw payload) are left for `toFileUiParts`. Scratch paths are
+ * sanitized to one safe segment and deduped within the batch. Compatibility
+ * adapter; new code should use {@link lowerOperableFiles}. Pure.
  */
 export function extractOperableFiles(
   parts: readonly AttachmentPartLike[]

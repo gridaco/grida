@@ -41,6 +41,12 @@ export type UserFileAttachmentDescriptor = {
   size: number;
   /** Flat scratch-relative path used by filesystem and shell tools. */
   path: string;
+  /**
+   * Zero-based index among provider-native `file` parts in this user message.
+   * Present only when that provider part and this scratch path are two
+   * representations of the same attached resource.
+   */
+  provider_file_index?: number;
 };
 
 /** Persisted payload of {@link USER_FILE_ATTACHMENTS}. File order is semantic. */
@@ -51,14 +57,15 @@ export type UserFileAttachmentsData = {
 
 /**
  * The user attached one or more files to the turn. The part's `.data` payload
- * carries LEAN facts — `{ location: "scratch", files: [{ name, mime, size, path }] }`
- * — NOT instructions. `name` is display metadata; `path` is the stable,
- * scratch-relative address. The file BYTES ride `scratch_seed` into session
- * scratch separately and MUST be staged before this part is persisted; the
- * agent reads or extracts them there via filesystem or shell tools (WG
- * `scratch.md` / `binary.md`).
- * Non-image files land here; an inline raster image rides the perceive-only
- * `file` part instead (it needs no tool call to be seen).
+ * carries LEAN facts — `{ location: "scratch", files: [{ name, mime, size,
+ * path, provider_file_index? }] }` — NOT instructions. `name` is display
+ * metadata; `path` is the stable, scratch-relative address. The file BYTES ride
+ * `scratch_seed` into session scratch separately and MUST be staged before this
+ * part is persisted; the agent reads or extracts them there via filesystem or
+ * shell tools (WG `scratch.md` / `binary.md`). A raster upload can also ride a
+ * provider-native `file` part in the same message: the inline part supplies
+ * immediate perception while this descriptor names the byte-exact operable
+ * copy, and `provider_file_index` correlates the two representations.
  */
 export const USER_FILE_ATTACHMENTS = "data-user_file_attachments";
 

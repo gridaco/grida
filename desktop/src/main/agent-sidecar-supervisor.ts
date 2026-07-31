@@ -49,6 +49,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { home } from "@grida/home";
 import {
+  defaultScratchBase,
+  prepareScratchAuthority,
+} from "@grida/agent/server";
+import {
   ensureInitialized,
   wrap,
   dispose,
@@ -61,6 +65,7 @@ import { AgentNetworkAuthority } from "./agent-network-authority";
 import { AgentNetworkHost } from "./agent-network-host";
 import { AgentDaemonSocketHost } from "./agent-daemon-socket-host";
 import { DesktopAgentSandboxPolicy } from "./agent-sandbox-policy";
+import { AgentCommandHost, sweepAgentCommandTemps } from "./agent-command-host";
 
 export type AgentSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -85,6 +90,8 @@ export class AgentSidecarSupervisor {
   private isShuttingDown = false;
   private restartTimer: NodeJS.Timeout | null = null;
   private sandboxReady = false;
+  private scratchBase: string | null = null;
+  private commandHost: AgentCommandHost | null = null;
   private readonly networkAuthority = new AgentNetworkAuthority(
     new URL(EDITOR_BASE_URL).origin
   );
@@ -237,6 +244,19 @@ export class AgentSidecarSupervisor {
    */
   private async initSandbox(): Promise<void> {
     if (this.sandboxReady) return;
+    // Resolve temp in trusted Electron main before SRT rewrites the sidecar's
+    // TMPDIR to its shared compatibility directory. Session scratch must live
+    // outside those unconditional write defaults so a per-command deny of the
+    // shared base can carve back exactly one session.
+    this.scratchBase = defaultScratchBase(
+      this.user_data_path,
+      app.getPath("temp")
+    );
+    // Establish the predictable temp authority before any listing/removal.
+    // This rejects a foreign-owned or symlinked base, then safely reclaims
+    // command-temp remnants left by a prior crash.
+    prepareScratchAuthority(this.scratchBase, this.user_data_path);
+    await sweepAgentCommandTemps(this.scratchBase);
     if (!isSupportedPlatform()) {
       // Windows or another unsupported platform. Log loudly and let
       // the spawn proceed unwrapped — the alternative is refusing
@@ -281,6 +301,12 @@ export class AgentSidecarSupervisor {
         allowWrite: policy.filesystem.allow_write,
         denyWrite: policy.filesystem.deny_write,
       },
+    });
+    this.commandHost = new AgentCommandHost({
+      scratchBase: this.scratchBase,
+      userData: this.user_data_path,
+      home: app.getPath("home"),
+      filesystemPolicy: policy.filesystem,
     });
     this.sandboxReady = true;
   }
@@ -335,9 +361,13 @@ export class AgentSidecarSupervisor {
     const supportedSandbox = isSupportedPlatform();
 
     const skillsRoot = this.skillsRootPath();
+    if (!this.scratchBase) {
+      throw new Error("agent scratch authority was not initialized");
+    }
     const args = [
       scriptPath,
       `--user-data=${this.user_data_path}`,
+      `--scratch-base=${this.scratchBase}`,
       // Host-bundled skills dir (repo-root `skills/`) — the built-in skills the
       // agent advertises + loads on demand. Read-only; omitted if unresolved.
       ...(skillsRoot ? [`--skills-root=${skillsRoot}`] : []),
@@ -347,9 +377,9 @@ export class AgentSidecarSupervisor {
       // ready app, which holds at spawn time (post `app.whenReady`).
       `--projects-root=${path.join(app.getPath("documents"), "Grida")}`,
       `--editor-base-url=${EDITOR_BASE_URL}`,
-      // GRIDA-SEC-004 — tell the sidecar whether srt wraps this spawn. Only
-      // then does it expose the `run_command` shell tool (fail-closed). On
-      // platforms srt can't wrap, this is "0" and the agent gets no shell.
+      // GRIDA-SEC-004 — attest the coarse outer SRT wrap. The sidecar exposes
+      // `run_command` only when this is true AND main injected the private
+      // per-command executor above. On unsupported platforms both are absent.
       `--sandbox-enforced=${supportedSandbox ? "1" : "0"}`,
     ];
     let wrappedCmd: string | null = null;
@@ -478,7 +508,8 @@ export class AgentSidecarSupervisor {
           input: child.stdout!,
           output: child.stdin!,
           authority: this.networkAuthority,
-          onFatal: (error) => failSpawnChannel("provider channel", error),
+          onFatal: (error) => failSpawnChannel("capability channel", error),
+          commandExecutor: this.commandHost?.shellExecutor,
         });
         spawnNetworkHost = host;
         if (!this.isCurrentGeneration(child, generation) || resolved) {
@@ -502,7 +533,7 @@ export class AgentSidecarSupervisor {
         resolve(this.info);
       })().catch((error) => {
         failSpawnChannel(
-          "provider channel startup",
+          "capability channel startup",
           error instanceof Error ? error : new Error(String(error))
         );
       });

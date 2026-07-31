@@ -104,6 +104,25 @@ orthogonal: it remains enabled by default for compatibility, and a host with a
 listener-independent request transport can pass `allow_local_binding: false`.
 The outbound default is `"allowlisted"`, preserving CLI behavior.
 
+## Finite command execution
+
+`run_command` is exposed only when a host injects `shell_executor`. Each call
+receives the validated command plus an immutable scope naming the current
+workspace, optional own-session scratch, shared scratch base, and protected
+read roots. The executor is the authority boundary: Desktop sends the request
+to Electron main and creates a fresh OS-sandbox profile for that finite process.
+The boolean `sandbox_enforced` attests only the coarse process tree (used by the
+external-agent disposition); it cannot expose raw shell by itself.
+
+The tool abort signal is part of the executor contract. Desktop acknowledges an
+aborted command only after the worker has returned and its per-command
+authority has been cleaned up; the runtime keeps the owning session occupied
+until that acknowledgement and the aborted model pump settle.
+
+A standalone host that deliberately accepts ambient filesystem authority may
+set `allow_unsandboxed_shell`; this injects the package's raw runner and logs
+the weaker posture. Omission of both options withholds the tool.
+
 ## Anti-goals
 
 The perimeter that keeps this package small. A feature request that

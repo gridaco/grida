@@ -1,9 +1,297 @@
 import { PassThrough, Transform } from "node:stream";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AgentSidecarChannel } from "./agent-sidecar-channel";
 import { AgentSidecarNetwork } from "./agent-sidecar-network";
 
 describe("AgentSidecarNetwork", () => {
+  it("executes a host command and reconstructs the daemon shell result", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    const result = harness.network.shellExecutor(
+      {
+        cmd: "node",
+        args: ["script.js", "--mode=test"],
+        cwd: "/workspace/project",
+        timeout_ms: 12_345,
+      },
+      {
+        workspace_root: "/workspace",
+        scratch_root: "/scratch/session-1",
+        scratch_base: "/scratch",
+        protected_read_roots: ["/agent-home"],
+      }
+    );
+
+    const request = await harness.untilFrame("command.request");
+    expect(request).toEqual({
+      v: 1,
+      type: "command.request",
+      requestId: request.requestId,
+      command: "node",
+      args: ["script.js", "--mode=test"],
+      workdir: "/workspace/project",
+      timeoutMs: 12_345,
+      workspaceRoot: "/workspace",
+      scratchDir: "/scratch/session-1",
+    });
+    await harness.host.write({
+      v: 1,
+      type: "command.output",
+      requestId: request.requestId,
+      stream: "stdout",
+      sequence: 0,
+      data: "hello, ",
+    });
+    await harness.host.write({
+      v: 1,
+      type: "command.output",
+      requestId: request.requestId,
+      stream: "stderr",
+      sequence: 1,
+      data: "warning\n",
+    });
+    await harness.host.write({
+      v: 1,
+      type: "command.output",
+      requestId: request.requestId,
+      stream: "stdout",
+      sequence: 2,
+      data: "세계\n",
+    });
+    await harness.host.write({
+      v: 1,
+      type: "command.end",
+      requestId: request.requestId,
+      sequence: 3,
+      exitCode: 0,
+      signal: null,
+      timedOut: false,
+      truncated: false,
+      durationMs: 42,
+    });
+
+    await expect(result).resolves.toEqual({
+      cmd: "node",
+      args: ["script.js", "--mode=test"],
+      cwd: "/workspace/project",
+      exit_code: 0,
+      signal: null,
+      stdout: "hello, 세계\n",
+      stderr: "warning\n",
+      duration_ms: 42,
+      timed_out: false,
+      truncated: false,
+    });
+    harness.network.close();
+  });
+
+  it("omits absent optional command scope fields and propagates host errors", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    const result = harness.network.shellExecutor(
+      { cmd: "pwd", args: [], cwd: "/workspace" },
+      {
+        workspace_root: "/workspace",
+        protected_read_roots: [],
+      }
+    );
+    const request = await harness.untilFrame("command.request");
+    expect(request).not.toHaveProperty("timeoutMs");
+    expect(request).not.toHaveProperty("scratchDir");
+
+    const rejection = result.catch((error: unknown) => error);
+    await harness.host.write({
+      v: 1,
+      type: "command.error",
+      requestId: request.requestId,
+      message: "host refused the command scope",
+    });
+    expect(await rejection).toMatchObject({
+      message: expect.stringMatching(/refused the command scope/),
+    });
+    harness.network.close();
+  });
+
+  it("sends command.abort and ignores a terminal response that races cancellation", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    const fatal = vi.fn<(error: Error) => void>();
+    harness.network.onFatal(fatal);
+    const controller = new AbortController();
+    const result = harness.network.shellExecutor(
+      { cmd: "sleep", args: ["60"], cwd: "/workspace" },
+      {
+        workspace_root: "/workspace",
+        protected_read_roots: [],
+      },
+      controller.signal
+    );
+    const request = await harness.untilFrame("command.request");
+    let settled = false;
+    void result.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      }
+    );
+
+    controller.abort("user stopped the turn");
+
+    await expect(harness.untilFrame("command.abort")).resolves.toEqual({
+      v: 1,
+      type: "command.abort",
+      requestId: request.requestId,
+      reason: "caller aborted",
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(settled).toBe(false);
+
+    // Main may have already queued output before it observes command.abort.
+    // Those frames belong to the cancelled generation and are not a protocol
+    // violation.
+    await harness.host.write({
+      v: 1,
+      type: "command.output",
+      requestId: request.requestId,
+      stream: "stdout",
+      sequence: 0,
+      data: "late",
+    });
+    await harness.host.write({
+      v: 1,
+      type: "command.end",
+      requestId: request.requestId,
+      sequence: 1,
+      exitCode: null,
+      signal: "SIGTERM",
+      timedOut: false,
+      truncated: false,
+      durationMs: 1,
+    });
+    await harness.host.write({
+      v: 1,
+      type: "command.error",
+      requestId: request.requestId,
+      message: "late host failure",
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(fatal).not.toHaveBeenCalled();
+    expect(settled).toBe(false);
+
+    await harness.host.write({
+      v: 1,
+      type: "command.aborted",
+      requestId: request.requestId,
+    });
+    await expect(result).rejects.toMatchObject({
+      name: "AbortError",
+      message: "user stopped the turn",
+    });
+    expect(settled).toBe(true);
+    harness.network.close();
+  });
+
+  it("fails the generation when command.request delivery is ambiguous", async () => {
+    const sidecarOutput = new NthWriteFailingTransform(1);
+    const harness = createHarness(sidecarOutput);
+    await harness.bootstrap();
+    const fatal = new Promise<Error>((resolve) => {
+      harness.network.onFatal(resolve);
+    });
+
+    const result = harness.network.shellExecutor(
+      { cmd: "sleep", args: ["60"], cwd: "/workspace" },
+      {
+        workspace_root: "/workspace",
+        protected_read_roots: [],
+      }
+    );
+    const rejection = result.catch((error: unknown) => error);
+
+    // The bytes reached the peer-facing stream before its completion callback
+    // failed, so main could already own a live worker.
+    await expect(harness.untilFrame("command.request")).resolves.toMatchObject({
+      type: "command.request",
+      command: "sleep",
+    });
+    expect(await rejection).toMatchObject({
+      message: expect.stringMatching(/request delivery failed/),
+    });
+    await expect(fatal).resolves.toMatchObject({
+      message: expect.stringMatching(/request delivery failed/),
+    });
+  });
+
+  it("fails the channel on an out-of-sequence command response", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    const fatal = new Promise<Error>((resolve) => {
+      harness.network.onFatal(resolve);
+    });
+    const result = harness.network.shellExecutor(
+      { cmd: "pwd", args: [], cwd: "/workspace" },
+      {
+        workspace_root: "/workspace",
+        protected_read_roots: [],
+      }
+    );
+    const rejection = result.catch((error: unknown) => error);
+    const request = await harness.untilFrame("command.request");
+    await harness.host.write({
+      v: 1,
+      type: "command.output",
+      requestId: request.requestId,
+      stream: "stdout",
+      sequence: 1,
+      data: "out of order",
+    });
+
+    expect((await fatal).message).toMatch(/sequence mismatch/);
+    expect(await rejection).toMatchObject({
+      message: expect.stringMatching(/sequence mismatch/),
+    });
+  });
+
+  it("caps cumulative command output even when every frame is legal", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    const fatal = new Promise<Error>((resolve) => {
+      harness.network.onFatal(resolve);
+    });
+    const result = harness.network.shellExecutor(
+      { cmd: "noisy", args: [], cwd: "/workspace" },
+      {
+        workspace_root: "/workspace",
+        protected_read_roots: [],
+      }
+    );
+    const rejection = result.catch((error: unknown) => error);
+    const request = await harness.untilFrame("command.request");
+    const chunk = "x".repeat(
+      AgentSidecarChannel.MAX_COMMAND_OUTPUT_CHUNK_BYTES
+    );
+    const legalChunks =
+      AgentSidecarChannel.MAX_COMMAND_OUTPUT_BYTES /
+      AgentSidecarChannel.MAX_COMMAND_OUTPUT_CHUNK_BYTES;
+    for (let sequence = 0; sequence <= legalChunks; sequence += 1) {
+      await harness.host.write({
+        v: 1,
+        type: "command.output",
+        requestId: request.requestId,
+        stream: "stdout",
+        sequence,
+        data: chunk,
+      });
+    }
+
+    expect((await fatal).message).toMatch(/exceeded the sidecar limit/);
+    expect(await rejection).toMatchObject({
+      message: expect.stringMatching(/exceeded the sidecar limit/),
+    });
+  });
+
   it("turns an injected provider fetch into a streamed, credited exchange", async () => {
     const harness = createHarness();
     await harness.bootstrap();
@@ -423,5 +711,27 @@ class NthWriteBlockedTransform extends Transform {
     const callback = this.blockedCallback;
     this.blockedCallback = null;
     callback?.();
+  }
+}
+
+class NthWriteFailingTransform extends Transform {
+  private writes = 0;
+
+  constructor(private readonly failedWrite: number) {
+    super();
+  }
+
+  override _transform(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    callback: (error?: Error | null) => void
+  ): void {
+    this.push(chunk);
+    this.writes += 1;
+    callback(
+      this.writes === this.failedWrite
+        ? new Error("simulated ambiguous pipe failure")
+        : undefined
+    );
   }
 }

@@ -1,11 +1,12 @@
 /**
  * Scratch capability injection (WG `scratch.md` S1: the agent is *told* its
- * scratch location). Pins the gating in `buildCapabilityHints`: when a command
- * binding carries a `scratch_dir`, a scratch hint is emitted advertising the
- * path; with no scratch_dir (or no command at all) the hint is absent. Scratch
- * reach rides the shell, so the hint is coupled to the command capability.
+ * scratch location). Pins the gating in `buildCapabilityHints`: the
+ * host-provisioned `scratch_dir` advertises the exact root independently of
+ * command execution, so structured filesystem reach remains discoverable when
+ * the fail-closed host posture withholds the shell.
  */
 import { describe, expect, it } from "vitest";
+import { AgentFs } from "../fs";
 import { buildCapabilityHints, type CreateAgentOptions } from "./index";
 
 const NOOP_BACKEND: NonNullable<
@@ -30,7 +31,26 @@ const modelFactory: CreateAgentOptions["model_factory"] = () => {
 };
 
 describe("buildCapabilityHints — scratch", () => {
-  it("advertises the scratch path when the command binding carries scratch_dir (S1)", () => {
+  it("advertises structured-fs scratch without exposing command execution (S1)", () => {
+    const hints = buildCapabilityHints({
+      model_factory: modelFactory,
+      fs: new AgentFs(new AgentFs.MemoryBackend()),
+      scratch_dir: SCRATCH,
+    });
+    const hint = scratchHint(hints);
+    expect(hint).toBeDefined();
+    expect(hint).toContain(SCRATCH);
+    expect(hint!.toLowerCase()).toContain("filesystem");
+    expect(hint).not.toContain("run_command");
+    expect(hints.some((h) => h.includes('<capability name="command">'))).toBe(
+      false
+    );
+    // The promotion + ephemerality guidance is the load-bearing part of S2.
+    expect(hint!.toLowerCase()).toContain("ephemeral");
+    expect(hint!.toLowerCase()).toContain("promote");
+  });
+
+  it("keeps the command-carried path as a compatibility fallback", () => {
     const hints = buildCapabilityHints({
       model_factory: modelFactory,
       command: {
@@ -40,14 +60,12 @@ describe("buildCapabilityHints — scratch", () => {
       },
     });
     const hint = scratchHint(hints);
-    expect(hint).toBeDefined();
     expect(hint).toContain(SCRATCH);
-    // The promotion + ephemerality guidance is the load-bearing part of S2.
-    expect(hint!.toLowerCase()).toContain("ephemeral");
-    expect(hint!.toLowerCase()).toContain("promote");
+    expect(hint).toContain("run_command");
+    expect(hint!.toLowerCase()).not.toContain("filesystem tools");
   });
 
-  it("omits the scratch hint when the command binding has no scratch_dir", () => {
+  it("omits the scratch hint when no root was provisioned", () => {
     const hints = buildCapabilityHints({
       model_factory: modelFactory,
       command: { backend: NOOP_BACKEND, default_workdir: "/work" },
@@ -59,7 +77,7 @@ describe("buildCapabilityHints — scratch", () => {
     );
   });
 
-  it("omits the scratch hint when there is no command capability at all", () => {
+  it("omits the scratch hint when neither scratch nor command is present", () => {
     const hints = buildCapabilityHints({ model_factory: modelFactory });
     expect(scratchHint(hints)).toBeUndefined();
   });

@@ -61,6 +61,7 @@ import {
 } from "@/lib/agent-chat";
 import { ai as desktopAi, useDesktopBridge } from "@/lib/desktop/bridge";
 import { AgentLibraryAttachmentPicker } from "./agent-library-attachment-picker";
+import { AgentComposerResourceId } from "./agent-composer-resource-id";
 import {
   AgentComposerQueueSubmitGuard,
   isSameComposerDraft,
@@ -88,10 +89,10 @@ export type AgentComposerInputProps = {
    *  of the catalog's own commands, and intercepted on submit. */
   commandActions?: ComposerCommandAction[];
   /**
-   * Receives the lowered prompt text, any inlined image attachments as AI-SDK
-   * `file` parts (perceive-only), and `extras` — operable file uploads (scratch
-   * bytes + their marker). Empty submissions (no text AND no attachments) are
-   * filtered unless `allowEmptySubmit` is set.
+   * Receives the lowered prompt text, provider-native media as AI-SDK `file`
+   * parts, and `extras` — operable scratch copies + their marker. One raster
+   * upload may intentionally appear in both. Empty submissions (no text AND no
+   * attachments) are filtered unless `allowEmptySubmit` is set.
    */
   onSubmit: (
     text: string,
@@ -252,8 +253,8 @@ function AgentComposerInner({
     return () => queueSubmitGuard.unmount();
   }, [queueSubmitGuard]);
 
-  // Minimal, neutral inline feedback for the two cases that would otherwise do
-  // nothing visible: a non-vision model, or attempting to queue images.
+  // Minimal, neutral inline feedback for cases that would otherwise do nothing
+  // visible: a provider-capability miss or a busy out-of-band attachment send.
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notify = useCallback((msg: string | null) => {
@@ -270,11 +271,6 @@ function AgentComposerInner({
 
   const preparedResources = useRef(new PreparedResourceLedger());
   const preparationTail = useRef<Promise<void>>(Promise.resolve());
-  const resourceSequence = useRef(0);
-  const nextResourceId = useCallback((source: string) => {
-    resourceSequence.current += 1;
-    return `${source}-${resourceSequence.current}`;
-  }, []);
 
   // Feasibility is dynamic and separate from the selected preference policy.
   // In particular, a File from paste/drop/picker is bytes-only until a trusted
@@ -284,6 +280,8 @@ function AgentComposerInner({
     : undefined;
   const scratchSeedBase64Supported =
     desktopAi.supportsScratchSeedBase64(desktopBridge);
+  const scratchBinaryToolsSupported =
+    desktopAi.supportsScratchBinaryTools(desktopBridge);
   const resourceEnvironment = useMemo<InputResourceRouter.Environment>(
     () => ({
       // The runtime has path-aware filesystem tools but no general URL reader.
@@ -300,6 +298,7 @@ function AgentComposerInner({
                 maxFiles: OPERABLE_FILE_POLICY.maxFiles,
                 maxTotalBytes: OPERABLE_FILE_POLICY.maxTotalBytes,
                 reservation: scratchReservation,
+                binaryTools: scratchBinaryToolsSupported,
               },
             }
           : {}),
@@ -307,6 +306,7 @@ function AgentComposerInner({
     }),
     [
       attachDirectory,
+      scratchBinaryToolsSupported,
       scratchSeedBase64Supported,
       operableFiles,
       providerFileMimes,
@@ -398,14 +398,14 @@ function AgentComposerInner({
         if (resource.kind === "file") {
           inputs.push({
             kind: "browser-file",
-            id: nextResourceId(event.source),
+            id: AgentComposerResourceId.create(event.source),
             source: event.source,
             file: resource.file,
           });
         } else if (event.source === "drop") {
           inputs.push({
             kind: "browser-directory",
-            id: nextResourceId(event.source),
+            id: AgentComposerResourceId.create(event.source),
             source: event.source,
             directory: resource.file,
           });
@@ -413,7 +413,7 @@ function AgentComposerInner({
       }
       void prepareResources(inputs);
     },
-    [nextResourceId, prepareResources]
+    [prepareResources]
   );
 
   // "+" upload feeds the same router with explicit picker provenance. The input
@@ -432,14 +432,14 @@ function AgentComposerInner({
         void prepareResources(
           files.map((file) => ({
             kind: "browser-file",
-            id: nextResourceId("picker"),
+            id: AgentComposerResourceId.create("picker"),
             source: "picker",
             file,
           }))
         );
       }
     },
-    [nextResourceId, prepareResources]
+    [prepareResources]
   );
 
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -469,8 +469,9 @@ function AgentComposerInner({
       return;
     }
     // No blanket `isStreaming` early-return: submitting WHILE a turn streams is
-    // how a TEXT message gets queued (RFC `queue`). Images are the exception —
-    // the turn queue persists text only, so image sends need an idle session.
+    // how a TEXT message gets queued (RFC `queue`). Out-of-band attachments are
+    // the exception — the turn queue persists text only, so they need an idle
+    // session.
     // `allow_empty` mirrors the later `allowEmptySubmit` guard: without it the
     // composer core returns null for a blank editor and we'd bail here, before
     // that guard — so a picked-template start or host-owned empty action would
@@ -807,6 +808,11 @@ function resourcePreparationNotice(
       ? "Some files weren't added because this chat has no scratch space."
       : "This chat can only attach images.";
   }
+  if (reasons.size === 1 && reasons.has("scratch-binary-tools-required")) {
+    return some
+      ? "Some files weren't added because their formats need binary tools that aren't available in this chat."
+      : "This file's format needs binary tools that aren't available in this chat.";
+  }
   if (
     reasons.size === 1 &&
     reasons.has("reference-capability-unavailable") &&
@@ -872,6 +878,9 @@ function resourceLoweringNotice(
   }
   if (reasons.has("scratch-unavailable")) {
     return "These files need scratch space, which isn't available in this chat.";
+  }
+  if (reasons.has("scratch-binary-tools-required")) {
+    return "These files need binary tools, which aren't available in this chat.";
   }
   if (reasons.has("file-too-large")) {
     return "An attached file is too large — remove it and try again.";

@@ -91,6 +91,23 @@ describe("lowerOperableFiles", () => {
     expect(files[0].name).toBe("../a.pdf");
   });
 
+  it("derives distinct paths for the same file across composer lifetimes", () => {
+    const lower = (id: string) =>
+      lowerOperableFiles([
+        {
+          id,
+          name: "screen.png",
+          mime: "image/png",
+          size: 3,
+          base64: "AAAA",
+        },
+      ]).scratchSeed[0].path;
+
+    expect(lower("drop-00000000-0000-4000-8000-000000000001")).not.toBe(
+      lower("drop-00000000-0000-4000-8000-000000000002")
+    );
+  });
+
   it("preserves a typed zero-byte file", () => {
     expect(
       lowerOperableFiles([

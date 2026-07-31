@@ -8,16 +8,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCapabilityHints, type CreateAgentOptions } from "./index";
 
-const NOOP_BACKEND: NonNullable<
-  CreateAgentOptions["command"]
->["backend"] = async () => ({
-  stdout: "",
-  stderr: "",
-  exit_code: 0,
-  timed_out: false,
-  truncated: false,
-});
-
 const SCRATCH = "/tmp/grida-agent/sessions/ses_x/scratch";
 
 const FAKE_GENERATOR: NonNullable<CreateAgentOptions["image_gen"]> = {
@@ -35,15 +25,11 @@ function imageGenHint(hints: string[]): string | undefined {
 }
 
 describe("buildCapabilityHints — image generation", () => {
-  it("advertises generate_image when a generator and scratch path are wired", () => {
+  it("advertises generate_image when a generator and standalone scratch path are wired", () => {
     const hints = buildCapabilityHints({
       model_factory: modelFactory,
       image_gen: FAKE_GENERATOR,
-      command: {
-        backend: NOOP_BACKEND,
-        default_workdir: "/work",
-        scratch_dir: SCRATCH,
-      },
+      scratch_dir: SCRATCH,
     });
     const hint = imageGenHint(hints);
     expect(hint).toBeDefined();
@@ -58,11 +44,7 @@ describe("buildCapabilityHints — image generation", () => {
   it("omits the hint when no generator is wired (no provider key)", () => {
     const hints = buildCapabilityHints({
       model_factory: modelFactory,
-      command: {
-        backend: NOOP_BACKEND,
-        default_workdir: "/work",
-        scratch_dir: SCRATCH,
-      },
+      scratch_dir: SCRATCH,
     });
     expect(imageGenHint(hints)).toBeUndefined();
   });
@@ -71,7 +53,6 @@ describe("buildCapabilityHints — image generation", () => {
     const hints = buildCapabilityHints({
       model_factory: modelFactory,
       image_gen: FAKE_GENERATOR,
-      command: { backend: NOOP_BACKEND, default_workdir: "/work" },
     });
     expect(imageGenHint(hints)).toBeUndefined();
   });

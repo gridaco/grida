@@ -62,10 +62,14 @@ export {
 } from "./auth/file";
 export {
   runShell,
+  runUnsandboxedShell,
   validateShellRequest,
-  type AdditionalAllowedRoots,
+  type AllowedCwdRoots,
   type ProtectedReadRoots,
+  type ShellExecutionScope,
+  type ShellExecutor,
   type ShellRunError,
+  type ShellRunOptions,
   type ShellRunRequest,
   type ShellRunResult,
 } from "./shell/runner";

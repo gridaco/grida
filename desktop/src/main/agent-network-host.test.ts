@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough, Readable, Writable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { net, session } from "electron";
+import type { ShellExecutor } from "@grida/daemon/server";
 
 vi.mock("electron", () => ({
   session: {
@@ -109,6 +110,292 @@ describe("AgentNetworkHost", () => {
       output.release();
       vi.useRealTimers();
     }
+  });
+
+  it("executes a finite command through the injected host capability", async () => {
+    const commandExecutor = vi.fn<ShellExecutor>(async (request, _scope) => ({
+      cmd: request.cmd,
+      args: request.args,
+      cwd: request.cwd,
+      exit_code: 0,
+      signal: null,
+      stdout: "hello, 세계\n",
+      stderr: "warning\n",
+      duration_ms: 12,
+      timed_out: false,
+      truncated: false,
+    }));
+    const harness = createHarness({
+      fetch: async () => new Response(),
+      commandExecutor,
+    });
+    await harness.start();
+
+    await harness.sidecar.write({
+      v: 1,
+      type: "command.request",
+      requestId: "cmd_1",
+      command: "node",
+      args: ["script.js"],
+      workdir: "/workspace/project",
+      timeoutMs: 2_000,
+      workspaceRoot: "/workspace",
+      scratchDir: "/scratch/sessions/ses_A/scratch",
+    });
+
+    const end = await harness.untilFrame("command.end");
+    expect(commandExecutor).toHaveBeenCalledWith(
+      {
+        cmd: "node",
+        args: ["script.js"],
+        cwd: "/workspace/project",
+        timeout_ms: 2_000,
+      },
+      {
+        workspace_root: "/workspace",
+        scratch_root: "/scratch/sessions/ses_A/scratch",
+        protected_read_roots: [],
+      },
+      expect.objectContaining({ aborted: false })
+    );
+    expect(
+      harness.frames.filter((frame) => frame.type === "command.output")
+    ).toEqual([
+      {
+        v: 1,
+        type: "command.output",
+        requestId: "cmd_1",
+        stream: "stdout",
+        sequence: 0,
+        data: "hello, 세계\n",
+      },
+      {
+        v: 1,
+        type: "command.output",
+        requestId: "cmd_1",
+        stream: "stderr",
+        sequence: 1,
+        data: "warning\n",
+      },
+    ]);
+    expect(end).toEqual({
+      v: 1,
+      type: "command.end",
+      requestId: "cmd_1",
+      sequence: 2,
+      exitCode: 0,
+      signal: null,
+      timedOut: false,
+      truncated: false,
+      durationMs: 12,
+    });
+    harness.host.close();
+  });
+
+  it("fails closed when no finite-command capability was injected", async () => {
+    const harness = createHarness({
+      fetch: async () => new Response(),
+    });
+    await harness.start();
+
+    await harness.sidecar.write({
+      v: 1,
+      type: "command.request",
+      requestId: "cmd_unavailable",
+      command: "pwd",
+      args: [],
+      workdir: "/workspace",
+      workspaceRoot: "/workspace",
+    });
+
+    await expect(harness.untilFrame("command.error")).resolves.toMatchObject({
+      requestId: "cmd_unavailable",
+      message: expect.stringMatching(/unavailable/),
+    });
+    harness.host.close();
+  });
+
+  it("aborts finite commands when their sidecar generation closes", async () => {
+    let observedSignal: AbortSignal | undefined;
+    let startedResolve: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      startedResolve = resolve;
+    });
+    const commandExecutor: ShellExecutor = async (request, _scope, signal) => {
+      observedSignal = signal;
+      startedResolve?.();
+      await new Promise<void>((resolve) =>
+        signal?.addEventListener("abort", () => resolve(), { once: true })
+      );
+      return {
+        cmd: request.cmd,
+        args: request.args,
+        cwd: request.cwd,
+        exit_code: null,
+        signal: "SIGTERM",
+        stdout: "",
+        stderr: "",
+        duration_ms: 1,
+        timed_out: false,
+        truncated: false,
+      };
+    };
+    const harness = createHarness({
+      fetch: async () => new Response(),
+      commandExecutor,
+    });
+    await harness.start();
+    await harness.sidecar.write({
+      v: 1,
+      type: "command.request",
+      requestId: "cmd_lifecycle",
+      command: "sleep",
+      args: ["60"],
+      workdir: "/workspace",
+      workspaceRoot: "/workspace",
+    });
+    await started;
+
+    harness.host.close();
+
+    expect(observedSignal?.aborted).toBe(true);
+  });
+
+  it("revokes a finite command when the sidecar cancels its tool call", async () => {
+    let observedSignal: AbortSignal | undefined;
+    let startedResolve: (() => void) | undefined;
+    let cleanupResolve: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      startedResolve = resolve;
+    });
+    const cleanup = new Promise<void>((resolve) => {
+      cleanupResolve = resolve;
+    });
+    const commandExecutor: ShellExecutor = async (request, _scope, signal) => {
+      observedSignal = signal;
+      startedResolve?.();
+      await new Promise<void>((resolve) =>
+        signal?.addEventListener("abort", () => resolve(), { once: true })
+      );
+      await cleanup;
+      return {
+        cmd: request.cmd,
+        args: request.args,
+        cwd: request.cwd,
+        exit_code: null,
+        signal: "SIGTERM",
+        stdout: "",
+        stderr: "",
+        duration_ms: 1,
+        timed_out: false,
+        truncated: false,
+      };
+    };
+    const harness = createHarness({
+      fetch: async () => new Response(),
+      commandExecutor,
+    });
+    await harness.start();
+    await harness.sidecar.write({
+      v: 1,
+      type: "command.request",
+      requestId: "cmd_cancelled",
+      command: "sleep",
+      args: ["60"],
+      workdir: "/workspace",
+      workspaceRoot: "/workspace",
+    });
+    await started;
+
+    await harness.sidecar.write({
+      v: 1,
+      type: "command.abort",
+      requestId: "cmd_cancelled",
+      reason: "caller aborted",
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(observedSignal?.aborted).toBe(true);
+    expect(
+      harness.frames.some(
+        (frame) =>
+          frame.type === "command.aborted" &&
+          frame.requestId === "cmd_cancelled"
+      )
+    ).toBe(false);
+    cleanupResolve?.();
+    await expect(harness.untilFrame("command.aborted")).resolves.toEqual({
+      v: 1,
+      type: "command.aborted",
+      requestId: "cmd_cancelled",
+    });
+    expect(
+      harness.frames.some(
+        (frame) =>
+          "requestId" in frame &&
+          frame.requestId === "cmd_cancelled" &&
+          (frame.type === "command.output" ||
+            frame.type === "command.end" ||
+            frame.type === "command.error")
+      )
+    ).toBe(false);
+    expect(harness.fatal).not.toHaveBeenCalled();
+    harness.host.close();
+  });
+
+  it("acknowledges abort that races a rejecting command's error write", async () => {
+    let errorWriteStartedResolve: (() => void) | undefined;
+    let releaseErrorWrite: (() => void) | undefined;
+    const errorWriteStarted = new Promise<void>((resolve) => {
+      errorWriteStartedResolve = resolve;
+    });
+    const errorWrite = new Promise<void>((resolve) => {
+      releaseErrorWrite = resolve;
+    });
+    const harness = createHarness({
+      fetch: async () => new Response(),
+      commandExecutor: async () => {
+        throw new Error("worker rejected");
+      },
+    });
+    const commandError = vi.spyOn(
+      harness.host as unknown as {
+        commandError(requestId: string, message: string): Promise<void>;
+      },
+      "commandError"
+    );
+    commandError.mockImplementation(async () => {
+      errorWriteStartedResolve?.();
+      await errorWrite;
+    });
+    await harness.start();
+    await harness.sidecar.write({
+      v: 1,
+      type: "command.request",
+      requestId: "cmd_error_abort_race",
+      command: "false",
+      args: [],
+      workdir: "/workspace",
+      workspaceRoot: "/workspace",
+    });
+    await errorWriteStarted;
+
+    await harness.sidecar.write({
+      v: 1,
+      type: "command.abort",
+      requestId: "cmd_error_abort_race",
+      reason: "caller aborted",
+    });
+    releaseErrorWrite?.();
+
+    await expect(harness.untilFrame("command.aborted")).resolves.toEqual({
+      v: 1,
+      type: "command.aborted",
+      requestId: "cmd_error_abort_race",
+    });
+    expect(commandError).toHaveBeenCalledTimes(1);
+    expect(harness.fatal).not.toHaveBeenCalled();
+    harness.host.close();
   });
 
   it("aborts and drains a late response after interactive proxy auth", async () => {
@@ -831,6 +1118,7 @@ describe("AgentNetworkHost", () => {
 function createHarness(adapter: {
   fetch: (url: string, init: RequestInit) => Promise<Response>;
   maxBufferedRequestBodyBytes?: number;
+  commandExecutor?: ShellExecutor;
 }) {
   const sidecarOutput = new PassThrough();
   const sidecarInput = new PassThrough();
@@ -842,7 +1130,8 @@ function createHarness(adapter: {
     authority,
     adapter,
     fatal,
-    adapter.maxBufferedRequestBodyBytes
+    adapter.maxBufferedRequestBodyBytes,
+    adapter.commandExecutor
   );
   const sidecar = new AgentSidecarChannel.Writer(sidecarOutput);
   const decoder = new AgentSidecarChannel.Decoder();

@@ -38,6 +38,7 @@ import { AgentVision } from "../vision";
 import {
   CONTEXT_MARKERS,
   USER_DIRECTORY_REFERENCES,
+  USER_FILE_ATTACHMENTS,
 } from "../protocol/context";
 import { normalizeSdkToolPartFields } from "../protocol/tool-part-fields";
 
@@ -66,6 +67,9 @@ export function buildModelMessages(
     /** Live host grants for this session. Omitted by generic callers that only
      * need structural lowering; the runtime always supplies it. */
     availableDirectoryScopeIds?: ReadonlySet<string>;
+    /** Scratch-relative direct files live for this model turn. Omitted by
+     * generic callers; the runtime always supplies a snapshot. */
+    availableScratchAttachmentPaths?: ReadonlySet<string>;
   } = {}
 ): ModelUIMessage[] {
   const boundary = compactionBoundary(visible);
@@ -108,6 +112,7 @@ export function buildModelMessages(
     const parts = lowerParts(m.parts, {
       elideImages: i < liveStart,
       availableDirectoryScopeIds: opts.availableDirectoryScopeIds,
+      availableScratchAttachmentPaths: opts.availableScratchAttachmentPaths,
     });
     if (m.role === "user" && pendingSummary !== null) {
       parts.unshift({
@@ -173,6 +178,7 @@ function lowerParts(
   opts: {
     elideImages: boolean;
     availableDirectoryScopeIds?: ReadonlySet<string>;
+    availableScratchAttachmentPaths?: ReadonlySet<string>;
   } = { elideImages: false }
 ): unknown[] {
   const out: unknown[] = [];
@@ -189,11 +195,12 @@ function lowerParts(
       type === "source-url" ||
       type === "source-document"
     ) {
-      // Inline attachments are NOT auto-elided: unlike a `view_image` result,
-      // a pasted image has no re-view affordance (no path, no tool to re-call),
-      // so dropping it is lossy and irreversible. They stay durable across the
-      // rebuild (see agent.test.ts "DB-rebuild durability"); only re-viewable
-      // perceptions are evicted below.
+      // Inline attachments are NOT auto-elided here. A neighboring scratch
+      // descriptor may make an upload re-viewable while that path is live, but
+      // this model-view layer has no correlated liveness proof. Dropping pixels
+      // without one would be lossy, so attachments stay durable across the
+      // rebuild (see agent.test.ts "DB-rebuild durability"); only explicitly
+      // re-viewable perceptions are evicted below.
       out.push(data);
       continue;
     }
@@ -265,38 +272,65 @@ function lowerParts(
 }
 
 /**
- * Add model-only liveness to directory descriptors without mutating the
- * durable message part. The transcript records intent; only the host registry
- * can say whether that intent is currently operable for this session. Generic
- * structural callers omit the availability set and retain the legacy payload.
+ * Add model-only liveness to host-backed resource descriptors without mutating
+ * the durable message part. The transcript records intent; only current host
+ * state can say whether that intent is operable for this turn. Generic
+ * structural callers omit the availability sets and retain the legacy payload.
  */
 function lowerContextPayload(
   type: string,
   payload: unknown,
-  opts: { availableDirectoryScopeIds?: ReadonlySet<string> }
-): unknown {
-  if (
-    type !== USER_DIRECTORY_REFERENCES ||
-    opts.availableDirectoryScopeIds === undefined ||
-    payload == null ||
-    typeof payload !== "object"
-  ) {
-    return payload;
+  opts: {
+    availableDirectoryScopeIds?: ReadonlySet<string>;
+    availableScratchAttachmentPaths?: ReadonlySet<string>;
   }
-  const availableDirectoryScopeIds = opts.availableDirectoryScopeIds;
-  const directories = (payload as { directories?: unknown }).directories;
-  if (!Array.isArray(directories)) return payload;
-  return {
-    ...(payload as Record<string, unknown>),
-    directories: directories.map((directory) => {
-      if (directory == null || typeof directory !== "object") return directory;
-      const id = (directory as { id?: unknown }).id;
-      return {
-        ...(directory as Record<string, unknown>),
-        available: typeof id === "string" && availableDirectoryScopeIds.has(id),
-      };
-    }),
-  };
+): unknown {
+  if (payload == null || typeof payload !== "object") return payload;
+  if (
+    type === USER_DIRECTORY_REFERENCES &&
+    opts.availableDirectoryScopeIds !== undefined
+  ) {
+    const availableDirectoryScopeIds = opts.availableDirectoryScopeIds;
+    const directories = (payload as { directories?: unknown }).directories;
+    if (!Array.isArray(directories)) return payload;
+    return {
+      ...(payload as Record<string, unknown>),
+      directories: directories.map((directory) => {
+        if (directory == null || typeof directory !== "object") {
+          return directory;
+        }
+        const id = (directory as { id?: unknown }).id;
+        return {
+          ...(directory as Record<string, unknown>),
+          available:
+            typeof id === "string" && availableDirectoryScopeIds.has(id),
+        };
+      }),
+    };
+  }
+  if (
+    type === USER_FILE_ATTACHMENTS &&
+    opts.availableScratchAttachmentPaths !== undefined
+  ) {
+    const availableScratchAttachmentPaths =
+      opts.availableScratchAttachmentPaths;
+    const files = (payload as { files?: unknown }).files;
+    if (!Array.isArray(files)) return payload;
+    return {
+      ...(payload as Record<string, unknown>),
+      files: files.map((file) => {
+        if (file == null || typeof file !== "object") return file;
+        const path = (file as { path?: unknown }).path;
+        return {
+          ...(file as Record<string, unknown>),
+          available:
+            typeof path === "string" &&
+            availableScratchAttachmentPaths.has(path),
+        };
+      }),
+    };
+  }
+  return payload;
 }
 
 const DESIGN_SEARCH_PART_TYPE = `tool-${AgentDesignSearch.TOOL_NAME}`;

@@ -20,18 +20,18 @@
  * allowlist; the OS sandbox is the structural boundary.
  *
  * GRIDA-SEC-004 — this tool owns the supervised-approval gate. The
- * `needsApproval` predicate below is what PAUSES a mutating command for an
- * Allow/Deny in `accept-edits` (and is absent in `auto`). The gate lives on
+ * `needsApproval` predicate below is what PAUSES a host-classified command for
+ * an Allow/Deny in `accept-edits` (and is absent in `auto`). The gate lives on
  * the tool, NOT the backend: by the time the backend's `execute` runs, the
- * call is already cleared (auto, or user-approved), so the backend cannot
- * re-gate on mode. The mode→predicate wiring is at
- * `workspace-agent-bindings.ts`; the read-only classification is
- * `permissions.ts` `isReadOnlyCommand`; the server-authoritative answer is
- * atomically bound to its consuming run by
+ * call is already cleared (auto, host-pre-authorized, or user-approved), so
+ * the backend cannot re-gate on mode. The mode→predicate wiring is at
+ * `workspace-agent-bindings.ts`; it combines the read-only classification
+ * with the narrow scratch-local copy/move exception. The server-authoritative
+ * answer is atomically bound to its consuming run by
  * `store.commitApprovalContinuation`. See SECURITY.md.
  */
 
-import { tool } from "ai";
+import { tool, type ToolExecutionOptions } from "ai";
 import { z } from "zod";
 import { RUN_COMMAND_TOOL_NAME } from "./names";
 
@@ -41,7 +41,7 @@ export { RUN_COMMAND_TOOL_NAME };
 export type RunCommandToolName = typeof RUN_COMMAND_TOOL_NAME;
 
 /** Shape the agent expects from the injected command backend. The
- * caller's job is to apply its allowlist, resolve the workdir, spawn the
+ * caller's job is to validate and confine the workdir/scope, spawn the
  * process, and aggregate the result. The agent doesn't know or care
  * how that happens. */
 export type RunCommandResult = {
@@ -69,13 +69,25 @@ export type RunCommandFailure = {
 
 export type RunCommandOutcome = RunCommandResult | RunCommandFailure;
 
-export type RunCommandBackend = (input: {
+export type RunCommandApprovalInput = {
   command: string;
   args: string[];
+  /** Effective workdir after applying the tool's default. Approval policy
+   * needs the resolved value to distinguish a scratch-local operation from a
+   * workspace mutation. */
   workdir: string;
-  timeout_ms?: number;
-  description: string;
-}) => Promise<RunCommandOutcome>;
+};
+
+export type RunCommandBackend = (
+  input: {
+    command: string;
+    args: string[];
+    workdir: string;
+    timeout_ms?: number;
+    description: string;
+  },
+  signal?: ToolExecutionOptions["abortSignal"]
+) => Promise<RunCommandOutcome>;
 
 /**
  * Build the command tool bound to a specific backend + default workdir.
@@ -90,21 +102,21 @@ export function createRunCommandTool(opts: {
    * Supervised-approval gate (RFC `permission modes`, Phase 2). When this
    * returns true for a given call, the AI SDK emits a `tool-approval-request`
    * and PAUSES — `execute` does not run until the user approves (Allow). In
-   * `accept-edits` the host wires this to "true unless the command is
-   * read-only"; in `auto` it's absent (every command auto-runs). The decision
-   * lives here, NOT in the backend, because the backend's `execute` can't tell
-   * an approved call from an un-approved one — by the time `execute` runs, the
-   * SDK has already cleared the call (auto, or user-approved).
+   * `accept-edits` the host wires its read-only and narrowly pre-authorized
+   * scratch-operation policy here; in `auto` it's absent (every command
+   * auto-runs). The decision lives here, NOT in the backend, because the
+   * backend's `execute` can't tell an approved call from an un-approved one —
+   * by the time `execute` runs, the SDK has already cleared the call.
    */
-  needs_approval?: (input: { command: string; args: string[] }) => boolean;
+  needs_approval?: (input: RunCommandApprovalInput) => boolean;
 }) {
   const policy =
     opts.policy_description ??
-    "The host backend is responsible for command allowlisting, workdir " +
-      "validation, timeout caps, and process isolation.";
+    "The host backend is responsible for workdir validation, scope " +
+      "confinement, timeout caps, and process isolation.";
   return tool({
     description:
-      "Run a host-approved command in the workspace. This directly " +
+      "Run a host-approved command in an authorized working directory. This directly " +
       "spawns an executable with argv arguments; it is not a shell, " +
       "so pipes, redirects, glob expansion, env assignment, and `&&` " +
       `are not interpreted. ${policy} ` +
@@ -114,9 +126,7 @@ export function createRunCommandTool(opts: {
       command: z
         .string()
         .min(1)
-        .describe(
-          "Bare executable name. Must be accepted by the host backend."
-        ),
+        .describe("Bare executable name resolved by the host backend."),
       args: z
         .array(z.string())
         .default([])
@@ -126,7 +136,7 @@ export function createRunCommandTool(opts: {
         .optional()
         .describe(
           "Optional absolute path. Defaults to the workspace root. " +
-            "Must resolve inside the workspace."
+            "Must resolve inside a host-authorized root."
         ),
       timeout_ms: z
         .number()
@@ -162,22 +172,23 @@ export function createRunCommandTool(opts: {
           opts.needs_approval!({
             command: input.command,
             args: input.args ?? [],
+            workdir: input.workdir ?? opts.default_workdir,
           })
       : false,
-    execute: async ({
-      command,
-      args,
-      workdir,
-      timeout_ms: timeoutMs,
-      description,
-    }) => {
-      return await opts.backend({
-        command,
-        args: args ?? [],
-        workdir: workdir ?? opts.default_workdir,
-        timeout_ms: timeoutMs,
-        description,
-      });
+    execute: async (
+      { command, args, workdir, timeout_ms: timeoutMs, description },
+      { abortSignal }
+    ) => {
+      return await opts.backend(
+        {
+          command,
+          args: args ?? [],
+          workdir: workdir ?? opts.default_workdir,
+          timeout_ms: timeoutMs,
+          description,
+        },
+        abortSignal
+      );
     },
   });
 }

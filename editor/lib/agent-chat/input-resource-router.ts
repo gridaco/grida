@@ -3,9 +3,11 @@
  *
  * Source adapters describe what they actually hold (browser bytes, a Library
  * URL, an agent-visible path, or a host-mintable directory handle). The pure
- * policy selects one legal route; this module executes exactly that route and
- * returns a typed prepared resource. Composer cards receive display data only
- * and never become the hidden source of delivery semantics.
+ * policy selects one legal route; this module executes that route and returns
+ * the representation it actually materialized. A composite route may degrade
+ * to either declared single-leg fallback when only one encoder succeeds.
+ * Composer cards receive display data only and never become the hidden source
+ * of delivery semantics.
  */
 
 import type { FileUIPart } from "ai";
@@ -15,6 +17,7 @@ import {
   lowerOperableFiles,
   readFileAsBase64,
   type EncodedOperableFile,
+  type EncodedOperableResource,
 } from "./file-attachment";
 import {
   IMAGE_ATTACHMENT_POLICY,
@@ -81,6 +84,15 @@ export namespace InputResourceRouter {
       /** Present only when this chat has a tool-visible scratch binding. */
       scratch?: ScratchSeedBudget.Limits & {
         reservation?: ScratchSeedBudget.Reservation;
+        binaryTools?: boolean;
+      };
+      /**
+       * Renderer-memory admission for raw operable twins retained in a draft.
+       * Independent of the smaller, submit-time scratch seed budget.
+       */
+      operableTwinRetention?: {
+        maxFiles: number;
+        maxTotalBytes: number;
       };
     };
     /** Test/host injection points. Production uses the existing encoders. */
@@ -128,6 +140,21 @@ export namespace InputResourceRouter {
         representation: "inline-bytes" | "remote-url";
       })
     | (PreparedBase & {
+        kind: "provider-and-scratch-file";
+        /** Original upload metadata and bytes, preserved byte-for-byte. */
+        mimeType: string;
+        size: number;
+        base64: string;
+        /** Provider-processed representation used for immediate perception. */
+        provider: {
+          name: string;
+          mimeType: string;
+          size: number;
+          url: string;
+          representation: "inline-bytes";
+        };
+      })
+    | (PreparedBase & {
         kind: "scratch-file";
         mimeType: string;
         size: number;
@@ -151,6 +178,8 @@ export namespace InputResourceRouter {
   export type Card =
     | {
         kind: "file";
+        /** Stable prepared-resource identity retained by ComposerCore. */
+        id: string;
         name: string;
         mime?: string;
         size?: number;
@@ -159,6 +188,8 @@ export namespace InputResourceRouter {
       }
     | {
         kind: "directory";
+        /** Stable prepared-resource identity retained by ComposerCore. */
+        id: string;
         name: string;
         ref: DirectoryScopeDescriptor;
       };
@@ -172,6 +203,8 @@ export namespace InputResourceRouter {
     | {
         status: "accept";
         decision: Extract<InputResourcePolicy.Decision, { status: "accept" }>;
+        /** The route actually materialized after effect-level fallback. */
+        materializedRoute: InputResourcePolicy.Route;
         resource: PreparedResource;
       }
     | {
@@ -199,6 +232,11 @@ export namespace InputResourceRouter {
     files: FileUIPart[];
     extras?: SendExtras;
     references: Reference[];
+    /** Final route selected for each successfully lowered resource. */
+    routes: Array<{
+      attachmentId: string;
+      route: InputResourcePolicy.Route;
+    }>;
     rejected: Array<{
       attachmentId: string;
       reason: InputResourcePolicy.UnavailableReason;
@@ -220,6 +258,17 @@ export namespace InputResourceRouter {
       ),
     encodeOperableFile: readFileAsBase64,
   };
+
+  /**
+   * Raw twins are base64 strings retained with the composer draft. Bound that
+   * memory independently of the one-turn scratch budget: resources admitted
+   * here can still be reallocated dynamically if other chips/reservations
+   * change before submit; later rasters use the declared provider-only fallback.
+   */
+  export const OPERABLE_TWIN_RETENTION_LIMITS = {
+    maxFiles: 16,
+    maxTotalBytes: 32 * 1024 * 1024,
+  } as const;
 
   export function capabilities(
     environment: Readonly<Environment>
@@ -251,9 +300,11 @@ export namespace InputResourceRouter {
   }
 
   /**
-   * Plan a gesture as one atomic batch before any byte-backed scratch input is
-   * read. Existing prepared resources and non-composer reservations participate
-   * in the same budget, while provider/reference routes remain independent.
+   * Preflight mandatory scratch-only members as one atomic batch before their
+   * bytes are read. Composite rasters retain both per-file representations;
+   * their optional scratch legs are allocated against the current aggregate
+   * only at final lowering, so draft removal or reservation changes can restore
+   * operability without rereading the user's source.
    */
   export async function prepareBatch(
     inputs: readonly Readonly<Input>[],
@@ -270,25 +321,53 @@ export namespace InputResourceRouter {
         decision: InputResourcePolicy.decide(facts, available, config),
       };
     });
-    const existingScratch = existing.flatMap((resource) =>
+    const existingRequiredScratch = existing.flatMap((resource) =>
       resource.kind === "scratch-file" ? [{ size: resource.size }] : []
     );
-    const incomingScratch = plans.flatMap(({ decision, facts }) =>
-      isScratchDecision(decision) ? [{ size: facts.size ?? 0 }] : []
+    const incomingRequiredScratch = plans.flatMap(({ decision, facts }) =>
+      isScratchOnlyDecision(decision) ? [{ size: facts.size ?? 0 }] : []
     );
-    const scratchRejection = scratchBatchRejection(
-      [...existingScratch, ...incomingScratch],
+    const requiredScratchRejection = scratchBatchRejection(
+      [...existingRequiredScratch, ...incomingRequiredScratch],
       environment.attachment.scratch
     );
-
+    const retainedTwins = existing.flatMap((resource) =>
+      resource.kind === "provider-and-scratch-file"
+        ? [{ size: resource.size }]
+        : []
+    );
+    const retentionLimits =
+      environment.attachment.operableTwinRetention ??
+      OPERABLE_TWIN_RETENTION_LIMITS;
+    for (const plan of plans) {
+      if (!isProviderAndScratchDecision(plan.decision)) continue;
+      const rejected = retainedTwinBatchRejection(
+        [...retainedTwins, { size: plan.facts.size ?? 0 }],
+        retentionLimits
+      );
+      if (rejected) {
+        plan.decision = fallbackWithoutScratch(
+          plan.facts,
+          available,
+          config,
+          rejected
+        );
+      } else {
+        retainedTwins.push({ size: plan.facts.size ?? 0 });
+      }
+    }
     const effects = { ...DEFAULT_EFFECTS, ...environment.effects };
     return Promise.all(
       plans.map(async ({ input, decision }): Promise<PrepareResult> => {
         if (decision.status === "reject") {
           return { status: "reject", reason: decision.reason, decision };
         }
-        if (scratchRejection && isScratchDecision(decision)) {
-          return { status: "reject", decision, reason: scratchRejection };
+        if (requiredScratchRejection && isScratchOnlyDecision(decision)) {
+          return {
+            status: "reject",
+            decision,
+            reason: requiredScratchRejection,
+          };
         }
         try {
           const resource = await execute(
@@ -298,7 +377,12 @@ export namespace InputResourceRouter {
             effects
           );
           return resource
-            ? { status: "accept", decision, resource }
+            ? {
+                status: "accept",
+                decision,
+                materializedRoute: routeForPrepared(resource),
+                resource,
+              }
             : {
                 status: "reject",
                 decision,
@@ -320,14 +404,25 @@ export namespace InputResourceRouter {
       case "provider-file":
         return {
           kind: "file",
+          id: resource.sourceId,
           name: resource.name,
           mime: resource.mimeType,
           size: resource.size,
           url: resource.url,
         };
+      case "provider-and-scratch-file":
+        return {
+          kind: "file",
+          id: resource.sourceId,
+          name: resource.name,
+          mime: resource.mimeType,
+          size: resource.size,
+          url: resource.provider.url,
+        };
       case "scratch-file":
         return {
           kind: "file",
+          id: resource.sourceId,
           name: resource.name,
           mime: resource.mimeType,
           size: resource.size,
@@ -335,12 +430,14 @@ export namespace InputResourceRouter {
       case "directory-reference":
         return {
           kind: "directory",
+          id: resource.sourceId,
           name: resource.name,
           ref: resource.ref,
         };
       case "path-reference":
         return {
           kind: "file",
+          id: resource.sourceId,
           name: resource.name,
           mime: resource.mimeType,
           size: resource.size,
@@ -349,6 +446,7 @@ export namespace InputResourceRouter {
       case "url-reference":
         return {
           kind: "file",
+          id: resource.sourceId,
           name: resource.name,
           mime: resource.mimeType,
           size: resource.size,
@@ -370,43 +468,65 @@ export namespace InputResourceRouter {
     }
   ): Lowered {
     const files: FileUIPart[] = [];
-    const operable: Array<EncodedOperableFile & { id: string }> = [];
+    const operable: EncodedOperableResource[] = [];
     const scratchCandidates: Array<{
       attachmentId: string;
-      resource: Extract<PreparedResource, { kind: "scratch-file" }>;
+      resource: {
+        name: string;
+        mimeType: string;
+        size: number;
+        base64: string;
+      };
+      required: boolean;
+      providerDelivered: boolean;
+      /** Zero-based index among provider-native file parts in this message. */
+      providerFileIndex?: number;
     }> = [];
     const directories: DirectoryScopeDescriptor[] = [];
     const references: Reference[] = [];
+    const routeByAttachmentId = new Map<string, InputResourcePolicy.Route>();
     const rejected: Lowered["rejected"] = [];
 
     for (const { attachmentId, resource } of bound) {
       switch (resource.kind) {
-        case "provider-file":
-          if (
-            !(
-              resource.representation === "inline-bytes"
-                ? input.provider.inlineMimes
-                : input.provider.remoteUrlMimes
-            ).includes(resource.mimeType)
-          ) {
+        case "provider-file": {
+          if (appendProviderFile(files, resource, input.provider)) {
+            routeByAttachmentId.set(attachmentId, routeForPrepared(resource));
+          } else {
             rejected.push({
               attachmentId,
               reason: "provider-capability-unavailable",
             });
-            break;
           }
-          files.push({
-            type: "file",
-            url: resource.url,
-            mediaType: resource.mimeType,
-            filename: resource.name,
+          break;
+        }
+        case "provider-and-scratch-file": {
+          const providerFileIndex = files.length;
+          const providerDelivered = appendProviderFile(
+            files,
+            resource.provider,
+            input.provider
+          );
+          scratchCandidates.push({
+            attachmentId,
+            resource,
+            required: !providerDelivered,
+            providerDelivered,
+            ...(providerDelivered ? { providerFileIndex } : {}),
           });
           break;
+        }
         case "scratch-file":
-          scratchCandidates.push({ attachmentId, resource });
+          scratchCandidates.push({
+            attachmentId,
+            resource,
+            required: true,
+            providerDelivered: false,
+          });
           break;
         case "directory-reference":
           directories.push(resource.ref);
+          routeByAttachmentId.set(attachmentId, routeForPrepared(resource));
           break;
         case "path-reference":
           references.push({
@@ -415,6 +535,7 @@ export namespace InputResourceRouter {
             path: resource.path,
             space: resource.space,
           });
+          routeByAttachmentId.set(attachmentId, routeForPrepared(resource));
           break;
         case "url-reference":
           references.push({
@@ -422,27 +543,95 @@ export namespace InputResourceRouter {
             name: resource.name,
             url: resource.url,
           });
+          routeByAttachmentId.set(attachmentId, routeForPrepared(resource));
           break;
       }
     }
 
-    const scratchRejection = scratchBatchRejection(
-      scratchCandidates.map(({ resource }) => resource),
+    const requiredScratch = scratchCandidates.filter(
+      (candidate) => candidate.required
+    );
+    const optionalScratch = scratchCandidates.filter(
+      (candidate) => !candidate.required
+    );
+    const requiredScratchRejection = scratchBatchRejection(
+      requiredScratch.map(({ resource }) => resource),
       input.scratch
     );
-    if (scratchRejection) {
-      for (const { attachmentId } of scratchCandidates) {
-        rejected.push({ attachmentId, reason: scratchRejection });
+    const acceptedScratch: typeof scratchCandidates = [];
+    const omittedScratch: Array<{
+      candidate: (typeof scratchCandidates)[number];
+      reason: InputResourcePolicy.UnavailableReason;
+    }> = [];
+
+    if (requiredScratchRejection) {
+      for (const candidate of scratchCandidates) {
+        omittedScratch.push({
+          candidate,
+          reason: requiredScratchRejection,
+        });
       }
     } else {
-      for (const { attachmentId, resource } of scratchCandidates) {
+      acceptedScratch.push(...requiredScratch);
+      for (const candidate of optionalScratch) {
+        const rejection = scratchBatchRejection(
+          [
+            ...acceptedScratch.map(({ resource }) => resource),
+            candidate.resource,
+          ],
+          input.scratch
+        );
+        if (rejection) {
+          omittedScratch.push({ candidate, reason: rejection });
+        } else {
+          acceptedScratch.push(candidate);
+        }
+      }
+    }
+
+    const acceptedScratchSet = new Set(acceptedScratch);
+    for (const candidate of scratchCandidates) {
+      const scratchDelivered = acceptedScratchSet.has(candidate);
+      if (scratchDelivered) {
+        const { attachmentId, resource } = candidate;
         operable.push({
           id: attachmentId,
           name: resource.name,
           mime: resource.mimeType,
           size: resource.size,
           base64: resource.base64,
+          ...(candidate.providerFileIndex !== undefined
+            ? { providerFileIndex: candidate.providerFileIndex }
+            : {}),
         });
+      }
+      const route =
+        scratchDelivered && candidate.providerDelivered
+          ? ({
+              kind: "attachment",
+              via: "provider-and-scratch",
+              from: "bytes",
+              representation: "inline-bytes",
+            } satisfies InputResourcePolicy.Route)
+          : scratchDelivered
+            ? ({
+                kind: "attachment",
+                via: "scratch",
+                from: "bytes",
+              } satisfies InputResourcePolicy.Route)
+            : candidate.providerDelivered
+              ? ({
+                  kind: "attachment",
+                  via: "provider",
+                  from: "bytes",
+                  representation: "inline-bytes",
+                } satisfies InputResourcePolicy.Route)
+              : undefined;
+      if (route) routeByAttachmentId.set(candidate.attachmentId, route);
+    }
+    for (const { candidate, reason } of omittedScratch) {
+      if (candidate.required || !candidate.providerDelivered) {
+        rejected.push({ attachmentId: candidate.attachmentId, reason });
       }
     }
 
@@ -464,7 +653,11 @@ export namespace InputResourceRouter {
           }
         : undefined;
 
-    return { files, extras, references, rejected };
+    const routes = bound.flatMap(({ attachmentId }) => {
+      const route = routeByAttachmentId.get(attachmentId);
+      return route ? [{ attachmentId, route }] : [];
+    });
+    return { files, extras, references, routes, rejected };
   }
 
   export function describe(
@@ -555,6 +748,81 @@ export namespace InputResourceRouter {
   ): Promise<PreparedResource | null> {
     const base = preparedBase(input);
     if (route.kind === "attachment") {
+      if (
+        route.via === "provider-and-scratch" &&
+        route.from === "bytes" &&
+        route.representation === "inline-bytes"
+      ) {
+        if (input.kind !== "browser-file") return null;
+        const scratch = environment.attachment.scratch;
+        if (!scratch) return null;
+        const [providerResult, operableResult] = await Promise.allSettled([
+          effects.encodeProviderFile(input.file, {
+            outputMimes: environment.attachment.provider.inlineMimes,
+          }),
+          effects.encodeOperableFile(input.file, {
+            maxBytes: scratch.maxFileBytes,
+          }),
+        ]);
+        const provider =
+          providerResult.status === "fulfilled" &&
+          providerResult.value &&
+          isValidEncodedProviderFile(
+            providerResult.value,
+            environment.attachment.provider.inlineMimes
+          )
+            ? providerResult.value
+            : null;
+        const operable =
+          operableResult.status === "fulfilled" &&
+          operableResult.value &&
+          isValidEncodedOperableFile(
+            operableResult.value,
+            input.file.size,
+            scratch.maxFileBytes
+          )
+            ? operableResult.value
+            : null;
+        if (provider && operable) {
+          return {
+            ...base,
+            kind: "provider-and-scratch-file",
+            name: operable.name,
+            mimeType: operable.mime,
+            size: operable.size,
+            base64: operable.base64,
+            provider: {
+              name: provider.name,
+              mimeType: provider.mime,
+              size: provider.size,
+              url: provider.url,
+              representation: "inline-bytes",
+            },
+          };
+        }
+        if (provider) {
+          return {
+            ...base,
+            kind: "provider-file",
+            name: provider.name,
+            mimeType: provider.mime,
+            size: provider.size,
+            url: provider.url,
+            representation: "inline-bytes",
+          };
+        }
+        if (operable) {
+          return {
+            ...base,
+            kind: "scratch-file",
+            name: operable.name,
+            mimeType: operable.mime,
+            size: operable.size,
+            base64: operable.base64,
+          };
+        }
+        return null;
+      }
       if (
         route.via === "provider" &&
         route.from === "bytes" &&
@@ -679,6 +947,30 @@ export namespace InputResourceRouter {
     return null;
   }
 
+  function appendProviderFile(
+    files: FileUIPart[],
+    resource: Readonly<{
+      name: string;
+      mimeType: string;
+      url: string;
+      representation: "inline-bytes" | "remote-url";
+    }>,
+    capability: Readonly<Environment["attachment"]["provider"]>
+  ): boolean {
+    const supportedMimes =
+      resource.representation === "inline-bytes"
+        ? capability.inlineMimes
+        : capability.remoteUrlMimes;
+    if (!supportedMimes.includes(resource.mimeType)) return false;
+    files.push({
+      type: "file",
+      url: resource.url,
+      mediaType: resource.mimeType,
+      filename: resource.name,
+    });
+    return true;
+  }
+
   /**
    * Inline provider delivery has one honest wire shape: a bounded data URL
    * whose declared MIME and decoded byte count match the prepared metadata.
@@ -760,7 +1052,7 @@ export namespace InputResourceRouter {
       : "preparation-failed";
   }
 
-  function isScratchDecision(
+  function isScratchOnlyDecision(
     decision: InputResourcePolicy.Decision
   ): decision is Extract<InputResourcePolicy.Decision, { status: "accept" }> & {
     route: { kind: "attachment"; via: "scratch"; from: "bytes" };
@@ -770,6 +1062,92 @@ export namespace InputResourceRouter {
       decision.route.kind === "attachment" &&
       decision.route.via === "scratch"
     );
+  }
+
+  function isProviderAndScratchDecision(
+    decision: InputResourcePolicy.Decision
+  ): decision is Extract<InputResourcePolicy.Decision, { status: "accept" }> & {
+    route: {
+      kind: "attachment";
+      via: "provider-and-scratch";
+      from: "bytes";
+      representation: "inline-bytes";
+    };
+  } {
+    return (
+      decision.status === "accept" &&
+      decision.route.kind === "attachment" &&
+      decision.route.via === "provider-and-scratch"
+    );
+  }
+
+  function fallbackWithoutScratch(
+    facts: Readonly<InputResourcePolicy.ResourceFacts>,
+    available: Readonly<InputResourcePolicy.Capabilities>,
+    config: InputResourcePolicy.Config,
+    reason: InputResourcePolicy.UnavailableReason
+  ): InputResourcePolicy.Decision {
+    const fallback = InputResourcePolicy.decide(
+      facts,
+      {
+        reference: available.reference,
+        attachment: { provider: available.attachment.provider },
+      },
+      config
+    );
+    const trace = fallback.trace.map((entry) =>
+      entry.preference === "provider-and-scratch-bytes-attachment" &&
+      entry.reason === "scratch-unavailable"
+        ? { ...entry, reason }
+        : entry
+    );
+    return fallback.status === "accept"
+      ? { ...fallback, trace }
+      : {
+          ...fallback,
+          reason:
+            fallback.reason === "scratch-unavailable"
+              ? reason
+              : fallback.reason,
+          trace,
+        };
+  }
+
+  function routeForPrepared(
+    resource: Readonly<PreparedResource>
+  ): InputResourcePolicy.Route {
+    switch (resource.kind) {
+      case "provider-file":
+        return {
+          kind: "attachment",
+          via: "provider",
+          from: resource.source === "library" ? "url" : "bytes",
+          representation: resource.representation,
+        };
+      case "provider-and-scratch-file":
+        return {
+          kind: "attachment",
+          via: "provider-and-scratch",
+          from: "bytes",
+          representation: "inline-bytes",
+        };
+      case "scratch-file":
+        return { kind: "attachment", via: "scratch", from: "bytes" };
+      case "directory-reference":
+        return {
+          kind: "reference",
+          via: "host-scope",
+          resource: "directory",
+        };
+      case "path-reference":
+        return {
+          kind: "reference",
+          via: "path",
+          space: resource.space,
+        };
+      case "url-reference":
+        return { kind: "reference", via: "url" };
+    }
   }
 
   function scratchBatchRejection(
@@ -792,6 +1170,24 @@ export namespace InputResourceRouter {
       reservation.totalBytes
     );
     return totalBytes > limits.maxTotalBytes ? "scratch-budget-exceeded" : null;
+  }
+
+  function retainedTwinBatchRejection(
+    resources: readonly { size: number }[],
+    limits: Readonly<
+      NonNullable<Environment["attachment"]["operableTwinRetention"]>
+    >
+  ): InputResourcePolicy.UnavailableReason | null {
+    if (resources.length > limits.maxFiles) {
+      return "draft-operable-copy-budget-exceeded";
+    }
+    const totalBytes = resources.reduce(
+      (sum, resource) => sum + resource.size,
+      0
+    );
+    return totalBytes > limits.maxTotalBytes
+      ? "draft-operable-copy-budget-exceeded"
+      : null;
   }
 
   function preparedBase(input: Readonly<Input>): PreparedBase {

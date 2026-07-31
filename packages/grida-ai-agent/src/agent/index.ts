@@ -16,6 +16,10 @@
  *                          capability hint. Without it the agent can't
  *                          even see command execution exists (LLM-level
  *                          safety, not just runtime gating).
+ *   - `scratch_dir`      — optional. The host-provisioned session scratch
+ *                          root already reachable through the injected
+ *                          filesystem bindings. This advertises its address;
+ *                          it grants no filesystem capability by itself.
  *   - `onStepFinish`     — optional diagnostic hook (per-step logger).
  *
  * The fs / todos tools are always present — they're the baseline. The
@@ -111,6 +115,14 @@ export type CreateAgentOptions = {
   /** Command-execution capability. Without it, the `run_command` tool is
    * not registered and the LLM cannot call it. */
   command?: ToolsetCapabilities["command"];
+  /**
+   * Host-provisioned per-session scratch root already reachable through the
+   * injected filesystem/vision bindings. This is prompt metadata only: passing
+   * it grants no reach, so hosts MUST omit it unless those bindings can resolve
+   * the exact root. Kept separate from `command` because a sandbox-withheld
+   * shell must not hide scratch from the structured filesystem tools.
+   */
+  scratch_dir?: string;
   /**
    * Discovered skills (RFC `skills`). When provided, their descriptions
    * are advertised in the system prompt and the locked `skill` tool joins
@@ -274,11 +286,11 @@ export function gridaAttribution(
 /**
  * Free-form capability hints appended to the composed prompt.
  *
- * Today: command execution + the session scratch dir (gated on the command,
- * since scratch reach rides the shell) + vision. The blurb tells the LLM the
- * tool exists, what defaults apply, and what enforcement to expect — kept to a
- * few lines so it doesn't crowd the per-skill blocks. Exported (module-level,
- * not at the package root) so the gating is unit-pinned without driving a model.
+ * Today: command execution + the independently provisioned session scratch dir
+ * + vision. The blurb tells the LLM what exists, what defaults apply, and what
+ * enforcement to expect — kept to a few lines so it doesn't crowd the
+ * per-skill blocks. Exported (module-level, not at the package root) so the
+ * gating is unit-pinned without driving a model.
  */
 export function buildCapabilityHints(opts: CreateAgentOptions): string[] {
   // Surface presentation is locked into every toolset. The same generic hint
@@ -297,17 +309,21 @@ export function buildCapabilityHints(opts: CreateAgentOptions): string[] {
         opts.command.default_workdir
       )
     );
-    // Scratch reach rides the shell, so it is advertised only alongside the
-    // command capability. Promote to a standalone hint if structured-fs or
-    // perception reach for scratch lands later (WG `scratch.md`).
-    if (opts.command.scratch_dir) {
-      hints.push(
-        prompts.scratch_capability(
-          RUN_COMMAND_TOOL_NAME,
-          opts.command.scratch_dir
-        )
-      );
-    }
+  }
+  // `scratch_dir` is the canonical host attestation. Keep the command-carried
+  // field as a compatibility fallback for callers predating the standalone
+  // seam; neither arm derives or widens filesystem authority.
+  const scratchDir = opts.scratch_dir ?? opts.command?.scratch_dir;
+  if (scratchDir) {
+    hints.push(
+      prompts.scratch_capability(scratchDir, {
+        // Only the standalone field attests that the injected structured
+        // filesystem resolves this root. The legacy command-carried fallback
+        // attests shell reach only.
+        filesystem: opts.scratch_dir !== undefined,
+        run_command_name: opts.command ? RUN_COMMAND_TOOL_NAME : undefined,
+      })
+    );
   }
   if (opts.vision) {
     hints.push(prompts.vision_capability(AgentVision.TOOL_NAMES.view_image));
@@ -315,11 +331,11 @@ export function buildCapabilityHints(opts: CreateAgentOptions): string[] {
   // Image generation rides scratch (its produced files sink there), so it is
   // advertised only when the generator AND a scratch path are wired — the same
   // gating that builds the generator binding in the first place.
-  if (opts.image_gen && opts.command?.scratch_dir) {
+  if (opts.image_gen && scratchDir) {
     hints.push(
       prompts.image_gen_capability(
         AgentGen.TOOL_NAMES.generate_image,
-        opts.command.scratch_dir
+        scratchDir
       )
     );
   }

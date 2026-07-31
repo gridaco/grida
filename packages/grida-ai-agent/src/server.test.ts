@@ -23,7 +23,7 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
   // Every host-supplied tenant field must ride from the composed daemon into
   // the tenant. `skills_root` shipped disabled precisely because it was omitted
   // here → the agent discovered ZERO built-in skills on the desktop.
-  it("forwards skills_root, gg_base_url, scratch_base, provider_http, and the capability flags", () => {
+  it("forwards host capabilities, including the finite shell executor", () => {
     const provider_http = {
       request: globalThis.fetch,
       download: globalThis.fetch,
@@ -40,6 +40,9 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
       originator: "grida-test",
       default_model_id: "openai/gpt-5.6-terra" as const,
     };
+    const shell_executor = async () => {
+      throw new Error("not invoked by the option-mapping test");
+    };
     const out = agentTenantOptionsFromDaemon(
       {
         password: "p",
@@ -49,6 +52,7 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
         gg_base_url: "https://grida.co",
         scratch_base: "/tmp/scratch",
         image_model_id: "img/model",
+        shell_executor,
         sandbox_enforced: true,
         external_agent_execution: "disabled",
         allow_unsandboxed_shell: false,
@@ -63,6 +67,7 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
     expect(out.gg_base_url).toBe("https://grida.co");
     expect(out.scratch_base).toBe("/tmp/scratch");
     expect(out.image_model_id).toBe("img/model");
+    expect(out.shell_executor).toBe(shell_executor);
     expect(out.sandbox_enforced).toBe(true);
     expect(out.external_agent_execution).toBe("disabled");
     expect(out.interactive).toBe(true);

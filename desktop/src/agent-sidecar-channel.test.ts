@@ -88,6 +88,53 @@ const frames: readonly AgentSidecarChannel.Frame[] = [
     message: "request failed",
   },
   { v: 1, type: "response.credit", requestId: "req_1", bytes: 65_536 },
+  {
+    v: 1,
+    type: "command.request",
+    requestId: "cmd_1",
+    command: "node",
+    args: ["script.js", "--name=Grida"],
+    workdir: "/workspace",
+    timeoutMs: 30_000,
+    workspaceRoot: "/workspace",
+    scratchDir: "/scratch/session-1",
+  },
+  {
+    v: 1,
+    type: "command.abort",
+    requestId: "cmd_cancelled",
+    reason: "caller aborted",
+  },
+  {
+    v: 1,
+    type: "command.aborted",
+    requestId: "cmd_cancelled",
+  },
+  {
+    v: 1,
+    type: "command.output",
+    requestId: "cmd_1",
+    stream: "stdout",
+    sequence: 0,
+    data: "hello, 세계\n",
+  },
+  {
+    v: 1,
+    type: "command.end",
+    requestId: "cmd_1",
+    sequence: 1,
+    exitCode: 0,
+    signal: null,
+    timedOut: false,
+    truncated: false,
+    durationMs: 12,
+  },
+  {
+    v: 1,
+    type: "command.error",
+    requestId: "cmd_2",
+    message: "command scope denied",
+  },
   { v: 1, type: "shutdown" },
 ];
 
@@ -220,6 +267,118 @@ describe("AgentSidecarChannel.parse", () => {
         data,
       })
     ).toThrow(/bounded base64 chunk/);
+  });
+
+  it("keeps command requests and UTF-8 output strictly bounded", () => {
+    const request = frames.find(
+      (frame) => frame.type === "command.request"
+    ) as AgentSidecarChannel.CommandRequestFrame;
+
+    expect(() =>
+      AgentSidecarChannel.parse({
+        ...request,
+        args: Array.from(
+          { length: AgentSidecarChannel.MAX_COMMAND_ARGS + 1 },
+          () => "x"
+        ),
+      })
+    ).toThrow(/args must be an array/);
+    expect(() =>
+      AgentSidecarChannel.parse({
+        ...request,
+        command: "node\0--inspect",
+      })
+    ).toThrow(/null byte/);
+    expect(
+      AgentSidecarChannel.parse({
+        ...request,
+        timeoutMs: 60_001,
+      })
+    ).toMatchObject({ timeoutMs: 60_001 });
+    expect(() =>
+      AgentSidecarChannel.parse({
+        ...request,
+        timeoutMs: 0,
+      })
+    ).toThrow(/timeoutMs must be an integer/);
+    expect(() =>
+      AgentSidecarChannel.parse({
+        ...request,
+        scratchDir: "",
+      })
+    ).toThrow(/scratchDir must be a string/);
+    expect(() =>
+      AgentSidecarChannel.parse({
+        v: 1,
+        type: "command.output",
+        requestId: "cmd",
+        stream: "stdout",
+        sequence: 0,
+        data: "🌍".repeat(
+          AgentSidecarChannel.MAX_COMMAND_OUTPUT_CHUNK_BYTES / 4 + 1
+        ),
+      })
+    ).toThrow(/bounded UTF-8 chunk/);
+  });
+
+  it("rejects malformed command completion frames", () => {
+    expect(() =>
+      AgentSidecarChannel.parse({
+        v: 1,
+        type: "command.output",
+        requestId: "cmd",
+        stream: "stdin",
+        sequence: 0,
+        data: "nope",
+      })
+    ).toThrow(/output stream/);
+    expect(
+      AgentSidecarChannel.parse({
+        v: 1,
+        type: "command.end",
+        requestId: "cmd",
+        sequence: 0,
+        exitCode: 256,
+        signal: null,
+        timedOut: false,
+        truncated: false,
+        durationMs: 1,
+      })
+    ).toMatchObject({ exitCode: 256 });
+    expect(
+      AgentSidecarChannel.parse({
+        v: 1,
+        type: "command.end",
+        requestId: "cmd",
+        sequence: 0,
+        exitCode: -1,
+        signal: null,
+        timedOut: false,
+        truncated: false,
+        durationMs: 1,
+      })
+    ).toMatchObject({ exitCode: -1 });
+    expect(() =>
+      AgentSidecarChannel.parse({
+        v: 1,
+        type: "command.end",
+        requestId: "cmd",
+        sequence: 0,
+        exitCode: Number.MAX_SAFE_INTEGER + 1,
+        signal: null,
+        timedOut: false,
+        truncated: false,
+        durationMs: 1,
+      })
+    ).toThrow(/exitCode must be an integer/);
+    expect(() =>
+      AgentSidecarChannel.parse({
+        v: 1,
+        type: "command.error",
+        requestId: "cmd",
+        message: "",
+      })
+    ).toThrow(/message must be a string/);
   });
 });
 

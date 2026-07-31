@@ -56,10 +56,20 @@ flag is never consulted again.
 
 On macOS and Linux, the sidecar runs under `srt` with no direct external
 destinations and `allow_local_binding: false`; Electron main supplies the two
-explicit capabilities above. Windows currently runs the sidecar without that
-outer wrapper: shell and external ACP are withheld, while structured local file
-tools remain available and no kernel egress fence exists. That is a documented
-nonconformance rather than a sandbox claim.
+explicit capabilities above. A model-selected command is a third private
+sidecar-to-main capability: main gives each finite worker a fresh SRT profile
+containing only its exact workspace, own session scratch, and private command
+temp write roots. The coarse sidecar profile is not used as proof of
+cross-session shell isolation. Windows currently runs the sidecar without the
+outer wrapper: shell and external ACP are withheld, while structured local
+file tools remain available and no kernel egress fence exists. That is a
+documented nonconformance rather than a sandbox claim.
+
+Windows still accepts per-session scratch staging. Raster inputs remain
+operable through provider perception/`view_image`, and structured text
+(including SVG) remains operable through filesystem tools. Scratch-only binary
+inputs such as PDF/archives are withheld because the confined binary command
+tool is unavailable; the renderer does not create an inert attachment path.
 
 If a bug reproduces in files, workspaces, BYOK providers, sessions,
 or agent execution, add the first test in

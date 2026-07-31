@@ -56,6 +56,7 @@ import {
 } from "./names";
 import {
   createRunCommandTool,
+  type RunCommandApprovalInput,
   type RunCommandBackend,
   type RunCommandOutcome,
 } from "./run-command";
@@ -71,7 +72,12 @@ export {
   SURFACE_LIST_OPEN_TOOL_NAME,
   SKILL_TOOL_NAME,
 };
-export type { AgentToolName, RunCommandBackend, RunCommandOutcome };
+export type {
+  AgentToolName,
+  RunCommandApprovalInput,
+  RunCommandBackend,
+  RunCommandOutcome,
+};
 
 export type ToolsetCapabilities = {
   /** Server-side AgentFs binding. When provided, fs tools get
@@ -111,7 +117,7 @@ export type ToolsetCapabilities = {
      * straight to `createRunCommandTool` → the tool's `needsApproval`. The
      * host computes it from the session mode + `isReadOnlyCommand`; absent in
      * `auto` (every command auto-runs). */
-    needs_approval?: (input: { command: string; args: string[] }) => boolean;
+    needs_approval?: (input: RunCommandApprovalInput) => boolean;
   };
   /** Inject the discovered skill index. When provided, the locked `skill`
    * tool joins the registry, letting the model load any advertised skill
