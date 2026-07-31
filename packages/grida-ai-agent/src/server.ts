@@ -18,6 +18,7 @@
  */
 
 import os from "node:os";
+import { readFileSync } from "node:fs";
 import type { Hono } from "hono";
 import {
   DaemonServer,
@@ -56,6 +57,8 @@ import { StreamRegistry } from "./runtime/stream-registry";
 import { defaultScratchBase, sweepScratch } from "./session/scratch";
 import { DirectoryScopeRegistry } from "./session/directory-scopes";
 import { ProviderHttp, type ProviderHttpTransport } from "./providers/http";
+import { ModelCatalogStore } from "./providers/model-catalog";
+import { models } from "@grida/ai-models";
 
 export {
   DirectoryScopeRegistry,
@@ -244,6 +247,13 @@ export type AgentTenantOptions = {
    * (only project/user skills discovered).
    */
   skills_root?: string;
+  /**
+   * A model catalogue supplied by the host, instead of the bundled one
+   * and instead of fetching the published one. Pins the tenant's
+   * catalogue for its whole life — the escape hatch for air-gapped or
+   * version-pinned deployments. See `ModelCatalogStore`.
+   */
+  models_snapshot?: models.snapshot.Snapshot;
 };
 
 /**
@@ -294,6 +304,17 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       // requests cannot arrive until tenant registration returns.
       let onProviderReady: (() => void) | undefined;
       const signalProviderReady = () => onProviderReady?.();
+      // The catalogue this tenant resolves against: the bundled one as a
+      // seed, the published one as the authority. A refresh can make a
+      // previously unresolvable model resolvable, which is exactly the
+      // condition `on_provider_ready` exists to retry — a session parked
+      // as `provider_down` on an unknown model un-parks here.
+      const modelCatalog = new ModelCatalogStore({
+        ...resolveCatalogOverride(opts.models_snapshot),
+        base_url: gridaGatewayBaseUrl,
+        fetch: providerHttp.request,
+        on_change: signalProviderReady,
+      });
       if (gridaGatewayBaseUrl) {
         registerGridaAuthRoutes(app, {
           store: gridaSession,
@@ -512,6 +533,10 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       if (caps.sessions)
         registerSessionsRoutes(app, { store: sessionsStore, runtime });
 
+      // After registration: the boot fetch is non-blocking, but a refresh
+      // signals provider-ready, and that callback must already be wired.
+      modelCatalog.start();
+
       return {
         // `gg` reflects the feature actually being ON (base URL
         // present) — clients feature-detect the hosted provider by it.
@@ -523,6 +548,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         cleanup: () => {
           runtime.dispose();
           directoryScopes.dispose();
+          modelCatalog.dispose();
           sessionsStore.close();
         },
       };
@@ -617,4 +643,51 @@ export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
       createAgentTenant(agentTenantOptionsFromDaemon(opts, capabilities)),
     ],
   });
+}
+
+/** `GRIDA_AGENT_MODELS_PATH` — pin the catalogue to a file on disk. */
+const MODELS_PATH_ENV = "GRIDA_AGENT_MODELS_PATH";
+/** `GRIDA_AGENT_DISABLE_MODELS_FETCH` — never fetch; stay on the seed. */
+const MODELS_FETCH_DISABLED_ENV = "GRIDA_AGENT_DISABLE_MODELS_FETCH";
+
+/**
+ * Host and operator overrides for the model catalogue, resolved into
+ * `ModelCatalogStore` options.
+ *
+ * A pinned snapshot (from the host option or a file) freezes the store;
+ * disabling the fetch leaves it on the bundled seed. Both are escape
+ * hatches for air-gapped or version-pinned deployments — and both fail
+ * OPEN to normal behaviour, because an operator typo must not be the
+ * reason a daemon has no catalogue at all.
+ */
+function resolveCatalogOverride(
+  hostSnapshot?: models.snapshot.Snapshot
+): { snapshot?: models.snapshot.Snapshot; base_url?: undefined } | object {
+  if (hostSnapshot) return { snapshot: hostSnapshot };
+
+  const filePath = process.env[MODELS_PATH_ENV]?.trim();
+  if (filePath) {
+    try {
+      const parsed = models.snapshot.parse(
+        JSON.parse(readFileSync(filePath, "utf8"))
+      );
+      if (parsed) return { snapshot: parsed };
+      console.warn(
+        `[grida-agent] ${MODELS_PATH_ENV}=${filePath} did not match schema ${models.snapshot.SCHEMA}; ignoring it`
+      );
+    } catch (err) {
+      console.warn(
+        `[grida-agent] ${MODELS_PATH_ENV}=${filePath} could not be read (${
+          err instanceof Error ? err.message : String(err)
+        }); ignoring it`
+      );
+    }
+  }
+
+  if (process.env[MODELS_FETCH_DISABLED_ENV] === "1") {
+    // Freeze on the bundled catalogue: a seed snapshot pins the store
+    // exactly the way a supplied one does.
+    return { snapshot: models.snapshot.seed() };
+  }
+  return {};
 }
