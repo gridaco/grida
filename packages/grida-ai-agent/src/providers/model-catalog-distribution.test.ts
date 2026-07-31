@@ -23,6 +23,13 @@ const NEW_MODEL = "acme/published-after-release";
 
 const BASE_URL = "https://grida.test";
 
+/** A fetch stub serving whatever `body()` returns at call time. */
+function serve(body: () => unknown): typeof fetch {
+  return vi.fn<typeof fetch>(
+    async () => new Response(JSON.stringify(body()), { status: 200 })
+  );
+}
+
 function spec(id: string): models.text.ModelSpec {
   return {
     id,
@@ -56,10 +63,7 @@ function publishedCatalogue(): models.snapshot.Snapshot {
 async function fetchedStore(): Promise<ModelCatalogStore> {
   const store = new ModelCatalogStore({
     base_url: BASE_URL,
-    fetch: (async () =>
-      new Response(JSON.stringify(publishedCatalogue()), {
-        status: 200,
-      })) as unknown as typeof globalThis.fetch,
+    fetch: serve(publishedCatalogue),
   });
   expect(await store.refresh("boot")).toBe(true);
   return store;
@@ -117,10 +121,10 @@ describe("a model published after this binary shipped", () => {
     // so its catalogue is stale at the moment the request arrives. Without
     // the in-request refresh the user watches their own picker's model get
     // rejected as unknown.
-    const fetchImpl = vi.fn(
+    const fetchImpl = vi.fn<typeof fetch>(
       async () =>
         new Response(JSON.stringify(publishedCatalogue()), { status: 200 })
-    ) as unknown as typeof globalThis.fetch;
+    );
     const store = new ModelCatalogStore({
       base_url: BASE_URL,
       fetch: fetchImpl,
@@ -138,10 +142,7 @@ describe("a model published after this binary shipped", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const store = new ModelCatalogStore({
       base_url: BASE_URL,
-      fetch: (async () =>
-        new Response(JSON.stringify(models.snapshot.seed()), {
-          status: 200,
-        })) as unknown as typeof globalThis.fetch,
+      fetch: serve(models.snapshot.seed),
     });
     const result = await runGate("acme/never-existed", runDeps(store));
     expect(result).toBeInstanceOf(Response);
@@ -225,10 +226,7 @@ describe("a tier retargeted after this binary shipped", () => {
     let body: unknown = models.snapshot.seed();
     const store = new ModelCatalogStore({
       base_url: BASE_URL,
-      fetch: (async () =>
-        new Response(JSON.stringify(body), {
-          status: 200,
-        })) as unknown as typeof globalThis.fetch,
+      fetch: serve(() => body),
     });
     await store.refresh("boot");
 
@@ -280,10 +278,7 @@ describe("a model withdrawn from the published catalogue", () => {
     // bundled seed would defeat it on every installed client.
     const store = new ModelCatalogStore({
       base_url: BASE_URL,
-      fetch: (async () =>
-        new Response(JSON.stringify(withoutLuna()), {
-          status: 200,
-        })) as unknown as typeof globalThis.fetch,
+      fetch: serve(withoutLuna),
     });
     await store.refresh("boot");
 
@@ -300,10 +295,7 @@ describe("a model withdrawn from the published catalogue", () => {
     // the catalogue flips it into that class — by design.
     const store = new ModelCatalogStore({
       base_url: BASE_URL,
-      fetch: (async () =>
-        new Response(JSON.stringify(withoutLuna()), {
-          status: 200,
-        })) as unknown as typeof globalThis.fetch,
+      fetch: serve(withoutLuna),
     });
     await store.refresh("boot");
 

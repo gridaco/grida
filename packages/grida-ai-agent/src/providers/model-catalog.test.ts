@@ -51,10 +51,15 @@ function jsonResponse(value: unknown): Response {
 
 /** A fetch stub that serves `bodies` in order, repeating the last. */
 function serving(...bodies: unknown[]) {
-  return vi.fn(async () => {
+  return vi.fn<typeof fetch>(async () => {
     const next = bodies.length > 1 ? bodies.shift() : bodies[0];
     return jsonResponse(next);
-  }) as unknown as typeof globalThis.fetch;
+  });
+}
+
+/** A fetch stub built from a bare handler. */
+function fetching(handler: () => Promise<Response>) {
+  return vi.fn<typeof fetch>(handler);
 }
 
 const stores: ModelCatalogStore[] = [];
@@ -142,7 +147,7 @@ describe("ModelCatalogStore — applying a published catalogue", () => {
   });
 
   it("notifies on change, and only on change", async () => {
-    const onChange = vi.fn();
+    const onChange = vi.fn<() => void>();
     const body = published(["acme/one"]);
     const store = make({
       base_url: BASE_URL,
@@ -178,22 +183,19 @@ describe("ModelCatalogStore — failure is never fatal", () => {
   it.each([
     [
       "a network error",
-      vi.fn(async () => {
+      fetching(async () => {
         throw new Error("offline");
       }),
     ],
-    ["a 404", vi.fn(async () => new Response("", { status: 404 }))],
-    ["a 500", vi.fn(async () => new Response("", { status: 500 }))],
+    ["a 404", fetching(async () => new Response("", { status: 404 }))],
+    ["a 500", fetching(async () => new Response("", { status: 500 }))],
     [
       "a non-JSON body",
-      vi.fn(async () => new Response("<!doctype html>", { status: 200 })),
+      fetching(async () => new Response("<!doctype html>", { status: 200 })),
     ],
   ])("keeps the bundled catalogue on %s", async (_label, fetchImpl) => {
     warn();
-    const store = make({
-      base_url: BASE_URL,
-      fetch: fetchImpl as unknown as typeof globalThis.fetch,
-    });
+    const store = make({ base_url: BASE_URL, fetch: fetchImpl });
     await expect(store.refresh("boot")).resolves.toBe(false);
     expect(store.view().catalog).toEqual(models.text.catalog);
   });
@@ -236,10 +238,10 @@ describe("ModelCatalogStore — failure is never fatal", () => {
     let fail = false;
     const store = make({
       base_url: BASE_URL,
-      fetch: (async () => {
+      fetch: fetching(async () => {
         if (fail) throw new Error("offline");
         return jsonResponse(good);
-      }) as unknown as typeof globalThis.fetch,
+      }),
     });
     await store.refresh("boot");
     fail = true;
@@ -252,10 +254,9 @@ describe("ModelCatalogStore — failure is never fatal", () => {
     warn();
     const store = make({
       base_url: BASE_URL,
-      fetch: (async () =>
-        new Response("x".repeat(1_000_001), {
-          status: 200,
-        })) as unknown as typeof globalThis.fetch,
+      fetch: fetching(
+        async () => new Response("x".repeat(1_000_001), { status: 200 })
+      ),
     });
     expect(await store.refresh("boot")).toBe(false);
   });
@@ -264,9 +265,9 @@ describe("ModelCatalogStore — failure is never fatal", () => {
     const spy = warn();
     const store = make({
       base_url: BASE_URL,
-      fetch: (async () => {
+      fetch: fetching(async () => {
         throw new Error("offline");
-      }) as unknown as typeof globalThis.fetch,
+      }),
     });
     await store.refresh("boot");
     await store.refresh("boot");
@@ -280,9 +281,9 @@ describe("ModelCatalogStore — failure is never fatal", () => {
 describe("ModelCatalogStore — single-flight and rate limiting", () => {
   it("collapses concurrent refreshes into one request", async () => {
     let resolve!: (r: Response) => void;
-    const fetchImpl = vi.fn(
+    const fetchImpl = vi.fn<typeof fetch>(
       () => new Promise<Response>((r) => (resolve = r))
-    ) as unknown as typeof globalThis.fetch;
+    );
     const store = make({ base_url: BASE_URL, fetch: fetchImpl });
 
     const all = Promise.all([
@@ -368,9 +369,9 @@ describe("ModelCatalogStore — lifecycle", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const store = make({
       base_url: BASE_URL,
-      fetch: (async () => {
+      fetch: fetching(async () => {
         throw new Error("offline");
-      }) as unknown as typeof globalThis.fetch,
+      }),
       refresh_interval_ms: null,
     });
     expect(() => store.start()).not.toThrow();

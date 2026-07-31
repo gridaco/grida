@@ -242,7 +242,66 @@ its own**:
 - **Granularity** — one hosted request per model step, so per-request
   gating _is_ step-level gating for the agent.
 
-### 4. Relationship to provider selection
+### 4. Catalogue distribution (credential-free)
+
+The model catalogue is compiled into every client that consumes it, so a
+shipped desktop binary can only ever see the catalogue it was built with.
+Adding a model or retargeting a tier used to require a release — while the
+renderer, served fresh from grida.co, would already be offering the new
+model. The result was a client whose own picker offered a model its own
+agent host rejected as unknown.
+
+The catalogue is therefore **published, not shipped**: authored in-repo
+(it is a curated product decision, not a scrape) and served at
+`GET /api/v1/models/catalog`.
+
+- **The published snapshot IS the deployed gate.** That endpoint's body
+  and the server's own model allowlist are the same static import in the
+  same deploy artifact, so they cannot disagree. This is why the published
+  catalogue outranks a client's bundled one even when the binary is newer:
+  converging on it is converging on the table that will actually be
+  enforced.
+- **The bundle is the seed, and the floor.** A host answers from its
+  bundled catalogue immediately and forever if the network never comes
+  back. A bad snapshot can make a host mis-list; it can never leave one
+  with no catalogue at all.
+- **Whole-or-reject, and wholesale.** A snapshot that fails validation is
+  discarded entirely — a half-applied catalogue must not exist. A valid one
+  REPLACES the catalogue rather than merging: removing a model is the kill
+  switch, and a merge would defeat it on every installed client.
+- **Credential-free, and outside `/api/v1/ai/**`.** A desktop sidecar
+fetches this at boot, long before a renderer can push a signed-in
+session token, so the route must accept no credential — and
+`GRIDA-SEC-006`binds the`/api/v1/ai/\*\*`glob to`verifyGgToken`
+  exclusively. Accepting no credential is stronger than accepting the
+  wrong one, but only while the route stays out of that glob.
+- **Pricing is included, deliberately.** The "no pricing" rule on
+  `/api/v1/ai/models` guards the OpenAI-compatible surface against
+  client-side cost math drifting from the billing rail. This payload is
+  the source that FEEDS a host's local estimate and its compaction limits;
+  withholding rates is what would cause drift. The same numbers are
+  already public on the models page and in the pricing docs.
+
+**Convergence.** A host refreshes at boot, on an interval, and once when
+its run gate misses. The gate miss is the load-bearing one: it is awaited
+in-request, so the FIRST run of a newly published model succeeds instead of
+failing until some later tick. A tier retarget produces no miss (the old
+target is still valid), so it converges on the interval instead.
+
+**Schema.** Additive changes do not bump the schema major — clients ignore
+fields they do not know, so a new optional field is safe to publish. A
+breaking change publishes at a NEW path and bumps the major, leaving old
+clients on the old path or falling back to their seed. One rule follows
+from that: a model requiring new CLIENT CODE (a new provider kind) must
+never be published into an existing schema, because old clients will
+accept its data and then fail to drive it. Ordinary models are pure data
+and need no accompanying release.
+
+`image` and `video` are reserved keys for the deferred media phase; today
+only `text` (catalogue + tier map) is published or consumed, so new image
+and video models still require a release.
+
+### 5. Relationship to provider selection
 
 GG is one native capacity source; it does not own the global provider order.
 The golden selection rules live in the
@@ -300,7 +359,11 @@ handoff, is then retained only in the daemon's memory, and is re-minted on
 expiry; each GG call uses the bounded native provider transport and Chromium
 system route without giving Electron main durable token custody; the gateway
 gates and meters through the live billing rail; BYOK
-continues to bypass everything. The experimental ChatGPT subscription
+continues to bypass everything. The model catalogue is published at
+`/api/v1/models/catalog` and agent hosts resolve through it — seeded from
+their bundled copy, refreshed at boot, on an interval, and once on a run-gate
+miss — so a text model added or a tier retargeted on the server reaches an
+already-installed binary without a release. The experimental ChatGPT subscription
 provider now participates in the native resolver and provider-qualified
 session persistence described above. That local implementation does not make
 it a stable OpenAI-supported integration: its legal/support contract remains
@@ -334,7 +397,15 @@ later, and the honest risks:
   subscription-backend posture, remains an external release gate.
 - **Packaged egress smoke** — the native sandbox must be proven to reach
   the hosted host from a _packaged_ build; the dev loop cannot prove the
-  packaged allowlist.
+  packaged allowlist. This now also covers the catalogue fetch, which
+  rides the same provider lane.
+- **Catalogue distribution is text-only.** The `image` and `video` keys are
+  reserved but neither published nor consumed, so a new image or video
+  model still requires a desktop release.
+- **A published catalogue is not persisted.** A host holds it in memory
+  only, so an offline start falls back to the bundled seed rather than the
+  last catalogue it saw. Accepted: it also means a bad-but-valid snapshot
+  cannot outlive the process that fetched it.
 - **Hosted-deploy prerequisite** — the gateway fails closed without its
   dedicated signing secret configured in the hosted environment.
 
