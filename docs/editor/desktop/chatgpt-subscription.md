@@ -55,7 +55,8 @@ provider/model option.
 
 The model picker organizes other text models by provider:
 
-- **Grida** is always shown. Its models use Grida credits.
+- **Grida** is always shown. Its hosted models are metered against your
+  organization's prepaid Grida AI credit.
 - **OpenRouter** and **Vercel** appear after their keys are configured.
 - **Ollama** appears after it is configured with at least one model.
 
@@ -65,7 +66,8 @@ Other provider groups appear when they are configured and available.
 
 ChatGPT Subscription is a text-model provider. Image, video, and audio
 generation continue to use the providers shown under
-**Settings → Image/Video/Audio Providers** or Grida-included credits.
+**Settings → Image/Video/Audio Providers** or Grida-hosted models metered
+against your organization's prepaid Grida AI credit.
 
 ## Troubleshooting
 

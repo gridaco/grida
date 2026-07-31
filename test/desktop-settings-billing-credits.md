@@ -7,7 +7,7 @@ tags: [billing, credits, account, open-external, degraded-mode]
 status: untested
 severity: medium
 date: 2026-07-03
-updated: 2026-07-03
+updated: 2026-07-31
 automatable: false
 covered_by:
   - editor/app/desktop/billing/summary/route.test.ts
@@ -44,7 +44,7 @@ browser, the desktop number updates on the next visit to Settings.
    grant the org a complimentary credit (e.g. $5) from `/insiders/billing`
    (dev-only). In the **desktop app**, sign in and open Settings.
 2. Expected: Credits card renders a skeleton, then the org's display
-   name, plan badge (Free/Pro/Team), and the granted balance as `$5.00`.
+   name, a plan badge, and the granted balance as `$5.00`.
 3. Click **Manage billing**.
 4. Expected: the OS browser opens `/organizations/{slug}/settings/billing`
    for that org; the desktop window stays on Settings (no webview

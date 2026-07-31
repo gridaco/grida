@@ -38,7 +38,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@app/ui/components/dropdown-menu";
-import { Progress } from "@app/ui/components/progress";
 import { useWorkspace, WorkspaceState } from "@/scaffolds/workspace";
 import {
   DotsHorizontalIcon,
@@ -60,12 +59,7 @@ import { Labels } from "@/k/labels";
 import { Button } from "@/components/ui-editor/button";
 import { ShineBorder } from "@/www/ui/shine-border";
 import { validateProjectName } from "@/services/utils/regex";
-import type {
-  GDocument,
-  OrganizationWithAvatar,
-  OrganizationWithMembers,
-  PlanTier,
-} from "@/types";
+import type { GDocument, OrganizationWithAvatar, PlanTier } from "@/types";
 import Link from "next/link";
 import "core-js/features/object/group-by";
 import {
@@ -188,73 +182,55 @@ export default function WorkspaceSidebar({
 function PricingTierCard({
   organization,
 }: {
-  organization: OrganizationWithAvatar & OrganizationWithMembers;
+  organization: OrganizationWithAvatar;
 }) {
-  const { plan, is_enterprise, members } = organization;
-  const ENTERPRISE_DEFAULT_SEATS = 5;
+  const { plan, is_enterprise } = organization;
   const label = Labels.planTier(plan, is_enterprise);
-  const isEnterprise = is_enterprise;
-  const isTeam = plan === "team";
-  const canUpgrade = !isEnterprise && !isTeam;
+  const isCustom = is_enterprise;
+  const highlight = isCustom || plan !== "free";
+  const planActionLabel = isCustom
+    ? null
+    : plan === "free"
+      ? "Upgrade to Pro"
+      : plan === "team"
+        ? "Move to Pro monthly"
+        : null;
 
   const tierMessages: Record<PlanTier, string> = {
-    free: "You're currently on the Free Plan. Upgrade to unlock premium features!",
-    pro: "Thanks for being a Pro user! You're accessing advanced capabilities.",
-    team: "You're on our Team plan, optimized for collaboration.",
+    free: "You're on the Free plan.",
+    pro: "You're on the Pro plan.",
+    team: "You're on a legacy Team plan. Move to the current Pro monthly subscription when you're ready.",
   };
 
-  const message = isEnterprise
-    ? "You're on Enterprise Plan—thank you for your continued partnership"
+  const message = isCustom
+    ? "Your Custom plan follows the terms arranged for your organization."
     : (tierMessages[plan] ?? `Thanks for subscribing to ${label}!`);
 
   return (
     <div className="relative rounded-lg border p-3">
-      {!canUpgrade && (
+      {highlight && (
         <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
       )}
       <div className="flex items-center justify-between mb-2">
-        {canUpgrade && <h3 className="text-sm font-semibold">Current Plan</h3>}
+        <h3 className="text-sm font-semibold">Current Plan</h3>
         <Badge variant="outline">{label}</Badge>
       </div>
       <p className="mb-3 text-xs text-muted-foreground">{message}</p>
-      {canUpgrade && (
-        <Link
-          href={`/organizations/${organization.name}/settings/billing/upgrade`}
-        >
-          <Button size="xs" variant="outline">
-            Upgrade Plan
-          </Button>
-        </Link>
+      {planActionLabel && (
+        <Button size="xs" variant="outline" asChild>
+          <Link
+            href={`/organizations/${organization.name}/settings/billing/upgrade`}
+          >
+            {planActionLabel}
+          </Link>
+        </Button>
       )}
-      {isEnterprise && (
-        <Link href={sitemap.links.contact} target="_blank">
-          <Button size="xs" variant="outline">
-            Arrange Dedicated Support
-          </Button>
-        </Link>
-      )}
-      {isEnterprise && (
-        <div className="mt-3 grid gap-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <label>Seats</label>
-            <label
-              data-state={
-                members.length >= ENTERPRISE_DEFAULT_SEATS ? "over" : "under"
-              }
-              className="data-[state=over]:text-workbench-accent-orange"
-            >
-              ({members.length}/{ENTERPRISE_DEFAULT_SEATS})
-            </label>
-          </div>
-          <div className="w-full">
-            <Progress
-              value={Math.min(
-                (members.length / ENTERPRISE_DEFAULT_SEATS) * 100,
-                100
-              )}
-            />
-          </div>
-        </div>
+      {isCustom && (
+        <Button size="xs" variant="outline" asChild>
+          <Link href={sitemap.links.contact} target="_blank">
+            Contact Grida
+          </Link>
+        </Button>
       )}
     </div>
   );

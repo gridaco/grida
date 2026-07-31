@@ -60,8 +60,8 @@ export default function AudioGenTool({
               </h1>
               <p className="text-muted-foreground text-sm font-light max-w-2xl">
                 Generate music with Google Lyria 3 from a text prompt or
-                reference image. 48kHz stereo, MP3 output. Sign in to start —
-                your free monthly budget covers the cost.
+                reference image. 48kHz stereo, MP3 output. Sign in to use
+                prepaid credit from your organization.
               </p>
             </header>
             <Workspace />

@@ -18,7 +18,7 @@ export default async function SettingsLayout({
 
   const { data: org } = await client
     .from("organization")
-    .select("id, name")
+    .select("id, name, is_enterprise")
     .eq("name", organization_name)
     .single();
 
@@ -33,7 +33,7 @@ export default async function SettingsLayout({
   const plan = sub?.plan ?? "free";
 
   return (
-    <SettingsShell orgName={org.name} plan={plan}>
+    <SettingsShell orgName={org.name} plan={plan} isCustom={org.is_enterprise}>
       {children}
     </SettingsShell>
   );

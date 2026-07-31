@@ -1,5 +1,7 @@
 "use client";
 
+// GRIDA-EE: billing — organization subscription, invoices, and AI credit.
+
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -119,6 +121,7 @@ type InvoicesState = {
   past: PastInvoice[];
   payment_method: PaymentMethod;
   billing_email: string | null;
+  has_stripe_customer: boolean;
 };
 
 function fmtCents(cents: number, decimals = 2): string {
@@ -157,9 +160,11 @@ function SectionShell({
 export default function BillingView({
   orgId,
   orgName,
+  isCustom,
 }: {
   orgId: number;
   orgName: string;
+  isCustom: boolean;
 }) {
   const [state, setState] = useState<BillingState | null>(null);
   const [invoices, setInvoices] = useState<InvoicesState | null>(null);
@@ -193,6 +198,7 @@ export default function BillingView({
           past: [],
           payment_method: null,
           billing_email: null,
+          has_stripe_customer: false,
         });
       }
     } catch (e) {
@@ -295,14 +301,23 @@ export default function BillingView({
   const paidPlan: PaidPlanId | null =
     state.plan === "pro" || state.plan === "team" ? state.plan : null;
   const isPaid = paidPlan !== null;
-  const planLabel = paidPlan ? PAID_PLANS[paidPlan].name : "Free";
-  // v1: single-seat. Prices come from the catalogue source of truth. Annual
-  // shows the monthly equivalent inline so users can sanity-check the discount.
-  const priceLabel = paidPlan
-    ? state.interval === "year"
-      ? `$${price_dollars(paidPlan, "year")}/yr (~$${price_monthly_equivalent_dollars(paidPlan, "year").toFixed(0)}/mo)`
-      : `$${price_dollars(paidPlan, "month")}/mo`
-    : "$0/mo";
+  const hasCommercialPlan = isCustom || isPaid;
+  const isCurrentProMonthly =
+    state.plan === "pro" && state.interval === "month";
+  const planLabel = isCustom
+    ? "Custom"
+    : paidPlan
+      ? PAID_PLANS[paidPlan].name
+      : "Free";
+  // Historical paid offers remain readable. Annual prices show their monthly
+  // equivalent so the user can understand the current legacy subscription.
+  const priceLabel = isCustom
+    ? "Agreement-defined"
+    : paidPlan
+      ? state.interval === "year"
+        ? `$${price_dollars(paidPlan, "year")}/yr (~$${price_monthly_equivalent_dollars(paidPlan, "year").toFixed(0)}/mo)`
+        : `$${price_dollars(paidPlan, "month")}/mo`
+      : "$0/mo";
   // Destructive payment-failure states. `incomplete` / `incomplete_expired`
   // mean the *first* invoice never settled (e.g. test card 4000 0000 0000 0002);
   // UX is the same as a renewal failure — point the user at the Stripe portal
@@ -379,19 +394,17 @@ export default function BillingView({
               <div className="flex items-center justify-between gap-3">
                 <CardTitle className="text-2xl flex items-center gap-3">
                   {planLabel}
-                  <Badge variant={isPaid ? "default" : "secondary"}>
-                    {state.status}
+                  <Badge variant={hasCommercialPlan ? "default" : "secondary"}>
+                    {isCustom ? "managed" : state.status}
                   </Badge>
-                  {state.cancel_at_period_end && (
+                  {!isCustom && state.cancel_at_period_end && (
                     <Badge variant="outline">cancels at period end</Badge>
                   )}
                 </CardTitle>
               </div>
-              <CardDescription className="mt-2">
-                {isPaid ? priceLabel : "$0/mo"}
-              </CardDescription>
+              <CardDescription className="mt-2">{priceLabel}</CardDescription>
             </CardHeader>
-            {isPaid && (periodStartLabel || periodEndLabel) && (
+            {!isCustom && isPaid && (periodStartLabel || periodEndLabel) && (
               <CardContent className="text-sm text-muted-foreground space-y-1">
                 {periodStartLabel && periodEndLabel && (
                   <p>
@@ -411,20 +424,28 @@ export default function BillingView({
                   Stripe rejects price-change on past_due/incomplete subs.
                   Cancellation lives in the Danger zone at the bottom of the
                   page; intentionally not surfaced alongside everyday actions. */}
-              {!isPastDue && !isPaused && (
+              {isCustom ? (
+                <Button asChild variant="outline">
+                  <Link href="/contact">Contact Grida</Link>
+                </Button>
+              ) : !isPastDue && !isPaused ? (
                 <Button asChild variant={isPaid ? "outline" : "default"}>
                   <Link href={`${baseUrl}/upgrade`}>
-                    {isPaid ? "Adjust plan" : "Upgrade"}
+                    {isCurrentProMonthly
+                      ? "View plan"
+                      : isPaid
+                        ? "Move to Pro monthly"
+                        : "Upgrade to Pro"}
                   </Link>
                 </Button>
-              )}
+              ) : null}
               {/* Resume = undo a pending `cancel_at_period_end`. Stripe charges
                   nothing — the existing sub continues on its current schedule.
                   Visible alongside everyday actions on purpose: undoing a
                   destructive action should be at least as easy as taking it.
                   No loading state needed — the click optimistically flips
                   `cancel_at_period_end` so the button vanishes instantly. */}
-              {state.cancel_at_period_end && (
+              {!isCustom && state.cancel_at_period_end && (
                 <Button variant="default" onClick={resume}>
                   Resume subscription
                 </Button>
@@ -434,7 +455,7 @@ export default function BillingView({
         </SectionShell>
 
         {/* 2. Grida AI Credit */}
-        <AiCreditsSection orgId={orgId} baseUrl={baseUrl} />
+        <AiCreditsSection orgId={orgId} baseUrl={baseUrl} isCustom={isCustom} />
 
         {/* 3. Past Invoices */}
         <SectionShell
@@ -445,7 +466,9 @@ export default function BillingView({
           {!invoices?.past.length ? (
             <p className="text-sm text-muted-foreground">
               No past invoices.{" "}
-              {isPaid ? "" : "Upgrade to a paid plan to begin billing."}
+              {hasCommercialPlan
+                ? ""
+                : "Upgrade to a paid plan to begin billing."}
             </p>
           ) : (
             <div className="rounded-xl border bg-card overflow-hidden">
@@ -538,7 +561,7 @@ export default function BillingView({
             <Button
               variant="outline"
               onClick={updatePaymentMethod}
-              disabled={!isPaid && !invoices?.payment_method}
+              disabled={!invoices?.has_stripe_customer}
             >
               Update payment method
             </Button>
@@ -549,32 +572,37 @@ export default function BillingView({
              the page on purpose, behind a visually distinct boundary. Hidden
              when there's nothing to cancel (free plans, already-canceling,
              past_due/paused subs that need recovery first). */}
-        {isPaid && !state.cancel_at_period_end && !isPastDue && !isPaused && (
-          <SectionShell
-            id="danger-zone"
-            title="Danger zone"
-            description="Irreversible and account-affecting actions."
-          >
-            <div className="rounded-xl border border-destructive/30 bg-card p-6">
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Cancel subscription</p>
-                  <p className="text-xs text-muted-foreground">
-                    Your plan stays active until the end of the current billing
-                    period, then reverts to Free. Top-up balance is preserved.
-                  </p>
+        {!isCustom &&
+          isPaid &&
+          !state.cancel_at_period_end &&
+          !isPastDue &&
+          !isPaused && (
+            <SectionShell
+              id="danger-zone"
+              title="Danger zone"
+              description="Irreversible and account-affecting actions."
+            >
+              <div className="rounded-xl border border-destructive/30 bg-card p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Cancel subscription</p>
+                    <p className="text-xs text-muted-foreground">
+                      Your plan stays active until the end of the current
+                      billing period, then reverts to Free. Top-up balance is
+                      preserved.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="text-destructive hover:bg-destructive/10 border-destructive/40"
+                    onClick={cancelSubscription}
+                  >
+                    Cancel subscription
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  className="text-destructive hover:bg-destructive/10 border-destructive/40"
-                  onClick={cancelSubscription}
-                >
-                  Cancel subscription
-                </Button>
               </div>
-            </div>
-          </SectionShell>
-        )}
+            </SectionShell>
+          )}
       </div>
 
       {state.is_test_mode && (
@@ -650,9 +678,11 @@ function UsdInput({
 function AiCreditsSection({
   orgId,
   baseUrl,
+  isCustom,
 }: {
   orgId: number;
   baseUrl: string;
+  isCustom: boolean;
 }) {
   const [summary, setSummary] = useState<AiCreditsSummary | null>(null);
   const [transactions, setTransactions] = useState<AiCreditTransaction[]>([]);
@@ -886,7 +916,7 @@ function AiCreditsSection({
     <SectionShell
       id="ai-credits"
       title="Grida AI Credit"
-      description="Purchase credit for Grida AI. These are separate from any credit included in your Pro plan."
+      description="Purchase prepaid credit for Grida AI. Plan subscriptions do not include recurring AI credit."
     >
       <Card>
         <CardContent className="p-6 space-y-4">
@@ -941,24 +971,27 @@ function AiCreditsSection({
                   className={`size-4 transition-transform ${autoReloadOpen ? "" : "-rotate-90"}`}
                 />
                 Auto-reload
-                {!summary.has_active_subscription && (
+                {(isCustom || !summary.has_active_subscription) && (
                   <Badge variant="outline" className="ml-2 font-normal">
-                    Pro plan required
+                    {isCustom ? "Agreement-managed" : "Pro required"}
                   </Badge>
                 )}
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-4 space-y-4">
-              {!summary.has_active_subscription && !savedOn && (
+              {(isCustom || (!summary.has_active_subscription && !savedOn)) && (
                 <div className="flex items-start gap-3 rounded-lg border bg-muted/40 p-3">
                   <InfoIcon className="size-4 shrink-0 text-muted-foreground mt-0.5" />
                   <div className="flex-1 space-y-2">
                     <p className="text-xs">
-                      Auto-reload is available on paid plans. Manual top-ups
-                      work on any plan.
+                      {isCustom
+                        ? "Auto-reload for this Custom plan follows your agreement. Manual top-ups remain available."
+                        : "Auto-reload is available on Pro. Manual top-ups work on any plan."}
                     </p>
                     <Button asChild variant="outline" size="sm">
-                      <Link href={`${baseUrl}/upgrade`}>Upgrade plan</Link>
+                      <Link href={isCustom ? "/contact" : `${baseUrl}/upgrade`}>
+                        {isCustom ? "Contact Grida" : "Upgrade to Pro"}
+                      </Link>
                     </Button>
                   </div>
                 </div>
@@ -972,6 +1005,7 @@ function AiCreditsSection({
                   checked={autoReloadOn}
                   onCheckedChange={setAutoReloadOn}
                   disabled={
+                    isCustom ||
                     busy !== null ||
                     (!summary.has_active_subscription && !savedOn)
                   }
@@ -987,9 +1021,10 @@ function AiCreditsSection({
                     <UsdInput
                       value={thresholdInput}
                       onChange={setThresholdInput}
-                      disabled={busy !== null}
+                      disabled={isCustom || busy !== null}
                     />
                     {(() => {
+                      if (isCustom) return null;
                       const validThreshold =
                         Number.isFinite(localThresholdCents) &&
                         localThresholdCents >=
@@ -1012,9 +1047,10 @@ function AiCreditsSection({
                     <UsdInput
                       value={rechargeInput}
                       onChange={setRechargeInput}
-                      disabled={busy !== null}
+                      disabled={isCustom || busy !== null}
                     />
                     {(() => {
+                      if (isCustom) return null;
                       const validRecharge =
                         Number.isFinite(localRechargeCents) &&
                         localRechargeCents >= AUTO_RELOAD_RECHARGE_MIN_CENTS &&
@@ -1052,13 +1088,13 @@ function AiCreditsSection({
                 <Button
                   variant="outline"
                   onClick={cancelAutoReload}
-                  disabled={!dirty || busy !== null}
+                  disabled={isCustom || !dirty || busy !== null}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={saveAutoReload}
-                  disabled={!dirty || busy !== null}
+                  disabled={isCustom || !dirty || busy !== null}
                 >
                   {busy === "auto-reload-checkout"
                     ? "Opening Checkout…"

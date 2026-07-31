@@ -212,6 +212,14 @@ const docs = [
       },
       {
         type: "doc",
+        id: "platform/billing",
+      },
+      {
+        type: "doc",
+        id: "platform/refund-policy",
+      },
+      {
+        type: "doc",
         id: "platform/customers/index",
       },
       {

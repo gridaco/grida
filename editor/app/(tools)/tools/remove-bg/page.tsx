@@ -4,31 +4,33 @@ import Footer from "@/www/footer";
 import RemoveBackgroundTool from "./_page";
 
 export const metadata: Metadata = {
-  title: "Remove Background — Free AI Background Remover | Grida",
+  title: "AI Background Remover — Grida",
   description:
-    "Remove the background from any image instantly with AI. Free online background remover — drop in a JPG or PNG and get a transparent PNG back.",
+    "Remove an image background with AI and download a transparent PNG. Sign in to use prepaid credit from your Grida organization.",
   keywords: [
     "remove background",
     "background remover",
     "ai background remover",
     "transparent png",
     "image cutout",
-    "free background removal",
     "online photo editor",
     "grida tools",
   ],
+  alternates: {
+    canonical: "https://grida.co/tools/remove-bg",
+  },
   openGraph: {
-    title: "Remove Background — Free AI Background Remover | Grida",
+    title: "AI Background Remover — Grida",
     description:
-      "Drop an image, get a clean transparent PNG. Free AI background remover.",
+      "Remove an image background with AI using prepaid Grida organization credit.",
     type: "website",
     url: "https://grida.co/tools/remove-bg",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Remove Background — Free AI Background Remover | Grida",
+    title: "AI Background Remover — Grida",
     description:
-      "Drop an image, get a clean transparent PNG. Free AI background remover.",
+      "Remove an image background with AI using prepaid Grida organization credit.",
   },
 };
 

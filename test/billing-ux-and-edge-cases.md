@@ -4,13 +4,18 @@ title: User-facing UX, observability, and operational edge cases
 module: billing
 area: ops
 tags: [ux, dashboard, observability, audit, edge-case, clock, schema, ops]
-status: untested
+status: deprecated
 severity: high
 date: 2026-05-05
-updated: 2026-05-05
+updated: 2026-07-31
 automatable: partial
 covered_by: []
 ---
+
+> Deprecated on 2026-07-31. This composite suite assumes the retired plan and
+> recurring-credit model and is not current acceptance criteria. Use the
+> approved billing contract in `docs/wg/platform/billing/plans.md` and add new
+> one-behavior-per-file cases under `test/`.
 
 ## Behavior
 

@@ -3,8 +3,8 @@ import grida from "@grida/schema";
 /**
  * Plan tier as it appears in the Grida UI. Sourced from
  * `grida_billing.subscription.plan` (Stripe-backed) — `'free' | 'pro' | 'team'`.
- * Enterprise is a separate ops flag (`organization.is_enterprise`); when true,
- * the UI renders Enterprise regardless of the underlying plan.
+ * Custom is a separate ops flag (`organization.is_enterprise`); when true,
+ * the UI presents Custom regardless of the underlying Stripe plan.
  */
 export type PlanTier = "free" | "pro" | "team";
 

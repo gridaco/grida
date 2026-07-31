@@ -36,8 +36,12 @@ import {
 } from "@grida/react-icons/logos";
 
 export const metadata: Metadata = {
-  title: "AI Models",
-  description: "Explore the AI models available on Grida",
+  title: "AI Models & Pricing — Grida",
+  description:
+    "Compare AI models and usage rates on Grida. Grida-hosted AI is billed from prepaid organization credit.",
+  alternates: {
+    canonical: "https://grida.co/ai/models",
+  },
 };
 
 const Logos: Partial<Record<string, FC<{ className?: string }>>> = {
@@ -491,8 +495,9 @@ function TextModelsSection() {
         <h1 className="text-3xl font-bold tracking-tight mb-2">Agent Models</h1>
         <p className="text-base text-muted-foreground max-w-xl">
           Models powering agentic features in the editor — chat, code, tool use,
-          and reasoning. Tiered models are included in the free budget;
-          everything else is available metered at provider rates.
+          and reasoning. Grida-hosted usage is deducted from prepaid
+          organization credit at the rates below; plans do not include recurring
+          AI credit.
         </p>
       </div>
 

@@ -38,7 +38,7 @@ export default function RemoveBackgroundTool() {
             </h1>
             <p className="text-muted-foreground text-sm font-light max-w-2xl">
               Drop an image to remove its background with AI. Sign in to process
-              your image — your free monthly budget covers the cost.
+              your image using prepaid credit from your organization.
             </p>
           </header>
           <Workspace />

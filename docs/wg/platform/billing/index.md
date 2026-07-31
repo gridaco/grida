@@ -14,6 +14,8 @@ AI credit, Stripe ↔ Metronome sync).
 
 ## Documents
 
+- [Billing plans](./plans) — the current commercial offer, Custom
+  fulfillment, and legacy-compatibility contract.
 - [AI Credits — Master Plan](./ai-credits) — design notes for the
   Metronome-backed prepaid credit system, top-up + auto-reload flows,
   drain order, refund pattern, gate primitive.
@@ -26,4 +28,4 @@ AI credit, Stripe ↔ Metronome sync).
 
 - [Contributor setup](../../../contributing/billing) — local dev with
   Stripe + Metronome sandbox accounts and a cloudflared tunnel.
-- User-facing billing copy: [docs/platform/billing.mdx](../../../platform/billing.mdx).
+- [User-facing plans and billing guide](../../../platform/billing.mdx).

@@ -94,8 +94,7 @@ maps the building blocks below to current code.
   broke.
 - **Commit operations** — the two flavors of credit grant we issue
   today: Stripe-charged top-up and complimentary grant. Plan-included
-  recurring credit is deferred (re-introduced when seat-based
-  subscriptions land).
+  recurring credit is not part of the current commercial contract.
 
 ---
 
@@ -164,7 +163,7 @@ Two flavors today, each landing as a Metronome `Commit` on the contract:
 
 | Operation             | Charges Stripe? | Drain priority      | Use case                                 |
 | --------------------- | --------------- | ------------------- | ---------------------------------------- |
-| Stripe-charged top-up | yes             | TOPUP (drains last) | user-initiated $5–$1000 prepaid purchase |
+| Stripe-charged top-up | yes             | TOPUP (drains last) | user-initiated $10–$500 prepaid purchase |
 | Complimentary grant   | no              | PROMO (middle)      | promo / refund / manual ops grant        |
 
 Both are commits on the same contract. The drain priority scheme
@@ -176,9 +175,8 @@ PROMO (50) < TOPUP (90)
 
 Lower priority drains first. This is the cookbook pattern from
 Metronome's prepaid-credits launch guide; integers are arbitrary as
-long as the relative order holds. A third tier (plan-included
-recurring credit, drains first) is reserved for the seat-based
-subscription milestone and deliberately not implemented today.
+long as the relative order holds. A third tier for an expiring plan grant is
+reserved as research and requires a future commercial contract before use.
 
 ### Auto-reload configuration
 

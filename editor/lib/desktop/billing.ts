@@ -25,6 +25,12 @@ import { createClient } from "@/lib/supabase/server";
 
 export type { PlanId } from "@/lib/billing/plans";
 
+/**
+ * Plan identifier presented by Desktop. Custom agreements overlay the
+ * Stripe-backed plan; Team remains readable only for historical subscriptions.
+ */
+export type DesktopPlanId = PlanId | "custom";
+
 export type DesktopBillingCredits = {
   /** `null` ⇔ org not provisioned in Metronome — render "—", never "$0.00". */
   balance_cents: number | null;
@@ -40,7 +46,7 @@ export type DesktopBillingSummary =
   | {
       state: "ready";
       organization: { id: number; name: string; display_name: string };
-      plan: PlanId;
+      plan: DesktopPlanId;
       credits: DesktopBillingCredits;
       /** Web billing page for the org — built from the slug `name`. */
       manage_path: string;
@@ -82,7 +88,7 @@ export async function getDesktopBillingSummary(
     // GRIDA-SEC-003-tagged resolver's select.
     client
       .from("organization")
-      .select("display_name")
+      .select("display_name, is_enterprise")
       .eq("id", org.id)
       .maybeSingle(),
     client
@@ -107,8 +113,11 @@ export async function getDesktopBillingSummary(
   }
 
   const rawPlan = subRow.data?.plan;
-  const plan: PlanId =
+  const stripePlan: PlanId =
     rawPlan === "pro" || rawPlan === "team" ? rawPlan : "free";
+  const plan: DesktopPlanId = orgRow.data?.is_enterprise
+    ? "custom"
+    : stripePlan;
 
   return {
     state: "ready",

@@ -1,81 +1,42 @@
-"use client";
+// GRIDA-EE: billing — public pricing acquisition surface.
 
-import React, { useState } from "react";
+import React from "react";
 import { PricingCard, PricingCardButton } from "@/www/pricing/pricing-card";
-import {
-  plans as nosave_plans,
-  save_plans,
-} from "@/lib/billing/marketing-plans";
-import PricingComparisonTable from "./pricing-comparison-table";
-import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
+import { plans, proPlan } from "@/lib/billing/marketing-plans";
 import Link from "next/link";
 
 export function Pricing() {
-  // Default to monthly so visitors first see the real default price.
-  // Annual is opt-in.
-  const [save, setSave] = useState(false);
-
-  const plans = save ? save_plans : nosave_plans;
-
   return (
-    <>
-      <section>
-        <div className="pt-12 pb-20 flex flex-col items-center gap-7">
-          <h2 className="text-4xl font-semibold text-center">Pricing</h2>
-          <p className="opacity-50 text-center max-w-md">
-            Begin your creation at no cost, join forces with your team, and then
-            expand to reach millions.
-          </p>
-          <label className="inline-flex items-center cursor-pointer">
-            <Tabs
-              defaultValue="monthly"
-              value={save ? "yearly" : "monthly"}
-              onValueChange={(t) => {
-                setSave(t === "yearly");
-              }}
-            >
-              <TabsList>
-                <TabsTrigger value="monthly" className="font-semibold">
-                  Pay monthly
-                </TabsTrigger>
-                <TabsTrigger value="yearly" className="font-semibold">
-                  Pay yearly
-                  <span
-                    data-active={save ? "true" : "false"}
-                    className="ms-1 text-xs font-normal text-foreground data-[active='true']:text-blue-500"
-                  >
-                    save 20%
-                  </span>
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </label>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-6 gap-y-10 w-full">
-          {plans.map((plan) => (
-            <PricingCard
-              key={plan.id}
-              plan={plan.name}
-              price={{
-                primary: `${plan.priceMonthly}`,
-                secondary: plan.costUnit,
-                note: plan.priceNote,
-              }}
-              features={plan.features}
-              excerpt={plan.description}
-              highlight={plan.highlight}
-              action={
+    <section>
+      <div className="pt-12 pb-20 flex flex-col items-center gap-7">
+        <h1 className="text-4xl font-semibold text-center">Simple pricing</h1>
+        <p className="text-muted-foreground text-center max-w-xl">
+          Start free, upgrade to Pro for {proPlan.priceMonthly} a month, or talk
+          to us about a Custom plan.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-10 w-full max-w-6xl mx-auto">
+        {plans.map((plan) => (
+          <PricingCard
+            key={plan.id}
+            plan={plan.name}
+            price={{
+              primary: plan.priceMonthly,
+              secondary: plan.costUnit,
+            }}
+            features={plan.features}
+            excerpt={plan.description}
+            highlight={plan.highlight}
+            action={
+              <PricingCardButton asChild inverted={plan.highlight}>
                 <Link href={plan.href} className="w-full">
-                  <PricingCardButton inverted={plan.highlight}>
-                    {plan.cta}
-                  </PricingCardButton>
+                  {plan.cta}
                 </Link>
-              }
-            />
-          ))}
-        </div>
-      </section>
-      <PricingComparisonTable plans={plans} />
-    </>
+              </PricingCardButton>
+            }
+          />
+        ))}
+      </div>
+    </section>
   );
 }

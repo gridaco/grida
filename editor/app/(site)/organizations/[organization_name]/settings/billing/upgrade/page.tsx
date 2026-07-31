@@ -1,3 +1,5 @@
+// GRIDA-EE: billing — standard Pro upgrade entry point.
+
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import UpgradeView from "./_view";
@@ -16,11 +18,12 @@ export default async function OrganizationBillingUpgradePage({
 
   const { data: org } = await client
     .from("organization")
-    .select("id, name")
+    .select("id, name, is_enterprise")
     .eq("name", organization_name)
     .single();
 
   if (!org) return notFound();
+  if (org.is_enterprise) return redirect("/contact");
 
   return <UpgradeView orgId={org.id} orgName={org.name} />;
 }

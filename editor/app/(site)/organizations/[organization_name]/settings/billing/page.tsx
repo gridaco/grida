@@ -1,3 +1,5 @@
+// GRIDA-EE: billing — organization billing entry point.
+
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import BillingView from "./_view";
@@ -16,11 +18,17 @@ export default async function OrganizationBillingPage({
 
   const { data: org } = await client
     .from("organization")
-    .select("id, name")
+    .select("id, name, is_enterprise")
     .eq("name", organization_name)
     .single();
 
   if (!org) return notFound();
 
-  return <BillingView orgId={org.id} orgName={org.name} />;
+  return (
+    <BillingView
+      orgId={org.id}
+      orgName={org.name}
+      isCustom={org.is_enterprise}
+    />
+  );
 }

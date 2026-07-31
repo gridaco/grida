@@ -9,53 +9,28 @@ import {
 
 const faqs: { question: string; answer: React.ReactNode }[] = [
   {
-    question: "How do AI credits work?",
-    answer: (
-      <>
-        Each plan includes a monthly AI credit — $0.50 on Free,{" "}
-        <strong>$10</strong> on Pro, <strong>$35</strong> on Team. AI features
-        draw from this balance at the model provider&apos;s cost; we never mark
-        up AI usage. Unused monthly credit resets at the start of the next
-        billing period.{" "}
-        <Link
-          href="/docs/platform/billing"
-          className="underline underline-offset-4"
-        >
-          Read the full guide
-        </Link>
-        .
-      </>
-    ),
+    question: "Which plans are available?",
+    answer:
+      "Grida offers Free, Pro, and Custom plans. Free costs $0, Pro costs $20 per month, and Custom plans use bespoke commercial terms.",
   },
   {
-    question: "What's the difference between Pro and Team?",
-    answer:
-      "Both pool AI credit at the org level. Team raises the AI credit ($35 vs $10), storage, and monthly active users on published projects, and adds chat support. Pro is for individuals and small teams with lighter AI usage; Team is for teams that lean heavily on AI. You can switch between them any time — Stripe prorates the difference automatically.",
+    question: "How is Pro billed?",
+    answer: "Pro is billed monthly at $20 per organization.",
   },
   {
-    question: "Can I buy credit ahead of time?",
+    question: "Does a plan include AI credit?",
     answer:
-      "Yes. You can top up at any time, in any amount from $5 to $1000. The amount you pick is exactly what lands in your balance — the card processor's fee is added on top of the charge and shown clearly at checkout. Top-up credit never expires, even if you cancel and come back later.",
+      "No. AI credit is purchased separately. Pro adds automatic credit reload so an organization can keep working without manual top-ups.",
   },
   {
-    question: "What happens when I run out of credit?",
+    question: "How do I upgrade to Pro?",
     answer:
-      "AI features pause until your monthly credit refreshes or you top up. Saving, editing, exporting — everything else in Grida keeps working. We never charge your card automatically to cover an AI call.",
+      "Choose Upgrade to Pro, select your organization, and complete checkout from its billing settings.",
   },
   {
-    question: "Are AI prices marked up?",
+    question: "What is a Custom plan?",
     answer:
-      "No. We charge you exactly what the model provider charges us. Our margin lives in the plan base price (the part that isn't AI credit), not in AI usage. When provider prices change, we update what we charge to match.",
-  },
-  {
-    question: "What happens if I cancel?",
-    answer:
-      "You keep your plan and the current month's credit until the end of the period you've already paid for. After that, you switch to Free and start receiving $0.50 of credit each month. Any top-up credit you have stays in your account.",
-  },
-  {
-    question: "Can my whole team work together?",
-    answer:
-      "Yes — invite as many teammates as you want and everyone collaborates on the same projects. Today the subscription is a single flat plan price (one Pro org pays $20/month, one Team org pays $60/month) regardless of how many teammates you've invited. Per-seat billing with prorated invites is on the roadmap.",
+      "Custom plans are arranged directly with Grida for organizations that need tailored commercial terms. Contact us to discuss your requirements.",
   },
 ];
 
@@ -76,9 +51,9 @@ export default function PricingFAQ() {
         ))}
       </Accordion>
       <p className="text-center text-sm text-muted-foreground mt-12">
-        For the full breakdown — examples, edge cases, and policies — see the{" "}
+        For more information about managing your subscription, see the{" "}
         <Link
-          href="/docs/platform/billing"
+          href="https://grida.co/docs/platform/billing"
           className="underline underline-offset-4 text-foreground"
         >
           billing guide

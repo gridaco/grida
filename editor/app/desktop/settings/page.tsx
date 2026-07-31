@@ -108,7 +108,8 @@ export default function DesktopSettingsPage() {
             description={
               <>
                 Connect ChatGPT, an API-key provider, or a local model endpoint.
-                Grida-included AI works when you&apos;re signed in.
+                Grida-hosted AI works when you&apos;re signed in and uses your
+                organization&apos;s prepaid AI credit.
               </>
             }
             modalities={["text"]}

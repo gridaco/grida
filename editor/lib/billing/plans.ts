@@ -1,14 +1,11 @@
-// Single source of truth for paid-plan definitions in the editor billing
-// surface. Used by:
-//   • the upgrade UI (plan cards)
-//   • the billing settings UI (current price line)
-//   • the Stripe setup script (to provision products + prices)
+// Readable catalogue for standard paid-plan records in the editor billing
+// surface. This deliberately retains Team and annual definitions so existing
+// subscriptions, invoices, and webhook events remain intelligible.
 //
-// Stripe is the runtime authority for what gets charged — these constants
-// are what the setup script *writes* to Stripe. The www marketing pricing
-// page reads from `./marketing-plans` (sibling file) so price numbers
-// can't drift between surfaces; only copy (descriptions, features, CTAs)
-// lives there separately.
+// Saleability is a separate policy owned by `./offers`: only offers accepted
+// there may be used by checkout, plan-change flows, or Stripe setup. Stripe is
+// the runtime authority for existing charges. The public pricing page reads
+// from `./marketing-plans`, which derives the current Pro price from here.
 
 export type PaidPlanId = "pro" | "team";
 export type PlanId = "free" | PaidPlanId;
@@ -31,7 +28,7 @@ export type PaidPlanDefinition = {
   description: string;
   /** Sticker monthly price in cents. */
   monthly_cents: number;
-  /** Annual price in cents. By design = monthly_cents × 12 × 0.8 (20% off). */
+  /** Historical annual price in cents; annual offers are no longer saleable. */
   annual_cents: number;
   features: ReadonlyArray<string>;
 };
@@ -50,7 +47,7 @@ export const PAID_PLANS: Readonly<Record<PaidPlanId, PaidPlanDefinition>> = {
   },
   team: {
     id: "team",
-    name: "Team",
+    name: "Team (legacy)",
     description: "More headroom for heavier workflows.",
     monthly_cents: 6000,
     annual_cents: 57600,
@@ -62,11 +59,13 @@ export const PAID_PLANS: Readonly<Record<PaidPlanId, PaidPlanDefinition>> = {
   },
 };
 
+/** @deprecated Historical ordering only; do not use as a saleable offer list. */
 export const PAID_PLAN_LIST: ReadonlyArray<PaidPlanDefinition> = [
   PAID_PLANS.pro,
   PAID_PLANS.team,
 ];
 
+/** @deprecated Historical comparison only; Custom is outside this hierarchy. */
 export const PLAN_RANK: Readonly<Record<PlanId, number>> = {
   free: 0,
   pro: 1,

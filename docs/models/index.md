@@ -12,9 +12,9 @@ Grida uses AI models across the editor for text generation, image generation, an
 
 All models are routed through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway).
 
-## Budget
+## Billing
 
-Free users receive a **$1.00 monthly budget** (rolling 30-day window). Each AI operation deducts the model's cost from the budget.
+Grida-hosted AI usage is deducted from prepaid credit purchased separately for your organization. Pricing plans do not include recurring AI credit. The rates below show how each operation is charged against that credit balance.
 
 ## Agent Models
 
@@ -22,12 +22,12 @@ Agent models power chat, content generation, summarization, code, tool use, and 
 
 Models are organized into **tiers** based on capability and cost:
 
-| Tier   | Audience          | Typical use                                             |
-| ------ | ----------------- | ------------------------------------------------------- |
-| `nano` | Free users / misc | Title generation, summarization, lightweight extraction |
-| `mini` | Free users        | Main agent, sub-agent, multimodal tasks                 |
-| `pro`  | Paid users        | Main agent, multimodal tasks                            |
-| `max`  | Paid users        | Heaviest tasks, complex reasoning                       |
+| Tier   | Role            | Typical use                                             |
+| ------ | --------------- | ------------------------------------------------------- |
+| `nano` | Background work | Title generation, summarization, lightweight extraction |
+| `mini` | General-purpose | Main agent, sub-agent, multimodal tasks                 |
+| `pro`  | Higher quality  | Main agent, multimodal tasks                            |
+| `max`  | Most capable    | Heaviest tasks, complex reasoning                       |
 
 ### Current Models
 
