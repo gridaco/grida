@@ -24,10 +24,12 @@ type SettingsCategory = { href: string; label: string };
 export default function SettingsShell({
   orgName,
   plan,
+  isCustom,
   children,
 }: {
   orgName: string;
   plan: string;
+  isCustom: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -37,7 +39,7 @@ export default function SettingsShell({
   const categories: ReadonlyArray<SettingsCategory> = [
     { href: `${settingsBase}/profile`, label: "Profile" },
     { href: `${settingsBase}/billing`, label: "Billing" },
-    ...(isPaidPlan
+    ...(isPaidPlan || isCustom
       ? []
       : [{ href: `${settingsBase}/billing/upgrade`, label: "Upgrade plan" }]),
   ];

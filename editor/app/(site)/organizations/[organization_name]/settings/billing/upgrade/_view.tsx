@@ -22,7 +22,12 @@ import {
   startPlanChangeConfirm,
   startSubscribeCheckout,
 } from "../_actions";
-import { PAID_PLANS, type Interval, type PlanId } from "@/lib/billing/plans";
+import {
+  PAID_PLANS,
+  price_dollars,
+  type Interval,
+  type PlanId,
+} from "@/lib/billing/plans";
 
 type CurrentState = {
   plan: PlanId;
@@ -37,6 +42,8 @@ const PRO_FEATURES = [
   "Stripe-managed billing and invoices",
   "AI credit purchased separately",
 ] as const;
+
+const PRO_MONTHLY_PRICE = `$${price_dollars(PAID_PLANS.pro.id, "month")}`;
 
 export default function UpgradeView({
   orgId,
@@ -165,7 +172,8 @@ export default function UpgradeView({
       {isLegacy && (
         <div className="mb-4 rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
           Team and annual billing are legacy offers. Your current subscription
-          remains readable; this action moves it to Pro at $20 per month.
+          remains readable; this action moves it to Pro at {PRO_MONTHLY_PRICE}{" "}
+          per month.
         </div>
       )}
       <Card className={isCurrentPro ? "border-primary" : undefined}>
@@ -180,7 +188,7 @@ export default function UpgradeView({
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-3xl font-semibold tabular-nums">
-            $20
+            {PRO_MONTHLY_PRICE}
             <span className="text-base font-normal text-muted-foreground">
               {" "}
               / month
