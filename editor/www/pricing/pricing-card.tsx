@@ -1,3 +1,5 @@
+// GRIDA-EE: billing — plan card presentation for the public pricing page.
+
 import React from "react";
 import { Button } from "@app/ui/components/button";
 import { CheckIcon } from "@radix-ui/react-icons";
@@ -36,7 +38,7 @@ export function PricingCard({
         bg-background
         dark:bg-muted/50
         flex-1 flex flex-col p-6 border gap-4 rounded-lg
-        min-h-[420px]
+        min-h-[480px] md:h-[570px]
         hover:scale-[1.02]
         duration-300
         transition-all
