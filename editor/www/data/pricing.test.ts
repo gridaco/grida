@@ -7,8 +7,9 @@ const featureNames = categories.flatMap((category) =>
 );
 
 describe("public pricing comparison", () => {
-  it("expands the former 25-row product inventory", () => {
-    expect(featureNames.length).toBeGreaterThan(25);
+  it("keeps the 52-row product inventory intact and unique", () => {
+    expect(featureNames).toHaveLength(52);
+    expect(new Set(featureNames).size).toBe(featureNames.length);
   });
 
   it("keeps the major shipped product surfaces visible", () => {

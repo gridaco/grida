@@ -154,7 +154,11 @@ export const pricing: Pricing = {
       },
       {
         title: "Form response simulator",
-        plans: availableToAllPlans,
+        plans: {
+          free: "Beta",
+          pro: "Beta",
+          custom: "Beta",
+        },
       },
       {
         title: "Scheduling, response limits, and completion redirects",
@@ -181,7 +185,7 @@ export const pricing: Pricing = {
         },
       },
       {
-        title: "Form interface available in 12 languages",
+        title: "Form interface available in 13 languages",
         plans: availableToAllPlans,
       },
     ],
@@ -218,7 +222,7 @@ export const pricing: Pricing = {
         plans: availableToAllPlans,
       },
       {
-        title: "Customer records, CSV updates, tags, and segments",
+        title: "Customer records, CSV updates, and tags",
         plans: availableToAllPlans,
       },
     ],
@@ -231,7 +235,7 @@ export const pricing: Pricing = {
         plans: availableToAllPlans,
       },
       {
-        title: "fig2grida CLI and library",
+        title: "Open-source Figma-to-Grida conversion tools",
         plans: availableToAllPlans,
       },
       {
@@ -239,7 +243,7 @@ export const pricing: Pricing = {
         plans: availableToAllPlans,
       },
       {
-        title: "Canvas Embed SDK",
+        title: "Embeddable Canvas viewer and host controls",
         plans: {
           free: "Alpha",
           pro: "Alpha",

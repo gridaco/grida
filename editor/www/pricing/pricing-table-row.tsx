@@ -26,7 +26,7 @@ export const PricingTableRowDesktop = (props: PricingTableRowDesktopProps) => {
       >
         <th
           className="bg-background text-foreground sticky top-[60px] xl:top-[40px] z-10 py-3 pl-6 text-left text-sm font-medium"
-          scope="colgroup"
+          scope="row"
         >
           <div className="flex items-center gap-4">
             {props.icon}
@@ -73,11 +73,15 @@ export const PricingTableRowDesktop = (props: PricingTableRowDesktopProps) => {
                       ].join(" ")}
                     >
                       {typeof planValue === "boolean" && planValue === true ? (
-                        <CheckCircledIcon />
+                        <>
+                          <span className="sr-only">Included</span>
+                          <CheckCircledIcon aria-hidden="true" />
+                        </>
                       ) : typeof planValue === "boolean" &&
                         planValue === false ? (
                         <div className="opacity-20">
-                          <MinusCircledIcon />
+                          <span className="sr-only">Not included</span>
+                          <MinusCircledIcon aria-hidden="true" />
                         </div>
                       ) : (
                         <div className="text-foreground text-xs flex flex-col justify-center">
@@ -165,12 +169,14 @@ export const PricingTableRowMobile = (props: PricingTableRowMobileProps) => {
                 {typeof feat.plans[plan] === "boolean" &&
                 feat.plans[plan] === true ? (
                   <span className="inline-block">
-                    <CheckCircledIcon />
+                    <span className="sr-only">Included</span>
+                    <CheckCircledIcon aria-hidden="true" />
                   </span>
                 ) : typeof feat.plans[plan] === "boolean" &&
                   feat.plans[plan] === false ? (
                   <span className="inline-block">
-                    <MinusCircledIcon />
+                    <span className="sr-only">Not included</span>
+                    <MinusCircledIcon aria-hidden="true" />
                   </span>
                 ) : (
                   <span className="text-foreground flex flex-col text-sm">

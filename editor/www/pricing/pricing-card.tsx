@@ -38,7 +38,7 @@ export function PricingCard({
         bg-background
         dark:bg-muted/50
         flex-1 flex flex-col p-6 border gap-4 rounded-lg
-        min-h-[480px] md:h-[570px]
+        min-h-[480px] md:min-h-[570px]
         hover:scale-[1.02]
         duration-300
         transition-all
@@ -51,7 +51,7 @@ export function PricingCard({
       )}
       <div className="flex-[2] flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <span className="text-2xl font-semibold">{plan}</span>
+          <h2 className="text-2xl font-semibold">{plan}</h2>
           <span className="text-sm font-normal text-muted-foreground">
             {excerpt}
           </span>
@@ -71,7 +71,7 @@ export function PricingCard({
         </div>
         <hr />
       </div>
-      <div className="flex-[3] flex min-h-0 shrink flex-col gap-3">
+      <div className="flex-[3] flex flex-col gap-3">
         {features.map((feature, i) => (
           <PricingFeatureRow key={i} {...feature} />
         ))}
