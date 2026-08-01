@@ -1,3 +1,5 @@
+// GRIDA-EE: billing — public pricing and plan acquisition page.
+
 import { Pricing } from "@/www/pricing/pricing";
 import Header from "@/www/header";
 import FooterWithCTA from "@/www/footer-with-cta";
@@ -8,14 +10,14 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Pricing — Grida",
   description:
-    "Start free, upgrade to Grida Pro for $20 per month, or contact us for a Custom plan.",
+    "Start free, upgrade to Grida Pro for $20 per organization each month, or contact us for a Custom plan.",
   alternates: {
     canonical: "https://grida.co/pricing",
   },
   openGraph: {
     title: "Pricing — Grida",
     description:
-      "Start free, upgrade to Grida Pro for $20 per month, or contact us for a Custom plan.",
+      "Start free, upgrade to Grida Pro for $20 per organization each month, or contact us for a Custom plan.",
     url: "https://grida.co/pricing",
     type: "website",
   },
@@ -23,7 +25,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "Pricing — Grida",
     description:
-      "Start free, upgrade to Grida Pro for $20 per month, or contact us for a Custom plan.",
+      "Start free, upgrade to Grida Pro for $20 per organization each month, or contact us for a Custom plan.",
   },
 };
 

@@ -1,3 +1,5 @@
+// GRIDA-EE: billing — customer-facing plan and billing questions.
+
 import React from "react";
 import Link from "next/link";
 import {
@@ -20,7 +22,7 @@ const faqs: { question: string; answer: React.ReactNode }[] = [
   {
     question: "Does a plan include AI credit?",
     answer:
-      "No. AI credit is purchased separately. Pro adds automatic credit reload so an organization can keep working without manual top-ups.",
+      "Free and Pro do not include recurring AI credit. You can buy prepaid AI credit as needed, and Pro lets an organization enable automatic reload. A Custom agreement may define different AI-credit terms.",
   },
   {
     question: "How do I upgrade to Pro?",
