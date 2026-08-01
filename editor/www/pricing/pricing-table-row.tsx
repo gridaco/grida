@@ -110,9 +110,6 @@ export const PricingTableRowDesktop = (props: PricingTableRowDesktopProps) => {
                 }
               )}
             </tr>
-            {i === category.features.length - 1 && (
-              <tr className="my-16 bg-green-400 border-none"></tr>
-            )}
           </Fragment>
         );
       })}
