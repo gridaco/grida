@@ -647,12 +647,9 @@ export namespace methods {
     options: ai.server.methods.LyriaAudioOptions
   ): Promise<ai.server.methods.AudioGenerationResult> {
     const input: Record<string, unknown> = { prompt: options.prompt };
-    if (options.image_inputs && options.image_inputs.length > 0) {
-      input.image_inputs = options.image_inputs;
+    if (options.images && options.images.length > 0) {
+      input.images = options.images;
     }
-    if (options.language) input.language = options.language;
-    if (options.negative_prompt)
-      input.negative_prompt = options.negative_prompt;
     if (typeof options.seed === "number") input.seed = options.seed;
 
     const card = ai.audio.models[model_id];

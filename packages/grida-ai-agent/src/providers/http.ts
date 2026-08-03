@@ -20,6 +20,7 @@ import {
 // Deliberately private: hosts authorize routes, not larger payloads.
 const MAX_DOWNLOAD_ASSET_COUNT = 16;
 const MAX_DOWNLOAD_BATCH_BYTES = 64 * 1024 * 1024;
+const MAX_SINGLE_PROVIDER_ASSET_BYTES = 256 * 1024 * 1024;
 const DATA_URL_PREFIX = "data:";
 
 type ProviderHttpLimits = Readonly<{
@@ -31,6 +32,12 @@ type ProviderAssetDownloadOptions = Readonly<{
   /** Cancellation is the only per-call input; credentials cannot enter here. */
   signal?: AbortSignal;
 }>;
+
+type ProviderSingleAssetDownloadOptions = ProviderAssetDownloadOptions &
+  Readonly<{
+    /** Provider-advertised size hint. The response stream is bounded again. */
+    declared_size_bytes?: number;
+  }>;
 
 /**
  * The server-construction contract a host may supply.
@@ -152,6 +159,35 @@ export class ProviderHttp {
       downloaded.push(result);
     }
     return downloaded;
+  }
+
+  /**
+   * Credential-free lane for one viewer-sized provider result. Unlike the
+   * image/video batch path above, a single retained asset may be up to 256 MiB.
+   * A provider size hint can fail before host I/O; Content-Length and streamed
+   * bytes are independently enforced by {@link downloadPart}.
+   */
+  async downloadProviderAsset(
+    url: URL,
+    options?: ProviderSingleAssetDownloadOptions
+  ): Promise<{ data: Uint8Array; mediaType: string | undefined }> {
+    const declared = options?.declared_size_bytes;
+    if (
+      declared !== undefined &&
+      (!Number.isSafeInteger(declared) || declared < 0)
+    ) {
+      throw new DownloadError({
+        url: url.toString(),
+        message: "provider asset declared size is invalid",
+      });
+    }
+    if (declared !== undefined && declared > MAX_SINGLE_PROVIDER_ASSET_BYTES) {
+      throw new DownloadError({
+        url: url.toString(),
+        message: "provider asset download is too large",
+      });
+    }
+    return this.downloadPart(url, MAX_SINGLE_PROVIDER_ASSET_BYTES, options);
   }
 
   private async downloadPart(

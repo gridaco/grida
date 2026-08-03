@@ -6,8 +6,8 @@
  *
  * The capability KEYS are the wire vocabulary of protocol 1 and include
  * tenant-mounted route groups (`agent`, `sessions`, `providers`, `images`,
- * `video`, `secrets`) alongside the daemon's own (`files`, `recent`,
- * `workspaces`). The daemon does not implement the tenant groups — a
+ * `video`, `three_d`, `audio`, `secrets`) alongside the daemon's own (`files`,
+ * `recent`, `workspaces`). The daemon does not implement the tenant groups — a
  * registered tenant reports them at mount time (see `DaemonTenant` in
  * `http/server.ts`) — but the wire shape is one flat record so protocol 1
  * clients keep parsing it unchanged.
@@ -39,6 +39,17 @@ export type DaemonCapabilities = {
    */
   video?: boolean;
   /**
+   * `/three-d/generate` — BYOK 3D generation. Optional so older hosts remain
+   * compatible; clients treat a missing flag as "not served".
+   */
+  three_d?: boolean;
+  /**
+   * `/audio/music/generate` and `/audio/sound-effects/generate` — audio
+   * generation. Optional so older hosts remain compatible; clients treat a
+   * missing flag as "not served".
+   */
+  audio?: boolean;
+  /**
    * `/auth/gg/*` — the Grida hosted ("included") AI session
    * (GRIDA-SEC-006). True only when the host configured a hosted base
    * URL. Optional so older host-supplied capability shapes stay valid;
@@ -56,9 +67,9 @@ export const DAEMON_PROTOCOL = 1 as const;
 /**
  * The daemon's OWN capability defaults — only the route groups the daemon
  * itself implements. Tenant groups (`agent`, `sessions`, `secrets`,
- * `providers`, `images`, `video`) default off and are merged in from each
- * registered tenant's handle. The composed agent-daemon default (everything
- * on) lives with the tenant: `@grida/agent/server`.
+ * `providers`, `images`, `video`, `three_d`, `audio`) default off and are
+ * merged in from each registered tenant's handle. The composed agent-daemon
+ * default (everything on) lives with the tenant: `@grida/agent/server`.
  */
 export const DAEMON_DEFAULT_CAPABILITIES: DaemonCapabilities = {
   files: true,
@@ -70,6 +81,8 @@ export const DAEMON_DEFAULT_CAPABILITIES: DaemonCapabilities = {
   providers: false,
   images: false,
   video: false,
+  three_d: false,
+  audio: false,
   shell: false,
 };
 

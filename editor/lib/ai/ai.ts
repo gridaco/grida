@@ -109,7 +109,8 @@ export namespace ai {
         image: ImageData; // returns URL
       };
 
-      export type AudioGenerationModelId = audio.AudioModelId;
+      /** Existing Replicate-backed route serves Lyria music only. */
+      export type AudioGenerationModelId = audio.MusicModelId;
 
       /**
        * Options for Lyria audio generation models.
@@ -122,11 +123,7 @@ export namespace ai {
          * additional inspiration for composition. Up to 10 supported by the
          * provider.
          */
-        image_inputs?: string[];
-        /** Optional language hint passed through to the model. */
-        language?: string;
-        /** Optional negative prompt. */
-        negative_prompt?: string;
+        images?: string[];
         /** Optional seed for reproducibility. */
         seed?: number;
       };

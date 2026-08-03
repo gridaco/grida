@@ -7,6 +7,7 @@
  * - `models.text.*`        — text-model spec table, tier→spec map, lookup
  * - `models.image.*`       — image-generation catalogue
  * - `models.audio.*`       — audio-generation catalogue
+ * - `models.three_d.*`     — 3D-generation catalogue
  * - `models.video.*`       — video-generation catalogue
  * - `models.image_tools.*` — non-generator image tools (background removal, upscale)
  * - `models.Provider`, `models.Vendor` — shared discriminator labels
@@ -20,9 +21,10 @@
  * modules — keeping the full `namespace models` declaration in a
  * single source file is the workaround.
  *
- * Routing labels on the cards — `Provider` (text/image), `audio.AudioProvider`,
- * and video's per-binding `video.VideoProvider` — are data labels only; see the
- * README for the full contract.
+ * Routing labels on the cards — `Provider` (text/image),
+ * `audio.AudioProvider`, `three_d.ThreeDProvider`, and video's per-binding
+ * `video.VideoProvider` — are data labels only; see the README for the full
+ * contract.
  *
  * @module
  */
@@ -49,9 +51,22 @@ export namespace models {
     | "recraft-ai"
     | "black-forest-labs"
     | "google"
+    | "microsoft"
+    | "tencent"
+    | "elevenlabs"
     | "stability-ai"
     | "bytedance"
     | "xai";
+
+  /**
+   * Catalogue lifecycle for newly grounded media surfaces.
+   *
+   * - `listed` — integrated and safe to show in the normal user-facing list.
+   * - `staged` — the provider contract is grounded and may be callable only
+   *   from a dedicated compatibility playground; it is not yet part of normal
+   *   integrated model selection. Staged never means callable by itself.
+   */
+  export type CatalogueStatus = "listed" | "staged";
 
   // ── models.text ───────────────────────────────────────────────────
   //
@@ -1512,20 +1527,54 @@ export namespace models {
   /**
    * Audio-generation model catalogue.
    *
-   * Currently houses Google's Lyria family on Replicate. Pricing is
-   * taken from the public Replicate model pages; update if the
-   * provider changes its meter.
-   *
-   * Schema mirrors `models.image` where it makes sense — vendor,
-   * provider, speed, deprecation, and a discriminated `pricing`
-   * union — so audio cards can be rendered alongside image cards.
+   * Music and sound effects share an output medium but not a provider contract:
+   * Replicate meters Lyria per output file in USD, while ElevenLabs meters SFX
+   * in provider credits. The category, input, output, and pricing discriminants
+   * keep those routes separate instead of treating "audio" as one callable
+   * modality.
    */
   export namespace audio {
-    export type AudioModelId = "google/lyria-3" | "google/lyria-3-pro";
+    export type MusicModelId = "google/lyria-3" | "google/lyria-3-pro";
 
-    export type AudioModelCategory = "audio/generation";
+    /** Exact ElevenLabs Sound Effects API `model_id`. */
+    export type SoundEffectModelId = "eleven_text_to_sound_v2";
 
-    export type AudioProvider = "replicate";
+    export type AudioModelId = MusicModelId | SoundEffectModelId;
+
+    export type AudioModelCategory = "audio/music" | "audio/sound-effect";
+
+    export type AudioProvider = "replicate" | "elevenlabs";
+
+    export type AudioInputModality = "text" | "image";
+
+    export type AudioInputSpec = {
+      /** Required/accepted source modalities for this provider route. */
+      modalities: readonly AudioInputModality[];
+      /** Provider-published image ceiling, when image input is accepted. */
+      max_images?: number;
+    };
+
+    export type AudioDurationSpec =
+      | { mode: "fixed"; seconds: number }
+      | { mode: "up_to"; max_seconds: number }
+      | {
+          mode: "automatic_or_fixed";
+          min_seconds: number;
+          max_seconds: number;
+        };
+
+    export type AudioOutputFormat = "mp3";
+
+    export type AudioOutputSpec = {
+      /** Portable/default codec guaranteed by the catalogued route. */
+      default_format: AudioOutputFormat;
+      formats: readonly AudioOutputFormat[];
+      /** Omitted where the chosen provider output format controls it. */
+      sample_rate_hz?: number;
+      /** Omitted where the chosen provider output format controls it. */
+      channels?: number;
+      duration: AudioDurationSpec;
+    };
 
     /**
      * Flat per-run pricing — one fee per generation regardless of duration.
@@ -1537,9 +1586,22 @@ export namespace models {
       usd: number;
     };
 
-    export type AudioModelPricing = PerRunFlatPricing;
+    /**
+     * ElevenLabs' API-native meter. Credits do not have one stable USD value:
+     * their effective price varies by account plan, so the catalogue preserves
+     * the published credit units instead of inventing a dollar conversion.
+     */
+    export type ProviderCreditsPricing = {
+      type: "provider_credits";
+      /** Charge when ElevenLabs chooses the duration. */
+      automatic_duration_credits: number;
+      /** Charge when the caller supplies `duration_seconds`. */
+      specified_duration_credits_per_second: number;
+    };
 
-    export type AudioModelCard = {
+    export type AudioModelPricing = PerRunFlatPricing | ProviderCreditsPricing;
+
+    type AudioModelCardBase = {
       id: AudioModelId;
       label: string;
       deprecated: boolean;
@@ -1547,25 +1609,53 @@ export namespace models {
       vendor: Vendor;
       provider: AudioProvider;
       category: AudioModelCategory;
+      status: CatalogueStatus;
+      input: AudioInputSpec;
+      output: AudioOutputSpec;
       /** Approximate output duration. */
       duration_label: string;
-      /** Sample format produced by the model. */
+      /** Legacy compact display field; canonical data lives in `output`. */
       output_format: string;
-      /** Sample rate label (e.g. "48 kHz stereo"). */
+      /** Legacy compact display field; canonical data lives in `output`. */
       sample_rate_label: string;
-      speed_label: image.SpeedLabel;
-      speed_max: string;
+      /** UI hint only; `null` when the provider publishes no stable bound. */
+      speed_label: image.SpeedLabel | null;
+      /** UI hint only; `null` when the provider publishes no stable bound. */
+      speed_max: string | null;
       pricing: AudioModelPricing;
       /**
-       * Coarse estimate of cost per invocation in USD. For flat-rate
-       * models this is just `pricing.usd`. Not for display.
+       * Coarse estimate of cost per invocation in USD. `null` when the
+       * provider-native meter cannot be converted honestly without an account
+       * plan (ElevenLabs credits). Not for display.
        */
-      avg_cost_usd: number;
+      avg_cost_usd: number | null;
       /** Public model page on the provider. */
       url: string;
     };
 
-    export const models: Record<AudioModelId, AudioModelCard> = {
+    export type MusicModelCard = AudioModelCardBase & {
+      id: MusicModelId;
+      vendor: "google";
+      provider: "replicate";
+      category: "audio/music";
+      speed_label: image.SpeedLabel;
+      speed_max: string;
+      pricing: PerRunFlatPricing;
+    };
+
+    export type SoundEffectModelCard = AudioModelCardBase & {
+      id: SoundEffectModelId;
+      vendor: "elevenlabs";
+      provider: "elevenlabs";
+      category: "audio/sound-effect";
+      speed_label: null;
+      speed_max: null;
+      pricing: ProviderCreditsPricing;
+    };
+
+    export type AudioModelCard = MusicModelCard | SoundEffectModelCard;
+
+    export const models = {
       "google/lyria-3": {
         id: "google/lyria-3",
         label: "Lyria 3",
@@ -1574,7 +1664,16 @@ export namespace models {
           "Generate 30-second 48kHz stereo music clips from text or images.",
         vendor: "google",
         provider: "replicate",
-        category: "audio/generation",
+        category: "audio/music",
+        status: "listed",
+        input: { modalities: ["text", "image"], max_images: 10 },
+        output: {
+          default_format: "mp3",
+          formats: ["mp3"],
+          sample_rate_hz: 48_000,
+          channels: 2,
+          duration: { mode: "fixed", seconds: 30 },
+        },
         duration_label: "30s",
         output_format: "mp3",
         sample_rate_label: "48 kHz stereo",
@@ -1593,7 +1692,16 @@ export namespace models {
           "Generate full-length tracks up to ~3 minutes from text or images.",
         vendor: "google",
         provider: "replicate",
-        category: "audio/generation",
+        category: "audio/music",
+        status: "listed",
+        input: { modalities: ["text", "image"], max_images: 10 },
+        output: {
+          default_format: "mp3",
+          formats: ["mp3"],
+          sample_rate_hz: 48_000,
+          channels: 2,
+          duration: { mode: "up_to", max_seconds: 180 },
+        },
         duration_label: "up to 3m",
         output_format: "mp3",
         sample_rate_label: "48 kHz stereo",
@@ -1604,9 +1712,265 @@ export namespace models {
         avg_cost_usd: 0.08,
         url: "https://replicate.com/google/lyria-3-pro",
       },
-    } as const;
+      eleven_text_to_sound_v2: {
+        id: "eleven_text_to_sound_v2",
+        label: "Eleven Text to Sound v2",
+        deprecated: false,
+        short_description:
+          "Generate loopable sound effects up to 30 seconds from text.",
+        vendor: "elevenlabs",
+        provider: "elevenlabs",
+        category: "audio/sound-effect",
+        status: "staged",
+        input: { modalities: ["text"] },
+        output: {
+          default_format: "mp3",
+          formats: ["mp3"],
+          sample_rate_hz: 44_100,
+          duration: {
+            mode: "automatic_or_fixed",
+            min_seconds: 0.5,
+            max_seconds: 30,
+          },
+        },
+        duration_label: "0.5–30s",
+        output_format: "mp3",
+        sample_rate_label: "44.1 kHz",
+        speed_label: null,
+        speed_max: null,
+        // API: 100 credits when duration is automatic, or 11 credits/s when set.
+        pricing: {
+          type: "provider_credits",
+          automatic_duration_credits: 100,
+          specified_duration_credits_per_second: 11,
+        },
+        avg_cost_usd: null,
+        url: "https://elevenlabs.io/docs/api-reference/text-to-sound-effects/convert",
+      },
+    } as const satisfies Record<AudioModelId, AudioModelCard>;
 
-    export const audio_model_ids = Object.keys(models) as AudioModelId[];
+    const all_cards: readonly AudioModelCard[] = Object.values(models);
+
+    export const audio_model_ids = Object.freeze(
+      Object.keys(models) as AudioModelId[]
+    );
+    export const music_model_ids = Object.freeze(
+      audio_model_ids.filter(
+        (id): id is MusicModelId => models[id].category === "audio/music"
+      )
+    );
+    export const sound_effect_model_ids = Object.freeze(
+      audio_model_ids.filter(
+        (id): id is SoundEffectModelId =>
+          models[id].category === "audio/sound-effect"
+      )
+    );
+
+    export function is_music_model_id(id: string): id is MusicModelId {
+      return (music_model_ids as readonly string[]).includes(id);
+    }
+
+    let _listed: readonly AudioModelCard[] | null = null;
+    export const listed_models = (): readonly AudioModelCard[] =>
+      (_listed ??= Object.freeze(
+        all_cards.filter((card) => card.status === "listed")
+      ));
+
+    let _staged: readonly AudioModelCard[] | null = null;
+    export const staged_models = (): readonly AudioModelCard[] =>
+      (_staged ??= Object.freeze(
+        all_cards.filter((card) => card.status === "staged")
+      ));
+
+    let _music: readonly MusicModelCard[] | null = null;
+    export const music_models = (): readonly MusicModelCard[] =>
+      (_music ??= Object.freeze(
+        all_cards.filter(
+          (card): card is MusicModelCard => card.category === "audio/music"
+        )
+      ));
+
+    let _sound_effects: readonly SoundEffectModelCard[] | null = null;
+    export const sound_effect_models = (): readonly SoundEffectModelCard[] =>
+      (_sound_effects ??= Object.freeze(
+        all_cards.filter(
+          (card): card is SoundEffectModelCard =>
+            card.category === "audio/sound-effect"
+        )
+      ));
+  }
+
+  // ── models.three_d ────────────────────────────────────────────────
+
+  /**
+   * 3D-generation endpoint catalogue.
+   *
+   * These entries are deliberately `staged`: ids, IO contracts, meters, and a
+   * playground execution seam are grounded, while workspace integration remains
+   * deferred. The catalogue itself is not an execution seam. All currently
+   * selected endpoints are served by fal.
+   */
+  export namespace three_d {
+    export type ThreeDModelId =
+      | "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d"
+      | "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"
+      | "fal-ai/trellis-2";
+
+    export type ThreeDProvider = "fal";
+
+    export type ThreeDModelCategory = "3d/text-to-3d" | "3d/image-to-3d";
+
+    export type ThreeDInput =
+      | {
+          type: "text";
+          /** Provider-published UTF-8 prompt ceiling. */
+          max_utf8_characters: number;
+        }
+      | {
+          type: "image";
+          min_images: number;
+          /** One required front image plus any provider-supported extra views. */
+          max_images: number;
+        };
+
+    export type ThreeDOutputFormat = "glb" | "fbx" | "obj" | "usdz";
+
+    export type ThreeDOutput = {
+      /** Required, portable result returned by every catalogued endpoint. */
+      primary: "glb";
+      /** Provider-schema formats that may also be present in `model_urls`. */
+      optional: readonly Exclude<ThreeDOutputFormat, "glb">[];
+    };
+
+    export type HunyuanSurcharge = "pbr" | "multi_view" | "custom_face_count";
+
+    export type PerGenerationBasePlusSurchargesPricing = {
+      type: "per_generation_base_plus_surcharges";
+      /** Starting price for the default generation request. */
+      base_usd: number;
+      /** Additive provider charges when the corresponding option is used. */
+      surcharges_usd: Partial<Record<HunyuanSurcharge, number>>;
+    };
+
+    export type TrellisResolution = "512" | "1024" | "1536";
+
+    export type PerGenerationByResolutionPricing = {
+      type: "per_generation_by_resolution";
+      default_resolution: TrellisResolution;
+      usd_by_resolution: Record<TrellisResolution, number>;
+    };
+
+    export type ThreeDModelPricing =
+      | PerGenerationBasePlusSurchargesPricing
+      | PerGenerationByResolutionPricing;
+
+    export type ThreeDModelCard = {
+      /** Exact fal endpoint id; unlike video, there is no canonical indirection. */
+      id: ThreeDModelId;
+      label: string;
+      deprecated: boolean;
+      short_description: string;
+      vendor: Vendor;
+      provider: ThreeDProvider;
+      category: ThreeDModelCategory;
+      status: CatalogueStatus;
+      input: ThreeDInput;
+      output: ThreeDOutput;
+      pricing: ThreeDModelPricing;
+      /** Cost of the default request represented by the card. Not for display. */
+      avg_cost_usd: number;
+      /** Public fal model page for this exact endpoint. */
+      url: string;
+    };
+
+    const HUNYUAN_OUTPUT = {
+      primary: "glb",
+      optional: ["fbx", "obj", "usdz"],
+    } as const satisfies ThreeDOutput;
+
+    export const models = {
+      "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d": {
+        id: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+        label: "Hunyuan 3D v3.1 Pro — Text",
+        deprecated: false,
+        short_description: "Generate a textured 3D asset from a text prompt.",
+        vendor: "tencent",
+        provider: "fal",
+        category: "3d/text-to-3d",
+        status: "staged",
+        input: { type: "text", max_utf8_characters: 1024 },
+        output: HUNYUAN_OUTPUT,
+        pricing: {
+          type: "per_generation_base_plus_surcharges",
+          base_usd: 0.375,
+          surcharges_usd: { pbr: 0.15, custom_face_count: 0.15 },
+        },
+        avg_cost_usd: 0.375,
+        url: "https://fal.ai/models/fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+      },
+      "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d": {
+        id: "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+        label: "Hunyuan 3D v3.1 Pro — Image",
+        deprecated: false,
+        short_description:
+          "Generate a textured 3D asset from one image or up to eight views.",
+        vendor: "tencent",
+        provider: "fal",
+        category: "3d/image-to-3d",
+        status: "staged",
+        input: { type: "image", min_images: 1, max_images: 8 },
+        output: HUNYUAN_OUTPUT,
+        pricing: {
+          type: "per_generation_base_plus_surcharges",
+          base_usd: 0.375,
+          surcharges_usd: {
+            pbr: 0.15,
+            multi_view: 0.15,
+            custom_face_count: 0.15,
+          },
+        },
+        avg_cost_usd: 0.375,
+        url: "https://fal.ai/models/fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+      },
+      "fal-ai/trellis-2": {
+        id: "fal-ai/trellis-2",
+        label: "TRELLIS.2",
+        deprecated: false,
+        short_description:
+          "Generate a textured GLB asset from a single reference image.",
+        vendor: "microsoft",
+        provider: "fal",
+        category: "3d/image-to-3d",
+        status: "staged",
+        input: { type: "image", min_images: 1, max_images: 1 },
+        output: { primary: "glb", optional: [] },
+        pricing: {
+          type: "per_generation_by_resolution",
+          default_resolution: "1024",
+          usd_by_resolution: { "512": 0.25, "1024": 0.3, "1536": 0.35 },
+        },
+        avg_cost_usd: 0.3,
+        url: "https://fal.ai/models/fal-ai/trellis-2",
+      },
+    } as const satisfies Record<ThreeDModelId, ThreeDModelCard>;
+
+    const all_cards: readonly ThreeDModelCard[] = Object.values(models);
+
+    export const three_d_model_ids = Object.freeze(
+      Object.keys(models) as ThreeDModelId[]
+    );
+
+    let _listed: readonly ThreeDModelCard[] | null = null;
+    export const listed_models = (): readonly ThreeDModelCard[] =>
+      (_listed ??= Object.freeze(
+        all_cards.filter((card) => card.status === "listed")
+      ));
+
+    let _staged: readonly ThreeDModelCard[] | null = null;
+    export const staged_models = (): readonly ThreeDModelCard[] =>
+      (_staged ??= Object.freeze(
+        all_cards.filter((card) => card.status === "staged")
+      ));
   }
 
   // ── models.video ──────────────────────────────────────────────────

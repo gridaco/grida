@@ -87,11 +87,9 @@ function vendorLabel(vendor: string) {
   );
 }
 
-function groupAudioByVendor(
-  models: Record<string, AITypes.audio.AudioModelCard>
-) {
-  const groups = new Map<string, AITypes.audio.AudioModelCard[]>();
-  for (const model of Object.values(models)) {
+function groupAudioByVendor(models: readonly AITypes.audio.MusicModelCard[]) {
+  const groups = new Map<string, AITypes.audio.MusicModelCard[]>();
+  for (const model of models) {
     const list = groups.get(model.vendor) ?? [];
     list.push(model);
     groups.set(model.vendor, list);
@@ -640,8 +638,9 @@ export default function AIModelsCatalogPage() {
       <div className="container px-4 pt-16 pb-10">
         <h1 className="text-3xl font-bold tracking-tight mb-2">Audio Models</h1>
         <p className="text-base text-muted-foreground max-w-xl">
-          Music and audio generation models available on Grida. Pricing is
-          sourced directly from each provider.
+          Music generation models currently available on Grida. Pricing is
+          sourced directly from each provider; staged compatibility contracts
+          are not shown here.
         </p>
       </div>
 
@@ -664,7 +663,7 @@ export default function AIModelsCatalogPage() {
 function AudioPricingBadge({
   pricing,
 }: {
-  pricing: AITypes.audio.AudioModelPricing;
+  pricing: AITypes.audio.PerRunFlatPricing;
 }) {
   return (
     <span className="font-mono text-sm">${pricing.usd.toFixed(3)}/run</span>
@@ -674,7 +673,7 @@ function AudioPricingBadge({
 function AudioPricingDetail({
   pricing,
 }: {
-  pricing: AITypes.audio.AudioModelPricing;
+  pricing: AITypes.audio.PerRunFlatPricing;
 }) {
   return (
     <div className="flex items-baseline gap-2">
@@ -686,7 +685,7 @@ function AudioPricingDetail({
   );
 }
 
-function AudioModelCard({ model }: { model: AITypes.audio.AudioModelCard }) {
+function AudioModelCard({ model }: { model: AITypes.audio.MusicModelCard }) {
   return (
     <Card className="flex flex-col bg-card/50 border-muted overflow-hidden">
       <CardHeader className="pb-3 h-20">
@@ -759,7 +758,7 @@ function AudioModelCard({ model }: { model: AITypes.audio.AudioModelCard }) {
 }
 
 function AudioModelsTable() {
-  const grouped = groupAudioByVendor(ai.audio.models);
+  const grouped = groupAudioByVendor(listedMusicModels());
   return (
     <div className="container mx-auto px-4 pb-12">
       <div className="rounded-lg border overflow-hidden">
@@ -816,7 +815,7 @@ function AudioModelsTable() {
 }
 
 function AudioModelsCards() {
-  const grouped = groupAudioByVendor(ai.audio.models);
+  const grouped = groupAudioByVendor(listedMusicModels());
   return (
     <>
       {[...grouped.entries()].map(([vendor, models]) => {
@@ -837,4 +836,13 @@ function AudioModelsCards() {
       })}
     </>
   );
+}
+
+function listedMusicModels(): readonly AITypes.audio.MusicModelCard[] {
+  return ai.audio
+    .listed_models()
+    .filter(
+      (model): model is AITypes.audio.MusicModelCard =>
+        model.category === "audio/music"
+    );
 }

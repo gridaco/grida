@@ -15,6 +15,7 @@ import { RecentStore } from "../files/recent";
 import { SecretsStore } from "../secrets";
 import { AuthStore } from "../auth/file";
 import { WorkspaceRegistry } from "../workspaces";
+import { MediaStore, type MediaPersistence } from "../media";
 import type { DaemonCapabilities } from "../protocol/handshake";
 
 /**
@@ -37,6 +38,12 @@ export type DaemonServices = {
   workspaces: WorkspaceRegistry;
   files: FileRegistry;
   recent: RecentStore;
+  /**
+   * Optional host-rooted durable binary-media persistence. Its root is separate
+   * from `user_data_path`; tenants can save path-free records but cannot list,
+   * read, or resolve native paths. Null when the host did not provide a root.
+   */
+  media: MediaPersistence | null;
   /**
    * Shared credential persistence for tenant-owned OAuth sessions.
    *
@@ -109,6 +116,11 @@ export type ServerOptions = {
    * that don't wire it (CLI/dev), where `createProject` throws.
    */
   projects_root?: string;
+  /**
+   * Host-provided dedicated root for durable binary media. Omitted on hosts
+   * that do not offer this capability; never derived from a client request.
+   */
+  media_root?: string;
   /** Host/client HTTP perimeter policy for CORS + Referer checks. */
   http_access: DaemonHttpAccess;
   /** Capability tenants to mount behind the perimeter. */
@@ -183,6 +195,7 @@ export function buildServer(opts: ServerOptions): BuiltServer {
     user_data_path: opts.user_data_path,
     files: new FileRegistry(),
     recent: new RecentStore(opts.user_data_path),
+    media: createMediaPersistence(opts.media_root),
     workspaces: new WorkspaceRegistry(opts.user_data_path, opts.projects_root),
     auth,
     secrets: new SecretsStore(auth),
@@ -213,4 +226,15 @@ export function buildServer(opts: ServerOptions): BuiltServer {
       for (const h of handles) h.cleanup?.();
     },
   };
+}
+
+function createMediaPersistence(
+  root: string | undefined
+): MediaPersistence | null {
+  if (!root) return null;
+  const store = new MediaStore(root);
+  const persistence: MediaPersistence = {
+    save: (input) => store.save(input),
+  };
+  return Object.freeze(persistence);
 }

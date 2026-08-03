@@ -76,7 +76,7 @@ type ResultItem = {
   id: number;
   url: string;
   prompt: string;
-  modelId: ai.audio.AudioModelId;
+  modelId: ai.audio.MusicModelId;
 };
 
 function Workspace() {
@@ -85,7 +85,7 @@ function Workspace() {
   const [loading, startGenerate] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [modelId, setModelId] =
-    useState<ai.audio.AudioModelId>("google/lyria-3");
+    useState<ai.audio.MusicModelId>("google/lyria-3");
   const [results, setResults] = useState<ResultItem[]>([]);
   const card = useMemo(() => ai.audio.models[modelId], [modelId]);
 
@@ -94,13 +94,13 @@ function Workspace() {
       const prompt = message.text.trim();
       if (!prompt) return;
 
-      const image_inputs: string[] = [];
+      const images: string[] = [];
       for (const f of message.files) {
         if (
           f.url &&
           (f.url.startsWith("data:image/") || f.url.startsWith("http"))
         ) {
-          image_inputs.push(f.url);
+          images.push(f.url);
         }
       }
 
@@ -109,7 +109,7 @@ function Workspace() {
         const env = await generateAudio({
           model: modelId,
           prompt,
-          image_inputs: image_inputs.length > 0 ? image_inputs : undefined,
+          images: images.length > 0 ? images : undefined,
         });
         const data = credits.consume(env, { next: "/ai/playground/music" });
         if (!data) {
@@ -159,13 +159,13 @@ function Workspace() {
               </PromptInputActionMenu>
               <Select
                 value={modelId}
-                onValueChange={(v) => setModelId(v as ai.audio.AudioModelId)}
+                onValueChange={(v) => setModelId(v as ai.audio.MusicModelId)}
               >
                 <SelectTrigger className="w-min border-none h-8">
                   <SelectValue>{card.label}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {ai.audio.audio_model_ids.map((id) => {
+                  {ai.audio.music_model_ids.map((id) => {
                     const m = ai.audio.models[id];
                     return (
                       <SelectItem key={id} value={id}>
@@ -289,7 +289,7 @@ function ResultCard({ item }: { item: ResultItem }) {
   );
 }
 
-function EmptyState({ modelId }: { modelId: ai.audio.AudioModelId }) {
+function EmptyState({ modelId }: { modelId: ai.audio.MusicModelId }) {
   const card = ai.audio.models[modelId];
   return (
     <div className="rounded-xl border border-dashed bg-muted/20 px-6 py-10 text-center">

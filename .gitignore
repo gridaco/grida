@@ -240,3 +240,8 @@ __screenshots__/
 # Generated artwork-station demo output (regenerable from
 # fixtures/prompts/artwork-station-prompts.txt) — heavy binaries, not a test fixture
 fixtures/test-canvas/artwork.canvas/outputs/
+
+# Local media-playground review and 3D benchmark artifacts.
+/output/playwright/
+/output/pdf/3d-generation-default-benchmark.pdf
+/tmp/3d-model-benchmark/

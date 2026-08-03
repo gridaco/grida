@@ -1,4 +1,3 @@
-// GRIDA-GG: provider — the `gg` hosted image arm (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — `/images/generate` route (BYOK image generation, #908).
  *
@@ -26,19 +25,23 @@
 
 import type { Hono } from "hono";
 import { generateImage } from "ai";
-import type { SecretsStore } from "@grida/daemon/server";
+import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import {
   ImageModelUnavailableError,
   resolveImageModel,
 } from "../../providers/resolve-image";
-import { hostedGenerationError } from "./gg-media-errors";
+import { mediaGenerationError } from "./media-generation-errors";
 import { body, v } from "@grida/daemon/server";
 import type { ProviderHttp } from "../../providers/http";
+import type { ImageGeneratedImage } from "../../protocol/images";
+import { GeneratedMediaPersistence } from "./generated-media-persistence";
 
 const IMAGE_PROVIDERS = ["vercel", "fal", "openrouter", "gg"] as const;
 
 export type ImagesRoutesDeps = {
   secrets: SecretsStore;
+  media?: MediaPersistence | null;
+  // GRIDA-GG: provider — the optional hosted image arm.
   /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
   gg?: import("../../providers/gg-session").GridaGatewaySessionStore;
   gg_base_url?: string;
@@ -115,7 +118,7 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
         ...(providerOptions ? { providerOptions } : {}),
       });
     } catch (e) {
-      return hostedGenerationError(c, {
+      return mediaGenerationError(c, {
         error: e,
         scope: "agent-host-images",
         label: "image generation failed",
@@ -124,13 +127,33 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       });
     }
 
+    const images: ImageGeneratedImage[] = [];
+    for (const [index, generated] of generation.images.entries()) {
+      const image = {
+        base64: generated.base64,
+        media_type: generated.mediaType,
+      };
+      const fileName = GeneratedMediaPersistence.fileName(
+        "image",
+        index,
+        image.media_type
+      );
+      const storedMedia = fileName
+        ? await GeneratedMediaPersistence.save(deps.media, {
+            ...image,
+            file_name: fileName,
+          })
+        : undefined;
+      images.push({
+        ...image,
+        ...(storedMedia ? { stored_media: storedMedia } : {}),
+      });
+    }
+
     return c.json({
       model_id: resolved.model_id,
       provider_id: resolved.provider_id,
-      images: generation.images.map((f) => ({
-        base64: f.base64,
-        media_type: f.mediaType,
-      })),
+      images,
     });
   });
 }

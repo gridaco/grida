@@ -15,14 +15,19 @@ export function DesktopPageShell({
   children,
   className,
   titleBarClassName,
+  navigationDisabled = false,
 }: {
   children: ReactNode;
   className?: string;
   titleBarClassName?: string;
+  navigationDisabled?: boolean;
 }) {
   return (
     <div className={cn("flex h-svh w-full flex-col bg-background", className)}>
-      <TitleBar className={titleBarClassName} />
+      <TitleBar
+        className={titleBarClassName}
+        navigationDisabled={navigationDisabled}
+      />
       {children}
     </div>
   );

@@ -17,6 +17,7 @@ import { createServer, type AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { DaemonServer } from "./daemon-server";
+import type { MediaPersistence } from "./media";
 import { DaemonTransport } from "./transport";
 import type { DaemonTenant } from "./http/server";
 import type { DaemonCapabilities } from "./protocol/handshake";
@@ -36,6 +37,7 @@ async function makeDaemon(
     capabilities?: Partial<DaemonCapabilities>;
     tenants?: readonly DaemonTenant[];
     port?: number;
+    media_root?: string;
   } = {}
 ): Promise<{ daemon: DaemonServer; base_dir: string }> {
   const baseDir = await fs.mkdtemp(
@@ -46,6 +48,7 @@ async function makeDaemon(
     capabilities: opts.capabilities,
     tenants: opts.tenants,
     user_data_path: baseDir,
+    media_root: opts.media_root,
     http_access: HTTP_ACCESS,
     port: opts.port ?? 0,
   });
@@ -329,6 +332,48 @@ describe("DaemonServer listener-independent lifecycle", () => {
 });
 
 describe("DaemonServer tenant seam", () => {
+  it("supplies persistence-only media authority when configured", async () => {
+    const seen: Array<MediaPersistence | null> = [];
+    const tenant: DaemonTenant = {
+      register: (_app, services) => {
+        seen.push(services.media);
+        return {};
+      },
+    };
+    const mediaBase = await fs.mkdtemp(
+      path.join(os.tmpdir(), "grida-daemon-media-test-")
+    );
+    const absent = await makeDaemon({ tenants: [tenant] });
+    const configured = await makeDaemon({
+      tenants: [tenant],
+      media_root: path.join(mediaBase, "media"),
+    });
+    try {
+      await absent.daemon.start({ listen: false });
+      await configured.daemon.start({ listen: false });
+      expect(seen[0]).toBeNull();
+      expect(Object.isFrozen(seen[1]!)).toBe(true);
+      expect(Object.keys(seen[1]!)).toEqual(["save"]);
+      expect("resolvePath" in seen[1]!).toBe(false);
+      await expect(
+        seen[1]!.save({
+          file_name: "scene.glb",
+          media_type: "model/gltf-binary",
+          bytes: new Uint8Array([1, 2, 3]),
+        })
+      ).resolves.toMatchObject({
+        file_name: "scene.glb",
+        media_type: "model/gltf-binary",
+      });
+    } finally {
+      await absent.daemon.stop();
+      await configured.daemon.stop();
+      await fs.rm(absent.base_dir, { recursive: true, force: true });
+      await fs.rm(configured.base_dir, { recursive: true, force: true });
+      await fs.rm(mediaBase, { recursive: true, force: true });
+    }
+  });
+
   it("stop() drains tenant work BEFORE tenant cleanup, then refuses connections", async () => {
     // Stands in for the agent tenant: `drain` aborts in-flight upstream
     // model calls; `cleanup` closes SQLite. The seam contract is the
@@ -339,7 +384,7 @@ describe("DaemonServer tenant seam", () => {
       register: (app) => {
         app.post("/tenant/ping", (c) => c.json({ ok: true }));
         return {
-          capabilities: { sessions: true },
+          capabilities: { sessions: true, three_d: true, audio: true },
           drain: () => order.push("drain"),
           cleanup: () => order.push("cleanup"),
         };
@@ -375,7 +420,11 @@ describe("DaemonServer tenant seam", () => {
       };
       expect(body.capabilities.sessions).toBe(true);
       expect(body.capabilities.agent).toBe(false);
+      expect(body.capabilities.three_d).toBe(true);
+      expect(body.capabilities.audio).toBe(true);
       expect(body.supports).toContain("sessions@1");
+      expect(body.supports).toContain("three-d@1");
+      expect(body.supports).toContain("audio@1");
 
       const port = daemon.port;
       await daemon.stop();
@@ -411,8 +460,12 @@ describe("DaemonServer tenant seam", () => {
       expect(body.capabilities.agent).toBe(false);
       expect(body.capabilities.sessions).toBe(false);
       expect(body.capabilities.secrets).toBe(false);
+      expect(body.capabilities.three_d).toBe(false);
+      expect(body.capabilities.audio).toBe(false);
       expect(body.supports).toContain("files@1");
       expect(body.supports).not.toContain("agent@1");
+      expect(body.supports).not.toContain("three-d@1");
+      expect(body.supports).not.toContain("audio@1");
 
       // Daemon-owned route groups answer; tenant groups are absent (404,
       // not 401 — the perimeter clears first, then no route matches).

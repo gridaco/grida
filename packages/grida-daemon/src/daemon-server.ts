@@ -57,6 +57,11 @@ export type DaemonServerOptions = {
    * {@link ServerOptions} by the `...opts` spread below.
    */
   projects_root?: string;
+  /**
+   * Host-injected dedicated root for durable binary media. This is distinct
+   * from the daemon's secret/session `user_data_path` and from workspaces.
+   */
+  media_root?: string;
   /** Host/client HTTP perimeter policy for CORS + Referer checks. */
   http_access: DaemonHttpAccess;
   /** Loopback host to bind in listening mode. Default `127.0.0.1`. */

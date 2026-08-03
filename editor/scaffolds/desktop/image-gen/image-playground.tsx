@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
 import { models } from "@grida/ai-models";
 import { Skeleton } from "@app/ui/components/skeleton";
+import { cn } from "@app/ui/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@app/ui/components/dialog";
 import {
   DropdownMenu,
@@ -28,7 +29,7 @@ import {
   usePromptInputController,
   type PromptInputMessage,
 } from "@app/ui/ai-elements/prompt-input";
-import { images } from "@/lib/desktop/bridge";
+import { images, type MediaItem } from "@/lib/desktop/bridge";
 import { ImageModelPicker } from "./image-model-picker";
 
 /** Named prompt templates — pick one from the composer menu to fill the input.
@@ -145,8 +146,14 @@ type Tile = {
  */
 export function DesktopImagePlayground({
   initialModelId,
+  showGridLeftBorder = true,
+  onGenerationBusyChange,
+  onStoredMediaCreated,
 }: {
   initialModelId?: string;
+  showGridLeftBorder?: boolean;
+  onGenerationBusyChange?: (busy: boolean) => void;
+  onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
   const [modelId, setModelId] = useState(
     initialModelId && models.image.models[initialModelId]?.listed
@@ -169,19 +176,20 @@ export function DesktopImagePlayground({
   };
 
   const runGenerate = async (rawPrompt: string) => {
+    const prompt = rawPrompt.trim();
+    if (!prompt) return;
     // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh so a
     // signed-in keyless user generates through the included provider.
     // Never throws; BYOK runs are unaffected when it degrades.
-    await gridaGateway.ensureFresh();
-    const prompt = rawPrompt.trim();
-    if (!prompt) return;
     const id = crypto.randomUUID();
     const model_id = modelId;
     setTiles((prev) => [
       { id, prompt, model_id, status: "generating" },
       ...prev,
     ]);
+    onGenerationBusyChange?.(true);
     try {
+      await gridaGateway.ensureFresh();
       const res = await images.generate({
         model_id,
         prompt,
@@ -190,6 +198,10 @@ export function DesktopImagePlayground({
           : {}),
         ...(quality !== "auto" ? { quality } : {}),
       });
+      for (let index = res.images.length - 1; index >= 0; index -= 1) {
+        const stored = res.images[index]?.stored_media;
+        if (stored) onStoredMediaCreated?.(stored);
+      }
       const first = res.images[0];
       const src = first
         ? `data:${first.media_type};base64,${first.base64}`
@@ -209,6 +221,8 @@ export function DesktopImagePlayground({
           t.id === id ? { ...t, status: "error", error: String(e) } : t
         )
       );
+    } finally {
+      onGenerationBusyChange?.(false);
     }
   };
 
@@ -223,9 +237,15 @@ export function DesktopImagePlayground({
 
       {/* Gallery — a real hairline grid, visible even when empty. Cells are
           transparent; the borders (cell right/bottom + grid left/top) draw a
-          single crisp line everywhere. */}
+          single crisp line everywhere. The left edge is optional when a parent
+          surface already owns that shared boundary. */}
       <div className="min-h-0 flex-1 overflow-y-auto pb-40">
-        <div className="grid grid-cols-2 border-l border-t border-border sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div
+          className={cn(
+            "grid grid-cols-2 border-t border-border sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+            showGridLeftBorder && "border-l"
+          )}
+        >
           {Array.from({ length: cellCount }, (_, i) => {
             const tile = tiles[i];
             return tile ? (

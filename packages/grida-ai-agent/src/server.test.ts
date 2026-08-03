@@ -47,6 +47,7 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
       {
         password: "p",
         user_data_path: "/tmp/ud",
+        media_root: "/tmp/media",
         http_access: { allowed_origins: [], allowed_referer_paths: [] },
         skills_root: "/repo/skills",
         gg_base_url: "https://grida.co",
@@ -74,6 +75,7 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
     expect(out.library).toBe(true);
     expect(out.provider_http).toBe(provider_http);
     expect(out.chatgpt).toBe(chatgpt);
+    expect(out).not.toHaveProperty("media_root");
   });
 });
 

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
 import { models } from "@grida/ai-models";
 import { Skeleton } from "@app/ui/components/skeleton";
+import { cn } from "@app/ui/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@app/ui/components/dialog";
 import {
   DropdownMenu,
@@ -28,7 +29,7 @@ import {
   usePromptInputController,
   type PromptInputMessage,
 } from "@app/ui/ai-elements/prompt-input";
-import { video } from "@/lib/desktop/bridge";
+import { video, type MediaItem } from "@/lib/desktop/bridge";
 import { VideoModelPicker } from "./video-model-picker";
 
 /** Named prompt templates — motion-flavored starters, original to Grida. */
@@ -125,8 +126,14 @@ type Tile = {
  */
 export function DesktopVideoPlayground({
   initialModelId,
+  showGridLeftBorder = true,
+  onGenerationBusyChange,
+  onStoredMediaCreated,
 }: {
   initialModelId?: string;
+  showGridLeftBorder?: boolean;
+  onGenerationBusyChange?: (busy: boolean) => void;
+  onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
   const [modelId, setModelId] = useState(
     initialModelId && models.video.models[initialModelId]?.listed
@@ -151,25 +158,30 @@ export function DesktopVideoPlayground({
   };
 
   const runGenerate = async (rawPrompt: string) => {
+    const prompt = rawPrompt.trim();
+    if (!prompt) return;
     // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh so a
     // signed-in keyless user generates through the included provider.
     // Never throws; BYOK runs are unaffected when it degrades.
-    await gridaGateway.ensureFresh();
-    const prompt = rawPrompt.trim();
-    if (!prompt) return;
     const id = crypto.randomUUID();
     const model_id = modelId;
     setTiles((prev) => [
       { id, prompt, model_id, status: "generating" },
       ...prev,
     ]);
+    onGenerationBusyChange?.(true);
     try {
+      await gridaGateway.ensureFresh();
       const res = await video.generate({
         model_id,
         prompt,
         ...(aspect !== AUTO ? { aspect_ratio: aspect } : {}),
         ...(duration.value != null ? { duration: duration.value } : {}),
       });
+      for (let index = res.videos.length - 1; index >= 0; index -= 1) {
+        const stored = res.videos[index]?.stored_media;
+        if (stored) onStoredMediaCreated?.(stored);
+      }
       const first = res.videos[0];
       const src = first
         ? `data:${first.media_type};base64,${first.base64}`
@@ -189,6 +201,8 @@ export function DesktopVideoPlayground({
           t.id === id ? { ...t, status: "error", error: String(e) } : t
         )
       );
+    } finally {
+      onGenerationBusyChange?.(false);
     }
   };
 
@@ -201,7 +215,12 @@ export function DesktopVideoPlayground({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-40">
-        <div className="grid grid-cols-1 border-l border-t border-border sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div
+          className={cn(
+            "grid grid-cols-1 border-t border-border sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+            showGridLeftBorder && "border-l"
+          )}
+        >
           {Array.from({ length: cellCount }, (_, i) => {
             const tile = tiles[i];
             return tile ? (

@@ -308,6 +308,9 @@ function makeResolvedByok(
       // The text precedence loop already skips it (see `byokProvidersFor`);
       // this guards an explicit text pick of `fal`.
       throw new ProviderUnavailableError(providerId);
+    case "elevenlabs":
+      // ElevenLabs is audio-only and likewise cannot satisfy a text pick.
+      throw new ProviderUnavailableError(providerId);
   }
   const _exhaustive: never = providerId;
   throw new ProviderUnavailableError(_exhaustive);

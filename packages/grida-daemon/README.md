@@ -22,15 +22,32 @@ It owns:
   streamed Range-aware `GET /workspaces/file`), and the handshake.
 - **The `DaemonTenant` seam.** A tenant registers its route groups
   against `DaemonServices` (workspace registry, file registry, recents,
-  secrets store, `user_data_path`) and reports capability flags +
-  `drain`/`cleanup`. A static, typed list — not a plugin registry.
+  secrets store, optional host-rooted media persistence, `user_data_path`) and
+  reports capability flags + `drain`/`cleanup`. A static, typed list — not a
+  plugin registry.
 - **Daemon discovery.** The `Daemon` namespace (WG spec
   [daemon.md](../../docs/wg/ai/agent/daemon.md), #798): registration
   record, persistent credential, authenticated probe, connect-or-spawn.
 - **Host primitives tenants build on.** The shell runner (structural
   GRIDA-SEC-004 gates), `SecretsStore`/`AuthStore` (presence/set/delete;
-  raw reads stay server-side), path containment, request validation,
-  and the sandbox policy frame.
+  raw reads stay server-side), `MediaPersistence` (path-free binary-media
+  publication backed by a separately injected host store), path containment,
+  request validation, and the sandbox policy frame.
+
+`MediaStore` is deliberately not an AI-generation catalog or a general file
+browser. It stores bytes by MIME type with fixed admission bounds: 64 MiB per
+item, 512 committed valid items, and 4 GiB total logical bytes. A store instance
+serializes concurrent save admission so count and byte quotas cannot race. It
+never evicts published items; a full store rejects the new save with a stable,
+path-free error. Prompts/provider/model metadata are omitted, and native path
+resolution is exposed only from the Node server entry. There is no general
+media HTTP route; a host may wrap the store in a narrower purpose-built native
+capability.
+
+Tenants receive only the persistence-only `MediaPersistence.save` contract.
+Listing, reading, and native path resolution remain host operations on the
+Node-only `MediaStore`; the tenant seam cannot turn an opaque item id into a
+local path.
 
 **AI-free by contract.** This package declares and imports nothing
 AI-specific — no `ai`, no model catalogs, no provider SDKs. Enforced by
@@ -39,12 +56,12 @@ belongs in a tenant.
 
 ## Exports
 
-| Subpath       | What                                                                                   | Platform |
-| ------------- | -------------------------------------------------------------------------------------- | -------- |
-| `.`           | handshake vocabulary (`DaemonCapabilities`, `DAEMON_PROTOCOL`), local-resource DTOs    | neutral  |
-| `./server`    | `DaemonServer`, `buildServer`, the tenant seam, `Daemon` discovery, the tenant toolkit | Node     |
-| `./transport` | `DaemonTransport` — Basic-Auth signing, fetch/SSE helpers, the daemon route client     | neutral  |
-| `./sandbox`   | sandbox policy frame (`buildDaemonSandboxPolicy`, `hostFromUrl`) — AI-free             | Node     |
+| Subpath       | What                                                                                    | Platform |
+| ------------- | --------------------------------------------------------------------------------------- | -------- |
+| `.`           | handshake vocabulary (`DaemonCapabilities`, `DAEMON_PROTOCOL`), local-resource DTOs     | neutral  |
+| `./server`    | `DaemonServer`, `buildServer`, the tenant seam, `Daemon` discovery, host stores/toolkit | Node     |
+| `./transport` | `DaemonTransport` — Basic-Auth signing, fetch/SSE helpers, the daemon route client      | neutral  |
+| `./sandbox`   | sandbox policy frame (`buildDaemonSandboxPolicy`, `hostFromUrl`) — AI-free              | Node     |
 
 ### Sandbox network baseline
 

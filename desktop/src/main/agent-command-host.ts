@@ -43,6 +43,7 @@ type WrappedCommand = Readonly<{
 export type AgentCommandHostOptions = Readonly<{
   scratchBase: string;
   userData: string;
+  mediaRoot: string;
   home: string;
   filesystemPolicy: FilesystemPolicy;
   wrap?: (
@@ -93,6 +94,7 @@ export class AgentCommandHost {
 
   private readonly scratchBase: string;
   private readonly userData: string;
+  private readonly mediaRoot: string;
   private readonly home: string;
   private readonly filesystemPolicy: FilesystemPolicy;
   private readonly wrapCommand: NonNullable<AgentCommandHostOptions["wrap"]>;
@@ -104,6 +106,7 @@ export class AgentCommandHost {
   constructor(options: AgentCommandHostOptions) {
     this.scratchBase = path.resolve(options.scratchBase);
     this.userData = path.resolve(options.userData);
+    this.mediaRoot = path.resolve(options.mediaRoot);
     this.home = path.resolve(options.home);
     this.filesystemPolicy = options.filesystemPolicy;
     this.wrapCommand = options.wrap ?? wrapArgv;
@@ -176,6 +179,7 @@ export class AgentCommandHost {
     scratchRoot?: string;
     scratchBase: string;
     userData: string;
+    mediaRoot: string;
     cwd: string;
   }> {
     const expectedScratchBase = await realpathNearest(this.scratchBase);
@@ -191,6 +195,7 @@ export class AgentCommandHost {
       "workspace"
     );
     const userData = await realpathNearest(this.userData);
+    const mediaRoot = await realpathNearest(this.mediaRoot);
     if (
       containsPath(userData, workspaceRoot) ||
       containsPath(workspaceRoot, userData)
@@ -202,6 +207,24 @@ export class AgentCommandHost {
       containsPath(expectedScratchBase, userData)
     ) {
       throw new Error("scratch authority overlaps the agent secret root");
+    }
+    if (
+      containsPath(mediaRoot, workspaceRoot) ||
+      containsPath(workspaceRoot, mediaRoot)
+    ) {
+      throw new Error("command workspace overlaps the media library root");
+    }
+    if (
+      containsPath(mediaRoot, expectedScratchBase) ||
+      containsPath(expectedScratchBase, mediaRoot)
+    ) {
+      throw new Error("scratch authority overlaps the media library root");
+    }
+    if (
+      containsPath(userData, mediaRoot) ||
+      containsPath(mediaRoot, userData)
+    ) {
+      throw new Error("media library root overlaps the agent secret root");
     }
     // A workspace that contains the shared scratch base would make the
     // workspace write grant cover every session. The inverse is equally
@@ -241,6 +264,7 @@ export class AgentCommandHost {
       scratchRoot,
       scratchBase: expectedScratchBase,
       userData,
+      mediaRoot,
       cwd,
     };
   }
@@ -251,6 +275,7 @@ export class AgentCommandHost {
       scratchRoot?: string;
       scratchBase: string;
       userData: string;
+      mediaRoot: string;
     },
     commandTemp: string
   ): Partial<SandboxRuntimeConfig> {
@@ -287,6 +312,7 @@ export class AgentCommandHost {
         denyRead: uniquePaths([
           ...this.filesystemPolicy.deny_read,
           grant.userData,
+          grant.mediaRoot,
           grant.scratchBase,
           ...sharedWriteDefaults,
         ]),
@@ -301,6 +327,7 @@ export class AgentCommandHost {
         denyWrite: uniquePaths([
           ...this.filesystemPolicy.deny_write,
           grant.userData,
+          grant.mediaRoot,
           ...sharedWriteDefaults,
         ]),
       },

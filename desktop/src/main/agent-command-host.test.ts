@@ -13,6 +13,7 @@ import { AgentCommandHost, sweepAgentCommandTemps } from "./agent-command-host";
 describe("AgentCommandHost", () => {
   let root: string;
   let userData: string;
+  let mediaRoot: string;
   let scratchBase: string;
   let workspaceA: string;
   let workspaceB: string;
@@ -22,14 +23,15 @@ describe("AgentCommandHost", () => {
   beforeEach(async () => {
     root = await fs.mkdtemp(path.join(os.tmpdir(), "grida-command-host-"));
     userData = path.join(root, "userdata");
+    mediaRoot = path.join(root, "media");
     scratchBase = path.join(root, "scratch-base");
     workspaceA = path.join(root, "workspace-a");
     workspaceB = path.join(root, "workspace-b");
     scratchA = path.join(scratchBase, "sessions", "ses_A", "scratch");
     scratchB = path.join(scratchBase, "sessions", "ses_B", "scratch");
     await Promise.all(
-      [userData, workspaceA, workspaceB, scratchA, scratchB].map((dir) =>
-        fs.mkdir(dir, { recursive: true })
+      [userData, mediaRoot, workspaceA, workspaceB, scratchA, scratchB].map(
+        (dir) => fs.mkdir(dir, { recursive: true })
       )
     );
   });
@@ -107,6 +109,18 @@ describe("AgentCommandHost", () => {
     expect(policy?.filesystem?.allowWrite).not.toContain(
       await fs.realpath(workspaceB)
     );
+    expect(policy?.filesystem?.denyRead).toContain(
+      await fs.realpath(mediaRoot)
+    );
+    expect(policy?.filesystem?.denyWrite).toContain(
+      await fs.realpath(mediaRoot)
+    );
+    expect(policy?.filesystem?.allowRead).not.toContain(
+      await fs.realpath(mediaRoot)
+    );
+    expect(policy?.filesystem?.allowWrite).not.toContain(
+      await fs.realpath(mediaRoot)
+    );
   });
 
   it("refuses a cwd in another registered session workspace", async () => {
@@ -151,6 +165,22 @@ describe("AgentCommandHost", () => {
         }
       )
     ).rejects.toThrow(/overlaps the scratch authority root/);
+  });
+
+  it("refuses a workspace whose grant would overlap the media library", async () => {
+    const nestedWorkspace = path.join(mediaRoot, "workspace");
+    await fs.mkdir(nestedWorkspace);
+    const host = commandHost();
+
+    await expect(
+      host.shellExecutor(
+        { cmd: "true", args: [], cwd: nestedWorkspace },
+        {
+          workspace_root: nestedWorkspace,
+          protected_read_roots: [userData],
+        }
+      )
+    ).rejects.toThrow(/overlaps the media library root/);
   });
 
   it("does not re-allow a workspace through a protected read root", async () => {
@@ -240,6 +270,7 @@ describe("AgentCommandHost", () => {
     return new AgentCommandHost({
       scratchBase,
       userData,
+      mediaRoot,
       home: root,
       filesystemPolicy: {
         deny_read: [path.join(root, ".ssh")],

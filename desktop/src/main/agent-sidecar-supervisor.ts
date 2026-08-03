@@ -66,6 +66,7 @@ import { AgentNetworkHost } from "./agent-network-host";
 import { AgentDaemonSocketHost } from "./agent-daemon-socket-host";
 import { DesktopAgentSandboxPolicy } from "./agent-sandbox-policy";
 import { AgentCommandHost, sweepAgentCommandTemps } from "./agent-command-host";
+import { DesktopMediaRoot } from "./media-root";
 
 export type AgentSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -100,10 +101,11 @@ export class AgentSidecarSupervisor {
   // (~/.grida/agent). Resolved ONCE so the sandbox write-allowlist and the
   // sidecar's `--user-data` argv cannot diverge (GRIDA-SEC-004). Uses
   // os.homedir() (== app.getPath("home")) so it is safe to compute at module
-  // construction, before Electron is ready. Electron's own
-  // app.getPath("userData") (Chromium cookies/cache/window state) is left
-  // untouched — mirrors codex keeping ~/.codex separate from its GUI shell dir.
+  // construction, before Electron is ready. This secret-state path stays
+  // separate from Electron's app.getPath("userData") browser profile; the
+  // app-managed media root below is resolved and sandboxed independently.
   private readonly user_data_path = home.join("agent");
+  private readonly media_root = DesktopMediaRoot.current;
 
   // Durable sidecar log (~/.grida/agent/logs/sidecar.log) — the on-disk
   // trace a packaged-app incident needs (the console is gone by the time
@@ -286,6 +288,7 @@ export class AgentSidecarSupervisor {
     }
     const policy = DesktopAgentSandboxPolicy.build({
       userData: this.user_data_path,
+      mediaRoot: this.media_root,
       home: app.getPath("home"),
       ggHost: new URL(EDITOR_BASE_URL).hostname,
     });
@@ -305,6 +308,7 @@ export class AgentSidecarSupervisor {
     this.commandHost = new AgentCommandHost({
       scratchBase: this.scratchBase,
       userData: this.user_data_path,
+      mediaRoot: this.media_root,
       home: app.getPath("home"),
       filesystemPolicy: policy.filesystem,
     });
@@ -367,6 +371,7 @@ export class AgentSidecarSupervisor {
     const args = [
       scriptPath,
       `--user-data=${this.user_data_path}`,
+      `--media-root=${this.media_root}`,
       `--scratch-base=${this.scratchBase}`,
       // Host-bundled skills dir (repo-root `skills/`) — the built-in skills the
       // agent advertises + loads on demand. Read-only; omitted if unresolved.

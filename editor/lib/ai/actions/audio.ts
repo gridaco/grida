@@ -1,8 +1,6 @@
 "use server";
 
-/**
- * AI audio generation action — Lyria et al. via Replicate.
- */
+/** AI music generation action — Google Lyria via Replicate. */
 
 import { methods, withAiAuth, type AiActionResult } from "@/lib/ai/server";
 import ai from "@/lib/ai";
@@ -10,17 +8,15 @@ import ai from "@/lib/ai";
 export type GenerateAudioInput = {
   /** Verified org id — server resolves via `requireOrganizationId`. */
   organizationId?: number;
-  model: ai.audio.AudioModelId;
+  model: ai.audio.MusicModelId;
   prompt: string;
-  image_inputs?: string[];
-  language?: string;
-  negative_prompt?: string;
+  images?: string[];
   seed?: number;
 };
 
 export type GenerateAudioData = {
   url: string;
-  modelId: ai.audio.AudioModelId;
+  modelId: ai.audio.MusicModelId;
   timestamp: string;
 };
 
@@ -29,7 +25,7 @@ export type GenerateAudioResponse = AiActionResult<GenerateAudioData>;
 export async function generateAudio(
   input: GenerateAudioInput
 ): Promise<GenerateAudioResponse> {
-  if (!input.prompt || input.prompt.trim() === "") {
+  if (typeof input.prompt !== "string" || input.prompt.trim() === "") {
     return {
       success: false,
       code: "bad_request",
@@ -37,11 +33,33 @@ export async function generateAudio(
       status: 400,
     };
   }
-  if (!Object.hasOwn(ai.audio.models, input.model)) {
+  if (!ai.audio.is_music_model_id(input.model)) {
     return {
       success: false,
       code: "bad_request",
       message: "invalid model",
+      status: 400,
+    };
+  }
+  const card = ai.audio.models[input.model];
+  if (
+    input.images !== undefined &&
+    (!Array.isArray(input.images) ||
+      input.images.some((image) => typeof image !== "string") ||
+      input.images.length > (card.input.max_images ?? 0))
+  ) {
+    return {
+      success: false,
+      code: "bad_request",
+      message: `images must contain at most ${card.input.max_images ?? 0} URLs`,
+      status: 400,
+    };
+  }
+  if (input.seed !== undefined && !Number.isSafeInteger(input.seed)) {
+    return {
+      success: false,
+      code: "bad_request",
+      message: "seed must be an integer",
       status: 400,
     };
   }
@@ -51,9 +69,7 @@ export async function generateAudio(
     async (orgId) => {
       const result = await methods.generateAudio(orgId, input.model, {
         prompt: input.prompt,
-        image_inputs: input.image_inputs,
-        language: input.language,
-        negative_prompt: input.negative_prompt,
+        images: input.images,
         seed: input.seed,
       });
       return {

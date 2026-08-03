@@ -7,7 +7,8 @@
  * for the daemon-owned route groups (handshake, files, recents,
  * workspaces). This module extends that client with the agent tenant's
  * groups — sessions, agent run/stream, lifecycle events, secrets,
- * providers, images, video — and re-exposes the primitives under
+ * providers, image, video, 3D, and audio generation — and re-exposes the
+ * primitives under
  * `AgentTransport` so callers deal with ONE namespace. Consumers should
  * not hand-build route strings.
  */
@@ -36,6 +37,16 @@ import type {
   VideoGenerateRequest,
   VideoGenerateResult,
 } from "./protocol/video";
+import type {
+  ThreeDGenerateRequest,
+  ThreeDGenerateResult,
+} from "./protocol/three-d";
+import type {
+  MusicGenerateRequest,
+  MusicGenerateResult,
+  SoundEffectGenerateRequest,
+  SoundEffectGenerateResult,
+} from "./protocol/audio";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type { DirectoryScopeDescriptor } from "./protocol/context";
 import type {
@@ -214,12 +225,43 @@ export namespace AgentTransport {
     } as const;
 
     /** BYOK video generation (#908). Desktop-only; gated by the `video`
-     *  capability. Returns a provider URL (or base64) — never the user's key. */
+     *  capability. Returns base64 bytes only — never a provider URL or the
+     *  user's key. */
     readonly video = {
       generate: async (
         req: VideoGenerateRequest
       ): Promise<VideoGenerateResult> =>
         await this.postJson<VideoGenerateResult>("/video/generate", req),
+    } as const;
+
+    /** fal BYOK 3D generation. Returns primary GLB bytes only. */
+    readonly threeD = {
+      generate: async (
+        req: ThreeDGenerateRequest
+      ): Promise<ThreeDGenerateResult> =>
+        await this.postJson<ThreeDGenerateResult>("/three-d/generate", req),
+    } as const;
+
+    /** Audio keeps hosted music and ElevenLabs BYOK sound effects distinct. */
+    readonly audio = {
+      music: {
+        generate: async (
+          req: MusicGenerateRequest
+        ): Promise<MusicGenerateResult> =>
+          await this.postJson<MusicGenerateResult>(
+            "/audio/music/generate",
+            req
+          ),
+      },
+      soundEffects: {
+        generate: async (
+          req: SoundEffectGenerateRequest
+        ): Promise<SoundEffectGenerateResult> =>
+          await this.postJson<SoundEffectGenerateResult>(
+            "/audio/sound-effects/generate",
+            req
+          ),
+      },
     } as const;
 
     readonly sessions = {

@@ -409,6 +409,20 @@ const bridge: DesktopBridge = {
     },
   },
 
+  // GRIDA-SEC-004 — app-managed media stays behind purpose-scoped native IPC.
+  // The renderer receives opaque ids, path-free descriptors, and bytes only;
+  // unlike generation and workspace APIs, none of these calls use daemon HTTP.
+  media: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.MEDIA_LIST),
+    read: (id) => ipcRenderer.invoke(IPC_CHANNELS.MEDIA_READ, id),
+    reveal: async (id) => {
+      await ipcRenderer.invoke(IPC_CHANNELS.MEDIA_REVEAL, id);
+    },
+    open_folder: async () => {
+      await ipcRenderer.invoke(IPC_CHANNELS.MEDIA_OPEN_FOLDER);
+    },
+  },
+
   workspaces: {
     list: () => agentClient.workspaces.list(),
     open: (rootPath) => agentClient.workspaces.open(rootPath),
@@ -577,6 +591,19 @@ const bridge: DesktopBridge = {
 
   video: {
     generate: (req) => agentClient.video.generate(req),
+  },
+
+  threeD: {
+    generate: (req) => agentClient.threeD.generate(req),
+  },
+
+  audio: {
+    music: {
+      generate: (req) => agentClient.audio.music.generate(req),
+    },
+    soundEffects: {
+      generate: (req) => agentClient.audio.soundEffects.generate(req),
+    },
   },
 
   agent: {

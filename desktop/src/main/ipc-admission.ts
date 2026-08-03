@@ -25,6 +25,13 @@ const ONBOARDING_CHANNELS = new Set<IpcChannel>([
   IPC_CHANNELS.WINDOW_COMPLETE_ONBOARDING,
 ]);
 
+const TOOLS_ONLY_CHANNELS = new Set<IpcChannel>([
+  IPC_CHANNELS.MEDIA_LIST,
+  IPC_CHANNELS.MEDIA_READ,
+  IPC_CHANNELS.MEDIA_REVEAL,
+  IPC_CHANNELS.MEDIA_OPEN_FOLDER,
+]);
+
 /**
  * Closed IPC allowlist for non-main entry roles.
  *
@@ -48,11 +55,17 @@ export namespace ipc_admission {
         // A renderer may commit a contained auth/onboarding navigation before
         // Electron's navigation observer runs. Path admission closes that gap
         // without letting URL state grant a role.
-        return (
-          pathname !== "/desktop/onboarding" &&
-          pathname !== "/desktop/auth" &&
-          !pathname.startsWith("/desktop/auth/")
-        );
+        if (
+          pathname === "/desktop/onboarding" ||
+          pathname === "/desktop/auth" ||
+          pathname.startsWith("/desktop/auth/")
+        ) {
+          return false;
+        }
+        if (TOOLS_ONLY_CHANNELS.has(channel)) {
+          return pathname === "/desktop/tools";
+        }
+        return true;
       case "sign-in":
         return (
           pathname === "/desktop/auth/sign-in" && SIGN_IN_CHANNELS.has(channel)

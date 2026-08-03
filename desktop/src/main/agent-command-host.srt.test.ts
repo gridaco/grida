@@ -18,6 +18,7 @@ const describeMacOS = process.platform === "darwin" ? describe : describe.skip;
 describeMacOS("AgentCommandHost per-command SRT boundary", () => {
   let root: string;
   let userData: string;
+  let mediaRoot: string;
   let scratchBase: string;
   let workspace: string;
   let scratchA: string;
@@ -27,21 +28,24 @@ describeMacOS("AgentCommandHost per-command SRT boundary", () => {
   beforeEach(async () => {
     root = await fs.mkdtemp(path.join(os.tmpdir(), "grida-command-srt-"));
     userData = path.join(root, "user-data");
+    mediaRoot = path.join(root, "media");
     scratchBase = path.join(root, "scratch-authority");
     workspace = path.join(root, "workspace");
     scratchA = path.join(scratchBase, "sessions", "ses_A", "scratch");
     scratchB = path.join(scratchBase, "sessions", "ses_B", "scratch");
     await Promise.all(
-      [userData, workspace, scratchA, scratchB].map((dir) =>
+      [userData, mediaRoot, workspace, scratchA, scratchB].map((dir) =>
         fs.mkdir(dir, { recursive: true })
       )
     );
     await fs.writeFile(path.join(scratchA, "own.txt"), "session-a");
     await fs.writeFile(path.join(scratchB, "private.txt"), "session-b-secret");
     await fs.writeFile(path.join(userData, "auth.json"), "host-secret");
+    await fs.writeFile(path.join(mediaRoot, "model.glb"), "media-private");
 
     const policy = DesktopAgentSandboxPolicy.build({
       userData,
+      mediaRoot,
       home: os.homedir(),
       ggHost: "grida.co",
     });
@@ -61,6 +65,7 @@ describeMacOS("AgentCommandHost per-command SRT boundary", () => {
     host = new AgentCommandHost({
       scratchBase,
       userData,
+      mediaRoot,
       home: os.homedir(),
       filesystemPolicy: policy.filesystem,
     });
@@ -121,6 +126,20 @@ describeMacOS("AgentCommandHost per-command SRT boundary", () => {
     expect(computedSecretAttack.exit_code).not.toBe(0);
     expect(computedSecretAttack.stdout).not.toContain("host-secret");
 
+    const mediaReadAttack = await host.shellExecutor(
+      {
+        cmd: process.execPath,
+        args: [
+          "-e",
+          `process.stdout.write(require('node:fs').readFileSync(${JSON.stringify(path.join(mediaRoot, "model.glb"))}, 'utf8'))`,
+        ],
+        cwd: workspace,
+      },
+      scope
+    );
+    expect(mediaReadAttack.exit_code).not.toBe(0);
+    expect(mediaReadAttack.stdout).not.toContain("media-private");
+
     const writeAttack = await host.shellExecutor(
       {
         cmd: process.execPath,
@@ -137,6 +156,23 @@ describeMacOS("AgentCommandHost per-command SRT boundary", () => {
     await expect(
       fs.readFile(path.join(scratchB, "private.txt"), "utf8")
     ).resolves.toBe("session-b-secret");
+
+    const mediaWriteAttack = await host.shellExecutor(
+      {
+        cmd: process.execPath,
+        args: [
+          "-e",
+          "require('node:fs').writeFileSync(process.argv[1], 'overwritten')",
+          path.join(mediaRoot, "model.glb"),
+        ],
+        cwd: workspace,
+      },
+      scope
+    );
+    expect(mediaWriteAttack.exit_code).not.toBe(0);
+    await expect(
+      fs.readFile(path.join(mediaRoot, "model.glb"), "utf8")
+    ).resolves.toBe("media-private");
   });
 
   it("kills a background descendant before releasing its SRT profile", async () => {

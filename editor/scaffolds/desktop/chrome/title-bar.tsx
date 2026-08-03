@@ -98,6 +98,7 @@ export function TitleBar({
   children,
   className,
   reserveRightWindowControls = true,
+  navigationDisabled = false,
 }: {
   children?: ReactNode;
   className?: string;
@@ -107,6 +108,8 @@ export function TitleBar({
    * those right-edge controls; that layout must reserve their space itself.
    */
   reserveRightWindowControls?: boolean;
+  /** Keep a long-running page operation from being orphaned through history. */
+  navigationDisabled?: boolean;
 }) {
   const platform = usePlatform();
   const isMac = platform === "darwin";
@@ -141,7 +144,7 @@ export function TitleBar({
       }}
     >
       <div className="flex h-full w-full items-center gap-2 px-3 text-xs text-muted-foreground">
-        <NavButtons />
+        <NavButtons disabled={navigationDisabled} />
         {children}
       </div>
     </div>
@@ -166,7 +169,7 @@ export function TitleBar({
  * Each button opts out of the drag region via `.desktop-no-drag` — without it
  * the OS would consume the click as a window-move gesture.
  */
-function NavButtons() {
+function NavButtons({ disabled = false }: { disabled?: boolean }) {
   const state = useNavigationState();
   if (!state) return null;
   if (!state.can_go_back && !state.can_go_forward) return null;
@@ -176,7 +179,7 @@ function NavButtons() {
         type="button"
         variant="ghost"
         size="icon-sm"
-        disabled={!state.can_go_back}
+        disabled={disabled || !state.can_go_back}
         onClick={() => void nav.back()}
         aria-label="Go back"
         title="Go back"
@@ -187,7 +190,7 @@ function NavButtons() {
         type="button"
         variant="ghost"
         size="icon-sm"
-        disabled={!state.can_go_forward}
+        disabled={disabled || !state.can_go_forward}
         onClick={() => void nav.forward()}
         aria-label="Go forward"
         title="Go forward"

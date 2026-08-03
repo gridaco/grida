@@ -5,6 +5,7 @@
  */
 
 import type { models } from "@grida/ai-models";
+import type { MediaItem } from "@grida/daemon";
 
 /** A BYOK video provider (mirrors {@link models.video.VideoProvider}). */
 export type VideoGenProvider = models.video.VideoProvider;
@@ -35,6 +36,8 @@ export type GeneratedVideo = {
    */
   base64: string;
   media_type: string;
+  /** Present only when the optional host media store accepted this output. */
+  stored_media?: MediaItem;
 };
 
 export type VideoGenerateResult = {

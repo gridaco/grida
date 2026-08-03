@@ -95,6 +95,10 @@ export namespace AgentNetworkPolicy {
       // ChatGPT-subscription provider. Neither origin joins the download lane.
       "https://auth.openai.com",
       "https://chatgpt.com",
+      // ElevenLabs returns generated audio bytes on the credential-bearing
+      // request itself. It is an exact provider origin and must never join the
+      // credential-free provider-asset download lane.
+      "https://api.elevenlabs.io",
     ];
     return [
       {

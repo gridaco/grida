@@ -42,6 +42,13 @@ import {
   type ProbedEndpointModel,
   type ImageGenerateRequest,
   type ImageGenerateResult,
+  type MusicGenerateRequest,
+  type MusicGenerateResult,
+  type SoundEffectGenerateRequest,
+  type SoundEffectGenerateResult,
+  type ThreeDGenerateRequest,
+  type ThreeDGenerateResult,
+  type ThreeDInputImage,
   type VideoGenerateRequest,
   type VideoGenerateResult,
   type PatchSessionOptions,
@@ -53,8 +60,10 @@ import {
 import type {
   DesktopBridge,
   ChatGptConnectResult,
+  DesktopMediaReadResult,
   DesktopHostAppId,
   DesktopHostAppInfo,
+  MediaItem,
   NavigationState,
   Workspace,
   WorkspaceChangeEvent,
@@ -88,6 +97,13 @@ export {
   type ImageGenProvider,
   type ImageGenerateRequest,
   type ImageGenerateResult,
+  type MusicGenerateRequest,
+  type MusicGenerateResult,
+  type SoundEffectGenerateRequest,
+  type SoundEffectGenerateResult,
+  type ThreeDGenerateRequest,
+  type ThreeDGenerateResult,
+  type ThreeDInputImage,
   type VideoGenProvider,
   type VideoGenerateRequest,
   type VideoGenerateResult,
@@ -120,6 +136,8 @@ export type {
   FileReadResult,
   FileWriteResult,
   HandshakeResponse,
+  DesktopMediaReadResult,
+  MediaItem,
   NavigationState,
   OpenDialogOptions,
   RecentEntry,
@@ -551,8 +569,8 @@ export namespace images {
 
 /**
  * BYOK video generation (#908). Same posture as {@link images}: the request
- * resolves the user's key in the sidecar and returns a provider URL (or base64)
- * — the key never crosses the bridge (GRIDA-SEC-004). Feature-detect with
+ * resolves the user's key in the sidecar and returns base64 video bytes — no
+ * provider URL or key crosses the bridge (GRIDA-SEC-004). Feature-detect with
  * {@link isSupported}.
  */
 export namespace video {
@@ -566,6 +584,103 @@ export namespace video {
     const bridge = bridgeOrThrow().video;
     if (!bridge) throw new DesktopBridgeMissingError();
     return await bridge.generate(req);
+  }
+}
+
+/* ───────────────────────── 3D namespace ─────────────────────── */
+
+/**
+ * Experimental fal-only 3D generation for the media-formats playground.
+ * The sidecar returns GLB bytes; provider credentials and result URLs never
+ * cross this renderer boundary.
+ */
+export namespace threeD {
+  export function isSupported(): boolean {
+    return getDesktopBridge()?.threeD != null;
+  }
+
+  export async function generate(
+    req: ThreeDGenerateRequest
+  ): Promise<ThreeDGenerateResult> {
+    const bridge = bridgeOrThrow().threeD;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    return await bridge.generate(req);
+  }
+}
+
+/* ──────────────────────── audio namespace ───────────────────── */
+
+/** Byte-returning music and sound-effect generation playground routes. */
+export namespace audio {
+  export function isSupported(): boolean {
+    return getDesktopBridge()?.audio != null;
+  }
+
+  export namespace music {
+    export function isSupported(): boolean {
+      return getDesktopBridge()?.audio?.music != null;
+    }
+
+    export async function generate(
+      req: MusicGenerateRequest
+    ): Promise<MusicGenerateResult> {
+      const bridge = bridgeOrThrow().audio?.music;
+      if (!bridge) throw new DesktopBridgeMissingError();
+      return await bridge.generate(req);
+    }
+  }
+
+  export namespace soundEffects {
+    export function isSupported(): boolean {
+      return getDesktopBridge()?.audio?.soundEffects != null;
+    }
+
+    export async function generate(
+      req: SoundEffectGenerateRequest
+    ): Promise<SoundEffectGenerateResult> {
+      const bridge = bridgeOrThrow().audio?.soundEffects;
+      if (!bridge) throw new DesktopBridgeMissingError();
+      return await bridge.generate(req);
+    }
+  }
+}
+
+/* ───────────────────── media library namespace ─────────────────── */
+
+/**
+ * App-managed, format-oriented media saved by Desktop Tools.
+ *
+ * The optional bridge carries only opaque ids, path-free descriptors, and
+ * bytes. Native paths stay in Electron main; Finder actions resolve an id
+ * through the host-owned store rather than accepting a renderer path.
+ */
+export namespace mediaLibrary {
+  export function isSupported(): boolean {
+    return getDesktopBridge()?.media != null;
+  }
+
+  export async function list(): Promise<MediaItem[]> {
+    const bridge = bridgeOrThrow().media;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    return await bridge.list();
+  }
+
+  export async function read(id: string): Promise<DesktopMediaReadResult> {
+    const bridge = bridgeOrThrow().media;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    return await bridge.read(id);
+  }
+
+  export async function reveal(id: string): Promise<void> {
+    const bridge = bridgeOrThrow().media;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    await bridge.reveal(id);
+  }
+
+  export async function openFolder(): Promise<void> {
+    const bridge = bridgeOrThrow().media;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    await bridge.open_folder();
   }
 }
 

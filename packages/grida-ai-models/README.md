@@ -27,7 +27,9 @@ and lookup helpers.
   size constraints, defaults, and pricing
 - Video generation model cards: canonical (provider-agnostic) models, each with
   per-provider bindings carrying that provider's call id and pricing
-- Audio generation model cards
+- Audio generation model cards with explicit music/SFX categories, IO
+  capabilities, and provider-native pricing
+- Staged 3D generation endpoint cards for text-to-3D and image-to-3D
 - Image tool model cards, such as background removal and upscaling
 - Shared discriminator types for providers, vendors, speed labels, and pricing
   schemes
@@ -49,6 +51,8 @@ const imageModel = models.image.models["openai/gpt-image-2"];
 const compactImageModel = imageModel && models.image.toCompact(imageModel);
 
 const audioModel = models.audio.models["google/lyria-3"];
+const sfxModel = models.audio.models.eleven_text_to_sound_v2;
+const staged3d = models.three_d.staged_models();
 const upscaleTool = models.image_tools.models["nightmareai/real-esrgan"];
 ```
 
@@ -111,6 +115,7 @@ Media model data lives under the `models` namespace:
 
 - `models.image`
 - `models.audio`
+- `models.three_d`
 - `models.video`
 - `models.image_tools`
 
@@ -124,8 +129,39 @@ Image pricing is a discriminated union:
 - `per_image_flat`: one price per image
 - `per_token`: token rates for input and output
 
-Audio models currently use flat per-run pricing. Image tools use flat
-per-invocation pricing.
+Audio cards distinguish `audio/music` from `audio/sound-effect` and carry
+explicit input/output specs. Replicate Lyria uses flat USD-per-run pricing.
+ElevenLabs Sound Effects uses the provider's own credits meter (100 credits for
+automatic duration, or 11 credits per second when duration is specified).
+Credits intentionally are not converted to USD because their effective dollar
+value depends on the account plan. Image tools use flat per-invocation pricing.
+
+Audio and 3D cards use `status: "listed" | "staged"`. `listed` means the model
+has an integrated execution surface and can appear in normal user-facing
+selection. `staged` means its provider id, modalities, output, and price are
+grounded for a dedicated compatibility playground, but it is not yet part of
+normal integrated model selection and the catalogue alone does not make the
+model callable. Use `listed_models()` or `staged_models()` rather than
+inferring runtime availability from presence in `models`.
+
+For audio, `music_model_ids` and `music_models()` isolate the Replicate-backed
+Lyria routes; `sound_effect_model_ids` and `sound_effect_models()` isolate
+ElevenLabs SFX. The existing music execution path must accept `MusicModelId`,
+not the broader `AudioModelId`.
+
+### 3D models
+
+`models.three_d` currently contains fal-only, staged endpoint cards:
+
+- Hunyuan 3D v3.1 Pro text-to-3D
+- Hunyuan 3D v3.1 Pro image-to-3D
+- TRELLIS.2 image-to-3D
+
+The card id is the exact fal endpoint id. Hunyuan guarantees a GLB result and
+may also return FBX, OBJ, or USDZ entries; TRELLIS.2 guarantees GLB. Pricing is
+also endpoint-shaped: Hunyuan stores its base generation price plus additive
+option surcharges, while TRELLIS.2 stores its 512/1024/1536 resolution tiers.
+No default provider selection or inference client lives in this package.
 
 Image cards are multi-homed like video: each card holds a `providers` record of
 bindings — one per serving provider (`vercel` / `fal` / `openrouter`), each with
@@ -161,8 +197,8 @@ No default provider is encoded; resolve a route with
 
 ## Updating The Catalog
 
-To add or update a text model (or any image / audio / video / image-tool model),
-edit `src/models.ts`. That file is the central catalogue and also the
+To add or update a text model (or any image / audio / 3D / video / image-tool
+model), edit `src/models.ts`. That file is the central catalogue and also the
 type source — `models.text.CatalogId` is derived from the text-model table.
 
 To change a tier mapping, update `TIER_MODEL_IDS` in `src/tiers.ts`. The

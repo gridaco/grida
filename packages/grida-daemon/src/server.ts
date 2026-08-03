@@ -51,6 +51,7 @@ export {
 } from "./workspaces/scan";
 export { FileRegistry } from "./files/registry";
 export { RecentStore } from "./files/recent";
+export { MediaStore, type MediaPersistence } from "./media";
 export { SecretsStore } from "./secrets";
 export {
   AuthStore,

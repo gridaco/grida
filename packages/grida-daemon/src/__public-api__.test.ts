@@ -20,6 +20,8 @@ import {
 } from ".";
 import type {
   FileReadResult,
+  MediaItem,
+  MediaReadResult,
   RecentEntry,
   Workspace,
   WorkspaceCreateInput,
@@ -30,6 +32,7 @@ import {
   containsPath,
   Daemon,
   DaemonServer,
+  MediaStore,
   runUnsandboxedShell,
   SecretsStore,
   validateShellRequest,
@@ -41,6 +44,7 @@ import {
   type DaemonServices,
   type DaemonTenant,
   type DaemonTenantHandle,
+  type MediaPersistence,
   type ShellExecutionScope,
   type ShellExecutor,
   type ShellRunOptions,
@@ -69,12 +73,16 @@ describe("@grida/daemon public API", () => {
       expect(caps.agent).toBe(false);
       expect(caps.sessions).toBe(false);
       expect(caps.secrets).toBe(false);
+      expect(caps.three_d).toBe(false);
+      expect(caps.audio).toBe(false);
       expect(handshake.protocol).toBe(1);
     });
 
     it("exposes the local-resource DTOs", () => {
       type _FR = FileReadResult;
       type _RE = RecentEntry;
+      type _MI = MediaItem;
+      type _MR = MediaReadResult;
       type _W = Workspace;
       type _WCI = WorkspaceCreateInput;
       type _WE = WorkspaceFsEntry;
@@ -120,6 +128,12 @@ describe("@grida/daemon public API", () => {
         },
       };
       expect(typeof tenant.register).toBe("function");
+      expectTypeOf<
+        NonNullable<DaemonServices["media"]>
+      >().toEqualTypeOf<MediaPersistence>();
+      type MediaTenantAuthority = keyof NonNullable<DaemonServices["media"]>;
+      const mediaTenantAuthority: MediaTenantAuthority = "save";
+      expect(mediaTenantAuthority).toBe("save");
       type _B = BuiltServer;
     });
 
@@ -148,6 +162,7 @@ describe("@grida/daemon public API", () => {
 
     it("exposes the tenant toolkit", () => {
       expect(typeof WorkspaceRegistry).toBe("function");
+      expect(typeof MediaStore).toBe("function");
       expect(typeof SecretsStore).toBe("function");
       expect(typeof workspaceFs.readDir).toBe("function");
       expect(typeof workspaceFs.iterateDir).toBe("function");

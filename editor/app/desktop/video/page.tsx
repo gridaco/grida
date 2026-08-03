@@ -1,28 +1,13 @@
-"use client";
+import { redirect } from "next/navigation";
+import { DesktopMediaTool } from "@/scaffolds/desktop/tools/media-tool-registry";
 
-import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { DesktopPageShell } from "@/scaffolds/desktop/chrome/page-shell";
-import { DesktopVideoPlayground } from "@/scaffolds/desktop/video-gen/video-playground";
-
-/**
- * Desktop video-generation page (#908) — the dedicated home for BYOK video
- * generation, the sibling of `/desktop/images`. A `?model=<id>` query (set by
- * "Try this model" in Settings) preselects a model. Generation runs in the
- * agent sidecar against the user's connected provider key; the key never
- * reaches this renderer (GRIDA-SEC-004).
- */
-export default function DesktopVideoPage() {
-  return (
-    <DesktopPageShell>
-      <Suspense>
-        <PlaygroundWithQuery />
-      </Suspense>
-    </DesktopPageShell>
-  );
-}
-
-function PlaygroundWithQuery() {
-  const model = useSearchParams().get("model") ?? undefined;
-  return <DesktopVideoPlayground initialModelId={model} />;
+/** Compatibility redirect. Video generation now lives in Desktop Tools. */
+export default async function DesktopVideoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ model?: string | string[] }>;
+}) {
+  const { model } = await searchParams;
+  const modelId = Array.isArray(model) ? model[0] : model;
+  redirect(DesktopMediaTool.href("video-generator", modelId));
 }
