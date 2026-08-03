@@ -6,24 +6,24 @@ vi.mock("@/lib/ai/openai-compat/limits", () => ({
   allowAiRequest: async () => ({ success: true }),
 }));
 
-const generateAudio =
+const generateMusic =
   vi.fn<
     (org: number, model: string, input: unknown) => Promise<{ url: string }>
   >();
 vi.mock("@/lib/ai/server", () => ({
   methods: {
-    generateAudio: (org: number, model: string, input: unknown) =>
-      generateAudio(org, model, input),
+    generateMusic: (org: number, model: string, input: unknown) =>
+      generateMusic(org, model, input),
   },
 }));
 
 import { POST } from "./route";
 import { signGgToken } from "@/lib/auth/gg-token";
 
-const SECRET = "audio-secret-0123456789abcdef0123456789abcdef";
+const SECRET = "music-secret-0123456789abcdef0123456789abcdef";
 
 function request(body: unknown, token?: string): Request {
-  return new Request("http://grida.test/api/v1/ai/audio/generations", {
+  return new Request("http://grida.test/api/v1/ai/music/generations", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -36,15 +36,15 @@ function request(body: unknown, token?: string): Request {
 beforeEach(() => {
   vi.unstubAllGlobals();
   process.env.GG_TOKEN_SECRET = SECRET;
-  generateAudio.mockReset();
+  generateMusic.mockReset();
   vi.restoreAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
-describe("POST /api/v1/ai/audio/generations", () => {
+describe("POST /api/v1/ai/music/generations", () => {
   it("returns bounded MP3 bytes and never the Replicate URL", async () => {
     const bytes = new Uint8Array([0x49, 0x44, 0x33, 0x03]);
-    generateAudio.mockResolvedValue({
+    generateMusic.mockResolvedValue({
       url: "https://replicate.delivery/pbxt/test/music.mp3",
     });
     vi.stubGlobal(
@@ -86,14 +86,14 @@ describe("POST /api/v1/ai/audio/generations", () => {
       },
     });
     expect(JSON.stringify(result)).not.toContain("replicate.delivery");
-    expect(generateAudio).toHaveBeenCalledWith(7, "google/lyria-3", {
+    expect(generateMusic).toHaveBeenCalledWith(7, "google/lyria-3", {
       prompt: "Clockwork forest percussion",
       seed: 42,
     });
   });
 
   it("rejects non-MP3 bytes from the trusted delivery host", async () => {
-    generateAudio.mockResolvedValue({
+    generateMusic.mockResolvedValue({
       url: "https://replicate.delivery/pbxt/test/music.mp3",
     });
     vi.stubGlobal(
@@ -130,11 +130,11 @@ describe("POST /api/v1/ai/audio/generations", () => {
       )
     );
     expect(response.status).toBe(404);
-    expect(generateAudio).not.toHaveBeenCalled();
+    expect(generateMusic).not.toHaveBeenCalled();
   });
 
   it("does not follow an untrusted provider output URL", async () => {
-    generateAudio.mockResolvedValue({
+    generateMusic.mockResolvedValue({
       url: "https://example.test/private.mp3",
     });
     const fetchMock = vi.fn<typeof globalThis.fetch>();
@@ -154,7 +154,7 @@ describe("POST /api/v1/ai/audio/generations", () => {
   });
 
   it("does not follow a trusted output URL that redirects off-domain", async () => {
-    generateAudio.mockResolvedValue({
+    generateMusic.mockResolvedValue({
       url: "https://replicate.delivery/pbxt/test/music.mp3",
     });
     const fetchMock = vi.fn<typeof globalThis.fetch>(
@@ -186,6 +186,6 @@ describe("POST /api/v1/ai/audio/generations", () => {
       (await POST(request({ model_id: "google/lyria-3", prompt: "" }, token)))
         .status
     ).toBe(400);
-    expect(generateAudio).not.toHaveBeenCalled();
+    expect(generateMusic).not.toHaveBeenCalled();
   });
 });

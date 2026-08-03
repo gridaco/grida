@@ -3,13 +3,11 @@
  *
  * The exact provider origin and endpoint are constants. The provider returns
  * MP3 bytes synchronously, which remain inside the sidecar and are normalized
- * to the renderer-safe audio result contract (GRIDA-SEC-004).
+ * to the renderer-safe MP3 result contract (GRIDA-SEC-004).
  */
 
-import type {
-  GeneratedAudio,
-  SoundEffectGenerateRequest,
-} from "../protocol/audio";
+import type { GeneratedMp3 } from "../protocol/generated-mp3";
+import type { SoundEffectGenerateRequest } from "../protocol/sound-effects";
 import { safeText } from "./fetch-helpers";
 import { ProviderHttp } from "./http";
 
@@ -26,7 +24,7 @@ export class ElevenLabsSoundEffectProvider {
   async generate(
     request: SoundEffectGenerateRequest,
     abortSignal?: AbortSignal
-  ): Promise<GeneratedAudio> {
+  ): Promise<GeneratedMp3> {
     const response = await this.providerHttp.request(
       ELEVENLABS_SOUND_EFFECT_URL,
       {

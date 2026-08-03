@@ -474,14 +474,15 @@ export type DesktopBridge = {
     generate: (req: ThreeDGenerateRequest) => Promise<ThreeDGenerateResult>;
   };
   /**
-   * Audio generation. Music and sound effects stay separate because their
-   * providers and request contracts differ. Optional for older Desktop hosts.
+   * Audio-output generation taxonomy. Music and sound effects are independent
+   * optional capabilities because their providers, availability, and request
+   * contracts differ. The parent is optional for older Desktop hosts.
    */
   audio?: {
-    music: {
+    music?: {
       generate: (req: MusicGenerateRequest) => Promise<MusicGenerateResult>;
     };
-    soundEffects: {
+    soundEffects?: {
       generate: (
         req: SoundEffectGenerateRequest
       ) => Promise<SoundEffectGenerateResult>;

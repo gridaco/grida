@@ -5,7 +5,7 @@ import type {
   MusicGenerateResult,
 } from "@/lib/desktop/bridge";
 import type { GridaGatewaySessionState } from "@/lib/desktop/gg-session";
-import { generateMusicWithGgRecovery } from "./generation-controls";
+import { generateMusicWithGgRecovery } from "./music-generation-controls";
 
 type Generate = (req: MusicGenerateRequest) => Promise<MusicGenerateResult>;
 type ForceRefresh = () => Promise<GridaGatewaySessionState>;

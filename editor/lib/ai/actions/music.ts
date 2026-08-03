@@ -5,26 +5,26 @@
 import { methods, withAiAuth, type AiActionResult } from "@/lib/ai/server";
 import ai from "@/lib/ai";
 
-export type GenerateAudioInput = {
+export type GenerateMusicInput = {
   /** Verified org id — server resolves via `requireOrganizationId`. */
   organizationId?: number;
-  model: ai.audio.MusicModelId;
+  model: ai.audio.music.ModelId;
   prompt: string;
   images?: string[];
   seed?: number;
 };
 
-export type GenerateAudioData = {
+export type GenerateMusicData = {
   url: string;
-  modelId: ai.audio.MusicModelId;
+  modelId: ai.audio.music.ModelId;
   timestamp: string;
 };
 
-export type GenerateAudioResponse = AiActionResult<GenerateAudioData>;
+export type GenerateMusicResponse = AiActionResult<GenerateMusicData>;
 
-export async function generateAudio(
-  input: GenerateAudioInput
-): Promise<GenerateAudioResponse> {
+export async function generateMusic(
+  input: GenerateMusicInput
+): Promise<GenerateMusicResponse> {
   if (typeof input.prompt !== "string" || input.prompt.trim() === "") {
     return {
       success: false,
@@ -33,7 +33,7 @@ export async function generateAudio(
       status: 400,
     };
   }
-  if (!ai.audio.is_music_model_id(input.model)) {
+  if (!ai.audio.music.is_model_id(input.model)) {
     return {
       success: false,
       code: "bad_request",
@@ -41,7 +41,7 @@ export async function generateAudio(
       status: 400,
     };
   }
-  const card = ai.audio.models[input.model];
+  const card = ai.audio.music.models[input.model];
   if (
     input.images !== undefined &&
     (!Array.isArray(input.images) ||
@@ -64,10 +64,10 @@ export async function generateAudio(
     };
   }
   return withAiAuth(
-    "ai/audio/generate",
+    "ai/music/generate",
     input.organizationId,
     async (orgId) => {
-      const result = await methods.generateAudio(orgId, input.model, {
+      const result = await methods.generateMusic(orgId, input.model, {
         prompt: input.prompt,
         images: input.images,
         seed: input.seed,
@@ -76,7 +76,7 @@ export async function generateAudio(
         url: result.url,
         modelId: input.model,
         timestamp: new Date().toISOString(),
-      } satisfies GenerateAudioData;
+      } satisfies GenerateMusicData;
     }
   );
 }

@@ -47,19 +47,22 @@ export type {
   VideoGenerateResult,
 } from "./protocol/video";
 export type {
-  ThreeDGenProvider,
+  FalTextToThreeDModelId,
+  FalImageToThreeDModelId,
   ThreeDInputImage,
   ThreeDGenerateRequest,
   ThreeDGeneratedGlb,
   ThreeDGenerateResult,
 } from "./protocol/three-d";
+export type { GeneratedMp3 } from "./protocol/generated-mp3";
 export type {
-  GeneratedAudio,
   MusicGenerateRequest,
   MusicGenerateResult,
+} from "./protocol/music";
+export type {
   SoundEffectGenerateRequest,
   SoundEffectGenerateResult,
-} from "./protocol/audio";
+} from "./protocol/sound-effects";
 export {
   OLLAMA_ENDPOINT_PRESET,
   isValidEndpointProviderId,

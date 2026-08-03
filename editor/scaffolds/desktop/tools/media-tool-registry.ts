@@ -1,8 +1,4 @@
 import { models } from "@grida/ai-models";
-import {
-  resolveMediaModelHandoff,
-  type MediaModelHandoff,
-} from "../media-formats/media-model-handoff";
 
 export type DesktopMediaToolId =
   | "image-generator"
@@ -17,52 +13,18 @@ export type DesktopMediaToolId =
 
 export type DesktopMediaToolGroupId = "create" | "inspect";
 
-type DesktopThreeDToolSpec = Readonly<{
+export type DesktopMediaToolSpec = Readonly<{
   id: DesktopMediaToolId;
   group: DesktopMediaToolGroupId;
   label: string;
   description: string;
-  mode: "3d";
-  modelIds: readonly models.three_d.ThreeDModelId[];
+  /** Exact model ids accepted by this tool. Empty for viewer-only tools. */
+  modelIds: readonly string[];
 }>;
-
-type DesktopImageToolSpec = Readonly<{
-  id: DesktopMediaToolId;
-  group: DesktopMediaToolGroupId;
-  label: string;
-  description: string;
-  mode: "image";
-  modelIds: readonly models.image.ImageModelId[];
-}>;
-
-type DesktopVideoToolSpec = Readonly<{
-  id: DesktopMediaToolId;
-  group: DesktopMediaToolGroupId;
-  label: string;
-  description: string;
-  mode: "video";
-  modelIds: readonly models.video.VideoModelId[];
-}>;
-
-type DesktopAudioToolSpec = Readonly<{
-  id: DesktopMediaToolId;
-  group: DesktopMediaToolGroupId;
-  label: string;
-  description: string;
-  mode: "audio";
-  modelIds: readonly models.audio.AudioModelId[];
-}>;
-
-export type DesktopMediaToolSpec =
-  | DesktopImageToolSpec
-  | DesktopVideoToolSpec
-  | DesktopThreeDToolSpec
-  | DesktopAudioToolSpec;
 
 export type DesktopMediaToolSelection = Readonly<{
   tool: DesktopMediaToolSpec;
   initialModelId: string | null;
-  initialHandoff: MediaModelHandoff | null;
 }>;
 
 const TOOL_SPECS = Object.freeze([
@@ -71,7 +33,6 @@ const TOOL_SPECS = Object.freeze([
     group: "create",
     label: "Images",
     description: "Create images from a written prompt.",
-    mode: "image",
     modelIds: models.image.listed_models().map((card) => card.id),
   },
   {
@@ -79,7 +40,6 @@ const TOOL_SPECS = Object.freeze([
     group: "create",
     label: "Video",
     description: "Create a video from a written prompt.",
-    mode: "video",
     modelIds: models.video.listed_models().map((card) => card.id),
   },
   {
@@ -87,7 +47,6 @@ const TOOL_SPECS = Object.freeze([
     group: "create",
     label: "3D model",
     description: "Create a 3D model from text or a reference image.",
-    mode: "3d",
     modelIds: models.three_d.three_d_model_ids,
   },
   {
@@ -95,23 +54,20 @@ const TOOL_SPECS = Object.freeze([
     group: "create",
     label: "Music",
     description: "Create a music track from genre, mood, and arrangement.",
-    mode: "audio",
-    modelIds: models.audio.music_model_ids,
+    modelIds: models.audio.music.model_ids,
   },
   {
     id: "text-to-sound-effects",
     group: "create",
     label: "SFX",
     description: "Create a short sound effect from a written cue.",
-    mode: "audio",
-    modelIds: models.audio.sound_effect_model_ids,
+    modelIds: models.audio.sound_effects.model_ids,
   },
   {
     id: "image-viewer",
     group: "inspect",
     label: "Image viewer",
     description: "Open a saved image result.",
-    mode: "image",
     modelIds: [],
   },
   {
@@ -119,7 +75,6 @@ const TOOL_SPECS = Object.freeze([
     group: "inspect",
     label: "Video viewer",
     description: "Open and play a saved video result.",
-    mode: "video",
     modelIds: [],
   },
   {
@@ -127,7 +82,6 @@ const TOOL_SPECS = Object.freeze([
     group: "inspect",
     label: "3D viewer",
     description: "Open GLB files or experimental glTF bundles locally.",
-    mode: "3d",
     modelIds: [],
   },
   {
@@ -135,7 +89,6 @@ const TOOL_SPECS = Object.freeze([
     group: "inspect",
     label: "Audio player",
     description: "Open and play common audio formats locally.",
-    mode: "audio",
     modelIds: [],
   },
 ] as const satisfies readonly DesktopMediaToolSpec[]);
@@ -190,23 +143,11 @@ export namespace DesktopMediaTool {
     const inferredTool = !toolValue ? inferFromModel(modelValue) : null;
     const tool = inferredTool ?? resolve(toolValue);
     if (tool.modelIds.length === 0) {
-      return { tool, initialModelId: null, initialHandoff: null };
+      return { tool, initialModelId: null };
     }
 
     const initialModelId = resolveRequestedModel(tool, toolValue, modelValue);
-    const initialHandoff: MediaModelHandoff | null =
-      tool.mode === "3d"
-        ? {
-            mode: "3d",
-            modelId: initialModelId as models.three_d.ThreeDModelId,
-          }
-        : tool.mode === "audio"
-          ? {
-              mode: "audio",
-              modelId: initialModelId as models.audio.AudioModelId,
-            }
-          : null;
-    return { tool, initialModelId, initialHandoff };
+    return { tool, initialModelId };
   }
 
   export function href(id: DesktopMediaToolId, modelId?: string): string {
@@ -233,16 +174,22 @@ export namespace DesktopMediaTool {
     if (models.video.models[modelId]?.listed) {
       return resolve("video-generator");
     }
-    const handoff = resolveMediaModelHandoff(modelId);
-    if (!handoff) return null;
-    if (handoff.mode === "3d") {
+    if (
+      (models.three_d.three_d_model_ids as readonly string[]).includes(modelId)
+    ) {
       return resolve("3d-generator");
     }
-    return resolve(
-      models.audio.models[handoff.modelId].category === "audio/music"
-        ? "text-to-music"
-        : "text-to-sound-effects"
-    );
+    if ((models.audio.music.model_ids as readonly string[]).includes(modelId)) {
+      return resolve("text-to-music");
+    }
+    if (
+      (models.audio.sound_effects.model_ids as readonly string[]).includes(
+        modelId
+      )
+    ) {
+      return resolve("text-to-sound-effects");
+    }
+    return null;
   }
 
   function resolveRequestedModel(
@@ -260,11 +207,9 @@ export namespace DesktopMediaTool {
       tool.id === "3d-generator" &&
       (toolValue === "text-to-3d" || toolValue === "image-to-3d")
     ) {
-      const inputType = toolValue === "text-to-3d" ? "text" : "image";
-      const modelIds = tool.modelIds as readonly models.three_d.ThreeDModelId[];
-      return modelIds.find(
-        (id) => models.three_d.models[id].input.type === inputType
-      )!;
+      return toolValue === "text-to-3d"
+        ? models.three_d.text_to_three_d_model_ids[0]!
+        : models.three_d.image_to_three_d_model_ids[0]!;
     }
     return tool.modelIds[0]!;
   }

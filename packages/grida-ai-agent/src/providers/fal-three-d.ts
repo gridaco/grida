@@ -1,5 +1,5 @@
 /**
- * fal BYOK 3D generation.
+ * fal 3D generation with the user's fal key.
  *
  * The adapter owns the exact fal endpoint request shapes, the bounded queue
  * lifecycle, and primary-GLB download. Provider response URLs never leave this
@@ -168,7 +168,7 @@ function falInput(request: ThreeDGenerateRequest): Record<string, unknown> {
       if (!request.image) throw new Error("image-to-3D requires an image");
       return { image_url: imageDataUrl(request.image) };
     default:
-      return assertNever(request.model_id);
+      return assertNever(request);
   }
 }
 
@@ -176,6 +176,6 @@ function imageDataUrl(image: { base64: string; media_type: string }): string {
   return `data:${image.media_type};base64,${image.base64}`;
 }
 
-function assertNever(value: never): never {
-  throw new Error(`unsupported 3D model: ${String(value)}`);
+function assertNever(_value: never): never {
+  throw new Error("unsupported 3D request");
 }

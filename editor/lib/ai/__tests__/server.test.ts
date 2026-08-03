@@ -105,7 +105,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("methods.generateAudio", () => {
+describe("methods.generateMusic", () => {
   it("sends only fields accepted by the current Replicate Lyria schema", async () => {
     process.env.REPLICATE_API_TOKEN = "test-replicate-token";
     mockedGetEntitlement.mockResolvedValueOnce({
@@ -119,7 +119,7 @@ describe("methods.generateAudio", () => {
     replicateMock.run.mockResolvedValueOnce("https://example.test/audio.mp3");
 
     await expect(
-      methods.generateAudio(7, "google/lyria-3", {
+      methods.generateMusic(7, "google/lyria-3", {
         prompt: "Clockwork forest percussion",
         images: ["https://example.test/reference.png"],
         seed: 42,

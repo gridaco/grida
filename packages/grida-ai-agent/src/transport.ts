@@ -7,8 +7,8 @@
  * for the daemon-owned route groups (handshake, files, recents,
  * workspaces). This module extends that client with the agent tenant's
  * groups — sessions, agent run/stream, lifecycle events, secrets,
- * providers, image, video, 3D, and audio generation — and re-exposes the
- * primitives under
+ * providers, image, video, 3D, music, and Sound Effects generation — and
+ * re-exposes the primitives under
  * `AgentTransport` so callers deal with ONE namespace. Consumers should
  * not hand-build route strings.
  */
@@ -44,9 +44,11 @@ import type {
 import type {
   MusicGenerateRequest,
   MusicGenerateResult,
+} from "./protocol/music";
+import type {
   SoundEffectGenerateRequest,
   SoundEffectGenerateResult,
-} from "./protocol/audio";
+} from "./protocol/sound-effects";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type { DirectoryScopeDescriptor } from "./protocol/context";
 import type {
@@ -242,7 +244,10 @@ export namespace AgentTransport {
         await this.postJson<ThreeDGenerateResult>("/three-d/generate", req),
     } as const;
 
-    /** Audio keeps hosted music and ElevenLabs BYOK sound effects distinct. */
+    /**
+     * Output-format grouping only: hosted music and ElevenLabs Sound Effects
+     * remain independent provider/request contracts.
+     */
     readonly audio = {
       music: {
         generate: async (

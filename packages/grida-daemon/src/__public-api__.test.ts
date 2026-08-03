@@ -74,7 +74,8 @@ describe("@grida/daemon public API", () => {
       expect(caps.sessions).toBe(false);
       expect(caps.secrets).toBe(false);
       expect(caps.three_d).toBe(false);
-      expect(caps.audio).toBe(false);
+      expect(caps.music).toBe(false);
+      expect(caps.sound_effects).toBe(false);
       expect(handshake.protocol).toBe(1);
     });
 

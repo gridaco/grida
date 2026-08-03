@@ -1,102 +1,35 @@
 /**
- * GRIDA-SEC-004 — Desktop audio-generation routes.
+ * GRIDA-SEC-004 — ElevenLabs Sound Effects generation.
  *
- * Music is a hosted GG operation and sound effects use the user's ElevenLabs
- * key. They remain separate endpoints and normalize to MP3 bytes; neither path
- * returns a provider URL, key, or raw upstream error body.
+ * This route receives only the BYOK secrets authority needed to resolve the
+ * user's ElevenLabs key. It has no access to the hosted GG session used by the
+ * separate music route.
  */
 
 import type { Hono } from "hono";
 import { models } from "@grida/ai-models";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
-import type {
-  MusicGenerateRequest,
-  SoundEffectGenerateRequest,
-} from "../../protocol/audio";
-import { ElevenLabsSoundEffectProvider } from "../../providers/audio-byok";
-import { GridaGatewayMusicProvider } from "../../providers/gg-media";
-import type { GridaGatewaySessionStore } from "../../providers/gg-session";
+import type { SoundEffectGenerateRequest } from "../../protocol/sound-effects";
+import { ElevenLabsSoundEffectProvider } from "../../providers/elevenlabs-sound-effects";
 import { ProviderHttp } from "../../providers/http";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
 import { mediaGenerationError } from "./media-generation-errors";
 
-const MUSIC_MODEL_IDS = models.audio.music_model_ids;
-const SOUND_EFFECT_MODEL_IDS = models.audio.sound_effect_model_ids;
-const MAX_MUSIC_PROMPT_CHARACTERS = 4_096;
+const SOUND_EFFECT_MODEL_IDS = models.audio.sound_effects.model_ids;
 const MAX_SOUND_EFFECT_PROMPT_CHARACTERS = 450;
 
-export type AudioRoutesDeps = {
+export type SoundEffectsRoutesDeps = {
   secrets: SecretsStore;
   media?: MediaPersistence | null;
-  gg?: GridaGatewaySessionStore;
-  gg_base_url?: string;
   provider_http?: ProviderHttp;
 };
 
-export function registerAudioRoutes(app: Hono, deps: AudioRoutesDeps) {
+export function registerSoundEffectsRoutes(
+  app: Hono,
+  deps: SoundEffectsRoutesDeps
+) {
   const providerHttp = deps.provider_http ?? new ProviderHttp();
-
-  // GRIDA-GG: provider — hosted music generation.
-  // GRIDA-SEC-006 — the session token is read per call by the GG adapter.
-  app.post("/audio/music/generate", async (c) => {
-    const r = await body(c, {
-      model_id: v.oneOf(MUSIC_MODEL_IDS),
-      prompt: v.string,
-      seed: v.optional(v.number),
-    });
-    if (!r.ok) return r.res;
-    const prompt = r.data.prompt.trim();
-    if (!prompt) return c.json({ error: "prompt must not be blank" }, 400);
-    if ([...prompt].length > MAX_MUSIC_PROMPT_CHARACTERS) {
-      return c.json(
-        {
-          error: `prompt must not exceed ${MAX_MUSIC_PROMPT_CHARACTERS} characters`,
-        },
-        400
-      );
-    }
-    if (r.data.seed !== undefined && !Number.isSafeInteger(r.data.seed)) {
-      return c.json({ error: "seed must be a safe integer" }, 400);
-    }
-    if (!deps.gg || !deps.gg_base_url) {
-      return c.json(
-        { error: "hosted music generation is unavailable", provider_id: "gg" },
-        400
-      );
-    }
-
-    const request: MusicGenerateRequest = {
-      model_id: r.data.model_id,
-      prompt,
-      ...(r.data.seed === undefined ? {} : { seed: r.data.seed }),
-    };
-    try {
-      const result = await new GridaGatewayMusicProvider(
-        deps.gg,
-        deps.gg_base_url,
-        providerHttp
-      ).generate(request, c.req.raw.signal);
-      const storedMedia = await GeneratedMediaPersistence.save(
-        deps.media,
-        result.audio
-      );
-      return c.json({
-        model_id: result.model_id,
-        provider_id: result.provider_id,
-        audio: result.audio,
-        ...(storedMedia ? { stored_media: storedMedia } : {}),
-      });
-    } catch (error) {
-      return mediaGenerationError(c, {
-        error,
-        scope: "agent-host-audio-music",
-        label: "music generation failed",
-        model_id: request.model_id,
-        provider_id: "gg",
-      });
-    }
-  });
 
   app.post("/audio/sound-effects/generate", async (c) => {
     const r = await body(c, {
@@ -172,7 +105,7 @@ export function registerAudioRoutes(app: Hono, deps: AudioRoutesDeps) {
     } catch (error) {
       return mediaGenerationError(c, {
         error,
-        scope: "agent-host-audio-sound-effects",
+        scope: "agent-host-sound-effects",
         label: "sound-effect generation failed",
         model_id: request.model_id,
         provider_id: "elevenlabs",

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ELEVENLABS_SOUND_EFFECT_URL,
   ElevenLabsSoundEffectProvider,
-} from "./audio-byok";
+} from "./elevenlabs-sound-effects";
 import { ProviderHttp } from "./http";
 
 describe("ElevenLabsSoundEffectProvider", () => {

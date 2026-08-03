@@ -27,18 +27,21 @@ import {
   SidebarProvider,
 } from "@app/ui/components/sidebar";
 import { cn } from "@app/ui/lib/utils";
+import type { models } from "@grida/ai-models";
 import { mediaLibrary, type MediaItem } from "@/lib/desktop/bridge";
+import { ThreeDPlayground } from "../3d-gen/three-d-playground";
+import { MusicPlayground } from "../audio-gen/music-playground";
+import { SoundEffectPlayground } from "../audio-gen/sound-effect-playground";
 import { DesktopImagePlayground } from "../image-gen/image-playground";
-import {
-  DesktopMediaFormatsPlayground,
-  type MediaFormatsStoredPreview,
-} from "../media-formats/media-formats-playground";
 import { DesktopVideoPlayground } from "../video-gen/video-playground";
 import {
   DesktopMediaTool,
   type DesktopMediaToolId,
   type DesktopMediaToolSelection,
+  type DesktopMediaToolSpec,
 } from "./media-tool-registry";
+import { AudioPlayerTool } from "./audio-player-tool";
+import { GltfViewerTool } from "./gltf-viewer-tool";
 import { StoredMedia, type StoredMediaPreview } from "./stored-media";
 import { StoredVisualMediaViewer } from "./stored-visual-media-viewer";
 
@@ -70,7 +73,7 @@ export function DesktopMediaTools({
   initialMediaId?: string | null;
   onGenerationBusyChange?: (busy: boolean) => void;
 }) {
-  const { tool, initialModelId, initialHandoff } = selection;
+  const { tool, initialModelId } = selection;
   const librarySupported = mediaLibrary.isSupported();
   const [generationOperations, setGenerationOperations] = useState(0);
   const generationBusy = generationOperations > 0;
@@ -205,10 +208,6 @@ export function DesktopMediaTools({
     storedSelection.kind === "ready" &&
     storedSelection.mediaId === initialMediaId
       ? storedSelection.preview
-      : null;
-  const formatStoredPreview: MediaFormatsStoredPreview | null =
-    storedPreview?.mode === "3d" || storedPreview?.mode === "audio"
-      ? { ...storedPreview, mode: storedPreview.mode }
       : null;
   const viewerTool = storedPreview
     ? DesktopMediaTool.resolve(StoredMedia.viewerToolId(storedPreview.mode))
@@ -406,67 +405,141 @@ export function DesktopMediaTools({
           <StoredMediaLoading />
         ) : storedSelectionError ? (
           <StoredMediaError toolId={storedMediaRecoveryToolId(tool.id)} />
-        ) : storedPreview &&
-          (storedPreview.mode === "image" || storedPreview.mode === "video") ? (
-          <StoredVisualMediaViewer
-            key={playgroundKey}
-            preview={storedPreview}
-            revealDisabled={nativeAction !== null}
-            onReveal={() => void reveal(storedPreview.item)}
-          />
-        ) : viewerTool.id === "image-viewer" ||
-          viewerTool.id === "video-viewer" ? (
-          <StoredMediaError
-            toolId={
-              viewerTool.mode === "image"
-                ? "image-generator"
-                : "video-generator"
-            }
-          />
-        ) : viewerTool.mode === "image" ? (
-          <DesktopImagePlayground
-            key={playgroundKey}
-            initialModelId={initialModelId ?? undefined}
-            showGridLeftBorder={false}
-            onGenerationBusyChange={setGenerationOperationBusy}
-            onStoredMediaCreated={onStoredMediaCreated}
-          />
-        ) : viewerTool.mode === "video" ? (
-          <DesktopVideoPlayground
-            key={playgroundKey}
-            initialModelId={initialModelId ?? undefined}
-            showGridLeftBorder={false}
-            onGenerationBusyChange={setGenerationOperationBusy}
-            onStoredMediaCreated={onStoredMediaCreated}
-          />
         ) : (
-          <DesktopMediaFormatsPlayground
+          <DesktopMediaToolContent
             key={playgroundKey}
-            initialMode={viewerTool.mode}
-            initialHandoff={formatStoredPreview ? null : initialHandoff}
-            initialStoredMedia={formatStoredPreview}
-            title={viewerTool.label}
-            badgeLabel={null}
-            headingLevel={2}
-            showModeTabs={false}
-            showGeneration={
-              !formatStoredPreview && viewerTool.modelIds.length > 0
-            }
-            threeDModelIds={
-              viewerTool.mode === "3d" ? viewerTool.modelIds : undefined
-            }
-            audioModelIds={
-              viewerTool.mode === "audio" ? viewerTool.modelIds : undefined
-            }
+            tool={viewerTool}
+            initialModelId={storedPreview ? null : initialModelId}
+            storedPreview={storedPreview}
             generationDisabled={generationBusy}
             onGenerationBusyChange={setGenerationOperationBusy}
             onStoredMediaCreated={onStoredMediaCreated}
+            revealDisabled={nativeAction !== null}
             onRevealStoredMedia={(item) => void reveal(item)}
           />
         )}
       </SidebarInset>
     </SidebarProvider>
   );
+}
+
+function DesktopMediaToolContent({
+  tool,
+  initialModelId,
+  storedPreview,
+  generationDisabled,
+  revealDisabled,
+  onGenerationBusyChange,
+  onStoredMediaCreated,
+  onRevealStoredMedia,
+}: {
+  tool: DesktopMediaToolSpec;
+  initialModelId: string | null;
+  storedPreview: StoredMediaPreview | null;
+  generationDisabled: boolean;
+  revealDisabled: boolean;
+  onGenerationBusyChange: (busy: boolean) => void;
+  onStoredMediaCreated: (item: MediaItem) => void;
+  onRevealStoredMedia: (item: MediaItem) => void;
+}) {
+  if (storedPreview) {
+    switch (storedPreview.mode) {
+      case "image":
+      case "video":
+        return (
+          <StoredVisualMediaViewer
+            preview={storedPreview}
+            revealDisabled={revealDisabled}
+            onReveal={() => onRevealStoredMedia(storedPreview.item)}
+          />
+        );
+      case "3d":
+        return (
+          <GltfViewerTool
+            initialStoredMedia={storedPreview}
+            onRevealStoredMedia={onRevealStoredMedia}
+          />
+        );
+      case "audio":
+        return (
+          <AudioPlayerTool
+            initialStoredMedia={storedPreview}
+            onRevealStoredMedia={onRevealStoredMedia}
+          />
+        );
+    }
+  }
+
+  switch (tool.id) {
+    case "image-generator":
+      return (
+        <DesktopImagePlayground
+          initialModelId={initialModelId ?? undefined}
+          showGridLeftBorder={false}
+          onGenerationBusyChange={onGenerationBusyChange}
+          onStoredMediaCreated={onStoredMediaCreated}
+        />
+      );
+    case "video-generator":
+      return (
+        <DesktopVideoPlayground
+          initialModelId={initialModelId ?? undefined}
+          showGridLeftBorder={false}
+          onGenerationBusyChange={onGenerationBusyChange}
+          onStoredMediaCreated={onStoredMediaCreated}
+        />
+      );
+    case "3d-generator":
+      return (
+        <ThreeDPlayground
+          initialModelId={
+            (initialModelId as models.three_d.ThreeDModelId | null) ?? undefined
+          }
+          modelIds={tool.modelIds as readonly models.three_d.ThreeDModelId[]}
+          generationDisabled={generationDisabled}
+          onGenerationBusyChange={onGenerationBusyChange}
+          onStoredMediaCreated={onStoredMediaCreated}
+          onRevealStoredMedia={onRevealStoredMedia}
+        />
+      );
+    case "text-to-music":
+      return (
+        <MusicPlayground
+          initialModelId={
+            (initialModelId as models.audio.music.ModelId | null) ?? undefined
+          }
+          modelIds={tool.modelIds as readonly models.audio.music.ModelId[]}
+          generationDisabled={generationDisabled}
+          onGenerationBusyChange={onGenerationBusyChange}
+          onStoredMediaCreated={onStoredMediaCreated}
+          onRevealStoredMedia={onRevealStoredMedia}
+        />
+      );
+    case "text-to-sound-effects":
+      return (
+        <SoundEffectPlayground
+          initialModelId={
+            (initialModelId as models.audio.sound_effects.ModelId | null) ??
+            undefined
+          }
+          modelIds={
+            tool.modelIds as readonly models.audio.sound_effects.ModelId[]
+          }
+          generationDisabled={generationDisabled}
+          onGenerationBusyChange={onGenerationBusyChange}
+          onStoredMediaCreated={onStoredMediaCreated}
+          onRevealStoredMedia={onRevealStoredMedia}
+        />
+      );
+    case "3d-viewer":
+      return <GltfViewerTool />;
+    case "audio-player":
+      return <AudioPlayerTool />;
+    case "image-viewer":
+      return <StoredMediaError toolId="image-generator" />;
+    case "video-viewer":
+      return <StoredMediaError toolId="video-generator" />;
+  }
 }
 
 function StoredMediaLoading() {

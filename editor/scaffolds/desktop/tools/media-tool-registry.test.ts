@@ -34,32 +34,29 @@ describe("DesktopMediaTool", () => {
       const selection = DesktopMediaTool.resolveSelection(null, card.id);
       expect(selection.tool.id).toBe("image-generator");
       expect(selection.initialModelId).toBe(card.id);
-      expect(selection.initialHandoff).toBeNull();
     }
 
     for (const card of models.video.listed_models()) {
       const selection = DesktopMediaTool.resolveSelection(null, card.id);
       expect(selection.tool.id).toBe("video-generator");
       expect(selection.initialModelId).toBe(card.id);
-      expect(selection.initialHandoff).toBeNull();
     }
 
     for (const modelId of models.three_d.three_d_model_ids) {
       const selection = DesktopMediaTool.resolveSelection(null, modelId);
       expect(selection.tool.id).toBe("3d-generator");
       expect(selection.initialModelId).toBe(modelId);
-      expect(selection.initialHandoff).toEqual({ mode: "3d", modelId });
     }
 
-    for (const modelId of models.audio.audio_model_ids) {
+    for (const modelId of models.audio.music.model_ids) {
       const selection = DesktopMediaTool.resolveSelection(null, modelId);
-      expect(selection.tool.id).toBe(
-        models.audio.models[modelId].category === "audio/music"
-          ? "text-to-music"
-          : "text-to-sound-effects"
-      );
+      expect(selection.tool.id).toBe("text-to-music");
       expect(selection.initialModelId).toBe(modelId);
-      expect(selection.initialHandoff).toEqual({ mode: "audio", modelId });
+    }
+    for (const modelId of models.audio.sound_effects.model_ids) {
+      const selection = DesktopMediaTool.resolveSelection(null, modelId);
+      expect(selection.tool.id).toBe("text-to-sound-effects");
+      expect(selection.initialModelId).toBe(modelId);
     }
   });
 
@@ -70,12 +67,8 @@ describe("DesktopMediaTool", () => {
     );
     expect(selection.tool.id).toBe("text-to-sound-effects");
     expect(selection.initialModelId).toBe(
-      models.audio.sound_effect_model_ids[0]
+      models.audio.sound_effects.model_ids[0]
     );
-    expect(selection.initialHandoff).toEqual({
-      mode: "audio",
-      modelId: models.audio.sound_effect_model_ids[0],
-    });
   });
 
   it("keeps viewer selections generation-free", () => {
@@ -87,11 +80,11 @@ describe("DesktopMediaTool", () => {
     ).toEqual([]);
     expect(
       DesktopMediaTool.resolveSelection("3d-viewer", "fal-ai/trellis-2")
-        .initialHandoff
+        .initialModelId
     ).toBeNull();
     expect(
       DesktopMediaTool.resolveSelection("audio-player", "google/lyria-3")
-        .initialHandoff
+        .initialModelId
     ).toBeNull();
   });
 
@@ -99,18 +92,10 @@ describe("DesktopMediaTool", () => {
     expect(DesktopMediaTool.resolveSelection("text-to-3d", null)).toEqual({
       tool: DesktopMediaTool.resolve("3d-generator"),
       initialModelId: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
-      initialHandoff: {
-        mode: "3d",
-        modelId: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
-      },
     });
     expect(DesktopMediaTool.resolveSelection("image-to-3d", null)).toEqual({
       tool: DesktopMediaTool.resolve("3d-generator"),
       initialModelId: "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
-      initialHandoff: {
-        mode: "3d",
-        modelId: "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
-      },
     });
   });
 

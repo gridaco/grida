@@ -10,7 +10,8 @@ It owns three agent-system concerns:
 
 - **The agent tenant.** `createAgentTenant` registers the AI route
   groups (`/agent`, `/events`, `/sessions`, `/secrets`, `/providers`,
-  `/images`, `/video`, `/three-d`, `/audio`, and optional native-provider auth)
+  `/images`, `/video`, `/three-d`, `/audio/music`, `/audio/sound-effects`, and
+  optional native-provider auth)
   through the daemon's `DaemonTenant` seam, and
   owns their state — the run loop, chat sessions (SQLite), BYOK
   and native-provider resolution, endpoint configs. `createAgentDaemon` is the

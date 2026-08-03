@@ -16,14 +16,14 @@ type Limiter = {
   limit(key: string): Promise<{ success: boolean; reset: number }>;
 };
 
-type LimiterName = "chat" | "models" | "images" | "video" | "audio";
+type LimiterName = "chat" | "models" | "images" | "video" | "music";
 
 const CONFIG: Record<LimiterName, { tokens: number; window: `${number} s` }> = {
   chat: { tokens: 60, window: "60 s" },
   models: { tokens: 60, window: "60 s" },
   images: { tokens: 12, window: "60 s" },
   video: { tokens: 4, window: "600 s" },
-  audio: { tokens: 6, window: "600 s" },
+  music: { tokens: 6, window: "600 s" },
 };
 
 const _limiters = new Map<LimiterName, Limiter | null>();

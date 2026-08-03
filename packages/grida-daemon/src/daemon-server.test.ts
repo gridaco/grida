@@ -384,7 +384,12 @@ describe("DaemonServer tenant seam", () => {
       register: (app) => {
         app.post("/tenant/ping", (c) => c.json({ ok: true }));
         return {
-          capabilities: { sessions: true, three_d: true, audio: true },
+          capabilities: {
+            sessions: true,
+            three_d: true,
+            music: true,
+            sound_effects: false,
+          },
           drain: () => order.push("drain"),
           cleanup: () => order.push("cleanup"),
         };
@@ -421,10 +426,12 @@ describe("DaemonServer tenant seam", () => {
       expect(body.capabilities.sessions).toBe(true);
       expect(body.capabilities.agent).toBe(false);
       expect(body.capabilities.three_d).toBe(true);
-      expect(body.capabilities.audio).toBe(true);
+      expect(body.capabilities.music).toBe(true);
+      expect(body.capabilities.sound_effects).toBe(false);
       expect(body.supports).toContain("sessions@1");
       expect(body.supports).toContain("three-d@1");
-      expect(body.supports).toContain("audio@1");
+      expect(body.supports).toContain("music@1");
+      expect(body.supports).not.toContain("sound-effects@1");
 
       const port = daemon.port;
       await daemon.stop();
@@ -461,11 +468,13 @@ describe("DaemonServer tenant seam", () => {
       expect(body.capabilities.sessions).toBe(false);
       expect(body.capabilities.secrets).toBe(false);
       expect(body.capabilities.three_d).toBe(false);
-      expect(body.capabilities.audio).toBe(false);
+      expect(body.capabilities.music).toBe(false);
+      expect(body.capabilities.sound_effects).toBe(false);
       expect(body.supports).toContain("files@1");
       expect(body.supports).not.toContain("agent@1");
       expect(body.supports).not.toContain("three-d@1");
-      expect(body.supports).not.toContain("audio@1");
+      expect(body.supports).not.toContain("music@1");
+      expect(body.supports).not.toContain("sound-effects@1");
 
       // Daemon-owned route groups answer; tenant groups are absent (404,
       // not 401 — the perimeter clears first, then no route matches).

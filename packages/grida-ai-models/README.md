@@ -27,8 +27,8 @@ and lookup helpers.
   size constraints, defaults, and pricing
 - Video generation model cards: canonical (provider-agnostic) models, each with
   per-provider bindings carrying that provider's call id and pricing
-- Audio generation model cards with explicit music/SFX categories, IO
-  capabilities, and provider-native pricing
+- Separate music and sound-effect catalogues with provider-native IO and
+  pricing contracts
 - Staged 3D generation endpoint cards for text-to-3D and image-to-3D
 - Image tool model cards, such as background removal and upscaling
 - Shared discriminator types for providers, vendors, speed labels, and pricing
@@ -50,8 +50,8 @@ const spec = models.text.modelSpecById("claude-fable-5");
 const imageModel = models.image.models["openai/gpt-image-2"];
 const compactImageModel = imageModel && models.image.toCompact(imageModel);
 
-const audioModel = models.audio.models["google/lyria-3"];
-const sfxModel = models.audio.models.eleven_text_to_sound_v2;
+const musicModel = models.audio.music.models["google/lyria-3"];
+const sfxModel = models.audio.sound_effects.models.eleven_text_to_sound_v2;
 const staged3d = models.three_d.staged_models();
 const upscaleTool = models.image_tools.models["nightmareai/real-esrgan"];
 ```
@@ -114,7 +114,8 @@ const spec = models.text.registry.resolve("llama3.1:8b", customSpecs);
 Media model data lives under the `models` namespace:
 
 - `models.image`
-- `models.audio`
+- `models.audio.music`
+- `models.audio.sound_effects`
 - `models.three_d`
 - `models.video`
 - `models.image_tools`
@@ -129,12 +130,13 @@ Image pricing is a discriminated union:
 - `per_image_flat`: one price per image
 - `per_token`: token rates for input and output
 
-Audio cards distinguish `audio/music` from `audio/sound-effect` and carry
-explicit input/output specs. Replicate Lyria uses flat USD-per-run pricing.
-ElevenLabs Sound Effects uses the provider's own credits meter (100 credits for
-automatic duration, or 11 credits per second when duration is specified).
-Credits intentionally are not converted to USD because their effective dollar
-value depends on the account plan. Image tools use flat per-invocation pricing.
+`models.audio` is an organizational parent, not a callable model family.
+`models.audio.music` describes Replicate Lyria with flat USD-per-run pricing;
+`models.audio.sound_effects` describes ElevenLabs Sound Effects with the
+provider's own credits meter (100 credits for automatic duration, or 11 credits
+per second when duration is specified). Credits intentionally are not converted
+to USD because their effective dollar value depends on the account plan. The
+two catalogues deliberately share no model-card or pricing union.
 
 Audio and 3D cards use `status: "listed" | "staged"`. `listed` means the model
 has an integrated execution surface and can appear in normal user-facing
@@ -144,10 +146,9 @@ normal integrated model selection and the catalogue alone does not make the
 model callable. Use `listed_models()` or `staged_models()` rather than
 inferring runtime availability from presence in `models`.
 
-For audio, `music_model_ids` and `music_models()` isolate the Replicate-backed
-Lyria routes; `sound_effect_model_ids` and `sound_effect_models()` isolate
-ElevenLabs SFX. The existing music execution path must accept `MusicModelId`,
-not the broader `AudioModelId`.
+Music execution accepts `models.audio.music.ModelId`; ElevenLabs SFX execution
+accepts `models.audio.sound_effects.ModelId`. There is intentionally no broader
+audio model id.
 
 ### 3D models
 

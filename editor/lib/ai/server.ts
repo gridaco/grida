@@ -1,4 +1,4 @@
-// GRIDA-GG: gateway — the generateVideo seam method the GG video route bills through (docs/wg/platform/hosted-ai.md)
+// GRIDA-GG: gateway — generation seam methods used by metered GG routes (docs/wg/platform/hosted-ai.md)
 import "server-only";
 
 /**
@@ -14,7 +14,7 @@ import "server-only";
  *   - `grida(modelId)` / `grida.imageModel(modelId)` — Vercel AI SDK
  *     calls. Pass `providerOptions: { grida: { organizationId, feature } }`.
  *   - `runPrediction(ctx, input)` — raw Replicate predictions.
- *   - `methods.upscale` / `methods.removeBackground` / `methods.generateAudio`
+ *   - `methods.upscale` / `methods.removeBackground` / `methods.generateMusic`
  *     — named business-logic wrappers.
  *
  * Per call: gate-check → run → fire-and-forget ingest. See
@@ -73,7 +73,7 @@ import {
 // Public types
 // ===========================================================================
 
-export type CallKind = "text" | "image" | "replicate-prediction" | "audio";
+export type CallKind = "text" | "image" | "replicate-prediction" | "music";
 
 export interface GridaCallContext {
   /** Verified organization id. Required. */
@@ -601,7 +601,7 @@ export async function runPredictionRaw<T = unknown>(
 }
 
 // ===========================================================================
-// Named methods — image/audio business logic
+// Named methods — image/music business logic
 //
 // Mirrors the `ai.server.methods.*` namespace (where the matching types
 // and constants live). Each function accepts a verified `organizationId`
@@ -641,22 +641,22 @@ export namespace methods {
     return { image: { kind: "url", url: outputUrl } };
   }
 
-  export async function generateAudio(
+  export async function generateMusic(
     organizationId: number,
-    model_id: ai.server.methods.AudioGenerationModelId,
-    options: ai.server.methods.LyriaAudioOptions
-  ): Promise<ai.server.methods.AudioGenerationResult> {
+    model_id: ai.server.methods.MusicGenerationModelId,
+    options: ai.server.methods.LyriaMusicOptions
+  ): Promise<ai.server.methods.MusicGenerationResult> {
     const input: Record<string, unknown> = { prompt: options.prompt };
     if (options.images && options.images.length > 0) {
       input.images = options.images;
     }
     if (typeof options.seed === "number") input.seed = options.seed;
 
-    const card = ai.audio.models[model_id];
+    const card = ai.audio.music.models[model_id];
     const outputUrl = await runPrediction(
       {
         organizationId,
-        feature: "ai/audio/generate",
+        feature: "ai/music/generate",
         model_id,
         costMills: ai.toMills(card.pricing.usd),
       },

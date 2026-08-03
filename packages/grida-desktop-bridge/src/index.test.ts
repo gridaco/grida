@@ -46,12 +46,9 @@ describe("DesktopBridge ChatGPT connect result", () => {
 describe("DesktopBridge media generation", () => {
   it("keeps the optional 3D and nested audio namespaces aligned with the agent transport", () => {
     type ThreeDGenerate = NonNullable<DesktopBridge["threeD"]>["generate"];
-    type MusicGenerate = NonNullable<
-      DesktopBridge["audio"]
-    >["music"]["generate"];
-    type SoundEffectsGenerate = NonNullable<
-      DesktopBridge["audio"]
-    >["soundEffects"]["generate"];
+    type Audio = NonNullable<DesktopBridge["audio"]>;
+    type MusicGenerate = NonNullable<Audio["music"]>["generate"];
+    type SoundEffectsGenerate = NonNullable<Audio["soundEffects"]>["generate"];
 
     expectTypeOf<
       Parameters<ThreeDGenerate>[0]

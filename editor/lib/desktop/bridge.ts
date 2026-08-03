@@ -590,7 +590,7 @@ export namespace video {
 /* ───────────────────────── 3D namespace ─────────────────────── */
 
 /**
- * Experimental fal-only 3D generation for the media-formats playground.
+ * Experimental fal-only 3D generation for the Desktop Tools playground.
  * The sidecar returns GLB bytes; provider credentials and result URLs never
  * cross this renderer boundary.
  */
@@ -610,12 +610,8 @@ export namespace threeD {
 
 /* ──────────────────────── audio namespace ───────────────────── */
 
-/** Byte-returning music and sound-effect generation playground routes. */
+/** Organizational parent for the two exact audio-output routes. */
 export namespace audio {
-  export function isSupported(): boolean {
-    return getDesktopBridge()?.audio != null;
-  }
-
   export namespace music {
     export function isSupported(): boolean {
       return getDesktopBridge()?.audio?.music != null;

@@ -111,35 +111,27 @@ describe("models.image provider-binding invariants", () => {
   });
 });
 
-describe("models.audio catalogue invariants", () => {
-  it("keeps music and sound-effects ids in distinct category sets", () => {
-    expect(models.audio.music_model_ids).toEqual([
+describe("models.audio.music catalogue invariants", () => {
+  it("lists only the Replicate-backed music ids", () => {
+    expect(models.audio.music.model_ids).toEqual([
       "google/lyria-3",
       "google/lyria-3-pro",
     ]);
-    expect(models.audio.sound_effect_model_ids).toEqual([
-      "eleven_text_to_sound_v2",
-    ]);
-
-    expect(models.audio.is_music_model_id("google/lyria-3")).toBe(true);
-    expect(models.audio.is_music_model_id("eleven_text_to_sound_v2")).toBe(
+    expect(models.audio.music.is_model_id("google/lyria-3")).toBe(true);
+    expect(models.audio.music.is_model_id("eleven_text_to_sound_v2")).toBe(
       false
     );
   });
 
-  it("separates integrated listings from staged provider contracts", () => {
-    expect(models.audio.listed_models().map((card) => card.id)).toEqual([
+  it("lists the integrated music models", () => {
+    expect(models.audio.music.listed_models().map((card) => card.id)).toEqual([
       "google/lyria-3",
       "google/lyria-3-pro",
-    ]);
-    expect(models.audio.staged_models().map((card) => card.id)).toEqual([
-      "eleven_text_to_sound_v2",
     ]);
   });
 
   it("grounds Lyria as image-conditioned music with Replicate's flat meter", () => {
-    for (const card of models.audio.music_models()) {
-      expect(card.category).toBe("audio/music");
+    for (const card of Object.values(models.audio.music.models)) {
       expect(card.provider).toBe("replicate");
       expect(card.input).toEqual({
         modalities: ["text", "image"],
@@ -153,16 +145,26 @@ describe("models.audio catalogue invariants", () => {
       expect(card.avg_cost_usd).toBe(card.pricing.usd);
     }
   });
+});
+
+describe("models.audio.sound_effects catalogue invariants", () => {
+  it("keeps the exact ElevenLabs model staged", () => {
+    expect(models.audio.sound_effects.model_ids).toEqual([
+      "eleven_text_to_sound_v2",
+    ]);
+    expect(
+      models.audio.sound_effects.staged_models().map((card) => card.id)
+    ).toEqual(["eleven_text_to_sound_v2"]);
+  });
 
   it("stores ElevenLabs' exact SFX id, IO limits, and provider-credit meter", () => {
-    const card = models.audio.models.eleven_text_to_sound_v2;
+    const card = models.audio.sound_effects.models.eleven_text_to_sound_v2;
     expect(card).toMatchObject({
       id: "eleven_text_to_sound_v2",
       vendor: "elevenlabs",
       provider: "elevenlabs",
-      category: "audio/sound-effect",
       status: "staged",
-      input: { modalities: ["text"] },
+      input: { type: "text" },
       output: {
         default_format: "mp3",
         formats: ["mp3"],
@@ -192,6 +194,13 @@ describe("models.three_d catalogue invariants", () => {
 
   it("uses exact fal endpoint ids and keeps every route staged", () => {
     expect(models.three_d.three_d_model_ids).toEqual(expectedIds);
+    expect(models.three_d.text_to_three_d_model_ids).toEqual([
+      "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+    ]);
+    expect(models.three_d.image_to_three_d_model_ids).toEqual([
+      "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+      "fal-ai/trellis-2",
+    ]);
     expect(models.three_d.listed_models()).toEqual([]);
     expect(models.three_d.staged_models().map((card) => card.id)).toEqual(
       expectedIds

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ThreeDGenerateRequest } from "../protocol/three-d";
-import { FalThreeDProvider } from "./three-d-byok";
+import { FalThreeDProvider } from "./fal-three-d";
 import { ProviderHttp } from "./http";
 
 const STATUS_URL = "https://queue.fal.run/requests/one/status";

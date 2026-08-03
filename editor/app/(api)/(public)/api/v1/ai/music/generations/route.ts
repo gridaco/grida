@@ -2,7 +2,7 @@
 // GRIDA-GG: gateway — see docs/wg/platform/hosted-ai.md
 // GRIDA-EE: billing — see ee-billing
 /**
- * `POST /api/v1/ai/audio/generations` — hosted Lyria music generation for
+ * `POST /api/v1/ai/music/generations` — hosted Lyria music generation for
  * Desktop. The Replicate prediction is gated and billed by the existing AI
  * seam; this route then materializes the short-lived output into bounded MP3
  * bytes. Provider URLs never cross the GG or renderer boundary.
@@ -23,7 +23,7 @@ import { allowAiRequest } from "@/lib/ai/openai-compat/limits";
 export const maxDuration = 300;
 
 const NO_STORE = { "cache-control": "no-store" } as const;
-const MAX_AUDIO_BYTES = 32 * 1024 * 1024;
+const MAX_MUSIC_BYTES = 32 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
 
 const requestSchema = z.looseObject({
@@ -42,19 +42,19 @@ function replicateOutputUrl(value: string): URL {
   try {
     url = new URL(value);
   } catch {
-    throw new Error("Replicate returned an invalid audio output URL.");
+    throw new Error("Replicate returned an invalid music output URL.");
   }
   const host = url.hostname.toLowerCase();
   if (
     url.protocol !== "https:" ||
     (host !== "replicate.delivery" && !host.endsWith(".replicate.delivery"))
   ) {
-    throw new Error("Replicate returned an untrusted audio output URL.");
+    throw new Error("Replicate returned an untrusted music output URL.");
   }
   return url;
 }
 
-async function readBoundedAudio(urlValue: string): Promise<Uint8Array> {
+async function readBoundedMusic(urlValue: string): Promise<Uint8Array> {
   let url = replicateOutputUrl(urlValue);
   for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
     const response = await fetch(url, {
@@ -66,7 +66,7 @@ async function readBoundedAudio(urlValue: string): Promise<Uint8Array> {
       const location = response.headers.get("location");
       await response.body?.cancel().catch(() => {});
       if (!location || redirects === MAX_REDIRECTS) {
-        throw new Error("Replicate audio output redirected unexpectedly.");
+        throw new Error("Replicate music output redirected unexpectedly.");
       }
       url = replicateOutputUrl(new URL(location, url).toString());
       continue;
@@ -74,14 +74,14 @@ async function readBoundedAudio(urlValue: string): Promise<Uint8Array> {
     if (!response.ok || !response.body) {
       await response.body?.cancel().catch(() => {});
       throw new Error(
-        `Replicate audio output download failed (${response.status}).`
+        `Replicate music output download failed (${response.status}).`
       );
     }
 
     const length = Number(response.headers.get("content-length"));
-    if (Number.isFinite(length) && length > MAX_AUDIO_BYTES) {
+    if (Number.isFinite(length) && length > MAX_MUSIC_BYTES) {
       await response.body.cancel().catch(() => {});
-      throw new Error("Replicate audio output exceeds the 32 MiB limit.");
+      throw new Error("Replicate music output exceeds the 32 MiB limit.");
     }
 
     const reader = response.body.getReader();
@@ -92,9 +92,9 @@ async function readBoundedAudio(urlValue: string): Promise<Uint8Array> {
         const { done, value } = await reader.read();
         if (done) break;
         total += value.byteLength;
-        if (total > MAX_AUDIO_BYTES) {
+        if (total > MAX_MUSIC_BYTES) {
           await reader.cancel().catch(() => {});
-          throw new Error("Replicate audio output exceeds the 32 MiB limit.");
+          throw new Error("Replicate music output exceeds the 32 MiB limit.");
         }
         chunks.push(value);
       }
@@ -103,7 +103,7 @@ async function readBoundedAudio(urlValue: string): Promise<Uint8Array> {
     }
 
     if (total === 0) {
-      throw new Error("Replicate returned an empty audio output.");
+      throw new Error("Replicate returned an empty music output.");
     }
 
     const bytes = new Uint8Array(total);
@@ -117,7 +117,7 @@ async function readBoundedAudio(urlValue: string): Promise<Uint8Array> {
     }
     return bytes;
   }
-  throw new Error("Replicate audio output exceeded the redirect limit.");
+  throw new Error("Replicate music output exceeded the redirect limit.");
 }
 
 /** Accept an ID3v2 tag or a structurally valid MPEG audio frame header. */
@@ -149,21 +149,21 @@ function isMp3(bytes: Uint8Array): boolean {
 export async function POST(request: Request) {
   try {
     const claims = await verifyGgToken(request);
-    const rl = await allowAiRequest("audio", claims.sub);
+    const rl = await allowAiRequest("music", claims.sub);
     if (!rl.success) return rateLimited(rl.retryAfterSeconds);
 
     const parsed = await parseJsonRequest(request, requestSchema);
     if (!parsed.ok) return parsed.res;
     const req = parsed.data;
-    if (!ai.audio.is_music_model_id(req.model_id)) {
+    if (!ai.audio.music.is_model_id(req.model_id)) {
       return modelNotFound(req.model_id);
     }
 
-    const generated = await methods.generateAudio(claims.org, req.model_id, {
+    const generated = await methods.generateMusic(claims.org, req.model_id, {
       prompt: req.prompt,
       seed: req.seed ?? undefined,
     });
-    const bytes = await readBoundedAudio(generated.url);
+    const bytes = await readBoundedMusic(generated.url);
     const result: MusicGenerateResult = {
       model_id: req.model_id,
       provider_id: "gg",
@@ -175,6 +175,6 @@ export async function POST(request: Request) {
     };
     return Response.json(result, { headers: NO_STORE });
   } catch (error) {
-    return fromUnknownError(error, "v1/ai/audio");
+    return fromUnknownError(error, "v1/ai/music");
   }
 }

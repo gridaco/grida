@@ -141,12 +141,17 @@ describe("composed agent-daemon (wire parity with the pre-split host)", () => {
       "providers",
       "images",
       "video",
+      "three_d",
+      "music",
+      "sound_effects",
     ]) {
       expect(body.capabilities[cap]).toBe(true);
     }
     expect(body.capabilities.shell).toBe(false);
     expect(body.supports).toContain("agent@1");
     expect(body.supports).toContain("files@1");
+    expect(body.supports).toContain("music@1");
+    expect(body.supports).toContain("sound-effects@1");
   });
 
   it("serves daemon routes and tenant routes behind ONE perimeter", async () => {

@@ -6,7 +6,7 @@
  *
  * - `models.text.*`        — text-model spec table, tier→spec map, lookup
  * - `models.image.*`       — image-generation catalogue
- * - `models.audio.*`       — audio-generation catalogue
+ * - `models.audio.music.*` / `.sound_effects.*` — exact audio-output catalogues
  * - `models.three_d.*`     — 3D-generation catalogue
  * - `models.video.*`       — video-generation catalogue
  * - `models.image_tools.*` — non-generator image tools (background removal, upscale)
@@ -21,8 +21,8 @@
  * modules — keeping the full `namespace models` declaration in a
  * single source file is the workaround.
  *
- * Routing labels on the cards — `Provider` (text/image),
- * `audio.AudioProvider`, `three_d.ThreeDProvider`, and video's per-binding
+ * Routing labels on the cards — `Provider` (text/image), the literal provider
+ * bindings on music, sound-effect, and 3D cards, and video's per-binding
  * `video.VideoProvider` — are data labels only; see the README for the full
  * contract.
  *
@@ -1525,279 +1525,221 @@ export namespace models {
   // ── models.audio ──────────────────────────────────────────────────
 
   /**
-   * Audio-generation model catalogue.
+   * Audio-output generation catalogues.
    *
-   * Music and sound effects share an output medium but not a provider contract:
-   * Replicate meters Lyria per output file in USD, while ElevenLabs meters SFX
-   * in provider credits. The category, input, output, and pricing discriminants
-   * keep those routes separate instead of treating "audio" as one callable
-   * modality.
+   * This namespace is organizational only. Music and sound effects have
+   * separate model ids, provider contracts, request shapes, lifecycle lists,
+   * and meters; there is deliberately no generic audio-model union.
    */
   export namespace audio {
-    export type MusicModelId = "google/lyria-3" | "google/lyria-3-pro";
+    /** Replicate-backed Google Lyria music generation. */
+    export namespace music {
+      export type ModelId = "google/lyria-3" | "google/lyria-3-pro";
 
-    /** Exact ElevenLabs Sound Effects API `model_id`. */
-    export type SoundEffectModelId = "eleven_text_to_sound_v2";
+      export type Input = {
+        modalities: readonly ("text" | "image")[];
+        max_images: number;
+      };
 
-    export type AudioModelId = MusicModelId | SoundEffectModelId;
+      export type Duration =
+        | { mode: "fixed"; seconds: number }
+        | { mode: "up_to"; max_seconds: number };
 
-    export type AudioModelCategory = "audio/music" | "audio/sound-effect";
+      export type Output = {
+        default_format: "mp3";
+        formats: readonly "mp3"[];
+        sample_rate_hz: number;
+        channels: number;
+        duration: Duration;
+      };
 
-    export type AudioProvider = "replicate" | "elevenlabs";
+      /** Replicate's flat charge per generated output file. */
+      export type Pricing = {
+        type: "per_run_flat";
+        usd: number;
+      };
 
-    export type AudioInputModality = "text" | "image";
+      export type ModelCard = {
+        id: ModelId;
+        label: string;
+        deprecated: boolean;
+        short_description: string;
+        vendor: "google";
+        provider: "replicate";
+        status: CatalogueStatus;
+        input: Input;
+        output: Output;
+        duration_label: string;
+        output_format: "mp3";
+        sample_rate_label: string;
+        speed_label: image.SpeedLabel;
+        speed_max: string;
+        pricing: Pricing;
+        /** Cost of one generation. Not for display. */
+        avg_cost_usd: number;
+        url: string;
+      };
 
-    export type AudioInputSpec = {
-      /** Required/accepted source modalities for this provider route. */
-      modalities: readonly AudioInputModality[];
-      /** Provider-published image ceiling, when image input is accepted. */
-      max_images?: number;
-    };
+      export const models = {
+        "google/lyria-3": {
+          id: "google/lyria-3",
+          label: "Lyria 3",
+          deprecated: false,
+          short_description:
+            "Generate 30-second 48kHz stereo music clips from text or images.",
+          vendor: "google",
+          provider: "replicate",
+          status: "listed",
+          input: { modalities: ["text", "image"], max_images: 10 },
+          output: {
+            default_format: "mp3",
+            formats: ["mp3"],
+            sample_rate_hz: 48_000,
+            channels: 2,
+            duration: { mode: "fixed", seconds: 30 },
+          },
+          duration_label: "30s",
+          output_format: "mp3",
+          sample_rate_label: "48 kHz stereo",
+          speed_label: "fast",
+          speed_max: "20s",
+          // Source: replicate.com/google/lyria-3 — "$0.04 per output audio file"
+          pricing: { type: "per_run_flat", usd: 0.04 },
+          avg_cost_usd: 0.04,
+          url: "https://replicate.com/google/lyria-3",
+        },
+        "google/lyria-3-pro": {
+          id: "google/lyria-3-pro",
+          label: "Lyria 3 Pro",
+          deprecated: false,
+          short_description:
+            "Generate full-length tracks up to ~3 minutes from text or images.",
+          vendor: "google",
+          provider: "replicate",
+          status: "listed",
+          input: { modalities: ["text", "image"], max_images: 10 },
+          output: {
+            default_format: "mp3",
+            formats: ["mp3"],
+            sample_rate_hz: 48_000,
+            channels: 2,
+            duration: { mode: "up_to", max_seconds: 180 },
+          },
+          duration_label: "up to 3m",
+          output_format: "mp3",
+          sample_rate_label: "48 kHz stereo",
+          speed_label: "medium",
+          speed_max: "60s",
+          // Source: replicate.com/google/lyria-3-pro — "$0.08 per output audio file"
+          pricing: { type: "per_run_flat", usd: 0.08 },
+          avg_cost_usd: 0.08,
+          url: "https://replicate.com/google/lyria-3-pro",
+        },
+      } as const satisfies Record<ModelId, ModelCard>;
 
-    export type AudioDurationSpec =
-      | { mode: "fixed"; seconds: number }
-      | { mode: "up_to"; max_seconds: number }
-      | {
+      export const model_ids = Object.freeze(Object.keys(models) as ModelId[]);
+
+      export function is_model_id(id: string): id is ModelId {
+        return (model_ids as readonly string[]).includes(id);
+      }
+
+      let _listed: readonly ModelCard[] | null = null;
+      export const listed_models = (): readonly ModelCard[] =>
+        (_listed ??= Object.freeze(
+          Object.values(models).filter((card) => card.status === "listed")
+        ));
+    }
+
+    /** ElevenLabs Text to Sound Effects. */
+    export namespace sound_effects {
+      /** Exact ElevenLabs Sound Effects API `model_id`. */
+      export type ModelId = "eleven_text_to_sound_v2";
+
+      export type Input = { type: "text" };
+
+      export type Output = {
+        default_format: "mp3";
+        formats: readonly "mp3"[];
+        sample_rate_hz: number;
+        duration: {
           mode: "automatic_or_fixed";
           min_seconds: number;
           max_seconds: number;
         };
+      };
 
-    export type AudioOutputFormat = "mp3";
-
-    export type AudioOutputSpec = {
-      /** Portable/default codec guaranteed by the catalogued route. */
-      default_format: AudioOutputFormat;
-      formats: readonly AudioOutputFormat[];
-      /** Omitted where the chosen provider output format controls it. */
-      sample_rate_hz?: number;
-      /** Omitted where the chosen provider output format controls it. */
-      channels?: number;
-      duration: AudioDurationSpec;
-    };
-
-    /**
-     * Flat per-run pricing — one fee per generation regardless of duration.
-     *
-     * This is the meter Replicate publishes for the Lyria models today.
-     */
-    export type PerRunFlatPricing = {
-      type: "per_run_flat";
-      usd: number;
-    };
-
-    /**
-     * ElevenLabs' API-native meter. Credits do not have one stable USD value:
-     * their effective price varies by account plan, so the catalogue preserves
-     * the published credit units instead of inventing a dollar conversion.
-     */
-    export type ProviderCreditsPricing = {
-      type: "provider_credits";
-      /** Charge when ElevenLabs chooses the duration. */
-      automatic_duration_credits: number;
-      /** Charge when the caller supplies `duration_seconds`. */
-      specified_duration_credits_per_second: number;
-    };
-
-    export type AudioModelPricing = PerRunFlatPricing | ProviderCreditsPricing;
-
-    type AudioModelCardBase = {
-      id: AudioModelId;
-      label: string;
-      deprecated: boolean;
-      short_description: string;
-      vendor: Vendor;
-      provider: AudioProvider;
-      category: AudioModelCategory;
-      status: CatalogueStatus;
-      input: AudioInputSpec;
-      output: AudioOutputSpec;
-      /** Approximate output duration. */
-      duration_label: string;
-      /** Legacy compact display field; canonical data lives in `output`. */
-      output_format: string;
-      /** Legacy compact display field; canonical data lives in `output`. */
-      sample_rate_label: string;
-      /** UI hint only; `null` when the provider publishes no stable bound. */
-      speed_label: image.SpeedLabel | null;
-      /** UI hint only; `null` when the provider publishes no stable bound. */
-      speed_max: string | null;
-      pricing: AudioModelPricing;
       /**
-       * Coarse estimate of cost per invocation in USD. `null` when the
-       * provider-native meter cannot be converted honestly without an account
-       * plan (ElevenLabs credits). Not for display.
+       * ElevenLabs' API-native meter. Credits have no stable USD value because
+       * their effective price varies by account plan.
        */
-      avg_cost_usd: number | null;
-      /** Public model page on the provider. */
-      url: string;
-    };
+      export type Pricing = {
+        type: "provider_credits";
+        automatic_duration_credits: number;
+        specified_duration_credits_per_second: number;
+      };
 
-    export type MusicModelCard = AudioModelCardBase & {
-      id: MusicModelId;
-      vendor: "google";
-      provider: "replicate";
-      category: "audio/music";
-      speed_label: image.SpeedLabel;
-      speed_max: string;
-      pricing: PerRunFlatPricing;
-    };
+      export type ModelCard = {
+        id: ModelId;
+        label: string;
+        deprecated: boolean;
+        short_description: string;
+        vendor: "elevenlabs";
+        provider: "elevenlabs";
+        status: CatalogueStatus;
+        input: Input;
+        output: Output;
+        duration_label: string;
+        output_format: "mp3";
+        sample_rate_label: string;
+        pricing: Pricing;
+        /** Provider credits cannot be converted honestly without an account plan. */
+        avg_cost_usd: null;
+        url: string;
+      };
 
-    export type SoundEffectModelCard = AudioModelCardBase & {
-      id: SoundEffectModelId;
-      vendor: "elevenlabs";
-      provider: "elevenlabs";
-      category: "audio/sound-effect";
-      speed_label: null;
-      speed_max: null;
-      pricing: ProviderCreditsPricing;
-    };
-
-    export type AudioModelCard = MusicModelCard | SoundEffectModelCard;
-
-    export const models = {
-      "google/lyria-3": {
-        id: "google/lyria-3",
-        label: "Lyria 3",
-        deprecated: false,
-        short_description:
-          "Generate 30-second 48kHz stereo music clips from text or images.",
-        vendor: "google",
-        provider: "replicate",
-        category: "audio/music",
-        status: "listed",
-        input: { modalities: ["text", "image"], max_images: 10 },
-        output: {
-          default_format: "mp3",
-          formats: ["mp3"],
-          sample_rate_hz: 48_000,
-          channels: 2,
-          duration: { mode: "fixed", seconds: 30 },
-        },
-        duration_label: "30s",
-        output_format: "mp3",
-        sample_rate_label: "48 kHz stereo",
-        speed_label: "fast",
-        speed_max: "20s",
-        // Source: replicate.com/google/lyria-3 — "$0.04 per output audio file"
-        pricing: { type: "per_run_flat", usd: 0.04 },
-        avg_cost_usd: 0.04,
-        url: "https://replicate.com/google/lyria-3",
-      },
-      "google/lyria-3-pro": {
-        id: "google/lyria-3-pro",
-        label: "Lyria 3 Pro",
-        deprecated: false,
-        short_description:
-          "Generate full-length tracks up to ~3 minutes from text or images.",
-        vendor: "google",
-        provider: "replicate",
-        category: "audio/music",
-        status: "listed",
-        input: { modalities: ["text", "image"], max_images: 10 },
-        output: {
-          default_format: "mp3",
-          formats: ["mp3"],
-          sample_rate_hz: 48_000,
-          channels: 2,
-          duration: { mode: "up_to", max_seconds: 180 },
-        },
-        duration_label: "up to 3m",
-        output_format: "mp3",
-        sample_rate_label: "48 kHz stereo",
-        speed_label: "medium",
-        speed_max: "60s",
-        // Source: replicate.com/google/lyria-3-pro — "$0.08 per output audio file"
-        pricing: { type: "per_run_flat", usd: 0.08 },
-        avg_cost_usd: 0.08,
-        url: "https://replicate.com/google/lyria-3-pro",
-      },
-      eleven_text_to_sound_v2: {
-        id: "eleven_text_to_sound_v2",
-        label: "Eleven Text to Sound v2",
-        deprecated: false,
-        short_description:
-          "Generate loopable sound effects up to 30 seconds from text.",
-        vendor: "elevenlabs",
-        provider: "elevenlabs",
-        category: "audio/sound-effect",
-        status: "staged",
-        input: { modalities: ["text"] },
-        output: {
-          default_format: "mp3",
-          formats: ["mp3"],
-          sample_rate_hz: 44_100,
-          duration: {
-            mode: "automatic_or_fixed",
-            min_seconds: 0.5,
-            max_seconds: 30,
+      export const models = {
+        eleven_text_to_sound_v2: {
+          id: "eleven_text_to_sound_v2",
+          label: "Eleven Text to Sound v2",
+          deprecated: false,
+          short_description:
+            "Generate loopable sound effects up to 30 seconds from text.",
+          vendor: "elevenlabs",
+          provider: "elevenlabs",
+          status: "staged",
+          input: { type: "text" },
+          output: {
+            default_format: "mp3",
+            formats: ["mp3"],
+            sample_rate_hz: 44_100,
+            duration: {
+              mode: "automatic_or_fixed",
+              min_seconds: 0.5,
+              max_seconds: 30,
+            },
           },
+          duration_label: "0.5–30s",
+          output_format: "mp3",
+          sample_rate_label: "44.1 kHz",
+          // API: 100 credits when duration is automatic, or 11 credits/s when set.
+          pricing: {
+            type: "provider_credits",
+            automatic_duration_credits: 100,
+            specified_duration_credits_per_second: 11,
+          },
+          avg_cost_usd: null,
+          url: "https://elevenlabs.io/docs/api-reference/text-to-sound-effects/convert",
         },
-        duration_label: "0.5–30s",
-        output_format: "mp3",
-        sample_rate_label: "44.1 kHz",
-        speed_label: null,
-        speed_max: null,
-        // API: 100 credits when duration is automatic, or 11 credits/s when set.
-        pricing: {
-          type: "provider_credits",
-          automatic_duration_credits: 100,
-          specified_duration_credits_per_second: 11,
-        },
-        avg_cost_usd: null,
-        url: "https://elevenlabs.io/docs/api-reference/text-to-sound-effects/convert",
-      },
-    } as const satisfies Record<AudioModelId, AudioModelCard>;
+      } as const satisfies Record<ModelId, ModelCard>;
 
-    const all_cards: readonly AudioModelCard[] = Object.values(models);
+      export const model_ids = Object.freeze(Object.keys(models) as ModelId[]);
 
-    export const audio_model_ids = Object.freeze(
-      Object.keys(models) as AudioModelId[]
-    );
-    export const music_model_ids = Object.freeze(
-      audio_model_ids.filter(
-        (id): id is MusicModelId => models[id].category === "audio/music"
-      )
-    );
-    export const sound_effect_model_ids = Object.freeze(
-      audio_model_ids.filter(
-        (id): id is SoundEffectModelId =>
-          models[id].category === "audio/sound-effect"
-      )
-    );
-
-    export function is_music_model_id(id: string): id is MusicModelId {
-      return (music_model_ids as readonly string[]).includes(id);
+      let _staged: readonly ModelCard[] | null = null;
+      export const staged_models = (): readonly ModelCard[] =>
+        (_staged ??= Object.freeze(
+          Object.values(models).filter((card) => card.status === "staged")
+        ));
     }
-
-    let _listed: readonly AudioModelCard[] | null = null;
-    export const listed_models = (): readonly AudioModelCard[] =>
-      (_listed ??= Object.freeze(
-        all_cards.filter((card) => card.status === "listed")
-      ));
-
-    let _staged: readonly AudioModelCard[] | null = null;
-    export const staged_models = (): readonly AudioModelCard[] =>
-      (_staged ??= Object.freeze(
-        all_cards.filter((card) => card.status === "staged")
-      ));
-
-    let _music: readonly MusicModelCard[] | null = null;
-    export const music_models = (): readonly MusicModelCard[] =>
-      (_music ??= Object.freeze(
-        all_cards.filter(
-          (card): card is MusicModelCard => card.category === "audio/music"
-        )
-      ));
-
-    let _sound_effects: readonly SoundEffectModelCard[] | null = null;
-    export const sound_effect_models = (): readonly SoundEffectModelCard[] =>
-      (_sound_effects ??= Object.freeze(
-        all_cards.filter(
-          (card): card is SoundEffectModelCard =>
-            card.category === "audio/sound-effect"
-        )
-      ));
   }
 
   // ── models.three_d ────────────────────────────────────────────────
@@ -1811,12 +1753,13 @@ export namespace models {
    * selected endpoints are served by fal.
    */
   export namespace three_d {
-    export type ThreeDModelId =
-      | "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d"
+    export type TextToThreeDModelId = "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d";
+
+    export type ImageToThreeDModelId =
       | "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"
       | "fal-ai/trellis-2";
 
-    export type ThreeDProvider = "fal";
+    export type ThreeDModelId = TextToThreeDModelId | ImageToThreeDModelId;
 
     export type ThreeDModelCategory = "3d/text-to-3d" | "3d/image-to-3d";
 
@@ -1871,7 +1814,8 @@ export namespace models {
       deprecated: boolean;
       short_description: string;
       vendor: Vendor;
-      provider: ThreeDProvider;
+      /** Every currently catalogued endpoint is the exact fal route in `id`. */
+      provider: "fal";
       category: ThreeDModelCategory;
       status: CatalogueStatus;
       input: ThreeDInput;
@@ -1959,6 +1903,28 @@ export namespace models {
     export const three_d_model_ids = Object.freeze(
       Object.keys(models) as ThreeDModelId[]
     );
+    export const text_to_three_d_model_ids = Object.freeze(
+      three_d_model_ids.filter(
+        (id): id is TextToThreeDModelId => models[id].input.type === "text"
+      )
+    );
+    export const image_to_three_d_model_ids = Object.freeze(
+      three_d_model_ids.filter(
+        (id): id is ImageToThreeDModelId => models[id].input.type === "image"
+      )
+    );
+
+    export function is_text_to_three_d_model_id(
+      id: string
+    ): id is TextToThreeDModelId {
+      return (text_to_three_d_model_ids as readonly string[]).includes(id);
+    }
+
+    export function is_image_to_three_d_model_id(
+      id: string
+    ): id is ImageToThreeDModelId {
+      return (image_to_three_d_model_ids as readonly string[]).includes(id);
+    }
 
     let _listed: readonly ThreeDModelCard[] | null = null;
     export const listed_models = (): readonly ThreeDModelCard[] =>
@@ -1981,7 +1947,8 @@ export namespace models {
    * The video provider ecosystem is **fragmented**: the same model is served
    * by several providers (Vercel AI Gateway, fal.ai, OpenRouter), each with a
    * *different id, a different meter, and different availability*. So unlike
-   * `models.image`/`models.audio` — which bind one card to one provider — a
+   * `models.image`/`models.audio.music`/`models.audio.sound_effects` — which
+   * bind one card to one provider — a
    * video card is **canonical** (provider-agnostic id + intrinsic specs) and
    * holds a {@link VideoProviderBinding} per provider that serves it, keyed by
    * provider in {@link VideoModelCard.providers}. The default-provider choice

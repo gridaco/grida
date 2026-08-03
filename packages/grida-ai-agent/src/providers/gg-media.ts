@@ -3,7 +3,7 @@
  * GRIDA-SEC-006 — Grida hosted media adapters.
  *
  * `ImageModelV3` / `VideoModelV3` and the typed music adapter call the hosted
- * `/api/v1/ai/{images,videos,audio}/generations` endpoints using Grida-native
+ * `/api/v1/ai/{images,videos,music}/generations` endpoints using Grida-native
  * request/result contracts. The daemon contacts ONLY the configured editor
  * origin for this provider; results are base64 by contract, so nothing from
  * the response body is ever followed as a URL.
@@ -28,15 +28,15 @@ import type { VideoGenerateResult } from "../protocol/video";
 import type {
   MusicGenerateRequest,
   MusicGenerateResult,
-} from "../protocol/audio";
+} from "../protocol/music";
 import { ProviderHttp } from "./http";
 
-const MAX_HOSTED_AUDIO_BYTES = 32 * 1024 * 1024;
-const MAX_HOSTED_AUDIO_BASE64_CHARACTERS =
-  Math.ceil(MAX_HOSTED_AUDIO_BYTES / 3) * 4;
-const MAX_HOSTED_AUDIO_JSON_ENVELOPE_BYTES = 4 * 1024;
-const MAX_HOSTED_AUDIO_RESPONSE_BYTES =
-  MAX_HOSTED_AUDIO_BASE64_CHARACTERS + MAX_HOSTED_AUDIO_JSON_ENVELOPE_BYTES;
+const MAX_HOSTED_MUSIC_BYTES = 32 * 1024 * 1024;
+const MAX_HOSTED_MUSIC_BASE64_CHARACTERS =
+  Math.ceil(MAX_HOSTED_MUSIC_BYTES / 3) * 4;
+const MAX_HOSTED_MUSIC_JSON_ENVELOPE_BYTES = 4 * 1024;
+const MAX_HOSTED_MUSIC_RESPONSE_BYTES =
+  MAX_HOSTED_MUSIC_BASE64_CHARACTERS + MAX_HOSTED_MUSIC_JSON_ENVELOPE_BYTES;
 
 function joinApi(baseUrl: string, path: string): string {
   return new URL(path, baseUrl).toString();
@@ -248,7 +248,7 @@ export class GridaGatewayVideoModel implements VideoModelV3 {
 }
 
 /**
- * Hosted Lyria client. Audio has no AI SDK provider interface in this package,
+ * Hosted Lyria client. Music has no AI SDK provider interface in this package,
  * so this stays a small typed adapter over Grida's native endpoint. The hosted
  * endpoint returns MP3 bytes as base64; this adapter never follows a provider
  * result URL (GRIDA-SEC-004/006).
@@ -266,11 +266,11 @@ export class GridaGatewayMusicProvider {
   ): Promise<MusicGenerateResult> {
     const result = await postHosted<MusicGenerateResult>({
       session: this.session,
-      url: joinApi(this.baseUrl, "/api/v1/ai/audio/generations"),
-      scope: "grida-audio",
+      url: joinApi(this.baseUrl, "/api/v1/ai/music/generations"),
+      scope: "grida-music",
       abortSignal,
       provider_http: this.providerHttp,
-      max_response_bytes: MAX_HOSTED_AUDIO_RESPONSE_BYTES,
+      max_response_bytes: MAX_HOSTED_MUSIC_RESPONSE_BYTES,
       body: request,
     });
     if (
@@ -278,15 +278,15 @@ export class GridaGatewayMusicProvider {
       result.provider_id !== "gg" ||
       typeof result.audio?.base64 !== "string" ||
       result.audio.base64.length === 0 ||
-      result.audio.base64.length > MAX_HOSTED_AUDIO_BASE64_CHARACTERS ||
+      result.audio.base64.length > MAX_HOSTED_MUSIC_BASE64_CHARACTERS ||
       !/^[A-Za-z0-9+/]+={0,2}$/.test(result.audio.base64) ||
       result.audio.base64.length % 4 !== 0 ||
-      decodedBase64Bytes(result.audio.base64) > MAX_HOSTED_AUDIO_BYTES ||
+      decodedBase64Bytes(result.audio.base64) > MAX_HOSTED_MUSIC_BYTES ||
       result.audio.media_type !== "audio/mpeg" ||
       typeof result.audio.file_name !== "string" ||
       !/^[^/\\]{1,128}\.mp3$/i.test(result.audio.file_name)
     ) {
-      throw new Error("[grida-audio] hosted response was malformed");
+      throw new Error("[grida-music] hosted response was malformed");
     }
     return result;
   }

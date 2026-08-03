@@ -15,7 +15,7 @@ import type {
   ThreeDGenerateRequest,
   ThreeDInputImage,
 } from "../../protocol/three-d";
-import { FalThreeDProvider } from "../../providers/three-d-byok";
+import { FalThreeDProvider } from "../../providers/fal-three-d";
 import { ProviderHttp } from "../../providers/http";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
 import { mediaGenerationError } from "./media-generation-errors";
@@ -75,29 +75,38 @@ export function registerThreeDRoutes(app: Hono, deps: ThreeDRoutesDeps) {
       image: optionalImage,
     });
     if (!r.ok) return r.res;
-    const card = models.three_d.models[r.data.model_id];
+    const modelId = r.data.model_id;
     const prompt = r.data.prompt?.trim();
+    let request: ThreeDGenerateRequest;
 
-    if (card.input.type === "text") {
+    if (models.three_d.is_text_to_three_d_model_id(modelId)) {
+      const textInput = models.three_d.models[modelId].input;
       if (!prompt || r.data.image) {
         return c.json(
           { error: "text-to-3D requires prompt and does not accept image" },
           400
         );
       }
-      if ([...prompt].length > card.input.max_utf8_characters) {
+      if ([...prompt].length > textInput.max_utf8_characters) {
         return c.json(
           {
-            error: `prompt must not exceed ${card.input.max_utf8_characters} characters`,
+            error: `prompt must not exceed ${textInput.max_utf8_characters} characters`,
           },
           400
         );
       }
-    } else if (!r.data.image || prompt) {
-      return c.json(
-        { error: "image-to-3D requires one image and does not accept prompt" },
-        400
-      );
+      request = { model_id: modelId, prompt };
+    } else {
+      const image = r.data.image;
+      if (!image || prompt) {
+        return c.json(
+          {
+            error: "image-to-3D requires one image and does not accept prompt",
+          },
+          400
+        );
+      }
+      request = { model_id: modelId, image };
     }
 
     const apiKey = await deps.secrets._getKey("fal");
@@ -108,11 +117,6 @@ export function registerThreeDRoutes(app: Hono, deps: ThreeDRoutesDeps) {
       );
     }
 
-    const request: ThreeDGenerateRequest = {
-      model_id: r.data.model_id,
-      ...(prompt ? { prompt } : {}),
-      ...(r.data.image ? { image: r.data.image } : {}),
-    };
     try {
       const glb = await new FalThreeDProvider(
         apiKey.trim(),

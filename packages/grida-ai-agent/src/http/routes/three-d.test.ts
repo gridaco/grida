@@ -15,7 +15,7 @@ const generate = vi.hoisted(() =>
     ) => Promise<ThreeDGeneratedGlb>
   >()
 );
-vi.mock("../../providers/three-d-byok", () => ({
+vi.mock("../../providers/fal-three-d", () => ({
   FalThreeDProvider: class {
     generate = generate;
   },

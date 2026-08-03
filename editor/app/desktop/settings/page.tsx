@@ -129,8 +129,8 @@ export default function DesktopSettingsPage() {
         >
           <ProviderListCard
             title="Media Provider Keys"
-            description="Provider keys for image, video, 3D, and audio workflows. Providers that also serve LLMs may appear in both sections."
-            modalities={["image", "video", "3d", "audio"]}
+            description="Provider keys for image, video, fal 3D, and ElevenLabs Sound Effects workflows. Providers that also serve LLMs may appear in both sections."
+            providerIds={MEDIA_PROVIDER_IDS}
           />
           <MediaModelsSection />
         </SettingsSection>
@@ -406,7 +406,7 @@ function AccountSection() {
 
 /* ───────────────────────────── Providers ──────────────────────────── */
 
-type ProviderModality = "text" | "image" | "video" | "3d" | "audio";
+type ProviderModality = "text" | "image" | "video";
 
 const BYOK_PROVIDER_LOGOS: Partial<
   Record<ByokProviderId, React.ComponentType<React.ComponentProps<"svg">>>
@@ -479,13 +479,16 @@ function ProviderListCard({
   title,
   description,
   modalities,
+  providerIds,
   excludeModalities = [],
   leading,
   children,
 }: {
   title: string;
   description: ReactNode;
-  modalities: readonly ProviderModality[];
+  modalities?: readonly ProviderModality[];
+  /** Exact provider identities for provider-shaped, non-resolver surfaces. */
+  providerIds?: readonly ByokProviderId[];
   excludeModalities?: readonly ProviderModality[];
   leading?: ReactNode;
   children?: ReactNode;
@@ -494,7 +497,9 @@ function ProviderListCard({
     .byokProviderMetadata()
     .filter(
       (provider) =>
-        providerServesAny(provider, modalities) &&
+        (providerIds
+          ? providerIds.includes(provider.id)
+          : providerServesAny(provider, modalities ?? [])) &&
         !providerServesAny(provider, excludeModalities)
     );
   return (
@@ -906,9 +911,9 @@ function MediaModelsSection() {
   const imageModels = imageSupported ? models.image.listed_models() : [];
   const videoModels = videoSupported ? models.video.listed_models() : [];
   const threeDModels = threeDSupported ? models.three_d.staged_models() : [];
-  const musicModels = musicSupported ? models.audio.music_models() : [];
+  const musicModels = musicSupported ? models.audio.music.listed_models() : [];
   const soundEffectModels = soundEffectSupported
-    ? models.audio.sound_effect_models()
+    ? models.audio.sound_effects.staged_models()
     : [];
 
   useEffect(() => {

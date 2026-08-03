@@ -8,7 +8,8 @@
  * module contributes everything AI: the run loop (`/agent/*`, `/events`),
  * chat sessions (`/sessions/*`), BYOK credentials vocabulary (`/secrets/*`),
  * endpoint providers (`/providers/*`), and generation (`/images/*`,
- * `/video/*`, `/three-d/*`, `/audio/*`). Dependency direction is one-way —
+ * `/video/*`, `/three-d/*`, `/audio/music`, `/audio/sound-effects`).
+ * Dependency direction is one-way —
  * this package imports `@grida/daemon`; the daemon knows no tenant.
  *
  * Hosts (desktop sidecar, CLI) construct the composed server via
@@ -33,7 +34,8 @@ import { registerProvidersRoutes } from "./http/routes/providers";
 import { registerImagesRoutes } from "./http/routes/images";
 import { registerVideoRoutes } from "./http/routes/video";
 import { registerThreeDRoutes } from "./http/routes/three-d";
-import { registerAudioRoutes } from "./http/routes/audio";
+import { registerMusicRoutes } from "./http/routes/music";
+import { registerSoundEffectsRoutes } from "./http/routes/sound-effects";
 import { registerAgentRoutes } from "./http/routes/agent";
 import { registerDirectoryScopesRoutes } from "./http/routes/directory-scopes";
 import { registerSessionsRoutes } from "./http/routes/sessions";
@@ -104,7 +106,8 @@ export const AGENT_DAEMON_DEFAULT_CAPABILITIES: DaemonCapabilities = {
   images: true,
   video: true,
   three_d: true,
-  audio: true,
+  music: true,
+  sound_effects: true,
   shell: false,
 };
 
@@ -124,7 +127,8 @@ export type AgentTenantOptions = {
       | "images"
       | "video"
       | "three_d"
-      | "audio"
+      | "music"
+      | "sound_effects"
     >
   >;
   /**
@@ -257,7 +261,8 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
     images: opts.capabilities?.images ?? true,
     video: opts.capabilities?.video ?? true,
     three_d: opts.capabilities?.three_d ?? true,
-    audio: opts.capabilities?.audio ?? true,
+    music: opts.capabilities?.music ?? true,
+    sound_effects: opts.capabilities?.sound_effects ?? true,
   };
   // GRIDA-SEC-004 — the ONLY routes where the credential may ride the
   // `auth_token` query parameter (header-less EventSource attach; WG daemon
@@ -379,12 +384,18 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           provider_http: providerHttp,
         });
       }
-      if (caps.audio) {
-        registerAudioRoutes(app, {
-          secrets: services.secrets,
+      if (caps.music) {
+        registerMusicRoutes(app, {
           media: services.media,
           gg: gridaSession,
           gg_base_url: gridaGatewayBaseUrl,
+          provider_http: providerHttp,
+        });
+      }
+      if (caps.sound_effects) {
+        registerSoundEffectsRoutes(app, {
+          secrets: services.secrets,
+          media: services.media,
           provider_http: providerHttp,
         });
       }

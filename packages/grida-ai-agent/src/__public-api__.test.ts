@@ -145,8 +145,8 @@ describe("@grida/agent public API", () => {
       ).toEqual([
         { id: "openrouter", modalities: ["text", "image", "video"] },
         { id: "vercel", modalities: ["text", "image", "video"] },
-        { id: "fal", modalities: ["image", "video", "3d"] },
-        { id: "elevenlabs", modalities: ["audio"] },
+        { id: "fal", modalities: ["image", "video"] },
+        { id: "elevenlabs", modalities: [] },
       ]);
       const byok: ByokProviderId = "vercel";
       const metadata: ByokProviderMetadata = BYOK_PROVIDER_METADATA[0];
@@ -289,7 +289,8 @@ describe("@grida/agent public API", () => {
       expect(caps.agent).toBe(true);
       expect(caps.files).toBe(true);
       expect(caps.three_d).toBe(true);
-      expect(caps.audio).toBe(true);
+      expect(caps.music).toBe(true);
+      expect(caps.sound_effects).toBe(true);
       expect(caps.shell).toBe(false);
       const handshake: DaemonHandshakeResponse = {
         protocol: DAEMON_PROTOCOL,

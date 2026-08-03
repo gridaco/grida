@@ -149,7 +149,7 @@ describe("GridaGatewayMusicProvider.generate", () => {
   it("posts the closed request to hosted audio and accepts base64 bytes only", async () => {
     const request = vi.fn<typeof globalThis.fetch>(async (input, init) => {
       expect(String(input)).toBe(
-        "https://grida.test/api/v1/ai/audio/generations"
+        "https://grida.test/api/v1/ai/music/generations"
       );
       expect(new Headers(init?.headers).get("authorization")).toBe(
         "Bearer tok"
