@@ -87,11 +87,9 @@ function vendorLabel(vendor: string) {
   );
 }
 
-function groupAudioByVendor(
-  models: Record<string, AITypes.audio.AudioModelCard>
-) {
-  const groups = new Map<string, AITypes.audio.AudioModelCard[]>();
-  for (const model of Object.values(models)) {
+function groupMusicByVendor(models: readonly AITypes.audio.music.ModelCard[]) {
+  const groups = new Map<string, AITypes.audio.music.ModelCard[]>();
+  for (const model of models) {
     const list = groups.get(model.vendor) ?? [];
     list.push(model);
     groups.set(model.vendor, list);
@@ -636,22 +634,23 @@ export default function AIModelsCatalogPage() {
 
       <Separator />
 
-      {/* Audio models hero */}
+      {/* Music models hero */}
       <div className="container px-4 pt-16 pb-10">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Audio Models</h1>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Music Models</h1>
         <p className="text-base text-muted-foreground max-w-xl">
-          Music and audio generation models available on Grida. Pricing is
-          sourced directly from each provider.
+          Music generation models currently available on Grida. Pricing is
+          sourced directly from each provider; staged compatibility contracts
+          are not shown here.
         </p>
       </div>
 
-      {/* Audio comparison table */}
-      <AudioModelsTable />
+      {/* Music comparison table */}
+      <MusicModelsTable />
 
       <Separator />
 
-      {/* Audio detail cards by vendor */}
-      <AudioModelsCards />
+      {/* Music detail cards by vendor */}
+      <MusicModelsCards />
 
       <div className="h-40" />
       <Footer />
@@ -659,22 +658,22 @@ export default function AIModelsCatalogPage() {
   );
 }
 
-// ── Audio models ────────────────────────────────────────────────────────────
+// ── Music models ───────────────────────────────────────────────────────────
 
-function AudioPricingBadge({
+function MusicPricingBadge({
   pricing,
 }: {
-  pricing: AITypes.audio.AudioModelPricing;
+  pricing: AITypes.audio.music.Pricing;
 }) {
   return (
     <span className="font-mono text-sm">${pricing.usd.toFixed(3)}/run</span>
   );
 }
 
-function AudioPricingDetail({
+function MusicPricingDetail({
   pricing,
 }: {
-  pricing: AITypes.audio.AudioModelPricing;
+  pricing: AITypes.audio.music.Pricing;
 }) {
   return (
     <div className="flex items-baseline gap-2">
@@ -686,7 +685,7 @@ function AudioPricingDetail({
   );
 }
 
-function AudioModelCard({ model }: { model: AITypes.audio.AudioModelCard }) {
+function MusicModelCard({ model }: { model: AITypes.audio.music.ModelCard }) {
   return (
     <Card className="flex flex-col bg-card/50 border-muted overflow-hidden">
       <CardHeader className="pb-3 h-20">
@@ -707,7 +706,7 @@ function AudioModelCard({ model }: { model: AITypes.audio.AudioModelCard }) {
       </CardHeader>
       <Separator />
       <CardContent className="flex-1 flex flex-col gap-4 pt-4">
-        <AudioPricingDetail pricing={model.pricing} />
+        <MusicPricingDetail pricing={model.pricing} />
 
         <Separator />
 
@@ -758,8 +757,8 @@ function AudioModelCard({ model }: { model: AITypes.audio.AudioModelCard }) {
   );
 }
 
-function AudioModelsTable() {
-  const grouped = groupAudioByVendor(ai.audio.models);
+function MusicModelsTable() {
+  const grouped = groupMusicByVendor(ai.audio.music.listed_models());
   return (
     <div className="container mx-auto px-4 pb-12">
       <div className="rounded-lg border overflow-hidden">
@@ -789,7 +788,7 @@ function AudioModelsTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <AudioPricingBadge pricing={model.pricing} />
+                    <MusicPricingBadge pricing={model.pricing} />
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     <Badge
@@ -815,8 +814,8 @@ function AudioModelsTable() {
   );
 }
 
-function AudioModelsCards() {
-  const grouped = groupAudioByVendor(ai.audio.models);
+function MusicModelsCards() {
+  const grouped = groupMusicByVendor(ai.audio.music.listed_models());
   return (
     <>
       {[...grouped.entries()].map(([vendor, models]) => {
@@ -829,7 +828,7 @@ function AudioModelsCards() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {models.map((model) => (
-                <AudioModelCard key={model.id} model={model} />
+                <MusicModelCard key={model.id} model={model} />
               ))}
             </div>
           </section>

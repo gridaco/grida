@@ -18,12 +18,15 @@ export type AgentDaemonSandboxPolicy = DaemonSandboxPolicy;
 const BYOK_PROVIDER_NETWORK_HOSTS = {
   openrouter: ["openrouter.ai"],
   vercel: ["ai-gateway.vercel.sh", "*.vercel-ai.com"],
-  // fal (#908) — BYOK image provider. Submit/poll/result ride the queue API
+  // fal (#908) — BYOK image/video/3D provider. Submit/poll/result ride the queue API
   // (`queue.fal.run`); generated images download from the fal media CDN
   // (`fal.media`, incl. `v3.fal.media`). srt `*.host` matches subdomains only,
   // so the apexes are listed too. Same posture as the other BYOK hosts: the
   // provider sees the prompt by design — not a new exfil class.
   fal: ["fal.run", "*.fal.run", "fal.media", "*.fal.media"],
+  // ElevenLabs sound-effects generation returns bytes directly from the API;
+  // there is no separate provider-asset download origin to admit.
+  elevenlabs: ["api.elevenlabs.io"],
 } as const satisfies Record<ByokProviderId, readonly string[]>;
 
 /**

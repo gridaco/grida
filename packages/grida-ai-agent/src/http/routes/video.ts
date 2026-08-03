@@ -1,4 +1,3 @@
-// GRIDA-GG: provider — the `gg` hosted video arm (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — `/video/generate` route (BYOK video generation, #908).
  *
@@ -27,15 +26,17 @@
 import type { Hono } from "hono";
 import { DownloadError } from "ai";
 import type { Experimental_VideoModelV3CallOptions as VideoModelV3CallOptions } from "@ai-sdk/provider";
-import type { SecretsStore } from "@grida/daemon/server";
+import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import {
   VideoModelUnavailableError,
   resolveVideoModel,
 } from "../../providers/resolve-video";
 import { VERCEL_VIDEO_GATEWAY_BASE_URL } from "../../providers/video-byok";
-import { hostedGenerationError } from "./gg-media-errors";
+import { mediaGenerationError } from "./media-generation-errors";
 import { body, v } from "@grida/daemon/server";
 import { ProviderHttp } from "../../providers/http";
+import type { GeneratedVideo } from "../../protocol/video";
+import { GeneratedMediaPersistence } from "./generated-media-persistence";
 
 const VIDEO_PROVIDERS = ["vercel", "fal", "openrouter", "gg"] as const;
 const VERCEL_VIDEO_GATEWAY_ORIGIN = new URL(VERCEL_VIDEO_GATEWAY_BASE_URL)
@@ -104,6 +105,8 @@ function videoFetchFailureMessage(error: unknown): string {
 
 export type VideoRoutesDeps = {
   secrets: SecretsStore;
+  media?: MediaPersistence | null;
+  // GRIDA-GG: provider — the optional hosted video arm.
   /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
   gg?: import("../../providers/gg-session").GridaGatewaySessionStore;
   gg_base_url?: string;
@@ -172,7 +175,7 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
     try {
       generation = await resolved.model.doGenerate(callOptions);
     } catch (e) {
-      return hostedGenerationError(c, {
+      return mediaGenerationError(c, {
         error: e,
         scope: "agent-host-video",
         label: "video generation failed",
@@ -185,7 +188,7 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
     // URL. OpenRouter already uses its fixed authenticated content endpoint;
     // URL-shaped outputs from other adapters are lowered through the bounded
     // ProviderHttp download path after provider-specific trust checks.
-    let videos;
+    let videos: Array<Pick<GeneratedVideo, "base64" | "media_type">>;
     try {
       const urls: URL[] = [];
       const pending = generation.videos.map((vid) => {
@@ -236,10 +239,29 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
       );
     }
 
+    const persistedVideos: GeneratedVideo[] = [];
+    for (const [index, video] of videos.entries()) {
+      const fileName = GeneratedMediaPersistence.fileName(
+        "video",
+        index,
+        video.media_type
+      );
+      const storedMedia = fileName
+        ? await GeneratedMediaPersistence.save(deps.media, {
+            ...video,
+            file_name: fileName,
+          })
+        : undefined;
+      persistedVideos.push({
+        ...video,
+        ...(storedMedia ? { stored_media: storedMedia } : {}),
+      });
+    }
+
     return c.json({
       model_id: resolved.model_id,
       provider_id: resolved.provider_id,
-      videos,
+      videos: persistedVideos,
     });
   });
 }

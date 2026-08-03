@@ -1,18 +1,17 @@
-// GRIDA-GG: provider — hosted media-generation error mapping (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-004 — renderer-safe media-generation error mapping.
 /**
- * GRIDA-SEC-004/006 — the shared renderer-safe error posture for the hosted
- * image + video generation routes.
+ * Shared error posture for hosted and BYOK media-generation routes.
  *
- * 401/402 are ACTIONABLE for the renderer, so the bare code is surfaced
- * (GRIDA-SEC-006); every other failure logs its detail — which can embed
- * upstream body text (fal/OpenRouter adapters call `safeText(res)`) — in the
- * sidecar ONLY and returns a generic 502. Single-sourced so both routes keep
- * the identical, non-leaking contract.
+ * Expected GG session/credit failures remain actionable to the renderer. Every
+ * other failure logs its detail — which can embed upstream body text
+ * (fal/OpenRouter adapters call `safeText(res)`) — in the sidecar ONLY and
+ * returns a generic 502. Single-sourced so every media route keeps the same
+ * non-leaking contract without implying that BYOK failures belong to GG.
  */
 
 import type { Context } from "hono";
 
-export function hostedGenerationError(
+export function mediaGenerationError(
   c: Context,
   args: {
     error: unknown;
@@ -25,15 +24,27 @@ export function hostedGenerationError(
   }
 ): Response {
   const code = (args.error as { code?: unknown })?.code;
+
+  // GRIDA-GG: provider — actionable hosted-session failures.
+  // GRIDA-SEC-006 — preserve literal codes across contextBridge while never
+  // reflecting the scoped token or hosted response body.
   if (code === "gg_token_expired") {
     return c.json(
-      { error: "gg session expired", code, provider_id: "gg" },
+      {
+        error: "gg_token_expired: Grida session expired",
+        code,
+        provider_id: "gg",
+      },
       401
     );
   }
   if (code === "insufficient_credits") {
     return c.json(
-      { error: "insufficient AI credits", code, provider_id: "gg" },
+      {
+        error: "insufficient_credits: insufficient AI credits",
+        code,
+        provider_id: "gg",
+      },
       402
     );
   }

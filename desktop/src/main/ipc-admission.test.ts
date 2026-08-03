@@ -41,8 +41,29 @@ describe("ipc_admission", () => {
     expect(allowedFor("onboarding", "/desktop/auth/sign-in")).toEqual([]);
   });
 
-  it("admits every registered bridge channel in main", () => {
-    expect(allowedFor("main", "/desktop/settings")).toEqual(allChannels);
+  it("admits every registered bridge channel on the exact Tools route", () => {
+    expect(allowedFor("main", "/desktop/tools")).toEqual(allChannels);
+  });
+
+  it("keeps durable media capabilities exclusive to the exact Tools route", () => {
+    const mediaChannels = [
+      IPC_CHANNELS.MEDIA_LIST,
+      IPC_CHANNELS.MEDIA_READ,
+      IPC_CHANNELS.MEDIA_REVEAL,
+      IPC_CHANNELS.MEDIA_OPEN_FOLDER,
+    ];
+    for (const pathname of [
+      "/desktop/settings",
+      "/desktop/welcome",
+      "/desktop/tools/history",
+      "/desktop/onboarding",
+      "/desktop/auth/sign-in",
+    ]) {
+      const allowed = allowedFor("main", pathname);
+      for (const channel of mediaChannels) {
+        expect(allowed).not.toContain(channel);
+      }
+    }
   });
 
   it("rejects auth-control and onboarding paths even before main observes navigation", () => {

@@ -6,9 +6,9 @@
 `DaemonServer` is the Node lifecycle owner for the local daemon.
 
 It owns the request perimeter and the daemon's long-lived host state:
-workspace/file registries, recents, and the secrets store. Hosts construct it
-(usually through a composed factory), start it, and call `stop()` during
-shutdown.
+workspace/file registries, recents, the secrets store, and an optional
+host-rooted media store. Hosts construct it (usually through a composed
+factory), start it, and call `stop()` during shutdown.
 
 The default `start()` binds the Node HTTP adapter to loopback. Once startup
 resolves, `port` reports the bound port. A host that already owns a private
@@ -40,6 +40,8 @@ Hosts must provide:
 
 - `password` for per-request Basic Auth.
 - `user_data_path` for persistent local state.
+- optionally, `media_root` for a dedicated durable binary-media store kept
+  separate from secret/session state and workspaces.
 - `http_access` for CORS and Referer policy.
 - `tenants` — the static, typed list of capability tenants to mount
   (an empty list is a valid, bare daemon).

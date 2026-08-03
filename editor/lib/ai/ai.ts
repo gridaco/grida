@@ -18,9 +18,9 @@ export namespace ai {
     return Math.ceil(cost_usd * 1000);
   }
 
-  // Re-aggregate the media catalogues from `@grida/ai-models` under
-  // their original editor-side dotted path. Consumers continue to
-  // write `ai.image.X`, `ai.audio.X`, `ai.image_tools.X` unchanged.
+  // Re-aggregate the media catalogues from `@grida/ai-models` under the
+  // editor-side `ai.*` path. Audio remains an organizational parent with
+  // exact `music` and `sound_effects` children.
   export import image = _catalog.image;
   export import audio = _catalog.audio;
   export import image_tools = _catalog.image_tools;
@@ -109,12 +109,13 @@ export namespace ai {
         image: ImageData; // returns URL
       };
 
-      export type AudioGenerationModelId = audio.AudioModelId;
+      /** Existing Replicate-backed route serves Lyria music only. */
+      export type MusicGenerationModelId = audio.music.ModelId;
 
       /**
-       * Options for Lyria audio generation models.
+       * Options for Lyria music generation models.
        */
-      export type LyriaAudioOptions = {
+      export type LyriaMusicOptions = {
         /** Prompt describing the music. Required. */
         prompt: string;
         /**
@@ -122,17 +123,13 @@ export namespace ai {
          * additional inspiration for composition. Up to 10 supported by the
          * provider.
          */
-        image_inputs?: string[];
-        /** Optional language hint passed through to the model. */
-        language?: string;
-        /** Optional negative prompt. */
-        negative_prompt?: string;
+        images?: string[];
         /** Optional seed for reproducibility. */
         seed?: number;
       };
 
-      export type AudioGenerationResult = {
-        /** Public URL to the generated audio (mp3). */
+      export type MusicGenerationResult = {
+        /** Public URL to the generated music (MP3). */
         url: string;
       };
     }

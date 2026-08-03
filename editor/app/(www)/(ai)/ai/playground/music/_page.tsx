@@ -31,7 +31,7 @@ import {
   PromptInputTools,
   type PromptInputMessage,
 } from "@app/ui/ai-elements/prompt-input";
-import { generateAudio } from "@/lib/ai/actions/audio";
+import { generateMusic } from "@/lib/ai/actions/music";
 import { useAiCredits } from "@/lib/ai/credits";
 import ai from "@/lib/ai";
 import { DownloadIcon, Loader2Icon, Music2Icon, Wand2Icon } from "lucide-react";
@@ -76,7 +76,7 @@ type ResultItem = {
   id: number;
   url: string;
   prompt: string;
-  modelId: ai.audio.AudioModelId;
+  modelId: ai.audio.music.ModelId;
 };
 
 function Workspace() {
@@ -85,31 +85,31 @@ function Workspace() {
   const [loading, startGenerate] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [modelId, setModelId] =
-    useState<ai.audio.AudioModelId>("google/lyria-3");
+    useState<ai.audio.music.ModelId>("google/lyria-3");
   const [results, setResults] = useState<ResultItem[]>([]);
-  const card = useMemo(() => ai.audio.models[modelId], [modelId]);
+  const card = useMemo(() => ai.audio.music.models[modelId], [modelId]);
 
   const handleSubmit = useCallback(
     (message: PromptInputMessage) => {
       const prompt = message.text.trim();
       if (!prompt) return;
 
-      const image_inputs: string[] = [];
+      const images: string[] = [];
       for (const f of message.files) {
         if (
           f.url &&
           (f.url.startsWith("data:image/") || f.url.startsWith("http"))
         ) {
-          image_inputs.push(f.url);
+          images.push(f.url);
         }
       }
 
       setError(null);
       startGenerate(async () => {
-        const env = await generateAudio({
+        const env = await generateMusic({
           model: modelId,
           prompt,
-          image_inputs: image_inputs.length > 0 ? image_inputs : undefined,
+          images: images.length > 0 ? images : undefined,
         });
         const data = credits.consume(env, { next: "/ai/playground/music" });
         if (!data) {
@@ -159,14 +159,14 @@ function Workspace() {
               </PromptInputActionMenu>
               <Select
                 value={modelId}
-                onValueChange={(v) => setModelId(v as ai.audio.AudioModelId)}
+                onValueChange={(v) => setModelId(v as ai.audio.music.ModelId)}
               >
                 <SelectTrigger className="w-min border-none h-8">
                   <SelectValue>{card.label}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {ai.audio.audio_model_ids.map((id) => {
-                    const m = ai.audio.models[id];
+                  {ai.audio.music.model_ids.map((id) => {
+                    const m = ai.audio.music.models[id];
                     return (
                       <SelectItem key={id} value={id}>
                         <div className="flex items-center justify-between gap-2 w-full">
@@ -256,7 +256,7 @@ function PromptChip({
 }
 
 function ResultCard({ item }: { item: ResultItem }) {
-  const card = ai.audio.models[item.modelId];
+  const card = ai.audio.music.models[item.modelId];
   return (
     <div className="rounded-xl border bg-card p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -289,8 +289,8 @@ function ResultCard({ item }: { item: ResultItem }) {
   );
 }
 
-function EmptyState({ modelId }: { modelId: ai.audio.AudioModelId }) {
-  const card = ai.audio.models[modelId];
+function EmptyState({ modelId }: { modelId: ai.audio.music.ModelId }) {
+  const card = ai.audio.music.models[modelId];
   return (
     <div className="rounded-xl border border-dashed bg-muted/20 px-6 py-10 text-center">
       <Music2Icon className="size-6 mx-auto mb-3 text-muted-foreground" />

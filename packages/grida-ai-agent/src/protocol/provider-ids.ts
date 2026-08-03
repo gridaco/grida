@@ -21,10 +21,11 @@ export {
 /**
  * Which generation modalities a BYOK provider serves. A provider may serve
  * several: OpenRouter does text + image; Vercel does text + image + video; fal
- * does image + video (its catalog bindings are image-to-video). The marker
- * keeps each resolver from ever picking a provider that can't serve its
- * modality, while the secrets store + settings UI still list every provider so
- * its key can be stored.
+ * does image + video. This vocabulary is intentionally limited to the generic
+ * model resolvers that consume {@link byokProvidersFor}. Provider-shaped
+ * endpoints such as fal 3D generation and ElevenLabs Sound Effects select
+ * their exact provider directly; claiming broad `3d` or `audio` support here
+ * would make this routing metadata dishonest.
  */
 export type ByokModality = "text" | "image" | "video";
 
@@ -43,6 +44,14 @@ export const BYOK_PROVIDER_METADATA = [
     id: "fal",
     label: "fal",
     modalities: ["image", "video"],
+  },
+  {
+    id: "elevenlabs",
+    label: "ElevenLabs",
+    // Sound Effects is an exact provider endpoint, not a generic audio-model
+    // resolver. The provider remains in this identity table so its BYOK secret
+    // can be stored, while its readiness is checked by the SFX surface itself.
+    modalities: [],
   },
 ] as const;
 
@@ -82,6 +91,7 @@ export const GG_PROVIDER_METADATA = {
   label: "Grida",
   /** Picker affordance copy — one source of truth for the UI. */
   included_label: "Grida — included",
+  // Hosted music is an exact GG endpoint, not a generic audio resolver.
   modalities: ["text", "image", "video"],
 } as const;
 

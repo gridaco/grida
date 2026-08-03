@@ -1,7 +1,11 @@
 // GRIDA-GG: provider — see docs/wg/platform/hosted-ai.md
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ImageModelV3CallOptions } from "@ai-sdk/provider";
-import { GridaGatewayImageModel, GridaGatewayVideoModel } from "./gg-media";
+import {
+  GridaGatewayImageModel,
+  GridaGatewayMusicProvider,
+  GridaGatewayVideoModel,
+} from "./gg-media";
 import { GridaGatewaySessionStore } from "./gg-session";
 import { ProviderHttp } from "./http";
 
@@ -138,5 +142,131 @@ describe("GridaGatewayImageModel.doGenerate", () => {
       "https://grida.test/api/v1/ai/videos/generations",
     ]);
     expect(download).not.toHaveBeenCalled();
+  });
+});
+
+describe("GridaGatewayMusicProvider.generate", () => {
+  it("posts the closed request to hosted audio and accepts base64 bytes only", async () => {
+    const request = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      expect(String(input)).toBe(
+        "https://grida.test/api/v1/ai/music/generations"
+      );
+      expect(new Headers(init?.headers).get("authorization")).toBe(
+        "Bearer tok"
+      );
+      expect(JSON.parse(String(init?.body))).toEqual({
+        model_id: "google/lyria-3",
+        prompt: "clockwork percussion",
+        seed: 7,
+      });
+      return Response.json({
+        model_id: "google/lyria-3",
+        provider_id: "gg",
+        audio: {
+          base64: "SUQz",
+          media_type: "audio/mpeg",
+          file_name: "music.mp3",
+        },
+      });
+    });
+    const download = vi.fn<typeof globalThis.fetch>();
+    const provider = new GridaGatewayMusicProvider(
+      liveStore(),
+      "https://grida.test",
+      new ProviderHttp({ request, download })
+    );
+
+    await expect(
+      provider.generate({
+        model_id: "google/lyria-3",
+        prompt: "clockwork percussion",
+        seed: 7,
+      })
+    ).resolves.toMatchObject({
+      provider_id: "gg",
+      audio: { base64: "SUQz", file_name: "music.mp3" },
+    });
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("rejects a hosted response with an unsafe filename", async () => {
+    const request = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json({
+        model_id: "google/lyria-3",
+        provider_id: "gg",
+        audio: {
+          base64: "SUQz",
+          media_type: "audio/mpeg",
+          file_name: "../../secret.mp3",
+        },
+      })
+    );
+    const provider = new GridaGatewayMusicProvider(
+      liveStore(),
+      "https://grida.test",
+      new ProviderHttp({ request, download: vi.fn<typeof globalThis.fetch>() })
+    );
+
+    await expect(
+      provider.generate({
+        model_id: "google/lyria-3",
+        prompt: "x",
+      })
+    ).rejects.toThrow(/malformed/);
+  });
+
+  it("rejects an oversized hosted audio Content-Length before reading JSON", async () => {
+    const cancel = vi.fn<(reason?: unknown) => void>();
+    const body = new ReadableStream<Uint8Array>({ pull() {}, cancel });
+    const request = vi.fn<typeof globalThis.fetch>(
+      async () =>
+        new Response(body, {
+          status: 200,
+          headers: { "content-length": String(100 * 1024 * 1024) },
+        })
+    );
+    const provider = new GridaGatewayMusicProvider(
+      liveStore(),
+      "https://grida.test",
+      new ProviderHttp({ request, download: vi.fn<typeof globalThis.fetch>() })
+    );
+
+    await expect(
+      provider.generate({ model_id: "google/lyria-3", prompt: "x" })
+    ).rejects.toThrow(/response was too large/);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("bounds streamed hosted audio before JSON.parse without a large fixture", async () => {
+    const cancel = vi.fn<(reason?: unknown) => Promise<void>>(
+      async () => undefined
+    );
+    const releaseLock = vi.fn<() => void>();
+    const read = vi.fn<() => Promise<ReadableStreamReadResult<Uint8Array>>>(
+      async () => ({
+        done: false,
+        // The reader limit is checked before copying the chunk, so this object
+        // proves the streamed boundary without allocating its advertised size.
+        value: { byteLength: 100 * 1024 * 1024 } as Uint8Array,
+      })
+    );
+    const response = {
+      status: 200,
+      ok: true,
+      headers: new Headers(),
+      body: { getReader: () => ({ read, cancel, releaseLock }) },
+    } as unknown as Response;
+    const request = vi.fn<typeof globalThis.fetch>(async () => response);
+    const provider = new GridaGatewayMusicProvider(
+      liveStore(),
+      "https://grida.test",
+      new ProviderHttp({ request, download: vi.fn<typeof globalThis.fetch>() })
+    );
+
+    await expect(
+      provider.generate({ model_id: "google/lyria-3", prompt: "x" })
+    ).rejects.toThrow(/response was too large/);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(releaseLock).toHaveBeenCalledOnce();
   });
 });

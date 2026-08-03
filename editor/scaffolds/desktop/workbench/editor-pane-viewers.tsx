@@ -281,9 +281,11 @@ function Base64ImageViewer({
 export function VideoViewer({
   workspaceId,
   relPath,
+  active,
 }: {
   workspaceId: string;
   relPath: string;
+  active: boolean;
 }) {
   const revision = useWorkspaceFileRevision(
     WorkspaceFileRevision.exact(relPath)
@@ -291,29 +293,23 @@ export function VideoViewer({
   const direct = workspacesNs.mediaUrl(workspaceId, relPath);
   const src = direct ? WorkspaceFileRevision.url(direct, revision) : undefined;
   return src ? (
-    <StreamedVideo src={src} />
+    <StreamedVideo src={src} active={active} />
   ) : (
     <Base64VideoViewer
       workspaceId={workspaceId}
       relPath={relPath}
       revision={revision}
+      active={active}
     />
   );
 }
 
-function StreamedVideo({ src }: { src: string }) {
+function StreamedVideo({ src, active }: { src: string; active: boolean }) {
   const [errored, onError] = useMediaLoadError(src);
   if (errored) return <ErrorState message="Couldn't load this file." />;
   return (
     <MediaContainer>
-      <video
-        src={src}
-        controls
-        playsInline
-        preload="metadata"
-        className="max-h-full max-w-full object-contain"
-        onError={onError}
-      />
+      <VideoElement src={src} active={active} onError={onError} />
     </MediaContainer>
   );
 }
@@ -322,10 +318,12 @@ function Base64VideoViewer({
   workspaceId,
   relPath,
   revision,
+  active,
 }: {
   workspaceId: string;
   relPath: string;
   revision: number;
+  active: boolean;
 }) {
   const state = useFileBytes(workspaceId, relPath, revision);
   const src =
@@ -342,15 +340,34 @@ function Base64VideoViewer({
     );
   return (
     <MediaContainer>
-      <video
-        src={src}
-        controls
-        playsInline
-        preload="metadata"
-        className="max-h-full max-w-full object-contain"
-        onError={onError}
-      />
+      <VideoElement src={src} active={active} onError={onError} />
     </MediaContainer>
+  );
+}
+
+function VideoElement({
+  src,
+  active,
+  onError,
+}: {
+  src: string;
+  active: boolean;
+  onError: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (!active) videoRef.current?.pause();
+  }, [active]);
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      controls
+      playsInline
+      preload="metadata"
+      className="max-h-full max-w-full object-contain"
+      onError={onError}
+    />
   );
 }
 

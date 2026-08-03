@@ -35,6 +35,9 @@ const SUPPORTS_TAGS: Record<keyof DaemonCapabilities, string> = {
   providers: "providers@1",
   images: "images@1",
   video: "video@1",
+  three_d: "three-d@1",
+  music: "music@1",
+  sound_effects: "sound-effects@1",
   shell: "shell@1",
 };
 

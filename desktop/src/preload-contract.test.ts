@@ -31,4 +31,32 @@ describe("Desktop preload agent seam", () => {
       /chatgpt:\s*{\s*connect:\s*\(\)\s*=>\s*ipcRenderer\.invoke\(IPC_CHANNELS\.CHATGPT_CONNECT\)\s*[,}]/
     );
   });
+
+  it("delegates 3D, music, and sound-effect generation through the agent transport", () => {
+    expect(preloadSource).toContain(
+      "generate: (req) => agentClient.threeD.generate(req)"
+    );
+    expect(preloadSource).toContain(
+      "generate: (req) => agentClient.audio.music.generate(req)"
+    );
+    expect(preloadSource).toContain(
+      "generate: (req) => agentClient.audio.soundEffects.generate(req)"
+    );
+  });
+
+  it("routes durable media only through purpose-scoped native IPC", () => {
+    expect(preloadSource).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_LIST)"
+    );
+    expect(preloadSource).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_READ, id)"
+    );
+    expect(preloadSource).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_REVEAL, id)"
+    );
+    expect(preloadSource).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_OPEN_FOLDER)"
+    );
+    expect(preloadSource).not.toContain("agentClient.media");
+  });
 });

@@ -409,6 +409,75 @@ describe("ProviderHttp", () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 
+  it("gives one provider asset a separate 256 MiB streamed bound", async () => {
+    const request = vi.fn<typeof globalThis.fetch>();
+    const download = vi.fn<typeof globalThis.fetch>(
+      async () =>
+        new Response(Uint8Array.from([1]), {
+          status: 200,
+          // A header above the generic 64 MiB batch ceiling proves this path
+          // does not inherit that limit; the tiny body avoids a large fixture.
+          headers: { "content-length": String(65 * 1024 * 1024) },
+        })
+    );
+    const http = new ProviderHttp({ request, download });
+
+    await expect(
+      http.downloadProviderAsset(
+        new URL("https://cdn.example/viewer-model.glb"),
+        { declared_size_bytes: 65 * 1024 * 1024 }
+      )
+    ).resolves.toEqual({ data: Uint8Array.from([1]), mediaType: undefined });
+    expect(download).toHaveBeenCalledOnce();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("lets the owning provider lower the retained single-asset budget", async () => {
+    const cancel = vi.fn<(reason?: unknown) => void>();
+    const body = new ReadableStream<Uint8Array>({ pull() {}, cancel });
+    const request = vi.fn<typeof globalThis.fetch>();
+    const download = vi.fn<typeof globalThis.fetch>(
+      async () =>
+        new Response(body, {
+          status: 200,
+          headers: { "content-length": "4" },
+        })
+    );
+    const http = new ProviderHttp({ request, download });
+
+    await expect(
+      http.downloadProviderAsset(
+        new URL("https://cdn.example/memory-budgeted.glb"),
+        { max_bytes: 3 }
+      )
+    ).rejects.toThrow(/download is too large/);
+    expect(download).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("cancels a single provider asset declared above 256 MiB by the response", async () => {
+    const cancel = vi.fn<(reason?: unknown) => void>();
+    const body = new ReadableStream<Uint8Array>({ pull() {}, cancel });
+    const request = vi.fn<typeof globalThis.fetch>();
+    const download = vi.fn<typeof globalThis.fetch>(
+      async () =>
+        new Response(body, {
+          status: 200,
+          headers: { "content-length": String(256 * 1024 * 1024 + 1) },
+        })
+    );
+    const http = new ProviderHttp({ request, download });
+
+    await expect(
+      http.downloadProviderAsset(
+        new URL("https://cdn.example/oversize-model.glb")
+      )
+    ).rejects.toThrow(/download is too large/);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("refuses more than 16 automatic assets before any host I/O", async () => {
     const request = vi.fn<typeof globalThis.fetch>();
     const download = vi.fn<typeof globalThis.fetch>();

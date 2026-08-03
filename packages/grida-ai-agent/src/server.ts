@@ -7,9 +7,10 @@
  * (files, recents, workspaces) plus the stores in `DaemonServices`. This
  * module contributes everything AI: the run loop (`/agent/*`, `/events`),
  * chat sessions (`/sessions/*`), BYOK credentials vocabulary (`/secrets/*`),
- * endpoint providers (`/providers/*`), and BYOK generation (`/images/*`,
- * `/video/*`). Dependency direction is one-way — this package imports
- * `@grida/daemon`; the daemon knows no tenant.
+ * endpoint providers (`/providers/*`), and generation (`/images/*`,
+ * `/video/*`, `/three-d/*`, `/audio/music`, `/audio/sound-effects`).
+ * Dependency direction is one-way —
+ * this package imports `@grida/daemon`; the daemon knows no tenant.
  *
  * Hosts (desktop sidecar, CLI) construct the composed server via
  * `createAgentDaemon` — behaviorally today's full agent daemon, wire
@@ -32,6 +33,9 @@ import { registerSecretsRoutes } from "./http/routes/secrets";
 import { registerProvidersRoutes } from "./http/routes/providers";
 import { registerImagesRoutes } from "./http/routes/images";
 import { registerVideoRoutes } from "./http/routes/video";
+import { registerThreeDRoutes } from "./http/routes/three-d";
+import { registerMusicRoutes } from "./http/routes/music";
+import { registerSoundEffectsRoutes } from "./http/routes/sound-effects";
 import { registerAgentRoutes } from "./http/routes/agent";
 import { registerDirectoryScopesRoutes } from "./http/routes/directory-scopes";
 import { registerSessionsRoutes } from "./http/routes/sessions";
@@ -101,6 +105,9 @@ export const AGENT_DAEMON_DEFAULT_CAPABILITIES: DaemonCapabilities = {
   providers: true,
   images: true,
   video: true,
+  three_d: true,
+  music: true,
+  sound_effects: true,
   shell: false,
 };
 
@@ -113,7 +120,15 @@ export type AgentTenantOptions = {
   capabilities?: Partial<
     Pick<
       DaemonCapabilities,
-      "secrets" | "agent" | "sessions" | "providers" | "images" | "video"
+      | "secrets"
+      | "agent"
+      | "sessions"
+      | "providers"
+      | "images"
+      | "video"
+      | "three_d"
+      | "music"
+      | "sound_effects"
     >
   >;
   /**
@@ -245,6 +260,9 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
     providers: opts.capabilities?.providers ?? true,
     images: opts.capabilities?.images ?? true,
     video: opts.capabilities?.video ?? true,
+    three_d: opts.capabilities?.three_d ?? true,
+    music: opts.capabilities?.music ?? true,
+    sound_effects: opts.capabilities?.sound_effects ?? true,
   };
   // GRIDA-SEC-004 — the ONLY routes where the credential may ride the
   // `auth_token` query parameter (header-less EventSource attach; WG daemon
@@ -344,6 +362,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       if (caps.images) {
         registerImagesRoutes(app, {
           secrets: services.secrets,
+          media: services.media,
           gg: gridaSession,
           gg_base_url: gridaGatewayBaseUrl,
           provider_http: providerHttp,
@@ -352,8 +371,31 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       if (caps.video) {
         registerVideoRoutes(app, {
           secrets: services.secrets,
+          media: services.media,
           gg: gridaSession,
           gg_base_url: gridaGatewayBaseUrl,
+          provider_http: providerHttp,
+        });
+      }
+      if (caps.three_d) {
+        registerThreeDRoutes(app, {
+          secrets: services.secrets,
+          media: services.media,
+          provider_http: providerHttp,
+        });
+      }
+      if (caps.music) {
+        registerMusicRoutes(app, {
+          media: services.media,
+          gg: gridaSession,
+          gg_base_url: gridaGatewayBaseUrl,
+          provider_http: providerHttp,
+        });
+      }
+      if (caps.sound_effects) {
+        registerSoundEffectsRoutes(app, {
+          secrets: services.secrets,
+          media: services.media,
           provider_http: providerHttp,
         });
       }
@@ -501,6 +543,8 @@ export type AgentDaemonOptions = AgentTenantOptions & {
   user_data_path: string;
   /** GRIDA-SEC-004 — host-injected managed root for `/workspaces/create`. */
   projects_root?: string;
+  /** Daemon-frame field: host-injected root for durable generated media. */
+  media_root?: string;
   /** Host/client HTTP perimeter policy for CORS + Referer checks. */
   http_access: DaemonHttpAccess;
   /** Loopback host to bind. Default `127.0.0.1`. */
@@ -535,6 +579,7 @@ export function agentTenantOptionsFromDaemon(
     capabilities: _daemonCapabilities,
     user_data_path: _userDataPath,
     projects_root: _projectsRoot,
+    media_root: _mediaRoot,
     http_access: _httpAccess,
     hostname: _hostname,
     port: _port,
@@ -555,6 +600,7 @@ export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
     password: opts.password,
     user_data_path: opts.user_data_path,
     projects_root: opts.projects_root,
+    media_root: opts.media_root,
     http_access: opts.http_access,
     hostname: opts.hostname,
     port: opts.port,

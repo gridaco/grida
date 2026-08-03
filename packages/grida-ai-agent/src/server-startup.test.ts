@@ -41,6 +41,7 @@ describe("agent tenant startup", () => {
       files: new FileRegistry(),
       recent: new RecentStore(baseDir),
       workspaces: new WorkspaceRegistry(baseDir),
+      media: null,
       auth,
       secrets: new SecretsStore(auth),
     };
@@ -83,6 +84,7 @@ describe("agent tenant startup", () => {
       files: new FileRegistry(),
       recent: new RecentStore(baseDir),
       workspaces: new WorkspaceRegistry(baseDir),
+      media: null,
       auth,
       secrets: new SecretsStore(auth),
     };
@@ -138,6 +140,7 @@ describe("agent tenant startup", () => {
       files: new FileRegistry(),
       recent: new RecentStore(baseDir),
       workspaces: new WorkspaceRegistry(baseDir),
+      media: null,
       auth,
       secrets: new SecretsStore(auth),
     };
@@ -197,6 +200,7 @@ describe("agent tenant startup", () => {
       files: new FileRegistry(),
       recent: new RecentStore(baseDir),
       workspaces: new WorkspaceRegistry(baseDir),
+      media: null,
       auth,
       secrets: new SecretsStore(auth),
     };

@@ -1,4 +1,4 @@
-// GRIDA-SEC-008 — narrow native-provider IPC channel vocabulary.
+// GRIDA-SEC-004 / GRIDA-SEC-008 — narrow native IPC channel vocabulary.
 export {
   DESKTOP_BRIDGE_PROTOCOL,
   DESKTOP_HOST_APP_IDS,
@@ -12,10 +12,12 @@ export type {
   DesktopCapabilities,
   DesktopHostAppId,
   DesktopHostAppInfo,
+  DesktopMediaReadResult,
   DesktopNativeCapabilities,
   FileReadResult,
   FileWriteResult,
   HandshakeResponse,
+  MediaItem,
   NavigationState,
   OpenDialogOptions,
   RecentEntry,
@@ -61,6 +63,10 @@ export const IPC_CHANNELS = {
   DIALOG_SAVE_AS: "grida:dialog:save-as",
   SHELL_OPEN_EXTERNAL: "grida:shell:open-external",
   SHELL_SHOW_ITEM_IN_FOLDER: "grida:shell:show-item-in-folder",
+  MEDIA_LIST: "grida:media:list",
+  MEDIA_READ: "grida:media:read",
+  MEDIA_REVEAL: "grida:media:reveal",
+  MEDIA_OPEN_FOLDER: "grida:media:open-folder",
   HOST_APPS_RESOLVE_PREFERRED: "grida:host-apps:resolve-preferred",
   HOST_APPS_OPEN_WORKSPACE: "grida:host-apps:open-workspace",
   TERMINAL_CREATE: "grida:terminal:create",

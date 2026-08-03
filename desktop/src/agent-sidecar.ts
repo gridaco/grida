@@ -35,6 +35,9 @@
  *                        --scratch-base=<absolute path>
  *                          Electron-main-resolved temp authority root. This is
  *                          intentionally resolved before SRT rewrites TMPDIR.
+ *                        --media-root=<absolute path>
+ *                          Platform-local app-managed durable media root.
+ *                          Required and resolved by trusted Electron main.
  *
  * Stdout contract: framed sidecar→host control and provider requests only.
  * Human-readable logs always use stderr.
@@ -99,6 +102,12 @@ if (!userDataPath) {
   process.exit(1);
 }
 const requiredUserDataPath = userDataPath;
+const mediaRoot = getCliArg("media-root");
+if (!mediaRoot) {
+  console.error("[agent-sidecar] fatal: missing --media-root");
+  process.exit(1);
+}
+const requiredMediaRoot = mediaRoot;
 const scratchBase = getCliArg("scratch-base");
 if (!scratchBase) {
   console.error("[agent-sidecar] fatal: missing --scratch-base");
@@ -167,6 +176,7 @@ async function main() {
   const host = createAgentDaemon({
     password,
     user_data_path: requiredUserDataPath,
+    media_root: requiredMediaRoot,
     scratch_base: requiredScratchBase,
     projects_root: projectsRoot,
     skills_root: skillsRoot,

@@ -5,9 +5,9 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
 } from "@app/ui/components/select";
+import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
 
 /**
  * Provider-hidden image-model picker (#908). Lists only the curated
@@ -27,12 +27,9 @@ export function ImageModelPicker({
   const listed = models.image.listed_models();
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger
-        size="sm"
-        className="w-fit gap-1 border-0 bg-transparent px-2 shadow-none focus-visible:ring-0"
-      >
+      <MediaModelPickerTrigger>
         <SelectValue placeholder="Choose a model" />
-      </SelectTrigger>
+      </MediaModelPickerTrigger>
       <SelectContent>
         {listed.map((card) => (
           <SelectItem key={card.id} value={card.id}>

@@ -5,6 +5,7 @@
  */
 
 import type { models } from "@grida/ai-models";
+import type { MediaItem } from "@grida/daemon";
 
 /** A BYOK image provider (mirrors {@link models.image.ImageProvider}). */
 export type ImageGenProvider = models.image.ImageProvider;
@@ -34,6 +35,8 @@ export type ImageGeneratedImage = {
   base64: string;
   /** MIME type, e.g. `image/png`. */
   media_type: string;
+  /** Present only when the optional host media store accepted this output. */
+  stored_media?: MediaItem;
 };
 
 export type ImageGenerateResult = {

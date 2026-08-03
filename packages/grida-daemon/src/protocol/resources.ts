@@ -23,6 +23,29 @@ export type RecentEntry = {
   opened_at: number;
 };
 
+/** GRIDA-SEC-004 — durable binary-media descriptor with no native path. */
+export type MediaItem = {
+  id: string;
+  file_name: string;
+  /** Canonical lowercase MIME type; viewer selection is format-oriented. */
+  media_type: string;
+  byte_size: number;
+  created_at: number;
+};
+
+export type MediaSaveInput = {
+  file_name: string;
+  media_type: string;
+  bytes: Uint8Array;
+};
+
+export type MediaListOptions = { limit?: number };
+
+export type MediaReadResult = {
+  item: MediaItem;
+  bytes: Uint8Array;
+};
+
 export type Workspace = {
   id: string;
   root: string;

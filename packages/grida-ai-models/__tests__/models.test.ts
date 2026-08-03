@@ -111,6 +111,167 @@ describe("models.image provider-binding invariants", () => {
   });
 });
 
+describe("models.audio.music catalogue invariants", () => {
+  it("lists only the Replicate-backed music ids", () => {
+    expect(models.audio.music.model_ids).toEqual([
+      "google/lyria-3",
+      "google/lyria-3-pro",
+    ]);
+    expect(models.audio.music.is_model_id("google/lyria-3")).toBe(true);
+    expect(models.audio.music.is_model_id("eleven_text_to_sound_v2")).toBe(
+      false
+    );
+  });
+
+  it("lists the integrated music models", () => {
+    expect(models.audio.music.listed_models().map((card) => card.id)).toEqual([
+      "google/lyria-3",
+      "google/lyria-3-pro",
+    ]);
+  });
+
+  it("grounds Lyria as image-conditioned music with Replicate's flat meter", () => {
+    for (const card of Object.values(models.audio.music.models)) {
+      expect(card.provider).toBe("replicate");
+      expect(card.input).toEqual({
+        modalities: ["text", "image"],
+        max_images: 10,
+      });
+      expect(card.output.default_format).toBe("mp3");
+      expect(card.output.sample_rate_hz).toBe(48_000);
+      expect(card.output.channels).toBe(2);
+      expect(card.pricing.type).toBe("per_run_flat");
+      expect(card.pricing.usd).toBeGreaterThan(0);
+      expect(card.avg_cost_usd).toBe(card.pricing.usd);
+    }
+  });
+});
+
+describe("models.audio.sound_effects catalogue invariants", () => {
+  it("keeps the exact ElevenLabs model staged", () => {
+    expect(models.audio.sound_effects.model_ids).toEqual([
+      "eleven_text_to_sound_v2",
+    ]);
+    expect(
+      models.audio.sound_effects.staged_models().map((card) => card.id)
+    ).toEqual(["eleven_text_to_sound_v2"]);
+  });
+
+  it("stores ElevenLabs' exact SFX id, IO limits, and provider-credit meter", () => {
+    const card = models.audio.sound_effects.models.eleven_text_to_sound_v2;
+    expect(card).toMatchObject({
+      id: "eleven_text_to_sound_v2",
+      vendor: "elevenlabs",
+      provider: "elevenlabs",
+      status: "staged",
+      input: { type: "text" },
+      output: {
+        default_format: "mp3",
+        formats: ["mp3"],
+        sample_rate_hz: 44_100,
+        duration: {
+          mode: "automatic_or_fixed",
+          min_seconds: 0.5,
+          max_seconds: 30,
+        },
+      },
+      pricing: {
+        type: "provider_credits",
+        automatic_duration_credits: 100,
+        specified_duration_credits_per_second: 11,
+      },
+      avg_cost_usd: null,
+    });
+  });
+});
+
+describe("models.three_d catalogue invariants", () => {
+  const expectedIds = [
+    "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+    "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+    "fal-ai/trellis-2",
+  ] as const;
+
+  it("uses exact fal endpoint ids and keeps every route staged", () => {
+    expect(models.three_d.three_d_model_ids).toEqual(expectedIds);
+    expect(models.three_d.text_to_three_d_model_ids).toEqual([
+      "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+    ]);
+    expect(models.three_d.image_to_three_d_model_ids).toEqual([
+      "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+      "fal-ai/trellis-2",
+    ]);
+    expect(models.three_d.listed_models()).toEqual([]);
+    expect(models.three_d.staged_models().map((card) => card.id)).toEqual(
+      expectedIds
+    );
+
+    for (const [id, card] of Object.entries(models.three_d.models)) {
+      expect(card.id).toBe(id);
+      expect(card.provider).toBe("fal");
+      expect(card.status).toBe("staged");
+    }
+  });
+
+  it("keeps category, required input, and guaranteed output aligned", () => {
+    for (const card of Object.values(models.three_d.models)) {
+      expect(card.category).toBe(`3d/${card.input.type}-to-3d`);
+      expect(card.output.primary).toBe("glb");
+      expect(card.output.optional).not.toContain("glb");
+    }
+
+    const text = models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/text-to-3d"];
+    expect(text.input).toEqual({
+      type: "text",
+      max_utf8_characters: 1024,
+    });
+
+    const image =
+      models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"];
+    expect(image.input).toEqual({
+      type: "image",
+      min_images: 1,
+      max_images: 8,
+    });
+    expect(image.output.optional).toEqual(["fbx", "obj", "usdz"]);
+
+    expect(models.three_d.models["fal-ai/trellis-2"].output.optional).toEqual(
+      []
+    );
+  });
+
+  it("does not flatten Hunyuan surcharges or TRELLIS.2 resolution tiers", () => {
+    const text = models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/text-to-3d"];
+    expect(text.pricing).toEqual({
+      type: "per_generation_base_plus_surcharges",
+      base_usd: 0.375,
+      surcharges_usd: { pbr: 0.15, custom_face_count: 0.15 },
+    });
+
+    const image =
+      models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"];
+    expect(image.pricing).toEqual({
+      type: "per_generation_base_plus_surcharges",
+      base_usd: 0.375,
+      surcharges_usd: {
+        pbr: 0.15,
+        multi_view: 0.15,
+        custom_face_count: 0.15,
+      },
+    });
+
+    const trellis = models.three_d.models["fal-ai/trellis-2"];
+    expect(trellis.pricing).toEqual({
+      type: "per_generation_by_resolution",
+      default_resolution: "1024",
+      usd_by_resolution: { "512": 0.25, "1024": 0.3, "1536": 0.35 },
+    });
+    expect(trellis.avg_cost_usd).toBe(
+      trellis.pricing.usd_by_resolution[trellis.pricing.default_resolution]
+    );
+  });
+});
+
 describe("models.video catalogue invariants", () => {
   it("every dict key resolves to a defined card", () => {
     for (const id of Object.keys(models.video.models)) {

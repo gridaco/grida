@@ -6,7 +6,8 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
-import type { SecretsStore } from "@grida/daemon/server";
+import type { MediaItem } from "@grida/daemon";
+import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import { registerVideoRoutes } from "./video";
 import { ProviderHttp } from "../../providers/http";
 
@@ -16,11 +17,16 @@ function fakeSecrets(keys: Record<string, string>): SecretsStore {
   } as unknown as SecretsStore;
 }
 
-function appWith(keys: Record<string, string>, providerHttp?: ProviderHttp) {
+function appWith(
+  keys: Record<string, string>,
+  providerHttp?: ProviderHttp,
+  media?: MediaPersistence | null
+) {
   const app = new Hono();
   registerVideoRoutes(app, {
     secrets: fakeSecrets(keys),
     provider_http: providerHttp,
+    media,
   });
   return app;
 }
@@ -39,11 +45,15 @@ const VEO = "google/veo-3.1";
 /** Shape of the `init` arg our `fetch` mock reads. */
 type MockInit = { method?: string; body?: string };
 
-function vercelVideoResult(url: string): Response {
+function vercelVideoResults(urls: string[]): Response {
   return new Response(
     `data: ${JSON.stringify({
       type: "result",
-      videos: [{ type: "url", url, mediaType: "video/mp4" }],
+      videos: urls.map((url) => ({
+        type: "url",
+        url,
+        mediaType: "video/mp4",
+      })),
       warnings: [],
     })}\n\n`,
     {
@@ -51,6 +61,10 @@ function vercelVideoResult(url: string): Response {
       headers: { "content-type": "text/event-stream" },
     }
   );
+}
+
+function vercelVideoResult(url: string): Response {
+  return vercelVideoResults([url]);
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -281,6 +295,63 @@ describe("POST /video/generate", () => {
       prompt: "x",
     });
     expect(await res.text()).not.toContain("sk-secret-123");
+  });
+
+  it("offers every output to the host store and correlates only accepted descriptors", async () => {
+    const request = vi.fn<typeof globalThis.fetch>(async () =>
+      vercelVideoResults([
+        "data:video/mp4;base64,AAAY",
+        "data:video/mp4;base64,AQID",
+      ])
+    );
+    const download = vi.fn<typeof globalThis.fetch>();
+    const providerHttp = new ProviderHttp({ request, download });
+    const stored: MediaItem = {
+      id: "7ccb8e68-a201-40d9-a793-44de9e6c6fc6",
+      file_name: "video-1.mp4",
+      media_type: "video/mp4",
+      byte_size: 3,
+      created_at: 1,
+    };
+    const save = vi.fn<MediaPersistence["save"]>();
+    save.mockResolvedValueOnce(stored);
+    save.mockRejectedValueOnce(new Error("media-too-large"));
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await post(
+      appWith({ vercel: "sk-v" }, providerHttp, { save }),
+      {
+        model_id: VEO,
+        prompt: "must not enter storage",
+        provider: "vercel",
+      }
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      videos: [
+        {
+          base64: "AAAY",
+          media_type: "video/mp4",
+          stored_media: stored,
+        },
+        { base64: "AQID", media_type: "video/mp4" },
+      ],
+    });
+    expect(save).toHaveBeenNthCalledWith(1, {
+      file_name: "video-1.mp4",
+      media_type: "video/mp4",
+      bytes: Buffer.from("AAAY", "base64"),
+    });
+    expect(save).toHaveBeenNthCalledWith(2, {
+      file_name: "video-2.mp4",
+      media_type: "video/mp4",
+      bytes: Buffer.from("AQID", "base64"),
+    });
+    expect(JSON.stringify(save.mock.calls)).not.toContain("must not enter");
+    expect(download).not.toHaveBeenCalled();
+    expect(warning).toHaveBeenCalledOnce();
+    warning.mockRestore();
   });
 });
 

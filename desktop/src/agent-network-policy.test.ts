@@ -82,6 +82,42 @@ describe("AgentNetworkPolicy", () => {
     }
   });
 
+  it("admits ElevenLabs only on the exact credential-bearing provider origin", () => {
+    const url =
+      "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128";
+    expect(
+      AgentNetworkPolicy.authorize(grants, {
+        grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+        method: "POST",
+        url,
+        headers: [["xi-api-key", "secret"]],
+      }).url.origin
+    ).toBe("https://api.elevenlabs.io");
+
+    expect(() =>
+      AgentNetworkPolicy.authorize(grants, {
+        grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+        method: "GET",
+        url,
+        headers: [],
+      })
+    ).toThrow(/not granted/);
+
+    for (const denied of [
+      "https://evil.api.elevenlabs.io/v1/sound-generation",
+      "https://api.elevenlabs.io.attacker.example/v1/sound-generation",
+    ]) {
+      expect(() =>
+        AgentNetworkPolicy.authorize(grants, {
+          grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+          method: "POST",
+          url: denied,
+          headers: [],
+        })
+      ).toThrow(/not granted/);
+    }
+  });
+
   it("pins custom grants to a canonical exact origin", () => {
     const custom: AgentNetworkPolicy.Grant = {
       id: "custom:ollama",

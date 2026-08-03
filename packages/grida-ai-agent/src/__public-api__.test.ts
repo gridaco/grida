@@ -13,6 +13,7 @@
  * New public additions go inside one of those namespaces.
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
+import type { MediaItem } from "@grida/daemon";
 
 import * as root from ".";
 import {
@@ -33,6 +34,14 @@ import {
   type AgentUIMessageChunk,
   type ByokProviderMetadata,
   type ByokProviderId,
+  type ImageGenerateResult,
+  type VideoGenerateResult,
+  type ThreeDGenerateRequest,
+  type ThreeDGenerateResult,
+  type MusicGenerateRequest,
+  type MusicGenerateResult,
+  type SoundEffectGenerateRequest,
+  type SoundEffectGenerateResult,
   type ChatMessageRow,
   type ChatMessageWithParts,
   type ChatModel,
@@ -114,13 +123,19 @@ describe("@grida/agent public API", () => {
     });
 
     it("exposes BYOK provider identity, wire vocab, tiers, and session-row types", () => {
-      // fal is image-only BYOK (#908) — present for key storage + image
-      // routing, excluded from the text resolver via its `modalities` marker.
-      expect(BYOK_PROVIDER_IDS).toEqual(["openrouter", "vercel", "fal"]);
+      // Media-only providers remain excluded from the text resolver via their
+      // modality markers while still joining the closed secrets vocabulary.
+      expect(BYOK_PROVIDER_IDS).toEqual([
+        "openrouter",
+        "vercel",
+        "fal",
+        "elevenlabs",
+      ]);
       expect(BYOK_PROVIDER_METADATA.map((provider) => provider.label)).toEqual([
         "OpenRouter",
         "Vercel",
         "fal",
+        "ElevenLabs",
       ]);
       // The modality matrix drives image/video resolver routing (via
       // byokProvidersFor) — pin it so a bad metadata edit can't silently
@@ -131,11 +146,47 @@ describe("@grida/agent public API", () => {
         { id: "openrouter", modalities: ["text", "image", "video"] },
         { id: "vercel", modalities: ["text", "image", "video"] },
         { id: "fal", modalities: ["image", "video"] },
+        { id: "elevenlabs", modalities: [] },
       ]);
       const byok: ByokProviderId = "vercel";
       const metadata: ByokProviderMetadata = BYOK_PROVIDER_METADATA[0];
       expect(byok).toBe("vercel");
       expect(metadata.id).toBe("openrouter");
+
+      expectTypeOf<
+        ImageGenerateResult["images"][number]["stored_media"]
+      >().toEqualTypeOf<MediaItem | undefined>();
+      expectTypeOf<
+        VideoGenerateResult["videos"][number]["stored_media"]
+      >().toEqualTypeOf<MediaItem | undefined>();
+
+      const threeDRequest: ThreeDGenerateRequest = {
+        model_id: "fal-ai/trellis-2",
+        image: { base64: "AAAA", media_type: "image/png" },
+      };
+      expect(threeDRequest.model_id).toBe("fal-ai/trellis-2");
+      expectTypeOf<
+        ThreeDGenerateResult["glb"]["base64"]
+      >().toEqualTypeOf<string>();
+      expectTypeOf<ThreeDGenerateResult["stored_media"]>().toEqualTypeOf<
+        MediaItem | undefined
+      >();
+      expectTypeOf<MusicGenerateRequest["prompt"]>().toEqualTypeOf<string>();
+      expectTypeOf<
+        MusicGenerateResult["audio"]["file_name"]
+      >().toEqualTypeOf<string>();
+      expectTypeOf<MusicGenerateResult["stored_media"]>().toEqualTypeOf<
+        MediaItem | undefined
+      >();
+      expectTypeOf<
+        SoundEffectGenerateRequest["prompt"]
+      >().toEqualTypeOf<string>();
+      expectTypeOf<
+        SoundEffectGenerateResult["audio"]["file_name"]
+      >().toEqualTypeOf<string>();
+      expectTypeOf<SoundEffectGenerateResult["stored_media"]>().toEqualTypeOf<
+        MediaItem | undefined
+      >();
 
       // Tier constants.
       expect(AGENT_TIERS).toContain(AGENT_DEFAULT_TIER);
@@ -237,6 +288,9 @@ describe("@grida/agent public API", () => {
       const caps: DaemonCapabilities = AGENT_DAEMON_DEFAULT_CAPABILITIES;
       expect(caps.agent).toBe(true);
       expect(caps.files).toBe(true);
+      expect(caps.three_d).toBe(true);
+      expect(caps.music).toBe(true);
+      expect(caps.sound_effects).toBe(true);
       expect(caps.shell).toBe(false);
       const handshake: DaemonHandshakeResponse = {
         protocol: DAEMON_PROTOCOL,
@@ -252,6 +306,7 @@ describe("@grida/agent public API", () => {
       const opts: AgentDaemonOptions = {
         password: "pw",
         user_data_path: "/tmp/grida",
+        media_root: "/tmp/grida-media",
         http_access: httpAccess,
       };
       // Type-level: the factory returns the daemon's lifecycle class; the

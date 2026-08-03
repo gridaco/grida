@@ -55,6 +55,8 @@ import { trashWorkspaceEntry } from "./workspace-files";
 import { createChatGptOAuthCoordinator } from "./chatgpt-oauth";
 import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
 import { ipc_sender } from "./ipc-sender";
+import { DesktopMediaHost } from "./media-host";
+import { DesktopMediaRoot } from "./media-root";
 
 // `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
 // build-time constant once at module init rather than per call.
@@ -72,6 +74,14 @@ const chatgptOAuth = createChatGptOAuthCoordinator({
   sidecar_fetch: (path, init) => agentSidecarClient.fetch(path, init),
   open_external: async (url) => {
     await shell.openExternal(url);
+  },
+});
+const mediaHost = new DesktopMediaHost({
+  root: DesktopMediaRoot.current,
+  reveal: (nativePath) => shell.showItemInFolder(nativePath),
+  openFolder: async (nativePath) => {
+    const error = await shell.openPath(nativePath);
+    if (error) throw new Error("native folder open failed");
   },
 });
 
@@ -334,6 +344,18 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       shell.showItemInFolder(path.resolve(filePath));
     }
   );
+
+  // GRIDA-SEC-004 — durable media operations are path-free and admitted only
+  // from the exact main-role `/desktop/tools` surface. `DesktopMediaHost`
+  // resolves opaque ids and keeps every native path on this side of IPC.
+  guarded(IPC_CHANNELS.MEDIA_LIST, () => mediaHost.list());
+  guarded(IPC_CHANNELS.MEDIA_READ, (_event, id: string) => mediaHost.read(id));
+  guarded(IPC_CHANNELS.MEDIA_REVEAL, async (_event, id: string) => {
+    await mediaHost.reveal(id);
+  });
+  guarded(IPC_CHANNELS.MEDIA_OPEN_FOLDER, async () => {
+    await mediaHost.openFolder();
+  });
 
   guarded(IPC_CHANNELS.WINDOW_NAVIGATION_STATE, (event) =>
     computeNavigationState(event.sender)

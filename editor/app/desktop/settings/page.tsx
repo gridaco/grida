@@ -50,8 +50,10 @@ import {
   DesktopBridgeMissingError,
   OLLAMA_ENDPOINT_PRESET,
   account,
+  audio,
   app,
   images,
+  threeD,
   video,
   mergeProbedModels,
   providers,
@@ -62,14 +64,17 @@ import {
   type EndpointModelEntry,
   type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
+import * as gridaGateway from "@/lib/desktop/gg-session";
 import Link from "next/link";
 import {
   DesktopPageContent,
   DesktopPageShell,
 } from "@/scaffolds/desktop/chrome/page-shell";
+import { DesktopMediaTool } from "@/scaffolds/desktop/tools/media-tool-registry";
 import * as chatgptSubscription from "@/lib/desktop/chatgpt-subscription";
 import { useChatGptSubscription } from "@/lib/desktop/chatgpt-subscription-react";
 import { CreditsSection } from "./_components/credits-section";
+import { MediaModelReadiness } from "./_components/media-model-readiness";
 
 /**
  * Desktop settings — BYOK key slots, version/platform.
@@ -119,13 +124,13 @@ export default function DesktopSettingsPage() {
           </ProviderListCard>
         </SettingsSection>
         <SettingsSection
-          title="Image/Video/Audio Providers"
-          description="Generation providers for media workflows."
+          title="Media Providers"
+          description="Generation providers for image, video, 3D, and audio workflows."
         >
           <ProviderListCard
             title="Media Provider Keys"
-            description="Provider keys for image, video, and audio workflows. Providers that also serve LLMs may appear in both sections."
-            modalities={["image", "video"]}
+            description="Provider keys for image, video, fal 3D, and ElevenLabs Sound Effects workflows. Providers that also serve LLMs may appear in both sections."
+            providerIds={MEDIA_PROVIDER_IDS}
           />
           <MediaModelsSection />
         </SettingsSection>
@@ -452,6 +457,13 @@ const BYOK_PROVIDER_SETUP: Record<
     consoleHref: "https://fal.ai/dashboard/keys",
     placeholder: "fal_sk_00000000000000000000000000000000",
   },
+  elevenlabs: {
+    label: "ElevenLabs",
+    article: "an",
+    consoleLabel: "ElevenLabs API keys",
+    consoleHref: "https://elevenlabs.io/app/developers/api-keys",
+    placeholder: "sk_00000000000000000000000000000000",
+  },
 };
 
 function providerServesAny(
@@ -467,13 +479,16 @@ function ProviderListCard({
   title,
   description,
   modalities,
+  providerIds,
   excludeModalities = [],
   leading,
   children,
 }: {
   title: string;
   description: ReactNode;
-  modalities: readonly ProviderModality[];
+  modalities?: readonly ProviderModality[];
+  /** Exact provider identities for provider-shaped, non-resolver surfaces. */
+  providerIds?: readonly ByokProviderId[];
   excludeModalities?: readonly ProviderModality[];
   leading?: ReactNode;
   children?: ReactNode;
@@ -482,7 +497,9 @@ function ProviderListCard({
     .byokProviderMetadata()
     .filter(
       (provider) =>
-        providerServesAny(provider, modalities) &&
+        (providerIds
+          ? providerIds.includes(provider.id)
+          : providerServesAny(provider, modalities ?? [])) &&
         !providerServesAny(provider, excludeModalities)
     );
   return (
@@ -856,51 +873,115 @@ function AcpSection() {
 
 /* ───────────────────────────── Models ───────────────────────────── */
 
-/** Media providers, by precedence — one connected key unlocks media routes. */
+/** Provider ids rendered as badges for media model rows. */
 const MEDIA_PROVIDER_IDS = [
+  "openrouter",
+  "vercel",
+  "fal",
+  "elevenlabs",
+] as const satisfies readonly ByokProviderId[];
+
+const VISUAL_BYOK_PROVIDER_IDS = [
   "openrouter",
   "vercel",
   "fal",
 ] as const satisfies readonly ByokProviderId[];
 
 /**
- * Media-generation models (#908). Shows the curated, provider-agnostic image
- * and video lists with provider availability badges. The agent host resolves
- * the provider per request; the renderer never sees the key (GRIDA-SEC-004).
+ * Media-generation models. Readiness is scoped to each callable route rather
+ * than inferred from one unrelated provider key: fal for 3D, ElevenLabs for
+ * SFX, and an active hosted Grida session for music.
  */
 function MediaModelsSection() {
-  const [ready, setReady] = useState<boolean | null>(null);
+  const [connectedVisualProviders, setConnectedVisualProviders] =
+    useState<ReadonlySet<ByokProviderId> | null>(null);
+  const [hostedMediaReady, setHostedMediaReady] = useState<boolean | null>(
+    null
+  );
+  const [threeDReady, setThreeDReady] = useState<boolean | null>(null);
+  const [musicReady, setMusicReady] = useState<boolean | null>(null);
+  const [soundEffectReady, setSoundEffectReady] = useState<boolean | null>(
+    null
+  );
   const imageSupported = images.isSupported();
   const videoSupported = video.isSupported();
+  const threeDSupported = threeD.isSupported();
+  const musicSupported = audio.music.isSupported();
+  const soundEffectSupported = audio.soundEffects.isSupported();
   const imageModels = imageSupported ? models.image.listed_models() : [];
   const videoModels = videoSupported ? models.video.listed_models() : [];
+  const threeDModels = threeDSupported ? models.three_d.staged_models() : [];
+  const musicModels = musicSupported ? models.audio.music.listed_models() : [];
+  const soundEffectModels = soundEffectSupported
+    ? models.audio.sound_effects.staged_models()
+    : [];
 
   useEffect(() => {
-    if (!imageSupported && !videoSupported) return;
     let live = true;
-    (async () => {
-      const present = await Promise.all(
-        MEDIA_PROVIDER_IDS.map((id) => secrets.hasKey(id).catch(() => false))
+    if (imageSupported || videoSupported) {
+      void Promise.all(
+        VISUAL_BYOK_PROVIDER_IDS.map((id) =>
+          secrets.hasKey(id).catch(() => false)
+        )
+      ).then((present) => {
+        if (!live) return;
+        setConnectedVisualProviders(
+          new Set(
+            VISUAL_BYOK_PROVIDER_IDS.filter(
+              (_provider, index) => present[index]
+            )
+          )
+        );
+      });
+    }
+    if (threeDSupported) {
+      void secrets.hasKey("fal").then(
+        (present) => live && setThreeDReady(present),
+        () => live && setThreeDReady(false)
       );
-      if (live) setReady(present.some(Boolean));
-    })();
+    }
+    if (soundEffectSupported) {
+      void secrets.hasKey("elevenlabs").then(
+        (present) => live && setSoundEffectReady(present),
+        () => live && setSoundEffectReady(false)
+      );
+    }
+    if (imageSupported || videoSupported || musicSupported) {
+      void gridaGateway.ensureFresh().then((state) => {
+        if (!live) return;
+        const active = state.kind === "active";
+        if (imageSupported || videoSupported) setHostedMediaReady(active);
+        if (musicSupported) setMusicReady(active);
+      });
+    }
     return () => {
       live = false;
     };
-  }, [imageSupported, videoSupported]);
+  }, [
+    imageSupported,
+    musicSupported,
+    soundEffectSupported,
+    threeDSupported,
+    videoSupported,
+  ]);
 
-  if (!imageSupported && !videoSupported) return null;
+  if (
+    !imageSupported &&
+    !videoSupported &&
+    !threeDSupported &&
+    !musicSupported &&
+    !soundEffectSupported
+  ) {
+    return null;
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Media models</CardTitle>
         <CardDescription>
-          {ready === null
-            ? "Checking your connected providers…"
-            : ready
-              ? "Ready — you can generate media with the models below."
-              : "Connect an OpenRouter, Vercel, or fal key above to use these."}
+          Each group reports the provider or hosted session it actually uses.
+          You can still open the playground to finish setup there.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
@@ -908,10 +989,14 @@ function MediaModelsSection() {
           <MediaModelGroup
             title="Image"
             models={imageModels}
-            ready={ready === true}
-            hrefForModel={(id) =>
-              `/desktop/images?model=${encodeURIComponent(id)}`
+            readyForModel={(card) =>
+              MediaModelReadiness.visual(
+                card,
+                connectedVisualProviders,
+                hostedMediaReady
+              )
             }
+            hrefForModel={mediaToolHref}
             actionLabel="Open in image generator"
           />
         )}
@@ -919,11 +1004,42 @@ function MediaModelsSection() {
           <MediaModelGroup
             title="Video"
             models={videoModels}
-            ready={ready === true}
-            hrefForModel={(id) =>
-              `/desktop/video?model=${encodeURIComponent(id)}`
+            readyForModel={(card) =>
+              MediaModelReadiness.visual(
+                card,
+                connectedVisualProviders,
+                hostedMediaReady
+              )
             }
+            hrefForModel={mediaToolHref}
             actionLabel="Open in video generator"
+          />
+        )}
+        {threeDSupported && (
+          <MediaModelGroup
+            title="3D · fal"
+            models={threeDModels}
+            readyForModel={() => threeDReady}
+            hrefForModel={mediaToolHref}
+            actionLabel="Open in 3D generator"
+          />
+        )}
+        {musicSupported && (
+          <MediaModelGroup
+            title="Music · Grida included"
+            models={musicModels}
+            readyForModel={() => musicReady}
+            hrefForModel={mediaToolHref}
+            actionLabel="Open in music generator"
+          />
+        )}
+        {soundEffectSupported && (
+          <MediaModelGroup
+            title="Sound effects · ElevenLabs"
+            models={soundEffectModels}
+            readyForModel={() => soundEffectReady}
+            hrefForModel={mediaToolHref}
+            actionLabel="Open in SFX generator"
           />
         )}
       </CardContent>
@@ -936,19 +1052,20 @@ type MediaModelCard = {
   label: string;
   short_description: string;
   vendor: models.Vendor;
-  providers: object;
+  provider?: string;
+  providers?: object;
 };
 
 function MediaModelGroup({
   title,
   models,
-  ready,
+  readyForModel,
   hrefForModel,
   actionLabel,
 }: {
   title: string;
   models: readonly MediaModelCard[];
-  ready: boolean;
+  readyForModel: (card: MediaModelCard) => boolean | null;
   hrefForModel: (id: string) => string;
   actionLabel: string;
 }) {
@@ -962,7 +1079,7 @@ function MediaModelGroup({
           <MediaModelRow
             key={card.id}
             card={card}
-            ready={ready}
+            ready={readyForModel(card)}
             href={hrefForModel(card.id)}
             actionLabel={actionLabel}
           />
@@ -979,7 +1096,7 @@ function MediaModelRow({
   actionLabel,
 }: {
   card: MediaModelCard;
-  ready: boolean;
+  ready: boolean | null;
   href: string;
   actionLabel: string;
 }) {
@@ -989,21 +1106,28 @@ function MediaModelRow({
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-2">
           <span className="font-medium">{card.label}</span>
-          <MediaProviderLogos providers={card.providers} />
+          <MediaProviderLogos card={card} />
+          <span
+            className={
+              ready === true
+                ? "ml-auto shrink-0 text-xs text-emerald-600"
+                : "ml-auto shrink-0 text-xs text-muted-foreground"
+            }
+          >
+            {ready === null ? "Checking" : ready ? "Ready" : "Setup required"}
+          </span>
         </div>
         <span className="text-xs text-muted-foreground">
           {card.short_description}
         </span>
-        {ready && (
-          <Button
-            asChild
-            variant="link"
-            size="sm"
-            className="mt-1 h-auto self-start p-0 text-xs"
-          >
-            <Link href={href}>{actionLabel}</Link>
-          </Button>
-        )}
+        <Button
+          asChild
+          variant="link"
+          size="sm"
+          className="mt-1 h-auto self-start p-0 text-xs"
+        >
+          <Link href={href}>{actionLabel}</Link>
+        </Button>
       </div>
     </div>
   );
@@ -1032,9 +1156,11 @@ function MediaVendorLogo({ vendor }: { vendor: models.Vendor }) {
   );
 }
 
-function MediaProviderLogos({ providers }: { providers: object }) {
+function MediaProviderLogos({ card }: { card: MediaModelCard }) {
   const providerIds = MEDIA_PROVIDER_IDS.filter((id) =>
-    Object.prototype.hasOwnProperty.call(providers, id)
+    card.providers
+      ? Object.prototype.hasOwnProperty.call(card.providers, id)
+      : card.provider === id
   );
 
   return (
@@ -1053,6 +1179,10 @@ function MediaProviderLogos({ providers }: { providers: object }) {
       })}
     </div>
   );
+}
+
+function mediaToolHref(id: string): string {
+  return DesktopMediaTool.hrefForModel(id);
 }
 
 /* ─────────────────────────── Local models ───────────────────────── */

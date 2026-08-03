@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { SettingsIcon } from "lucide-react";
+import { SettingsIcon, WrenchIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 import {
@@ -22,9 +22,9 @@ import {
 } from "./application-preset";
 
 /**
- * `PresetRail` — the home-scoped, icon-only sidebar. Not app chrome: it lives
- * inside the welcome window and does one thing — mutate the active preset (plus
- * a Settings link pinned to the footer).
+ * `PresetRail` — the home-scoped, icon-only sidebar. The preset controls mutate
+ * the shared Welcome surface; routed destinations remain visibly separated so
+ * they cannot be mistaken for another workspace/application preset.
  */
 export function PresetRail({
   value,
@@ -116,7 +116,7 @@ export function PresetRail({
     <TooltipProvider>
       <nav
         data-testid="desktop-home-preset-rail"
-        aria-label="Mode"
+        aria-label="Welcome navigation"
         className={cn(
           "flex w-12 shrink-0 flex-col items-center gap-0.5 border-r bg-background py-2",
           className
@@ -126,6 +126,25 @@ export function PresetRail({
         {/* Divider — sets the neutral Home apart from the marketable modes. */}
         <div className="my-1 h-px w-6 bg-border" aria-hidden />
         {presetItems.map(renderItem)}
+
+        {/* Tools is a destination, not an application preset: it owns a unique,
+            temporary surface instead of mutating the Welcome composer. */}
+        <div className="my-1 h-px w-6 bg-border" aria-hidden />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              asChild
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground"
+            >
+              <Link href="/desktop/tools" prefetch={false} aria-label="Tools">
+                <WrenchIcon className="size-4" />
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Tools</TooltipContent>
+        </Tooltip>
 
         {/* Footer — pinned to the bottom of the rail. Settings used to live in
             the title bar; the rail gives it a natural home now. */}

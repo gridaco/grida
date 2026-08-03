@@ -1,16 +1,16 @@
 ---
 title: Models & Pricing
-description: Compare Grida AI model tiers, context windows, token prices, and image generation costs.
-keywords: [AI models, AI pricing, GPT-5.6, Claude Fable 5, Grida AI]
+description: Compare Grida AI model tiers, context windows, and text, image, and music generation costs.
+keywords: [AI models, AI pricing, GPT-5.6, Claude Fable 5, Lyria, Grida AI]
 slug: pricing
 format: md
 ---
 
 # Models & Pricing
 
-Grida uses AI models across the editor for text generation, image generation, and image processing. This page documents the available models, their capabilities, and pricing.
+Grida uses AI models across the editor for text, image, music, and media-processing workflows. This page documents the models that are integrated and available to use, their capabilities, and pricing.
 
-All models are routed through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway).
+Text and image models use Grida's hosted model routes. Media models that require a specialist provider identify that provider explicitly; a catalogued compatibility contract is not the same as an integrated model.
 
 ## Billing
 
@@ -186,6 +186,20 @@ Image tools provide processing capabilities like upscaling and background remova
 | Model                                   | Cost/Image |
 | --------------------------------------- | ---------- |
 | Real-ESRGAN (`nightmareai/real-esrgan`) | $0.002     |
+
+## Music Generation Models
+
+The current music playground uses Google Lyria through Replicate. Both models
+accept a text prompt, up to 10 optional reference images, and an optional seed.
+
+| Model                              | Output                       | Price/Generation |
+| ---------------------------------- | ---------------------------- | ---------------- |
+| Lyria 3 (`google/lyria-3`)         | 30s, 48 kHz stereo MP3       | $0.040           |
+| Lyria 3 Pro (`google/lyria-3-pro`) | Up to ~3m, 48 kHz stereo MP3 | $0.080           |
+
+Provider output URLs are transport locations, not durable assets. An integrated
+workflow must copy generated audio into durable, application-owned storage
+before presenting it as complete.
 
 ## Tier Selection Guide
 

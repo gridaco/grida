@@ -3,6 +3,22 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const replicateMock = vi.hoisted(() => ({
+  run: vi.fn<
+    (
+      model: string,
+      options: { input: Record<string, unknown> }
+    ) => Promise<unknown>
+  >(),
+}));
+
+vi.mock("replicate", () => ({
+  default: class ReplicateMock {
+    readonly run = replicateMock.run;
+    constructor(_options?: unknown) {}
+  },
+}));
+
 vi.mock("@/lib/billing/metronome", () => ({
   getEntitlement: vi.fn<(...args: never[]) => unknown>(),
   ingestUsageEvent: vi.fn<(...args: never[]) => unknown>(),
@@ -51,6 +67,7 @@ import {
   costMillsFromTokenUsage,
   MissingOrgIdError,
   checkGate,
+  methods,
 } from "../server";
 
 const mockedGetEntitlement = vi.mocked(getEntitlement);
@@ -69,6 +86,7 @@ beforeEach(() => {
   mockedCreateLibraryClient.mockReset();
   mockedRequireOrganizationId.mockReset();
   mockedIsByokActive.mockReset();
+  replicateMock.run.mockReset();
   // Default: BYOK inactive (billed path) unless a test opts in.
   mockedIsByokActive.mockReturnValue(false);
 });
@@ -83,7 +101,46 @@ function stubAuthed(orgId = 7) {
 }
 
 afterEach(() => {
+  delete process.env.REPLICATE_API_TOKEN;
   vi.clearAllMocks();
+});
+
+describe("methods.generateMusic", () => {
+  it("sends only fields accepted by the current Replicate Lyria schema", async () => {
+    process.env.REPLICATE_API_TOKEN = "test-replicate-token";
+    mockedGetEntitlement.mockResolvedValueOnce({
+      allowed: true,
+      cachedBalanceCents: 1000,
+      cachedAt: null,
+    });
+    mockedIngestUsageEvent.mockResolvedValueOnce({
+      transactionId: "tx-audio",
+    });
+    replicateMock.run.mockResolvedValueOnce("https://example.test/audio.mp3");
+
+    await expect(
+      methods.generateMusic(7, "google/lyria-3", {
+        prompt: "Clockwork forest percussion",
+        images: ["https://example.test/reference.png"],
+        seed: 42,
+      })
+    ).resolves.toEqual({ url: "https://example.test/audio.mp3" });
+
+    expect(replicateMock.run).toHaveBeenCalledExactlyOnceWith(
+      "google/lyria-3",
+      {
+        input: {
+          prompt: "Clockwork forest percussion",
+          images: ["https://example.test/reference.png"],
+          seed: 42,
+        },
+      }
+    );
+    const providerInput = replicateMock.run.mock.calls[0][1].input;
+    expect(providerInput).not.toHaveProperty("image_inputs");
+    expect(providerInput).not.toHaveProperty("language");
+    expect(providerInput).not.toHaveProperty("negative_prompt");
+  });
 });
 
 describe("costMillsFromTokenUsage", () => {

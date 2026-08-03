@@ -1,13 +1,12 @@
 // GRIDA-GG: provider — see docs/wg/platform/hosted-ai.md
 /**
- * GRIDA-SEC-006 — Grida hosted image/video adapters.
+ * GRIDA-SEC-006 — Grida hosted media adapters.
  *
- * The media counterparts of `./grida.ts`: `ImageModelV3` /
- * `VideoModelV3` over the hosted `/api/v1/ai/{images,videos}/generations`
- * endpoints (Grida-native protocol — the same request/result shapes the
- * BYOK routes speak). The daemon contacts ONLY the configured editor
- * origin for this provider; results are base64 by contract, so nothing
- * from the response body is ever followed as a URL.
+ * `ImageModelV3` / `VideoModelV3` and the typed music adapter call the hosted
+ * `/api/v1/ai/{images,videos,music}/generations` endpoints using Grida-native
+ * request/result contracts. The daemon contacts ONLY the configured editor
+ * origin for this provider; results are base64 by contract, so nothing from
+ * the response body is ever followed as a URL.
  *
  * Credential: the session token, read PER CALL from the store (never
  * captured at construction). Error posture mirrors the BYOK adapters'
@@ -26,7 +25,18 @@ import type { GridaGatewaySessionStore } from "./gg-session";
 import { readGgToken, throwOnGgHttpError } from "./gg";
 import type { ImageGenerateResult } from "../protocol/images";
 import type { VideoGenerateResult } from "../protocol/video";
+import type {
+  MusicGenerateRequest,
+  MusicGenerateResult,
+} from "../protocol/music";
 import { ProviderHttp } from "./http";
+
+const MAX_HOSTED_MUSIC_BYTES = 32 * 1024 * 1024;
+const MAX_HOSTED_MUSIC_BASE64_CHARACTERS =
+  Math.ceil(MAX_HOSTED_MUSIC_BYTES / 3) * 4;
+const MAX_HOSTED_MUSIC_JSON_ENVELOPE_BYTES = 4 * 1024;
+const MAX_HOSTED_MUSIC_RESPONSE_BYTES =
+  MAX_HOSTED_MUSIC_BASE64_CHARACTERS + MAX_HOSTED_MUSIC_JSON_ENVELOPE_BYTES;
 
 function joinApi(baseUrl: string, path: string): string {
   return new URL(path, baseUrl).toString();
@@ -39,6 +49,7 @@ async function postHosted<T>(args: {
   scope: string;
   abortSignal?: AbortSignal;
   provider_http: ProviderHttp;
+  max_response_bytes?: number;
 }): Promise<T> {
   const res = await args.provider_http.request(args.url, {
     method: "POST",
@@ -56,7 +67,67 @@ async function postHosted<T>(args: {
     await res.body?.cancel().catch(() => {});
     throw new Error(`[${args.scope}] hosted request failed (${res.status})`);
   }
-  return (await res.json()) as T;
+  if (args.max_response_bytes === undefined) {
+    // Preserve the established generic image/video response behavior.
+    return (await res.json()) as T;
+  }
+  return readHostedJsonBounded<T>(res, args.max_response_bytes, args.scope);
+}
+
+async function readHostedJsonBounded<T>(
+  response: Response,
+  maxBytes: number,
+  scope: string
+): Promise<T> {
+  const contentLength = response.headers.get("content-length");
+  if (
+    contentLength !== null &&
+    /^\d+$/.test(contentLength) &&
+    Number(contentLength) > maxBytes
+  ) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error(`[${scope}] hosted response was too large`);
+  }
+  if (!response.body) {
+    throw new Error(`[${scope}] hosted response was malformed`);
+  }
+
+  const reader = response.body.getReader();
+  let data = new Uint8Array();
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const nextTotal = total + value.byteLength;
+      if (!Number.isSafeInteger(nextTotal) || nextTotal > maxBytes) {
+        throw new Error(`[${scope}] hosted response was too large`);
+      }
+      if (nextTotal > data.byteLength) {
+        const capacity = Math.min(
+          maxBytes,
+          Math.max(
+            nextTotal,
+            data.byteLength === 0 ? 64 * 1024 : data.byteLength * 2
+          )
+        );
+        const grown = new Uint8Array(capacity);
+        grown.set(data.subarray(0, total));
+        data = grown;
+      }
+      data.set(value, total);
+      total = nextTotal;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+
+  try {
+    return JSON.parse(new TextDecoder().decode(data.subarray(0, total))) as T;
+  } catch {
+    throw new Error(`[${scope}] hosted response was malformed`);
+  }
 }
 
 export class GridaGatewayImageModel implements ImageModelV3 {
@@ -174,4 +245,54 @@ export class GridaGatewayVideoModel implements VideoModelV3 {
       providerMetadata: {},
     };
   }
+}
+
+/**
+ * Hosted Lyria client. Music has no AI SDK provider interface in this package,
+ * so this stays a small typed adapter over Grida's native endpoint. The hosted
+ * endpoint returns MP3 bytes as base64; this adapter never follows a provider
+ * result URL (GRIDA-SEC-004/006).
+ */
+export class GridaGatewayMusicProvider {
+  constructor(
+    private readonly session: GridaGatewaySessionStore,
+    private readonly baseUrl: string,
+    private readonly providerHttp: ProviderHttp = new ProviderHttp()
+  ) {}
+
+  async generate(
+    request: MusicGenerateRequest,
+    abortSignal?: AbortSignal
+  ): Promise<MusicGenerateResult> {
+    const result = await postHosted<MusicGenerateResult>({
+      session: this.session,
+      url: joinApi(this.baseUrl, "/api/v1/ai/music/generations"),
+      scope: "grida-music",
+      abortSignal,
+      provider_http: this.providerHttp,
+      max_response_bytes: MAX_HOSTED_MUSIC_RESPONSE_BYTES,
+      body: request,
+    });
+    if (
+      result.model_id !== request.model_id ||
+      result.provider_id !== "gg" ||
+      typeof result.audio?.base64 !== "string" ||
+      result.audio.base64.length === 0 ||
+      result.audio.base64.length > MAX_HOSTED_MUSIC_BASE64_CHARACTERS ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(result.audio.base64) ||
+      result.audio.base64.length % 4 !== 0 ||
+      decodedBase64Bytes(result.audio.base64) > MAX_HOSTED_MUSIC_BYTES ||
+      result.audio.media_type !== "audio/mpeg" ||
+      typeof result.audio.file_name !== "string" ||
+      !/^[^/\\]{1,128}\.mp3$/i.test(result.audio.file_name)
+    ) {
+      throw new Error("[grida-music] hosted response was malformed");
+    }
+    return result;
+  }
+}
+
+function decodedBase64Bytes(value: string): number {
+  const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
+  return (value.length / 4) * 3 - padding;
 }

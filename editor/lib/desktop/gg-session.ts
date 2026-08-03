@@ -12,9 +12,10 @@
  *
  * Contract for callers: `ensureFresh()` before anything that may use the
  * hosted provider (the agent transport pre-send hook, the playgrounds'
- * generate). It is SINGLE-FLIGHT, cheap when fresh (>5 min left = one
- * compare), and **never throws** — hosted AI degrading must never break
- * a BYOK run. Sign-out paths call `clear()`.
+ * generate). It is SINGLE-FLIGHT and, while the renderer cache is fresh,
+ * confirms the daemon still holds its memory-only session before returning.
+ * It **never throws** — hosted AI degrading must never break a BYOK run.
+ * Sign-out paths call `clear()`.
  */
 import { getDesktopBridge } from "@/lib/desktop/bridge";
 
@@ -58,16 +59,41 @@ export function peek(): GridaGatewaySessionState {
 export async function ensureFresh(): Promise<GridaGatewaySessionState> {
   const bridge = ggBridge();
   if (!bridge) return setCached({ kind: "unsupported" });
-  if (
-    cached?.kind === "active" &&
-    cached.expires_at - Date.now() > REFRESH_SLACK_MS
-  ) {
-    return cached;
-  }
-  inflight ??= mintAndPush(bridge).finally(() => {
+  inflight ??= ensureFreshWithBridge(bridge).finally(() => {
     inflight = null;
   });
   return inflight;
+}
+
+async function ensureFreshWithBridge(
+  bridge: NonNullable<ReturnType<typeof ggBridge>>
+): Promise<GridaGatewaySessionState> {
+  const rendererSession = cached;
+  if (
+    rendererSession?.kind === "active" &&
+    rendererSession.expires_at - Date.now() > REFRESH_SLACK_MS
+  ) {
+    let daemonActive = false;
+    try {
+      daemonActive = (await bridge.status()).active;
+    } catch {
+      // A failed liveness check cannot prove that the memory-only token
+      // survived. Re-seeding is safe and preserves ensureFresh's never-throws
+      // contract.
+    }
+
+    // `clear()` may win while the status request is in flight. Never re-mint
+    // across that sign-out boundary. A null cache means forceRefresh() won and
+    // deliberately requested a fresh mint through this same single-flight.
+    if (cached !== rendererSession) {
+      if (cached !== null) return cached;
+    } else if (daemonActive) {
+      return rendererSession;
+    }
+    cached = null;
+  }
+
+  return mintAndPush(bridge);
 }
 
 /** Drop the cache and re-mint (e.g. after a `gg_token_expired` error). */

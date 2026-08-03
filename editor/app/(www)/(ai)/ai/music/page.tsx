@@ -85,8 +85,8 @@ const collageCovers = COLLAGE_IDS.map((id) => {
 });
 
 export default function MusicLandingPage() {
-  const lyria3 = ai.audio.models["google/lyria-3"];
-  const lyria3Pro = ai.audio.models["google/lyria-3-pro"];
+  const lyria3 = ai.audio.music.models["google/lyria-3"];
+  const lyria3Pro = ai.audio.music.models["google/lyria-3-pro"];
 
   const ldJson = {
     "@context": "https://schema.org",
@@ -646,7 +646,7 @@ function ModelRow({
   art,
   highlight,
 }: {
-  card: ai.audio.AudioModelCard;
+  card: ai.audio.music.ModelCard;
   tagline: string;
   bullets: string[];
   art: "clip" | "track";

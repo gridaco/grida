@@ -3,17 +3,23 @@
  * `generateImage`. No model, no network.
  */
 import { readFileSync } from "node:fs";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
-import type { SecretsStore } from "@grida/daemon/server";
+import type { MediaItem } from "@grida/daemon";
+import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import { registerImagesRoutes } from "./images";
 
 // Replace the `ai` SDK's generateImage so the route never drives a real model.
-vi.mock("ai", () => ({
-  generateImage: async () => ({
-    images: [{ base64: "AAAA", mediaType: "image/png" }],
-  }),
+const generation = vi.hoisted(() => ({
+  images: [] as Array<{ base64: string; mediaType: string }>,
 }));
+vi.mock("ai", () => ({
+  generateImage: async () => generation,
+}));
+
+beforeEach(() => {
+  generation.images = [{ base64: "AAAA", mediaType: "image/png" }];
+});
 
 function fakeSecrets(keys: Record<string, string>): SecretsStore {
   return {
@@ -21,9 +27,12 @@ function fakeSecrets(keys: Record<string, string>): SecretsStore {
   } as unknown as SecretsStore;
 }
 
-function appWith(keys: Record<string, string>) {
+function appWith(
+  keys: Record<string, string>,
+  media?: MediaPersistence | null
+) {
   const app = new Hono();
-  registerImagesRoutes(app, { secrets: fakeSecrets(keys) });
+  registerImagesRoutes(app, { secrets: fakeSecrets(keys), media });
   return app;
 }
 
@@ -86,6 +95,54 @@ describe("POST /images/generate", () => {
       prompt: "x",
     });
     expect(await res.text()).not.toContain("sk-secret-123");
+  });
+
+  it("offers every output to the host store and correlates only accepted descriptors", async () => {
+    generation.images = [
+      { base64: "Zmlyc3Q=", mediaType: "image/png" },
+      { base64: "c2Vjb25k", mediaType: "image/webp" },
+    ];
+    const stored: MediaItem = {
+      id: "7ccb8e68-a201-40d9-a793-44de9e6c6fc6",
+      file_name: "image-1.png",
+      media_type: "image/png",
+      byte_size: 5,
+      created_at: 1,
+    };
+    const save = vi.fn<MediaPersistence["save"]>();
+    save.mockResolvedValueOnce(stored);
+    save.mockRejectedValueOnce(new Error("media-full"));
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await post(appWith({ fal: "sk-fal" }, { save }), {
+      model_id: LISTED,
+      prompt: "must not enter storage",
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      images: [
+        {
+          base64: "Zmlyc3Q=",
+          media_type: "image/png",
+          stored_media: stored,
+        },
+        { base64: "c2Vjb25k", media_type: "image/webp" },
+      ],
+    });
+    expect(save).toHaveBeenNthCalledWith(1, {
+      file_name: "image-1.png",
+      media_type: "image/png",
+      bytes: Buffer.from("first"),
+    });
+    expect(save).toHaveBeenNthCalledWith(2, {
+      file_name: "image-2.webp",
+      media_type: "image/webp",
+      bytes: Buffer.from("second"),
+    });
+    expect(JSON.stringify(save.mock.calls)).not.toContain("must not enter");
+    expect(warning).toHaveBeenCalledOnce();
+    warning.mockRestore();
   });
 });
 

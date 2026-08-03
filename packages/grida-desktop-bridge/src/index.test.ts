@@ -1,6 +1,19 @@
-// GRIDA-SEC-008 — ChatGPT connect exposes only status or cancellation.
+// GRIDA-SEC-004 / GRIDA-SEC-008 — renderer-safe bridge contract pins.
 import { describe, expect, expectTypeOf, it } from "vitest";
-import type { ChatGptConnectResult, DesktopBridge } from "./index";
+import type {
+  MusicGenerateRequest,
+  MusicGenerateResult,
+  SoundEffectGenerateRequest,
+  SoundEffectGenerateResult,
+  ThreeDGenerateRequest,
+  ThreeDGenerateResult,
+} from "@grida/agent";
+import type { MediaItem } from "@grida/daemon";
+import type {
+  ChatGptConnectResult,
+  DesktopBridge,
+  DesktopMediaReadResult,
+} from "./index";
 
 describe("DesktopBridge ChatGPT connect result", () => {
   it("preserves status on success and exposes cancellation as a closed outcome", () => {
@@ -27,6 +40,63 @@ describe("DesktopBridge ChatGPT connect result", () => {
       ready: true,
       signing_in: false,
     });
+  });
+});
+
+describe("DesktopBridge media generation", () => {
+  it("keeps the optional 3D and nested audio namespaces aligned with the agent transport", () => {
+    type ThreeDGenerate = NonNullable<DesktopBridge["threeD"]>["generate"];
+    type Audio = NonNullable<DesktopBridge["audio"]>;
+    type MusicGenerate = NonNullable<Audio["music"]>["generate"];
+    type SoundEffectsGenerate = NonNullable<Audio["soundEffects"]>["generate"];
+
+    expectTypeOf<
+      Parameters<ThreeDGenerate>[0]
+    >().toEqualTypeOf<ThreeDGenerateRequest>();
+    expectTypeOf<
+      Awaited<ReturnType<ThreeDGenerate>>
+    >().toEqualTypeOf<ThreeDGenerateResult>();
+    expectTypeOf<
+      Parameters<MusicGenerate>[0]
+    >().toEqualTypeOf<MusicGenerateRequest>();
+    expectTypeOf<
+      Awaited<ReturnType<MusicGenerate>>
+    >().toEqualTypeOf<MusicGenerateResult>();
+    expectTypeOf<
+      Parameters<SoundEffectsGenerate>[0]
+    >().toEqualTypeOf<SoundEffectGenerateRequest>();
+    expectTypeOf<
+      Awaited<ReturnType<SoundEffectsGenerate>>
+    >().toEqualTypeOf<SoundEffectGenerateResult>();
+  });
+});
+
+describe("DesktopBridge durable media", () => {
+  it("exposes only path-free item ids, descriptors, and bytes", () => {
+    type Media = NonNullable<DesktopBridge["media"]>;
+
+    expectTypeOf<Awaited<ReturnType<Media["list"]>>>().toEqualTypeOf<
+      MediaItem[]
+    >();
+    expectTypeOf<Parameters<Media["read"]>>().toEqualTypeOf<[id: string]>();
+    expectTypeOf<
+      Awaited<ReturnType<Media["read"]>>
+    >().toEqualTypeOf<DesktopMediaReadResult>();
+    expectTypeOf<Parameters<Media["reveal"]>>().toEqualTypeOf<[id: string]>();
+
+    const item = {
+      id: "018f0170-8c80-4f2e-87db-346fbbdf7c56",
+      file_name: "model.glb",
+      media_type: "model/gltf-binary",
+      byte_size: 3,
+      created_at: 1,
+    } satisfies MediaItem;
+    const result = {
+      item,
+      bytes: Uint8Array.from([1, 2, 3]).buffer,
+    } satisfies DesktopMediaReadResult;
+    expect(result).not.toHaveProperty("path");
+    expect(result.item).not.toHaveProperty("path");
   });
 });
 

@@ -163,7 +163,13 @@ function ModeBody({
     case "image":
       return <ImageViewer workspaceId={workspaceId} relPath={relPath} />;
     case "video":
-      return <VideoViewer workspaceId={workspaceId} relPath={relPath} />;
+      return (
+        <VideoViewer
+          workspaceId={workspaceId}
+          relPath={relPath}
+          active={active}
+        />
+      );
     case "text":
       return (
         <EditorPaneCodeEditor

@@ -19,6 +19,12 @@ import type {
   ImageGenerateResult,
   VideoGenerateRequest,
   VideoGenerateResult,
+  ThreeDGenerateRequest,
+  ThreeDGenerateResult,
+  MusicGenerateRequest,
+  MusicGenerateResult,
+  SoundEffectGenerateRequest,
+  SoundEffectGenerateResult,
   ChatMessageWithParts,
   ChatSessionRow,
   ChatGptSubscriptionStatus,
@@ -36,6 +42,7 @@ import type {
   DaemonHandshakeResponse,
   FileReadResult,
   FileWriteResult,
+  MediaItem,
   RecentEntry,
   Workspace,
   WorkspaceCreateInput,
@@ -93,6 +100,7 @@ export type HandshakeResponse = DaemonHandshakeResponse;
 export type {
   FileReadResult,
   FileWriteResult,
+  MediaItem,
   RecentEntry,
   Workspace,
   WorkspaceCreateInput,
@@ -196,6 +204,13 @@ export type TerminalHandlers = {
   on_exit: (info: { exit_code: number }) => void;
 };
 
+/** Renderer-safe media bytes returned by the native Desktop host. */
+export type DesktopMediaReadResult = {
+  item: MediaItem;
+  /** Structured-clone byte buffer; avoids a second base64 expansion in IPC. */
+  bytes: ArrayBuffer;
+};
+
 export type DesktopBridge = {
   protocol: typeof DESKTOP_BRIDGE_PROTOCOL;
   app: { version: string; platform: string };
@@ -256,6 +271,17 @@ export type DesktopBridge = {
     touch: (path: string) => Promise<void>;
     pin: (path: string, pinned: boolean) => Promise<void>;
     forget: (path: string) => Promise<void>;
+  };
+  /**
+   * App-managed, durable media library. Optional because protocol-1 Desktop
+   * builds predate it. Every operation is purpose-scoped: the renderer names
+   * only an opaque item id and never receives or supplies a native path.
+   */
+  media?: {
+    list: () => Promise<MediaItem[]>;
+    read: (id: string) => Promise<DesktopMediaReadResult>;
+    reveal: (id: string) => Promise<void>;
+    open_folder: () => Promise<void>;
   };
   workspaces: {
     list: () => Promise<Workspace[]>;
@@ -434,11 +460,33 @@ export type DesktopBridge = {
   };
   /**
    * BYOK video generation (#908). Desktop-only; resolves the user's key in the
-   * sidecar and returns a provider URL (or base64) — never the key. Optional —
-   * older binaries lack it; renderers feature-detect.
+   * sidecar and returns base64 video bytes — never a provider URL or the key.
+   * Optional — older binaries lack it; renderers feature-detect.
    */
   video?: {
     generate: (req: VideoGenerateRequest) => Promise<VideoGenerateResult>;
+  };
+  /**
+   * BYOK 3D generation. Optional because protocol-1 Desktop builds predate
+   * the route; renderer code must feature-detect the namespace.
+   */
+  threeD?: {
+    generate: (req: ThreeDGenerateRequest) => Promise<ThreeDGenerateResult>;
+  };
+  /**
+   * Audio-output generation taxonomy. Music and sound effects are independent
+   * optional capabilities because their providers, availability, and request
+   * contracts differ. The parent is optional for older Desktop hosts.
+   */
+  audio?: {
+    music?: {
+      generate: (req: MusicGenerateRequest) => Promise<MusicGenerateResult>;
+    };
+    soundEffects?: {
+      generate: (
+        req: SoundEffectGenerateRequest
+      ) => Promise<SoundEffectGenerateResult>;
+    };
   };
   agent: {
     /**
