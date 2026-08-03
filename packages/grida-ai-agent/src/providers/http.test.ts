@@ -432,6 +432,30 @@ describe("ProviderHttp", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it("lets the owning provider lower the retained single-asset budget", async () => {
+    const cancel = vi.fn<(reason?: unknown) => void>();
+    const body = new ReadableStream<Uint8Array>({ pull() {}, cancel });
+    const request = vi.fn<typeof globalThis.fetch>();
+    const download = vi.fn<typeof globalThis.fetch>(
+      async () =>
+        new Response(body, {
+          status: 200,
+          headers: { "content-length": "4" },
+        })
+    );
+    const http = new ProviderHttp({ request, download });
+
+    await expect(
+      http.downloadProviderAsset(
+        new URL("https://cdn.example/memory-budgeted.glb"),
+        { max_bytes: 3 }
+      )
+    ).rejects.toThrow(/download is too large/);
+    expect(download).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("cancels a single provider asset declared above 256 MiB by the response", async () => {
     const cancel = vi.fn<(reason?: unknown) => void>();
     const body = new ReadableStream<Uint8Array>({ pull() {}, cancel });

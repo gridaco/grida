@@ -26,12 +26,12 @@ import { Input } from "@app/ui/components/input";
 import { Label } from "@app/ui/components/label";
 import { audio, type MediaItem } from "@/lib/desktop/bridge";
 import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 import { generatedMediaFile } from "../shared/generated-media-file";
 
 const SOUND_EFFECT_MODELS = models.audio.sound_effects.model_ids.map(
   (id) => models.audio.sound_effects.models[id]
 );
-const DEFAULT_SOUND_EFFECT_MODEL_ID = models.audio.sound_effects.model_ids[0]!;
 
 export type SoundEffectGeneratedPreview = Readonly<{
   file: File;
@@ -39,25 +39,52 @@ export type SoundEffectGeneratedPreview = Readonly<{
   storedMedia?: MediaItem;
 }>;
 
-export function SoundEffectGenerationControls({
-  initialModelId = DEFAULT_SOUND_EFFECT_MODEL_ID,
-  modelIds,
-  onGenerated,
-  onBusyChange,
-  disabled = false,
-}: {
+type SoundEffectGenerationControlsProps = Readonly<{
   initialModelId?: models.audio.sound_effects.ModelId;
   modelIds?: readonly models.audio.sound_effects.ModelId[];
   onGenerated: (result: SoundEffectGeneratedPreview) => void;
   onBusyChange?: (busy: boolean) => void;
   disabled?: boolean;
+}>;
+
+export function SoundEffectGenerationControls(
+  props: SoundEffectGenerationControlsProps
+) {
+  const availableModels = MediaModelAvailability.filter(
+    SOUND_EFFECT_MODELS,
+    props.modelIds
+  );
+  const fallbackModel = availableModels[0];
+  if (!fallbackModel) return <SoundEffectGenerationUnavailable />;
+
+  return (
+    <AvailableSoundEffectGenerationControls
+      key={`${props.initialModelId ?? ""}|${availableModels
+        .map((model) => model.id)
+        .join("|")}`}
+      {...props}
+      availableModels={availableModels}
+      fallbackModelId={fallbackModel.id}
+    />
+  );
+}
+
+function AvailableSoundEffectGenerationControls({
+  initialModelId,
+  onGenerated,
+  onBusyChange,
+  disabled = false,
+  availableModels,
+  fallbackModelId,
+}: SoundEffectGenerationControlsProps & {
+  availableModels: ReadonlyArray<(typeof SOUND_EFFECT_MODELS)[number]>;
+  fallbackModelId: models.audio.sound_effects.ModelId;
 }) {
-  const availableModels = availableSoundEffectModels(modelIds);
-  const resolvedInitialModelId = availableModels.some(
-    (model) => model.id === initialModelId
-  )
-    ? initialModelId
-    : availableModels[0]!.id;
+  const resolvedInitialModelId =
+    initialModelId &&
+    availableModels.some((model) => model.id === initialModelId)
+      ? initialModelId
+      : fallbackModelId;
   const [modelId, setModelId] = useState(resolvedInitialModelId);
   const [duration, setDuration] = useState("");
   const [busy, setBusy] = useState(false);
@@ -180,12 +207,20 @@ export function SoundEffectGenerationControls({
   );
 }
 
-function availableSoundEffectModels(
-  modelIds?: readonly models.audio.sound_effects.ModelId[]
-) {
-  if (!modelIds || modelIds.length === 0) return SOUND_EFFECT_MODELS;
-  const allowed = new Set<string>(modelIds);
-  return SOUND_EFFECT_MODELS.filter((model) => allowed.has(model.id));
+function SoundEffectGenerationUnavailable() {
+  return (
+    <div
+      data-testid="controls-sound-effect-generation"
+      className="mx-auto w-full max-w-2xl"
+    >
+      <p
+        className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground shadow-lg"
+        role="status"
+      >
+        No sound-effect generation model is available for this tool.
+      </p>
+    </div>
+  );
 }
 
 function SoundEffectSettings({

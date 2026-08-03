@@ -4,9 +4,9 @@
  *
  * This is deliberately narrower than a networking abstraction: provider
  * adapters may use {@link ProviderHttp.request} for their named upstream
- * operations, and may use {@link ProviderHttp.downloadProviderAssets} only for
- * a bounded batch of credential-free provider result/asset downloads. Tools,
- * shell processes, and external-agent processes never receive this object.
+ * operations, and the bounded download methods for credential-free provider
+ * results. Tools, shell processes, and external-agent processes never receive
+ * this object.
  */
 
 import {
@@ -37,6 +37,11 @@ type ProviderSingleAssetDownloadOptions = ProviderAssetDownloadOptions &
   Readonly<{
     /** Provider-advertised size hint. The response stream is bounded again. */
     declared_size_bytes?: number;
+    /**
+     * Caller-owned retained-memory budget. The provider adapter must account
+     * for any later representation it creates, such as a base64 result.
+     */
+    max_bytes?: number;
   }>;
 
 /**
@@ -162,16 +167,27 @@ export class ProviderHttp {
   }
 
   /**
-   * Credential-free lane for one viewer-sized provider result. Unlike the
-   * image/video batch path above, a single retained asset may be up to 256 MiB.
-   * A provider size hint can fail before host I/O; Content-Length and streamed
-   * bytes are independently enforced by {@link downloadPart}.
+   * Credential-free lane for one provider result. The package hard ceiling is
+   * 256 MiB, but the owning provider adapter can lower it to its actual
+   * retained-memory budget. A provider size hint can fail before host I/O;
+   * Content-Length and streamed bytes are independently enforced by
+   * {@link downloadPart}.
    */
   async downloadProviderAsset(
     url: URL,
     options?: ProviderSingleAssetDownloadOptions
   ): Promise<{ data: Uint8Array; mediaType: string | undefined }> {
     const declared = options?.declared_size_bytes;
+    const maximum = options?.max_bytes ?? MAX_SINGLE_PROVIDER_ASSET_BYTES;
+    if (
+      !Number.isSafeInteger(maximum) ||
+      maximum < 0 ||
+      maximum > MAX_SINGLE_PROVIDER_ASSET_BYTES
+    ) {
+      throw new RangeError(
+        "max_bytes must be a non-negative integer within the package limit"
+      );
+    }
     if (
       declared !== undefined &&
       (!Number.isSafeInteger(declared) || declared < 0)
@@ -181,13 +197,13 @@ export class ProviderHttp {
         message: "provider asset declared size is invalid",
       });
     }
-    if (declared !== undefined && declared > MAX_SINGLE_PROVIDER_ASSET_BYTES) {
+    if (declared !== undefined && declared > maximum) {
       throw new DownloadError({
         url: url.toString(),
         message: "provider asset download is too large",
       });
     }
-    return this.downloadPart(url, MAX_SINGLE_PROVIDER_ASSET_BYTES, options);
+    return this.downloadPart(url, maximum, options);
   }
 
   private async downloadPart(

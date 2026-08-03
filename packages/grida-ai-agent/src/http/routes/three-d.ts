@@ -67,6 +67,10 @@ export type ThreeDRoutesDeps = {
 
 export function registerThreeDRoutes(app: Hono, deps: ThreeDRoutesDeps) {
   const providerHttp = deps.provider_http ?? new ProviderHttp();
+  // One result retains the downloaded GLB, its base64 representation, and the
+  // response body together. Keep that provider-shaped memory cost exclusive
+  // instead of hiding it behind a generic media-generation concurrency claim.
+  let generationActive = false;
 
   app.post("/three-d/generate", async (c) => {
     const r = await body(c, {
@@ -117,6 +121,17 @@ export function registerThreeDRoutes(app: Hono, deps: ThreeDRoutesDeps) {
       );
     }
 
+    if (generationActive) {
+      return c.json(
+        {
+          error: "another 3D generation is already in progress",
+          code: "three_d_generation_busy",
+        },
+        429
+      );
+    }
+    generationActive = true;
+
     try {
       const glb = await new FalThreeDProvider(
         apiKey.trim(),
@@ -137,6 +152,8 @@ export function registerThreeDRoutes(app: Hono, deps: ThreeDRoutesDeps) {
         model_id: request.model_id,
         provider_id: "fal",
       });
+    } finally {
+      generationActive = false;
     }
   });
 }

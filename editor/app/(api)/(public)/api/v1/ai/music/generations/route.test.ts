@@ -176,6 +176,40 @@ describe("POST /api/v1/ai/music/generations", () => {
     expect(JSON.stringify(await response.json())).not.toContain("example.test");
   });
 
+  it("uses one bounded deadline across trusted redirects and the response body", async () => {
+    const bytes = new Uint8Array([0x49, 0x44, 0x33, 0x03]);
+    const signal = new AbortController().signal;
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(signal);
+    generateMusic.mockResolvedValue({
+      url: "https://replicate.delivery/pbxt/test/redirect.mp3",
+    });
+    const fetchMock = vi.fn<typeof globalThis.fetch>();
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: {
+            location: "https://replicate.delivery/pbxt/test/music.mp3",
+          },
+        })
+      )
+      .mockResolvedValueOnce(new Response(bytes, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { token } = await signGgToken("user-1", 7);
+
+    const response = await POST(
+      request({ model_id: "google/lyria-3", prompt: "Ambient strings" }, token)
+    );
+
+    expect(response.status).toBe(200);
+    expect(timeout).toHaveBeenCalledOnce();
+    expect(timeout).toHaveBeenCalledWith(60_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init?.signal).toBe(signal);
+    }
+  });
+
   it("requires a scoped token and a non-empty prompt", async () => {
     expect(
       (await POST(request({ model_id: "google/lyria-3", prompt: "no token" })))

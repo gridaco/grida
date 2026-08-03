@@ -154,27 +154,9 @@ describe("FalThreeDProvider", () => {
     ).rejects.toThrow(/not a GLB 2\.0 file/);
   });
 
-  it("accepts a single GLB advertised above the generic 64 MiB batch cap", async () => {
-    const advertised = 65 * 1024 * 1024;
+  it("rejects fal file_size above the 64 MiB 3D memory budget before download", async () => {
     const { provider, download } = harness({
-      file_size: advertised,
-      response_content_length: advertised,
-    });
-
-    await expect(
-      provider.generate({
-        model_id: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
-        prompt: "x",
-      })
-    ).resolves.toMatchObject({
-      base64: Buffer.from(GLB_BYTES).toString("base64"),
-    });
-    expect(download).toHaveBeenCalledOnce();
-  });
-
-  it("rejects fal file_size above 256 MiB before opening the download", async () => {
-    const { provider, download } = harness({
-      file_size: 256 * 1024 * 1024 + 1,
+      file_size: 64 * 1024 * 1024 + 1,
     });
 
     await expect(

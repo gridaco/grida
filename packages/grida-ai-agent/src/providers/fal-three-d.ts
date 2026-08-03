@@ -22,6 +22,9 @@ const FAL_QUEUE_BASE = "https://queue.fal.run";
 const FAL_HOSTS = ["*.fal.run", "fal.run", "fal.media", "*.fal.media"] as const;
 const FAL_POLL_TIMEOUT_MS = 600_000;
 const FAL_POLL_INTERVAL_MS = 2_000;
+// The route later retains both decoded bytes and a ~4/3-size base64 string.
+// Match the durable media item ceiling and admit only one generation at once.
+const MAX_THREE_D_GLB_BYTES = 64 * 1024 * 1024;
 
 type FalSubmitResponse = {
   request_id: string;
@@ -118,6 +121,7 @@ export class FalThreeDProvider {
       new URL(file.url),
       {
         signal: abortSignal,
+        max_bytes: MAX_THREE_D_GLB_BYTES,
         ...(fileSize === undefined ? {} : { declared_size_bytes: fileSize }),
       }
     );

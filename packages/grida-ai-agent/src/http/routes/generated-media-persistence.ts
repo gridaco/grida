@@ -51,8 +51,9 @@ export namespace GeneratedMediaPersistence {
     mediaType: string
   ): string | undefined {
     if (!Number.isSafeInteger(outputIndex) || outputIndex < 0) return undefined;
-    const extension = FILE_EXTENSIONS[mediaType.toLowerCase()];
-    if (!extension) return undefined;
+    const key = mediaType.toLowerCase();
+    if (!Object.hasOwn(FILE_EXTENSIONS, key)) return undefined;
+    const extension = FILE_EXTENSIONS[key]!;
     return `${kind}-${outputIndex + 1}.${extension}`;
   }
 

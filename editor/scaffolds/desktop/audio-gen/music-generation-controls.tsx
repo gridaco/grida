@@ -24,12 +24,12 @@ import {
 } from "@/lib/desktop/bridge";
 import * as gridaGateway from "@/lib/desktop/gg-session";
 import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 import { generatedMediaFile } from "../shared/generated-media-file";
 
 const MUSIC_MODELS = models.audio.music.model_ids.map(
   (id) => models.audio.music.models[id]
 );
-const DEFAULT_MUSIC_MODEL_ID = models.audio.music.model_ids[0]!;
 
 type MusicGenerationDependencies = Readonly<{
   generate: (req: MusicGenerateRequest) => Promise<MusicGenerateResult>;
@@ -47,25 +47,50 @@ export type MusicGeneratedPreview = Readonly<{
   storedMedia?: MediaItem;
 }>;
 
-export function MusicGenerationControls({
-  initialModelId = DEFAULT_MUSIC_MODEL_ID,
-  modelIds,
-  onGenerated,
-  onBusyChange,
-  disabled = false,
-}: {
+type MusicGenerationControlsProps = Readonly<{
   initialModelId?: models.audio.music.ModelId;
   modelIds?: readonly models.audio.music.ModelId[];
   onGenerated: (result: MusicGeneratedPreview) => void;
   onBusyChange?: (busy: boolean) => void;
   disabled?: boolean;
+}>;
+
+export function MusicGenerationControls(props: MusicGenerationControlsProps) {
+  const availableModels = MediaModelAvailability.filter(
+    MUSIC_MODELS,
+    props.modelIds
+  );
+  const fallbackModel = availableModels[0];
+  if (!fallbackModel) return <MusicGenerationUnavailable />;
+
+  return (
+    <AvailableMusicGenerationControls
+      key={`${props.initialModelId ?? ""}|${availableModels
+        .map((model) => model.id)
+        .join("|")}`}
+      {...props}
+      availableModels={availableModels}
+      fallbackModelId={fallbackModel.id}
+    />
+  );
+}
+
+function AvailableMusicGenerationControls({
+  initialModelId,
+  onGenerated,
+  onBusyChange,
+  disabled = false,
+  availableModels,
+  fallbackModelId,
+}: MusicGenerationControlsProps & {
+  availableModels: ReadonlyArray<(typeof MUSIC_MODELS)[number]>;
+  fallbackModelId: models.audio.music.ModelId;
 }) {
-  const availableModels = availableMusicModels(modelIds);
-  const resolvedInitialModelId = availableModels.some(
-    (model) => model.id === initialModelId
-  )
-    ? initialModelId
-    : availableModels[0]!.id;
+  const resolvedInitialModelId =
+    initialModelId &&
+    availableModels.some((model) => model.id === initialModelId)
+      ? initialModelId
+      : fallbackModelId;
   const [modelId, setModelId] = useState(resolvedInitialModelId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -163,12 +188,20 @@ export function MusicGenerationControls({
   );
 }
 
-function availableMusicModels(
-  modelIds?: readonly models.audio.music.ModelId[]
-) {
-  if (!modelIds || modelIds.length === 0) return MUSIC_MODELS;
-  const allowed = new Set<string>(modelIds);
-  return MUSIC_MODELS.filter((model) => allowed.has(model.id));
+function MusicGenerationUnavailable() {
+  return (
+    <div
+      data-testid="controls-music-generation"
+      className="mx-auto w-full max-w-2xl"
+    >
+      <p
+        className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground shadow-lg"
+        role="status"
+      >
+        No music generation model is available for this tool.
+      </p>
+    </div>
+  );
 }
 
 /**

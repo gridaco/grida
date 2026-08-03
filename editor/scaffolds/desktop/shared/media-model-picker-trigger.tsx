@@ -16,7 +16,7 @@ export function MediaModelPickerTrigger({
     <SelectTrigger
       size={size}
       className={cn(
-        "w-fit gap-1 border-0 bg-transparent px-2 shadow-none focus-visible:ring-0",
+        "w-fit gap-1 border-0 bg-transparent px-2 shadow-none",
         className
       )}
       {...props}

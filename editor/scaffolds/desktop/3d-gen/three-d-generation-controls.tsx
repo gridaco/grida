@@ -23,11 +23,11 @@ import {
 } from "@app/ui/ai-elements/prompt-input";
 import { threeD, type MediaItem } from "@/lib/desktop/bridge";
 import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 import { generatedMediaFile } from "../shared/generated-media-file";
 import { ThreeDReferenceImage } from "./three-d-reference-image";
 
 const THREE_D_MODELS = models.three_d.staged_models();
-const DEFAULT_THREE_D_MODEL_ID = THREE_D_MODELS[0]!.id;
 
 export type ThreeDGeneratedPreview = Readonly<{
   file: File;
@@ -37,27 +37,52 @@ export type ThreeDGeneratedPreview = Readonly<{
 
 export type ThreeDGenerationInputMode = "text" | "image";
 
-export function ThreeDGenerationControls({
-  initialModelId = DEFAULT_THREE_D_MODEL_ID,
-  inputMode,
-  modelIds,
-  onGenerated,
-  onBusyChange,
-  disabled = false,
-}: {
+type ThreeDGenerationControlsProps = Readonly<{
   initialModelId?: models.three_d.ThreeDModelId;
   inputMode?: ThreeDGenerationInputMode;
   modelIds?: readonly models.three_d.ThreeDModelId[];
   onGenerated: (result: ThreeDGeneratedPreview) => void;
   onBusyChange?: (busy: boolean) => void;
   disabled?: boolean;
+}>;
+
+export function ThreeDGenerationControls(props: ThreeDGenerationControlsProps) {
+  const availableModels = MediaModelAvailability.filter(
+    THREE_D_MODELS,
+    props.modelIds
+  );
+  const fallbackModel = availableModels[0];
+  if (!fallbackModel) return <ThreeDGenerationUnavailable />;
+
+  return (
+    <AvailableThreeDGenerationControls
+      key={`${props.initialModelId ?? ""}|${availableModels
+        .map((model) => model.id)
+        .join("|")}`}
+      {...props}
+      availableModels={availableModels}
+      fallbackModelId={fallbackModel.id}
+    />
+  );
+}
+
+function AvailableThreeDGenerationControls({
+  initialModelId,
+  inputMode,
+  onGenerated,
+  onBusyChange,
+  disabled = false,
+  availableModels,
+  fallbackModelId,
+}: ThreeDGenerationControlsProps & {
+  availableModels: readonly models.three_d.ThreeDModelCard[];
+  fallbackModelId: models.three_d.ThreeDModelId;
 }) {
-  const availableModels = availableThreeDModels(modelIds);
-  const resolvedInitialModelId = availableModels.some(
-    (model) => model.id === initialModelId
-  )
-    ? initialModelId
-    : availableModels[0]!.id;
+  const resolvedInitialModelId =
+    initialModelId &&
+    availableModels.some((model) => model.id === initialModelId)
+      ? initialModelId
+      : fallbackModelId;
   const textModels = availableModels.filter(
     (model) => model.input.type === "text"
   );
@@ -66,7 +91,13 @@ export function ThreeDGenerationControls({
   );
   const initialInputMode =
     models.three_d.models[resolvedInitialModelId].input.type;
-  const activeInputMode = inputMode ?? initialInputMode;
+  const requestedInputMode = inputMode ?? initialInputMode;
+  const activeInputMode =
+    requestedInputMode === "text" && textModels.length > 0
+      ? "text"
+      : requestedInputMode === "image" && imageModels.length > 0
+        ? "image"
+        : initialInputMode;
   const [textModelId, setTextModelId] = useState(
     initialInputMode === "text"
       ? resolvedInitialModelId
@@ -205,12 +236,20 @@ export function ThreeDGenerationControls({
   );
 }
 
-function availableThreeDModels(
-  modelIds?: readonly models.three_d.ThreeDModelId[]
-) {
-  if (!modelIds || modelIds.length === 0) return THREE_D_MODELS;
-  const allowed = new Set<string>(modelIds);
-  return THREE_D_MODELS.filter((model) => allowed.has(model.id));
+function ThreeDGenerationUnavailable() {
+  return (
+    <div
+      data-testid="controls-three-d-generation"
+      className="mx-auto w-full max-w-2xl"
+    >
+      <p
+        className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground shadow-lg"
+        role="status"
+      >
+        No 3D generation model is available for this tool.
+      </p>
+    </div>
+  );
 }
 
 function ReferenceImageInput() {

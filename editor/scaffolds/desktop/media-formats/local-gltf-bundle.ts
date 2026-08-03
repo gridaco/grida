@@ -536,7 +536,13 @@ function documentHasExternalResources(document: GltfDocument): boolean {
     if (typeof image.uri !== "string") {
       throw new Error(`images[${index}].uri must be a string.`);
     }
-    if (image.uri.startsWith("data:")) continue;
+    if (image.uri.startsWith("data:")) {
+      // Data images still need to pass the same MIME allowlist as selected
+      // sidecars. Route them through pack() instead of handing the original
+      // URI directly to GLTFLoader.
+      external = true;
+      continue;
+    }
     normalizeResourceUri(image.uri);
     external = true;
   }

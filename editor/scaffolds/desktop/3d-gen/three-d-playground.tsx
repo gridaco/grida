@@ -16,6 +16,7 @@ import type { MediaItem } from "@/lib/desktop/bridge";
 import { LocalGltfBundle } from "../media-formats/local-gltf-bundle";
 import { LocalGltfPreview } from "../media-formats/local-gltf-preview";
 import { FileDownloadButton } from "../shared/file-download-button";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 import {
   ThreeDGenerationControls,
   type ThreeDGeneratedPreview,
@@ -43,25 +44,27 @@ export function ThreeDPlayground({
   onStoredMediaCreated?: (item: MediaItem) => void;
   onRevealStoredMedia?: (item: MediaItem) => void;
 }) {
-  const availableModelIds = modelIds ?? models.three_d.three_d_model_ids;
-  const initialInputMode: ThreeDGenerationInputMode = initialModelId
-    ? models.three_d.models[initialModelId].input.type
-    : availableModelIds.some(
-          (id) => models.three_d.models[id].input.type === "text"
-        )
-      ? "text"
-      : "image";
+  const availableModels = MediaModelAvailability.filter(
+    models.three_d.staged_models(),
+    modelIds
+  );
+  const resolvedInitialModel =
+    availableModels.find((model) => model.id === initialModelId) ??
+    availableModels[0];
+  const availableModelIds = availableModels.map((model) => model.id);
+  const initialInputMode: ThreeDGenerationInputMode =
+    resolvedInitialModel?.input.type ?? "text";
   const [inputMode, setInputMode] =
     useState<ThreeDGenerationInputMode>(initialInputMode);
   const [files, setFiles] = useState<readonly File[]>([]);
   const [source, setSource] = useState<"local" | "generated" | null>(null);
   const [storedMedia, setStoredMedia] = useState<MediaItem | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasTextInput = availableModelIds.some(
-    (id) => models.three_d.models[id].input.type === "text"
+  const hasTextInput = availableModels.some(
+    (model) => model.input.type === "text"
   );
-  const hasImageInput = availableModelIds.some(
-    (id) => models.three_d.models[id].input.type === "image"
+  const hasImageInput = availableModels.some(
+    (model) => model.input.type === "image"
   );
 
   const onFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -173,9 +176,11 @@ export function ThreeDPlayground({
                 </EmptyMedia>
                 <EmptyTitle>Your 3D model will appear here</EmptyTitle>
                 <EmptyDescription id="three-d-generation-output-help">
-                  {inputMode === "text"
-                    ? "Describe what you want to create below."
-                    : "Add a reference image below."}
+                  {availableModels.length === 0
+                    ? "No 3D generation model is available for this tool."
+                    : inputMode === "text"
+                      ? "Describe what you want to create below."
+                      : "Add a reference image below."}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -184,9 +189,9 @@ export function ThreeDPlayground({
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center p-4">
           <div className="pointer-events-auto w-full">
             <ThreeDGenerationControls
-              initialModelId={initialModelId}
+              initialModelId={resolvedInitialModel?.id}
               inputMode={inputMode}
-              modelIds={modelIds}
+              modelIds={availableModelIds}
               onGenerated={onGenerated}
               disabled={generationDisabled}
               onBusyChange={onGenerationBusyChange}

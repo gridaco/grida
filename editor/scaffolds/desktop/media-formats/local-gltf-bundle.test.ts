@@ -159,6 +159,17 @@ describe("LocalGltfBundle.read", () => {
     ]);
   });
 
+  it("validates data images embedded in GLB JSON", async () => {
+    const source = encodeTestGlb({
+      asset: { version: "2.0" },
+      images: [{ uri: "data:image/svg+xml,%3Csvg%2F%3E" }],
+    });
+
+    await expect(
+      LocalGltfBundle.open([file("model.glb", source)]).read()
+    ).rejects.toThrow("must be PNG, JPEG, WebP, or AVIF");
+  });
+
   it("rejects remote, traversing, missing, and unsupported image resources", async () => {
     const cases = [
       {

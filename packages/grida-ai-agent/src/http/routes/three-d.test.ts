@@ -123,6 +123,44 @@ describe("POST /three-d/generate", () => {
     warning.mockRestore();
   });
 
+  it("admits one memory-heavy 3D generation at a time and releases the slot", async () => {
+    const glb: ThreeDGeneratedGlb = {
+      base64: "Z2xURg==",
+      media_type: "model/gltf-binary",
+      file_name: "model.glb",
+    };
+    let finishFirst!: (value: ThreeDGeneratedGlb) => void;
+    generate
+      .mockImplementationOnce(
+        async () =>
+          await new Promise<ThreeDGeneratedGlb>((resolve) => {
+            finishFirst = resolve;
+          })
+      )
+      .mockResolvedValueOnce(glb);
+    const app = appWith({ fal: "fal-key" });
+    const payload = {
+      model_id: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+      prompt: "robot",
+    };
+
+    const first = post(app, payload);
+    await vi.waitFor(() => expect(generate).toHaveBeenCalledOnce());
+
+    const concurrent = await post(app, payload);
+    expect(concurrent.status).toBe(429);
+    expect(await concurrent.json()).toEqual({
+      error: "another 3D generation is already in progress",
+      code: "three_d_generation_busy",
+    });
+    expect(generate).toHaveBeenCalledOnce();
+
+    finishFirst(glb);
+    expect((await first).status).toBe(200);
+    expect((await post(app, payload)).status).toBe(200);
+    expect(generate).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects unknown ids, missing fal keys, and mismatched inputs", async () => {
     expect(
       (

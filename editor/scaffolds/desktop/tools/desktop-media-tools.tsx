@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AudioWaveform,
@@ -41,6 +41,7 @@ import {
   type DesktopMediaToolSpec,
 } from "./media-tool-registry";
 import { AudioPlayerTool } from "./audio-player-tool";
+import { GenerationOperationCounter } from "./generation-operation-counter";
 import { GltfViewerTool } from "./gltf-viewer-tool";
 import { StoredMedia, type StoredMediaPreview } from "./stored-media";
 import { StoredVisualMediaViewer } from "./stored-visual-media-viewer";
@@ -75,8 +76,6 @@ export function DesktopMediaTools({
 }) {
   const { tool, initialModelId } = selection;
   const librarySupported = mediaLibrary.isSupported();
-  const [generationOperations, setGenerationOperations] = useState(0);
-  const generationBusy = generationOperations > 0;
   const [recents, setRecents] = useState<readonly MediaItem[]>([]);
   const [recentsLoading, setRecentsLoading] = useState(librarySupported);
   const [libraryError, setLibraryError] = useState<string | null>(null);
@@ -86,16 +85,69 @@ export function DesktopMediaTools({
       ? { kind: "loading", mediaId: initialMediaId }
       : { kind: "none" }
   );
+  const storedSelectionLoading = Boolean(
+    initialMediaId &&
+    (storedSelection.kind === "none" ||
+      storedSelection.mediaId !== initialMediaId ||
+      storedSelection.kind === "loading")
+  );
+  const storedSelectionError = Boolean(
+    initialMediaId &&
+    storedSelection.kind === "error" &&
+    storedSelection.mediaId === initialMediaId
+  );
+  const storedPreview =
+    initialMediaId &&
+    storedSelection.kind === "ready" &&
+    storedSelection.mediaId === initialMediaId
+      ? storedSelection.preview
+      : null;
+  const viewerTool = storedPreview
+    ? DesktopMediaTool.resolve(StoredMedia.viewerToolId(storedPreview.mode))
+    : tool;
+  const activeToolId =
+    viewerTool.id === "image-viewer"
+      ? "image-generator"
+      : viewerTool.id === "video-viewer"
+        ? "video-generator"
+        : viewerTool.id;
+  const playgroundKey = storedPreview
+    ? `${viewerTool.id}:${storedPreview.item.id}`
+    : `${tool.id}:${initialModelId ?? "local"}`;
+  const [generationOperations, setGenerationOperations] = useState(() =>
+    GenerationOperationCounter.initial(playgroundKey)
+  );
+  const activePlaygroundKey = useRef(playgroundKey);
+  const generationBusy = GenerationOperationCounter.isBusy(
+    generationOperations,
+    playgroundKey
+  );
+
+  useEffect(() => {
+    activePlaygroundKey.current = playgroundKey;
+    setGenerationOperations((current) =>
+      current.epoch === playgroundKey
+        ? current
+        : GenerationOperationCounter.initial(playgroundKey)
+    );
+  }, [playgroundKey]);
 
   useEffect(() => {
     onGenerationBusyChange?.(generationBusy);
   }, [generationBusy, onGenerationBusyChange]);
 
-  const setGenerationOperationBusy = useCallback((busy: boolean) => {
-    setGenerationOperations((current) =>
-      busy ? current + 1 : Math.max(0, current - 1)
-    );
-  }, []);
+  const setGenerationOperationBusy = useCallback(
+    (busy: boolean) => {
+      setGenerationOperations((current) =>
+        GenerationOperationCounter.update(current, {
+          sourceEpoch: playgroundKey,
+          activeEpoch: activePlaygroundKey.current,
+          busy,
+        })
+      );
+    },
+    [playgroundKey]
+  );
 
   useEffect(() => {
     if (!librarySupported) {
@@ -191,36 +243,6 @@ export function DesktopMediaTools({
       setNativeAction(null);
     }
   };
-
-  const storedSelectionLoading = Boolean(
-    initialMediaId &&
-    (storedSelection.kind === "none" ||
-      storedSelection.mediaId !== initialMediaId ||
-      storedSelection.kind === "loading")
-  );
-  const storedSelectionError = Boolean(
-    initialMediaId &&
-    storedSelection.kind === "error" &&
-    storedSelection.mediaId === initialMediaId
-  );
-  const storedPreview =
-    initialMediaId &&
-    storedSelection.kind === "ready" &&
-    storedSelection.mediaId === initialMediaId
-      ? storedSelection.preview
-      : null;
-  const viewerTool = storedPreview
-    ? DesktopMediaTool.resolve(StoredMedia.viewerToolId(storedPreview.mode))
-    : tool;
-  const activeToolId =
-    viewerTool.id === "image-viewer"
-      ? "image-generator"
-      : viewerTool.id === "video-viewer"
-        ? "video-generator"
-        : viewerTool.id;
-  const playgroundKey = storedPreview
-    ? `${viewerTool.id}:${storedPreview.item.id}`
-    : `${tool.id}:${initialModelId ?? "local"}`;
 
   return (
     <SidebarProvider

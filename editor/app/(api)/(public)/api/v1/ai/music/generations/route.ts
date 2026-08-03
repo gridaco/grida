@@ -25,6 +25,7 @@ export const maxDuration = 300;
 const NO_STORE = { "cache-control": "no-store" } as const;
 const MAX_MUSIC_BYTES = 32 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
+const DOWNLOAD_TIMEOUT_MS = 60_000;
 
 const requestSchema = z.looseObject({
   model_id: z.string().min(1),
@@ -56,10 +57,14 @@ function replicateOutputUrl(value: string): URL {
 
 async function readBoundedMusic(urlValue: string): Promise<Uint8Array> {
   let url = replicateOutputUrl(urlValue);
+  // One deadline covers redirects and the response body. A fresh timeout per
+  // hop would let a redirect chain multiply the route's memory/compute hold.
+  const signal = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
   for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
     const response = await fetch(url, {
       method: "GET",
       redirect: "manual",
+      signal,
       headers: { accept: "audio/mpeg,audio/*;q=0.9" },
     });
     if (response.status >= 300 && response.status < 400) {
