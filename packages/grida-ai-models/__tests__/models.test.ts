@@ -279,7 +279,7 @@ describe("models.video catalogue invariants", () => {
     }
   });
 
-  it("every card has at least one provider binding", () => {
+  it("never catalogues a video model without a supported provider binding", () => {
     for (const card of Object.values(models.video.models)) {
       if (!card) continue;
       expect(Object.keys(card.providers).length).toBeGreaterThan(0);
@@ -331,6 +331,41 @@ describe("models.video catalogue invariants", () => {
     );
     // Grok 1.5 is NOT on OpenRouter (only 1.0) — correctly absent.
     expect(models.video.binding(grok, "openrouter")).toBeNull();
+  });
+
+  it("grounds Gemini Omni Flash's fal route and default price", () => {
+    const gemini = models.video.models["google/gemini-omni-flash"]!;
+    expect(gemini).toMatchObject({
+      id: "google/gemini-omni-flash",
+      label: "Gemini Omni Flash",
+      vendor: "google",
+      listed: false,
+      aspect_ratios: ["16:9", "9:16"],
+      min_duration: 3,
+      max_duration: 10,
+      audio: true,
+      default: {
+        resolution: "720p",
+        aspect_ratio: "16:9",
+        duration: 5,
+        audio: true,
+      },
+    });
+
+    const fal = models.video.binding(gemini, "fal");
+    expect(fal).toMatchObject({
+      provider: "fal",
+      id: "google/gemini-omni-flash/image-to-video",
+      pricing: {
+        type: "per_second",
+        usd_per_second: { "720p": { audio: 0.13 } },
+      },
+      avg_cost_usd: 0.65,
+    });
+    expect(fal?.pricing.usd_per_second[gemini.default.resolution]?.audio).toBe(
+      0.13
+    );
+    expect(models.video.listed_models()).not.toContain(gemini);
   });
 
   it("listed video models are curated and each has at least one binding", () => {

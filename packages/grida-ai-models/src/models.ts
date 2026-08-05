@@ -1964,6 +1964,10 @@ export namespace models {
    * both resolution and whether audio is generated, so `per_second` is keyed
    * `resolution → audio-mode → USD/s` (see {@link PerSecondPricing}). Values
    * are the real provider rate; update if a provider changes its meter.
+   *
+   * **Catalogue boundary.** A model belongs here only when Grida supports at
+   * least one concrete provider route with grounded pricing. Published or
+   * announced models without a supported binding stay out of the catalogue.
    */
   export namespace video {
     /**
@@ -1981,6 +1985,7 @@ export namespace models {
      */
     export type VideoModelId =
       | "google/veo-3.1"
+      | "google/gemini-omni-flash"
       | "bytedance/seedance-2.0"
       | "xai/grok-imagine-video-1.5"
       | (string & {});
@@ -2061,7 +2066,7 @@ export namespace models {
        * still gates per-model on which provider the user actually connected.
        */
       listed: boolean;
-      /** Why a card is `listed: false` (legacy or superseded). */
+      /** Why a card is not enabled in curated model selection. */
       listed_reason?: string;
       /** Supported aspect ratios. */
       aspect_ratios: image.AspectRatioString[];
@@ -2163,6 +2168,49 @@ export namespace models {
             },
             avg_cost_usd: 3.2, // 1080p audio × 8s default
             url: "https://openrouter.ai/google/veo-3.1",
+          },
+        },
+      },
+      // -----------------------------------------------------------------
+      // Google — Gemini Omni Flash
+      // -----------------------------------------------------------------
+      // https://deepmind.google/models/gemini-omni/
+      "google/gemini-omni-flash": {
+        id: "google/gemini-omni-flash",
+        label: "Gemini Omni Flash",
+        deprecated: false,
+        short_description:
+          "Google's fast multimodal video model with native synchronized audio and conversational editing.",
+        vendor: "google",
+        listed: false,
+        listed_reason:
+          "The fal image-to-video route is catalogued, but Grida model selection is not enabled.",
+        aspect_ratios: ["16:9", "9:16"],
+        min_duration: 3,
+        max_duration: 10,
+        audio: true,
+        speed_label: "fast",
+        default: {
+          resolution: "720p",
+          aspect_ratio: "16:9",
+          duration: 5,
+          audio: true,
+        },
+        url: "https://deepmind.google/models/gemini-omni/",
+        providers: {
+          // fal.ai — image-to-video endpoint. Native audio, $0.13/s @720p.
+          // https://fal.ai/models/google/gemini-omni-flash/image-to-video
+          fal: {
+            provider: "fal",
+            id: "google/gemini-omni-flash/image-to-video",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.13 },
+              },
+            },
+            avg_cost_usd: 0.65, // 720p audio × 5s default
+            url: "https://fal.ai/models/google/gemini-omni-flash/image-to-video",
           },
         },
       },

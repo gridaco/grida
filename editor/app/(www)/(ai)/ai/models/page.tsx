@@ -30,15 +30,21 @@ import Header from "@/www/header";
 import Footer from "@/www/footer";
 import {
   BlackForestLabsLogo,
+  ByteDanceLogo,
+  ElevenLabsLogo,
   OpenAILogo,
   AnthropicLogo,
   GoogleLogo,
+  MicrosoftLogo,
+  RecraftLogo,
+  TencentLogo,
+  XAILogo,
 } from "@grida/react-icons/logos";
 
 export const metadata: Metadata = {
   title: "AI Models & Pricing — Grida",
   description:
-    "Compare AI models and usage rates on Grida. Grida-hosted AI is billed from prepaid organization credit.",
+    "Compare text, image, video, music, sound effect, and 3D AI models on Grida, including provider-native pricing and staged compatibility.",
   alternates: {
     canonical: "https://grida.co/ai/models",
   },
@@ -46,9 +52,15 @@ export const metadata: Metadata = {
 
 const Logos: Partial<Record<string, FC<{ className?: string }>>> = {
   "black-forest-labs": BlackForestLabsLogo,
+  bytedance: ByteDanceLogo,
   openai: OpenAILogo,
   anthropic: AnthropicLogo,
+  elevenlabs: ElevenLabsLogo,
   google: GoogleLogo,
+  microsoft: MicrosoftLogo,
+  "recraft-ai": RecraftLogo,
+  tencent: TencentLogo,
+  xai: XAILogo,
 };
 
 const LONG_CONTEXT_PRICING_NOTE =
@@ -73,6 +85,7 @@ const VendorLabels: Record<string, string> = {
   "black-forest-labs": "Black Forest Labs",
   openai: "OpenAI",
   anthropic: "Anthropic",
+  elevenlabs: "ElevenLabs",
   google: "Google",
   "recraft-ai": "Recraft AI",
 };
@@ -634,13 +647,16 @@ export default function AIModelsCatalogPage() {
 
       <Separator />
 
+      <VideoModelsSection />
+
+      <Separator />
+
       {/* Music models hero */}
       <div className="container px-4 pt-16 pb-10">
         <h1 className="text-3xl font-bold tracking-tight mb-2">Music Models</h1>
         <p className="text-base text-muted-foreground max-w-xl">
           Music generation models currently available on Grida. Pricing is
-          sourced directly from each provider; staged compatibility contracts
-          are not shown here.
+          sourced directly from each provider.
         </p>
       </div>
 
@@ -652,9 +668,149 @@ export default function AIModelsCatalogPage() {
       {/* Music detail cards by vendor */}
       <MusicModelsCards />
 
+      <Separator />
+
+      <SoundEffectModelsSection />
+
+      <Separator />
+
+      <ThreeDModelsSection />
+
       <div className="h-40" />
       <Footer />
     </main>
+  );
+}
+
+// ── Video models ───────────────────────────────────────────────────────────
+
+function VideoModelOutput({ model }: { model: AITypes.video.VideoModelCard }) {
+  return (
+    <div className="text-xs text-muted-foreground">
+      <div>
+        {model.min_duration}–{model.max_duration}s · {model.default.resolution}
+        {" default"}
+      </div>
+      <div>
+        {model.aspect_ratios.join(", ")} · {model.audio ? "audio" : "silent"}
+      </div>
+    </div>
+  );
+}
+
+const VideoProviderLabels: Record<AITypes.video.VideoProvider, string> = {
+  vercel: "Vercel",
+  fal: "fal",
+  openrouter: "OpenRouter",
+};
+
+function VideoProviderPricing({
+  model,
+}: {
+  model: AITypes.video.VideoModelCard;
+}) {
+  const bindings = Object.values(model.providers).filter(
+    (binding): binding is AITypes.video.VideoProviderBinding => !!binding
+  );
+
+  return (
+    <div className="space-y-1">
+      {bindings.map((binding) => {
+        const prices = Object.values(binding.pricing.usd_per_second).flatMap(
+          (modes) =>
+            Object.values(modes).filter(
+              (price): price is number => typeof price === "number"
+            )
+        );
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
+        const price =
+          min === max
+            ? `$${min.toFixed(3)}/s`
+            : `$${min.toFixed(3)}–$${max.toFixed(3)}/s`;
+
+        return (
+          <div key={binding.provider} className="text-xs">
+            <span className="font-medium">
+              {VideoProviderLabels[binding.provider]}
+            </span>{" "}
+            <span className="font-mono text-muted-foreground">{price}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function VideoModelStatus({ model }: { model: AITypes.video.VideoModelCard }) {
+  return model.listed ? "Integrated" : "Catalogued";
+}
+
+function VideoModelsSection() {
+  const models = Object.values(ai.video.models).filter(
+    (model): model is AITypes.video.VideoModelCard => !!model
+  );
+
+  return (
+    <section className="container mx-auto px-4 py-16">
+      <div className="mb-10">
+        <h2 className="text-3xl font-bold tracking-tight mb-2">Video Models</h2>
+        <p className="text-base text-muted-foreground max-w-2xl">
+          Every record shown includes at least one exact callable provider route
+          with grounded native pricing.
+        </p>
+      </div>
+
+      <div className="rounded-lg border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40">
+              <TableHead className="w-[320px]">Model</TableHead>
+              <TableHead className="hidden md:table-cell">Output</TableHead>
+              <TableHead>Provider pricing</TableHead>
+              <TableHead className="text-right">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {models.map((model) => {
+              const Logo = Logos[model.vendor];
+              return (
+                <TableRow key={model.id}>
+                  <TableCell className="font-medium align-top">
+                    <div className="flex items-start gap-2">
+                      {Logo && <Logo className="mt-0.5 size-4 shrink-0" />}
+                      <div>
+                        <div className="font-medium">{model.label}</div>
+                        <code className="text-xs text-muted-foreground">
+                          {model.id}
+                        </code>
+                        <div className="mt-1 max-w-sm text-xs font-normal text-muted-foreground">
+                          {model.short_description}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell align-top">
+                    <VideoModelOutput model={model} />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <VideoProviderPricing model={model} />
+                  </TableCell>
+                  <TableCell className="text-right align-top">
+                    <Badge
+                      variant="outline"
+                      className="whitespace-nowrap font-normal text-xs"
+                    >
+                      <VideoModelStatus model={model} />
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
   );
 }
 
@@ -835,5 +991,232 @@ function MusicModelsCards() {
         );
       })}
     </>
+  );
+}
+
+// ── Sound effect models ───────────────────────────────────────────────────
+
+function SoundEffectModelsSection() {
+  const models = ai.audio.sound_effects.staged_models();
+  if (models.length === 0) return null;
+
+  return (
+    <section className="container mx-auto px-4 py-16">
+      <div className="mb-10">
+        <h2 className="text-3xl font-bold tracking-tight mb-2">
+          Sound Effect Models
+        </h2>
+        <p className="text-base text-muted-foreground max-w-2xl">
+          Provider-specific text-to-sound-effect compatibility from ElevenLabs.
+          Staged means the model contract is grounded in Grida; it does not
+          imply web generation availability.
+        </p>
+      </div>
+
+      <div className="rounded-lg border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40">
+              <TableHead className="w-[300px]">Model</TableHead>
+              <TableHead className="hidden md:table-cell">Input</TableHead>
+              <TableHead className="hidden lg:table-cell">Output</TableHead>
+              <TableHead>Provider pricing</TableHead>
+              <TableHead className="text-right">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {models.map((model) => {
+              const Logo = Logos[model.vendor];
+              return (
+                <TableRow key={model.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {Logo && <Logo className="size-4 shrink-0" />}
+                      <div>
+                        <div className="font-medium">{model.label}</div>
+                        <code className="text-xs text-muted-foreground">
+                          {model.id}
+                        </code>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">
+                    Text prompt
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                    {model.duration_label} · {model.output_format.toUpperCase()}{" "}
+                    · {model.sample_rate_label}
+                  </TableCell>
+                  <TableCell>
+                    <div className="font-mono text-sm">
+                      {model.pricing.automatic_duration_credits} credits/run
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Automatic duration ·{" "}
+                      {model.pricing.specified_duration_credits_per_second}{" "}
+                      credits/s when specified
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Badge
+                      variant="outline"
+                      className="capitalize font-normal text-xs"
+                    >
+                      {model.status}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
+  );
+}
+
+// ── 3D models ─────────────────────────────────────────────────────────────
+
+const ThreeDSurchargeLabels: Record<AITypes.three_d.HunyuanSurcharge, string> =
+  {
+    pbr: "PBR",
+    multi_view: "multi-view",
+    custom_face_count: "custom face count",
+  };
+
+function ThreeDInputLabel(model: AITypes.three_d.ThreeDModelCard) {
+  if (model.input.type === "text") {
+    return `Text · up to ${model.input.max_utf8_characters.toLocaleString()} UTF-8 characters`;
+  }
+  if (model.input.min_images === model.input.max_images) {
+    return `${model.input.max_images} image`;
+  }
+  return `${model.input.min_images}–${model.input.max_images} images`;
+}
+
+function ThreeDPricing({
+  pricing,
+}: {
+  pricing: AITypes.three_d.ThreeDModelPricing;
+}) {
+  switch (pricing.type) {
+    case "per_generation_base_plus_surcharges": {
+      const surcharges = Object.entries(pricing.surcharges_usd) as [
+        AITypes.three_d.HunyuanSurcharge,
+        number,
+      ][];
+      return (
+        <div>
+          <div className="font-mono text-sm">
+            From ${pricing.base_usd.toFixed(3)}/generation
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {surcharges.map(([option, usd]) => (
+              <span key={option} className="mr-2 whitespace-nowrap">
+                +${usd.toFixed(3)} {ThreeDSurchargeLabels[option]}
+              </span>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    case "per_generation_by_resolution": {
+      const prices = Object.values(pricing.usd_by_resolution);
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      return (
+        <div>
+          <div className="font-mono text-sm">
+            ${min.toFixed(3)}–${max.toFixed(3)}/generation
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {Object.entries(pricing.usd_by_resolution)
+              .map(([resolution, usd]) => `${resolution}: $${usd.toFixed(3)}`)
+              .join(" · ")}
+          </div>
+        </div>
+      );
+    }
+  }
+}
+
+function ThreeDModelsSection() {
+  const models = ai.three_d.staged_models();
+  if (models.length === 0) return null;
+
+  return (
+    <section className="container mx-auto px-4 py-16">
+      <div className="mb-10">
+        <h2 className="text-3xl font-bold tracking-tight mb-2">3D Models</h2>
+        <p className="text-base text-muted-foreground max-w-2xl">
+          fal-hosted text-to-3D and image-to-3D endpoints staged for Grida. GLB
+          is the portable primary result; additional formats are endpoint
+          specific. Catalogue presence does not imply web generation
+          availability.
+        </p>
+      </div>
+
+      <div className="rounded-lg border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40">
+              <TableHead className="w-[300px]">Model</TableHead>
+              <TableHead className="hidden md:table-cell">Input</TableHead>
+              <TableHead className="hidden lg:table-cell">Output</TableHead>
+              <TableHead>Provider pricing</TableHead>
+              <TableHead className="text-right">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {models.map((model) => {
+              const Logo = Logos[model.vendor];
+              return (
+                <TableRow key={model.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {Logo && <Logo className="size-4 shrink-0" />}
+                      <div>
+                        <div className="font-medium">{model.label}</div>
+                        <code className="text-xs text-muted-foreground">
+                          {model.id}
+                        </code>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          via {model.provider}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">
+                    {ThreeDInputLabel(model)}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                    <div>{model.output.primary.toUpperCase()} primary</div>
+                    {model.output.optional.length > 0 && (
+                      <div>
+                        May also return{" "}
+                        {model.output.optional
+                          .map((format) => format.toUpperCase())
+                          .join(", ")}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <ThreeDPricing pricing={model.pricing} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Badge
+                      variant="outline"
+                      className="capitalize font-normal text-xs"
+                    >
+                      {model.status}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
   );
 }

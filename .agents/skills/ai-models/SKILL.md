@@ -165,6 +165,9 @@ Cards catalogue the **image-to-video** route only (canvas-relevant; Grok's sole 
 
 ### Adding a model / route
 
+- Catalogue boundary: never add or list a model Grida cannot call. A model
+  requires at least one verified provider binding with grounded pricing;
+  announcements and compatibility-only records stay out entirely.
 - New model → add the canonical id to `VideoModelId` and a card with ≥1 binding. Every binding must price the model's `default` `(resolution, audio)` — enforced by catalogue-invariant tests (plus: provider field matches key).
 - New route for an existing model → add a `VideoProviderBinding` under its provider key, **only with a verified rate** (e.g. OpenRouter surfaces `$0/MTok` for video — not usable; leave it out).
 - New capability (e.g. text-to-video) → only when actually used. If a provider keys it into a separate id (fal), that's a new binding/id; revisit the single-`id` shape only then.

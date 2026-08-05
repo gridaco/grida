@@ -36,13 +36,17 @@ import { Skeleton } from "@app/ui/components/skeleton";
 import { models } from "@grida/ai-models";
 import {
   BlackForestLabsLogo,
+  ByteDanceLogo,
   ClaudeLogo,
+  ElevenLabsLogo,
   FalLogo,
   GoogleLogo,
+  MicrosoftLogo,
   OllamaLogo,
   OpenAILogo,
   OpenRouterLogo,
   RecraftLogo,
+  TencentLogo,
   VercelLogo,
   XAILogo,
 } from "@grida/react-icons/logos";
@@ -414,6 +418,7 @@ const BYOK_PROVIDER_LOGOS: Partial<
   openrouter: OpenRouterLogo,
   vercel: VercelLogo,
   fal: FalLogo,
+  elevenlabs: ElevenLabsLogo,
 };
 
 const MODEL_VENDOR_LOGOS: Partial<
@@ -423,6 +428,10 @@ const MODEL_VENDOR_LOGOS: Partial<
   "recraft-ai": RecraftLogo,
   google: GoogleLogo,
   "black-forest-labs": BlackForestLabsLogo,
+  bytedance: ByteDanceLogo,
+  elevenlabs: ElevenLabsLogo,
+  microsoft: MicrosoftLogo,
+  tencent: TencentLogo,
   xai: XAILogo,
 };
 
