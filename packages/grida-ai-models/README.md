@@ -178,9 +178,15 @@ Video is different: the provider ecosystem is fragmented, so a video card is
 **canonical** (provider-agnostic `vendor/model` id + intrinsic specs) and holds a
 `providers` record of bindings — one per serving provider (`vercel` / `fal` /
 `openrouter`), each with its own call `id` and `per_second` pricing (nested
-`resolution → audio-mode → USD/s`). Cards catalogue the image-to-video route only.
+`resolution → audio-mode → USD/s`, plus any provider-published input-image
+surcharge). Cards catalogue the image-to-video route only.
 No default provider is encoded; resolve a route with
 `models.video.binding(card, provider)`.
+
+The video catalogue contains only models Grida can call: every card must have at
+least one verified provider binding with grounded pricing and be enabled in
+model selection. Announced, `listed: false`, or compatibility-only models stay
+out of the catalogue until that support exists.
 
 ## Lookups
 

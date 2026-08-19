@@ -1962,8 +1962,15 @@ export namespace models {
    *
    * **Pricing.** Video bills by output **duration**, and the rate varies by
    * both resolution and whether audio is generated, so `per_second` is keyed
-   * `resolution → audio-mode → USD/s` (see {@link PerSecondPricing}). Values
-   * are the real provider rate; update if a provider changes its meter.
+   * `resolution → audio-mode → USD/s` (see {@link PerSecondPricing}). A
+   * provider-published input-image surcharge stays explicit beside that
+   * duration meter. Values are real provider rates; update them if a provider
+   * changes its meter.
+   *
+   * **Catalogue boundary.** A model belongs here only when Grida supports at
+   * least one concrete provider route with grounded pricing and enables the
+   * model in runtime selection. Published, announced, or compatibility-only
+   * models stay out of the catalogue.
    */
   export namespace video {
     /**
@@ -2014,6 +2021,8 @@ export namespace models {
         ResolutionLabel,
         Partial<Record<AudioMode, number>>
       >;
+      /** Additional provider charge for each input image, when applicable. */
+      usd_per_input_image?: number;
     };
 
     export type VideoModelPricing = PerSecondPricing;
@@ -2036,8 +2045,8 @@ export namespace models {
       pricing: VideoModelPricing;
       /**
        * Coarse provider cost per invocation in USD — this binding's rate at the
-       * model's default `(resolution, audio)` × default duration. For budget
-       * estimation; not for display.
+       * model's default `(resolution, audio)` × default duration, plus any
+       * required input-image surcharge. For budget estimation; not for display.
        */
       avg_cost_usd: number;
       /** Per-binding deprecation (a provider may retire a route independently). */
@@ -2054,15 +2063,11 @@ export namespace models {
       short_description: string;
       vendor: Vendor;
       /**
-       * Whether this model is surfaced in the curated, user-facing list.
-       * Unlike image (where `listed` also implies universal coverage), the
-       * video provider ecosystem is fragmented — no model is on every provider
-       * — so `listed` here means proprietary · SOTA only. The runtime resolver
-       * still gates per-model on which provider the user actually connected.
+       * Video cards exist only for models enabled in Grida selection. Kept as
+       * an explicit marker for runtime guards and cross-modality consumers;
+       * unsupported or compatibility-only models do not get catalogue cards.
        */
-      listed: boolean;
-      /** Why a card is `listed: false` (legacy or superseded). */
-      listed_reason?: string;
+      listed: true;
       /** Supported aspect ratios. */
       aspect_ratios: image.AspectRatioString[];
       /** Inclusive output-duration bounds, in seconds. */
@@ -2166,7 +2171,6 @@ export namespace models {
           },
         },
       },
-      // -----------------------------------------------------------------
       // ByteDance — Seedance 2.0
       // -----------------------------------------------------------------
       "bytedance/seedance-2.0": {
@@ -2233,9 +2237,9 @@ export namespace models {
       // -----------------------------------------------------------------
       // Image-to-video only (no t2v, per xAI docs); native lip-synced audio
       // bundled into the rate. Per-second by resolution, identical on Vercel
-      // (no markup) and fal: $0.08/s @480p, $0.14/s @720p. Both also bill
-      // ~$0.01 per input image — an input surcharge not captured by the
-      // per_second (output) meter.
+      // (no markup) and fal: $0.08/s @480p, $0.14/s @720p, $0.25/s @1080p.
+      // Both also bill $0.01 per input image, captured separately from the
+      // output meter.
       "xai/grok-imagine-video-1.5": {
         id: "xai/grok-imagine-video-1.5",
         label: "Grok Imagine Video 1.5",
@@ -2245,7 +2249,7 @@ export namespace models {
         vendor: "xai",
         listed: true,
         aspect_ratios: ["16:9", "9:16"],
-        min_duration: 5,
+        min_duration: 1,
         max_duration: 15,
         audio: true,
         speed_label: "fast",
@@ -2255,22 +2259,24 @@ export namespace models {
           duration: 5,
           audio: true,
         },
-        url: "https://docs.x.ai/developers/models/grok-imagine-video-1.5-preview",
+        url: "https://docs.x.ai/developers/models/grok-imagine-video-1.5",
         providers: {
           // Vercel AI Gateway — image-to-video; mirrors xAI's list price (no markup).
           // https://vercel.com/changelog/grok-imagine-video-1-5-on-ai-gateway
           vercel: {
             provider: "vercel",
-            id: "xai/grok-imagine-video-1.5-preview",
+            id: "xai/grok-imagine-video-1.5",
             pricing: {
               type: "per_second",
               usd_per_second: {
                 "480p": { audio: 0.08 },
                 "720p": { audio: 0.14 },
+                "1080p": { audio: 0.25 },
               },
+              usd_per_input_image: 0.01,
             },
-            avg_cost_usd: 0.7, // 720p audio × 5s default
-            url: "https://vercel.com/ai-gateway/models/grok-imagine-video",
+            avg_cost_usd: 0.71, // 720p audio × 5s + one input image
+            url: "https://vercel.com/ai-gateway/models/grok-imagine-video-1.5",
           },
           // fal.ai — image-to-video endpoint; same per-second rate.
           // https://fal.ai/models/xai/grok-imagine-video/v1.5/image-to-video
@@ -2282,9 +2288,11 @@ export namespace models {
               usd_per_second: {
                 "480p": { audio: 0.08 },
                 "720p": { audio: 0.14 },
+                "1080p": { audio: 0.25 },
               },
+              usd_per_input_image: 0.01,
             },
-            avg_cost_usd: 0.7, // 720p audio × 5s default
+            avg_cost_usd: 0.71, // 720p audio × 5s + one input image
             url: "https://fal.ai/models/xai/grok-imagine-video/v1.5/image-to-video",
           },
         },
@@ -2305,9 +2313,9 @@ export namespace models {
     }
 
     let _listed: readonly VideoModelCard[] | null = null;
-    /** Cards in the curated user-facing list (`listed: true`). Computed once and
-     *  frozen — the catalog is static, so callers can call freely without
-     *  risking mutation of the shared view. */
+    /** Cards enabled in Grida model selection. Computed once and frozen — the
+     *  catalog is static, so callers can call freely without risking mutation
+     *  of the shared view. */
     export const listed_models = (): readonly VideoModelCard[] =>
       (_listed ??= Object.freeze(
         Object.values(models).filter(

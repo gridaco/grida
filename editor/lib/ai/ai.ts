@@ -23,6 +23,8 @@ export namespace ai {
   // exact `music` and `sound_effects` children.
   export import image = _catalog.image;
   export import audio = _catalog.audio;
+  export import three_d = _catalog.three_d;
+  export import video = _catalog.video;
   export import image_tools = _catalog.image_tools;
 
   export type Provider = _catalog.Provider;
