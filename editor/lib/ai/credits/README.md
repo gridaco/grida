@@ -91,9 +91,11 @@ const env = await refreshAiCredits();
    renders `"—"`, never `"$0.00"`. The deprecated `$0.00` stub at
    `hooks/use-credits.ts` was deleted as part of this refactor.
 
-4. **Initial state.** Must come from a server preload
-   (`preloadAiCredits`) at a route or layout boundary that owns the
-   `orgId`. The Provider does not fetch on mount.
+4. **Initial state.** Interactive pages may use a server preload
+   (`preloadAiCredits`) at a route or layout boundary that owns the `orgId`.
+   Static SEO pages must instead start neutral and let a client demo request a
+   server-sourced display/remedy snapshot after hydration. The Provider does
+   not fetch on mount.
 
 5. **Server authority.** `allowed` is not a client authorization decision.
    Callers must submit through the server seam and route its typed result; they

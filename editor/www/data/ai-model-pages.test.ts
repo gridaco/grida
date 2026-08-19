@@ -18,14 +18,18 @@ function resolve(reference: aiModelPages.MediaModelReference) {
 }
 
 describe("AI model SEO page inventory", () => {
-  it("keeps active slugs and direct-successor lineages unique", () => {
+  it("keeps active slugs, model references, and lineages unique", () => {
     const slugs = aiModelPages.active.map((page) => page.slug);
     const lineages = aiModelPages.active.map(
       (page) => page.successorLineage
     );
+    const references = aiModelPages.active.map(
+      (page) => `${page.model.catalogue}/${page.model.id}`
+    );
 
     expect(new Set(slugs).size).toBe(slugs.length);
     expect(new Set(lineages).size).toBe(lineages.length);
+    expect(new Set(references).size).toBe(references.length);
   });
 
   it("uses stable slugs and unique, concise metadata", () => {
@@ -39,6 +43,12 @@ describe("AI model SEO page inventory", () => {
       expect(page.metadata.keywords.length).toBeGreaterThan(0);
       expect(page.publishReason.trim()).not.toBe("");
       expect(page.retireWhen.trim()).not.toBe("");
+      expect(page.content.overview.trim()).not.toBe("");
+      expect(page.content.capabilities.length).toBeGreaterThan(0);
+      for (const capability of page.content.capabilities) {
+        expect(capability.title.trim()).not.toBe("");
+        expect(capability.description.trim()).not.toBe("");
+      }
       expect(titles.has(page.metadata.title)).toBe(false);
       expect(descriptions.has(page.metadata.description)).toBe(false);
       titles.add(page.metadata.title);
@@ -48,11 +58,28 @@ describe("AI model SEO page inventory", () => {
 
   it("references only real, non-deprecated media catalogue records", () => {
     for (const page of aiModelPages.active) {
-      for (const reference of page.models) {
-        const card = resolve(reference);
-        expect(card).toBeDefined();
-        expect(card?.deprecated).toBe(false);
-      }
+      const card = resolve(page.model);
+      expect(card).toBeDefined();
+      expect(card?.deprecated).toBe(false);
+    }
+  });
+
+  it("resolves a published page from its model", () => {
+    for (const page of aiModelPages.active) {
+      expect(aiModelPages.byModel(page.model)).toBe(page);
+    }
+  });
+
+  it("routes every page to the exact listed image model it references", () => {
+    for (const page of aiModelPages.active) {
+      expect(page.demo.runner).toBe("image-playground");
+      const demo = new URL(page.demo.href, "https://grida.co");
+      expect(demo.pathname).toBe("/playground/image");
+
+      expect(page.model.catalogue).toBe("image");
+      expect(demo.searchParams.get("model")).toBe(page.model.id);
+      const card = resolve(page.model);
+      expect(card && "listed" in card && card.listed).toBe(true);
     }
   });
 

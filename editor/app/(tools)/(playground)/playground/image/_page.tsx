@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useTransition } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ChatBoxFooter,
   ChatBox,
@@ -23,7 +23,10 @@ import {
   SelectLabel,
 } from "@app/ui/components/select";
 import { useImageModelConfig } from "@/lib/ai/hooks";
-import { generateAiImage } from "@/lib/ai/actions/image-generate";
+import {
+  generateAiImage,
+  type GenerateAiImageInput,
+} from "@/lib/ai/actions/image-generate";
 import { useAiCredits } from "@/lib/ai/credits";
 import {
   Selection,
@@ -57,20 +60,31 @@ import {
 } from "@app/ui/components/sidebar";
 import ai from "@/lib/ai";
 import { Badge } from "@app/ui/components/badge";
+import { Button } from "@app/ui/components/button";
 import {
   useContinueWithAuth,
   AuthProvider,
 } from "@/host/auth/use-continue-with-auth";
 import { useEditor } from "@/grida-canvas-react";
+import type { models } from "@grida/ai-models";
+// GRIDA-EE: entitlement — retain and remedy hosted-AI refusals.
+import { AiRunGate, useAiRunGate } from "@/kits/ai-run-gate-hosted";
+import { resolveSessionAiRunRemedy } from "@/kits/ai-run-gate-hosted/server";
 
-export default function ImagePlayground() {
+const DEFAULT_MODEL_ID = "openai/gpt-image-1-mini" as const;
+
+export default function ImagePlayground({
+  initialModelId = DEFAULT_MODEL_ID,
+}: {
+  initialModelId?: models.image.ImageModelId;
+}) {
   const instance = useEditor();
 
   return (
     <main className="w-screen h-screen overflow-hidden select-none">
       <AuthProvider>
         <StandaloneDocumentEditor editor={instance}>
-          <CanvasConsumer />
+          <CanvasConsumer initialModelId={initialModelId} />
         </StandaloneDocumentEditor>
       </AuthProvider>
     </main>
@@ -97,43 +111,68 @@ export default function ImagePlayground() {
   // );
 }
 
-function CanvasConsumer() {
+function CanvasConsumer({
+  initialModelId,
+}: {
+  initialModelId: models.image.ImageModelId;
+}) {
   const { withAuth, session } = useContinueWithAuth();
   const credits = useAiCredits();
   const editor = useCurrentEditor();
-  const model = useImageModelConfig("openai/gpt-image-1-mini");
-  const [loading, startGenerate] = useTransition();
+  const model = useImageModelConfig(initialModelId);
+  const [loading, setLoading] = useState(false);
+  const [composerRevision, setComposerRevision] = useState(0);
+  const gate = useAiRunGate<GenerateAiImageInput>(resolveSessionAiRunRemedy);
 
-  const onCommit = (value: { text: string }) => {
+  const run = async (
+    invocation: GenerateAiImageInput,
+    clearComposerOnSuccess = false
+  ): Promise<void | false> => {
+    gate.clear();
+    setLoading(true);
     const id = editor.commands.insertNode({
       type: "image",
-      name: value.text,
-      layout_target_width: model.width,
-      layout_target_height: model.height,
+      name: invocation.prompt,
+      layout_target_width: invocation.width ?? 1024,
+      layout_target_height: invocation.height ?? 1024,
       fit: "cover",
     });
-    startGenerate(async () => {
-      try {
-        const env = await generateAiImage({
-          model: model.modelId,
-          width: model.width,
-          height: model.height,
-          aspect_ratio: model.aspect_ratio,
-          prompt: value.text,
-        });
-        const data = credits.consume(env, { next: "/playground/image" });
-        if (!data) {
-          // gate / redirect handled by credits.consume; remove orphan node
-          editor.commands.delete([id]);
-          return;
-        }
-        editor.commands.changeNodePropertySrc(id, data.publicUrl);
-      } catch (e) {
-        console.error(e);
+
+    try {
+      const env = await generateAiImage(invocation);
+      if (!env.success) {
         editor.commands.delete([id]);
+        return await gate.refuse(env, invocation);
       }
-    });
+
+      const data = credits.consume(env);
+      if (!data) {
+        editor.commands.delete([id]);
+        return gate.fail(invocation);
+      }
+
+      editor.commands.changeNodePropertySrc(id, data.publicUrl);
+      if (clearComposerOnSuccess) {
+        setComposerRevision((revision) => revision + 1);
+      }
+    } catch (error) {
+      console.error(error);
+      editor.commands.delete([id]);
+      return gate.fail(invocation);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const runWithAuth = withAuth(run);
+  const onCommit = (value: { text: string }) =>
+    runWithAuth({
+      model: model.modelId,
+      width: model.width,
+      height: model.height,
+      aspect_ratio: model.aspect_ratio,
+      prompt: value.text,
+    });
 
   return (
     <>
@@ -154,7 +193,14 @@ function CanvasConsumer() {
                     <Chat
                       model={model}
                       loading={loading}
-                      onCommit={withAuth(onCommit)}
+                      composerRevision={composerRevision}
+                      onCommit={onCommit}
+                      failure={gate.failure}
+                      onRetry={() => {
+                        if (gate.failure) {
+                          runWithAuth(gate.failure.invocation, true);
+                        }
+                      }}
                       credits={session ? credits : null}
                     />
                   </ToolbarPosition>
@@ -240,14 +286,18 @@ function BudgetBadge({
 function Chat({
   model,
   loading,
+  composerRevision,
   onCommit,
+  failure,
+  onRetry,
   credits,
 }: {
   model: ReturnType<typeof useImageModelConfig>;
   loading: boolean;
-  onCommit: (value: {
-    text: string;
-  }) => Promise<void> | Promise<false> | void | false;
+  composerRevision: number;
+  onCommit: (value: { text: string }) => Promise<void | false> | void | false;
+  failure: AiRunGate.Failure<GenerateAiImageInput> | null;
+  onRetry: () => void;
   credits: ReturnType<typeof useAiCredits> | null;
 }) {
   const sizeGroups = useMemo(() => {
@@ -326,7 +376,11 @@ function Chat({
           </SelectContent>
         </Select>
       </div>
-      <ChatBox disabled={loading} onValueCommit={onCommit}>
+      <ChatBox
+        key={composerRevision}
+        disabled={loading}
+        onValueCommit={onCommit}
+      >
         <ChatBoxTextArea />
         <ChatBoxFooter>
           <div className="flex-1" />
@@ -334,6 +388,40 @@ function Chat({
           <ChatBoxSubmit />
         </ChatBoxFooter>
       </ChatBox>
+      {failure && (
+        <div
+          role="alert"
+          className="rounded-lg border bg-background p-3 text-sm shadow-sm"
+        >
+          <p className="text-muted-foreground">{failure.message}</p>
+          {(failure.action || failure.retryable) && (
+            <div className="mt-3 flex items-center gap-2">
+              {failure.action && (
+                <Button asChild size="sm">
+                  <a
+                    href={failure.action.href}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {failure.action.label}
+                  </a>
+                </Button>
+              )}
+              {failure.retryable && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={onRetry}
+                >
+                  Retry
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

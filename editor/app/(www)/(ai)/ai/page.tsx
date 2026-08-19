@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSessionOrganization } from "@/lib/auth/organization";
+import { AiCredits } from "@/lib/ai/credits";
+import { resolveInitialAiCredits } from "@/lib/ai/credits/actions";
 import Page from "./_page";
 
 export const metadata: Metadata = {
@@ -17,10 +19,12 @@ export type AiPageContext = {
 
 export default async function AiChatPage() {
   // Intentionally NOT pre-gated — unauth / no-org visitors must reach the
-  // chat UI and hit the gate at submit time. The credit chip + initial
-  // state come from the route-group layout's `<AiCredits.Provider>`.
+  // chat UI and hit the gate at submit time.
 
-  const client = await createClient();
+  const [client, initialCredits] = await Promise.all([
+    createClient(),
+    resolveInitialAiCredits(),
+  ]);
   const { data: auth } = await client.auth.getUser();
   const authed = !!auth.user;
 
@@ -29,5 +33,9 @@ export default async function AiChatPage() {
     ? { organizationId: org.id, organizationSlug: org.name }
     : null;
 
-  return <Page authed={authed} context={context} />;
+  return (
+    <AiCredits.Provider initial={initialCredits}>
+      <Page authed={authed} context={context} />
+    </AiCredits.Provider>
+  );
 }

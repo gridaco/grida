@@ -25,9 +25,26 @@ export namespace aiModelPages {
       }
     | { catalogue: "3d"; id: models.three_d.ThreeDModelId };
 
+  /**
+   * A web runner that exists today. Keep this union strict: adding a runner is
+   * the point where a modality proves its cookie-authenticated web execution
+   * path, rather than merely having a catalogue or Desktop integration.
+   */
   export type Demo =
-    | { placement: "embedded" }
-    | { placement: "routed"; href: `/${string}` };
+    {
+      runner: "image-playground";
+      placement: "routed";
+      href: `/playground/image?model=${string}`;
+    };
+
+  export type EditorialContent = {
+    /** Model-specific prose; catalogue summaries alone are not page content. */
+    overview: string;
+    capabilities: readonly {
+      title: string;
+      description: string;
+    }[];
+  };
 
   export type Entry = {
     /** Stable, lowercase, human-readable URL segment. */
@@ -37,8 +54,8 @@ export namespace aiModelPages {
      * active page may represent a lineage.
      */
     successorLineage: string;
-    /** One page may honestly cover multiple endpoints or variants in a family. */
-    models: readonly [MediaModelReference, ...MediaModelReference[]];
+    /** The one catalogue model this page describes and its demo selects. */
+    model: MediaModelReference;
     /** The concrete user search intent that earns this page its existence. */
     publishReason: string;
     /**
@@ -53,6 +70,7 @@ export namespace aiModelPages {
       description: string;
       keywords: readonly string[];
     };
+    content: EditorialContent;
     demo: Demo;
   };
 
@@ -68,7 +86,54 @@ export namespace aiModelPages {
    * The routable, indexable inventory. Keep this active-only: no drafts and no
    * text-model entries.
    */
-  export const active: readonly Entry[] = [];
+  export const active: readonly Entry[] = [
+    {
+      slug: "gpt-image-2",
+      successorLineage: "openai-gpt-image",
+      model: { catalogue: "image", id: "openai/gpt-image-2" },
+      publishReason:
+        "GPT Image 2 is Grida's current OpenAI image-generation page and matches direct model-name search intent.",
+      retireWhen:
+        "Redirect when Grida supports a direct GPT Image successor and the older model no longer serves a distinct search or product need.",
+      metadata: {
+        title: "GPT Image 2 AI Image Generator — Grida",
+        description:
+          "Generate images with OpenAI GPT Image 2 in Grida. Review its output sizes and published pricing, then try it with organization AI credit.",
+        keywords: [
+          "gpt image 2",
+          "gpt image 2 generator",
+          "openai image generator",
+          "ai image generator",
+        ],
+      },
+      content: {
+        overview:
+          "GPT Image 2 is OpenAI’s current image model for generation and editing. This Grida demo exposes its text-to-image path, placing generated results directly on a canvas where you can compare prompts and outputs.",
+        capabilities: [
+          {
+            title: "Prompt-to-image generation",
+            description:
+              "Describe an image in natural language and generate a new visual directly in the Grida playground.",
+          },
+          {
+            title: "Flexible output geometry",
+            description:
+              "The model supports square, portrait, and landscape presets, plus custom dimensions inside its published size envelope.",
+          },
+          {
+            title: "Generation and editing model",
+            description:
+              "GPT Image 2 supports both new-image generation and provider-specific reference editing. The current Grida demo is text-to-image only.",
+          },
+        ],
+      },
+      demo: {
+        runner: "image-playground",
+        placement: "routed",
+        href: "/playground/image?model=openai%2Fgpt-image-2",
+      },
+    },
+  ];
 
   /**
    * Published slugs that left the active inventory. Keep successor redirects
@@ -86,5 +151,15 @@ export namespace aiModelPages {
 
   export function bySlug(slug: string): Entry | undefined {
     return active.find((page) => page.slug === slug);
+  }
+
+  export function byModel(
+    reference: MediaModelReference
+  ): Entry | undefined {
+    return active.find(
+      (page) =>
+        page.model.catalogue === reference.catalogue &&
+        page.model.id === reference.id
+    );
   }
 }
