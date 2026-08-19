@@ -279,9 +279,10 @@ describe("models.video catalogue invariants", () => {
     }
   });
 
-  it("never catalogues a video model without a supported provider binding", () => {
+  it("only catalogues selectable video models with a supported provider binding", () => {
     for (const card of Object.values(models.video.models)) {
       if (!card) continue;
+      expect(card.listed).toBe(true);
       expect(Object.keys(card.providers).length).toBeGreaterThan(0);
     }
   });
@@ -326,49 +327,35 @@ describe("models.video catalogue invariants", () => {
     expect(models.video.binding(veo, "openrouter")?.id).toBe("google/veo-3.1");
 
     const grok = models.video.models["xai/grok-imagine-video-1.5"]!;
+    expect(grok).toMatchObject({ min_duration: 1, max_duration: 15 });
+    expect(models.video.binding(grok, "vercel")).toMatchObject({
+      id: "xai/grok-imagine-video-1.5",
+      pricing: {
+        usd_per_second: {
+          "480p": { audio: 0.08 },
+          "720p": { audio: 0.14 },
+          "1080p": { audio: 0.25 },
+        },
+        usd_per_input_image: 0.01,
+      },
+    });
     expect(models.video.binding(grok, "fal")?.id).toBe(
       "xai/grok-imagine-video/v1.5/image-to-video"
     );
+    expect(models.video.binding(grok, "fal")?.pricing).toMatchObject({
+      usd_per_second: {
+        "480p": { audio: 0.08 },
+        "720p": { audio: 0.14 },
+        "1080p": { audio: 0.25 },
+      },
+      usd_per_input_image: 0.01,
+    });
+    expect(models.video.binding(grok, "fal")?.avg_cost_usd).toBe(0.71);
     // Grok 1.5 is NOT on OpenRouter (only 1.0) — correctly absent.
     expect(models.video.binding(grok, "openrouter")).toBeNull();
   });
 
-  it("grounds Gemini Omni Flash's fal route and default price", () => {
-    const gemini = models.video.models["google/gemini-omni-flash"]!;
-    expect(gemini).toMatchObject({
-      id: "google/gemini-omni-flash",
-      label: "Gemini Omni Flash",
-      vendor: "google",
-      listed: false,
-      aspect_ratios: ["16:9", "9:16"],
-      min_duration: 3,
-      max_duration: 10,
-      audio: true,
-      default: {
-        resolution: "720p",
-        aspect_ratio: "16:9",
-        duration: 5,
-        audio: true,
-      },
-    });
-
-    const fal = models.video.binding(gemini, "fal");
-    expect(fal).toMatchObject({
-      provider: "fal",
-      id: "google/gemini-omni-flash/image-to-video",
-      pricing: {
-        type: "per_second",
-        usd_per_second: { "720p": { audio: 0.13 } },
-      },
-      avg_cost_usd: 0.65,
-    });
-    expect(fal?.pricing.usd_per_second[gemini.default.resolution]?.audio).toBe(
-      0.13
-    );
-    expect(models.video.listed_models()).not.toContain(gemini);
-  });
-
-  it("listed video models are curated and each has at least one binding", () => {
+  it("listed video models are enabled and each has at least one binding", () => {
     const listed = models.video.listed_models();
     expect(listed.length).toBeGreaterThan(0);
     for (const card of listed) {

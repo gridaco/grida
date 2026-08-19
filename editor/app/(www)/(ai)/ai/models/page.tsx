@@ -63,6 +63,22 @@ const Logos: Partial<Record<string, FC<{ className?: string }>>> = {
   xai: XAILogo,
 };
 
+function MakerLogo({
+  vendor,
+  className,
+}: {
+  vendor: string;
+  className: string;
+}) {
+  const Logo = Logos[vendor];
+  if (!Logo) return null;
+  return (
+    <span aria-hidden="true" className="inline-flex shrink-0">
+      <Logo className={className} />
+    </span>
+  );
+}
+
 const LONG_CONTEXT_PRICING_NOTE =
   "For GPT-5.5 and GPT-5.6 Sol, Terra, and Luna, requests above 272K total input tokens use 2× input/cache rates and 1.5× output rates for the full request.";
 
@@ -374,7 +390,6 @@ function fmtTokens(n: number): string {
 
 function TextModelRow({ tier, spec }: { tier: ModelTier; spec: ModelSpec }) {
   const vendor = vendorOf(spec.id);
-  const Logo = Logos[vendor];
   return (
     <TableRow>
       <TableCell>
@@ -384,7 +399,7 @@ function TextModelRow({ tier, spec }: { tier: ModelTier; spec: ModelSpec }) {
       </TableCell>
       <TableCell className="font-medium">
         <div className="flex items-center gap-2">
-          {Logo && <Logo className="size-4 shrink-0" />}
+          <MakerLogo vendor={vendor} className="size-4" />
           <div>
             <div className="font-medium">{spec.label}</div>
             <code className="text-xs text-muted-foreground">{spec.id}</code>
@@ -424,12 +439,11 @@ function fmtCost(value: number | undefined): string {
 
 function CatalogRow({ spec }: { spec: ModelSpec }) {
   const vendor = vendorOf(spec.id);
-  const Logo = Logos[vendor];
   return (
     <TableRow>
       <TableCell className="font-medium">
         <div className="flex items-center gap-2">
-          {Logo && <Logo className="size-4 shrink-0" />}
+          <MakerLogo vendor={vendor} className="size-4" />
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-medium">{spec.label}</span>
@@ -503,7 +517,16 @@ function TextModelsSection() {
     <>
       {/* Hero */}
       <div className="container px-4 pt-16 pb-10">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Agent Models</h1>
+        <h1 className="text-4xl font-bold tracking-tight mb-2">
+          AI Models &amp; Pricing
+        </h1>
+        <p className="text-base text-muted-foreground max-w-2xl">
+          Compare the AI models Grida supports across agent, image, video,
+          audio, and 3D workflows.
+        </p>
+        <h2 className="text-3xl font-bold tracking-tight mt-12 mb-2">
+          Agent Models
+        </h2>
         <p className="text-base text-muted-foreground max-w-xl">
           Models powering agentic features in the editor — chat, code, tool use,
           and reasoning. Grida-hosted usage is deducted from prepaid
@@ -563,7 +586,7 @@ export default function AIModelsCatalogPage() {
 
       {/* Hero */}
       <div className="container px-4 pt-16 pb-10">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Image Models</h1>
+        <h2 className="text-3xl font-bold tracking-tight mb-2">Image Models</h2>
         <p className="text-base text-muted-foreground max-w-xl">
           Image generation models available on Grida. Pricing is sourced
           directly from each provider.
@@ -586,12 +609,11 @@ export default function AIModelsCatalogPage() {
             </TableHeader>
             <TableBody>
               {[...grouped.entries()].map(([vendor, models]) => {
-                const Logo = Logos[vendor];
                 return models.map((model) => (
                   <TableRow key={model.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        {Logo && <Logo className="size-4 shrink-0" />}
+                        <MakerLogo vendor={vendor} className="size-4" />
                         <div>
                           <div className="font-medium">{model.label}</div>
                           <code className="text-xs text-muted-foreground">
@@ -629,12 +651,11 @@ export default function AIModelsCatalogPage() {
 
       {/* Detail cards by vendor */}
       {[...grouped.entries()].map(([vendor, models]) => {
-        const Logo = Logos[vendor];
         return (
           <section key={vendor} className="container mx-auto px-4 py-12">
             <div className="flex items-center gap-3 mb-6">
-              {Logo && <Logo className="size-6" />}
-              <h2 className="text-xl font-semibold">{vendorLabel(vendor)}</h2>
+              <MakerLogo vendor={vendor} className="size-6" />
+              <h3 className="text-xl font-semibold">{vendorLabel(vendor)}</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {models.map((model) => (
@@ -653,7 +674,7 @@ export default function AIModelsCatalogPage() {
 
       {/* Music models hero */}
       <div className="container px-4 pt-16 pb-10">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Music Models</h1>
+        <h2 className="text-3xl font-bold tracking-tight mb-2">Music Models</h2>
         <p className="text-base text-muted-foreground max-w-xl">
           Music generation models currently available on Grida. Pricing is
           sourced directly from each provider.
@@ -731,10 +752,17 @@ function VideoProviderPricing({
 
         return (
           <div key={binding.provider} className="text-xs">
-            <span className="font-medium">
-              {VideoProviderLabels[binding.provider]}
-            </span>{" "}
-            <span className="font-mono text-muted-foreground">{price}</span>
+            <div>
+              <span className="font-medium">
+                {VideoProviderLabels[binding.provider]}
+              </span>{" "}
+              <span className="font-mono text-muted-foreground">{price}</span>
+            </div>
+            {binding.pricing.usd_per_input_image !== undefined && (
+              <div className="font-mono text-muted-foreground">
+                +${binding.pricing.usd_per_input_image.toFixed(3)}/input image
+              </div>
+            )}
           </div>
         );
       })}
@@ -742,14 +770,8 @@ function VideoProviderPricing({
   );
 }
 
-function VideoModelStatus({ model }: { model: AITypes.video.VideoModelCard }) {
-  return model.listed ? "Integrated" : "Catalogued";
-}
-
 function VideoModelsSection() {
-  const models = Object.values(ai.video.models).filter(
-    (model): model is AITypes.video.VideoModelCard => !!model
-  );
+  const models = ai.video.listed_models();
 
   return (
     <section className="container mx-auto px-4 py-16">
@@ -768,17 +790,18 @@ function VideoModelsSection() {
               <TableHead className="w-[320px]">Model</TableHead>
               <TableHead className="hidden md:table-cell">Output</TableHead>
               <TableHead>Provider pricing</TableHead>
-              <TableHead className="text-right">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {models.map((model) => {
-              const Logo = Logos[model.vendor];
               return (
                 <TableRow key={model.id}>
                   <TableCell className="font-medium align-top">
                     <div className="flex items-start gap-2">
-                      {Logo && <Logo className="mt-0.5 size-4 shrink-0" />}
+                      <MakerLogo
+                        vendor={model.vendor}
+                        className="mt-0.5 size-4"
+                      />
                       <div>
                         <div className="font-medium">{model.label}</div>
                         <code className="text-xs text-muted-foreground">
@@ -795,14 +818,6 @@ function VideoModelsSection() {
                   </TableCell>
                   <TableCell className="align-top">
                     <VideoProviderPricing model={model} />
-                  </TableCell>
-                  <TableCell className="text-right align-top">
-                    <Badge
-                      variant="outline"
-                      className="whitespace-nowrap font-normal text-xs"
-                    >
-                      <VideoModelStatus model={model} />
-                    </Badge>
                   </TableCell>
                 </TableRow>
               );
@@ -929,12 +944,11 @@ function MusicModelsTable() {
           </TableHeader>
           <TableBody>
             {[...grouped.entries()].map(([vendor, models]) => {
-              const Logo = Logos[vendor];
               return models.map((model) => (
                 <TableRow key={model.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      {Logo && <Logo className="size-4 shrink-0" />}
+                      <MakerLogo vendor={vendor} className="size-4" />
                       <div>
                         <div className="font-medium">{model.label}</div>
                         <code className="text-xs text-muted-foreground">
@@ -975,12 +989,11 @@ function MusicModelsCards() {
   return (
     <>
       {[...grouped.entries()].map(([vendor, models]) => {
-        const Logo = Logos[vendor];
         return (
           <section key={vendor} className="container mx-auto px-4 py-12">
             <div className="flex items-center gap-3 mb-6">
-              {Logo && <Logo className="size-6" />}
-              <h2 className="text-xl font-semibold">{vendorLabel(vendor)}</h2>
+              <MakerLogo vendor={vendor} className="size-6" />
+              <h3 className="text-xl font-semibold">{vendorLabel(vendor)}</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {models.map((model) => (
@@ -997,7 +1010,9 @@ function MusicModelsCards() {
 // ── Sound effect models ───────────────────────────────────────────────────
 
 function SoundEffectModelsSection() {
-  const models = ai.audio.sound_effects.staged_models();
+  const models = Object.values(ai.audio.sound_effects.models).filter(
+    (model) => !model.deprecated
+  );
   if (models.length === 0) return null;
 
   return (
@@ -1008,8 +1023,8 @@ function SoundEffectModelsSection() {
         </h2>
         <p className="text-base text-muted-foreground max-w-2xl">
           Provider-specific text-to-sound-effect compatibility from ElevenLabs.
-          Staged means the model contract is grounded in Grida; it does not
-          imply web generation availability.
+          Status is reported explicitly; catalogue presence does not imply web
+          generation availability.
         </p>
       </div>
 
@@ -1026,12 +1041,11 @@ function SoundEffectModelsSection() {
           </TableHeader>
           <TableBody>
             {models.map((model) => {
-              const Logo = Logos[model.vendor];
               return (
                 <TableRow key={model.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      {Logo && <Logo className="size-4 shrink-0" />}
+                      <MakerLogo vendor={model.vendor} className="size-4" />
                       <div>
                         <div className="font-medium">{model.label}</div>
                         <code className="text-xs text-muted-foreground">
@@ -1049,12 +1063,13 @@ function SoundEffectModelsSection() {
                   </TableCell>
                   <TableCell>
                     <div className="font-mono text-sm">
-                      {model.pricing.automatic_duration_credits} credits/run
+                      {model.pricing.automatic_duration_credits} ElevenLabs
+                      credits/run
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Automatic duration ·{" "}
                       {model.pricing.specified_duration_credits_per_second}{" "}
-                      credits/s when specified
+                      ElevenLabs credits/s when specified
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
@@ -1141,7 +1156,9 @@ function ThreeDPricing({
 }
 
 function ThreeDModelsSection() {
-  const models = ai.three_d.staged_models();
+  const models = Object.values(ai.three_d.models).filter(
+    (model) => !model.deprecated
+  );
   if (models.length === 0) return null;
 
   return (
@@ -1149,10 +1166,10 @@ function ThreeDModelsSection() {
       <div className="mb-10">
         <h2 className="text-3xl font-bold tracking-tight mb-2">3D Models</h2>
         <p className="text-base text-muted-foreground max-w-2xl">
-          fal-hosted text-to-3D and image-to-3D endpoints staged for Grida. GLB
-          is the portable primary result; additional formats are endpoint
-          specific. Catalogue presence does not imply web generation
-          availability.
+          fal-hosted text-to-3D and image-to-3D endpoints supported by Grida.
+          GLB is the portable primary result; additional formats are endpoint
+          specific. Status is reported explicitly; catalogue presence does not
+          imply web generation availability.
         </p>
       </div>
 
@@ -1169,12 +1186,11 @@ function ThreeDModelsSection() {
           </TableHeader>
           <TableBody>
             {models.map((model) => {
-              const Logo = Logos[model.vendor];
               return (
                 <TableRow key={model.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      {Logo && <Logo className="size-4 shrink-0" />}
+                      <MakerLogo vendor={model.vendor} className="size-4" />
                       <div>
                         <div className="font-medium">{model.label}</div>
                         <code className="text-xs text-muted-foreground">

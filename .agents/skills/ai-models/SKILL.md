@@ -148,11 +148,14 @@ Cards catalogue the **image-to-video** route only (canvas-relevant; Grok's sole 
 
 ### Cost
 
-`avg_cost_usd` (per binding) = its rate at the model's default `(resolution, audio)` × default duration. **Video dwarfs image costs** (Veo 3.1 ≈ `$3.20` for an 8s 1080p clip). The current prepaid-credit gate checks a global balance floor, not an estimated per-request ceiling, so audit metering and bounded-overspend exposure before serving a new video route.
+`avg_cost_usd` (per binding) = its rate at the model's default `(resolution, audio)` × default duration, plus any required input-image surcharge. **Video dwarfs image costs** (Veo 3.1 ≈ `$3.20` for an 8s 1080p clip). The current prepaid-credit gate checks a global balance floor, not an estimated per-request ceiling, so audit metering and bounded-overspend exposure before serving a new video route.
 
 ### Pricing (lives on the binding)
 
-`per_second`, nested `resolution → audio-mode → USD/s`. The rate varies by both resolution **and** whether audio is generated, so the keys are the exact `(resolution, mode)` combos that provider serves & meters:
+`per_second`, nested `resolution → audio-mode → USD/s`, with an optional
+provider-native `usd_per_input_image` surcharge. The rate varies by both
+resolution **and** whether audio is generated, so the keys are the exact
+`(resolution, mode)` combos that provider serves & meters:
 
 ```
 { type: "per_second", usd_per_second: {
@@ -167,7 +170,8 @@ Cards catalogue the **image-to-video** route only (canvas-relevant; Grok's sole 
 
 - Catalogue boundary: never add or list a model Grida cannot call. A model
   requires at least one verified provider binding with grounded pricing;
-  announcements and compatibility-only records stay out entirely.
+  announcements, `listed: false`, and compatibility-only records stay out
+  entirely.
 - New model → add the canonical id to `VideoModelId` and a card with ≥1 binding. Every binding must price the model's `default` `(resolution, audio)` — enforced by catalogue-invariant tests (plus: provider field matches key).
 - New route for an existing model → add a `VideoProviderBinding` under its provider key, **only with a verified rate** (e.g. OpenRouter surfaces `$0/MTok` for video — not usable; leave it out).
 - New capability (e.g. text-to-video) → only when actually used. If a provider keys it into a separate id (fal), that's a new binding/id; revisit the single-`id` shape only then.
