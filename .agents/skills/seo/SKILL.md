@@ -27,6 +27,11 @@ pages, blog posts, and documentation.
 
 ## Next.js Pages (`editor/app/(www)`)
 
+Dedicated `/ai/models/:slug` pages are an editorial, media-only inventory in
+`editor/www/data/ai-model-pages.ts`. Do not derive publication from the model
+catalogue, and do not add text models. Route params, metadata, redirects, and
+the sitemap must derive from that inventory.
+
 ### Metadata
 
 Every public page must export metadata (static or dynamic).
