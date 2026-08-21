@@ -476,6 +476,34 @@ describe("models.text current catalogue", () => {
       outputLimit: 128_000,
       cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
     },
+    {
+      id: "anthropic/claude-sonnet-5",
+      contextWindow: 1_000_000,
+      outputLimit: 128_000,
+      cost: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+    },
+    {
+      id: "google/gemini-3.7-flash",
+      contextWindow: 1_048_576,
+      outputLimit: 65_536,
+      // Steady state, not Google's promotional rate through 2026-12-31.
+      cost: { input: 1.5, output: 7.5, cacheRead: 0.15 },
+    },
+    {
+      id: "google/gemini-3.1-pro-preview",
+      contextWindow: 1_048_576,
+      outputLimit: 65_536,
+      cost: {
+        input: 2,
+        output: 12,
+        cacheRead: 0.2,
+        longContext: {
+          inputTokensAbove: 200_000,
+          inputMultiplier: 2,
+          outputMultiplier: 1.5,
+        },
+      },
+    },
   ] as const;
 
   it.each(newModels)("stores the published $id rate card", (expected) => {
@@ -497,6 +525,18 @@ describe("models.text current catalogue", () => {
     expect(
       models.text.catalog["openai/gpt-5.5-pro"].cost.longContext
     ).toBeUndefined();
+  });
+
+  it("multiplies Gemini 3.1 Pro out to Google's published banded rates", () => {
+    // The catalogue stores base rates plus multipliers; Google publishes the
+    // banded rates directly. This is where the two are held to agree — the
+    // cost function's own tests assert totals, not rates.
+    const { input, output, cacheRead, longContext } =
+      models.text.catalog["google/gemini-3.1-pro-preview"].cost;
+    expect(longContext).toBeDefined();
+    expect(input * longContext!.inputMultiplier).toBe(4);
+    expect(cacheRead! * longContext!.inputMultiplier).toBeCloseTo(0.4);
+    expect(output * longContext!.outputMultiplier).toBe(18);
   });
 
   it("keeps catalogue lifecycle markers scoped to the requested models", () => {
