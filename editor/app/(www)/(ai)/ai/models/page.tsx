@@ -1,6 +1,8 @@
 import type { FC } from "react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import ai from "@/lib/ai";
+import { aiModelPages } from "@/www/data/ai-model-pages";
 import {
   models as textModels,
   catalog as textCatalog,
@@ -314,13 +316,26 @@ function ConstraintsDetail({
 
 // ── Card ─────────────────────────────────────────────────────────────────────
 
+function ImageModelLink({ model }: { model: AITypes.image.ImageModelCard }) {
+  const page = aiModelPages.byModel({ catalogue: "image", id: model.id });
+  if (!page) return model.label;
+  return (
+    <Link
+      href={aiModelPages.path(page.slug)}
+      className="underline-offset-4 hover:underline"
+    >
+      {model.label}
+    </Link>
+  );
+}
+
 function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
   return (
     <Card className="flex flex-col bg-card/50 border-muted overflow-hidden">
       <CardHeader className="pb-3 h-20">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base font-semibold">
-            {model.label}
+            <ImageModelLink model={model} />
           </CardTitle>
           <Badge
             variant="outline"
@@ -615,7 +630,9 @@ export default function AIModelsCatalogPage() {
                       <div className="flex items-center gap-2">
                         <MakerLogo vendor={vendor} className="size-4" />
                         <div>
-                          <div className="font-medium">{model.label}</div>
+                          <div className="font-medium">
+                            <ImageModelLink model={model} />
+                          </div>
                           <code className="text-xs text-muted-foreground">
                             {model.id}
                           </code>

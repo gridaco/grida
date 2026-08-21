@@ -52,7 +52,7 @@ const useChatBox = () => {
 type OnValueCommit = (value: {
   text: string;
   attachments: Attachment[];
-}) => void | false | Promise<void> | Promise<false>;
+}) => void | false | Promise<void | false>;
 
 interface ChatBoxProps {
   disabled?: boolean;

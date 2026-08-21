@@ -40,6 +40,11 @@ then trust:
   `supabase/schemas/*.sql` is a readable projection that can lag — use
   the **database** skill.
 - **Directory contract** → the nearest `AGENTS.md`/`README.md`.
+- **Public `(www)` route intent** →
+  [`editor/app/(www)/README.md`](<../../../editor/app/(www)/README.md>) for
+  route ownership, CTA/gate funnels, crawl intent, and lifecycle; reconcile it
+  against `editor/app/(www)/**` and `editor/app/sitemap.ts`, which own deployed
+  and crawler-visible reality.
 - **"I remember API X…"** → re-read current code; a memory is a claim
   about a _past_ state, verify before acting.
 

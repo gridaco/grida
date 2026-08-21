@@ -16,16 +16,16 @@ Currently, we have below features / modules.
 
 > **When entering an unfamiliar directory**, always check for `README.md` and `AGENTS.md` first. These files contain domain-specific context, conventions, and constraints that override general assumptions. The table below lists the known ones, but sub-directories and individual packages may have their own as well.
 
-| directory              | README                                       | AGENTS                                       | notes                                 |
-| ---------------------- | -------------------------------------------- | -------------------------------------------- | ------------------------------------- |
-| [docs](./docs)         | -                                            | [`docs/AGENTS.md`](./docs/AGENTS.md)         | the docs directory                    |
-| [editor](./editor)     | -                                            | [`editor/AGENTS.md`](./editor/AGENTS.md)     | the editor directory                  |
-| [packages](./packages) | -                                            | -                                            | shared packages                       |
-| [desktop](./desktop)   | [`desktop/README.md`](./desktop/README.md)   | -                                            | the electron desktop app              |
-| [supabase](./supabase) | [`supabase/README.md`](./supabase/README.md) | [`supabase/AGENTS.md`](./supabase/AGENTS.md) | the supabase project                  |
-| [apps](./apps)         | -                                            | -                                            | micro sites for Grida                 |
-| [jobs](./jobs)         | [`jobs/README.md`](./jobs/README.md)         | -                                            | hosted jobs                           |
-| [test](./test)         | [`test/README.md`](./test/README.md)         | [`test/AGENTS.md`](./test/AGENTS.md)         | manual test cases & UX behavior specs |
+| directory              | README                                       | AGENTS                                       | notes                                                                                 |
+| ---------------------- | -------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [docs](./docs)         | -                                            | [`docs/AGENTS.md`](./docs/AGENTS.md)         | the docs directory                                                                    |
+| [editor](./editor)     | -                                            | [`editor/AGENTS.md`](./editor/AGENTS.md)     | the editor directory; [public `(www)` route register](<./editor/app/(www)/README.md>) |
+| [packages](./packages) | -                                            | -                                            | shared packages                                                                       |
+| [desktop](./desktop)   | [`desktop/README.md`](./desktop/README.md)   | -                                            | the electron desktop app                                                              |
+| [supabase](./supabase) | [`supabase/README.md`](./supabase/README.md) | [`supabase/AGENTS.md`](./supabase/AGENTS.md) | the supabase project                                                                  |
+| [apps](./apps)         | -                                            | -                                            | micro sites for Grida                                                                 |
+| [jobs](./jobs)         | [`jobs/README.md`](./jobs/README.md)         | -                                            | hosted jobs                                                                           |
+| [test](./test)         | [`test/README.md`](./test/README.md)         | [`test/AGENTS.md`](./test/AGENTS.md)         | manual test cases & UX behavior specs                                                 |
 
 ## Languages, Frameworks, Tools, Infrastructures
 
@@ -95,6 +95,10 @@ Importance: **Very high**
 The editor is a monorepo nextjs project that contains the codebase for the editor.
 
 grida.co and \[tenant\].grida.site domains are connected.
+
+Public pages physically owned by `(www)` register their intent, CTA/gate
+funnels, crawl state, and lifecycle in
+[`editor/app/(www)/README.md`](<./editor/app/(www)/README.md>).
 
 - `/editor`
   - `/app` the nextjs app directory, no shared root layout, each has its own root layout.

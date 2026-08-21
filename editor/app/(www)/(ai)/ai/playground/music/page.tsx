@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
+import { AiCredits } from "@/lib/ai/credits";
+import { resolveInitialAiCredits } from "@/lib/ai/credits/actions";
 import AudioGenTool from "./_page";
 
 export const metadata: Metadata = {
@@ -36,14 +38,19 @@ export default async function MusicPlaygroundPage({
 }: {
   searchParams: Promise<{ prompt?: string | string[] }>;
 }) {
-  const params = await searchParams;
+  const [params, initialCredits] = await Promise.all([
+    searchParams,
+    resolveInitialAiCredits(),
+  ]);
   const raw = Array.isArray(params.prompt) ? params.prompt[0] : params.prompt;
   const initialPrompt = typeof raw === "string" ? raw.slice(0, 4000) : "";
 
   return (
     <main>
       <Header />
-      <AudioGenTool initialPrompt={initialPrompt} />
+      <AiCredits.Provider initial={initialCredits}>
+        <AudioGenTool initialPrompt={initialPrompt} />
+      </AiCredits.Provider>
       <Footer />
     </main>
   );

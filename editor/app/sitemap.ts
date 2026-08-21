@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { aiModelPages } from "@/www/data/ai-model-pages";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
@@ -142,6 +143,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.5,
     },
+    ...aiModelPages.active.map((page) => ({
+      url: aiModelPages.url(page.slug),
+      changeFrequency: "monthly" as const,
+      priority: 0.4,
+    })),
     {
       url: "https://grida.co/tools",
       changeFrequency: "monthly",
