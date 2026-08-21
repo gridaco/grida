@@ -317,8 +317,26 @@ describe("ModelCatalogStore — failure is never fatal", () => {
         throw new Error("listener blew up");
       },
     });
-    await expect(store.refresh("boot")).resolves.toBe(false);
+    await expect(store.refresh("boot")).resolves.toBe(true);
     await expect(store.refreshOnMiss()).resolves.toBeUndefined();
+  });
+
+  it("still applies the catalogue when on_change throws", async () => {
+    // The swap happens BEFORE the notification, so a broken host listener
+    // must not be reported as a refresh that did not happen — the return
+    // value means "the view changed", and it did.
+    warn();
+    const store = make({
+      base_url: BASE_URL,
+      fetch: serving(published(["acme/one"])),
+      on_change: () => {
+        throw new Error("listener blew up");
+      },
+    });
+    expect(await store.refresh("boot")).toBe(true);
+    expect(store.view().has("acme/one")).toBe(true);
+    // And the no-op short-circuit still sees it as already applied.
+    expect(await store.refresh("interval")).toBe(false);
   });
 
   it("warns once per failure kind, not once per attempt", async () => {

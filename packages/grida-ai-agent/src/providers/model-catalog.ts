@@ -124,11 +124,12 @@ export class ModelCatalogStore {
     if (this.url === null || this.disposed) return Promise.resolve(false);
     this.inFlight ??= this.refreshOnce(reason)
       // "Never rejects" has to be enforced, not just documented: the
-      // validator and the host's `on_change` listener are both outside
-      // this file's control, and `start()` fires this with `void` — an
-      // escaping rejection would be an unhandled rejection on a timer.
-      // `refreshOnMiss` awaits the same promise, so it would also surface
-      // on the run gate.
+      // validator is outside this file's control, and `start()` fires this
+      // with `void` — an escaping rejection would be an unhandled
+      // rejection on a timer. `refreshOnMiss` awaits the same promise, so
+      // it would also surface on the run gate. Reaching here means nothing
+      // was applied; a listener that throws AFTER a successful swap is
+      // handled in `refreshOnce`, which still reports the change.
       .catch((err) => {
         this.warnOnce(
           "apply",
@@ -235,7 +236,20 @@ export class ModelCatalogStore {
     if (this.disposed) return false;
     this.current = models.snapshot.view(snapshot);
     this.currentRaw = raw;
-    this.onChange?.();
+    // The catalogue is ALREADY live at this point, so a listener that
+    // throws must not be reported as a refresh that did not happen: the
+    // return value is "the view changed", and it did. Its own warn key,
+    // because a broken host listener is a different failure from a
+    // catalogue this store could not apply.
+    try {
+      this.onChange?.();
+    } catch (err) {
+      this.warnOnce(
+        "on-change",
+        `applied the published catalogue, but the on_change listener ` +
+          `failed (${describe(err)})`
+      );
+    }
     return true;
   }
 
