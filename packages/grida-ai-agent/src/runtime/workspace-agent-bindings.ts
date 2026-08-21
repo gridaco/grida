@@ -23,6 +23,7 @@ import { createMaterializingSkillLoader } from "../skills/materialize";
 import type { SkillBodyLoader } from "../skills/types";
 import { AGENT_DEFAULT_MODE, type AgentMode } from "../protocol/mode";
 import type { SecretsStore } from "@grida/daemon/server";
+import { catalogView } from "../providers/model-catalog";
 import {
   defaultImageModelId,
   hasUsableImageProvider,
@@ -145,6 +146,8 @@ export async function createWorkspaceAgentBindings(
     /** GRIDA-SEC-006 — hosted-session deps; lets `generate_image` serve a
      *  signed-in keyless user through the hosted provider. */
     gg?: import("../providers/gg-session").GridaGatewaySessionStore;
+    /** Image catalogue for `generate_image`; absent ⇒ the bundled one. */
+    catalog?: import("../providers/model-catalog").ModelCatalogStore;
     gg_base_url?: string;
     /** Provider HTTP used only inside the image-generator closure. */
     provider_http?: ProviderHttp;
@@ -287,6 +290,7 @@ export async function createWorkspaceAgentBindings(
       gg: deps.gg,
       gg_base_url: deps.gg_base_url,
       provider_http: deps.provider_http,
+      catalog: deps.catalog,
     };
     if (await hasUsableImageProvider(imageDeps)) {
       image_gen = createImageGenerator(
@@ -421,7 +425,13 @@ function createImageGenerator(
     async generate(input) {
       // The user's connected model (settings), not the agent's concern. The
       // tool is prompt-only — no model/provider/size/aspect/seed knobs.
-      const modelId = imageModelId ?? defaultImageModelId();
+      //
+      // The desktop host never sets `image_model_id`, so this default is
+      // what every real session generates against — which makes it the
+      // hottest staleness point on the media surface. Resolve it through
+      // the host's catalogue, not the bundled one.
+      const modelId =
+        imageModelId ?? defaultImageModelId(catalogView(imageDeps.catalog));
       if (!modelId) {
         return {
           ok: false,

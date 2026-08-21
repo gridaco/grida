@@ -242,7 +242,121 @@ its own**:
 - **Granularity** — one hosted request per model step, so per-request
   gating _is_ step-level gating for the agent.
 
-### 4. Relationship to provider selection
+### 4. Catalogue distribution (credential-free)
+
+The model catalogue is compiled into every client that consumes it, so a
+shipped desktop binary can only ever see the catalogue it was built with.
+Adding a model or retargeting a tier used to require a release — while the
+renderer, served fresh from grida.co, would already be offering the new
+model. The result was a client whose own picker offered a model its own
+agent host rejected as unknown.
+
+The catalogue is therefore **published, not shipped**: authored in-repo
+(it is a curated product decision, not a scrape) and served at
+`GET /api/v1/models/catalog`.
+
+- **The published snapshot IS the deployed gate.** That endpoint's body
+  and the server's own model allowlist are the same static import in the
+  same deploy artifact, so they cannot disagree. This is why the published
+  catalogue outranks a client's bundled one even when the binary is newer:
+  converging on it is converging on the table that will actually be
+  enforced.
+- **The bundle is the seed, and the floor.** A host answers from its
+  bundled catalogue immediately and forever if the network never comes
+  back. A bad snapshot can make a host mis-list; it can never leave one
+  with no catalogue at all.
+- **Whole-or-reject, and wholesale.** A snapshot that fails validation is
+  discarded entirely — a half-applied catalogue must not exist. A valid one
+  REPLACES the catalogue rather than merging: removing a model is the kill
+  switch, and a merge would defeat it on every installed client.
+- **Credential-free, and outside the token-gated glob.** A desktop
+  sidecar fetches this at boot, long before a renderer can push a
+  signed-in session token, so the route must accept no credential — while
+  `GRIDA-SEC-006` binds every `api/v1/ai` route to `verifyGgToken`
+  exclusively. Accepting no credential is stronger than accepting the
+  wrong one, but only while this route stays outside that family.
+- **Pricing is included, deliberately.** The "no pricing" rule on
+  `/api/v1/ai/models` guards the OpenAI-compatible surface against
+  client-side cost math drifting from the billing rail. This payload is
+  the source that FEEDS a host's local estimate and its compaction limits;
+  withholding rates is what would cause drift. The same numbers are
+  already public on the models page and in the pricing docs.
+
+**Convergence.** A host refreshes at boot, on an interval, and once when a
+lookup misses. The miss refresh is the load-bearing one: it is awaited
+in-request, so the FIRST use of a newly published model succeeds instead of
+failing until some later tick. It is deliberately modality-agnostic — an
+image card the renderer just offered is exactly as publishable-since-boot
+as a text model, and both are reached through a picker served fresh from
+grida.co. A tier retarget produces no miss (the old target is still
+valid), so it converges on the interval instead.
+
+**Membership is asked exactly; identity is asked loosely.** A view answers
+two different questions and a call site must not confuse them. `has` is
+exact catalogue membership — the question a GATE asks, because whatever
+passes a gate is forwarded to a provider verbatim and only an exact
+catalogue id is one the provider recognizes. `modelSpecById` also matches
+a bare name and a date suffix — right when asking for a model's LIMITS or
+RATES, where a near-miss id is still that model. Using the loose one to
+gate silently widens what the host admits and converts a clean
+"unknown model" rejection into a provider-level failure mid-run.
+
+**Pinning.** `GRIDA_AGENT_DISABLE_MODELS_FETCH=1` freezes a daemon on its
+bundled catalogue — the one hatch for an air-gapped or version-pinned
+deployment. It works by handing the store the seed as its snapshot, which
+is the same mechanism that pins it to any supplied catalogue, so there is
+one code path rather than a family of overrides.
+
+**Schema.** Additive changes do not bump the schema major — clients ignore
+fields they do not know, so a new optional field is safe to publish. A
+breaking change publishes at a NEW path and bumps the major, leaving old
+clients on the old path or falling back to their seed. One rule follows
+from that: a model requiring new CLIENT CODE (a new provider kind) must
+never be published into an existing schema, because old clients will
+accept its data and then fail to drive it. Ordinary models are pure data
+and need no accompanying release.
+
+**Sections are independently fallible.** `text`, `image`, and `video` are
+validated separately: an unusable media section is dropped on its own and
+the consumer falls back to its bundled catalogue for that modality only.
+Only `text` is load-bearing enough to reject the whole payload, because a
+host with no text catalogue cannot run a turn at all. A broken image
+catalogue must never cost a host its ability to answer.
+
+**Not every modality is published yet.** `text`, `image`, and `video` are.
+Music, sound effects, and 3D are still gated against the host's BUNDLED
+catalogue (`v.oneOf(models.audio.music.model_ids)` and its siblings in
+`packages/grida-ai-agent/src/http/routes/`), so adding a model in those
+families still needs a desktop release.
+
+That is a known gap, but it is NOT one more section away. Image and video
+cards fit the published shape because they carry open id unions,
+`listed: boolean`, and a `providers` map keyed by provider — which is what
+the media view is generic over. Music, sound-effect, and 3D cards carry
+closed literal id unions, a single `provider` field, and `status:
+"listed" | "staged"`, and their routes gate at body-validation level on the
+narrowed id (`three-d.ts` then indexes the card to drive per-model input
+validation). Publishing them means first changing those card shapes in
+`@grida/ai-models` — widening the id unions, reconciling `status` with
+`listed`, deciding whether a single-provider card grows a providers map —
+and only then adding a section. Two instantiations is also the minimum
+that justifies the current generic; stretching it over a third,
+incompatible shape before there is demand would be speculative. Image and
+video move monthly and are multi-provider; these three move roughly
+yearly and are single-provider hosted routes. Worth revisiting when one of
+those catalogues starts moving.
+
+**Closed vocabularies are validated as text on the wire.** Model vendor,
+speed label, and the like are closed unions in TypeScript but are accepted
+as plain strings when parsed, and an unknown _provider_ binding is dropped
+rather than rejecting its card. Otherwise publishing a model from a new
+vendor, or adding a provider, would be a breaking publish requiring a
+client release — the exact failure this system exists to remove. (Vercel's
+AI Gateway learned this in public: it validated its model-kind field as a
+hard enum, so the day a new kind shipped the entire listing failed to
+parse for every client. It now accepts loosely and filters unknown rows.)
+
+### 5. Relationship to provider selection
 
 GG is one native capacity source; it does not own the global provider order.
 The golden selection rules live in the
@@ -300,7 +414,14 @@ handoff, is then retained only in the daemon's memory, and is re-minted on
 expiry; each GG call uses the bounded native provider transport and Chromium
 system route without giving Electron main durable token custody; the gateway
 gates and meters through the live billing rail; BYOK
-continues to bypass everything. The experimental ChatGPT subscription
+continues to bypass everything. The model catalogue is published at
+`/api/v1/models/catalog` and agent hosts resolve through it — seeded from
+their bundled copy, refreshed at boot, on an interval, and once on a run-gate
+miss — so a model added or a tier retargeted on the server reaches an
+already-installed binary without a release. Text, image, and video are all
+published and consumed; `audio`, `image_tools`, and `embedding` deliberately
+are not (no agent-host reader, and the embedding card is a compile-time
+consistency pin against a database column, not distributable data). The experimental ChatGPT subscription
 provider now participates in the native resolver and provider-qualified
 session persistence described above. That local implementation does not make
 it a stable OpenAI-supported integration: its legal/support contract remains
@@ -334,7 +455,12 @@ later, and the honest risks:
   subscription-backend posture, remains an external release gate.
 - **Packaged egress smoke** — the native sandbox must be proven to reach
   the hosted host from a _packaged_ build; the dev loop cannot prove the
-  packaged allowlist.
+  packaged allowlist. This now also covers the catalogue fetch, which
+  rides the same provider lane.
+- **A published catalogue is not persisted.** A host holds it in memory
+  only, so an offline start falls back to the bundled seed rather than the
+  last catalogue it saw. Accepted: it also means a bad-but-valid snapshot
+  cannot outlive the process that fetched it.
 - **Hosted-deploy prerequisite** — the gateway fails closed without its
   dedicated signing secret configured in the hosted environment.
 

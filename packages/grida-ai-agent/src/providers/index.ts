@@ -26,9 +26,10 @@
  * precedence.
  */
 
-import { models, TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models";
+import { models } from "@grida/ai-models";
+import { catalogView, type ModelCatalogStore } from "./model-catalog";
+import type { TierModelIds } from "./byok";
 import type { ModelFactory } from "../agent";
-import type { ModelTier } from "../tiers";
 import type { SecretsStore } from "@grida/daemon/server";
 import {
   byokProvidersFor,
@@ -58,10 +59,6 @@ import type { ProviderHttp } from "./http";
 import { ChatGptProvider, type ChatGptProviderRuntime } from "./chatgpt";
 
 export { EndpointProvidersStore } from "./endpoints";
-
-/** Canonical tier->catalog-model map. One table, sourced from @grida/ai-models. */
-export const MODEL_BY_TIER: Record<ModelTier, TierModelId> = TIER_MODEL_IDS;
-const CATALOG_MODEL_IDS = new Set<string>(Object.keys(models.text.catalog));
 
 export type ResolvedProvider = {
   /** A native, BYOK, hosted, endpoint, or external-agent provider id. */
@@ -138,6 +135,12 @@ export type ResolveDeps = {
    * identity.
    */
   chatgpt?: ChatGptProviderRuntime;
+  /**
+   * The catalogue to resolve against. Optional so tests and key-only
+   * hosts need not wire a store; absent ⇒ the bundled catalogue, which
+   * is what this file read directly before the store existed.
+   */
+  catalog?: ModelCatalogStore;
 };
 
 export type ResolveOptions = {
@@ -157,6 +160,9 @@ export async function resolveProvider(
   if (options.explicit) {
     return await resolveExplicit(options.explicit, deps, options.model_id);
   }
+  // One read for the whole resolution: a mid-resolution refresh must not
+  // let the gate and the provider choice disagree about the catalogue.
+  const view = catalogView(deps.catalog);
 
   // A connected ChatGPT subscription is the zero-dollar onboarding path.
   // Model compatibility is checked before precedence: a catalog model not
@@ -170,7 +176,7 @@ export async function resolveProvider(
   if (
     options.model_id &&
     isChatGptSubscriptionModelId(options.model_id) &&
-    !CATALOG_MODEL_IDS.has(options.model_id)
+    !isCatalogModel(view, options.model_id)
   ) {
     throw new ProviderUnavailableError(CHATGPT_PROVIDER_ID);
   }
@@ -178,11 +184,11 @@ export async function resolveProvider(
   // Text path: only text-capable BYOK providers. An image-only provider
   // (fal) may have a stored key, but it serves no chat models — skip it so a
   // fal-only user falls through to endpoints rather than erroring.
-  if (isCatalogModel(options.model_id)) {
+  if (isCatalogModel(view, options.model_id)) {
     for (const provider of byokProvidersFor("text")) {
       const key = await deps.secrets._getKey(provider.id);
       if (key) {
-        return makeResolvedByok(provider.id, key, deps.provider_http);
+        return makeResolvedByok(provider.id, key, deps);
       }
     }
 
@@ -213,6 +219,7 @@ async function resolveExplicit(
   deps: ResolveDeps,
   modelId?: string
 ): Promise<ResolvedProvider> {
+  const view = catalogView(deps.catalog);
   if (isChatGptProviderId(providerId)) {
     const resolved = await maybeResolveChatGpt(deps, modelId);
     if (!resolved) throw new ProviderUnavailableError(providerId);
@@ -222,7 +229,9 @@ async function resolveExplicit(
     // Without a live token the pick surfaces as the existing 409
     // `provider_down` with `provider_id: "gg"` — the renderer maps
     // that to "Sign in to use included AI".
-    const resolved = isCatalogModel(modelId) ? maybeResolveGg(deps) : null;
+    const resolved = isCatalogModel(view, modelId)
+      ? maybeResolveGg(deps)
+      : null;
     if (!resolved) throw new ProviderUnavailableError(providerId);
     return resolved;
   }
@@ -231,13 +240,13 @@ async function resolveExplicit(
       !byokProvidersFor("text").some(
         (provider) => provider.id === providerId
       ) ||
-      !isCatalogModel(modelId)
+      !isCatalogModel(view, modelId)
     ) {
       throw new ProviderUnavailableError(providerId);
     }
     const key = await deps.secrets._getKey(providerId);
     if (!key) throw new ProviderUnavailableError(providerId);
-    return makeResolvedByok(providerId, key, deps.provider_http);
+    return makeResolvedByok(providerId, key, deps);
   }
   const endpoint = await deps.endpoints?.get(providerId);
   const resolved =
@@ -280,7 +289,11 @@ function maybeResolveGg(deps: ResolveDeps): ResolvedProvider | null {
     model_factory: makeGridaGatewayFactory(
       hosted.session,
       hosted.base_url,
-      deps.provider_http
+      deps.provider_http,
+      // The STORE, not a snapshot of it: a background subagent asks for
+      // its tier long after resolution, and must get the model the
+      // catalogue names then.
+      () => catalogView(deps.catalog).tier_model_ids
     ),
   };
 }
@@ -288,20 +301,34 @@ function maybeResolveGg(deps: ResolveDeps): ResolvedProvider | null {
 function makeResolvedByok(
   providerId: ByokProviderId,
   key: string,
-  providerHttp?: ProviderHttp
+  deps: ResolveDeps
 ): ResolvedProvider {
+  const providerHttp = deps.provider_http;
+  // The STORE, not a snapshot of it: a background subagent asks for its
+  // tier long after resolution, and must get the model the catalogue
+  // names then.
+  const tierModelIds: TierModelIds = () =>
+    catalogView(deps.catalog).tier_model_ids;
   switch (providerId) {
     case "openrouter":
       return {
         provider_id: providerId,
         kind: "byok",
-        model_factory: makeOpenRouterFactory(key.trim(), providerHttp),
+        model_factory: makeOpenRouterFactory(
+          key.trim(),
+          providerHttp,
+          tierModelIds
+        ),
       };
     case "vercel":
       return {
         provider_id: providerId,
         kind: "byok",
-        model_factory: makeVercelFactory(key.trim(), providerHttp),
+        model_factory: makeVercelFactory(
+          key.trim(),
+          providerHttp,
+          tierModelIds
+        ),
       };
     case "fal":
       // fal is an image-only BYOK provider — it has no text/chat factory.
@@ -351,6 +378,18 @@ async function maybeResolveEndpoint(
   };
 }
 
-function isCatalogModel(modelId: string | undefined): boolean {
-  return modelId === undefined || CATALOG_MODEL_IDS.has(modelId);
+/**
+ * Whether the model is one this host's catalogue carries. `undefined`
+ * (no explicit pick) is always in — the tier decides the model then.
+ *
+ * EXACT (`view.has`), not `modelSpecById`: the id that passes here is the
+ * id handed to the provider factory verbatim, so a bare or date-suffixed
+ * near-miss must fail this test rather than route to a provider that has
+ * never heard of it.
+ */
+function isCatalogModel(
+  view: models.snapshot.View,
+  modelId: string | undefined
+): boolean {
+  return modelId === undefined || view.has(modelId);
 }

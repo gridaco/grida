@@ -82,15 +82,33 @@ export type ResolveModelLimits = (model: ChatModel | null) => ModelLimits;
  */
 export function resolveModelLimits(
   model: ChatModel | null,
-  custom?: readonly models.text.registry.CustomModelSpec[]
+  custom?: readonly models.text.registry.CustomModelSpec[],
+  // The catalogue to size against. Defaults to the bundled one; a host
+  // that refreshes passes its live view, so a model published after this
+  // binary shipped is sized by its REAL window rather than falling
+  // through to the frontier-sized default below.
+  view: models.snapshot.View = models.snapshot.view()
 ): ModelLimits {
   let spec: { contextWindow: number; outputLimit: number } | undefined =
-    model?.model_id
-      ? models.text.registry.resolve(model.model_id, custom)
-      : undefined;
-  if (!spec && model?.tier) spec = models.text.byTier[model.tier];
-  if (!spec) spec = models.text.byTier.pro;
+    model?.model_id ? view.resolve(model.model_id, custom) : undefined;
+  if (!spec && model?.tier) spec = view.by_tier[model.tier];
+  if (!spec) spec = view.by_tier.pro;
   return { context_window: spec.contextWindow, output_limit: spec.outputLimit };
+}
+
+/**
+ * The summarizer's input cap for a model of the given window: reserve room
+ * for the summary output, clamped to the window itself so a sub-5k model is
+ * never handed more input than it can hold.
+ *
+ * Lives here (not at the call site) because this file owns the compaction
+ * default the cap overrides — `opts.summarizer_input_cap ??
+ * models.text.byTier.nano.contextWindow`. Callers that know the summarizer
+ * will NOT run on the catalogue's nano model resolve its real window and
+ * pass it through here; see `summarizerInputCap` in `runtime/index.ts`.
+ */
+export function clampSummarizerCap(contextWindow: number): number {
+  return Math.min(contextWindow, Math.max(1_024, contextWindow - 4_096));
 }
 
 /** Usable context = window − reserve. `reserve` is capped at the model's

@@ -31,6 +31,93 @@
 
 import { TIER_MODEL_IDS, type ModelTier } from "./tiers";
 
+/**
+ * The id-matching rules, over an arbitrary spec table.
+ *
+ * Private to this file and parameterized rather than closed over
+ * `catalogSpecs` so that `models.text.modelSpecById` (the bundled
+ * catalogue) and a `models.snapshot` view (a published catalogue) match
+ * ids identically. Two copies of these rules would drift the day a
+ * provider changes its id convention.
+ *
+ * Accepts an exact namespaced id, a bare id, or a date-suffixed id —
+ * see {@link models.text.modelSpecById} for the contract.
+ */
+function specByIdOver(
+  specs: readonly models.text.ModelSpec[],
+  modelId: string
+): models.text.ModelSpec | undefined {
+  for (const spec of specs) {
+    if (spec.id === modelId) return spec;
+
+    const baseName = spec.id.includes("/")
+      ? spec.id.split("/").slice(1).join("/")
+      : spec.id;
+
+    if (modelId === baseName) return spec;
+    if (
+      modelId.startsWith(baseName) &&
+      /^-\d/.test(modelId.slice(baseName.length))
+    ) {
+      return spec;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Open-registry resolution over an arbitrary spec table ∪ `custom`.
+ * The table wins on a collision; custom ids match exactly. Shared by
+ * `models.text.registry.resolve` and `models.snapshot` views so the
+ * precedence is stated once.
+ */
+function resolveOver(
+  specs: readonly models.text.ModelSpec[],
+  modelId: string,
+  custom?: readonly models.text.registry.CustomModelSpec[]
+): models.text.registry.ResolvedModelSpec | undefined {
+  const fromTable = specByIdOver(specs, modelId);
+  if (fromTable) return { ...fromTable, custom: false };
+  const fromCustom = custom?.find((m) => m.id === modelId);
+  return fromCustom ? models.text.registry.normalize(fromCustom) : undefined;
+}
+
+/**
+ * Card lookup over an arbitrary media table. Shared by
+ * `models.image.findImageModelCard` and the `models.snapshot` media views so
+ * the bundled catalogue and a published one answer identically.
+ *
+ * Accepts an exact namespaced id or a bare post-slash name. Unlike
+ * {@link specByIdOver} there is no date-suffix tolerance — media providers
+ * don't snapshot ids the way text ones do.
+ */
+function cardByIdOver<Card extends { id: string }>(
+  cards: Record<string, Card | undefined>,
+  modelId: string
+): Card | undefined {
+  if (!modelId) return undefined;
+  if (modelId.includes("/")) return cards[modelId] ?? undefined;
+  for (const card of Object.values(cards)) {
+    if (!card) continue;
+    const slash = card.id.indexOf("/");
+    if (slash >= 0 && card.id.slice(slash + 1) === modelId) return card;
+  }
+  return undefined;
+}
+
+/**
+ * The curated user-facing subset of a media table, frozen so callers can
+ * hold it without risking mutation of the shared catalogue. Callers memoize;
+ * this states the filter once.
+ */
+function listedOver<Card extends { listed: boolean }>(
+  cards: Record<string, Card | undefined>
+): readonly Card[] {
+  return Object.freeze(
+    Object.values(cards).filter((card): card is Card => !!card && card.listed)
+  );
+}
+
 export namespace models {
   // ── Shared discriminators ─────────────────────────────────────────
 
@@ -405,22 +492,7 @@ export namespace models {
      *   append a snapshot date in their API responses)
      */
     export function modelSpecById(modelId: string): ModelSpec | undefined {
-      for (const spec of Object.values(catalogSpecs)) {
-        if (spec.id === modelId) return spec;
-
-        const baseName = spec.id.includes("/")
-          ? spec.id.split("/").slice(1).join("/")
-          : spec.id;
-
-        if (modelId === baseName) return spec;
-        if (
-          modelId.startsWith(baseName) &&
-          /^-\d/.test(modelId.slice(baseName.length))
-        ) {
-          return spec;
-        }
-      }
-      return undefined;
+      return specByIdOver(Object.values(catalogSpecs), modelId);
     }
 
     /**
@@ -535,10 +607,7 @@ export namespace models {
         modelId: string,
         custom?: readonly CustomModelSpec[]
       ): ResolvedModelSpec | undefined {
-        const fromCatalog = modelSpecById(modelId);
-        if (fromCatalog) return { ...fromCatalog, custom: false };
-        const fromCustom = custom?.find((m) => m.id === modelId);
-        return fromCustom ? normalize(fromCustom) : undefined;
+        return resolveOver(Object.values(catalogSpecs), modelId, custom);
       }
     }
   }
@@ -676,13 +745,22 @@ export namespace models {
     // ── Providers ───────────────────────────────────────────────────
 
     /**
+     * Every provider that can serve an image model, as a value.
+     *
+     * The runtime list is the SOURCE and {@link ImageProvider} is derived
+     * from it — a resolver iterating providers and the type gating them can
+     * then never disagree. Adding a provider is one edit here.
+     */
+    export const providers = ["vercel", "fal", "openrouter"] as const;
+
+    /**
      * A provider that can serve an image model. Distinct from the top-level
      * {@link models.Provider} because the same flagship proprietary model is
      * now multi-homed: fal, OpenRouter, and the Vercel gateway each serve it
      * under a different id (and sometimes a different meter). Mirrors
      * {@link video.VideoProvider}.
      */
-    export type ImageProvider = "vercel" | "fal" | "openrouter";
+    export type ImageProvider = (typeof providers)[number];
 
     /**
      * How one provider serves an image model: the id you actually call on that
@@ -1487,16 +1565,7 @@ export namespace models {
     ): ImageModelCard | null {
       if (!model) return null;
       const modelId = typeof model === "string" ? model : model.modelId;
-      if (modelId.includes("/")) {
-        return models[modelId] ?? null;
-      }
-      for (const card of Object.values(models)) {
-        if (!card) continue;
-        const slash = card.id.indexOf("/");
-        if (slash < 0) continue;
-        if (card.id.slice(slash + 1) === modelId) return card;
-      }
-      return null;
+      return cardByIdOver(models, modelId) ?? null;
     }
 
     /**
@@ -1515,11 +1584,7 @@ export namespace models {
      *  frozen — the catalog is static, so callers can call freely without
      *  risking mutation of the shared view. */
     export const listed_models = (): readonly ImageModelCard[] =>
-      (_listed ??= Object.freeze(
-        Object.values(models).filter(
-          (card): card is ImageModelCard => !!card && card.listed
-        )
-      ));
+      (_listed ??= listedOver(models));
   }
 
   // ── models.audio ──────────────────────────────────────────────────
@@ -1974,11 +2039,19 @@ export namespace models {
    */
   export namespace video {
     /**
+     * Every provider that can serve a video model, as a value. The runtime
+     * list is the SOURCE; {@link VideoProvider} is derived from it. Kept
+     * separate from {@link image.providers} even though the members
+     * currently coincide — they are independent sets that happen to agree.
+     */
+    export const providers = ["vercel", "fal", "openrouter"] as const;
+
+    /**
      * A provider that can serve a video model. Distinct from the top-level
      * {@link models.Provider} because video routes through more than the
      * Vercel gateway. Each provider uses its own id format and meter.
      */
-    export type VideoProvider = "vercel" | "fal" | "openrouter";
+    export type VideoProvider = (typeof providers)[number];
 
     /**
      * **Canonical**, provider-agnostic model id in `vendor/model` form
@@ -2317,11 +2390,7 @@ export namespace models {
      *  catalog is static, so callers can call freely without risking mutation
      *  of the shared view. */
     export const listed_models = (): readonly VideoModelCard[] =>
-      (_listed ??= Object.freeze(
-        Object.values(models).filter(
-          (card): card is VideoModelCard => !!card && card.listed
-        )
-      ));
+      (_listed ??= listedOver(models));
   }
 
   // ── models.image_tools ────────────────────────────────────────────
@@ -2490,6 +2559,860 @@ export namespace models {
     export const LIBRARY_EMBEDDING_MODEL_ID: EmbeddingModelId =
       "google/gemini-embedding-2";
     export const LIBRARY_EMBEDDING_DIMENSIONS = 1536;
+  }
+
+  // ── models.snapshot ───────────────────────────────────────────────
+  //
+  // Catalogue distribution — see docs/wg/platform/hosted-ai.md.
+  //
+  // The bundled catalogue is a SEED, not the authority. A host may fetch
+  // a published snapshot and resolve against that instead, so a model
+  // added on the server reaches an already-installed binary without a
+  // release. This namespace is pure data + pure resolution: fetching,
+  // caching, and scheduling belong to the host (`ModelCatalogStore` in
+  // `@grida/agent`).
+
+  export namespace snapshot {
+    /**
+     * Wire schema major. {@link parse} rejects anything else.
+     *
+     * Additive evolution does NOT bump this — v1 parsers ignore fields
+     * they do not know, so publishing a new optional field is safe. A
+     * breaking shape change publishes at a NEW route path and bumps this,
+     * leaving old clients on the old path (or rejecting the body and
+     * falling back to the seed — fail-safe either way).
+     */
+    export const SCHEMA = 1;
+
+    /** Text catalogue + tier map. Replaces the seed's wholesale. */
+    export interface TextSection {
+      /**
+       * Full replacement for `models.text.catalog`. Each key equals its
+       * entry's `id`. Deliberately NOT merged with the seed: removing a
+       * model from the catalogue is the kill switch, and a merge would
+       * defeat it on every installed client.
+       */
+      catalog: Record<string, text.ModelSpec>;
+      /** Full replacement for `TIER_MODEL_IDS`. Every id is a `catalog` key. */
+      tier_model_ids: Record<ModelTier, string>;
+    }
+
+    /**
+     * A published catalogue.
+     *
+     * Sections are independent: a media section that fails validation is
+     * dropped on its own and the rest of the snapshot still applies. Only
+     * `text` is load-bearing enough to reject the whole payload, because a
+     * host with no text catalogue cannot run a turn at all.
+     */
+    export interface Snapshot {
+      /** Always {@link SCHEMA} on a parsed value. */
+      schema: number;
+      /** Opaque publisher version (a deploy sha; `"seed"` for the bundle). */
+      version: string;
+      /** Informational only; never drives resolution. */
+      generated_at?: string;
+      text: TextSection;
+      /** Absent ⇒ the consumer keeps its bundled image catalogue. */
+      image?: ImageSection;
+      /** Absent ⇒ the consumer keeps its bundled video catalogue. */
+      video?: VideoSection;
+    }
+
+    /** Image catalogue. Replaces `models.image.models` wholesale. */
+    export interface ImageSection {
+      models: Record<string, image.ImageModelCard>;
+    }
+
+    /** Video catalogue. Replaces `models.video.models` wholesale. */
+    export interface VideoSection {
+      models: Record<string, video.VideoModelCard>;
+    }
+
+    /**
+     * The read surface for one media catalogue. Mirrors the lookups the
+     * corresponding namespace exports, so a call site reads the same
+     * whether it is on the bundled catalogue or a published one.
+     */
+    export interface MediaView<Card, Provider extends string, Binding> {
+      readonly models: Readonly<Record<string, Card>>;
+      /** Cards in the curated user-facing list (`listed: true`). */
+      listed(): readonly Card[];
+      /** Exact namespaced id, or a bare post-slash name. No date tolerance. */
+      cardById(modelId: string): Card | undefined;
+      /** That provider's binding, or `null` if it does not serve the model. */
+      binding(card: Card, provider: Provider): Binding | null;
+    }
+
+    export type ImageView = MediaView<
+      image.ImageModelCard,
+      image.ImageProvider,
+      image.ImageProviderBinding
+    >;
+
+    export type VideoView = MediaView<
+      video.VideoModelCard,
+      video.VideoProvider,
+      video.VideoProviderBinding
+    >;
+
+    /**
+     * Resolution surface over one snapshot — the read API a host swaps
+     * atomically on refresh. Mirrors the `models.text.*` shape so a call
+     * site reads the same either way.
+     *
+     * Build only from {@link seed} or a {@link parse} result: `by_tier`
+     * assumes tier ids resolve, which is exactly what `parse` validates.
+     */
+    export interface View {
+      readonly catalog: Readonly<Record<string, text.ModelSpec>>;
+      readonly tier_model_ids: Readonly<Record<ModelTier, string>>;
+      readonly by_tier: Readonly<Record<ModelTier, text.ModelSpec>>;
+      /**
+       * Exact catalogue membership — `catalog[modelId] !== undefined`.
+       *
+       * This, NOT {@link modelSpecById}, is what a gate asks. The two
+       * differ on purpose: `modelSpecById` also matches a bare name and a
+       * date suffix, which is right when you want a model's LIMITS or
+       * RATES (a near-miss id is still that model), and wrong when you
+       * are deciding what id to forward to a provider — a provider is
+       * given the id the caller sent, and only an exact catalogue id is
+       * one it will recognize.
+       */
+      has(modelId: string): boolean;
+      /** Same matching rules as {@link models.text.modelSpecById}. */
+      modelSpecById(modelId: string): text.ModelSpec | undefined;
+      /** Same precedence as {@link models.text.registry.resolve}. */
+      resolve(
+        modelId: string,
+        custom?: readonly text.registry.CustomModelSpec[]
+      ): text.registry.ResolvedModelSpec | undefined;
+      readonly image: ImageView;
+      readonly video: VideoView;
+    }
+
+    const TIERS: readonly ModelTier[] = ["nano", "mini", "pro", "max"];
+
+    /** Bounds on untrusted input. Generous — the real catalogue is ~15. */
+    const MAX_CATALOG_ENTRIES = 256;
+
+    /**
+     * Plausible model-id shape. Also the reason a catalogue key can never
+     * be `__proto__`: assigning that key to an object literal would
+     * mutate its prototype instead of adding an entry.
+     */
+    const MODEL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+
+    function isRecord(v: unknown): v is Record<string, unknown> {
+      return typeof v === "object" && v !== null && !Array.isArray(v);
+    }
+
+    function isText(v: unknown): v is string {
+      return typeof v === "string" && v.length > 0;
+    }
+
+    /** A token count: positive and exactly representable. */
+    function isCount(v: unknown): v is number {
+      return typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+    }
+
+    /** A price or multiplier: finite and non-negative (free is legal). */
+    function isRate(v: unknown): v is number {
+      return typeof v === "number" && Number.isFinite(v) && v >= 0;
+    }
+
+    function parseCost(v: unknown): text.ModelCostPerMillion | undefined {
+      if (!isRecord(v) || !isRate(v.input) || !isRate(v.output)) {
+        return undefined;
+      }
+      const cost: text.ModelCostPerMillion = {
+        input: v.input,
+        output: v.output,
+      };
+      if (v.cacheRead !== undefined) {
+        if (!isRate(v.cacheRead)) return undefined;
+        cost.cacheRead = v.cacheRead;
+      }
+      if (v.cacheWrite !== undefined) {
+        if (!isRate(v.cacheWrite)) return undefined;
+        cost.cacheWrite = v.cacheWrite;
+      }
+      if (v.longContext !== undefined) {
+        const lc = v.longContext;
+        if (
+          !isRecord(lc) ||
+          !isCount(lc.inputTokensAbove) ||
+          !isRate(lc.inputMultiplier) ||
+          !isRate(lc.outputMultiplier)
+        ) {
+          return undefined;
+        }
+        cost.longContext = {
+          inputTokensAbove: lc.inputTokensAbove,
+          inputMultiplier: lc.inputMultiplier,
+          outputMultiplier: lc.outputMultiplier,
+        };
+      }
+      return cost;
+    }
+
+    function parseSpec(key: string, v: unknown): text.ModelSpec | undefined {
+      if (!MODEL_ID_PATTERN.test(key)) return undefined;
+      if (!isRecord(v) || v.id !== key) return undefined;
+      if (!isText(v.label)) return undefined;
+      if (typeof v.multimodal !== "boolean") return undefined;
+      if (typeof v.tool_call !== "boolean") return undefined;
+      if (!isCount(v.contextWindow) || !isCount(v.outputLimit))
+        return undefined;
+      if (!Array.isArray(v.imageInputMimes)) return undefined;
+      const imageInputMimes: text.ImageInputMime[] = [];
+      for (const mime of v.imageInputMimes) {
+        if (typeof mime !== "string" || !mime.startsWith("image/")) {
+          return undefined;
+        }
+        imageInputMimes.push(mime as text.ImageInputMime);
+      }
+      const cost = parseCost(v.cost);
+      if (!cost) return undefined;
+
+      const spec: text.ModelSpec = {
+        id: key,
+        label: v.label,
+        multimodal: v.multimodal,
+        imageInputMimes,
+        tool_call: v.tool_call,
+        contextWindow: v.contextWindow,
+        outputLimit: v.outputLimit,
+        cost,
+      };
+      if (v.short_label !== undefined) {
+        if (!isText(v.short_label)) return undefined;
+        spec.short_label = v.short_label;
+      }
+      if (v.deprecated !== undefined) {
+        if (typeof v.deprecated !== "boolean") return undefined;
+        spec.deprecated = v.deprecated;
+      }
+      return spec;
+    }
+
+    // ── media validation ──────────────────────────────────────────────
+
+    /** Bounds on the free-form key maps inside media pricing. */
+    const MAX_PRICE_KEYS = 64;
+
+    /**
+     * Keys that mutate an object instead of adding an entry.
+     *
+     * Media pricing carries FREE-FORM key maps — image `tiers`
+     * (`"medium/1024x1024"`) and video `usd_per_second` (`"720p"`) — which
+     * {@link MODEL_ID_PATTERN} does not cover. Copying a JSON-parsed
+     * `__proto__` key onto a plain object replaces that object's prototype
+     * rather than adding a key, and a later lookup then resolves through
+     * the prototype chain: `tiers["anything"]` would return an
+     * attacker-chosen number while `Object.keys(tiers)` still looks clean.
+     * That reads as a real price to a `!== undefined` billing guard.
+     */
+    const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+    /** A bounded map of free-form keys to validated values, or undefined. */
+    function parseKeyedMap<T>(
+      v: unknown,
+      parseValue: (value: unknown) => T | undefined
+    ): Record<string, T> | undefined {
+      if (!isRecord(v)) return undefined;
+      const entries = Object.entries(v);
+      if (entries.length === 0 || entries.length > MAX_PRICE_KEYS) {
+        return undefined;
+      }
+      const out: Record<string, T> = {};
+      for (const [key, value] of entries) {
+        if (!isText(key) || UNSAFE_KEYS.has(key)) return undefined;
+        const parsed = parseValue(value);
+        if (parsed === undefined) return undefined;
+        out[key] = parsed;
+      }
+      return out;
+    }
+
+    function parseRate(v: unknown): number | undefined {
+      return isRate(v) ? v : undefined;
+    }
+
+    /** Copy `key` from `src` onto `dst` only when present and valid. */
+    function optional<T extends object>(
+      dst: T,
+      src: Record<string, unknown>,
+      key: string & keyof T,
+      ok: (v: unknown) => boolean
+    ): boolean {
+      const value = src[key];
+      if (value === undefined) return true;
+      if (!ok(value)) return false;
+      // Conditional assign, never `{ k: src[k] }` — an own key holding
+      // `undefined` is dropped by JSON.stringify and breaks round-trip.
+      (dst as Record<string, unknown>)[key] = value;
+      return true;
+    }
+
+    function parsePerTokenRates(
+      v: Record<string, unknown>,
+      into: Record<string, unknown>
+    ): boolean {
+      if (!isRate(v.input) || !isRate(v.output)) return false;
+      into.input = v.input;
+      into.output = v.output;
+      for (const key of ["cached_input", "image_input", "cached_image_input"]) {
+        if (v[key] === undefined) continue;
+        if (!isRate(v[key])) return false;
+        into[key] = v[key];
+      }
+      return true;
+    }
+
+    function parseImagePricing(
+      v: unknown
+    ): image.ImageModelPricing | undefined {
+      if (!isRecord(v)) return undefined;
+      if (v.type === "per_image_flat") {
+        // Free is legal — `image-cost.ts` distinguishes an absent tier
+        // from a $0 one.
+        return isRate(v.usd)
+          ? { type: "per_image_flat", usd: v.usd }
+          : undefined;
+      }
+      if (v.type === "per_token") {
+        const out: Record<string, unknown> = { type: "per_token" };
+        return parsePerTokenRates(v, out)
+          ? (out as image.PerTokenPricing)
+          : undefined;
+      }
+      if (v.type === "per_image_tiered") {
+        const tiers = parseKeyedMap(v.tiers, parseRate);
+        if (!tiers) return undefined;
+        const out: image.PerImageTieredPricing = {
+          type: "per_image_tiered",
+          tiers,
+        };
+        if (v.tokens !== undefined) {
+          if (!isRecord(v.tokens)) return undefined;
+          const tokens: Record<string, unknown> = {};
+          if (!parsePerTokenRates(v.tokens, tokens)) return undefined;
+          out.tokens = tokens as image.PerTokenRates;
+        }
+        return out;
+      }
+      // An arm this client cannot price. `image-cost.ts` switches on the
+      // three known ones and would fall through to `undefined`.
+      return undefined;
+    }
+
+    function parseVideoPricing(v: unknown): video.PerSecondPricing | undefined {
+      if (!isRecord(v) || v.type !== "per_second") return undefined;
+      const usd_per_second = parseKeyedMap(v.usd_per_second, (modes) => {
+        if (!isRecord(modes)) return undefined;
+        const out: Partial<Record<video.AudioMode, number>> = {};
+        for (const mode of ["audio", "silent"] as const) {
+          if (modes[mode] === undefined) continue;
+          if (!isRate(modes[mode])) return undefined;
+          out[mode] = modes[mode];
+        }
+        // Absence IS the capability statement, but an empty entry states
+        // nothing and would make a resolution label unpriceable.
+        return Object.keys(out).length > 0 ? out : undefined;
+      });
+      if (!usd_per_second) return undefined;
+      const pricing: video.PerSecondPricing = {
+        type: "per_second",
+        usd_per_second,
+      };
+      if (!optional(pricing, v, "usd_per_input_image", isRate))
+        return undefined;
+      return pricing;
+    }
+
+    /**
+     * Provider bindings, keyed by provider.
+     *
+     * UNKNOWN PROVIDER KEYS ARE DROPPED rather than rejecting the card.
+     * A provider this client has no adapter for is not an error — it is a
+     * route it cannot take — and rejecting would make adding a provider a
+     * breaking publish. (The AI SDK gateway learned this the hard way: it
+     * validated its model-kind field as a hard enum, so the day a new kind
+     * shipped the whole listing failed to parse; it now accepts loosely
+     * and filters unknown rows.)
+     */
+    function parseBindings<P extends string, B>(
+      v: unknown,
+      known: readonly P[],
+      parseBinding: (provider: P, value: unknown) => B | undefined
+    ): Partial<Record<P, B>> | undefined {
+      if (!isRecord(v)) return undefined;
+      const out: Partial<Record<P, B>> = {};
+      for (const provider of known) {
+        const value = v[provider];
+        if (value === undefined) continue;
+        const binding = parseBinding(provider, value);
+        if (!binding) return undefined;
+        out[provider] = binding;
+      }
+      // Every card must be servable by something.
+      return Object.keys(out).length > 0 ? out : undefined;
+    }
+
+    /**
+     * The half of a binding both media modalities share: the routing id, the
+     * meter, and the two optional labels. Stated once so `url`, `deprecated`,
+     * and `avg_cost_usd` cannot end up validated two different ways.
+     */
+    type MediaBinding<P extends string, Pricing> = {
+      provider: P;
+      id: string;
+      pricing: Pricing;
+      avg_cost_usd: number;
+      deprecated?: boolean;
+      url?: string;
+    };
+
+    function parseMediaBinding<P extends string, Pricing>(
+      provider: P,
+      v: unknown,
+      parsePricing: (value: unknown) => Pricing | undefined
+    ): MediaBinding<P, Pricing> | undefined {
+      if (!isRecord(v)) return undefined;
+      // The `provider` field is redundant with its key by design; validate
+      // the redundancy rather than normalising it away.
+      if (v.provider !== provider) return undefined;
+      if (!isText(v.id) || !isRate(v.avg_cost_usd)) return undefined;
+      const pricing = parsePricing(v.pricing);
+      if (!pricing) return undefined;
+      const out: MediaBinding<P, Pricing> = {
+        provider,
+        id: v.id,
+        pricing,
+        avg_cost_usd: v.avg_cost_usd,
+      };
+      if (!optional(out, v, "deprecated", (x) => typeof x === "boolean")) {
+        return undefined;
+      }
+      if (!optional(out, v, "url", isText)) return undefined;
+      return out;
+    }
+
+    function parseImageBinding(
+      provider: image.ImageProvider,
+      v: unknown
+    ): image.ImageProviderBinding | undefined {
+      const out = parseMediaBinding(provider, v, parseImagePricing);
+      if (!out) return undefined;
+      const card: image.ImageProviderBinding = out;
+      const refs = (v as Record<string, unknown>).references;
+      if (refs !== undefined) {
+        // Dropping this silently disables image-to-image routing.
+        if (!isRecord(refs) || !isText(refs.id) || !isCount(refs.max)) {
+          return undefined;
+        }
+        card.references = { id: refs.id, max: refs.max };
+      }
+      return card;
+    }
+
+    function parseVideoBinding(
+      provider: video.VideoProvider,
+      v: unknown
+    ): video.VideoProviderBinding | undefined {
+      return parseMediaBinding(provider, v, parseVideoPricing);
+    }
+
+    /** `T | null` — null is meaningful here, a missing key is not. */
+    function nullable<T>(
+      v: unknown,
+      parseValue: (value: unknown) => T | undefined
+    ): T | null | undefined {
+      if (v === null) return null;
+      return parseValue(v);
+    }
+
+    function parseSizes(v: unknown): image.SizeSpec[] | undefined {
+      if (!Array.isArray(v)) return undefined;
+      const out: image.SizeSpec[] = [];
+      for (const size of v) {
+        if (
+          !Array.isArray(size) ||
+          size.length !== 3 ||
+          !isCount(size[0]) ||
+          !isCount(size[1]) ||
+          typeof size[2] !== "string" ||
+          !/^\d+:\d+$/.test(size[2])
+        ) {
+          return undefined;
+        }
+        out.push([size[0], size[1], size[2] as image.AspectRatioString]);
+      }
+      return out;
+    }
+
+    function parseConstraints(
+      v: unknown
+    ): image.ImageSizeConstraints | undefined {
+      if (!isRecord(v)) return undefined;
+      const out: image.ImageSizeConstraints = {};
+      for (const key of [
+        "step",
+        "min_edge",
+        "max_edge",
+        "min_pixels",
+        "max_pixels",
+      ] as const) {
+        if (v[key] === undefined) continue;
+        if (!isCount(v[key])) return undefined;
+        out[key] = v[key];
+      }
+      if (v.aspect_ratio !== undefined) {
+        const ar = v.aspect_ratio;
+        if (!isRecord(ar)) return undefined;
+        const bounds: { min?: number; max?: number } = {};
+        for (const key of ["min", "max"] as const) {
+          if (ar[key] === undefined) continue;
+          if (!isRate(ar[key])) return undefined;
+          bounds[key] = ar[key];
+        }
+        out.aspect_ratio = bounds;
+      }
+      return out;
+    }
+
+    function isAspectRatio(v: unknown): v is image.AspectRatioString {
+      return typeof v === "string" && /^\d+:\d+$/.test(v);
+    }
+
+    function parseImageCard(
+      key: string,
+      v: unknown
+    ): image.ImageModelCard | undefined {
+      if (!MODEL_ID_PATTERN.test(key)) return undefined;
+      if (!isRecord(v) || v.id !== key) return undefined;
+      if (!isText(v.label) || !isText(v.short_description)) return undefined;
+      // `vendor` and `speed_label` are closed unions in TypeScript but are
+      // validated as text on the wire: a model from a new vendor must not
+      // require a client release, which is the whole point of publishing.
+      if (!isText(v.vendor) || !isText(v.speed_label)) return undefined;
+      if (!isText(v.speed_max)) return undefined;
+      if (typeof v.deprecated !== "boolean") return undefined;
+      if (typeof v.listed !== "boolean") return undefined;
+      if (!isRate(v.avg_cost_usd)) return undefined;
+
+      const pricing = parseImagePricing(v.pricing);
+      if (!pricing) return undefined;
+
+      const styles = nullable(v.styles, (x) =>
+        Array.isArray(x) && x.every(isText) ? (x as string[]) : undefined
+      );
+      if (styles === undefined) return undefined;
+      const sizes = nullable(v.sizes, parseSizes);
+      if (sizes === undefined) return undefined;
+      const constraints = nullable(v.constraints, parseConstraints);
+      if (constraints === undefined) return undefined;
+
+      if (!isRecord(v.default)) return undefined;
+      if (!isCount(v.default.width) || !isCount(v.default.height)) {
+        return undefined;
+      }
+      if (!isAspectRatio(v.default.aspect_ratio)) return undefined;
+
+      const providers = parseBindings(
+        v.providers,
+        image.providers,
+        parseImageBinding
+      );
+      if (!providers) return undefined;
+      // The card's primary provider must actually be bound — the hosted
+      // arm and `/api/v1/ai/models` both filter on it.
+      if (v.provider !== "vercel" || !providers.vercel) return undefined;
+      // The one-key promise: a curated card is servable by EVERY provider,
+      // so one connected key serves the whole list. `resolve-image.ts`
+      // relies on it, and a listed card missing a binding is a silent
+      // capability hole.
+      if (v.listed && image.providers.some((p) => !providers[p])) {
+        return undefined;
+      }
+
+      const card: image.ImageModelCard = {
+        id: key,
+        label: v.label,
+        deprecated: v.deprecated,
+        short_description: v.short_description,
+        vendor: v.vendor as Vendor,
+        provider: "vercel",
+        listed: v.listed,
+        providers,
+        styles,
+        speed_label: v.speed_label as image.SpeedLabel,
+        speed_max: v.speed_max,
+        sizes,
+        constraints,
+        pricing,
+        avg_cost_usd: v.avg_cost_usd,
+        default: {
+          width: v.default.width,
+          height: v.default.height,
+          aspect_ratio: v.default.aspect_ratio,
+        },
+      };
+      if (!optional(card, v, "listed_reason", isText)) return undefined;
+      return card;
+    }
+
+    function parseVideoCard(
+      key: string,
+      v: unknown
+    ): video.VideoModelCard | undefined {
+      if (!MODEL_ID_PATTERN.test(key)) return undefined;
+      if (!isRecord(v) || v.id !== key) return undefined;
+      if (!isText(v.label) || !isText(v.short_description)) return undefined;
+      if (!isText(v.vendor) || !isText(v.speed_label) || !isText(v.url)) {
+        return undefined;
+      }
+      if (typeof v.deprecated !== "boolean") return undefined;
+      // Not `typeof === "boolean"`: a video card exists ONLY for a model in
+      // Grida selection, so the type pins `listed: true`. A payload saying
+      // otherwise is malformed, not a hidden card.
+      if (v.listed !== true) return undefined;
+      if (typeof v.audio !== "boolean") return undefined;
+      if (!isCount(v.min_duration) || !isCount(v.max_duration))
+        return undefined;
+      if (v.min_duration > v.max_duration) return undefined;
+      if (
+        !Array.isArray(v.aspect_ratios) ||
+        !v.aspect_ratios.every(isAspectRatio)
+      ) {
+        return undefined;
+      }
+
+      if (!isRecord(v.default)) return undefined;
+      const dflt = v.default;
+      if (!isText(dflt.resolution) || !isAspectRatio(dflt.aspect_ratio)) {
+        return undefined;
+      }
+      if (!isCount(dflt.duration) || typeof dflt.audio !== "boolean") {
+        return undefined;
+      }
+      if (dflt.duration < v.min_duration || dflt.duration > v.max_duration) {
+        return undefined;
+      }
+
+      const providers = parseBindings(
+        v.providers,
+        video.providers,
+        parseVideoBinding
+      );
+      if (!providers) return undefined;
+      // Provider selection is deferred to the runtime, so the contract is
+      // route-agnostic: whichever provider it later picks must be able to
+      // serve the model's DEFAULT config. Deliberately NOT the image
+      // one-key rule — the video ecosystem is fragmented and no model is
+      // on every provider.
+      const mode: video.AudioMode = dflt.audio ? "audio" : "silent";
+      for (const binding of Object.values(providers)) {
+        const rate = binding.pricing.usd_per_second[dflt.resolution]?.[mode];
+        if (!(typeof rate === "number" && rate > 0)) return undefined;
+      }
+
+      const card: video.VideoModelCard = {
+        id: key,
+        label: v.label,
+        deprecated: v.deprecated,
+        short_description: v.short_description,
+        vendor: v.vendor as Vendor,
+        listed: true,
+        aspect_ratios: v.aspect_ratios as image.AspectRatioString[],
+        min_duration: v.min_duration,
+        max_duration: v.max_duration,
+        audio: v.audio,
+        speed_label: v.speed_label as image.SpeedLabel,
+        default: {
+          resolution: dflt.resolution,
+          aspect_ratio: dflt.aspect_ratio,
+          duration: dflt.duration,
+          audio: dflt.audio,
+        },
+        url: v.url,
+        providers,
+      };
+      return card;
+    }
+
+    /**
+     * A media section, or `undefined` when absent or unusable.
+     *
+     * Unusable is not fatal: the caller drops just this section and keeps
+     * the rest of the snapshot, so a bad image catalogue can never take
+     * the text catalogue — or the whole daemon — down with it.
+     */
+    function parseMediaSection<Card>(
+      v: unknown,
+      parseCard: (key: string, value: unknown) => Card | undefined
+    ): { models: Record<string, Card> } | undefined {
+      if (!isRecord(v) || !isRecord(v.models)) return undefined;
+      const entries = Object.entries(v.models);
+      if (entries.length === 0 || entries.length > MAX_CATALOG_ENTRIES) {
+        return undefined;
+      }
+      const out: Record<string, Card> = {};
+      for (const [key, value] of entries) {
+        const card = parseCard(key, value);
+        if (!card) return undefined;
+        out[key] = card;
+      }
+      return { models: out };
+    }
+
+    /**
+     * The bundled catalogue expressed as a snapshot — the seed a host
+     * starts from and falls back to. Also what the publishing endpoint
+     * serves, which is why `parse(JSON.parse(JSON.stringify(seed())))`
+     * round-trips exactly (pinned in `__tests__/snapshot.test.ts`).
+     */
+    export function seed(opts?: { version?: string }): Snapshot {
+      return {
+        schema: SCHEMA,
+        version: opts?.version ?? "seed",
+        text: {
+          catalog: { ...text.catalog },
+          tier_model_ids: { ...TIER_MODEL_IDS },
+        },
+        image: {
+          models: { ...(image.models as Record<string, image.ImageModelCard>) },
+        },
+        video: {
+          models: { ...(video.models as Record<string, video.VideoModelCard>) },
+        },
+      };
+    }
+
+    /**
+     * Validate an untrusted published catalogue. Returns `null` rather
+     * than throwing — a host must be able to keep serving on a bad
+     * payload, and whole-or-reject is what keeps a half-applied
+     * catalogue from ever existing.
+     *
+     * Strict on shape and on the invariants resolution depends on;
+     * lenient on unknown fields, so a newer publisher stays readable.
+     */
+    export function parse(data: unknown): Snapshot | null {
+      if (!isRecord(data) || data.schema !== SCHEMA) return null;
+      if (!isText(data.version)) return null;
+      if (!isRecord(data.text) || !isRecord(data.text.catalog)) return null;
+
+      const entries = Object.entries(data.text.catalog);
+      if (entries.length === 0 || entries.length > MAX_CATALOG_ENTRIES) {
+        return null;
+      }
+      const catalog: Record<string, text.ModelSpec> = {};
+      for (const [key, value] of entries) {
+        const spec = parseSpec(key, value);
+        if (!spec) return null;
+        catalog[key] = spec;
+      }
+
+      const rawTiers = data.text.tier_model_ids;
+      if (!isRecord(rawTiers)) return null;
+      const tier_model_ids = {} as Record<ModelTier, string>;
+      for (const tier of TIERS) {
+        const id = rawTiers[tier];
+        // A tier pointing outside the catalogue would leave `by_tier`
+        // dangling, which every compaction limit reads.
+        if (!isText(id) || !Object.hasOwn(catalog, id)) return null;
+        tier_model_ids[tier] = id;
+      }
+
+      const parsed: Snapshot = {
+        schema: SCHEMA,
+        version: data.version,
+        text: { catalog, tier_model_ids },
+      };
+      if (data.generated_at !== undefined) {
+        if (!isText(data.generated_at)) return null;
+        parsed.generated_at = data.generated_at;
+      }
+
+      // Media sections are optional and independently fallible. An absent
+      // one leaves the consumer on its bundled media catalogue; an invalid
+      // one is dropped the same way, because a broken image catalogue must
+      // not cost a host its text catalogue too.
+      if (data.image !== undefined) {
+        const section = parseMediaSection(data.image, parseImageCard);
+        if (section) parsed.image = section;
+      }
+      if (data.video !== undefined) {
+        const section = parseMediaSection(data.video, parseVideoCard);
+        if (section) parsed.video = section;
+      }
+      return parsed;
+    }
+
+    /**
+     * A media read surface over one card table.
+     *
+     * The `listed` memo lives HERE, on the view, not on the catalogue —
+     * `models.image.listed_models()` memoizes over the bundled dict and
+     * can never observe a published one, so a swappable catalogue has to
+     * own its own lazily-computed list.
+     */
+    function buildMediaView<
+      Card extends { id: string; listed: boolean; providers: object },
+      Provider extends string,
+      Binding,
+    >(models: Record<string, Card>): MediaView<Card, Provider, Binding> {
+      let listed: readonly Card[] | undefined;
+      return {
+        models,
+        listed: () => (listed ??= listedOver(models)),
+        cardById: (modelId) => cardByIdOver(models, modelId),
+        binding: (card, provider) =>
+          (card.providers as Record<string, Binding>)[provider] ?? null,
+      };
+    }
+
+    function build(s: Snapshot): View {
+      const catalog = s.text.catalog;
+      const specs = Object.values(catalog);
+      const tier_model_ids = s.text.tier_model_ids;
+      return {
+        catalog,
+        tier_model_ids,
+        by_tier: {
+          nano: catalog[tier_model_ids.nano],
+          mini: catalog[tier_model_ids.mini],
+          pro: catalog[tier_model_ids.pro],
+          max: catalog[tier_model_ids.max],
+        },
+        has: (modelId) => Object.hasOwn(catalog, modelId),
+        modelSpecById: (modelId) => specByIdOver(specs, modelId),
+        resolve: (modelId, custom) => resolveOver(specs, modelId, custom),
+        // A snapshot without a media section falls back to the bundled
+        // catalogue for that modality only.
+        image: buildMediaView(
+          s.image?.models ??
+            (image.models as Record<string, image.ImageModelCard>)
+        ),
+        video: buildMediaView(
+          s.video?.models ??
+            (video.models as Record<string, video.VideoModelCard>)
+        ),
+      };
+    }
+
+    let seedView: View | undefined;
+
+    /**
+     * A resolution surface. With no argument, the bundled catalogue's —
+     * built once, so a host that never fetches pays nothing.
+     */
+    export function view(s?: Snapshot): View {
+      if (s) return build(s);
+      return (seedView ??= build(seed()));
+    }
   }
 }
 

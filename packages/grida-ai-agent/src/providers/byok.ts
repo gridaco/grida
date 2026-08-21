@@ -12,7 +12,18 @@ import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
 import { ProviderHttp } from "./http";
 
-const MODEL_BY_TIER: Record<ModelTier, TierModelId> = TIER_MODEL_IDS;
+/**
+ * Tier -> model id for a factory. A function, not a table: the caller
+ * hands one that reads the host's live catalogue, so a published tier
+ * retarget reaches background subagents (titler, compactor) that resolve
+ * their tier long after the provider was chosen. Defaults to the bundled
+ * table for standalone callers and tests.
+ */
+export type TierModelIds = () => Record<ModelTier, string>;
+
+/** The compile-time table — what a standalone caller or test gets. */
+export const BUNDLED_TIER_MODEL_IDS: TierModelIds = () =>
+  TIER_MODEL_IDS as Record<ModelTier, TierModelId>;
 
 const OPENROUTER_HEADERS = {
   // TODO: temporarily disabled — re-enable to restore OpenRouter app attribution
@@ -22,7 +33,8 @@ const OPENROUTER_HEADERS = {
 
 export function makeOpenRouterFactory(
   apiKey: string,
-  providerHttp: ProviderHttp = new ProviderHttp()
+  providerHttp: ProviderHttp = new ProviderHttp(),
+  tierModelIds: TierModelIds = BUNDLED_TIER_MODEL_IDS
 ): ModelFactory {
   const provider = createOpenAICompatible({
     name: "openrouter",
@@ -38,15 +50,16 @@ export function makeOpenRouterFactory(
   // Both OpenRouter and the catalog use Vercel-style `creator/model`
   // ids, so an explicit pick hands straight through; otherwise fall
   // back to the tier's canonical model.
-  return (tier, modelId) => provider(modelId ?? MODEL_BY_TIER[tier]);
+  return (tier, modelId) => provider(modelId ?? tierModelIds()[tier]);
 }
 
 export function makeVercelFactory(
   apiKey: string,
-  providerHttp: ProviderHttp = new ProviderHttp()
+  providerHttp: ProviderHttp = new ProviderHttp(),
+  tierModelIds: TierModelIds = BUNDLED_TIER_MODEL_IDS
 ): ModelFactory {
   const provider = createGateway({ apiKey, fetch: providerHttp.request });
-  return (tier, modelId) => provider(modelId ?? MODEL_BY_TIER[tier]);
+  return (tier, modelId) => provider(modelId ?? tierModelIds()[tier]);
 }
 
 /**

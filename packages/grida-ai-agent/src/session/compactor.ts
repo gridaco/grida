@@ -20,7 +20,14 @@ import type { ModelTier } from "../tiers";
 import { prompts } from "../prompts";
 
 /** Cheapest tier the provider exposes (RFC: `nano` / `small`). */
-const COMPACTOR_TIER: ModelTier = "nano";
+/**
+ * The tier the summarizer subagent runs on. Exported because the caller
+ * that sizes the summarizer's input cap must resolve the SAME tier through
+ * the session's provider — see `summarizerInputCap` in `runtime/index.ts`.
+ * A second hardcoded `"nano"` there would silently mis-size the cap the
+ * day this changes.
+ */
+export const COMPACTOR_TIER: ModelTier = "nano";
 // The cap must cover REASONING + the summary: on a thinking model the
 // output budget includes the think stream, and a tight cap truncates
 // before the Markdown summary lands. Non-thinking models stop at the

@@ -62,6 +62,25 @@ export class ChatGptProviderError extends Error {
   }
 }
 
+/**
+ * The subscription model a tier resolves to. The subscription serves its
+ * own model set, so this is deliberately NOT the catalogue's
+ * `TIER_MODEL_IDS` — the host configures a parallel table and a tier with
+ * no entry falls back to the configured default.
+ *
+ * Single owner on purpose: the model factory picks the model to CALL and
+ * the compactor needs the same answer to size the summarizer's input cap.
+ * Two copies of this fallback chain would drift silently, and the tier
+ * that drifts is `nano` — the one every background titler/compactor call
+ * rides. See `summarizerInputCap` in `runtime/index.ts`.
+ */
+export function tierModelId(
+  config: ChatGptProviderConfig,
+  tier: ModelTier
+): ChatGptSubscriptionModelId {
+  return config.tier_model_ids?.[tier] ?? config.default_model_id;
+}
+
 export namespace ChatGptProvider {
   export function validate(config: ChatGptProviderConfig): void {
     const responseUrl = new URL(config.responses_url);
@@ -131,10 +150,7 @@ export namespace ChatGptProvider {
     });
 
     return (tier, modelId) => {
-      const selected =
-        modelId ??
-        runtime.config.tier_model_ids?.[tier] ??
-        runtime.config.default_model_id;
+      const selected = modelId ?? tierModelId(runtime.config, tier);
       if (!isChatGptSubscriptionModelId(selected)) {
         throw new ChatGptProviderError("chatgpt_model_not_available");
       }

@@ -50,13 +50,14 @@ import type { ChatModel, ChatSessionRow, MessageUsage } from "../session/rows";
 import { usageTokenTotal } from "../session/cost";
 import {
   DEFAULT_COMPACTION_CONFIG,
+  clampSummarizerCap,
   compactSession,
   resolveModelLimits,
   shouldCompact,
   type CompactionConfig,
   type ResolveModelLimits,
 } from "../session/compaction";
-import type { compactor } from "../session/compactor";
+import { COMPACTOR_TIER, type compactor } from "../session/compactor";
 import {
   endpointDefaultModelId,
   resolveEndpointModels,
@@ -104,6 +105,10 @@ import { buildReplayPrefix } from "./replay-prefix";
 import type { ChatMessageWithParts } from "../session/rows";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
+import type { models } from "@grida/ai-models";
+import { catalogView } from "../providers/model-catalog";
+import { isChatGptProviderId } from "../protocol/chatgpt";
+import { tierModelId as chatGptTierModelId } from "../providers/chatgpt";
 
 /** Session-static agent context (RFC `skills`: discovered once per session). */
 type SessionContext = {
@@ -317,6 +322,8 @@ type ResolvedProvider = Awaited<ReturnType<typeof resolveProvider>>;
 type LimitsResolution = {
   resolve: ResolveModelLimits;
   configs: readonly EndpointProviderConfig[];
+  /** The catalogue every limit in this resolution was sized against. */
+  view: models.snapshot.View;
 };
 
 /**
@@ -805,9 +812,16 @@ export class AgentRuntime {
    * snapshot instead of re-reading the store.
    */
   private async limitsResolver(): Promise<LimitsResolution> {
+    // One read for the whole resolution, so every limit in a single
+    // compaction decision comes from the same catalogue.
+    const view = catalogView(this.deps.catalog);
     const endpoints = this.deps.endpoints;
     if (!endpoints) {
-      return { resolve: (model) => resolveModelLimits(model), configs: [] };
+      return {
+        resolve: (model) => resolveModelLimits(model, undefined, view),
+        configs: [],
+        view,
+      };
     }
     const configs = await endpoints.list();
     const custom = configs.flatMap(resolveEndpointModels);
@@ -831,17 +845,25 @@ export class AgentRuntime {
           effective = { ...model, model_id: defaultId };
         }
       }
-      return resolveModelLimits(effective, applicableCustom);
+      return resolveModelLimits(effective, applicableCustom, view);
     };
-    return { resolve, configs };
+    return { resolve, configs, view };
   }
 
   /**
    * The summarizer's input cap for a session (issue #806). The compactor
-   * subagent asks for the `nano` tier, but an endpoint factory maps every
-   * tier to the endpoint's default model — so when the session runs on a
-   * configured endpoint, the cap must be that model's window, not the
-   * catalog nano model's. `undefined` keeps the compaction default.
+   * subagent asks for the `nano` tier, but the model a tier resolves to is
+   * a PER-PROVIDER decision — so the cap must be the window of the model
+   * the summarizer will actually run on, not the catalog nano model's:
+   *
+   *  - endpoint providers map every tier to the endpoint's default model;
+   *  - the ChatGPT subscription has its own `tier_model_ids` table, which
+   *    may legitimately name a different (smaller-window) model than the
+   *    catalogue when the subscription does not serve the catalogue's;
+   *  - catalog/gg/byok resolve `nano` through the catalogue, which is the
+   *    compaction default, so they need no override here.
+   *
+   * `undefined` keeps the compaction default (`byTier.nano.contextWindow`).
    */
   private summarizerInputCap(
     model: ChatModel | null,
@@ -849,14 +871,31 @@ export class AgentRuntime {
   ): number | undefined {
     const providerId = model?.provider_id;
     if (!providerId) return undefined;
-    if (!limits.configs.some((e) => e.id === providerId)) return undefined;
+    if (isChatGptProviderId(providerId)) {
+      const config = this.deps.chatgpt?.config;
+      if (!config) return undefined;
+      const spec = limits.view.modelSpecById(
+        chatGptTierModelId(config, COMPACTOR_TIER)
+      );
+      // A subscription id the catalogue doesn't carry has no window to cap
+      // against; the compaction default is no worse than a guess.
+      return spec ? clampSummarizerCap(spec.contextWindow) : undefined;
+    }
+    if (!limits.configs.some((e) => e.id === providerId)) {
+      // Everything else resolves the compactor's tier through the
+      // catalogue. Supplying the cap explicitly (rather than leaning on
+      // compaction's bundled default) is what lets a published tier
+      // retarget resize the summarizer on an already-shipped binary.
+      return clampSummarizerCap(
+        limits.view.by_tier[COMPACTOR_TIER].contextWindow
+      );
+    }
     // Limits of the endpoint's DEFAULT model (what `nano` resolves to):
     // a model_id-less ChatModel routes through the resolver's default-
-    // model substitution above. Reserve room for the summary output —
-    // clamped to the window itself so a sub-5k model never gets handed
-    // more input than it can hold.
-    const window = limits.resolve({ provider_id: providerId }).context_window;
-    return Math.min(window, Math.max(1_024, window - 4_096));
+    // model substitution above.
+    return clampSummarizerCap(
+      limits.resolve({ provider_id: providerId }).context_window
+    );
   }
 
   /**
@@ -1695,6 +1734,7 @@ export class AgentRuntime {
       provider_http: this.deps.provider_http,
       image_gen_enabled: this.deps.image_gen_enabled === true,
       image_model_id: this.deps.image_model_id,
+      catalog: this.deps.catalog,
       // Host-level default for question resolution.
       interactive: this.deps.interactive === true,
       // Host-level default for design_search; per-run `req.library` overrides.

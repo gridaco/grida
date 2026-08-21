@@ -56,6 +56,8 @@ import { StreamRegistry } from "./runtime/stream-registry";
 import { defaultScratchBase, sweepScratch } from "./session/scratch";
 import { DirectoryScopeRegistry } from "./session/directory-scopes";
 import { ProviderHttp, type ProviderHttpTransport } from "./providers/http";
+import { ModelCatalogStore } from "./providers/model-catalog";
+import { models } from "@grida/ai-models";
 
 export {
   DirectoryScopeRegistry,
@@ -294,6 +296,17 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       // requests cannot arrive until tenant registration returns.
       let onProviderReady: (() => void) | undefined;
       const signalProviderReady = () => onProviderReady?.();
+      // The catalogue this tenant resolves against: the bundled one as a
+      // seed, the published one as the authority. A refresh can make a
+      // previously unresolvable model resolvable, which is exactly the
+      // condition `on_provider_ready` exists to retry — a session parked
+      // as `provider_down` on an unknown model un-parks here.
+      const modelCatalog = new ModelCatalogStore({
+        snapshot: pinnedCatalog(),
+        base_url: gridaGatewayBaseUrl,
+        fetch: providerHttp.request,
+        on_change: signalProviderReady,
+      });
       if (gridaGatewayBaseUrl) {
         registerGridaAuthRoutes(app, {
           store: gridaSession,
@@ -326,7 +339,9 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       const sessionsDb = openSessionsDb({
         user_data_path: services.user_data_path,
       });
-      const sessionsStore = new SessionsStore(sessionsDb);
+      const sessionsStore = new SessionsStore(sessionsDb, {
+        catalog_view: () => modelCatalog.view(),
+      });
       // GRIDA-SEC-004 — directory refs are in-memory host capabilities, not
       // workspace registrations. Preserve the SAME sensitive-read denies as
       // the outer sandbox in-process so unsupported/unsandboxed hosts cannot
@@ -366,6 +381,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           gg: gridaSession,
           gg_base_url: gridaGatewayBaseUrl,
           provider_http: providerHttp,
+          catalog: modelCatalog,
         });
       }
       if (caps.video) {
@@ -375,6 +391,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           gg: gridaSession,
           gg_base_url: gridaGatewayBaseUrl,
           provider_http: providerHttp,
+          catalog: modelCatalog,
         });
       }
       if (caps.three_d) {
@@ -435,6 +452,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         gg: gridaSession,
         gg_base_url: gridaGatewayBaseUrl,
         chatgpt,
+        catalog: modelCatalog,
         provider_http: providerHttp,
         workspace_registry: services.workspaces,
         sessions_store: sessionsStore,
@@ -512,6 +530,10 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       if (caps.sessions)
         registerSessionsRoutes(app, { store: sessionsStore, runtime });
 
+      // After registration: the boot fetch is non-blocking, but a refresh
+      // signals provider-ready, and that callback must already be wired.
+      modelCatalog.start();
+
       return {
         // `gg` reflects the feature actually being ON (base URL
         // present) — clients feature-detect the hosted provider by it.
@@ -523,6 +545,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         cleanup: () => {
           runtime.dispose();
           directoryScopes.dispose();
+          modelCatalog.dispose();
           sessionsStore.close();
         },
       };
@@ -617,4 +640,21 @@ export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
       createAgentTenant(agentTenantOptionsFromDaemon(opts, capabilities)),
     ],
   });
+}
+
+/** `GRIDA_AGENT_DISABLE_MODELS_FETCH` — never fetch; stay on the seed. */
+const MODELS_FETCH_DISABLED_ENV = "GRIDA_AGENT_DISABLE_MODELS_FETCH";
+
+/**
+ * The catalogue an operator pinned this daemon to, if any.
+ *
+ * A snapshot freezes the store, so handing it the bundled seed is exactly
+ * "never fetch". The one hatch for an air-gapped or version-pinned
+ * deployment; absent, the store seeds from the bundle and refreshes from
+ * the published catalogue as usual.
+ */
+function pinnedCatalog(): models.snapshot.Snapshot | undefined {
+  return process.env[MODELS_FETCH_DISABLED_ENV] === "1"
+    ? models.snapshot.seed()
+    : undefined;
 }

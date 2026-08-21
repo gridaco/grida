@@ -22,17 +22,12 @@ import { makeVideoModelFor } from "./video-byok";
 import { GridaGatewayVideoModel } from "./gg-media";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import type { ProviderHttp } from "./http";
+import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
 
 type VideoProvider = models.video.VideoProvider;
 
-const VIDEO_PROVIDERS: readonly VideoProvider[] = [
-  "vercel",
-  "fal",
-  "openrouter",
-];
-
 function isVideoProvider(id: string): id is VideoProvider {
-  return (VIDEO_PROVIDERS as readonly string[]).includes(id);
+  return (models.video.providers as readonly string[]).includes(id);
 }
 
 export type ResolvedVideoModel = {
@@ -60,6 +55,11 @@ export class VideoModelUnavailableError extends Error {
 
 export type ResolveVideoDeps = {
   secrets: SecretsStore;
+  /**
+   * The video catalogue to resolve against. Absent ⇒ the bundled one,
+   * which is what this file read directly before the store existed.
+   */
+  catalog?: ModelCatalogStore;
   /** Host-fed provider HTTP, resolved at the server construction edge. */
   provider_http?: ProviderHttp;
   /** Grida Cloud session (GRIDA-SEC-006) — optional; absent or token-less
@@ -109,7 +109,15 @@ export async function resolveVideoModel(
   modelId: string,
   options: ResolveVideoOptions = {}
 ): Promise<ResolvedVideoModel> {
-  const card = models.video.models[modelId];
+  // One read for the whole resolution: a mid-resolution refresh must not
+  // let the listed-gate and the binding lookup disagree — with a single
+  // exception for a MISS, which may just mean this host has not fetched
+  // the catalogue the renderer offered from. See `resolveImageModel`.
+  const view = await catalogViewOnMiss(
+    deps.catalog,
+    (v) => !v.video.cardById(modelId)
+  );
+  const card = view.video.cardById(modelId);
   if (!card || !card.listed) {
     throw new VideoModelUnavailableError(modelId, options.explicit);
   }
@@ -119,7 +127,7 @@ export async function resolveVideoModel(
   if (options.explicit === GG_PROVIDER_ID) {
     // t2v only — an image-to-video pick can't ride the hosted provider.
     const hosted = !options.image && liveGgMediaDeps(deps);
-    if (!hosted || !models.video.binding(card, "vercel")) {
+    if (!hosted || !view.video.binding(card, "vercel")) {
       throw new VideoModelUnavailableError(modelId, GG_PROVIDER_ID);
     }
     return resolvedGgVideo(modelId, card, hosted, deps.provider_http);
@@ -132,7 +140,7 @@ export async function resolveVideoModel(
         .filter(isVideoProvider);
 
   for (const provider of order) {
-    const binding = models.video.binding(card, provider);
+    const binding = view.video.binding(card, provider);
     if (!binding) continue;
     const key = await deps.secrets._getKey(provider);
     if (!key) continue;
@@ -153,7 +161,7 @@ export async function resolveVideoModel(
   // cards the hosted gateway can (a vercel binding).
   if (!options.explicit && !options.image) {
     const hosted = liveGgMediaDeps(deps);
-    if (hosted && models.video.binding(card, "vercel")) {
+    if (hosted && view.video.binding(card, "vercel")) {
       return resolvedGgVideo(modelId, card, hosted, deps.provider_http);
     }
   }

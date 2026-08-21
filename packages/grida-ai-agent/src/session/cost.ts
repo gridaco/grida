@@ -1,4 +1,4 @@
-import { models, TIER_MODEL_IDS } from "@grida/ai-models";
+import { models } from "@grida/ai-models";
 import type { ChatModel, MessageUsage } from "./rows";
 
 export function usageTokenTotal(usage: MessageUsage): number {
@@ -20,12 +20,18 @@ export function usageTokenTotal(usage: MessageUsage): number {
  */
 export function baseCostUsdFromMessageUsage(
   model: ChatModel | undefined,
-  usage: MessageUsage
+  usage: MessageUsage,
+  // The catalogue to price against. Defaults to the bundled one; a host
+  // that refreshes passes its live view, so a model published after this
+  // binary shipped is estimated at its real rates instead of silently
+  // costing nothing.
+  view: models.snapshot.View = models.snapshot.view()
 ): number | undefined {
   const modelId =
-    model?.model_id ?? (model?.tier ? TIER_MODEL_IDS[model.tier] : undefined);
+    model?.model_id ??
+    (model?.tier ? view.tier_model_ids[model.tier] : undefined);
   if (!modelId) return undefined;
-  const spec = models.text.modelSpecById(modelId);
+  const spec = view.modelSpecById(modelId);
   if (!spec) return undefined;
   const rates = spec.cost;
   const input = usage.input ?? 0;

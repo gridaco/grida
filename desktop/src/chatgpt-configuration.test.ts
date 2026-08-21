@@ -1,5 +1,7 @@
 // GRIDA-SEC-008 — authorization URL origin, query, and attempt correlation.
 import { describe, expect, it } from "vitest";
+import { TIER_MODEL_IDS } from "@grida/ai-models";
+import { CHATGPT_SUBSCRIPTION_MODEL_IDS } from "@grida/agent";
 import {
   CHATGPT_AUTHORIZE_URL,
   CHATGPT_CALLBACK_PATH,
@@ -118,5 +120,50 @@ describe("validateChatGptAuthorizationUrl", () => {
     expect(() =>
       validateChatGptAuthorizationUrl(duplicate.toString(), EXPECTATION)
     ).toThrow("unexpected authorization parameter");
+  });
+});
+
+describe("CHATGPT_SUBSCRIPTION_CONFIG.tier_model_ids", () => {
+  const subscriptionModelIds = new Set<string>(CHATGPT_SUBSCRIPTION_MODEL_IDS);
+
+  // The subscription serves its own model set, so this table is separate
+  // from the catalogue's `TIER_MODEL_IDS` on purpose. But separate is not
+  // free: `nano` drives every background titler/compactor call, and a
+  // silent drift here once pinned it to a model 3.75x more expensive with
+  // a 2.6x smaller window than the catalogue's nano.
+  //
+  // The rule: a tier MAY diverge only when the catalogue's model for that
+  // tier is not subscription-servable. When it IS servable, the two must
+  // agree — otherwise the divergence is drift, not a capability
+  // constraint. Tightening this to a plain deep-equal would be wrong; the
+  // whole reason the table exists is that the sets can differ.
+  it("matches the catalogue wherever the catalogue model is servable", () => {
+    const table = CHATGPT_SUBSCRIPTION_CONFIG.tier_model_ids ?? {};
+    const drift = Object.entries(TIER_MODEL_IDS)
+      .filter(([tier, catalogId]) => {
+        if (!subscriptionModelIds.has(catalogId)) return false;
+        return table[tier as keyof typeof table] !== catalogId;
+      })
+      .map(
+        ([tier, catalogId]) =>
+          `${tier}: subscription ${String(
+            table[tier as keyof typeof table]
+          )} != catalogue ${catalogId} (which the subscription serves)`
+      );
+
+    expect(drift).toEqual([]);
+  });
+
+  it("only names models the subscription actually serves", () => {
+    const unservable = Object.entries(
+      CHATGPT_SUBSCRIPTION_CONFIG.tier_model_ids ?? {}
+    )
+      .filter(([, id]) => !subscriptionModelIds.has(id))
+      .map(([tier, id]) => `${tier}: ${id}`);
+
+    expect(unservable).toEqual([]);
+    expect(
+      subscriptionModelIds.has(CHATGPT_SUBSCRIPTION_CONFIG.default_model_id)
+    ).toBe(true);
   });
 });
