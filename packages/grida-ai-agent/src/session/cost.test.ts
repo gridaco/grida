@@ -29,8 +29,10 @@ describe("session cost accounting", () => {
       }
     );
 
+    // Sonnet 5's rate card, spelled out rather than read from the catalogue:
+    // reading it back would assert nothing.
     expect(cost).toBeCloseTo(
-      (2_000 * 3 + 8_000 * 0.3 + 1_000 * 3.75 + 1_000 * 15 + 500 * 15) /
+      (2_000 * 2 + 8_000 * 0.2 + 1_000 * 2.5 + 1_000 * 10 + 500 * 10) /
         1_000_000
     );
   });

@@ -72,11 +72,11 @@ describe("resolveProvider", () => {
 
     const picked = provider.model_factory(
       "nano",
-      "google/gemini-3.5-flash"
+      "google/gemini-3.7-flash"
     ) as {
       modelId: string;
     };
-    expect(picked.modelId).toBe("google/gemini-3.5-flash");
+    expect(picked.modelId).toBe("google/gemini-3.7-flash");
   });
 });
 

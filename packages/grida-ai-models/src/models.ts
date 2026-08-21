@@ -365,10 +365,10 @@ export namespace models {
           longContext: OPENAI_LONG_CONTEXT_PRICING,
         },
       },
-      // Standard rates stored as canonical (identical to Sonnet 4.6).
-      // Anthropic ran an introductory discount ($2 in / $10 out / $0.20
-      // cacheRead / $2.50 cacheWrite) through 2026-08-31; not modelled — the
-      // catalogue holds steady-state provider pricing.
+      // $2/$10 is the standard rate, not a live discount: it launched as an
+      // introductory rate and Anthropic made it permanent, cancelling the
+      // announced step up to $3/$15. Do not restore the higher card.
+      // https://platform.claude.com/docs/en/about-claude/pricing
       "anthropic/claude-sonnet-5": {
         id: "anthropic/claude-sonnet-5",
         label: "Claude Sonnet 5",
@@ -378,7 +378,7 @@ export namespace models {
         tool_call: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
-        cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+        cost: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
       },
       "anthropic/claude-sonnet-4.6": {
         id: "anthropic/claude-sonnet-4.6",
@@ -441,15 +441,21 @@ export namespace models {
       },
       // Google's cache model is read + hourly storage (no one-time write
       // premium that matches `cacheWrite` semantics), so the field is omitted.
-      "google/gemini-3.5-flash": {
-        id: "google/gemini-3.5-flash",
-        label: "Gemini 3.5 Flash",
+      //
+      // Steady-state rates. Google is promoting $0.75 in / $3.75 out / $0.075
+      // cacheRead through 2026-12-31; these are the prices that apply from
+      // 2027-01-01. Checking Google's page before then will show the lower
+      // set — that is the promotion, not a correction.
+      // https://ai.google.dev/gemini-api/docs/pricing
+      "google/gemini-3.7-flash": {
+        id: "google/gemini-3.7-flash",
+        label: "Gemini 3.7 Flash",
         multimodal: true,
         imageInputMimes: GOOGLE_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 1_048_576,
         outputLimit: 65_536,
-        cost: { input: 1.5, output: 9, cacheRead: 0.15 },
+        cost: { input: 1.5, output: 7.5, cacheRead: 0.15 },
       },
       "google/gemini-3.1-pro-preview": {
         id: "google/gemini-3.1-pro-preview",
@@ -460,7 +466,21 @@ export namespace models {
         tool_call: true,
         contextWindow: 1_048_576,
         outputLimit: 65_536,
-        cost: { input: 2, output: 12, cacheRead: 0.2 },
+        cost: {
+          input: 2,
+          output: 12,
+          cacheRead: 0.2,
+          // Google bills the full request at $4 in / $18 out / $0.40
+          // cacheRead above 200K tokens. cacheRead doubling is not
+          // expressible here — a gap this shape has for every model that
+          // bands, including the OpenAI entries above.
+          // https://ai.google.dev/gemini-api/docs/pricing
+          longContext: {
+            inputTokensAbove: 200_000,
+            inputMultiplier: 2,
+            outputMultiplier: 1.5,
+          },
+        },
       },
     } as const satisfies Record<string, ModelSpec>;
 

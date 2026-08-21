@@ -69,7 +69,7 @@ Per 1M tokens.
 | ------------------------------------------------------------ | ------ | ----------- | ---------- | ------- |
 | GPT-5.4 Nano (`openai/gpt-5.4-nano`)                         | $0.20  | —           | $0.02      | $1.25   |
 | GPT-5.4 Mini (`openai/gpt-5.4-mini`)                         | $0.75  | —           | $0.075     | $4.50   |
-| Claude Sonnet 5 (`anthropic/claude-sonnet-5`)                | $3.00  | $3.75       | $0.30      | $15.00  |
+| Claude Sonnet 5 (`anthropic/claude-sonnet-5`)                | $2.00  | $2.50       | $0.20      | $10.00  |
 | Claude Sonnet 4.6 (`anthropic/claude-sonnet-4.6`) _(legacy)_ | $3.00  | $3.75       | $0.30      | $15.00  |
 | Claude Fable 5 (`anthropic/claude-fable-5`)                  | $10.00 | $12.50      | $1.00      | $50.00  |
 | Claude Opus 5 (`anthropic/claude-opus-5`)                    | $5.00  | $6.25       | $0.50      | $25.00  |
@@ -80,11 +80,18 @@ Per 1M tokens.
 | GPT-5.6 Luna (`openai/gpt-5.6-luna`)                         | $0.20  | $0.25       | $0.02      | $1.20   |
 | GPT-5.5 (`openai/gpt-5.5`) _(legacy)_                        | $5.00  | —           | $0.50      | $30.00  |
 | GPT-5.5 Pro (`openai/gpt-5.5-pro`)                           | $30.00 | —           | —          | $180.00 |
-| Gemini 3.5 Flash (`google/gemini-3.5-flash`)                 | $1.50  | —           | $0.15      | $9.00   |
+| Gemini 3.7 Flash (`google/gemini-3.7-flash`)                 | $1.50  | —           | $0.15      | $7.50   |
 | Gemini 3.1 Pro Preview (`google/gemini-3.1-pro-preview`)     | $2.00  | —           | $0.20      | $12.00  |
 
 GPT-5.6 and GPT-5.5 prices above are base rates. Requests with more than 272K
 input tokens are billed at 2x input and 1.5x output for the full request.
+`Gemini 3.1 Pro Preview` is tiered the same way at a 200K threshold ($4.00
+input / $18.00 output / $0.40 cache read for the full request).
+
+`Gemini 3.7 Flash` is listed at its steady-state rate. Google is running a
+promotion through 2026-12-31 at $0.75 input / $3.75 output / $0.075 cache
+read; the table holds the price that applies from 2027-01-01 so an expiring
+promotion is never a silent cost increase.
 
 `GPT-5.5` is deprecated in Grida's catalogue in favor of `GPT-5.6 Sol`;
 this is not an upstream OpenAI retirement. `GPT-5.5 Pro` remains active.

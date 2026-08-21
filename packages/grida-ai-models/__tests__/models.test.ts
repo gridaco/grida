@@ -546,7 +546,7 @@ describe("models.text image-input MIME capabilities", () => {
     }
 
     expect(
-      models.text.catalog["google/gemini-3.5-flash"].imageInputMimes
+      models.text.catalog["google/gemini-3.7-flash"].imageInputMimes
     ).toContain("image/heic");
     expect(
       models.text.catalog["openai/gpt-5.4-mini"].imageInputMimes

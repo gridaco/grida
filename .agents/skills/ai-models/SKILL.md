@@ -88,6 +88,29 @@ providers; an id is never portable. Two cataloguing patterns:
 
 ---
 
+## What the catalogue is for
+
+The catalogue states what is true and useful **now**. Its shape must never be a
+record of how recently someone got round to updating it — a stale entry is a
+wrong answer, not a conservative one.
+
+- **Price the steady state, not the promotion.** When a vendor runs an
+  introductory or time-limited rate, catalogue the price that applies once it
+  ends and note the date in a comment. Otherwise the promotion expiring is a
+  silent cost increase. Recheck when that date passes: a promotion can also be
+  made permanent, which changes the fact, not the rule.
+- **Deprecate a card that is still a real choice; remove one that is not.**
+  `deprecated: true` is for a model someone might still reasonably pick — same
+  price as its successor, or better at something. Delete the entry when the
+  successor is _strictly dominant_ (never worse on any axis, better on at least
+  one): a card nobody should choose is noise in every picker, and keeping it is
+  not caution.
+
+Removal is the kill switch — the id stops passing the run gate, and on a
+published catalogue that reaches installed clients within a refresh interval
+(`docs/wg/platform/hosted-ai.md`). That decisiveness is the point; it also means
+removal is the wrong tool for tidying.
+
 ## Text Models
 
 Live in `packages/grida-ai-models/src/models.ts` under `models.text.catalog: Record<CatalogId, ModelSpec>`. The tier set and tier→model id table sit in `packages/grida-ai-models/src/tiers.ts` and type-use `models.text.CatalogId` from `models.ts` — so every tier id must resolve to a real catalogued spec.
