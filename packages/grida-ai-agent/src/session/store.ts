@@ -1284,6 +1284,9 @@ export class SessionsStore {
         )
       );
     const costs = new Map<string, number>();
+    // One read for the whole rollup: a refresh mid-loop would price some
+    // rows against one catalogue and the rest against another.
+    const view = this.opts?.catalog_view?.();
     for (const row of rows) {
       const meta = parseJsonOr(row.metadata_json, {}) as
         | ({ usage?: MessageUsage } & Partial<AssistantTurnAccounting>)
@@ -1292,11 +1295,7 @@ export class SessionsStore {
       costs.set(
         row.session_id,
         (costs.get(row.session_id) ?? 0) +
-          (baseCostUsdFromMessageUsage(
-            meta.model,
-            meta.usage,
-            this.opts?.catalog_view?.()
-          ) ?? 0)
+          (baseCostUsdFromMessageUsage(meta.model, meta.usage, view) ?? 0)
       );
     }
     return costs;

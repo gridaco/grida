@@ -2,11 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { SecretsStore } from "@grida/daemon/server";
 import type { EndpointProviderConfig } from "../protocol/endpoints";
 import type { EndpointProvidersStore } from "./endpoints";
-import {
-  MODEL_BY_TIER,
-  ProviderUnavailableError,
-  resolveProvider,
-} from "./index";
+import { TIER_MODEL_IDS } from "@grida/ai-models";
+import { ProviderUnavailableError, resolveProvider } from "./index";
 
 function deps(
   keys: Record<string, string | null> = {},
@@ -71,7 +68,7 @@ describe("resolveProvider", () => {
     const provider = await resolveProvider(deps({ openrouter: "sk-or" }));
     expect(
       (provider.model_factory("nano") as { modelId: string }).modelId
-    ).toBe(MODEL_BY_TIER.nano);
+    ).toBe(TIER_MODEL_IDS.nano);
 
     const picked = provider.model_factory(
       "nano",

@@ -31,10 +31,10 @@ export const CATALOG_PATH = "/api/v1/models/catalog";
 const DEFAULT_REFRESH_INTERVAL_MS = 60 * 60 * 1_000;
 
 /**
- * Floor between network attempts triggered by a gate miss, so an
+ * Floor between network attempts triggered by a lookup miss, so an
  * unknown model id in a hot loop cannot turn into a request per run.
  */
-const DEFAULT_MISS_REFRESH_MIN_INTERVAL_MS = 30_000;
+const MISS_REFRESH_MIN_INTERVAL_MS = 30_000;
 
 /** Bound on an untrusted body. The real payload is a few tens of KB. */
 const MAX_BODY_BYTES = 1_000_000;
@@ -65,7 +65,6 @@ export type ModelCatalogStoreOptions = {
   on_change?: () => void;
   /** `null` disables the periodic refresh. */
   refresh_interval_ms?: number | null;
-  miss_refresh_min_interval_ms?: number;
   /** Test seam. */
   now?: () => number;
 };
@@ -77,9 +76,7 @@ export class ModelCatalogStore {
   private readonly fetchImpl: typeof globalThis.fetch;
   private readonly onChange?: () => void;
   private readonly refreshIntervalMs: number | null;
-  private readonly missMinIntervalMs: number;
   private readonly now: () => number;
-  private readonly frozen: boolean;
 
   private inFlight: Promise<boolean> | null = null;
   private lastMissAttemptAt = -Infinity;
@@ -89,7 +86,6 @@ export class ModelCatalogStore {
   private warned = new Set<string>();
 
   constructor(options: ModelCatalogStoreOptions = {}) {
-    this.frozen = options.snapshot !== undefined;
     this.current = models.snapshot.view(options.snapshot);
     this.fetchImpl = options.fetch ?? globalThis.fetch;
     this.onChange = options.on_change;
@@ -97,14 +93,13 @@ export class ModelCatalogStore {
       options.refresh_interval_ms === undefined
         ? DEFAULT_REFRESH_INTERVAL_MS
         : options.refresh_interval_ms;
-    this.missMinIntervalMs =
-      options.miss_refresh_min_interval_ms ??
-      DEFAULT_MISS_REFRESH_MIN_INTERVAL_MS;
     this.now = options.now ?? Date.now;
+    // A supplied snapshot pins the store: no URL means no fetch, no timer,
+    // and `refreshable === false` for every caller that asks.
     this.url =
-      this.frozen || !options.base_url
-        ? null
-        : safeCatalogUrl(options.base_url);
+      options.snapshot === undefined && options.base_url
+        ? safeCatalogUrl(options.base_url)
+        : null;
   }
 
   /** True when this store can ever change (a URL to fetch, not frozen). */
@@ -154,7 +149,9 @@ export class ModelCatalogStore {
       await inFlight;
       return;
     }
-    if (this.now() - this.lastMissAttemptAt < this.missMinIntervalMs) return;
+    if (this.now() - this.lastMissAttemptAt < MISS_REFRESH_MIN_INTERVAL_MS) {
+      return;
+    }
     this.lastMissAttemptAt = this.now();
     await this.refresh("gate-miss");
   }
@@ -188,10 +185,14 @@ export class ModelCatalogStore {
     try {
       raw = await this.fetchBody(url);
     } catch (err) {
+      // Keyed on the failure KIND, not on `reason`: an offline host retries
+      // at boot, on the interval, and on every miss, and keying by reason
+      // would let the same outage warn three times.
       this.warnOnce(
-        `fetch:${reason}`,
-        `could not fetch the published catalogue (${describe(err)}); ` +
-          `continuing on the ${this.currentRaw ? "last published" : "bundled"} catalogue`
+        "fetch",
+        `could not fetch the published catalogue on ${reason} ` +
+          `(${describe(err)}); continuing on the ` +
+          `${this.currentRaw ? "last published" : "bundled"} catalogue`
       );
       return false;
     }
@@ -224,27 +225,21 @@ export class ModelCatalogStore {
   }
 
   private async fetchBody(url: string): Promise<string> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const res = await this.fetchImpl(url, {
-        method: "GET",
-        headers: { accept: "application/json" },
-        signal: controller.signal,
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const declared = Number(res.headers.get("content-length"));
-      if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
-        throw new Error(`body too large (${declared} bytes)`);
-      }
-      const body = await res.text();
-      if (body.length > MAX_BODY_BYTES) {
-        throw new Error(`body too large (${body.length} bytes)`);
-      }
-      return body;
-    } finally {
-      clearTimeout(timeout);
+    const res = await this.fetchImpl(url, {
+      method: "GET",
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const declared = Number(res.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+      throw new Error(`body too large (${declared} bytes)`);
     }
+    const body = await res.text();
+    if (body.length > MAX_BODY_BYTES) {
+      throw new Error(`body too large (${body.length} bytes)`);
+    }
+    return body;
   }
 
   /**
@@ -275,6 +270,29 @@ export class ModelCatalogStore {
  */
 export function catalogView(store?: ModelCatalogStore): models.snapshot.View {
   return store?.view() ?? models.snapshot.view();
+}
+
+/**
+ * The view to resolve against, refreshing ONCE if the caller's lookup misses.
+ *
+ * The rule it states: a miss may just mean this host has not fetched the
+ * catalogue the client is already offering from, so try once, and then read
+ * everything from the NEW view — a decision must never straddle two
+ * catalogues. Stated here rather than at each resolver because the text gate
+ * and both media resolvers need exactly this and would otherwise each spell
+ * it out.
+ *
+ * `missed` is called on the current view and, if it refreshed, the caller
+ * re-reads from the returned one.
+ */
+export async function catalogViewOnMiss(
+  store: ModelCatalogStore | undefined,
+  missed: (view: models.snapshot.View) => boolean
+): Promise<models.snapshot.View> {
+  const view = catalogView(store);
+  if (!missed(view) || !store?.refreshable) return view;
+  await store.refreshOnMiss();
+  return catalogView(store);
 }
 
 /** `null` for anything that is not an http(s) base URL we can extend. */

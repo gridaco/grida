@@ -155,6 +155,26 @@ describe("a model published after this binary shipped", () => {
     store.dispose();
   });
 
+  it("costs nothing on ids that could never be catalogue ids", async () => {
+    // The refresh is the gate's LAST resort, not its first question.
+    // Agent-provider ids (#813) and endpoint-registered ids (#806) are
+    // admitted by their own tables and are never catalogue keys, so asking
+    // the network first would make every run on one of them wait on an
+    // awaited HTTPS GET that could not have answered yes.
+    const fetchImpl = vi.fn<typeof fetch>(
+      async () =>
+        new Response(JSON.stringify(publishedCatalogue()), { status: 200 })
+    );
+    const store = new ModelCatalogStore({
+      base_url: BASE_URL,
+      fetch: fetchImpl,
+    });
+    const result = await runGate("claude-acp/opus-5", runDeps(store));
+    expect(result).not.toBeInstanceOf(Response);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    store.dispose();
+  });
+
   it("does not admit a near-miss of it — the gate is EXACT", async () => {
     // `modelSpecById` matches a bare name and a date suffix, which is
     // right for LIMITS and RATES and wrong here: whatever passes this

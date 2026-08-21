@@ -82,6 +82,42 @@ function resolveOver(
   return fromCustom ? models.text.registry.normalize(fromCustom) : undefined;
 }
 
+/**
+ * Card lookup over an arbitrary media table. Shared by
+ * `models.image.findImageModelCard` and the `models.snapshot` media views so
+ * the bundled catalogue and a published one answer identically.
+ *
+ * Accepts an exact namespaced id or a bare post-slash name. Unlike
+ * {@link specByIdOver} there is no date-suffix tolerance — media providers
+ * don't snapshot ids the way text ones do.
+ */
+function cardByIdOver<Card extends { id: string }>(
+  cards: Record<string, Card | undefined>,
+  modelId: string
+): Card | undefined {
+  if (!modelId) return undefined;
+  if (modelId.includes("/")) return cards[modelId] ?? undefined;
+  for (const card of Object.values(cards)) {
+    if (!card) continue;
+    const slash = card.id.indexOf("/");
+    if (slash >= 0 && card.id.slice(slash + 1) === modelId) return card;
+  }
+  return undefined;
+}
+
+/**
+ * The curated user-facing subset of a media table, frozen so callers can
+ * hold it without risking mutation of the shared catalogue. Callers memoize;
+ * this states the filter once.
+ */
+function listedOver<Card extends { listed: boolean }>(
+  cards: Record<string, Card | undefined>
+): readonly Card[] {
+  return Object.freeze(
+    Object.values(cards).filter((card): card is Card => !!card && card.listed)
+  );
+}
+
 export namespace models {
   // ── Shared discriminators ─────────────────────────────────────────
 
@@ -709,13 +745,22 @@ export namespace models {
     // ── Providers ───────────────────────────────────────────────────
 
     /**
+     * Every provider that can serve an image model, as a value.
+     *
+     * The runtime list is the SOURCE and {@link ImageProvider} is derived
+     * from it — a resolver iterating providers and the type gating them can
+     * then never disagree. Adding a provider is one edit here.
+     */
+    export const providers = ["vercel", "fal", "openrouter"] as const;
+
+    /**
      * A provider that can serve an image model. Distinct from the top-level
      * {@link models.Provider} because the same flagship proprietary model is
      * now multi-homed: fal, OpenRouter, and the Vercel gateway each serve it
      * under a different id (and sometimes a different meter). Mirrors
      * {@link video.VideoProvider}.
      */
-    export type ImageProvider = "vercel" | "fal" | "openrouter";
+    export type ImageProvider = (typeof providers)[number];
 
     /**
      * How one provider serves an image model: the id you actually call on that
@@ -1520,16 +1565,7 @@ export namespace models {
     ): ImageModelCard | null {
       if (!model) return null;
       const modelId = typeof model === "string" ? model : model.modelId;
-      if (modelId.includes("/")) {
-        return models[modelId] ?? null;
-      }
-      for (const card of Object.values(models)) {
-        if (!card) continue;
-        const slash = card.id.indexOf("/");
-        if (slash < 0) continue;
-        if (card.id.slice(slash + 1) === modelId) return card;
-      }
-      return null;
+      return cardByIdOver(models, modelId) ?? null;
     }
 
     /**
@@ -1548,11 +1584,7 @@ export namespace models {
      *  frozen — the catalog is static, so callers can call freely without
      *  risking mutation of the shared view. */
     export const listed_models = (): readonly ImageModelCard[] =>
-      (_listed ??= Object.freeze(
-        Object.values(models).filter(
-          (card): card is ImageModelCard => !!card && card.listed
-        )
-      ));
+      (_listed ??= listedOver(models));
   }
 
   // ── models.audio ──────────────────────────────────────────────────
@@ -2007,11 +2039,19 @@ export namespace models {
    */
   export namespace video {
     /**
+     * Every provider that can serve a video model, as a value. The runtime
+     * list is the SOURCE; {@link VideoProvider} is derived from it. Kept
+     * separate from {@link image.providers} even though the members
+     * currently coincide — they are independent sets that happen to agree.
+     */
+    export const providers = ["vercel", "fal", "openrouter"] as const;
+
+    /**
      * A provider that can serve a video model. Distinct from the top-level
      * {@link models.Provider} because video routes through more than the
      * Vercel gateway. Each provider uses its own id format and meter.
      */
-    export type VideoProvider = "vercel" | "fal" | "openrouter";
+    export type VideoProvider = (typeof providers)[number];
 
     /**
      * **Canonical**, provider-agnostic model id in `vendor/model` form
@@ -2350,11 +2390,7 @@ export namespace models {
      *  catalog is static, so callers can call freely without risking mutation
      *  of the shared view. */
     export const listed_models = (): readonly VideoModelCard[] =>
-      (_listed ??= Object.freeze(
-        Object.values(models).filter(
-          (card): card is VideoModelCard => !!card && card.listed
-        )
-      ));
+      (_listed ??= listedOver(models));
   }
 
   // ── models.image_tools ────────────────────────────────────────────
@@ -2924,29 +2960,33 @@ export namespace models {
       return Object.keys(out).length > 0 ? out : undefined;
     }
 
-    const IMAGE_PROVIDERS: readonly image.ImageProvider[] = [
-      "vercel",
-      "fal",
-      "openrouter",
-    ];
-    const VIDEO_PROVIDERS: readonly video.VideoProvider[] = [
-      "vercel",
-      "fal",
-      "openrouter",
-    ];
+    /**
+     * The half of a binding both media modalities share: the routing id, the
+     * meter, and the two optional labels. Stated once so `url`, `deprecated`,
+     * and `avg_cost_usd` cannot end up validated two different ways.
+     */
+    type MediaBinding<P extends string, Pricing> = {
+      provider: P;
+      id: string;
+      pricing: Pricing;
+      avg_cost_usd: number;
+      deprecated?: boolean;
+      url?: string;
+    };
 
-    function parseImageBinding(
-      provider: image.ImageProvider,
-      v: unknown
-    ): image.ImageProviderBinding | undefined {
+    function parseMediaBinding<P extends string, Pricing>(
+      provider: P,
+      v: unknown,
+      parsePricing: (value: unknown) => Pricing | undefined
+    ): MediaBinding<P, Pricing> | undefined {
       if (!isRecord(v)) return undefined;
       // The `provider` field is redundant with its key by design; validate
       // the redundancy rather than normalising it away.
       if (v.provider !== provider) return undefined;
       if (!isText(v.id) || !isRate(v.avg_cost_usd)) return undefined;
-      const pricing = parseImagePricing(v.pricing);
+      const pricing = parsePricing(v.pricing);
       if (!pricing) return undefined;
-      const out: image.ImageProviderBinding = {
+      const out: MediaBinding<P, Pricing> = {
         provider,
         id: v.id,
         pricing,
@@ -2956,37 +2996,32 @@ export namespace models {
         return undefined;
       }
       if (!optional(out, v, "url", isText)) return undefined;
-      if (v.references !== undefined) {
-        const refs = v.references;
+      return out;
+    }
+
+    function parseImageBinding(
+      provider: image.ImageProvider,
+      v: unknown
+    ): image.ImageProviderBinding | undefined {
+      const out = parseMediaBinding(provider, v, parseImagePricing);
+      if (!out) return undefined;
+      const card: image.ImageProviderBinding = out;
+      const refs = (v as Record<string, unknown>).references;
+      if (refs !== undefined) {
         // Dropping this silently disables image-to-image routing.
         if (!isRecord(refs) || !isText(refs.id) || !isCount(refs.max)) {
           return undefined;
         }
-        out.references = { id: refs.id, max: refs.max };
+        card.references = { id: refs.id, max: refs.max };
       }
-      return out;
+      return card;
     }
 
     function parseVideoBinding(
       provider: video.VideoProvider,
       v: unknown
     ): video.VideoProviderBinding | undefined {
-      if (!isRecord(v)) return undefined;
-      if (v.provider !== provider) return undefined;
-      if (!isText(v.id) || !isRate(v.avg_cost_usd)) return undefined;
-      const pricing = parseVideoPricing(v.pricing);
-      if (!pricing) return undefined;
-      const out: video.VideoProviderBinding = {
-        provider,
-        id: v.id,
-        pricing,
-        avg_cost_usd: v.avg_cost_usd,
-      };
-      if (!optional(out, v, "deprecated", (x) => typeof x === "boolean")) {
-        return undefined;
-      }
-      if (!optional(out, v, "url", isText)) return undefined;
-      return out;
+      return parseMediaBinding(provider, v, parseVideoPricing);
     }
 
     /** `T | null` — null is meaningful here, a missing key is not. */
@@ -3087,7 +3122,7 @@ export namespace models {
 
       const providers = parseBindings(
         v.providers,
-        IMAGE_PROVIDERS,
+        image.providers,
         parseImageBinding
       );
       if (!providers) return undefined;
@@ -3098,7 +3133,7 @@ export namespace models {
       // so one connected key serves the whole list. `resolve-image.ts`
       // relies on it, and a listed card missing a binding is a silent
       // capability hole.
-      if (v.listed && IMAGE_PROVIDERS.some((p) => !providers[p])) {
+      if (v.listed && image.providers.some((p) => !providers[p])) {
         return undefined;
       }
 
@@ -3168,7 +3203,7 @@ export namespace models {
 
       const providers = parseBindings(
         v.providers,
-        VIDEO_PROVIDERS,
+        video.providers,
         parseVideoBinding
       );
       if (!providers) return undefined;
@@ -3332,22 +3367,8 @@ export namespace models {
       let listed: readonly Card[] | undefined;
       return {
         models,
-        listed: () =>
-          (listed ??= Object.freeze(
-            Object.values(models).filter((card) => card.listed)
-          )),
-        cardById: (modelId) => {
-          if (!modelId) return undefined;
-          // Same rules as `models.image.findImageModelCard`: exact when
-          // namespaced, else an exact post-slash name. No date tolerance —
-          // media providers don't snapshot ids the way text ones do.
-          if (modelId.includes("/")) return models[modelId];
-          for (const card of Object.values(models)) {
-            const slash = card.id.indexOf("/");
-            if (slash >= 0 && card.id.slice(slash + 1) === modelId) return card;
-          }
-          return undefined;
-        },
+        listed: () => (listed ??= listedOver(models)),
+        cardById: (modelId) => cardByIdOver(models, modelId),
         binding: (card, provider) =>
           (card.providers as Record<string, Binding>)[provider] ?? null,
       };

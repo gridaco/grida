@@ -26,18 +26,12 @@ import { GridaGatewayImageModel } from "./gg-media";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
 import type { ProviderHttp } from "./http";
-import { catalogView, type ModelCatalogStore } from "./model-catalog";
+import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
 
 type ImageProvider = models.image.ImageProvider;
 
-const IMAGE_PROVIDERS: readonly ImageProvider[] = [
-  "vercel",
-  "fal",
-  "openrouter",
-];
-
 function isImageProvider(id: string): id is ImageProvider {
-  return (IMAGE_PROVIDERS as readonly string[]).includes(id);
+  return (models.image.providers as readonly string[]).includes(id);
 }
 
 export type ResolvedImageModel = {
@@ -96,7 +90,9 @@ function referenceCapableProviders(
   card: models.image.ImageModelCard,
   view: models.snapshot.View
 ): ImageProvider[] {
-  return IMAGE_PROVIDERS.filter((p) => view.image.binding(card, p)?.references);
+  return models.image.providers.filter(
+    (p) => view.image.binding(card, p)?.references
+  );
 }
 
 export type ResolveImageDeps = {
@@ -202,13 +198,11 @@ export async function resolveImageModel(
   // model the agent was just offered can be one this host has not
   // fetched yet. Refresh once and re-read — both the card and every
   // binding below then come from the same, newer catalogue.
-  let view = catalogView(deps.catalog);
-  let card = view.image.cardById(modelId);
-  if (!card && deps.catalog?.refreshable) {
-    await deps.catalog.refreshOnMiss();
-    view = catalogView(deps.catalog);
-    card = view.image.cardById(modelId);
-  }
+  const view = await catalogViewOnMiss(
+    deps.catalog,
+    (v) => !v.image.cardById(modelId)
+  );
+  const card = view.image.cardById(modelId);
   // Unknown id, or a non-curated card (legacy / not universal) — not part of
   // the v1 BYOK image surface.
   if (!card || !card.listed) {

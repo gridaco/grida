@@ -21,7 +21,8 @@ import { ProviderHttp } from "./http";
  */
 export type TierModelIds = () => Record<ModelTier, string>;
 
-const BUNDLED_TIER_MODEL_IDS: TierModelIds = () =>
+/** The compile-time table — what a standalone caller or test gets. */
+export const BUNDLED_TIER_MODEL_IDS: TierModelIds = () =>
   TIER_MODEL_IDS as Record<ModelTier, TierModelId>;
 
 const OPENROUTER_HEADERS = {

@@ -22,18 +22,12 @@ import { makeVideoModelFor } from "./video-byok";
 import { GridaGatewayVideoModel } from "./gg-media";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import type { ProviderHttp } from "./http";
-import { catalogView, type ModelCatalogStore } from "./model-catalog";
+import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
 
 type VideoProvider = models.video.VideoProvider;
 
-const VIDEO_PROVIDERS: readonly VideoProvider[] = [
-  "vercel",
-  "fal",
-  "openrouter",
-];
-
 function isVideoProvider(id: string): id is VideoProvider {
-  return (VIDEO_PROVIDERS as readonly string[]).includes(id);
+  return (models.video.providers as readonly string[]).includes(id);
 }
 
 export type ResolvedVideoModel = {
@@ -119,13 +113,11 @@ export async function resolveVideoModel(
   // let the listed-gate and the binding lookup disagree — with a single
   // exception for a MISS, which may just mean this host has not fetched
   // the catalogue the renderer offered from. See `resolveImageModel`.
-  let view = catalogView(deps.catalog);
-  let card = view.video.cardById(modelId);
-  if (!card && deps.catalog?.refreshable) {
-    await deps.catalog.refreshOnMiss();
-    view = catalogView(deps.catalog);
-    card = view.video.cardById(modelId);
-  }
+  const view = await catalogViewOnMiss(
+    deps.catalog,
+    (v) => !v.video.cardById(modelId)
+  );
+  const card = view.video.cardById(modelId);
   if (!card || !card.listed) {
     throw new VideoModelUnavailableError(modelId, options.explicit);
   }

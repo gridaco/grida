@@ -12,6 +12,7 @@ import crypto from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import {
   catalogView,
+  catalogViewOnMiss,
   type ModelCatalogStore,
 } from "../providers/model-catalog";
 import {
@@ -122,8 +123,8 @@ export type ParseRunBodyDeps = {
 };
 
 /**
- * Whether this host's catalogue carries `modelId`, refreshing once if it
- * does not.
+ * Whether this host's catalogue carries `modelId` AFTER refreshing once —
+ * the last resort of the gate below, never its first question.
  *
  * This is where the distribution mechanism pays off. The client offering
  * the model is served fresh from grida.co; this host's catalogue was
@@ -134,14 +135,12 @@ export type ParseRunBodyDeps = {
  * The store rate-limits and de-duplicates the attempt, so an id that is
  * genuinely unknown costs at most one request per window, not one per run.
  */
-async function isCatalogueModelId(
+async function isCatalogueModelIdAfterRefresh(
   modelId: string,
   deps: ParseRunBodyDeps
 ): Promise<boolean> {
-  if (catalogView(deps.catalog).has(modelId)) return true;
-  if (!deps.catalog?.refreshable) return false;
-  await deps.catalog.refreshOnMiss();
-  return catalogView(deps.catalog).has(modelId);
+  const view = await catalogViewOnMiss(deps.catalog, (v) => !v.has(modelId));
+  return view.has(modelId);
 }
 
 export async function parseRunBody(
@@ -222,13 +221,21 @@ export async function parseRunBody(
     // Allowed model ids = this host's catalogue ∪ user-registered
     // endpoint models (the open-registry seam, issue #806). Still a
     // closed gate: an id neither table knows 400s.
+    //
+    // ORDER MATTERS: every test here is local except the last, which may
+    // fetch the published catalogue. Agent-provider ids (#813) and
+    // endpoint-registered ids (#806) are never catalogue ids, so asking
+    // the network first would make every run on one of those pay a
+    // refresh — awaited, on the gate — to answer a question it could
+    // never answer yes to.
     const allowed =
       typeof b.model_id === "string" &&
-      ((await isCatalogueModelId(b.model_id, deps)) ||
+      (catalogView(deps.catalog).has(b.model_id) ||
         isAgentProviderModel(b.model_id) || // issue #813 agent-provider class
         (deps.chatgpt !== undefined &&
           isChatGptSubscriptionModelId(b.model_id)) ||
-        (await isRegisteredModelId(b.model_id, deps)));
+        (await isRegisteredModelId(b.model_id, deps)) ||
+        (await isCatalogueModelIdAfterRefresh(b.model_id, deps)));
     if (!allowed) {
       return Response.json(
         { error: `modelId not allowed: ${String(b.model_id)}` },

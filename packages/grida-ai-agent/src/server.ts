@@ -18,7 +18,6 @@
  */
 
 import os from "node:os";
-import { readFileSync } from "node:fs";
 import type { Hono } from "hono";
 import {
   DaemonServer,
@@ -57,10 +56,7 @@ import { StreamRegistry } from "./runtime/stream-registry";
 import { defaultScratchBase, sweepScratch } from "./session/scratch";
 import { DirectoryScopeRegistry } from "./session/directory-scopes";
 import { ProviderHttp, type ProviderHttpTransport } from "./providers/http";
-import {
-  ModelCatalogStore,
-  type ModelCatalogStoreOptions,
-} from "./providers/model-catalog";
+import { ModelCatalogStore } from "./providers/model-catalog";
 import { models } from "@grida/ai-models";
 
 export {
@@ -250,13 +246,6 @@ export type AgentTenantOptions = {
    * (only project/user skills discovered).
    */
   skills_root?: string;
-  /**
-   * A model catalogue supplied by the host, instead of the bundled one
-   * and instead of fetching the published one. Pins the tenant's
-   * catalogue for its whole life — the escape hatch for air-gapped or
-   * version-pinned deployments. See `ModelCatalogStore`.
-   */
-  models_snapshot?: models.snapshot.Snapshot;
 };
 
 /**
@@ -313,7 +302,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       // condition `on_provider_ready` exists to retry — a session parked
       // as `provider_down` on an unknown model un-parks here.
       const modelCatalog = new ModelCatalogStore({
-        ...resolveCatalogOverride(opts.models_snapshot),
+        snapshot: pinnedCatalog(),
         base_url: gridaGatewayBaseUrl,
         fetch: providerHttp.request,
         on_change: signalProviderReady,
@@ -653,49 +642,19 @@ export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
   });
 }
 
-/** `GRIDA_AGENT_MODELS_PATH` — pin the catalogue to a file on disk. */
-const MODELS_PATH_ENV = "GRIDA_AGENT_MODELS_PATH";
 /** `GRIDA_AGENT_DISABLE_MODELS_FETCH` — never fetch; stay on the seed. */
 const MODELS_FETCH_DISABLED_ENV = "GRIDA_AGENT_DISABLE_MODELS_FETCH";
 
 /**
- * Host and operator overrides for the model catalogue, resolved into
- * `ModelCatalogStore` options.
+ * The catalogue an operator pinned this daemon to, if any.
  *
- * A pinned snapshot (from the host option or a file) freezes the store;
- * disabling the fetch leaves it on the bundled seed. Both are escape
- * hatches for air-gapped or version-pinned deployments — and both fail
- * OPEN to normal behaviour, because an operator typo must not be the
- * reason a daemon has no catalogue at all.
+ * A snapshot freezes the store, so handing it the bundled seed is exactly
+ * "never fetch". The one hatch for an air-gapped or version-pinned
+ * deployment; absent, the store seeds from the bundle and refreshes from
+ * the published catalogue as usual.
  */
-function resolveCatalogOverride(
-  hostSnapshot?: models.snapshot.Snapshot
-): Pick<ModelCatalogStoreOptions, "snapshot"> {
-  if (hostSnapshot) return { snapshot: hostSnapshot };
-
-  const filePath = process.env[MODELS_PATH_ENV]?.trim();
-  if (filePath) {
-    try {
-      const parsed = models.snapshot.parse(
-        JSON.parse(readFileSync(filePath, "utf8"))
-      );
-      if (parsed) return { snapshot: parsed };
-      console.warn(
-        `[grida-agent] ${MODELS_PATH_ENV}=${filePath} did not match schema ${models.snapshot.SCHEMA}; ignoring it`
-      );
-    } catch (err) {
-      console.warn(
-        `[grida-agent] ${MODELS_PATH_ENV}=${filePath} could not be read (${
-          err instanceof Error ? err.message : String(err)
-        }); ignoring it`
-      );
-    }
-  }
-
-  if (process.env[MODELS_FETCH_DISABLED_ENV] === "1") {
-    // Freeze on the bundled catalogue: a seed snapshot pins the store
-    // exactly the way a supplied one does.
-    return { snapshot: models.snapshot.seed() };
-  }
-  return {};
+function pinnedCatalog(): models.snapshot.Snapshot | undefined {
+  return process.env[MODELS_FETCH_DISABLED_ENV] === "1"
+    ? models.snapshot.seed()
+    : undefined;
 }

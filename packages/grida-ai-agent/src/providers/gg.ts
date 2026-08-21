@@ -13,15 +13,10 @@
  */
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models";
 import type { ModelFactory } from "../agent";
-import type { ModelTier } from "../tiers";
 import type { GridaGatewaySessionStore } from "./gg-session";
 import { ProviderHttp } from "./http";
-import type { TierModelIds } from "./byok";
-
-const BUNDLED_TIER_MODEL_IDS: TierModelIds = () =>
-  TIER_MODEL_IDS as Record<ModelTier, TierModelId>;
+import { BUNDLED_TIER_MODEL_IDS, type TierModelIds } from "./byok";
 
 /**
  * The hosted session is missing or expired. The literal code LEADS the

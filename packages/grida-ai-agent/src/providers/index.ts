@@ -26,10 +26,10 @@
  * precedence.
  */
 
-import { models, TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models";
+import { models } from "@grida/ai-models";
 import { catalogView, type ModelCatalogStore } from "./model-catalog";
+import type { TierModelIds } from "./byok";
 import type { ModelFactory } from "../agent";
-import type { ModelTier } from "../tiers";
 import type { SecretsStore } from "@grida/daemon/server";
 import {
   byokProvidersFor,
@@ -59,14 +59,6 @@ import type { ProviderHttp } from "./http";
 import { ChatGptProvider, type ChatGptProviderRuntime } from "./chatgpt";
 
 export { EndpointProvidersStore } from "./endpoints";
-
-/**
- * Canonical tier->catalog-model map. The BUNDLED one — a host with a
- * `catalog` store resolves tiers through that instead, so the published
- * catalogue can retarget a tier without a release. Kept exported for
- * callers that legitimately want the compile-time table.
- */
-export const MODEL_BY_TIER: Record<ModelTier, TierModelId> = TIER_MODEL_IDS;
 
 export type ResolvedProvider = {
   /** A native, BYOK, hosted, endpoint, or external-agent provider id. */
@@ -196,12 +188,7 @@ export async function resolveProvider(
     for (const provider of byokProvidersFor("text")) {
       const key = await deps.secrets._getKey(provider.id);
       if (key) {
-        return makeResolvedByok(
-          provider.id,
-          key,
-          deps.provider_http,
-          () => catalogView(deps.catalog).tier_model_ids
-        );
+        return makeResolvedByok(provider.id, key, deps);
       }
     }
 
@@ -259,12 +246,7 @@ async function resolveExplicit(
     }
     const key = await deps.secrets._getKey(providerId);
     if (!key) throw new ProviderUnavailableError(providerId);
-    return makeResolvedByok(
-      providerId,
-      key,
-      deps.provider_http,
-      () => catalogView(deps.catalog).tier_model_ids
-    );
+    return makeResolvedByok(providerId, key, deps);
   }
   const endpoint = await deps.endpoints?.get(providerId);
   const resolved =
@@ -319,9 +301,14 @@ function maybeResolveGg(deps: ResolveDeps): ResolvedProvider | null {
 function makeResolvedByok(
   providerId: ByokProviderId,
   key: string,
-  providerHttp?: ProviderHttp,
-  tierModelIds?: () => Record<ModelTier, string>
+  deps: ResolveDeps
 ): ResolvedProvider {
+  const providerHttp = deps.provider_http;
+  // The STORE, not a snapshot of it: a background subagent asks for its
+  // tier long after resolution, and must get the model the catalogue
+  // names then.
+  const tierModelIds: TierModelIds = () =>
+    catalogView(deps.catalog).tier_model_ids;
   switch (providerId) {
     case "openrouter":
       return {

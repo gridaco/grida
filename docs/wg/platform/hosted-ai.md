@@ -301,6 +301,12 @@ RATES, where a near-miss id is still that model. Using the loose one to
 gate silently widens what the host admits and converts a clean
 "unknown model" rejection into a provider-level failure mid-run.
 
+**Pinning.** `GRIDA_AGENT_DISABLE_MODELS_FETCH=1` freezes a daemon on its
+bundled catalogue — the one hatch for an air-gapped or version-pinned
+deployment. It works by handing the store the seed as its snapshot, which
+is the same mechanism that pins it to any supplied catalogue, so there is
+one code path rather than a family of overrides.
+
 **Schema.** Additive changes do not bump the schema major — clients ignore
 fields they do not know, so a new optional field is safe to publish. A
 breaking change publishes at a NEW path and bumps the major, leaving old
@@ -321,12 +327,24 @@ catalogue must never cost a host its ability to answer.
 Music, sound effects, and 3D are still gated against the host's BUNDLED
 catalogue (`v.oneOf(models.audio.music.model_ids)` and its siblings in
 `packages/grida-ai-agent/src/http/routes/`), so adding a model in those
-families still needs a desktop release. That is a known gap, not a
-decision that they belong on a different mechanism: each one wants a
-section, a validator, and a route reading through the view, exactly as
-image and video got. Worth doing when one of those catalogues starts
-moving; the schema is additive, so publishing a new section does not
-disturb clients that ignore it.
+families still needs a desktop release.
+
+That is a known gap, but it is NOT one more section away. Image and video
+cards fit the published shape because they carry open id unions,
+`listed: boolean`, and a `providers` map keyed by provider — which is what
+the media view is generic over. Music, sound-effect, and 3D cards carry
+closed literal id unions, a single `provider` field, and `status:
+"listed" | "staged"`, and their routes gate at body-validation level on the
+narrowed id (`three-d.ts` then indexes the card to drive per-model input
+validation). Publishing them means first changing those card shapes in
+`@grida/ai-models` — widening the id unions, reconciling `status` with
+`listed`, deciding whether a single-provider card grows a providers map —
+and only then adding a section. Two instantiations is also the minimum
+that justifies the current generic; stretching it over a third,
+incompatible shape before there is demand would be speculative. Image and
+video move monthly and are multi-provider; these three move roughly
+yearly and are single-provider hosted routes. Worth revisiting when one of
+those catalogues starts moving.
 
 **Closed vocabularies are validated as text on the wire.** Model vendor,
 speed label, and the like are closed unions in TypeScript but are accepted

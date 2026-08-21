@@ -47,8 +47,19 @@ const CACHE_CONTROL =
  */
 const VERSION = (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 12);
 
+/**
+ * Serialized once per deploy, not per request: the catalogue and `VERSION`
+ * are both compile-time constants here, so every response is the same ~20KB
+ * of bytes. Also gives the response a real `content-length`, which the
+ * agent-side store checks before reading the body.
+ */
+const BODY = JSON.stringify(models.snapshot.seed({ version: VERSION }));
+
 export async function GET() {
-  return Response.json(models.snapshot.seed({ version: VERSION }), {
-    headers: { "cache-control": CACHE_CONTROL },
+  return new Response(BODY, {
+    headers: {
+      "content-type": "application/json",
+      "cache-control": CACHE_CONTROL,
+    },
   });
 }
