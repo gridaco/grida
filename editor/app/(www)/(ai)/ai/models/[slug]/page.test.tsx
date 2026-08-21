@@ -15,12 +15,6 @@ const fixture = {
     title: "GPT Image 2 AI Image Generator — Grida",
     description: "Generate images with OpenAI GPT Image 2.",
     keywords: ["gpt image 2", "ai image generator"],
-    image: {
-      src: "/ai/music/showcase/neon-honey-rush.webp",
-      width: 1024,
-      height: 1024,
-      alt: "A GPT Image 2 output",
-    },
   },
   demo: {
     runner: "image-playground",
@@ -49,40 +43,29 @@ describe("AI model page route", () => {
       alternates: { canonical: "https://grida.co/ai/models/gpt-image-2" },
       openGraph: {
         url: "https://grida.co/ai/models/gpt-image-2",
-        images: [
-          expect.objectContaining({
-            url: fixture.metadata.image.src,
-            alt: fixture.metadata.image.alt,
-          }),
-        ],
+        images: undefined,
       },
       twitter: {
-        card: "summary_large_image",
-        images: [fixture.metadata.image.src],
+        card: "summary",
+        images: undefined,
       },
     });
   });
 
-  it("renders an authored GPT Image 2 page with real outputs and a routed demo", () => {
+  it("renders the dedicated GPT Image 2 scaffold and routed demo", () => {
     const markup = renderToStaticMarkup(<ModelPage page={fixture} />);
 
     expect(markup).toContain("<h1");
-    expect(markup).toContain("GPT Image 2,");
+    expect(markup).toContain("GPT Image 2");
     expect(markup).toContain("<h2");
-    expect(markup).toContain("One model. Very different directions.");
-    expect(markup).toContain("<h3");
-    expect(markup).toContain("Generated with GPT Image 2");
-    expect(markup).toContain("neon-honey-rush.webp");
-    expect(markup).toContain("One direction, two kinds of output.");
+    expect(markup).toContain("GPT Image 2 output");
+    expect(markup).toContain("Awaiting approved GPT Image 2 output.");
     expect(markup).toContain("1024×1024");
-    expect(markup).toContain("$0.005–$0.211 / image");
-    expect(markup).toContain("0.655–8.29 MP");
     expect(markup).toContain("openai/gpt-image-2");
-    expect(markup).toContain("Open GPT Image 2 playground");
+    expect(markup).toContain("Open in image playground");
     expect(markup).toContain("/playground/image?model=openai%2Fgpt-image-2");
-    expect(markup).toContain('type="application/ld+json"');
-    expect(markup).toContain("ldjson-gpt-image-2-software");
-    expect(markup).toContain("ldjson-gpt-image-2-faq");
+    expect(markup).not.toContain("Lyria");
+    expect(markup).not.toContain("/ai/music");
   });
 
   it("refuses a registry entry that points the authored page at another model", () => {

@@ -41,16 +41,22 @@ describe("AI model SEO page inventory", () => {
       expect(page.metadata.title).toMatch(/ — Grida$/);
       expect(page.metadata.description.length).toBeLessThanOrEqual(160);
       expect(page.metadata.keywords.length).toBeGreaterThan(0);
-      expect(page.metadata.image.src).toMatch(/^\//);
-      expect(page.metadata.image.width).toBeGreaterThan(0);
-      expect(page.metadata.image.height).toBeGreaterThan(0);
-      expect(page.metadata.image.alt.trim()).not.toBe("");
       expect(page.publishReason.trim()).not.toBe("");
       expect(page.retireWhen.trim()).not.toBe("");
       expect(titles.has(page.metadata.title)).toBe(false);
       expect(descriptions.has(page.metadata.description)).toBe(false);
       titles.add(page.metadata.title);
       descriptions.add(page.metadata.description);
+    }
+
+    const socialImages = aiModelPages.active.flatMap((page) =>
+      page.metadata.socialImage ? [page.metadata.socialImage] : []
+    );
+    for (const image of socialImages) {
+      expect(image.src).toMatch(/^\//);
+      expect(image.width).toBeGreaterThan(0);
+      expect(image.height).toBeGreaterThan(0);
+      expect(image.alt.trim()).not.toBe("");
     }
   });
 

@@ -60,8 +60,8 @@ export namespace aiModelPages {
       title: string;
       description: string;
       keywords: readonly string[];
-      /** Public model output used when this page is shared. */
-      image: {
+      /** Optional page-specific artwork used for social previews. */
+      socialImage?: {
         src: `/${string}`;
         width: number;
         height: number;
@@ -95,19 +95,13 @@ export namespace aiModelPages {
       metadata: {
         title: "GPT Image 2 AI Image Generator — Grida",
         description:
-          "Generate with OpenAI GPT Image 2 in Grida. Explore real outputs and an exact prompt, compare sizes and pricing, then open the image playground.",
+          "Open GPT Image 2 in Grida’s image playground with the exact model selected for text-to-image generation.",
         keywords: [
           "gpt image 2",
           "gpt image 2 generator",
           "openai image generator",
           "ai image generator",
         ],
-        image: {
-          src: "/ai/music/showcase/neon-honey-rush.webp",
-          width: 1024,
-          height: 1024,
-          alt: "A luminous glass heart filled with honey, generated with GPT Image 2",
-        },
       },
       demo: {
         runner: "image-playground",

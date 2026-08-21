@@ -3,6 +3,7 @@ import { aiModelPages } from "@/www/data/ai-model-pages";
 
 export function modelMetadata(page: aiModelPages.Entry): Metadata {
   const canonical = aiModelPages.url(page.slug);
+  const socialImage = page.metadata.socialImage;
 
   return {
     metadataBase: new URL("https://grida.co"),
@@ -15,20 +16,22 @@ export function modelMetadata(page: aiModelPages.Entry): Metadata {
       description: page.metadata.description,
       type: "website",
       url: canonical,
-      images: [
-        {
-          url: page.metadata.image.src,
-          width: page.metadata.image.width,
-          height: page.metadata.image.height,
-          alt: page.metadata.image.alt,
-        },
-      ],
+      images: socialImage
+        ? [
+            {
+              url: socialImage.src,
+              width: socialImage.width,
+              height: socialImage.height,
+              alt: socialImage.alt,
+            },
+          ]
+        : undefined,
     },
     twitter: {
-      card: "summary_large_image",
+      card: socialImage ? "summary_large_image" : "summary",
       title: page.metadata.title,
       description: page.metadata.description,
-      images: [page.metadata.image.src],
+      images: socialImage ? [socialImage.src] : undefined,
     },
   };
 }
