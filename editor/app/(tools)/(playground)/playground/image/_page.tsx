@@ -121,12 +121,10 @@ function CanvasConsumer({
   const editor = useCurrentEditor();
   const model = useImageModelConfig(initialModelId);
   const [loading, setLoading] = useState(false);
-  const [composerRevision, setComposerRevision] = useState(0);
   const gate = useAiRunGate<GenerateAiImageInput>(resolveSessionAiRunRemedy);
 
   const run = async (
-    invocation: GenerateAiImageInput,
-    clearComposerOnSuccess = false
+    invocation: GenerateAiImageInput
   ): Promise<void | false> => {
     gate.clear();
     setLoading(true);
@@ -152,9 +150,6 @@ function CanvasConsumer({
       }
 
       editor.commands.changeNodePropertySrc(id, data.publicUrl);
-      if (clearComposerOnSuccess) {
-        setComposerRevision((revision) => revision + 1);
-      }
     } catch (error) {
       console.error(error);
       editor.commands.delete([id]);
@@ -193,12 +188,11 @@ function CanvasConsumer({
                     <Chat
                       model={model}
                       loading={loading}
-                      composerRevision={composerRevision}
                       onCommit={onCommit}
                       failure={gate.failure}
                       onRetry={() => {
                         if (gate.failure) {
-                          runWithAuth(gate.failure.invocation, true);
+                          runWithAuth(gate.failure.invocation);
                         }
                       }}
                       credits={session ? credits : null}
@@ -286,7 +280,6 @@ function BudgetBadge({
 function Chat({
   model,
   loading,
-  composerRevision,
   onCommit,
   failure,
   onRetry,
@@ -294,7 +287,6 @@ function Chat({
 }: {
   model: ReturnType<typeof useImageModelConfig>;
   loading: boolean;
-  composerRevision: number;
   onCommit: (value: { text: string }) => Promise<void | false> | void | false;
   failure: AiRunGate.Failure<GenerateAiImageInput> | null;
   onRetry: () => void;
@@ -376,11 +368,7 @@ function Chat({
           </SelectContent>
         </Select>
       </div>
-      <ChatBox
-        key={composerRevision}
-        disabled={loading}
-        onValueCommit={onCommit}
-      >
+      <ChatBox disabled={loading} onValueCommit={onCommit}>
         <ChatBoxTextArea />
         <ChatBoxFooter>
           <div className="flex-1" />

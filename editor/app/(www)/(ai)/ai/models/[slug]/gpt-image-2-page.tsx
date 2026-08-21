@@ -77,7 +77,10 @@ export function GptImage2Page({ page }: { page: aiModelPages.Entry }) {
  */
 function OutputExampleSlot() {
   return (
-    <section className="container mx-auto px-4 py-24 md:py-32">
+    <section
+      data-testid="ai-model-page-output-example"
+      className="container mx-auto px-4 py-24 md:py-32"
+    >
       <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[0.72fr_1.28fr]">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
