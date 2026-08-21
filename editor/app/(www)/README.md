@@ -114,6 +114,29 @@ the shim.
 | `/figma/vscode` — [`(figma)/figma/vscode/page.tsx`](<(figma)/figma/vscode/page.tsx>)                      | Early onboarding; not in sitemap; currently indexable | Sales/community; Slack-led VS Code onboarding                   | Join Slack                                                       | External/community gate only                                                                                                                                      | When the extension or Slack onboarding path is retired; separately decide sitemap versus explicit `noindex`          |
 | `/west` — [`(west)/west/page.tsx`](<(west)/west/page.tsx>)                                                | Beta; not in sitemap; currently indexable             | Workspace acquisition and sales; referral-marketing concept     | Start project/sign in; book a meeting                            | Workspace destinations handle auth/org; Cal.com is external                                                                                                       | Promote with an explicit crawl decision, or retire/redirect if the beta ends                                         |
 
+## AI page topology
+
+The `/ai` prefix contains three independent page contracts. A modality does not
+need to publish all three merely to make the URL tree look symmetrical.
+
+- **Modality landing — `/ai/<modality>`**: an optional, durable product page
+  for broad modality intent. It must earn the route with authored workflows,
+  real output evidence, and a category-level funnel that can survive model
+  replacement. `/ai/music` is the current example: it covers Lyria 3 and Lyria
+  3 Pro, but the route belongs to music rather than either model.
+- **Exact model page — `/ai/models/<slug>`**: one editorially selected model,
+  its model-specific evidence, and an exact runner handoff. Publication and
+  retirement are owned by `ai-model-pages.ts`; a direct successor may replace
+  the route according to its recorded lifecycle.
+- **Runner**: the functional execution destination. Its browse policy,
+  indexing, accepted query parameters, and run-gate recovery are specified
+  independently from the landing or model page that links to it.
+
+Do not add `/ai/image` or another modality landing only to mirror
+`/ai/music`. Add one when it has distinct, maintained category content.
+Likewise, do not rename a modality landing into an exact model page without
+narrowing its content and proving an exact model-selected runner handoff.
+
 ## AI routes
 
 | Route and owner                                                                                     | State and crawl                                                                                        | Umbrella and reason                                                                     | Primary CTA and funnel                                                                      | Gate and recovery                                                                                                                                                                         | Replace or remove when                                                                                                                                   |

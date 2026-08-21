@@ -217,11 +217,14 @@ endpoint is a fresh chance to forget the membership check.
 
 1. **One verified producer** —
    [editor/lib/auth/organization.ts](editor/lib/auth/organization.ts)
-   exports `requireOrganizationId({ user_id, request, routeParams,
-inputOrgId })`. It resolves from: route param slug → request
-   header `X-Grida-Organization-Id` → explicit input. Every resolved
-   id is verified via `assertOrgMember(user_id, org_id)` before
-   return. No "current org" is read from session blob / cookie.
+   exports `requireOrganizationId`. Its source priority is: route-param slug →
+   request header `X-Grida-Organization-Id` → explicit input → DB-backed
+   session fallback. Route, header, and input identities are checked against
+   current membership. The fallback chooses the last-accessed project's
+   organization only when it intersects the current membership set returned
+   by `get_organizations_for_user`; otherwise it uses the first current
+   membership. No organization identity is trusted from a session blob or
+   browser cookie.
 2. **Runtime contract in the seam** —
    [editor/lib/ai/server.ts](editor/lib/ai/server.ts)
    `withTransaction` (and the AI SDK middleware that wraps it) throw
@@ -270,7 +273,8 @@ contributor/self-host switch under the existing server-env trust model.
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-003 .` to enumerate.
 Today:
 
-- [editor/lib/auth/organization.ts](editor/lib/auth/organization.ts) — `requireOrganizationId`.
+- [editor/lib/auth/organization.ts](editor/lib/auth/organization.ts) — verified
+  explicit and session-fallback organization resolution.
 - [editor/lib/ai/server.ts](editor/lib/ai/server.ts) — single seam entry; unconditional runtime gate; BYOK layer switch.
 - [editor/lib/ai/models.ts](editor/lib/ai/models.ts) — BYOK layer (bare provider, bypasses billing).
 - [editor/.oxlintrc.jsonc](editor/.oxlintrc.jsonc) — import lint rule.
