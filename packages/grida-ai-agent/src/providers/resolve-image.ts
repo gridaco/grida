@@ -26,7 +26,7 @@ import { GridaGatewayImageModel } from "./gg-media";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
 import type { ProviderHttp } from "./http";
-import type { ModelCatalogStore } from "./model-catalog";
+import { catalogView, type ModelCatalogStore } from "./model-catalog";
 
 type ImageProvider = models.image.ImageProvider;
 
@@ -147,11 +147,6 @@ export function defaultImageModelId(
   return view.image.listed()[0]?.id;
 }
 
-/** The catalogue backing a resolution — the host's if wired, else bundled. */
-function catalogView(deps: ResolveImageDeps): models.snapshot.View {
-  return deps.catalog?.view() ?? models.snapshot.view();
-}
-
 /**
  * Whether the user has a key for ANY image provider — the cheap presence gate
  * the host uses to decide whether to advertise the `generate_image` tool at all
@@ -200,8 +195,20 @@ export async function resolveImageModel(
 ): Promise<ResolvedImageModel> {
   // One read for the whole resolution: a mid-resolution refresh must not
   // let the listed-gate and the binding lookup disagree.
-  const view = catalogView(deps);
-  const card = view.image.cardById(modelId);
+  //
+  // The one deliberate exception is a MISS. The renderer builds this
+  // tool's model list from its own deploy-fresh catalogue
+  // (`editor/scaffolds/desktop/tools/media-tool-registry.ts`), so the
+  // model the agent was just offered can be one this host has not
+  // fetched yet. Refresh once and re-read — both the card and every
+  // binding below then come from the same, newer catalogue.
+  let view = catalogView(deps.catalog);
+  let card = view.image.cardById(modelId);
+  if (!card && deps.catalog?.refreshable) {
+    await deps.catalog.refreshOnMiss();
+    view = catalogView(deps.catalog);
+    card = view.image.cardById(modelId);
+  }
   // Unknown id, or a non-curated card (legacy / not universal) — not part of
   // the v1 BYOK image surface.
   if (!card || !card.listed) {

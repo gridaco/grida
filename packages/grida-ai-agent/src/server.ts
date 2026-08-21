@@ -57,7 +57,10 @@ import { StreamRegistry } from "./runtime/stream-registry";
 import { defaultScratchBase, sweepScratch } from "./session/scratch";
 import { DirectoryScopeRegistry } from "./session/directory-scopes";
 import { ProviderHttp, type ProviderHttpTransport } from "./providers/http";
-import { ModelCatalogStore } from "./providers/model-catalog";
+import {
+  ModelCatalogStore,
+  type ModelCatalogStoreOptions,
+} from "./providers/model-catalog";
 import { models } from "@grida/ai-models";
 
 export {
@@ -667,7 +670,7 @@ const MODELS_FETCH_DISABLED_ENV = "GRIDA_AGENT_DISABLE_MODELS_FETCH";
  */
 function resolveCatalogOverride(
   hostSnapshot?: models.snapshot.Snapshot
-): { snapshot?: models.snapshot.Snapshot; base_url?: undefined } | object {
+): Pick<ModelCatalogStoreOptions, "snapshot"> {
   if (hostSnapshot) return { snapshot: hostSnapshot };
 
   const filePath = process.env[MODELS_PATH_ENV]?.trim();

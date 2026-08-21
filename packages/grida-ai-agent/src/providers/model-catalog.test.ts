@@ -301,18 +301,11 @@ describe("ModelCatalogStore — single-flight and rate limiting", () => {
       base_url: BASE_URL,
       fetch: serving(published(["acme/brand-new"])),
     });
-    await store.refreshOnMiss("acme/brand-new");
-    expect(store.view().modelSpecById("acme/brand-new")).toBeDefined();
+    await store.refreshOnMiss();
+    expect(store.view().has("acme/brand-new")).toBe(true);
   });
 
-  it("skips the network when the id is already known", async () => {
-    const fetchImpl = serving(published(["acme/one"]));
-    const store = make({ base_url: BASE_URL, fetch: fetchImpl });
-    await store.refreshOnMiss("openai/gpt-5.6-luna");
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
-
-  it("rate-limits repeated misses on a genuinely unknown id", async () => {
+  it("rate-limits repeated misses", async () => {
     let clock = 0;
     const fetchImpl = serving(published(["acme/one"]));
     const store = make({
@@ -320,14 +313,24 @@ describe("ModelCatalogStore — single-flight and rate limiting", () => {
       fetch: fetchImpl,
       now: () => clock,
     });
-    await store.refreshOnMiss("acme/never");
-    await store.refreshOnMiss("acme/never");
-    await store.refreshOnMiss("acme/never");
+    await store.refreshOnMiss();
+    await store.refreshOnMiss();
+    await store.refreshOnMiss();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
 
     clock += 30_000;
-    await store.refreshOnMiss("acme/never");
+    await store.refreshOnMiss();
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("is modality-agnostic — a media miss refreshes the same way", async () => {
+    // The store deliberately takes no id: an image card the renderer just
+    // offered is exactly as publishable-since-boot as a text model, and a
+    // text-only known-check would have made this a no-op.
+    const fetchImpl = serving(published(["acme/one"]));
+    const store = make({ base_url: BASE_URL, fetch: fetchImpl });
+    await store.refreshOnMiss();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -342,10 +345,10 @@ describe("ModelCatalogStore — pinned by the host", () => {
     store.start();
     expect(store.refreshable).toBe(false);
     expect(await store.refresh("boot")).toBe(false);
-    await store.refreshOnMiss("acme/remote");
+    await store.refreshOnMiss();
     expect(fetchImpl).not.toHaveBeenCalled();
-    expect(store.view().modelSpecById("acme/pinned")).toBeDefined();
-    expect(store.view().modelSpecById("acme/remote")).toBeUndefined();
+    expect(store.view().has("acme/pinned")).toBe(true);
+    expect(store.view().has("acme/remote")).toBe(false);
   });
 });
 

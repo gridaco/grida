@@ -134,18 +134,21 @@ export class ModelCatalogStore {
   }
 
   /**
-   * Self-heal after the gate rejected `modelId`: the model may have been
+   * Self-heal after a catalogue lookup missed: the model may have been
    * published since this host last looked. Rate-limited so a client
    * retrying a genuinely unknown id cannot spin up traffic.
    *
-   * Awaited by the gate, so the FIRST run of a newly published model
+   * Awaited by the caller, so the FIRST use of a newly published model
    * succeeds rather than 400-ing until some later refresh — which is the
    * moment the whole mechanism exists for.
+   *
+   * Takes no id, deliberately. The CALLER establishes the miss against
+   * whichever section it reads and re-checks after; a miss on an image id
+   * is the same story as a miss on a text id, and a store that only knew
+   * how to check text ids would quietly never self-heal the others.
    */
-  async refreshOnMiss(modelId: string): Promise<void> {
+  async refreshOnMiss(): Promise<void> {
     if (this.url === null || this.disposed) return;
-    // Already known ⇒ the caller's miss was about something else.
-    if (this.current.modelSpecById(modelId)) return;
     const inFlight = this.inFlight;
     if (inFlight) {
       await inFlight;
@@ -254,6 +257,24 @@ export class ModelCatalogStore {
     this.warned.add(key);
     console.warn(`[grida-agent] model catalogue: ${message}`);
   }
+}
+
+/**
+ * The catalogue a call site resolves against: the host's store when one is
+ * wired, the bundled seed otherwise.
+ *
+ * One definition on purpose. Every resolver, gate, and estimator needs the
+ * same "absent ⇒ bundled" rule, and a hand-inlined `?? models.snapshot.view()`
+ * at each of them is a rule stated N times — the shape that drifts the day
+ * one site starts defaulting to something else.
+ *
+ * Call it ONCE per decision and reuse the result: a background refresh can
+ * land between two calls, and a gate that admits from one catalogue while
+ * the factory resolves against another is exactly the skew this store
+ * exists to remove.
+ */
+export function catalogView(store?: ModelCatalogStore): models.snapshot.View {
+  return store?.view() ?? models.snapshot.view();
 }
 
 /** `null` for anything that is not an http(s) base URL we can extend. */

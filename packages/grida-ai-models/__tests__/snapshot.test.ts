@@ -306,6 +306,22 @@ describe("models.snapshot.view", () => {
     expect(view.modelSpecById("acme/nope")).toBeUndefined();
   });
 
+  it("separates EXACT membership from the fuzzy lookup", () => {
+    // Two questions, deliberately not the same one. `modelSpecById` says
+    // "which model is this id about" — right for limits and rates, where
+    // a bare or date-suffixed id is still that model. `has` says "is this
+    // id in the catalogue" — the question a gate asks, because whatever
+    // passes a gate is handed to a provider verbatim, and a provider only
+    // knows the exact id.
+    const view = snapshot.view();
+    expect(view.has("openai/gpt-5.6-luna")).toBe(true);
+    for (const nearMiss of ["gpt-5.6-luna", "gpt-5.6-luna-2026-07-30"]) {
+      expect(view.modelSpecById(nearMiss)).toBeDefined();
+      expect(view.has(nearMiss)).toBe(false);
+    }
+    expect(view.has("acme/nope")).toBe(false);
+  });
+
   it("resolves a model the bundled catalogue has never heard of", () => {
     // The whole point: a published snapshot reaches an installed binary.
     const fresh = spec("acme/brand-new", { contextWindow: 42_000 });

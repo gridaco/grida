@@ -27,7 +27,7 @@
  */
 
 import { models, TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models";
-import type { ModelCatalogStore } from "./model-catalog";
+import { catalogView, type ModelCatalogStore } from "./model-catalog";
 import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
 import type { SecretsStore } from "@grida/daemon/server";
@@ -151,15 +151,6 @@ export type ResolveDeps = {
   catalog?: ModelCatalogStore;
 };
 
-/**
- * The catalogue view for a resolution — the store's if the host wired
- * one, the bundled seed otherwise. Read once per resolution so a refresh
- * mid-resolution cannot make the gate and the factory disagree.
- */
-function catalogView(deps: ResolveDeps): models.snapshot.View {
-  return deps.catalog?.view() ?? models.snapshot.view();
-}
-
 export type ResolveOptions = {
   /**
    * Optional caller override. If set, precedence is skipped and only the
@@ -179,7 +170,7 @@ export async function resolveProvider(
   }
   // One read for the whole resolution: a mid-resolution refresh must not
   // let the gate and the provider choice disagree about the catalogue.
-  const view = catalogView(deps);
+  const view = catalogView(deps.catalog);
 
   // A connected ChatGPT subscription is the zero-dollar onboarding path.
   // Model compatibility is checked before precedence: a catalog model not
@@ -209,7 +200,7 @@ export async function resolveProvider(
           provider.id,
           key,
           deps.provider_http,
-          () => catalogView(deps).tier_model_ids
+          () => catalogView(deps.catalog).tier_model_ids
         );
       }
     }
@@ -241,7 +232,7 @@ async function resolveExplicit(
   deps: ResolveDeps,
   modelId?: string
 ): Promise<ResolvedProvider> {
-  const view = catalogView(deps);
+  const view = catalogView(deps.catalog);
   if (isChatGptProviderId(providerId)) {
     const resolved = await maybeResolveChatGpt(deps, modelId);
     if (!resolved) throw new ProviderUnavailableError(providerId);
@@ -272,7 +263,7 @@ async function resolveExplicit(
       providerId,
       key,
       deps.provider_http,
-      () => catalogView(deps).tier_model_ids
+      () => catalogView(deps.catalog).tier_model_ids
     );
   }
   const endpoint = await deps.endpoints?.get(providerId);
@@ -320,7 +311,7 @@ function maybeResolveGg(deps: ResolveDeps): ResolvedProvider | null {
       // The STORE, not a snapshot of it: a background subagent asks for
       // its tier long after resolution, and must get the model the
       // catalogue names then.
-      () => catalogView(deps).tier_model_ids
+      () => catalogView(deps.catalog).tier_model_ids
     ),
   };
 }
@@ -403,10 +394,15 @@ async function maybeResolveEndpoint(
 /**
  * Whether the model is one this host's catalogue carries. `undefined`
  * (no explicit pick) is always in — the tier decides the model then.
+ *
+ * EXACT (`view.has`), not `modelSpecById`: the id that passes here is the
+ * id handed to the provider factory verbatim, so a bare or date-suffixed
+ * near-miss must fail this test rather than route to a provider that has
+ * never heard of it.
  */
 function isCatalogModel(
   view: models.snapshot.View,
   modelId: string | undefined
 ): boolean {
-  return modelId === undefined || view.modelSpecById(modelId) !== undefined;
+  return modelId === undefined || view.has(modelId);
 }

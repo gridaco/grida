@@ -22,7 +22,7 @@ import { makeVideoModelFor } from "./video-byok";
 import { GridaGatewayVideoModel } from "./gg-media";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import type { ProviderHttp } from "./http";
-import type { ModelCatalogStore } from "./model-catalog";
+import { catalogView, type ModelCatalogStore } from "./model-catalog";
 
 type VideoProvider = models.video.VideoProvider;
 
@@ -116,9 +116,16 @@ export async function resolveVideoModel(
   options: ResolveVideoOptions = {}
 ): Promise<ResolvedVideoModel> {
   // One read for the whole resolution: a mid-resolution refresh must not
-  // let the listed-gate and the binding lookup disagree.
-  const view = deps.catalog?.view() ?? models.snapshot.view();
-  const card = view.video.cardById(modelId);
+  // let the listed-gate and the binding lookup disagree — with a single
+  // exception for a MISS, which may just mean this host has not fetched
+  // the catalogue the renderer offered from. See `resolveImageModel`.
+  let view = catalogView(deps.catalog);
+  let card = view.video.cardById(modelId);
+  if (!card && deps.catalog?.refreshable) {
+    await deps.catalog.refreshOnMiss();
+    view = catalogView(deps.catalog);
+    card = view.video.cardById(modelId);
+  }
   if (!card || !card.listed) {
     throw new VideoModelUnavailableError(modelId, options.explicit);
   }

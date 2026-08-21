@@ -10,8 +10,10 @@
 
 import crypto from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { models } from "@grida/ai-models";
-import type { ModelCatalogStore } from "../providers/model-catalog";
+import {
+  catalogView,
+  type ModelCatalogStore,
+} from "../providers/model-catalog";
 import {
   SCRATCH_SEED_LIMITS,
   type AgentModelId,
@@ -119,11 +121,6 @@ export type ParseRunBodyDeps = {
   catalog?: ModelCatalogStore;
 };
 
-/** The catalogue backing the gate — the host's if wired, else bundled. */
-function catalogView(deps: ParseRunBodyDeps): models.snapshot.View {
-  return deps.catalog?.view() ?? models.snapshot.view();
-}
-
 /**
  * Whether this host's catalogue carries `modelId`, refreshing once if it
  * does not.
@@ -141,10 +138,10 @@ async function isCatalogueModelId(
   modelId: string,
   deps: ParseRunBodyDeps
 ): Promise<boolean> {
-  if (catalogView(deps).modelSpecById(modelId) !== undefined) return true;
+  if (catalogView(deps.catalog).has(modelId)) return true;
   if (!deps.catalog?.refreshable) return false;
-  await deps.catalog.refreshOnMiss(modelId);
-  return catalogView(deps).modelSpecById(modelId) !== undefined;
+  await deps.catalog.refreshOnMiss();
+  return catalogView(deps.catalog).has(modelId);
 }
 
 export async function parseRunBody(
@@ -614,12 +611,12 @@ async function isModelAvailableFromProvider(
   if (isGgProviderId(providerId)) {
     // No refresh here: the model gate above already ran, and a second
     // miss on the same request means the tuple is wrong, not stale.
-    return catalogView(deps).modelSpecById(modelId) !== undefined;
+    return catalogView(deps.catalog).has(modelId);
   }
   if (isByokProviderId(providerId)) {
     return (
       TEXT_BYOK_PROVIDER_IDS.has(providerId) &&
-      catalogView(deps).modelSpecById(modelId) !== undefined
+      catalogView(deps.catalog).has(modelId)
     );
   }
   const endpoint = await deps.endpoints?.get(providerId);

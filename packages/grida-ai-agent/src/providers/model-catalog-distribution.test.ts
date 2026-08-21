@@ -155,6 +155,25 @@ describe("a model published after this binary shipped", () => {
     store.dispose();
   });
 
+  it("does not admit a near-miss of it — the gate is EXACT", async () => {
+    // `modelSpecById` matches a bare name and a date suffix, which is
+    // right for LIMITS and RATES and wrong here: whatever passes this
+    // gate is forwarded to the provider verbatim, and only an exact
+    // catalogue id is one the provider will recognize. Routing the
+    // catalogue through a view must not quietly widen it.
+    const store = await fetchedStore();
+    const bare = NEW_MODEL.split("/").slice(1).join("/");
+    expect(store.view().modelSpecById(bare)).toBeDefined(); // fuzzy: yes
+    expect(store.view().has(bare)).toBe(false); // gate: no
+
+    for (const nearMiss of [bare, `${NEW_MODEL}-2026-01-01`]) {
+      const result = await runGate(nearMiss, runDeps(store));
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).status).toBe(400);
+    }
+    store.dispose();
+  });
+
   it("still 400s when the published catalogue does not have it either", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const store = new ModelCatalogStore({
@@ -380,6 +399,33 @@ describe("an image model published after this binary shipped", () => {
     store.dispose();
   });
 
+  it("resolves on its FIRST use, by refreshing on the miss", async () => {
+    // The renderer builds the media tool's model list from its own
+    // deploy-fresh catalogue, so the model the agent was just handed can
+    // postdate this host's boot fetch. Text self-heals at the run gate;
+    // media has to self-heal here or the first generation 400s.
+    const fetchImpl = vi.fn<typeof fetch>(
+      async () =>
+        new Response(JSON.stringify(publishedMedia()), {
+          status: 200,
+        })
+    );
+    const store = new ModelCatalogStore({
+      base_url: BASE_URL,
+      fetch: fetchImpl,
+    });
+    // Deliberately NOT pre-fetched.
+    expect(store.view().image.cardById(NEW_IMAGE)).toBeUndefined();
+
+    const resolved = await resolveImageModel(
+      { secrets: fakeImageKey(), catalog: store },
+      NEW_IMAGE
+    );
+    expect(resolved.model_id).toBe(NEW_IMAGE);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    store.dispose();
+  });
+
   it("keeps image-to-image routing across the wire", async () => {
     // `binding.references` is the field whose loss is silent: i2i would
     // simply stop being offered, with no error anywhere.
@@ -423,6 +469,28 @@ describe("a video model published after this binary shipped", () => {
     await expect(
       resolveVideoModel({ secrets: fakeVideoKey() }, NEW_VIDEO)
     ).rejects.toThrow(VideoModelUnavailableError);
+  });
+
+  it("resolves on its FIRST use, by refreshing on the miss", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(
+      async () =>
+        new Response(JSON.stringify(publishedMedia()), {
+          status: 200,
+        })
+    );
+    const store = new ModelCatalogStore({
+      base_url: BASE_URL,
+      fetch: fetchImpl,
+    });
+    expect(store.view().video.cardById(NEW_VIDEO)).toBeUndefined();
+
+    const resolved = await resolveVideoModel(
+      { secrets: fakeVideoKey(), catalog: store },
+      NEW_VIDEO
+    );
+    expect(resolved.model_id).toBe(NEW_VIDEO);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    store.dispose();
   });
 
   it("resolves once the published catalogue is applied", async () => {

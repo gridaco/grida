@@ -23,7 +23,7 @@ import { createMaterializingSkillLoader } from "../skills/materialize";
 import type { SkillBodyLoader } from "../skills/types";
 import { AGENT_DEFAULT_MODE, type AgentMode } from "../protocol/mode";
 import type { SecretsStore } from "@grida/daemon/server";
-import { models } from "@grida/ai-models";
+import { catalogView } from "../providers/model-catalog";
 import {
   defaultImageModelId,
   hasUsableImageProvider,
@@ -431,10 +431,7 @@ function createImageGenerator(
       // hottest staleness point on the media surface. Resolve it through
       // the host's catalogue, not the bundled one.
       const modelId =
-        imageModelId ??
-        defaultImageModelId(
-          imageDeps.catalog?.view() ?? models.snapshot.view()
-        );
+        imageModelId ?? defaultImageModelId(catalogView(imageDeps.catalog));
       if (!modelId) {
         return {
           ok: false,

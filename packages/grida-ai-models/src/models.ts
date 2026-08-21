@@ -2632,6 +2632,18 @@ export namespace models {
       readonly catalog: Readonly<Record<string, text.ModelSpec>>;
       readonly tier_model_ids: Readonly<Record<ModelTier, string>>;
       readonly by_tier: Readonly<Record<ModelTier, text.ModelSpec>>;
+      /**
+       * Exact catalogue membership — `catalog[modelId] !== undefined`.
+       *
+       * This, NOT {@link modelSpecById}, is what a gate asks. The two
+       * differ on purpose: `modelSpecById` also matches a bare name and a
+       * date suffix, which is right when you want a model's LIMITS or
+       * RATES (a near-miss id is still that model), and wrong when you
+       * are deciding what id to forward to a provider — a provider is
+       * given the id the caller sent, and only an exact catalogue id is
+       * one it will recognize.
+       */
+      has(modelId: string): boolean;
       /** Same matching rules as {@link models.text.modelSpecById}. */
       modelSpecById(modelId: string): text.ModelSpec | undefined;
       /** Same precedence as {@link models.text.registry.resolve}. */
@@ -3354,6 +3366,7 @@ export namespace models {
           pro: catalog[tier_model_ids.pro],
           max: catalog[tier_model_ids.max],
         },
+        has: (modelId) => Object.hasOwn(catalog, modelId),
         modelSpecById: (modelId) => specByIdOver(specs, modelId),
         resolve: (modelId, custom) => resolveOver(specs, modelId, custom),
         // A snapshot without a media section falls back to the bundled

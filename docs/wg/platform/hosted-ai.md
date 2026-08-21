@@ -269,12 +269,12 @@ The catalogue is therefore **published, not shipped**: authored in-repo
   discarded entirely — a half-applied catalogue must not exist. A valid one
   REPLACES the catalogue rather than merging: removing a model is the kill
   switch, and a merge would defeat it on every installed client.
-- **Credential-free, and outside `/api/v1/ai/**`.** A desktop sidecar
-fetches this at boot, long before a renderer can push a signed-in
-session token, so the route must accept no credential — and
-`GRIDA-SEC-006`binds the`/api/v1/ai/\*\*`glob to`verifyGgToken`
+- **Credential-free, and outside the token-gated glob.** A desktop
+  sidecar fetches this at boot, long before a renderer can push a
+  signed-in session token, so the route must accept no credential — while
+  `GRIDA-SEC-006` binds every `api/v1/ai` route to `verifyGgToken`
   exclusively. Accepting no credential is stronger than accepting the
-  wrong one, but only while the route stays out of that glob.
+  wrong one, but only while this route stays outside that family.
 - **Pricing is included, deliberately.** The "no pricing" rule on
   `/api/v1/ai/models` guards the OpenAI-compatible surface against
   client-side cost math drifting from the billing rail. This payload is
@@ -282,11 +282,24 @@ session token, so the route must accept no credential — and
   withholding rates is what would cause drift. The same numbers are
   already public on the models page and in the pricing docs.
 
-**Convergence.** A host refreshes at boot, on an interval, and once when
-its run gate misses. The gate miss is the load-bearing one: it is awaited
-in-request, so the FIRST run of a newly published model succeeds instead of
-failing until some later tick. A tier retarget produces no miss (the old
-target is still valid), so it converges on the interval instead.
+**Convergence.** A host refreshes at boot, on an interval, and once when a
+lookup misses. The miss refresh is the load-bearing one: it is awaited
+in-request, so the FIRST use of a newly published model succeeds instead of
+failing until some later tick. It is deliberately modality-agnostic — an
+image card the renderer just offered is exactly as publishable-since-boot
+as a text model, and both are reached through a picker served fresh from
+grida.co. A tier retarget produces no miss (the old target is still
+valid), so it converges on the interval instead.
+
+**Membership is asked exactly; identity is asked loosely.** A view answers
+two different questions and a call site must not confuse them. `has` is
+exact catalogue membership — the question a GATE asks, because whatever
+passes a gate is forwarded to a provider verbatim and only an exact
+catalogue id is one the provider recognizes. `modelSpecById` also matches
+a bare name and a date suffix — right when asking for a model's LIMITS or
+RATES, where a near-miss id is still that model. Using the loose one to
+gate silently widens what the host admits and converts a clean
+"unknown model" rejection into a provider-level failure mid-run.
 
 **Schema.** Additive changes do not bump the schema major — clients ignore
 fields they do not know, so a new optional field is safe to publish. A
@@ -303,6 +316,17 @@ the consumer falls back to its bundled catalogue for that modality only.
 Only `text` is load-bearing enough to reject the whole payload, because a
 host with no text catalogue cannot run a turn at all. A broken image
 catalogue must never cost a host its ability to answer.
+
+**Not every modality is published yet.** `text`, `image`, and `video` are.
+Music, sound effects, and 3D are still gated against the host's BUNDLED
+catalogue (`v.oneOf(models.audio.music.model_ids)` and its siblings in
+`packages/grida-ai-agent/src/http/routes/`), so adding a model in those
+families still needs a desktop release. That is a known gap, not a
+decision that they belong on a different mechanism: each one wants a
+section, a validator, and a route reading through the view, exactly as
+image and video got. Worth doing when one of those catalogues starts
+moving; the schema is additive, so publishing a new section does not
+disturb clients that ignore it.
 
 **Closed vocabularies are validated as text on the wire.** Model vendor,
 speed label, and the like are closed unions in TypeScript but are accepted

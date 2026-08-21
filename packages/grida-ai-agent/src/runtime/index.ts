@@ -105,7 +105,7 @@ import { buildReplayPrefix } from "./replay-prefix";
 import type { ChatMessageWithParts } from "../session/rows";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
-import { models } from "@grida/ai-models";
+import { catalogView } from "../providers/model-catalog";
 import { isChatGptProviderId } from "../protocol/chatgpt";
 import { tierModelId as chatGptTierModelId } from "../providers/chatgpt";
 
@@ -811,7 +811,7 @@ export class AgentRuntime {
   private async limitsResolver(): Promise<LimitsResolution> {
     // One read for the whole resolution, so every limit in a single
     // compaction decision comes from the same catalogue.
-    const view = this.catalogView();
+    const view = catalogView(this.deps.catalog);
     const endpoints = this.deps.endpoints;
     if (!endpoints) {
       return {
@@ -846,11 +846,6 @@ export class AgentRuntime {
     return { resolve, configs };
   }
 
-  /** The catalogue this runtime resolves against; bundled when unwired. */
-  private catalogView(): models.snapshot.View {
-    return this.deps.catalog?.view() ?? models.snapshot.view();
-  }
-
   /**
    * The summarizer's input cap for a session (issue #806). The compactor
    * subagent asks for the `nano` tier, but the model a tier resolves to is
@@ -875,7 +870,7 @@ export class AgentRuntime {
     if (isChatGptProviderId(providerId)) {
       const config = this.deps.chatgpt?.config;
       if (!config) return undefined;
-      const spec = this.catalogView().modelSpecById(
+      const spec = catalogView(this.deps.catalog).modelSpecById(
         chatGptTierModelId(config, COMPACTOR_TIER)
       );
       // A subscription id the catalogue doesn't carry has no window to cap
@@ -888,7 +883,7 @@ export class AgentRuntime {
       // compaction's bundled default) is what lets a published tier
       // retarget resize the summarizer on an already-shipped binary.
       return clampSummarizerCap(
-        this.catalogView().by_tier[COMPACTOR_TIER].contextWindow
+        catalogView(this.deps.catalog).by_tier[COMPACTOR_TIER].contextWindow
       );
     }
     // Limits of the endpoint's DEFAULT model (what `nano` resolves to):
