@@ -220,6 +220,35 @@ describe("costMillsFromTokenUsage", () => {
     );
   });
 
+  it("keeps Gemini 3.1 Pro base rates at the 200K input boundary", () => {
+    // The band is strictly-greater-than, so 200,000 exactly is still base.
+    const mills = costMillsFromTokenUsage("google/gemini-3.1-pro-preview", {
+      inputTokens: { total: 200_000, noCache: 150_000, cacheRead: 50_000 },
+      outputTokens: { total: 10_000 },
+    });
+
+    expect(mills).toBeCloseTo(
+      ((150_000 * 2 + 50_000 * 0.2 + 10_000 * 12) / 1_000_000) * 1000
+    );
+  });
+
+  it("bands Gemini 3.1 Pro above 200K input, cache reads included", () => {
+    // `inputMultiplier` covers every input bucket, so above the band the
+    // effective rates are Google's published $4 in / $0.40 cacheRead /
+    // $18 out. That the catalogue figures multiply out to those numbers is
+    // pinned on the catalogue itself, in `models.test.ts` — asserting it a
+    // second time here would just be this same expression, undistributed.
+    const mills = costMillsFromTokenUsage("google/gemini-3.1-pro-preview", {
+      inputTokens: { total: 200_001, noCache: 150_001, cacheRead: 50_000 },
+      outputTokens: { total: 10_000 },
+    });
+
+    expect(mills).toBeCloseTo(
+      (((150_001 * 2 + 50_000 * 0.2) * 2 + 10_000 * 12 * 1.5) / 1_000_000) *
+        1000
+    );
+  });
+
   it("throws on unknown model id", () => {
     expect(() =>
       costMillsFromTokenUsage("acme/totally-fake-model", {
