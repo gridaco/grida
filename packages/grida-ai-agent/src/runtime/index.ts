@@ -105,6 +105,7 @@ import { buildReplayPrefix } from "./replay-prefix";
 import type { ChatMessageWithParts } from "../session/rows";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
+import type { models } from "@grida/ai-models";
 import { catalogView } from "../providers/model-catalog";
 import { isChatGptProviderId } from "../protocol/chatgpt";
 import { tierModelId as chatGptTierModelId } from "../providers/chatgpt";
@@ -321,6 +322,8 @@ type ResolvedProvider = Awaited<ReturnType<typeof resolveProvider>>;
 type LimitsResolution = {
   resolve: ResolveModelLimits;
   configs: readonly EndpointProviderConfig[];
+  /** The catalogue every limit in this resolution was sized against. */
+  view: models.snapshot.View;
 };
 
 /**
@@ -817,6 +820,7 @@ export class AgentRuntime {
       return {
         resolve: (model) => resolveModelLimits(model, undefined, view),
         configs: [],
+        view,
       };
     }
     const configs = await endpoints.list();
@@ -843,7 +847,7 @@ export class AgentRuntime {
       }
       return resolveModelLimits(effective, applicableCustom, view);
     };
-    return { resolve, configs };
+    return { resolve, configs, view };
   }
 
   /**
@@ -870,7 +874,7 @@ export class AgentRuntime {
     if (isChatGptProviderId(providerId)) {
       const config = this.deps.chatgpt?.config;
       if (!config) return undefined;
-      const spec = catalogView(this.deps.catalog).modelSpecById(
+      const spec = limits.view.modelSpecById(
         chatGptTierModelId(config, COMPACTOR_TIER)
       );
       // A subscription id the catalogue doesn't carry has no window to cap
@@ -883,7 +887,7 @@ export class AgentRuntime {
       // compaction's bundled default) is what lets a published tier
       // retarget resize the summarizer on an already-shipped binary.
       return clampSummarizerCap(
-        catalogView(this.deps.catalog).by_tier[COMPACTOR_TIER].contextWindow
+        limits.view.by_tier[COMPACTOR_TIER].contextWindow
       );
     }
     // Limits of the endpoint's DEFAULT model (what `nano` resolves to):

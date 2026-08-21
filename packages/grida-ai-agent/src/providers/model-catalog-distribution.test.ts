@@ -7,7 +7,7 @@
  * Every test here would fail against the pre-store code — that is the
  * point. `model-catalog.test.ts` covers the store's own failure modes.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { models } from "@grida/ai-models";
 import { ModelCatalogStore } from "./model-catalog";
 import { resolveProvider, type ResolveDeps } from "./index";
@@ -23,6 +23,12 @@ import { baseCostUsdFromMessageUsage } from "../session/cost";
 import { resolveModelLimits } from "../session/compaction";
 import type { SecretsStore } from "@grida/daemon/server";
 import type { ChatModel } from "../session/rows";
+
+// A spy restored only on the happy path stays live for the REST of the file
+// if an assertion throws — silencing warnings a later test may depend on.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 /** A model no bundled catalogue has ever carried. */
 const NEW_MODEL = "acme/published-after-release";
@@ -204,7 +210,6 @@ describe("a model published after this binary shipped", () => {
     expect(result).toBeInstanceOf(Response);
     expect((result as Response).status).toBe(400);
     store.dispose();
-    vi.restoreAllMocks();
   });
 
   it("resolves through the hosted provider tuple gate", async () => {

@@ -122,9 +122,24 @@ export class ModelCatalogStore {
    */
   refresh(reason: RefreshReason): Promise<boolean> {
     if (this.url === null || this.disposed) return Promise.resolve(false);
-    this.inFlight ??= this.refreshOnce(reason).finally(() => {
-      this.inFlight = null;
-    });
+    this.inFlight ??= this.refreshOnce(reason)
+      // "Never rejects" has to be enforced, not just documented: the
+      // validator and the host's `on_change` listener are both outside
+      // this file's control, and `start()` fires this with `void` — an
+      // escaping rejection would be an unhandled rejection on a timer.
+      // `refreshOnMiss` awaits the same promise, so it would also surface
+      // on the run gate.
+      .catch((err) => {
+        this.warnOnce(
+          "apply",
+          `could not apply the published catalogue (${describe(err)}); ` +
+            `continuing on the ${this.currentRaw ? "last published" : "bundled"} catalogue`
+        );
+        return false;
+      })
+      .finally(() => {
+        this.inFlight = null;
+      });
     return this.inFlight;
   }
 
@@ -224,6 +239,15 @@ export class ModelCatalogStore {
     return true;
   }
 
+  /**
+   * The response body, refusing to buffer more than {@link MAX_BODY_BYTES}.
+   *
+   * Read through the stream rather than `res.text()`: `content-length` is
+   * optional, so a chunked response would otherwise be buffered in full
+   * before any check could reject it — bounded only by the fetch timeout.
+   * Counted in BYTES off the wire, not in string length, which counts
+   * UTF-16 code units and so under-counts every multi-byte character.
+   */
   private async fetchBody(url: string): Promise<string> {
     const res = await this.fetchImpl(url, {
       method: "GET",
@@ -235,11 +259,27 @@ export class ModelCatalogStore {
     if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
       throw new Error(`body too large (${declared} bytes)`);
     }
-    const body = await res.text();
-    if (body.length > MAX_BODY_BYTES) {
-      throw new Error(`body too large (${body.length} bytes)`);
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("response had no body");
+    // `stream: true` per chunk, then a final flush: a multi-byte character
+    // split across two chunks must not decode to a replacement character.
+    const decoder = new TextDecoder();
+    let bytes = 0;
+    let body = "";
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > MAX_BODY_BYTES) {
+          throw new Error(`body too large (over ${MAX_BODY_BYTES} bytes)`);
+        }
+        body += decoder.decode(value, { stream: true });
+      }
+    } finally {
+      await reader.cancel().catch(() => {});
     }
-    return body;
+    return body + decoder.decode();
   }
 
   /**

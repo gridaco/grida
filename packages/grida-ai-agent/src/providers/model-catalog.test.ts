@@ -261,6 +261,66 @@ describe("ModelCatalogStore — failure is never fatal", () => {
     expect(await store.refresh("boot")).toBe(false);
   });
 
+  it("stops reading an oversized body that declares no length", async () => {
+    // The bound has to hold while READING: `content-length` is optional,
+    // so a chunked response would otherwise be buffered in full before any
+    // check could reject it. Counted in bytes off the wire.
+    warn();
+    let pushed = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pushed += 64_000;
+        controller.enqueue(new Uint8Array(64_000).fill(0x61));
+        // A body that never ends: only the byte bound can stop this.
+        if (pushed > 8_000_000) controller.close();
+      },
+    });
+    const store = make({
+      base_url: BASE_URL,
+      fetch: fetching(async () => new Response(body, { status: 200 })),
+    });
+    expect(await store.refresh("boot")).toBe(false);
+    // Bounded well below what the stream was willing to produce.
+    expect(pushed).toBeLessThanOrEqual(2_000_000);
+  });
+
+  it("decodes a multi-byte character split across two chunks", async () => {
+    // A naive per-chunk decode turns the split character into U+FFFD and
+    // the payload silently fails to parse.
+    const json = JSON.stringify(published(["acme/one"], "héllo-✓"));
+    const bytes = new TextEncoder().encode(json);
+    const cut = bytes.indexOf(0xe2) + 1; // mid-way through the ✓
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, cut));
+        controller.enqueue(bytes.slice(cut));
+        controller.close();
+      },
+    });
+    const store = make({
+      base_url: BASE_URL,
+      fetch: fetching(async () => new Response(body, { status: 200 })),
+    });
+    expect(await store.refresh("boot")).toBe(true);
+    expect(store.view().has("acme/one")).toBe(true);
+  });
+
+  it("never rejects, even when the host's on_change listener throws", async () => {
+    // `start()` fires refresh with `void`, so an escaping rejection would
+    // be an unhandled rejection on a timer; `refreshOnMiss` awaits the
+    // same promise, so it would also surface on the run gate.
+    warn();
+    const store = make({
+      base_url: BASE_URL,
+      fetch: serving(published(["acme/one"])),
+      on_change: () => {
+        throw new Error("listener blew up");
+      },
+    });
+    await expect(store.refresh("boot")).resolves.toBe(false);
+    await expect(store.refreshOnMiss()).resolves.toBeUndefined();
+  });
+
   it("warns once per failure kind, not once per attempt", async () => {
     const spy = warn();
     const store = make({
