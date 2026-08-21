@@ -49,6 +49,11 @@ answer table.
 | Repo-root `*.md` (GitHub) | docs / source                    | relative works on GitHub but lands on raw `.md`; use the **hosted docs URL** when you mean the rendered doc |
 | Any                       | external                         | `https://…` as-is                                                                                           |
 
+For public `grida.co` pages physically owned by `(www)`, consult the
+[`(www)` route register](<../../../editor/app/(www)/README.md>) for why a URL
+exists and where its CTA/funnel is intended to lead. This skill still owns the
+link form that resolves correctly on the rendered host.
+
 ## Grida URLs
 
 The only first-party hosts. Build every absolute link from these — if a

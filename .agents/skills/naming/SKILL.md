@@ -197,6 +197,10 @@ chrome, analytics, and deployability story. Adding a group is an
 architectural commitment; if it's a new feature for an existing
 reader, it belongs inside an existing group.
 
+For `(www)`, adding, removing, or renaming a route—or changing its UX/CTA
+umbrella—also updates the canonical
+[`(www)` route register](<../../../editor/app/(www)/README.md>) in the same PR.
+
 ## The short version
 
 - Name first. If you can't name it, you don't understand it yet.

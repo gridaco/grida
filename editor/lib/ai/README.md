@@ -4,6 +4,11 @@ Start here when adding a playable AI surface to the web app. The public â€œgateâ
 is a composition of existing modules; no single client component is the payment
 authority.
 
+The canonical inventory for public pages physically owned by `(www)` is
+[`app/(www)/README.md`](<../../app/(www)/README.md>). It records each page's
+user-visible CTA, gate/recovery path, funnel outcome, crawl state, and lifecycle;
+this document remains authoritative for the AI execution topology itself.
+
 ## Sources of truth
 
 | Concern                                                     | Source                                                                     |
