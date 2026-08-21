@@ -471,9 +471,9 @@ export namespace models {
           output: 12,
           cacheRead: 0.2,
           // Google bills the full request at $4 in / $18 out / $0.40
-          // cacheRead above 200K tokens. cacheRead doubling is not
-          // expressible here — a gap this shape has for every model that
-          // bands, including the OpenAI entries above.
+          // cacheRead above 200K tokens. `inputMultiplier` covers every
+          // input bucket, so cacheRead 0.2 x 2 lands on $0.40 without a
+          // separate field.
           // https://ai.google.dev/gemini-api/docs/pricing
           longContext: {
             inputTokensAbove: 200_000,

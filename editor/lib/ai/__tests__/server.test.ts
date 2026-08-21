@@ -220,6 +220,36 @@ describe("costMillsFromTokenUsage", () => {
     );
   });
 
+  it("keeps Gemini 3.1 Pro base rates at the 200K input boundary", () => {
+    // The band is strictly-greater-than, so 200,000 exactly is still base.
+    const mills = costMillsFromTokenUsage("google/gemini-3.1-pro-preview", {
+      inputTokens: { total: 200_000, noCache: 150_000, cacheRead: 50_000 },
+      outputTokens: { total: 10_000 },
+    });
+
+    expect(mills).toBeCloseTo(
+      ((150_000 * 2 + 50_000 * 0.2 + 10_000 * 12) / 1_000_000) * 1000
+    );
+  });
+
+  it("bands Gemini 3.1 Pro above 200K input, cache reads included", () => {
+    // `inputMultiplier` covers every input bucket, so the cache-read rate
+    // above the band is 0.2 x 2 = $0.40/MTok — the figure Google publishes.
+    const mills = costMillsFromTokenUsage("google/gemini-3.1-pro-preview", {
+      inputTokens: { total: 200_001, noCache: 150_001, cacheRead: 50_000 },
+      outputTokens: { total: 10_000 },
+    });
+
+    expect(mills).toBeCloseTo(
+      (((150_001 * 2 + 50_000 * 0.2) * 2 + 10_000 * 12 * 1.5) / 1_000_000) *
+        1000
+    );
+    // Stated as a rate, not just a total: $0.40 is the published number.
+    expect(mills).toBeCloseTo(
+      ((150_001 * 4 + 50_000 * 0.4 + 10_000 * 18) / 1_000_000) * 1000
+    );
+  });
+
   it("throws on unknown model id", () => {
     expect(() =>
       costMillsFromTokenUsage("acme/totally-fake-model", {
