@@ -339,6 +339,45 @@ describe("ModelCatalogStore — failure is never fatal", () => {
     expect(await store.refresh("interval")).toBe(false);
   });
 
+  it("releases the response body on every early exit", async () => {
+    // An undici body neither read nor cancelled holds its stream open, and
+    // both paths here are routine: a 404 is the documented state for a
+    // rolled-back editor, and this store retries on a timer forever.
+    warn();
+    const cancelled: string[] = [];
+    const bodyFor = (label: string) =>
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array(8));
+        },
+        cancel() {
+          cancelled.push(label);
+        },
+      });
+
+    const notFound = make({
+      base_url: BASE_URL,
+      fetch: fetching(
+        async () => new Response(bodyFor("404"), { status: 404 })
+      ),
+    });
+    expect(await notFound.refresh("boot")).toBe(false);
+
+    const tooBig = make({
+      base_url: BASE_URL,
+      fetch: fetching(
+        async () =>
+          new Response(bodyFor("declared"), {
+            status: 200,
+            headers: { "content-length": String(10_000_000) },
+          })
+      ),
+    });
+    expect(await tooBig.refresh("boot")).toBe(false);
+
+    expect(cancelled.sort()).toEqual(["404", "declared"]);
+  });
+
   it("warns once per failure kind, not once per attempt", async () => {
     const spy = warn();
     const store = make({

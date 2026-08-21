@@ -268,10 +268,19 @@ export class ModelCatalogStore {
       headers: { accept: "application/json" },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // Every early exit cancels the body first. An undici response whose
+    // body is neither read nor cancelled holds its stream open, and the
+    // two paths below are the ROUTINE ones: a 404 is the documented state
+    // for a rolled-back or self-hosted-old editor, and this store retries
+    // on a timer forever.
+    const bail = async (message: string): Promise<never> => {
+      await res.body?.cancel().catch(() => {});
+      throw new Error(message);
+    };
+    if (!res.ok) return bail(`HTTP ${res.status}`);
     const declared = Number(res.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
-      throw new Error(`body too large (${declared} bytes)`);
+      return bail(`body too large (${declared} bytes)`);
     }
     const reader = res.body?.getReader();
     if (!reader) throw new Error("response had no body");
