@@ -37,15 +37,6 @@ export namespace aiModelPages {
       href: `/playground/image?model=${string}`;
     };
 
-  export type EditorialContent = {
-    /** Model-specific prose; catalogue summaries alone are not page content. */
-    overview: string;
-    capabilities: readonly {
-      title: string;
-      description: string;
-    }[];
-  };
-
   export type Entry = {
     /** Stable, lowercase, human-readable URL segment. */
     slug: string;
@@ -69,8 +60,14 @@ export namespace aiModelPages {
       title: string;
       description: string;
       keywords: readonly string[];
+      /** Public model output used when this page is shared. */
+      image: {
+        src: `/${string}`;
+        width: number;
+        height: number;
+        alt: string;
+      };
     };
-    content: EditorialContent;
     demo: Demo;
   };
 
@@ -98,34 +95,19 @@ export namespace aiModelPages {
       metadata: {
         title: "GPT Image 2 AI Image Generator — Grida",
         description:
-          "Generate images with OpenAI GPT Image 2 in Grida. Review its output sizes and published pricing, then try it with organization AI credit.",
+          "Generate with OpenAI GPT Image 2 in Grida. Explore real outputs and an exact prompt, compare sizes and pricing, then open the image playground.",
         keywords: [
           "gpt image 2",
           "gpt image 2 generator",
           "openai image generator",
           "ai image generator",
         ],
-      },
-      content: {
-        overview:
-          "GPT Image 2 is OpenAI’s current image model for generation and editing. This Grida demo exposes its text-to-image path, placing generated results directly on a canvas where you can compare prompts and outputs.",
-        capabilities: [
-          {
-            title: "Prompt-to-image generation",
-            description:
-              "Describe an image in natural language and generate a new visual directly in the Grida playground.",
-          },
-          {
-            title: "Flexible output geometry",
-            description:
-              "The model supports square, portrait, and landscape presets, plus custom dimensions inside its published size envelope.",
-          },
-          {
-            title: "Generation and editing model",
-            description:
-              "GPT Image 2 supports both new-image generation and provider-specific reference editing. The current Grida demo is text-to-image only.",
-          },
-        ],
+        image: {
+          src: "/ai/music/showcase/neon-honey-rush.webp",
+          width: 1024,
+          height: 1024,
+          alt: "A luminous glass heart filled with honey, generated with GPT Image 2",
+        },
       },
       demo: {
         runner: "image-playground",

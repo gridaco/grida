@@ -4,7 +4,7 @@ import Header from "@/www/header";
 import Footer from "@/www/footer";
 import { aiModelPages } from "@/www/data/ai-model-pages";
 import { modelMetadata } from "./model-metadata";
-import { ModelOverview } from "./model-overview";
+import { ModelPage } from "./model-page";
 
 type ModelPageProps = {
   params: Promise<{ slug: string }>;
@@ -35,7 +35,7 @@ export default async function AiModelPage({ params }: ModelPageProps) {
     <>
       <Header />
       <main>
-        <ModelOverview page={page} />
+        <ModelPage page={page} />
       </main>
       <Footer />
     </>

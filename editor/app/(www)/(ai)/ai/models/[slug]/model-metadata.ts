@@ -15,11 +15,20 @@ export function modelMetadata(page: aiModelPages.Entry): Metadata {
       description: page.metadata.description,
       type: "website",
       url: canonical,
+      images: [
+        {
+          url: page.metadata.image.src,
+          width: page.metadata.image.width,
+          height: page.metadata.image.height,
+          alt: page.metadata.image.alt,
+        },
+      ],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: page.metadata.title,
       description: page.metadata.description,
+      images: [page.metadata.image.src],
     },
   };
 }

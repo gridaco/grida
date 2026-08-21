@@ -41,14 +41,12 @@ describe("AI model SEO page inventory", () => {
       expect(page.metadata.title).toMatch(/ — Grida$/);
       expect(page.metadata.description.length).toBeLessThanOrEqual(160);
       expect(page.metadata.keywords.length).toBeGreaterThan(0);
+      expect(page.metadata.image.src).toMatch(/^\//);
+      expect(page.metadata.image.width).toBeGreaterThan(0);
+      expect(page.metadata.image.height).toBeGreaterThan(0);
+      expect(page.metadata.image.alt.trim()).not.toBe("");
       expect(page.publishReason.trim()).not.toBe("");
       expect(page.retireWhen.trim()).not.toBe("");
-      expect(page.content.overview.trim()).not.toBe("");
-      expect(page.content.capabilities.length).toBeGreaterThan(0);
-      for (const capability of page.content.capabilities) {
-        expect(capability.title.trim()).not.toBe("");
-        expect(capability.description.trim()).not.toBe("");
-      }
       expect(titles.has(page.metadata.title)).toBe(false);
       expect(descriptions.has(page.metadata.description)).toBe(false);
       titles.add(page.metadata.title);
