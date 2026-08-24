@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   FileUploader,
   FileUploaderTrigger,
@@ -16,6 +16,7 @@ import { DropzoneOptions } from "react-dropzone";
 import { UploadStatus, useFileUploader } from "./use-file-uploader";
 import type { FileUploaderFn } from "./uploader";
 import Image from "next/image";
+import { shouldBlockSubmitForFileUpload } from "./file-upload-validation";
 
 type Accept = {
   [key: string]: string[];
@@ -59,6 +60,8 @@ export const FileUploadField = ({
   onFilesChange,
   isMultipartFile,
 }: FileUploadDropzoneProps) => {
+  const uploadedFileValueRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (isMultipartFile) return;
     if (!uploader) {
@@ -69,7 +72,7 @@ export const FileUploadField = ({
   }, [isMultipartFile, uploader]);
 
   const [files, setFiles] = useState<File[]>([]);
-  const { getStatus, data } = useFileUploader({
+  const { getStatus, data, isUploading } = useFileUploader({
     files,
     uploader,
     autoUpload: true,
@@ -94,6 +97,45 @@ export const FileUploadField = ({
     () => data.map((info) => info.path).filter(Boolean) as string[],
     [data]
   );
+  const uploadedFilesValue = uploadedFilesPaths.join(",");
+
+  const shouldBlockSubmit = shouldBlockSubmitForFileUpload({
+    isMultipartFile,
+    selectedFilesCount: files.length,
+    uploadedFilesCount: uploadedFilesPaths.length,
+    isUploading,
+  });
+
+  const validationMessage = shouldBlockSubmit
+    ? "Please wait for the selected file upload to finish."
+    : "";
+
+  useEffect(() => {
+    uploadedFileValueRef.current?.setCustomValidity(validationMessage);
+  }, [validationMessage]);
+
+  useEffect(() => {
+    const input = uploadedFileValueRef.current;
+    const form = input?.form;
+
+    if (!input || !form || isMultipartFile) return;
+
+    const handleSubmit = (event: SubmitEvent) => {
+      if (!shouldBlockSubmit) return;
+
+      input.setCustomValidity(validationMessage);
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      input.reportValidity();
+    };
+
+    form.addEventListener("submit", handleSubmit, true);
+
+    return () => {
+      form.removeEventListener("submit", handleSubmit, true);
+    };
+  }, [isMultipartFile, shouldBlockSubmit, validationMessage]);
 
   return (
     <FileUploader
@@ -114,9 +156,10 @@ export const FileUploadField = ({
           />
           {!isMultipartFile && (
             <UploadedFileValue
+              ref={uploadedFileValueRef}
               name={name}
-              required={required}
-              value={uploadedFilesPaths}
+              required={required || shouldBlockSubmit}
+              value={uploadedFilesValue}
             />
           )}
         </>
