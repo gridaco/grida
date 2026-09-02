@@ -214,25 +214,25 @@ which is cheaper on every provider; this is not an upstream Recraft retirement.
 
 ### Image Sizes
 
-| Model                  | Min Size  | Max Size                            | Aspect Ratios |
-| ---------------------- | --------- | ----------------------------------- | ------------- |
-| GPT Image 2            | —         | edges ≤ 3840 px, ≤ 8.3M px total    | up to 3:1     |
-| GPT Image 1.5          | 1024x1024 | 1536x1536                           | 1:1, 2:3, 3:2 |
-| GPT Image Mini         | 1024x1024 | 1536x1536                           | 1:1, 2:3, 3:2 |
-| Gemini Flash Image     | —         | 1536x1536                           | Flexible      |
-| Gemini Flash Lite      | —         | 1024x1024 (1K only)                 | Flexible      |
-| Gemini Pro Image       | —         | 1536x1536                           | Flexible      |
-| Flux 2 Max             | 256x256   | 1440x1440                           | Flexible      |
-| Flux 2 Pro             | 256x256   | 1440x1440                           | Flexible      |
-| Flux Kontext Max       | —         | 1820x1820                           | Flexible      |
-| Flux Kontext Pro       | —         | 1820x1820                           | Flexible      |
-| Flux Pro 1.1           | 256x256   | 1440x1440                           | Flexible      |
-| Recraft V4.1           | —         | 2048x2048                           | Flexible      |
-| Recraft V3             | —         | 2048x2048                           | Flexible      |
-| Seedream 5.0 Pro       | 1024x1024 | 2048x2048                           | Flexible      |
-| Seedream 5.0 Lite      | —         | 4096x4096 (2K–4K; smaller upscaled) | Flexible      |
-| Grok Imagine Image 2.0 | —         | 2048x2048 (1K or 2K)                | Flexible      |
-| Muse Image 1.0         | —         | chosen by the model                 | 21:9 to 9:21  |
+| Model                  | Min Size  | Max Size                         | Aspect Ratios |
+| ---------------------- | --------- | -------------------------------- | ------------- |
+| GPT Image 2            | —         | edges ≤ 3840 px, ≤ 8.3M px total | up to 3:1     |
+| GPT Image 1.5          | 1024x1024 | 1536x1536                        | 1:1, 2:3, 3:2 |
+| GPT Image Mini         | 1024x1024 | 1536x1536                        | 1:1, 2:3, 3:2 |
+| Gemini Flash Image     | —         | 1536x1536                        | Flexible      |
+| Gemini Flash Lite      | —         | 1024x1024 (1K only)              | Flexible      |
+| Gemini Pro Image       | —         | 1536x1536                        | Flexible      |
+| Flux 2 Max             | 256x256   | 1440x1440                        | Flexible      |
+| Flux 2 Pro             | 256x256   | 1440x1440                        | Flexible      |
+| Flux Kontext Max       | —         | 1820x1820                        | Flexible      |
+| Flux Kontext Pro       | —         | 1820x1820                        | Flexible      |
+| Flux Pro 1.1           | 256x256   | 1440x1440                        | Flexible      |
+| Recraft V4.1           | —         | 2048x2048                        | Flexible      |
+| Recraft V3             | —         | 2048x2048                        | Flexible      |
+| Seedream 5.0 Pro       | 1.0 MP    | 4.2 MP (1024² to 2048² total px) | up to 16:1    |
+| Seedream 5.0 Lite      | 3.7 MP    | 16.8 MP (2560x1440 to 4096²)     | Flexible      |
+| Grok Imagine Image 2.0 | —         | 2048x2048 (1K or 2K)             | Flexible      |
+| Muse Image 1.0         | —         | chosen by the model              | 21:9 to 9:21  |
 
 ## Video Generation Models
 

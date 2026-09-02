@@ -1614,8 +1614,14 @@ export namespace models {
         speed_max: "30s",
         styles: null,
         sizes: null,
-        // fal: total pixels between 1024x1024 and 2048x2048.
-        constraints: { min_edge: 1024, max_edge: 2048 },
+        // fal: total pixels between 1024x1024 and 2048x2048, aspect ratio
+        // between 1:16 and 16:1 — an area bound, not a per-edge one, so a
+        // 512x2048 request is in-envelope and a 2048x2048 one is the ceiling.
+        constraints: {
+          min_pixels: 1_048_576,
+          max_pixels: 4_194_304,
+          aspect_ratio: { max: 16 },
+        },
         pricing: { type: "per_image_flat", usd: 0.035 },
         avg_cost_usd: 0.035,
         default: {
@@ -1665,12 +1671,15 @@ export namespace models {
         speed_max: "15s",
         styles: null,
         sizes: null,
-        constraints: { max_edge: 4096 },
+        // fal: total pixels between 2560x1440 and 4096x4096 (requests below
+        // the floor are scaled up to it); Vercel and OpenRouter serve 2K/4K
+        // only. An area envelope, so the default is a 2K request.
+        constraints: { min_pixels: 3_686_400, max_pixels: 16_777_216 },
         pricing: { type: "per_image_flat", usd: 0.035 },
         avg_cost_usd: 0.035,
         default: {
-          width: 1024,
-          height: 1024,
+          width: 2048,
+          height: 2048,
           aspect_ratio: "1:1",
         },
       },
