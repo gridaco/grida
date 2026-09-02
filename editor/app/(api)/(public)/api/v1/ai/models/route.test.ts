@@ -60,7 +60,10 @@ describe("GET /api/v1/ai/models", () => {
     ] as const) {
       expect(byId.get(id)?.grida).toMatchObject({ modality: "text", tier });
     }
-    for (const id of ["anthropic/claude-fable-5", "anthropic/claude-opus-5"]) {
+    for (const id of [
+      "anthropic/claude-fable-5.1",
+      "anthropic/claude-opus-5",
+    ]) {
       expect(byId.get(id)?.grida).toMatchObject({
         modality: "text",
         tier: null,
@@ -68,11 +71,16 @@ describe("GET /api/v1/ai/models", () => {
       });
     }
     // A deprecated catalogue card still lists, flagged.
-    expect(byId.get("anthropic/claude-opus-4.8")?.grida).toMatchObject({
-      modality: "text",
-      tier: null,
-      deprecated: true,
-    });
+    for (const id of [
+      "anthropic/claude-opus-4.8",
+      "anthropic/claude-fable-5",
+    ]) {
+      expect(byId.get(id)?.grida).toMatchObject({
+        modality: "text",
+        tier: null,
+        deprecated: true,
+      });
+    }
     // Every modality is represented.
     const modalities = new Set(body.data.map((e) => e.grida.modality));
     expect(modalities).toEqual(new Set(["text", "image", "video"]));
