@@ -140,6 +140,91 @@ describe("models.image provider-binding invariants", () => {
     });
   });
 
+  it("prices Flux 2 Pro and Max at the per-megapixel baseline every provider publishes", () => {
+    // Vercel model page, OpenRouter `cost_usd`/megapixel, fal "first megapixel"
+    // — all $0.03 (Pro) and $0.07 (Max), 2026-09-02. Pro's Vercel binding had
+    // shipped at $0.06: a 2x hosted over-billing.
+    for (const [id, usd] of [
+      ["bfl/flux-2-pro", 0.03],
+      ["bfl/flux-2-max", 0.07],
+    ] as const) {
+      const card = models.image.models[id]!;
+      expect(card.listed).toBe(true);
+      expect(card.pricing).toEqual({ type: "per_image_flat", usd });
+      for (const p of ["vercel", "fal", "openrouter"] as const) {
+        expect(models.image.binding(card, p)?.pricing).toEqual({
+          type: "per_image_flat",
+          usd,
+        });
+      }
+    }
+  });
+
+  it("lists Seedream 5.0 and deprecates 4.5", () => {
+    // Vercel feed `pricing.image` $0.035 for both 5.0 cards; fal $0.035 (Lite);
+    // OpenRouter `cost_usd` $0.035 (Lite) / $0.045 (Pro 1K). 4.5 is $0.04 on
+    // Vercel and fal — dominated by Lite on price and generation.
+    const lite = models.image.models["bytedance/seedream-5.0-lite"]!;
+    expect(lite.listed).toBe(true);
+    for (const p of ["vercel", "fal", "openrouter"] as const) {
+      expect(models.image.binding(lite, p)?.pricing).toEqual({
+        type: "per_image_flat",
+        usd: 0.035,
+      });
+    }
+    const pro = models.image.models["bytedance/seedream-5.0-pro"]!;
+    expect(pro.listed).toBe(true);
+    expect(models.image.binding(pro, "vercel")?.pricing).toEqual({
+      type: "per_image_flat",
+      usd: 0.035,
+    });
+    expect(models.image.models["bytedance/seedream-4.5"]).toMatchObject({
+      listed: false,
+      deprecated: true,
+    });
+  });
+
+  it("prices Grok Imagine Image 2.0 by the quality×size tiers all providers share", () => {
+    const grok = models.image.models["xai/grok-imagine-image-2.0"]!;
+    const tiers = {
+      "low/1024x1024": 0.04,
+      "medium/1024x1024": 0.06,
+      "low/2048x2048": 0.06,
+      "medium/2048x2048": 0.08,
+    };
+    expect(grok.listed).toBe(true);
+    expect(grok.pricing).toEqual({ type: "per_image_tiered", tiers });
+    for (const p of ["vercel", "fal", "openrouter"] as const) {
+      expect(models.image.binding(grok, p)?.pricing).toEqual({
+        type: "per_image_tiered",
+        tiers,
+      });
+    }
+  });
+
+  it("keeps Muse Image 1.0 unlisted: OpenRouter lists it with no endpoint", () => {
+    const muse = models.image.models["meta/muse-image-1.0"]!;
+    expect(muse.listed).toBe(false);
+    expect(models.image.binding(muse, "openrouter")).toBeNull();
+    for (const p of ["vercel", "fal"] as const) {
+      expect(models.image.binding(muse, p)?.pricing).toEqual({
+        type: "per_image_flat",
+        usd: 0.01,
+      });
+    }
+  });
+
+  it("calls Gemini 3.1 Flash Image by its graduated ids, canonical key unchanged", () => {
+    const card = models.image.models["google/gemini-3.1-flash-image-preview"]!;
+    expect(models.image.binding(card, "vercel")?.id).toBe(
+      "google/gemini-3.1-flash-image"
+    );
+    expect(models.image.binding(card, "fal")?.id).toBe("fal-ai/nano-banana-2");
+    expect(models.image.binding(card, "openrouter")?.id).toBe(
+      "google/gemini-3.1-flash-image"
+    );
+  });
+
   it("listed_models returns only listed cards", () => {
     for (const card of models.image.listed_models()) {
       expect(card.listed).toBe(true);
@@ -368,6 +453,57 @@ describe("models.video catalogue invariants", () => {
       expect(
         models.video.binding(veo, provider)?.pricing.usd_per_second
       ).toEqual(matrix);
+    }
+  });
+
+  it("prices Veo 3.1 Fast and Lite with the matrices Vercel and fal both publish", () => {
+    const fast = {
+      "720p": { audio: 0.15, silent: 0.1 },
+      "1080p": { audio: 0.15, silent: 0.1 },
+      "4k": { audio: 0.35, silent: 0.3 },
+    };
+    const lite = {
+      "720p": { audio: 0.05, silent: 0.03 },
+      "1080p": { audio: 0.08, silent: 0.05 },
+    };
+    for (const [id, matrix] of [
+      ["google/veo-3.1-fast", fast],
+      ["google/veo-3.1-lite", lite],
+    ] as const) {
+      const card = models.video.models[id]!;
+      for (const p of ["vercel", "fal"] as const) {
+        expect(models.video.binding(card, p)?.pricing.usd_per_second).toEqual(
+          matrix
+        );
+      }
+    }
+  });
+
+  it("prices Wan 3.0 per resolution, audio bundled, identically on Vercel and fal", () => {
+    const wan = models.video.models["alibaba/wan-3.0"]!;
+    expect(wan).toMatchObject({ min_duration: 2, max_duration: 30 });
+    for (const p of ["vercel", "fal"] as const) {
+      expect(models.video.binding(wan, p)?.pricing.usd_per_second).toEqual({
+        "480p": { audio: 0.05 },
+        "720p": { audio: 0.1 },
+        "1080p": { audio: 0.2 },
+      });
+    }
+  });
+
+  it("withholds a Vercel binding from token-metered Seedance", () => {
+    // The gateway serves both Seedance cards but bills `video_token_pricing`,
+    // which `PerSecondPricing` cannot express and the hosted route cannot
+    // pre-price. A per-second Vercel binding here would be invented — and
+    // was, on 2.0, until 2026-09-02. fal states per-second rates.
+    for (const id of ["bytedance/seedance-2.0", "bytedance/seedance-2.5"]) {
+      const card = models.video.models[id]!;
+      expect(models.video.binding(card, "vercel")).toBeNull();
+      expect(
+        models.video.binding(card, "fal")?.pricing.usd_per_second[
+          card.default.resolution
+        ]?.audio
+      ).toBeGreaterThan(0);
     }
   });
 

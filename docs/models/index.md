@@ -160,14 +160,45 @@ Per-token pricing (same model as text, with image output).
 
 ### Black Forest Labs
 
-Flat per-image pricing.
+Metered per megapixel by every provider; the table shows the 1-megapixel (1024x1024) baseline.
 
 | Model                                     | Price/Image |
 | ----------------------------------------- | ----------- |
-| Flux 2 Pro (`bfl/flux-2-pro`)             | $0.060      |
+| Flux 2 Max (`bfl/flux-2-max`)             | $0.070      |
+| Flux 2 Pro (`bfl/flux-2-pro`)             | $0.030      |
 | Flux Kontext Max (`bfl/flux-kontext-max`) | $0.080      |
 | Flux Kontext Pro (`bfl/flux-kontext-pro`) | $0.040      |
 | Flux Pro 1.1 (`bfl/flux-pro-1.1`)         | $0.040      |
+
+### ByteDance
+
+Flat per-image pricing.
+
+| Model                                              | Price/Image |
+| -------------------------------------------------- | ----------- |
+| Seedream 5.0 Pro (`bytedance/seedream-5.0-pro`)    | $0.035      |
+| Seedream 5.0 Lite (`bytedance/seedream-5.0-lite`)  | $0.035      |
+| Seedream 4.5 (`bytedance/seedream-4.5`) _(legacy)_ | $0.040      |
+
+`Seedream 4.5` is deprecated in Grida's catalogue in favor of the 5.0 models,
+which are cheaper on every provider; this is not an upstream retirement.
+
+### xAI
+
+Tiered by quality and size.
+
+| Model                                                 | 1K low | 1K medium | 2K low | 2K medium |
+| ----------------------------------------------------- | ------ | --------- | ------ | --------- |
+| Grok Imagine Image 2.0 (`xai/grok-imagine-image-2.0`) | $0.04  | $0.06     | $0.06  | $0.08     |
+
+### Meta
+
+| Model                                  | Price/Image |
+| -------------------------------------- | ----------- |
+| Muse Image 1.0 (`meta/muse-image-1.0`) | $0.010      |
+
+`Muse Image 1.0` is catalogued but not offered in the default picker: OpenRouter
+lists it without a serving endpoint, so it is not available on every provider.
 
 ### Recraft
 
@@ -183,18 +214,51 @@ which is cheaper on every provider; this is not an upstream Recraft retirement.
 
 ### Image Sizes
 
-| Model              | Min Size  | Max Size                         | Aspect Ratios |
-| ------------------ | --------- | -------------------------------- | ------------- |
-| GPT Image 2        | —         | edges ≤ 3840 px, ≤ 8.3M px total | up to 3:1     |
-| GPT Image 1.5      | 1024x1024 | 1536x1536                        | 1:1, 2:3, 3:2 |
-| GPT Image Mini     | 1024x1024 | 1536x1536                        | 1:1, 2:3, 3:2 |
-| Gemini Flash Image | —         | 1536x1536                        | Flexible      |
-| Gemini Flash Lite  | —         | 1024x1024 (1K only)              | Flexible      |
-| Gemini Pro Image   | —         | 1536x1536                        | Flexible      |
-| Flux 2 Pro         | 256x256   | 1440x1440                        | Flexible      |
-| Flux Kontext Max   | —         | 1820x1820                        | Flexible      |
-| Flux Kontext Pro   | —         | 1820x1820                        | Flexible      |
-| Flux Pro 1.1       | 256x256   | 1440x1440                        | Flexible      |
+| Model                  | Min Size  | Max Size                            | Aspect Ratios |
+| ---------------------- | --------- | ----------------------------------- | ------------- |
+| GPT Image 2            | —         | edges ≤ 3840 px, ≤ 8.3M px total    | up to 3:1     |
+| GPT Image 1.5          | 1024x1024 | 1536x1536                           | 1:1, 2:3, 3:2 |
+| GPT Image Mini         | 1024x1024 | 1536x1536                           | 1:1, 2:3, 3:2 |
+| Gemini Flash Image     | —         | 1536x1536                           | Flexible      |
+| Gemini Flash Lite      | —         | 1024x1024 (1K only)                 | Flexible      |
+| Gemini Pro Image       | —         | 1536x1536                           | Flexible      |
+| Flux 2 Max             | 256x256   | 1440x1440                           | Flexible      |
+| Flux 2 Pro             | 256x256   | 1440x1440                           | Flexible      |
+| Flux Kontext Max       | —         | 1820x1820                           | Flexible      |
+| Flux Kontext Pro       | —         | 1820x1820                           | Flexible      |
+| Flux Pro 1.1           | 256x256   | 1440x1440                           | Flexible      |
+| Recraft V4.1           | —         | 2048x2048                           | Flexible      |
+| Recraft V3             | —         | 2048x2048                           | Flexible      |
+| Seedream 5.0 Pro       | 1024x1024 | 2048x2048                           | Flexible      |
+| Seedream 5.0 Lite      | —         | 4096x4096 (2K–4K; smaller upscaled) | Flexible      |
+| Grok Imagine Image 2.0 | —         | 2048x2048 (1K or 2K)                | Flexible      |
+| Muse Image 1.0         | —         | chosen by the model                 | 21:9 to 9:21  |
+
+## Video Generation Models
+
+Video models are billed per second of generated output, by resolution and
+whether audio is generated. The rates below are the Grida-hosted (Vercel
+gateway) rates; the hosted route always generates the model's default audio
+mode, so the silent rates are informational until the request can carry an
+audio mode.
+
+| Model                                                 | 480p  | 720p          | 1080p         | 4K            | Duration |
+| ----------------------------------------------------- | ----- | ------------- | ------------- | ------------- | -------- |
+| Veo 3.1 (`google/veo-3.1`)                            | —     | $0.40 ($0.20) | $0.40 ($0.20) | $0.60 ($0.40) | 4–8s     |
+| Veo 3.1 Fast (`google/veo-3.1-fast`)                  | —     | $0.15 ($0.10) | $0.15 ($0.10) | $0.35 ($0.30) | 4–8s     |
+| Veo 3.1 Lite (`google/veo-3.1-lite`)                  | —     | $0.05 ($0.03) | $0.08 ($0.05) | —             | 4–8s     |
+| Wan 3.0 (`alibaba/wan-3.0`)                           | $0.05 | $0.10         | $0.20         | —             | 2–30s    |
+| Grok Imagine Video 1.5 (`xai/grok-imagine-video-1.5`) | $0.08 | $0.14         | $0.25         | —             | 1–15s    |
+
+Per second of output; the figure in parentheses is the silent rate where the
+provider meters one. Wan and Grok bundle audio into a single rate.
+
+`Seedance 2.0` and `Seedance 2.5` (`bytedance/seedance-2.0`, `-2.5`) are
+catalogued for bring-your-own-key use through fal, but are **not available on
+the hosted route**: the gateway meters them per video token rather than per
+second, and there is no honest per-second conversion, so Grida cannot
+pre-price a hosted request. This will change when hosted video is metered
+after generation.
 
 ## Image Tools
 

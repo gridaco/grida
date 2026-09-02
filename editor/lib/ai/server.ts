@@ -774,7 +774,13 @@ export namespace methods {
   } | null {
     const card = ai.image.findImageModelCard(model);
     if (!card) return null;
-    return { model: grida.imageModel(card.id), card };
+    // Call the gateway by the vercel BINDING id, never the canonical card
+    // id. They usually coincide, but not always — the Gemini card's
+    // canonical key is the `-preview` alias while the gateway's current id
+    // is the graduated one. Video already resolves this way.
+    const binding = ai.image.binding(card, "vercel");
+    if (!binding) return null;
+    return { model: grida.imageModel(binding.id), card };
   }
 
   /**
