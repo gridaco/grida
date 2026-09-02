@@ -76,6 +76,11 @@ org entitlement does not import billing internals. The seam is
 typed wrappers. New gates go through this function so fail-closed
 and BYOK behavior stay centralized.
 
+When the gate belongs to a public `(www)` page CTA, record its user-visible
+handoff, recovery path, and terminal funnel in the canonical
+[`(www)` route register](<../../../editor/app/(www)/README.md>). That register
+describes UX; `getEntitlement()` and this skill remain enforcement authority.
+
 ## BYOK carve-out — `GRIDA-SEC-003`
 
 If `BYOK_OPENROUTER_API_KEY` or `BYOK_AI_GATEWAY_API_KEY` is set in

@@ -4,6 +4,10 @@ The single source of truth for the AI credit balance UX. Every AI call
 site that displays balance or routes the GRIDA-SEC-003 gate flow
 consumes from this module.
 
+This is one part of the web AI run gate, not the payment authority or the
+sign-in flow. See the [web AI topology](../README.md) before adding a playable
+page.
+
 ## Purpose
 
 Before this module: each AI page hand-rolled its own balance state,
@@ -31,7 +35,7 @@ import { AiCredits, useAiCredits, AiCreditsController } from "@/lib/ai/credits";
 // 2. Consume from any client component.
 const credits = useAiCredits();
 credits.cents              // number | null      (null = unauth / no org)
-credits.allowed            // boolean            (gate state)
+credits.allowed            // boolean            (cached display snapshot)
 credits.formatted          // "$26.0" | null     chip display
 credits.formattedExact     // "$25.9921" | null  tooltip
 credits.refresh()          // Promise<void>      pull live from server
@@ -87,9 +91,15 @@ const env = await refreshAiCredits();
    renders `"—"`, never `"$0.00"`. The deprecated `$0.00` stub at
    `hooks/use-credits.ts` was deleted as part of this refactor.
 
-4. **Initial state.** Must come from a server preload
-   (`preloadAiCredits`) at a route or layout boundary that owns the
-   `orgId`. The Provider does not fetch on mount.
+4. **Initial state.** Interactive pages may use a server preload
+   (`preloadAiCredits`) at a route or layout boundary that owns the `orgId`.
+   Static SEO pages must instead start neutral and let a client demo request a
+   server-sourced display/remedy snapshot after hydration. The Provider does
+   not fetch on mount.
+
+5. **Server authority.** `allowed` is not a client authorization decision.
+   Callers must submit through the server seam and route its typed result; they
+   must not refuse locally based on `allowed` or `cents`.
 
 ## Lifecycle
 

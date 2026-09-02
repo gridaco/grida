@@ -1,20 +1,13 @@
-"use client";
+import ImagePlaygroundClient from "./image-playground-client";
+import { ImagePlaygroundModel } from "./image-playground-model";
 
-import React from "react";
-import { SidebarProvider } from "@app/ui/components/sidebar";
-import { TooltipProvider } from "@app/ui/components/tooltip";
-import dynamic from "next/dynamic";
+export default async function ImagePlaygroundPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ model?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const initialModelId = ImagePlaygroundModel.initial(params.model);
 
-const ImagePlayground = dynamic(() => import("./_page"), {
-  ssr: false,
-});
-
-export default function ImagePlaygroundPage() {
-  return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <ImagePlayground />
-      </SidebarProvider>
-    </TooltipProvider>
-  );
+  return <ImagePlaygroundClient initialModelId={initialModelId} />;
 }

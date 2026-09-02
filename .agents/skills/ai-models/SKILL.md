@@ -31,6 +31,7 @@ description: >
 | `editor/lib/ai/server.ts`                  | AI seam: prepaid-credit gate, provider call, and post-flight usage ingest                                                                                                                         |
 | `editor/lib/billing/metronome.ts`          | Organization credit entitlement, cached balance gate, and Metronome usage ledger                                                                                                                  |
 | `editor/app/(www)/(ai)/ai/models/page.tsx` | Public models catalog page                                                                                                                                                                        |
+| `editor/app/(www)/README.md`               | Public `(www)` page intent, exact CTA/gate funnel, crawl state, and lifecycle register                                                                                                            |
 | `docs/models/index.md`                     | User-facing models & pricing documentation                                                                                                                                                        |
 
 ## Tools
@@ -225,4 +226,6 @@ credit. Unit: **mills** (1 mill = $0.001 USD).
 - [ ] `pnpm tsc --noEmit` passes
 - [ ] `docs/models/index.md` matches the code
 - [ ] `/ai/models` page renders correctly
+- [ ] If a public model page or runner funnel changed, the `(www)` route
+      register matches its CTA, gate/recovery path, crawl state, and lifecycle
 - [ ] No stale model IDs remain (grep for old IDs)

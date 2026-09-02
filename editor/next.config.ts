@@ -1,6 +1,7 @@
 import path from "path";
 import type { NextConfig } from "next";
 import { Platform } from "@/lib/platform";
+import { aiModelPages } from "@/www/data/ai-model-pages";
 import { withSentryConfig, type SentryBuildOptions } from "@sentry/nextjs";
 import createMDX from "@next/mdx";
 
@@ -53,6 +54,17 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      ...aiModelPages.retired.flatMap((page) =>
+        page.disposition.kind === "redirect"
+          ? [
+              {
+                source: aiModelPages.path(page.slug),
+                destination: page.disposition.destination,
+                permanent: true,
+              },
+            ]
+          : []
+      ),
       // Engine WG docs moved to the engine repo (gridaco/nothing) — the docs
       // site no longer produces these pages. Path-shape contract: the tree
       // stays docs/wg/<cluster>/<doc>.md over there; retarget these to the

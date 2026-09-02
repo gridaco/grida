@@ -60,6 +60,7 @@ General conventions:
 | `email-template-authoring` | Email-client-style template authoring UI.        | `@/kits/email-template-authoring` |
 | `library-explorer`         | Embedded infinite Library browser.               | `@/kits/library-explorer`         |
 | `memory-navigator`         | Scoped, typed in-memory navigation stack.        | `@/kits/memory-navigator`         |
+| `ai-run-gate-hosted`       | Hosted AI refusal recovery and exact retry.      | `@/kits/ai-run-gate-hosted`       |
 
 ## API design guidelines
 

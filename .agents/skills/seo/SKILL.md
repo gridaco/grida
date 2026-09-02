@@ -27,6 +27,18 @@ pages, blog posts, and documentation.
 
 ## Next.js Pages (`editor/app/(www)`)
 
+Read the canonical
+[`(www)` route register](<../../../editor/app/(www)/README.md>) before changing
+a public route. Update it in the same PR when a page is added, removed, renamed,
+re-indexed, or changes its UX umbrella, primary CTA, gate/recovery path, funnel
+outcome, or lifecycle. The App Router and `editor/app/sitemap.ts` remain the
+runtime and crawl-discovery sources of truth.
+
+Dedicated `/ai/models/:slug` pages are an editorial, media-only inventory in
+`editor/www/data/ai-model-pages.ts`. Do not derive publication from the model
+catalogue, and do not add text models. Route params, metadata, redirects, and
+the sitemap must derive from that inventory.
+
 ### Metadata
 
 Every public page must export metadata (static or dynamic).
