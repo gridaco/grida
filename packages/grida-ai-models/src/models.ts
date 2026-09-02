@@ -1436,6 +1436,9 @@ export namespace models {
             pricing: { type: "per_image_flat", usd: 0.07 },
             avg_cost_usd: 0.07,
             url: "https://openrouter.ai/black-forest-labs/flux.2-max",
+            // OpenRouter `supported_parameters.input_references` 0–8
+            // (2026-09-02). As on Flux 2 Pro.
+            references: { id: "black-forest-labs/flux.2-max", max: 8 },
           },
           fal: {
             provider: "fal",
@@ -1601,6 +1604,9 @@ export namespace models {
             pricing: { type: "per_image_flat", usd: 0.045 },
             avg_cost_usd: 0.045,
             url: "https://openrouter.ai/bytedance-seed/seedream-5-0-pro",
+            // OpenRouter `supported_parameters.input_references` 0–14
+            // (2026-09-02). Same endpoint as t2i, as on 4.5.
+            references: { id: "bytedance-seed/seedream-5-0-pro", max: 14 },
           },
           fal: {
             provider: "fal",
@@ -1658,6 +1664,9 @@ export namespace models {
             pricing: { type: "per_image_flat", usd: 0.035 },
             avg_cost_usd: 0.035,
             url: "https://openrouter.ai/bytedance-seed/seedream-5-0-lite",
+            // OpenRouter `supported_parameters.input_references` 0–14
+            // (2026-09-02).
+            references: { id: "bytedance-seed/seedream-5-0-lite", max: 14 },
           },
           fal: {
             provider: "fal",
@@ -1785,6 +1794,9 @@ export namespace models {
             },
             avg_cost_usd: 0.06,
             url: "https://openrouter.ai/x-ai/grok-imagine-image-2.0",
+            // OpenRouter `supported_parameters.input_references` 0–3
+            // (2026-09-02). OR bills $0.01 per input image on top (not modelled).
+            references: { id: "x-ai/grok-imagine-image-2.0", max: 3 },
           },
           fal: {
             provider: "fal",
@@ -1902,6 +1914,9 @@ export namespace models {
             pricing: { type: "per_image_flat", usd: 0.035 },
             avg_cost_usd: 0.035,
             url: "https://openrouter.ai/recraft/recraft-v4.1",
+            // OpenRouter `supported_parameters.input_references` 0–1
+            // (2026-09-02).
+            references: { id: "recraft/recraft-v4.1", max: 1 },
           },
           fal: {
             provider: "fal",

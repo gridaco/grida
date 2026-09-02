@@ -225,6 +225,25 @@ describe("models.image provider-binding invariants", () => {
     );
   });
 
+  it("keeps image-to-image reachable on every new listed card", () => {
+    // Written from OpenRouter's `supported_parameters.input_references`
+    // (2026-09-02). Seedream 4.5 carried the catalogue's Seedream i2i route;
+    // unlisting it without giving 5.0 the same binding would have dropped
+    // Seedream editing from the BYOK surface.
+    for (const [id, max] of [
+      ["bytedance/seedream-5.0-pro", 14],
+      ["bytedance/seedream-5.0-lite", 14],
+      ["bfl/flux-2-max", 8],
+      ["xai/grok-imagine-image-2.0", 3],
+      ["recraft/recraft-v4.1", 1],
+    ] as const) {
+      const card = models.image.models[id]!;
+      expect(models.image.binding(card, "openrouter")?.references?.max).toBe(
+        max
+      );
+    }
+  });
+
   it("listed_models returns only listed cards", () => {
     for (const card of models.image.listed_models()) {
       expect(card.listed).toBe(true);
