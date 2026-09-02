@@ -1,7 +1,7 @@
 ---
 title: Models & Pricing
 description: Compare Grida AI model tiers, context windows, and text, image, and music generation costs.
-keywords: [AI models, AI pricing, GPT-5.6, Claude Fable 5, Lyria, Grida AI]
+keywords: [AI models, AI pricing, GPT-5.6, Claude Fable 5.1, Lyria, Grida AI]
 slug: pricing
 format: md
 ---
@@ -36,10 +36,10 @@ Models are organized into **tiers** based on capability and cost:
 | `nano` | GPT-5.6 Luna (`openai/gpt-5.6-luna`)   | 1.05M   | 128K       | $0.20          | $1.20           |
 | `mini` | GPT-5.6 Luna (`openai/gpt-5.6-luna`)   | 1.05M   | 128K       | $0.20          | $1.20           |
 | `pro`  | GPT-5.6 Terra (`openai/gpt-5.6-terra`) | 1.05M   | 128K       | $2.00          | $12.00          |
-| `max`  | GPT-5.6 Sol (`openai/gpt-5.6-sol`)     | 1.05M   | 128K       | $5.00          | $30.00          |
+| `max`  | GPT-5.6 Sol (`openai/gpt-5.6-sol`)     | 1.05M   | 128K       | $4.00          | $20.00          |
 
 All tier models support **multimodal** inputs (text + images).
-Claude Fable 5 and Claude Opus 5 remain active, non-tiered catalogue models.
+Claude Fable 5.1 and Claude Opus 5 remain active, non-tiered catalogue models.
 
 `nano` and `mini` currently resolve to the same model. `nano` is a floor —
 the cheapest model still good enough for background work (title generation,
@@ -59,7 +59,7 @@ All tiers support prompt caching, which reduces cost for repeated context:
 | `nano` | $0.02               | $0.25                |
 | `mini` | $0.02               | $0.25                |
 | `pro`  | $0.20               | $2.50                |
-| `max`  | $0.50               | $6.25                |
+| `max`  | $0.40               | $5.00                |
 
 ### All Models
 
