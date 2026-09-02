@@ -29,16 +29,18 @@ import type { ai as AITypes } from "@/lib/ai/ai";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import {
+  AlibabaCloudLogo,
   BlackForestLabsLogo,
   ByteDanceLogo,
   ElevenLabsLogo,
   OpenAILogo,
   AnthropicLogo,
   GoogleLogo,
+  MetaLogo,
   MicrosoftLogo,
   RecraftLogo,
+  SpaceXAILogo,
   TencentLogo,
-  XAILogo,
 } from "@grida/react-icons/logos";
 
 export const metadata: Metadata = {
@@ -51,16 +53,18 @@ export const metadata: Metadata = {
 };
 
 const Logos: Partial<Record<string, FC<{ className?: string }>>> = {
+  alibaba: AlibabaCloudLogo,
   "black-forest-labs": BlackForestLabsLogo,
   bytedance: ByteDanceLogo,
   openai: OpenAILogo,
   anthropic: AnthropicLogo,
   elevenlabs: ElevenLabsLogo,
   google: GoogleLogo,
+  meta: MetaLogo,
   microsoft: MicrosoftLogo,
   "recraft-ai": RecraftLogo,
   tencent: TencentLogo,
-  xai: XAILogo,
+  xai: SpaceXAILogo,
 };
 
 function MakerLogo({
@@ -105,7 +109,7 @@ const VendorLabels: Record<string, string> = {
   google: "Google",
   "recraft-ai": "Recraft AI",
   bytedance: "ByteDance",
-  xai: "xAI",
+  xai: "SpaceXAI",
   alibaba: "Alibaba",
   meta: "Meta",
 };

@@ -35,20 +35,22 @@ import {
 import { Skeleton } from "@app/ui/components/skeleton";
 import { models } from "@grida/ai-models";
 import {
+  AlibabaCloudLogo,
   BlackForestLabsLogo,
   ByteDanceLogo,
   ClaudeLogo,
   ElevenLabsLogo,
   FalLogo,
   GoogleLogo,
+  MetaLogo,
   MicrosoftLogo,
   OllamaLogo,
   OpenAILogo,
   OpenRouterLogo,
   RecraftLogo,
+  SpaceXAILogo,
   TencentLogo,
   VercelLogo,
-  XAILogo,
 } from "@grida/react-icons/logos";
 import {
   DesktopBridgeMissingError,
@@ -424,15 +426,17 @@ const BYOK_PROVIDER_LOGOS: Partial<
 const MODEL_VENDOR_LOGOS: Partial<
   Record<models.Vendor, React.ComponentType<React.ComponentProps<"svg">>>
 > = {
+  alibaba: AlibabaCloudLogo,
   openai: OpenAILogo,
   "recraft-ai": RecraftLogo,
   google: GoogleLogo,
   "black-forest-labs": BlackForestLabsLogo,
   bytedance: ByteDanceLogo,
+  meta: MetaLogo,
   elevenlabs: ElevenLabsLogo,
   microsoft: MicrosoftLogo,
   tencent: TencentLogo,
-  xai: XAILogo,
+  xai: SpaceXAILogo,
 };
 
 const BYOK_PROVIDER_SETUP: Record<

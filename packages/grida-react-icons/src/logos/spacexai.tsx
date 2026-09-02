@@ -1,4 +1,5 @@
-const XAILogo = ({ className, ...props }: React.ComponentProps<"svg">) => {
+/** SpaceXAI company mark. */
+const SpaceXAILogo = ({ className, ...props }: React.ComponentProps<"svg">) => {
   return (
     <svg
       viewBox="0 0 466.04 516.93"
@@ -17,4 +18,4 @@ const XAILogo = ({ className, ...props }: React.ComponentProps<"svg">) => {
   );
 };
 
-export default XAILogo;
+export default SpaceXAILogo;
