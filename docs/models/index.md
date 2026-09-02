@@ -258,7 +258,10 @@ catalogued for bring-your-own-key use through fal, but are **not available on
 the hosted route**: the gateway meters them per video token rather than per
 second, and there is no honest per-second conversion, so Grida cannot
 pre-price a hosted request. This will change when hosted video is metered
-after generation.
+after generation. `Seedance 2.5` is the newer generation but not a cheaper
+one — on fal it costs $0.47/s at 720p and $1.16/s at 1080p against 2.0's
+$0.30/s and $0.68/s, and it does not offer 4K — so both are kept: 2.0 for
+price and 4K, 2.5 for clips up to 30 seconds and editing.
 
 ## Image Tools
 

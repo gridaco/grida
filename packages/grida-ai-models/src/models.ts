@@ -2896,7 +2896,7 @@ export namespace models {
         label: "Seedance 2.0",
         deprecated: false,
         short_description:
-          "ByteDance's state-of-the-art video model — top-tier image-to-video with reference and editing modes.",
+          "ByteDance's video model — image-to-video with reference modes, up to 4K, at roughly two-thirds the price of Seedance 2.5.",
         vendor: "bytedance",
         listed: true,
         aspect_ratios: ["16:9", "9:16", "1:1"],
@@ -2963,9 +2963,13 @@ export namespace models {
       // -----------------------------------------------------------------
       // ByteDance — Seedance 2.5
       // -----------------------------------------------------------------
-      // Successor to 2.0 (2026-08-07): 4–30s clips, 21:9, native audio. Same
-      // metering story as 2.0 — the gateway bills tokens ($10.70/MTok at
-      // 480p/720p, $11.70 at 1080p), so no Vercel binding until post-flight
+      // Newer generation (2026-08-07), NOT a drop-in successor: ~55% more
+      // per token on the gateway ($10.70/MTok at 480p/720p, $11.70 at 1080p
+      // vs 2.0's $7.00/$7.70), ~56–71% more per second on fal, and no 4K.
+      // It buys 4–30s clips, video-editing and extend-video. 2.0 is cheaper
+      // and serves 4K, so it stays listed and undeprecated — the catalogue
+      // rule keeps a card that is still a real choice. Same metering story:
+      // the gateway bills tokens, so no Vercel binding until post-flight
       // metering exists. fal states per-second prices, audio bundled.
       "bytedance/seedance-2.5": {
         id: "bytedance/seedance-2.5",
