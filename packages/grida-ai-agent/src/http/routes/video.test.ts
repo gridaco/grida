@@ -274,8 +274,10 @@ describe("POST /video/generate", () => {
   });
 
   it("400 when the connected provider does not serve the model", async () => {
-    // Seedance has no fal binding.
-    const res = await post(appWith({ fal: "sk-fal" }), {
+    // Seedance has no vercel binding (token-metered on the gateway; the
+    // catalogue withholds an unpriceable route). fal DOES serve it — which
+    // is why this case must not use a fal key: it would reach fal for real.
+    const res = await post(appWith({ vercel: "sk-v" }), {
       model_id: "bytedance/seedance-2.0",
       prompt: "x",
     });

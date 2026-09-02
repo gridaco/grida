@@ -143,7 +143,9 @@ export namespace models {
     | "elevenlabs"
     | "stability-ai"
     | "bytedance"
-    | "xai";
+    | "xai"
+    | "alibaba"
+    | "meta";
 
   /**
    * Catalogue lifecycle for newly grounded media surfaces.
@@ -682,12 +684,20 @@ export namespace models {
       | "google/gemini-3-pro-image"
       // Black Forest Labs
       | "bfl/flux-2-pro"
+      | "bfl/flux-2-max"
       | "bfl/flux-kontext-max"
       | "bfl/flux-kontext-pro"
       | "bfl/flux-pro-1.1"
       // ByteDance
+      | "bytedance/seedream-5.0-pro"
+      | "bytedance/seedream-5.0-lite"
       | "bytedance/seedream-4.5"
+      // xAI
+      | "xai/grok-imagine-image-2.0"
+      // Meta
+      | "meta/muse-image-1.0"
       // Recraft
+      | "recraft/recraft-v4.1"
       | "recraft/recraft-v3"
       | (string & {});
 
@@ -1199,9 +1209,14 @@ export namespace models {
         listed: true,
         // "Nano Banana 2"; ids/prices verified 2026-06-29, see issues/908
         providers: {
+          // The gateway serves the graduated `google/gemini-3.1-flash-image`
+          // and the `-preview` alias at identical rates (feed, 2026-09-02).
+          // Bindings call the graduated id; the canonical key above stays
+          // `-preview` because it is persisted in selections and published
+          // in the catalogue snapshot — renaming it is a separate change.
           vercel: {
             provider: "vercel",
-            id: "google/gemini-3.1-flash-image-preview",
+            id: "google/gemini-3.1-flash-image",
             pricing: { type: "per_token", input: 0.5, output: 3.0 },
             avg_cost_usd: 0.004,
           },
@@ -1214,12 +1229,14 @@ export namespace models {
             // input_references advertised by OpenRouter (0–14), 2026-07-01.
             references: { id: "google/gemini-3.1-flash-image", max: 14 },
           },
+          // fal's graduated endpoint is `fal-ai/nano-banana-2`; same $0.08
+          // per 1K image as the `-preview` endpoint (2K ×1.5, 4K ×2).
           fal: {
             provider: "fal",
-            id: "fal-ai/gemini-3.1-flash-image-preview",
+            id: "fal-ai/nano-banana-2",
             pricing: { type: "per_image_flat", usd: 0.08 },
             avg_cost_usd: 0.08,
-            url: "https://fal.ai/models/fal-ai/gemini-3.1-flash-image-preview",
+            url: "https://fal.ai/models/fal-ai/nano-banana-2",
           },
         },
         speed_label: "fast",
@@ -1347,14 +1364,18 @@ export namespace models {
         vendor: "black-forest-labs",
         provider: "vercel",
         listed: true,
-        // ids/prices verified 2026-06-29, see issues/908. OR/fal meter per-MP
-        // (~$0.03 first MP); represented as flat at the 1MP baseline.
+        // All three providers meter $0.03 per megapixel (Vercel model page,
+        // OpenRouter endpoint `cost_usd`/megapixel, fal "first megapixel");
+        // represented as flat at the 1MP baseline. The Vercel binding shipped
+        // at $0.06 — a 2x hosted over-billing — corrected 2026-09-02. The
+        // gateway feed carries no `pricing` for BFL cards, so the page is the
+        // source.
         providers: {
           vercel: {
             provider: "vercel",
             id: "bfl/flux-2-pro",
-            pricing: { type: "per_image_flat", usd: 0.06 },
-            avg_cost_usd: 0.06,
+            pricing: { type: "per_image_flat", usd: 0.03 },
+            avg_cost_usd: 0.03,
           },
           openrouter: {
             provider: "openrouter",
@@ -1378,8 +1399,63 @@ export namespace models {
         styles: null,
         sizes: null,
         constraints: { min_edge: 256, max_edge: 1440 },
-        pricing: { type: "per_image_flat", usd: 0.06 },
-        avg_cost_usd: 0.06,
+        pricing: { type: "per_image_flat", usd: 0.03 },
+        avg_cost_usd: 0.03,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // -----------------------------------------------------------------
+      // Black Forest Labs — Flux 2 Max
+      // -----------------------------------------------------------------
+      // BFL's top Flux 2 line (2025-12-16). $0.07 per megapixel on all three
+      // (Vercel model page — the feed carries no BFL pricing; OpenRouter
+      // `cost_usd`/megapixel; fal "first megapixel", +$0.03 each additional).
+      // Represented as flat at the 1MP baseline. Verified 2026-09-02.
+      "bfl/flux-2-max": {
+        id: "bfl/flux-2-max",
+        label: "Flux 2 Max",
+        deprecated: false,
+        short_description:
+          "Black Forest Labs' highest-fidelity Flux 2 — maximum prompt adherence and detail.",
+        vendor: "black-forest-labs",
+        provider: "vercel",
+        listed: true,
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "bfl/flux-2-max",
+            pricing: { type: "per_image_flat", usd: 0.07 },
+            avg_cost_usd: 0.07,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "black-forest-labs/flux.2-max",
+            pricing: { type: "per_image_flat", usd: 0.07 },
+            avg_cost_usd: 0.07,
+            url: "https://openrouter.ai/black-forest-labs/flux.2-max",
+            // OpenRouter `supported_parameters.input_references` 0–8
+            // (2026-09-02). As on Flux 2 Pro.
+            references: { id: "black-forest-labs/flux.2-max", max: 8 },
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/flux-2-max",
+            pricing: { type: "per_image_flat", usd: 0.07 },
+            avg_cost_usd: 0.07,
+            url: "https://fal.ai/models/fal-ai/flux-2-max",
+          },
+        },
+        speed_label: "slow",
+        speed_max: "45s",
+        styles: null,
+        sizes: null,
+        // Same envelope as Flux 2 Pro pending a vendor spec for Max.
+        constraints: { min_edge: 256, max_edge: 1440 },
+        pricing: { type: "per_image_flat", usd: 0.07 },
+        avg_cost_usd: 0.07,
         default: {
           width: 1024,
           height: 1024,
@@ -1434,13 +1510,24 @@ export namespace models {
         provider: "vercel",
         listed: false,
         listed_reason:
-          "Image-editing model; superseded by Flux 2 and not universal.",
+          "Image-editing model; superseded by Flux 2 and not on OpenRouter, so not universal.",
+        // $0.04 on both providers. The card shipped at $0.05 — and because the
+        // hosted route gates on a vercel binding, not on `listed`, that was a
+        // live 25% over-deduction. Gateway feed `pricing.image` + fal's model
+        // page ("Fixed $0.04 cost per image edit"), verified 2026-09-02.
         providers: {
           vercel: {
             provider: "vercel",
             id: "bfl/flux-kontext-pro",
-            pricing: { type: "per_image_flat", usd: 0.05 },
-            avg_cost_usd: 0.05,
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/flux-pro/kontext",
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+            url: "https://fal.ai/models/fal-ai/flux-pro/kontext",
           },
         },
         speed_label: "medium",
@@ -1448,8 +1535,8 @@ export namespace models {
         styles: null,
         sizes: null,
         constraints: { max_edge: 1820 },
-        pricing: { type: "per_image_flat", usd: 0.05 },
-        avg_cost_usd: 0.05,
+        pricing: { type: "per_image_flat", usd: 0.04 },
+        avg_cost_usd: 0.04,
         default: {
           width: 1024,
           height: 1024,
@@ -1488,19 +1575,140 @@ export namespace models {
         },
       },
       // -----------------------------------------------------------------
+      // ByteDance — Seedream 5.0 Pro
+      // -----------------------------------------------------------------
+      // Vercel feed `pricing.image` $0.035 (the model page's rate table shows
+      // $0.04 while its copy says $0.035 — the feed is the billing contract);
+      // OpenRouter `cost_usd` $0.045 at 1K ($0.09 high-res, +$0.003 per
+      // input image, not modelled); fal $0.0675 for ≤1536² area, $0.135 up
+      // to 2048². Represented at the 1024² baseline. Verified 2026-09-02.
+      "bytedance/seedream-5.0-pro": {
+        id: "bytedance/seedream-5.0-pro",
+        label: "Seedream 5.0 Pro",
+        deprecated: false,
+        short_description:
+          "ByteDance's flagship image model — dense layouts, infographics and text-heavy compositions at 1K–2K.",
+        vendor: "bytedance",
+        provider: "vercel",
+        listed: true,
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "bytedance/seedream-5.0-pro",
+            pricing: { type: "per_image_flat", usd: 0.035 },
+            avg_cost_usd: 0.035,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "bytedance-seed/seedream-5-0-pro",
+            pricing: { type: "per_image_flat", usd: 0.045 },
+            avg_cost_usd: 0.045,
+            url: "https://openrouter.ai/bytedance-seed/seedream-5-0-pro",
+            // OpenRouter `supported_parameters.input_references` 0–14
+            // (2026-09-02). Same endpoint as t2i, as on 4.5.
+            references: { id: "bytedance-seed/seedream-5-0-pro", max: 14 },
+          },
+          fal: {
+            provider: "fal",
+            id: "bytedance/seedream/v5/pro/text-to-image",
+            pricing: { type: "per_image_flat", usd: 0.0675 },
+            avg_cost_usd: 0.0675,
+            url: "https://fal.ai/models/bytedance/seedream/v5/pro/text-to-image",
+          },
+        },
+        speed_label: "medium",
+        speed_max: "30s",
+        styles: null,
+        sizes: null,
+        // fal: total pixels between 1024x1024 and 2048x2048, aspect ratio
+        // between 1:16 and 16:1 — an area bound, not a per-edge one, so a
+        // 512x2048 request is in-envelope and a 2048x2048 one is the ceiling.
+        constraints: {
+          min_pixels: 1_048_576,
+          max_pixels: 4_194_304,
+          aspect_ratio: { max: 16 },
+        },
+        pricing: { type: "per_image_flat", usd: 0.035 },
+        avg_cost_usd: 0.035,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // -----------------------------------------------------------------
+      // ByteDance — Seedream 5.0 Lite
+      // -----------------------------------------------------------------
+      // Universal: $0.035/img on all three (Vercel feed `pricing.image`,
+      // OpenRouter `cost_usd`, fal page payload), verified 2026-09-02. A
+      // 2K–4K model: fal scales requests below 2560x1440 up to its floor.
+      "bytedance/seedream-5.0-lite": {
+        id: "bytedance/seedream-5.0-lite",
+        label: "Seedream 5.0 Lite",
+        deprecated: false,
+        short_description:
+          "ByteDance's fast 2K–4K image model — Seedream 5.0 quality at the 4.5 price point.",
+        vendor: "bytedance",
+        provider: "vercel",
+        listed: true,
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "bytedance/seedream-5.0-lite",
+            pricing: { type: "per_image_flat", usd: 0.035 },
+            avg_cost_usd: 0.035,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "bytedance-seed/seedream-5-0-lite",
+            pricing: { type: "per_image_flat", usd: 0.035 },
+            avg_cost_usd: 0.035,
+            url: "https://openrouter.ai/bytedance-seed/seedream-5-0-lite",
+            // OpenRouter `supported_parameters.input_references` 0–14
+            // (2026-09-02).
+            references: { id: "bytedance-seed/seedream-5-0-lite", max: 14 },
+          },
+          fal: {
+            provider: "fal",
+            id: "bytedance/seedream/v5/lite/text-to-image",
+            pricing: { type: "per_image_flat", usd: 0.035 },
+            avg_cost_usd: 0.035,
+            url: "https://fal.ai/models/bytedance/seedream/v5/lite/text-to-image",
+          },
+        },
+        speed_label: "fast",
+        speed_max: "15s",
+        styles: null,
+        sizes: null,
+        // fal: total pixels between 2560x1440 and 4096x4096 (requests below
+        // the floor are scaled up to it); Vercel and OpenRouter serve 2K/4K
+        // only. An area envelope, so the default is a 2K request.
+        constraints: { min_pixels: 3_686_400, max_pixels: 16_777_216 },
+        pricing: { type: "per_image_flat", usd: 0.035 },
+        avg_cost_usd: 0.035,
+        default: {
+          width: 2048,
+          height: 2048,
+          aspect_ratio: "1:1",
+        },
+      },
+      // -----------------------------------------------------------------
       // ByteDance — Seedream 4.5
       // -----------------------------------------------------------------
-      // Universal: $0.04/img identical on all three providers (verified
-      // 2026-06-29, see github.com/gridaco/grida/issues/908).
+      // $0.04/img on all three providers (re-verified 2026-09-02). Superseded
+      // by Seedream 5.0 Lite — cheaper on every provider, newer generation —
+      // so deprecated and unlisted; kept as a real choice for its editing
+      // route until 5.0's i2i is verified on the same providers.
       "bytedance/seedream-4.5": {
         id: "bytedance/seedream-4.5",
         label: "Seedream 4.5",
-        deprecated: false,
+        deprecated: true,
         short_description:
           "ByteDance's unified image generation and editing model.",
         vendor: "bytedance",
         provider: "vercel",
-        listed: true,
+        listed: false,
+        listed_reason: "Previous-generation model, superseded by Seedream 5.0.",
         providers: {
           vercel: {
             provider: "vercel",
@@ -1541,19 +1749,214 @@ export namespace models {
         },
       },
       // -----------------------------------------------------------------
+      // xAI — Grok Imagine Image 2.0
+      // -----------------------------------------------------------------
+      // Tiered by quality (low/medium) × resolution (1K/2K); the same four
+      // rates on all three providers (Vercel feed
+      // `image_dimension_quality_pricing`, OpenRouter `cost_usd` variants,
+      // fal page). OpenRouter also bills $0.01 per input image (not
+      // modelled). Verified 2026-09-02.
+      "xai/grok-imagine-image-2.0": {
+        id: "xai/grok-imagine-image-2.0",
+        label: "Grok Imagine Image 2.0",
+        deprecated: false,
+        short_description:
+          "xAI's image model — fast 1K/2K generation with a low-cost quality tier.",
+        vendor: "xai",
+        provider: "vercel",
+        listed: true,
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "spacexai/grok-imagine-image-2.0",
+            pricing: {
+              type: "per_image_tiered",
+              tiers: {
+                "low/1024x1024": 0.04,
+                "medium/1024x1024": 0.06,
+                "low/2048x2048": 0.06,
+                "medium/2048x2048": 0.08,
+              },
+            },
+            avg_cost_usd: 0.06,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "x-ai/grok-imagine-image-2.0",
+            pricing: {
+              type: "per_image_tiered",
+              tiers: {
+                "low/1024x1024": 0.04,
+                "medium/1024x1024": 0.06,
+                "low/2048x2048": 0.06,
+                "medium/2048x2048": 0.08,
+              },
+            },
+            avg_cost_usd: 0.06,
+            url: "https://openrouter.ai/x-ai/grok-imagine-image-2.0",
+            // OpenRouter `supported_parameters.input_references` 0–3
+            // (2026-09-02). OR bills $0.01 per input image on top (not modelled).
+            references: { id: "x-ai/grok-imagine-image-2.0", max: 3 },
+          },
+          fal: {
+            provider: "fal",
+            id: "xai/grok-imagine-image/v2.0/text-to-image",
+            pricing: {
+              type: "per_image_tiered",
+              tiers: {
+                "low/1024x1024": 0.04,
+                "medium/1024x1024": 0.06,
+                "low/2048x2048": 0.06,
+                "medium/2048x2048": 0.08,
+              },
+            },
+            avg_cost_usd: 0.06,
+            url: "https://fal.ai/models/xai/grok-imagine-image/v2.0/text-to-image",
+          },
+        },
+        speed_label: "fast",
+        speed_max: "15s",
+        styles: null,
+        sizes: null,
+        constraints: { max_edge: 2048 },
+        pricing: {
+          type: "per_image_tiered",
+          tiers: {
+            "low/1024x1024": 0.04,
+            "medium/1024x1024": 0.06,
+            "low/2048x2048": 0.06,
+            "medium/2048x2048": 0.08,
+          },
+        },
+        avg_cost_usd: 0.06, // medium 1K
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // -----------------------------------------------------------------
+      // Meta — Muse Image 1.0
+      // -----------------------------------------------------------------
+      // Meta's agentic image model (2026-08-26): $0.01/img on Vercel (feed
+      // `pricing.image`) and fal (page payload). OpenRouter lists it but
+      // exposes no serving endpoint, so it is not universal → unlisted.
+      // fal exposes aspect ratio only (no size control). Verified 2026-09-02.
+      "meta/muse-image-1.0": {
+        id: "meta/muse-image-1.0",
+        label: "Muse Image 1.0",
+        deprecated: false,
+        short_description:
+          "Meta's agentic image model — reasons before it renders; generates and edits from text and references.",
+        vendor: "meta",
+        provider: "vercel",
+        listed: false,
+        listed_reason:
+          "OpenRouter lists it without a serving endpoint, so not universal (one-key) coverage.",
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "meta/muse-image-1.0",
+            pricing: { type: "per_image_flat", usd: 0.01 },
+            avg_cost_usd: 0.01,
+          },
+          fal: {
+            provider: "fal",
+            id: "meta/muse-image/text-to-image",
+            pricing: { type: "per_image_flat", usd: 0.01 },
+            avg_cost_usd: 0.01,
+            url: "https://fal.ai/models/meta/muse-image/text-to-image",
+          },
+        },
+        speed_label: "medium",
+        speed_max: "30s",
+        styles: null,
+        sizes: null,
+        // Muse picks output dimensions from the aspect ratio; neither
+        // provider exposes a size envelope, so none is claimed.
+        constraints: null,
+        pricing: { type: "per_image_flat", usd: 0.01 },
+        avg_cost_usd: 0.01,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // -----------------------------------------------------------------
+      // Recraft — V4.1
+      // -----------------------------------------------------------------
+      // Universal: $0.035/img raster on every provider (Vercel feed
+      // `pricing.image`, OpenRouter endpoint `cost_usd`, fal page payload),
+      // verified 2026-09-02. Vector styles are $0.08 and a separate route on
+      // fal/OpenRouter (`.../text-to-vector`, `recraft-v4.1-vector`) — not
+      // catalogued; `styles: null` here means the raster route only.
+      // OpenRouter org slug is `recraft`, not `recraft-ai`.
+      "recraft/recraft-v4.1": {
+        id: "recraft/recraft-v4.1",
+        label: "Recraft V4.1",
+        deprecated: false,
+        short_description:
+          "Design-first image model — sharper prompt control and production-ready raster for brand and editorial work.",
+        vendor: "recraft-ai",
+        provider: "vercel",
+        listed: true,
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "recraft/recraft-v4.1",
+            pricing: { type: "per_image_flat", usd: 0.035 },
+            avg_cost_usd: 0.035,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "recraft/recraft-v4.1",
+            pricing: { type: "per_image_flat", usd: 0.035 },
+            avg_cost_usd: 0.035,
+            url: "https://openrouter.ai/recraft/recraft-v4.1",
+            // OpenRouter `supported_parameters.input_references` 0–1
+            // (2026-09-02).
+            references: { id: "recraft/recraft-v4.1", max: 1 },
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/recraft/v4.1/text-to-image",
+            pricing: { type: "per_image_flat", usd: 0.035 },
+            avg_cost_usd: 0.035,
+            url: "https://fal.ai/models/fal-ai/recraft/v4.1/text-to-image",
+          },
+        },
+        speed_label: "medium",
+        speed_max: "30s",
+        styles: null,
+        sizes: null,
+        constraints: { max_edge: 2048 },
+        pricing: { type: "per_image_flat", usd: 0.035 },
+        avg_cost_usd: 0.035,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // -----------------------------------------------------------------
       // Recraft — V3
       // -----------------------------------------------------------------
-      // Universal: ~$0.04/img across providers (verified 2026-06-29, see
-      // issues/908). OpenRouter org slug is `recraft`, not `recraft-ai`.
+      // $0.04/img raster on every provider (re-verified 2026-09-02; Recraft's
+      // own pricing table agrees). Superseded by V4.1, which is cheaper on
+      // every provider and equal on vector — deprecated, not removed, only
+      // because V3's positioned-text rendering is an axis V4.1 has not been
+      // shown to match. Remove once that is checked.
       "recraft/recraft-v3": {
         id: "recraft/recraft-v3",
         label: "Recraft V3",
-        deprecated: false,
+        deprecated: true,
         short_description:
           "Design-grade image model with strong text rendering and vector styles.",
         vendor: "recraft-ai",
         provider: "vercel",
-        listed: true,
+        listed: false,
+        listed_reason: "Previous-generation model, superseded by Recraft V4.1.",
         providers: {
           vercel: {
             provider: "vercel",
@@ -2105,6 +2508,10 @@ export namespace models {
      */
     export type VideoModelId =
       | "google/veo-3.1"
+      | "google/veo-3.1-fast"
+      | "google/veo-3.1-lite"
+      | "alibaba/wan-3.0"
+      | "bytedance/seedance-2.5"
       | "bytedance/seedance-2.0"
       | "xai/grok-imagine-video-1.5"
       | (string & {});
@@ -2114,8 +2521,8 @@ export namespace models {
 
     /**
      * Whether a clip is generated with synchronized audio. A real pricing axis:
-     * fal meters `silent` at roughly half of `audio`; Vercel sells `audio` only;
-     * Seedance bundles audio into its single rate.
+     * both fal and the Vercel gateway meter `silent` at roughly half of
+     * `audio`; Seedance bundles audio into its single rate.
      */
     export type AudioMode = "audio" | "silent";
 
@@ -2127,9 +2534,14 @@ export namespace models {
      *
      * A binding lists only the `(resolution, mode)` combinations its provider
      * actually serves and meters, so the keys double as that provider's
-     * resolution/audio support: Vercel's Veo card omits `"4k"` and `silent`
-     * because the gateway sells neither; fal lists both. Each value is the real
+     * resolution/audio support: Seedance lists only `audio` because it bundles
+     * audio into one rate, and Veo 3.1 Lite omits `"4k"` because the gateway
+     * does not sell it at that line. Each value is the real
      * USD-per-output-second rate for that exact config.
+     *
+     * These keys are provider truth, not Grida's request surface — a
+     * `(resolution, mode)` pair may be catalogued before the hosted wire can
+     * ask for it.
      */
     export type PerSecondPricing = {
       type: "per_second";
@@ -2235,8 +2647,19 @@ export namespace models {
         },
         url: "https://deepmind.google/models/veo/",
         providers: {
-          // Vercel AI Gateway — gateway.video(id), image-to-video. Audio-on
-          // only, ≤1080p, flat $0.40/s.
+          // Vercel AI Gateway — gateway.video(id), image-to-video. The
+          // gateway meters both audio modes and sells 4K; the matrix is
+          // identical to fal's. Verified against the gateway's own
+          // /v1/models feed (`video_duration_pricing`) on 2026-09-02 — the
+          // previous card claimed "audio-on only, ≤1080p", which the feed
+          // contradicts.
+          //
+          // `silent` is catalogued as provider truth but is not yet
+          // reachable on Grida's hosted route: the video wire carries no
+          // audio-mode field, so `generateVideo` prices the card's default
+          // mode (`editor/lib/ai/server.ts`). `"4k"` IS reachable — the
+          // request path maps a 2160 short edge to that label and today
+          // rejects it for want of a rate.
           // https://vercel.com/ai-gateway/models/veo-3.1-generate-001
           vercel: {
             provider: "vercel",
@@ -2244,17 +2667,18 @@ export namespace models {
             pricing: {
               type: "per_second",
               usd_per_second: {
-                "720p": { audio: 0.4 },
-                "1080p": { audio: 0.4 },
+                "720p": { audio: 0.4, silent: 0.2 },
+                "1080p": { audio: 0.4, silent: 0.2 },
+                "4k": { audio: 0.6, silent: 0.4 },
               },
             },
             avg_cost_usd: 3.2, // 1080p audio × 8s default
             url: "https://vercel.com/ai-gateway/models/veo-3.1-generate-001",
           },
           // fal.ai — image-to-video endpoint (capability is keyed into the id;
-          // t2v is a separate `fal-ai/veo3.1` endpoint, not catalogued). Meters
-          // audio/silent and adds 4K. Audio-on matches Vercel ($0.40/s @
-          // 720p/1080p); silent ~half; 4K $0.40 silent / $0.60 audio.
+          // t2v is a separate `fal-ai/veo3.1` endpoint, not catalogued). Rate
+          // matrix is identical to the Vercel gateway's: $0.40/s audio and
+          // $0.20/s silent at 720p/1080p, $0.60/$0.40 at 4K.
           // https://fal.ai/models/fal-ai/veo3.1/image-to-video
           fal: {
             provider: "fal",
@@ -2288,6 +2712,183 @@ export namespace models {
           },
         },
       },
+      // -----------------------------------------------------------------
+      // Google — Veo 3.1 Fast
+      // -----------------------------------------------------------------
+      // Same envelope as Veo 3.1 (16:9/9:16, 4/6/8s, native audio, ≤4K) at
+      // ~2.7x lower cost. Rate matrix is identical on Vercel and fal —
+      // gateway feed `video_duration_pricing` and fal's stated per-second
+      // rates, verified 2026-09-02.
+      "google/veo-3.1-fast": {
+        id: "google/veo-3.1-fast",
+        label: "Veo 3.1 Fast",
+        deprecated: false,
+        short_description:
+          "Faster, cheaper Veo 3.1 — the same envelope and native audio at a fraction of the price.",
+        vendor: "google",
+        listed: true,
+        aspect_ratios: ["16:9", "9:16"],
+        min_duration: 4,
+        max_duration: 8,
+        audio: true,
+        speed_label: "medium",
+        default: {
+          resolution: "1080p",
+          aspect_ratio: "16:9",
+          duration: 8,
+          audio: true,
+        },
+        url: "https://deepmind.google/models/veo/",
+        providers: {
+          // https://vercel.com/ai-gateway/models/veo-3.1-fast-generate-001
+          vercel: {
+            provider: "vercel",
+            id: "google/veo-3.1-fast-generate-001",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.15, silent: 0.1 },
+                "1080p": { audio: 0.15, silent: 0.1 },
+                "4k": { audio: 0.35, silent: 0.3 },
+              },
+            },
+            avg_cost_usd: 1.2, // 1080p audio × 8s default
+            url: "https://vercel.com/ai-gateway/models/veo-3.1-fast-generate-001",
+          },
+          // https://fal.ai/models/fal-ai/veo3.1/fast/image-to-video
+          fal: {
+            provider: "fal",
+            id: "fal-ai/veo3.1/fast/image-to-video",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.15, silent: 0.1 },
+                "1080p": { audio: 0.15, silent: 0.1 },
+                "4k": { audio: 0.35, silent: 0.3 },
+              },
+            },
+            avg_cost_usd: 1.2, // 1080p audio × 8s default
+            url: "https://fal.ai/models/fal-ai/veo3.1/fast/image-to-video",
+          },
+        },
+      },
+      // -----------------------------------------------------------------
+      // Google — Veo 3.1 Lite
+      // -----------------------------------------------------------------
+      // The budget Veo: 720p/1080p only, 4/6/8s, native audio. Rates
+      // identical on Vercel and fal (verified 2026-09-02). The gateway lists
+      // Lite as text-to-video only — the hosted route is t2v-only anyway;
+      // fal serves the image-to-video endpoint catalogued here.
+      "google/veo-3.1-lite": {
+        id: "google/veo-3.1-lite",
+        label: "Veo 3.1 Lite",
+        deprecated: false,
+        short_description:
+          "Budget Veo 3.1 — 720p/1080p clips with native audio for a few cents a second.",
+        vendor: "google",
+        listed: true,
+        aspect_ratios: ["16:9", "9:16"],
+        min_duration: 4,
+        max_duration: 8,
+        audio: true,
+        speed_label: "fast",
+        default: {
+          resolution: "1080p",
+          aspect_ratio: "16:9",
+          duration: 8,
+          audio: true,
+        },
+        url: "https://deepmind.google/models/veo/",
+        providers: {
+          // https://vercel.com/ai-gateway/models/veo-3.1-lite-generate-001
+          vercel: {
+            provider: "vercel",
+            id: "google/veo-3.1-lite-generate-001",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.05, silent: 0.03 },
+                "1080p": { audio: 0.08, silent: 0.05 },
+              },
+            },
+            avg_cost_usd: 0.64, // 1080p audio × 8s default
+            url: "https://vercel.com/ai-gateway/models/veo-3.1-lite-generate-001",
+          },
+          // https://fal.ai/models/fal-ai/veo3.1/lite/image-to-video
+          fal: {
+            provider: "fal",
+            id: "fal-ai/veo3.1/lite/image-to-video",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.05, silent: 0.03 },
+                "1080p": { audio: 0.08, silent: 0.05 },
+              },
+            },
+            avg_cost_usd: 0.64, // 1080p audio × 8s default
+            url: "https://fal.ai/models/fal-ai/veo3.1/lite/image-to-video",
+          },
+        },
+      },
+      // -----------------------------------------------------------------
+      // Alibaba — Wan 3.0
+      // -----------------------------------------------------------------
+      // Per-second by resolution, audio bundled into the rate (the gateway
+      // feed has no audio axis; fal exposes an `audio` toggle but bills the
+      // same). Identical on Vercel and fal, verified 2026-09-02. 2–30s.
+      "alibaba/wan-3.0": {
+        id: "alibaba/wan-3.0",
+        label: "Wan 3.0",
+        deprecated: false,
+        short_description:
+          "Alibaba's flagship video model — long clips (up to 30s) with bundled audio at the lowest per-second rates in the catalogue.",
+        vendor: "alibaba",
+        listed: true,
+        aspect_ratios: ["16:9", "4:3", "1:1", "3:4", "9:16"],
+        min_duration: 2,
+        max_duration: 30,
+        audio: true,
+        speed_label: "medium",
+        default: {
+          resolution: "1080p",
+          aspect_ratio: "16:9",
+          duration: 5,
+          audio: true,
+        },
+        url: "https://wan.video/",
+        providers: {
+          // https://vercel.com/ai-gateway/models/wan-v3.0-video
+          vercel: {
+            provider: "vercel",
+            id: "alibaba/wan-v3.0-video",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "480p": { audio: 0.05 },
+                "720p": { audio: 0.1 },
+                "1080p": { audio: 0.2 },
+              },
+            },
+            avg_cost_usd: 1.0, // 1080p × 5s default
+            url: "https://vercel.com/ai-gateway/models/wan-v3.0-video",
+          },
+          // https://fal.ai/models/alibaba/wan-3.0/image-to-video
+          fal: {
+            provider: "fal",
+            id: "alibaba/wan-3.0/image-to-video",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "480p": { audio: 0.05 },
+                "720p": { audio: 0.1 },
+                "1080p": { audio: 0.2 },
+              },
+            },
+            avg_cost_usd: 1.0, // 1080p × 5s default
+            url: "https://fal.ai/models/alibaba/wan-3.0/image-to-video",
+          },
+        },
+      },
       // ByteDance — Seedance 2.0
       // -----------------------------------------------------------------
       "bytedance/seedance-2.0": {
@@ -2295,7 +2896,7 @@ export namespace models {
         label: "Seedance 2.0",
         deprecated: false,
         short_description:
-          "ByteDance's state-of-the-art video model — top-tier image-to-video with reference and editing modes.",
+          "ByteDance's video model — image-to-video with reference modes, up to 4K, at roughly two-thirds the price of Seedance 2.5.",
         vendor: "bytedance",
         listed: true,
         aspect_ratios: ["16:9", "9:16", "1:1"],
@@ -2310,23 +2911,35 @@ export namespace models {
           audio: true,
         },
         url: "https://seed.bytedance.com/en/seedance2_0",
+        // NO Vercel binding, deliberately. The gateway serves
+        // `bytedance/seedance-2.0` but meters it PER TOKEN
+        // (`video_token_pricing`: $7.00/MTok at 480p/720p, $7.70 at 1080p,
+        // $4.00 at 4K; reduced with video input; "minimum token floors based
+        // on output duration"). `PerSecondPricing` cannot express that, the
+        // hosted route pre-prices rate×duration, and ByteDance publishes no
+        // tokens-per-second figure — so there is no honest per-second rate,
+        // and the per-second Vercel binding this card shipped with was
+        // invented. Withheld until the hosted path can meter post-flight;
+        // hosted requests fail with "not available on the hosted provider".
+        // See gridaco/grida#1019 (Blocker A). Feed checked 2026-09-02.
         providers: {
-          // Vercel AI Gateway — image-to-video. Per-second by resolution; audio
-          // bundled into the rate (no separate silent meter). 1080p exists but
-          // its per-second rate is unconfirmed; a `bytedance/seedance-2.0-fast`
-          // route also exists (~20% cheaper).
-          // https://vercel.com/changelog/seedance-2.0-video-now-available-on-ai-gateway
-          vercel: {
-            provider: "vercel",
-            id: "bytedance/seedance-2.0",
+          // fal — image-to-video. fal also meters tokens underneath
+          // ($0.014/1K), but states a per-second price for the two
+          // resolutions it prices: $0.3034/s @720p, $0.682/s @1080p, audio
+          // bundled. Those are fal's own figures, not a conversion of ours.
+          // https://fal.ai/models/bytedance/seedance-2.0/image-to-video
+          fal: {
+            provider: "fal",
+            id: "bytedance/seedance-2.0/image-to-video",
             pricing: {
               type: "per_second",
               usd_per_second: {
-                "480p": { audio: 0.092 },
-                "720p": { audio: 0.199 },
+                "720p": { audio: 0.3034 },
+                "1080p": { audio: 0.682 },
               },
             },
-            avg_cost_usd: 1.0, // 720p audio × 5s default (≈ $0.995)
+            avg_cost_usd: 1.52, // 720p audio × 5s default
+            url: "https://fal.ai/models/bytedance/seedance-2.0/image-to-video",
           },
           // OpenRouter — async `/api/v1/videos`. Flat $0.06726/s (verified
           // 2026-06-29, https://openrouter.ai/bytedance/seedance-2.0) — far
@@ -2345,8 +2958,57 @@ export namespace models {
             avg_cost_usd: 0.34, // 720p audio × 5s default
             url: "https://openrouter.ai/bytedance/seedance-2.0",
           },
-          // Also served by fal.ai and Replicate — add those bindings once
-          // their per-second rates are verified.
+        },
+      },
+      // -----------------------------------------------------------------
+      // ByteDance — Seedance 2.5
+      // -----------------------------------------------------------------
+      // Newer generation (2026-08-07), NOT a drop-in successor: ~55% more
+      // per token on the gateway ($10.70/MTok at 480p/720p, $11.70 at 1080p
+      // vs 2.0's $7.00/$7.70), ~56–71% more per second on fal, and no 4K.
+      // It buys 4–30s clips, video-editing and extend-video. 2.0 is cheaper
+      // and serves 4K, so it stays listed and undeprecated — the catalogue
+      // rule keeps a card that is still a real choice. Same metering story:
+      // the gateway bills tokens, so no Vercel binding until post-flight
+      // metering exists. fal states per-second prices, audio bundled.
+      "bytedance/seedance-2.5": {
+        id: "bytedance/seedance-2.5",
+        label: "Seedance 2.5",
+        deprecated: false,
+        short_description:
+          "ByteDance's latest video model — up to 30-second clips with native audio, reference and editing modes.",
+        vendor: "bytedance",
+        listed: true,
+        aspect_ratios: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"],
+        min_duration: 4,
+        max_duration: 30,
+        audio: true,
+        speed_label: "slow",
+        default: {
+          resolution: "720p",
+          aspect_ratio: "16:9",
+          duration: 5,
+          audio: true,
+        },
+        url: "https://seed.bytedance.com/en/seedance",
+        providers: {
+          // fal's stated rates: $0.2205/s @480p, $0.4730/s @720p, $1.164/s
+          // @1080p (fal meters $0.0214/1K tokens underneath). 2026-09-02.
+          // https://fal.ai/models/bytedance/seedance-2.5/image-to-video
+          fal: {
+            provider: "fal",
+            id: "bytedance/seedance-2.5/image-to-video",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "480p": { audio: 0.2205 },
+                "720p": { audio: 0.473 },
+                "1080p": { audio: 1.164 },
+              },
+            },
+            avg_cost_usd: 2.37, // 720p audio × 5s default
+            url: "https://fal.ai/models/bytedance/seedance-2.5/image-to-video",
+          },
         },
       },
       // -----------------------------------------------------------------

@@ -104,6 +104,10 @@ const VendorLabels: Record<string, string> = {
   elevenlabs: "ElevenLabs",
   google: "Google",
   "recraft-ai": "Recraft AI",
+  bytedance: "ByteDance",
+  xai: "xAI",
+  alibaba: "Alibaba",
+  meta: "Meta",
 };
 
 function vendorLabel(vendor: string) {
