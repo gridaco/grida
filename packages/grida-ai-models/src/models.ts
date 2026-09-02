@@ -317,6 +317,10 @@ export namespace models {
       },
       // Base rates; OPENAI_LONG_CONTEXT_PRICING represents the request-wide
       // band that applies above 272K total input tokens.
+      //
+      // Sol is cheaper than GPT-5.5, the card directly above it. It was
+      // introduced carrying 5.5's rates verbatim; these are OpenAI's own.
+      // https://developers.openai.com/api/docs/models/gpt-5.6-sol
       "openai/gpt-5.6-sol": {
         id: "openai/gpt-5.6-sol",
         label: "GPT-5.6 Sol",
@@ -326,10 +330,10 @@ export namespace models {
         contextWindow: 1_050_000,
         outputLimit: 128_000,
         cost: {
-          input: 5,
-          output: 30,
-          cacheRead: 0.5,
-          cacheWrite: 6.25,
+          input: 4,
+          output: 20,
+          cacheRead: 0.4,
+          cacheWrite: 5,
           longContext: OPENAI_LONG_CONTEXT_PRICING,
         },
       },
@@ -392,6 +396,25 @@ export namespace models {
         cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
         deprecated: true,
       },
+      // Same input/output/cacheWrite card as Claude Fable 5, with cache reads
+      // cut to $0.25/MTok. Not a drop-in successor — forced tool choice
+      // (`tool_choice` `any`/`tool`) is rejected here — which is why Fable 5
+      // stays catalogued rather than being removed.
+      // https://platform.claude.com/docs/en/about-claude/pricing
+      "anthropic/claude-fable-5.1": {
+        id: "anthropic/claude-fable-5.1",
+        label: "Claude Fable 5.1",
+        short_label: "Fable 5.1",
+        multimodal: true,
+        imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
+        tool_call: true,
+        contextWindow: 1_000_000,
+        outputLimit: 128_000,
+        cost: { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
+      },
+      // Superseded by Claude Fable 5.1, which is never more expensive, but
+      // still the only Fable that accepts forced tool choice — so it is
+      // deprecated, not removed.
       "anthropic/claude-fable-5": {
         id: "anthropic/claude-fable-5",
         label: "Claude Fable 5",
@@ -402,6 +425,7 @@ export namespace models {
         contextWindow: 1_000_000,
         outputLimit: 128_000,
         cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+        deprecated: true,
       },
       // Drop-in successor to Opus 4.8 at the same rate card.
       "anthropic/claude-opus-5": {
@@ -2355,10 +2379,12 @@ export namespace models {
         url: "https://docs.x.ai/developers/models/grok-imagine-video-1.5",
         providers: {
           // Vercel AI Gateway — image-to-video; mirrors xAI's list price (no markup).
+          // The gateway namespaces every xAI model under `spacexai/`, so the
+          // call id deliberately differs from this card's canonical `xai/` id.
           // https://vercel.com/changelog/grok-imagine-video-1-5-on-ai-gateway
           vercel: {
             provider: "vercel",
-            id: "xai/grok-imagine-video-1.5",
+            id: "spacexai/grok-imagine-video-1.5",
             pricing: {
               type: "per_second",
               usd_per_second: {

@@ -1,7 +1,7 @@
 ---
 title: Models & Pricing
 description: Compare Grida AI model tiers, context windows, and text, image, and music generation costs.
-keywords: [AI models, AI pricing, GPT-5.6, Claude Fable 5, Lyria, Grida AI]
+keywords: [AI models, AI pricing, GPT-5.6, Claude Fable 5.1, Lyria, Grida AI]
 slug: pricing
 format: md
 ---
@@ -36,10 +36,10 @@ Models are organized into **tiers** based on capability and cost:
 | `nano` | GPT-5.6 Luna (`openai/gpt-5.6-luna`)   | 1.05M   | 128K       | $0.20          | $1.20           |
 | `mini` | GPT-5.6 Luna (`openai/gpt-5.6-luna`)   | 1.05M   | 128K       | $0.20          | $1.20           |
 | `pro`  | GPT-5.6 Terra (`openai/gpt-5.6-terra`) | 1.05M   | 128K       | $2.00          | $12.00          |
-| `max`  | GPT-5.6 Sol (`openai/gpt-5.6-sol`)     | 1.05M   | 128K       | $5.00          | $30.00          |
+| `max`  | GPT-5.6 Sol (`openai/gpt-5.6-sol`)     | 1.05M   | 128K       | $4.00          | $20.00          |
 
 All tier models support **multimodal** inputs (text + images).
-Claude Fable 5 and Claude Opus 5 remain active, non-tiered catalogue models.
+Claude Fable 5.1 and Claude Opus 5 remain active, non-tiered catalogue models.
 
 `nano` and `mini` currently resolve to the same model. `nano` is a floor —
 the cheapest model still good enough for background work (title generation,
@@ -59,7 +59,7 @@ All tiers support prompt caching, which reduces cost for repeated context:
 | `nano` | $0.02               | $0.25                |
 | `mini` | $0.02               | $0.25                |
 | `pro`  | $0.20               | $2.50                |
-| `max`  | $0.50               | $6.25                |
+| `max`  | $0.40               | $5.00                |
 
 ### All Models
 
@@ -71,11 +71,12 @@ Per 1M tokens.
 | GPT-5.4 Mini (`openai/gpt-5.4-mini`)                         | $0.75  | —           | $0.075     | $4.50   |
 | Claude Sonnet 5 (`anthropic/claude-sonnet-5`)                | $2.00  | $2.50       | $0.20      | $10.00  |
 | Claude Sonnet 4.6 (`anthropic/claude-sonnet-4.6`) _(legacy)_ | $3.00  | $3.75       | $0.30      | $15.00  |
-| Claude Fable 5 (`anthropic/claude-fable-5`)                  | $10.00 | $12.50      | $1.00      | $50.00  |
+| Claude Fable 5.1 (`anthropic/claude-fable-5.1`)              | $10.00 | $12.50      | $0.25      | $50.00  |
+| Claude Fable 5 (`anthropic/claude-fable-5`) _(legacy)_       | $10.00 | $12.50      | $1.00      | $50.00  |
 | Claude Opus 5 (`anthropic/claude-opus-5`)                    | $5.00  | $6.25       | $0.50      | $25.00  |
 | Claude Opus 4.8 (`anthropic/claude-opus-4.8`) _(legacy)_     | $5.00  | $6.25       | $0.50      | $25.00  |
 | Claude Opus 4.7 (`anthropic/claude-opus-4.7`) _(legacy)_     | $5.00  | $6.25       | $0.50      | $25.00  |
-| GPT-5.6 Sol (`openai/gpt-5.6-sol`)                           | $5.00  | $6.25       | $0.50      | $30.00  |
+| GPT-5.6 Sol (`openai/gpt-5.6-sol`)                           | $4.00  | $5.00       | $0.40      | $20.00  |
 | GPT-5.6 Terra (`openai/gpt-5.6-terra`)                       | $2.00  | $2.50       | $0.20      | $12.00  |
 | GPT-5.6 Luna (`openai/gpt-5.6-luna`)                         | $0.20  | $0.25       | $0.02      | $1.20   |
 | GPT-5.5 (`openai/gpt-5.5`) _(legacy)_                        | $5.00  | —           | $0.50      | $30.00  |
@@ -99,6 +100,13 @@ this is not an upstream OpenAI retirement. `GPT-5.5 Pro` remains active.
 `Claude Opus 4.8` is deprecated in Grida's catalogue in favor of
 `Claude Opus 5`, its drop-in successor at the same rate card; this is not an
 upstream Anthropic retirement.
+
+`Claude Fable 5` is deprecated in Grida's catalogue in favor of
+`Claude Fable 5.1`, which carries the same input, output, and cache-write
+rates at a quarter of the cache-read price. It is kept rather than dropped
+because `Claude Fable 5.1` rejects forced tool choice, so `Claude Fable 5`
+remains the only Fable that serves it. Neither is an upstream Anthropic
+retirement.
 
 ## Image Generation Models
 

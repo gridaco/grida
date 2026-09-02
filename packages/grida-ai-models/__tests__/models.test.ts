@@ -328,8 +328,12 @@ describe("models.video catalogue invariants", () => {
 
     const grok = models.video.models["xai/grok-imagine-video-1.5"]!;
     expect(grok).toMatchObject({ min_duration: 1, max_duration: 15 });
+    // Vercel serves every xAI model under `spacexai/`, so the call id is not
+    // this card's canonical `xai/` id. Reusing the canonical id here is a 404
+    // at call time — which is how the binding was first shipped.
+    // https://vercel.com/ai-gateway/models/grok-imagine-video-1.5
     expect(models.video.binding(grok, "vercel")).toMatchObject({
-      id: "xai/grok-imagine-video-1.5",
+      id: "spacexai/grok-imagine-video-1.5",
       pricing: {
         usd_per_second: {
           "480p": { audio: 0.08 },
@@ -432,11 +436,13 @@ describe("models.text current catalogue", () => {
       id: "openai/gpt-5.6-sol",
       contextWindow: 1_050_000,
       outputLimit: 128_000,
+      // Deliberately below GPT-5.5's $5/$30 — Sol is the cheaper successor,
+      // and this card once carried 5.5's rates by mistake.
       cost: {
-        input: 5,
-        output: 30,
-        cacheRead: 0.5,
-        cacheWrite: 6.25,
+        input: 4,
+        output: 20,
+        cacheRead: 0.4,
+        cacheWrite: 5,
         longContext,
       },
     },
@@ -463,6 +469,14 @@ describe("models.text current catalogue", () => {
         cacheWrite: 0.25,
         longContext,
       },
+    },
+    {
+      id: "anthropic/claude-fable-5.1",
+      contextWindow: 1_000_000,
+      outputLimit: 128_000,
+      // Same card as Fable 5 apart from the cache read, which is the whole
+      // reason this entry is pinned separately.
+      cost: { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
     },
     {
       id: "anthropic/claude-fable-5",
@@ -545,8 +559,11 @@ describe("models.text current catalogue", () => {
       models.text.catalog["openai/gpt-5.5-pro"].deprecated
     ).toBeUndefined();
     expect(
-      models.text.catalog["anthropic/claude-fable-5"].deprecated
+      models.text.catalog["anthropic/claude-fable-5.1"].deprecated
     ).toBeUndefined();
+    expect(models.text.catalog["anthropic/claude-fable-5"].deprecated).toBe(
+      true
+    );
     expect(
       models.text.catalog["anthropic/claude-opus-5"].deprecated
     ).toBeUndefined();
