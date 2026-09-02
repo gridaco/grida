@@ -2114,8 +2114,8 @@ export namespace models {
 
     /**
      * Whether a clip is generated with synchronized audio. A real pricing axis:
-     * fal meters `silent` at roughly half of `audio`; Vercel sells `audio` only;
-     * Seedance bundles audio into its single rate.
+     * both fal and the Vercel gateway meter `silent` at roughly half of
+     * `audio`; Seedance bundles audio into its single rate.
      */
     export type AudioMode = "audio" | "silent";
 
@@ -2127,9 +2127,14 @@ export namespace models {
      *
      * A binding lists only the `(resolution, mode)` combinations its provider
      * actually serves and meters, so the keys double as that provider's
-     * resolution/audio support: Vercel's Veo card omits `"4k"` and `silent`
-     * because the gateway sells neither; fal lists both. Each value is the real
+     * resolution/audio support: Seedance lists only `audio` because it bundles
+     * audio into one rate, and Veo 3.1 Lite omits `"4k"` because the gateway
+     * does not sell it at that line. Each value is the real
      * USD-per-output-second rate for that exact config.
+     *
+     * These keys are provider truth, not Grida's request surface — a
+     * `(resolution, mode)` pair may be catalogued before the hosted wire can
+     * ask for it.
      */
     export type PerSecondPricing = {
       type: "per_second";
@@ -2235,8 +2240,19 @@ export namespace models {
         },
         url: "https://deepmind.google/models/veo/",
         providers: {
-          // Vercel AI Gateway — gateway.video(id), image-to-video. Audio-on
-          // only, ≤1080p, flat $0.40/s.
+          // Vercel AI Gateway — gateway.video(id), image-to-video. The
+          // gateway meters both audio modes and sells 4K; the matrix is
+          // identical to fal's. Verified against the gateway's own
+          // /v1/models feed (`video_duration_pricing`) on 2026-09-02 — the
+          // previous card claimed "audio-on only, ≤1080p", which the feed
+          // contradicts.
+          //
+          // `silent` is catalogued as provider truth but is not yet
+          // reachable on Grida's hosted route: the video wire carries no
+          // audio-mode field, so `generateVideo` prices the card's default
+          // mode (`editor/lib/ai/server.ts`). `"4k"` IS reachable — the
+          // request path maps a 2160 short edge to that label and today
+          // rejects it for want of a rate.
           // https://vercel.com/ai-gateway/models/veo-3.1-generate-001
           vercel: {
             provider: "vercel",
@@ -2244,17 +2260,18 @@ export namespace models {
             pricing: {
               type: "per_second",
               usd_per_second: {
-                "720p": { audio: 0.4 },
-                "1080p": { audio: 0.4 },
+                "720p": { audio: 0.4, silent: 0.2 },
+                "1080p": { audio: 0.4, silent: 0.2 },
+                "4k": { audio: 0.6, silent: 0.4 },
               },
             },
             avg_cost_usd: 3.2, // 1080p audio × 8s default
             url: "https://vercel.com/ai-gateway/models/veo-3.1-generate-001",
           },
           // fal.ai — image-to-video endpoint (capability is keyed into the id;
-          // t2v is a separate `fal-ai/veo3.1` endpoint, not catalogued). Meters
-          // audio/silent and adds 4K. Audio-on matches Vercel ($0.40/s @
-          // 720p/1080p); silent ~half; 4K $0.40 silent / $0.60 audio.
+          // t2v is a separate `fal-ai/veo3.1` endpoint, not catalogued). Rate
+          // matrix is identical to the Vercel gateway's: $0.40/s audio and
+          // $0.20/s silent at 720p/1080p, $0.60/$0.40 at 4K.
           // https://fal.ai/models/fal-ai/veo3.1/image-to-video
           fal: {
             provider: "fal",

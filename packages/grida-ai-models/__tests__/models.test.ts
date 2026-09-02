@@ -314,6 +314,27 @@ describe("models.video catalogue invariants", () => {
     }
   });
 
+  it("prices Veo 3.1 with the gateway's full audio/resolution matrix", () => {
+    // Written from the provider, not from the card: these are the exact
+    // `video_duration_pricing` rows the Vercel gateway's /v1/models feed
+    // returns for `google/veo-3.1-generate-001` (checked 2026-09-02).
+    // The card previously claimed audio-on-only at <=1080p, so a 4K request
+    // was rejected for want of a rate. The gateway meters both modes, and
+    // fal meters the same matrix.
+    // https://vercel.com/ai-gateway/models/veo-3.1-generate-001
+    const matrix = {
+      "720p": { audio: 0.4, silent: 0.2 },
+      "1080p": { audio: 0.4, silent: 0.2 },
+      "4k": { audio: 0.6, silent: 0.4 },
+    };
+    const veo = models.video.models["google/veo-3.1"]!;
+    for (const provider of ["vercel", "fal"] as const) {
+      expect(
+        models.video.binding(veo, provider)?.pricing.usd_per_second
+      ).toEqual(matrix);
+    }
+  });
+
   it("binding() resolves a present provider and nulls an absent one", () => {
     const veo = models.video.models["google/veo-3.1"]!;
     // fal keys the capability into the id — this is the image-to-video endpoint.
