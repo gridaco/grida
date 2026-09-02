@@ -692,7 +692,7 @@ export namespace models {
       | "bytedance/seedream-5.0-pro"
       | "bytedance/seedream-5.0-lite"
       | "bytedance/seedream-4.5"
-      // xAI
+      // SpaceXAI
       | "xai/grok-imagine-image-2.0"
       // Meta
       | "meta/muse-image-1.0"
@@ -1749,7 +1749,7 @@ export namespace models {
         },
       },
       // -----------------------------------------------------------------
-      // xAI — Grok Imagine Image 2.0
+      // SpaceXAI — Grok Imagine Image 2.0
       // -----------------------------------------------------------------
       // Tiered by quality (low/medium) × resolution (1K/2K); the same four
       // rates on all three providers (Vercel feed
@@ -1761,7 +1761,7 @@ export namespace models {
         label: "Grok Imagine Image 2.0",
         deprecated: false,
         short_description:
-          "xAI's image model — fast 1K/2K generation with a low-cost quality tier.",
+          "SpaceXAI's image model — fast 1K/2K generation with a low-cost quality tier.",
         vendor: "xai",
         provider: "vercel",
         listed: true,
@@ -3012,9 +3012,9 @@ export namespace models {
         },
       },
       // -----------------------------------------------------------------
-      // xAI — Grok Imagine Video 1.5
+      // SpaceXAI — Grok Imagine Video 1.5
       // -----------------------------------------------------------------
-      // Image-to-video only (no t2v, per xAI docs); native lip-synced audio
+      // Image-to-video only (no t2v, per SpaceXAI docs); native lip-synced audio
       // bundled into the rate. Per-second by resolution, identical on Vercel
       // (no markup) and fal: $0.08/s @480p, $0.14/s @720p, $0.25/s @1080p.
       // Both also bill $0.01 per input image, captured separately from the
@@ -3024,7 +3024,7 @@ export namespace models {
         label: "Grok Imagine Video 1.5",
         deprecated: false,
         short_description:
-          "xAI's image-to-video model — animates a still into cinematic video with native, lip-synced audio.",
+          "SpaceXAI's image-to-video model — animates a still into cinematic video with native, lip-synced audio.",
         vendor: "xai",
         listed: true,
         aspect_ratios: ["16:9", "9:16"],
@@ -3040,8 +3040,8 @@ export namespace models {
         },
         url: "https://docs.x.ai/developers/models/grok-imagine-video-1.5",
         providers: {
-          // Vercel AI Gateway — image-to-video; mirrors xAI's list price (no markup).
-          // The gateway namespaces every xAI model under `spacexai/`, so the
+          // Vercel AI Gateway — image-to-video; mirrors SpaceXAI's list price (no markup).
+          // The gateway namespaces every SpaceXAI model under `spacexai/`, so the
           // call id deliberately differs from this card's canonical `xai/` id.
           // https://vercel.com/changelog/grok-imagine-video-1-5-on-ai-gateway
           vercel: {

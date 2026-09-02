@@ -540,7 +540,7 @@ describe("models.video catalogue invariants", () => {
 
     const grok = models.video.models["xai/grok-imagine-video-1.5"]!;
     expect(grok).toMatchObject({ min_duration: 1, max_duration: 15 });
-    // Vercel serves every xAI model under `spacexai/`, so the call id is not
+    // Vercel serves every SpaceXAI model under `spacexai/`, so the call id is not
     // this card's canonical `xai/` id. Reusing the canonical id here is a 404
     // at call time — which is how the binding was first shipped.
     // https://vercel.com/ai-gateway/models/grok-imagine-video-1.5

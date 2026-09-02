@@ -183,7 +183,7 @@ Flat per-image pricing.
 `Seedream 4.5` is deprecated in Grida's catalogue in favor of the 5.0 models,
 which are cheaper on every provider; this is not an upstream retirement.
 
-### xAI
+### SpaceXAI
 
 Tiered by quality and size.
 
