@@ -166,8 +166,20 @@ Flat per-image pricing.
 | ----------------------------------------- | ----------- |
 | Flux 2 Pro (`bfl/flux-2-pro`)             | $0.060      |
 | Flux Kontext Max (`bfl/flux-kontext-max`) | $0.080      |
-| Flux Kontext Pro (`bfl/flux-kontext-pro`) | $0.050      |
+| Flux Kontext Pro (`bfl/flux-kontext-pro`) | $0.040      |
 | Flux Pro 1.1 (`bfl/flux-pro-1.1`)         | $0.040      |
+
+### Recraft
+
+Flat per-image pricing for raster output. Vector styles are a separate route at $0.08 and are not offered.
+
+| Model                                        | Price/Image |
+| -------------------------------------------- | ----------- |
+| Recraft V4.1 (`recraft/recraft-v4.1`)        | $0.035      |
+| Recraft V3 (`recraft/recraft-v3`) _(legacy)_ | $0.040      |
+
+`Recraft V3` is deprecated in Grida's catalogue in favor of `Recraft V4.1`,
+which is cheaper on every provider; this is not an upstream Recraft retirement.
 
 ### Image Sizes
 

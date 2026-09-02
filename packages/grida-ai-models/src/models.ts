@@ -688,6 +688,7 @@ export namespace models {
       // ByteDance
       | "bytedance/seedream-4.5"
       // Recraft
+      | "recraft/recraft-v4.1"
       | "recraft/recraft-v3"
       | (string & {});
 
@@ -1434,13 +1435,24 @@ export namespace models {
         provider: "vercel",
         listed: false,
         listed_reason:
-          "Image-editing model; superseded by Flux 2 and not universal.",
+          "Image-editing model; superseded by Flux 2 and not on OpenRouter, so not universal.",
+        // $0.04 on both providers. The card shipped at $0.05 — and because the
+        // hosted route gates on a vercel binding, not on `listed`, that was a
+        // live 25% over-deduction. Gateway feed `pricing.image` + fal's model
+        // page ("Fixed $0.04 cost per image edit"), verified 2026-09-02.
         providers: {
           vercel: {
             provider: "vercel",
             id: "bfl/flux-kontext-pro",
-            pricing: { type: "per_image_flat", usd: 0.05 },
-            avg_cost_usd: 0.05,
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/flux-pro/kontext",
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+            url: "https://fal.ai/models/fal-ai/flux-pro/kontext",
           },
         },
         speed_label: "medium",
@@ -1448,8 +1460,8 @@ export namespace models {
         styles: null,
         sizes: null,
         constraints: { max_edge: 1820 },
-        pricing: { type: "per_image_flat", usd: 0.05 },
-        avg_cost_usd: 0.05,
+        pricing: { type: "per_image_flat", usd: 0.04 },
+        avg_cost_usd: 0.04,
         default: {
           width: 1024,
           height: 1024,
@@ -1541,19 +1553,76 @@ export namespace models {
         },
       },
       // -----------------------------------------------------------------
+      // Recraft — V4.1
+      // -----------------------------------------------------------------
+      // Universal: $0.035/img raster on every provider (Vercel feed
+      // `pricing.image`, OpenRouter endpoint `cost_usd`, fal page payload),
+      // verified 2026-09-02. Vector styles are $0.08 and a separate route on
+      // fal/OpenRouter (`.../text-to-vector`, `recraft-v4.1-vector`) — not
+      // catalogued; `styles: null` here means the raster route only.
+      // OpenRouter org slug is `recraft`, not `recraft-ai`.
+      "recraft/recraft-v4.1": {
+        id: "recraft/recraft-v4.1",
+        label: "Recraft V4.1",
+        deprecated: false,
+        short_description:
+          "Design-first image model — sharper prompt control and production-ready raster for brand and editorial work.",
+        vendor: "recraft-ai",
+        provider: "vercel",
+        listed: true,
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "recraft/recraft-v4.1",
+            pricing: { type: "per_image_flat", usd: 0.035 },
+            avg_cost_usd: 0.035,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "recraft/recraft-v4.1",
+            pricing: { type: "per_image_flat", usd: 0.035 },
+            avg_cost_usd: 0.035,
+            url: "https://openrouter.ai/recraft/recraft-v4.1",
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/recraft/v4.1/text-to-image",
+            pricing: { type: "per_image_flat", usd: 0.035 },
+            avg_cost_usd: 0.035,
+            url: "https://fal.ai/models/fal-ai/recraft/v4.1/text-to-image",
+          },
+        },
+        speed_label: "medium",
+        speed_max: "30s",
+        styles: null,
+        sizes: null,
+        constraints: { max_edge: 2048 },
+        pricing: { type: "per_image_flat", usd: 0.035 },
+        avg_cost_usd: 0.035,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // -----------------------------------------------------------------
       // Recraft — V3
       // -----------------------------------------------------------------
-      // Universal: ~$0.04/img across providers (verified 2026-06-29, see
-      // issues/908). OpenRouter org slug is `recraft`, not `recraft-ai`.
+      // $0.04/img raster on every provider (re-verified 2026-09-02; Recraft's
+      // own pricing table agrees). Superseded by V4.1, which is cheaper on
+      // every provider and equal on vector — deprecated, not removed, only
+      // because V3's positioned-text rendering is an axis V4.1 has not been
+      // shown to match. Remove once that is checked.
       "recraft/recraft-v3": {
         id: "recraft/recraft-v3",
         label: "Recraft V3",
-        deprecated: false,
+        deprecated: true,
         short_description:
           "Design-grade image model with strong text rendering and vector styles.",
         vendor: "recraft-ai",
         provider: "vercel",
-        listed: true,
+        listed: false,
+        listed_reason: "Previous-generation model, superseded by Recraft V4.1.",
         providers: {
           vercel: {
             provider: "vercel",

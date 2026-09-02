@@ -104,6 +104,42 @@ describe("models.image provider-binding invariants", () => {
     expect(models.image.binding(kontext, "openrouter")).toBeNull();
   });
 
+  it("prices Recraft V4.1 at the raster rate every provider publishes", () => {
+    // Written from the providers, not the card: Vercel feed `pricing.image`,
+    // OpenRouter `/images/models/.../endpoints` `cost_usd`, and fal's model
+    // page payload all say $0.035 (checked 2026-09-02). V3 is $0.04 on the
+    // same three, which is why V4.1 is listed and V3 is not.
+    const v41 = models.image.models["recraft/recraft-v4.1"]!;
+    expect(v41.listed).toBe(true);
+    for (const p of ["vercel", "fal", "openrouter"] as const) {
+      expect(models.image.binding(v41, p)?.pricing).toEqual({
+        type: "per_image_flat",
+        usd: 0.035,
+      });
+    }
+    expect(models.image.binding(v41, "fal")?.id).toBe(
+      "fal-ai/recraft/v4.1/text-to-image"
+    );
+    const v3 = models.image.models["recraft/recraft-v3"]!;
+    expect(v3).toMatchObject({ listed: false, deprecated: true });
+  });
+
+  it("prices Flux Kontext Pro at $0.04 and binds fal", () => {
+    // The card shipped at $0.05 while the gateway feed's `pricing.image` is
+    // $0.04 — reachable over-deduction, since the hosted route gates on a
+    // vercel binding rather than `listed`. fal's page states the same $0.04.
+    const kontext = models.image.models["bfl/flux-kontext-pro"]!;
+    expect(kontext.pricing).toEqual({ type: "per_image_flat", usd: 0.04 });
+    expect(models.image.binding(kontext, "vercel")?.pricing).toEqual({
+      type: "per_image_flat",
+      usd: 0.04,
+    });
+    expect(models.image.binding(kontext, "fal")).toMatchObject({
+      id: "fal-ai/flux-pro/kontext",
+      pricing: { type: "per_image_flat", usd: 0.04 },
+    });
+  });
+
   it("listed_models returns only listed cards", () => {
     for (const card of models.image.listed_models()) {
       expect(card.listed).toBe(true);
