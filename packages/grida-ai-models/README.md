@@ -192,9 +192,9 @@ out of the catalogue until that support exists.
 
 `models.text.modelSpecById(modelId)` accepts:
 
-- Full ids, such as `openai/gpt-5.4-mini`
-- Bare ids, such as `gpt-5.4-mini`
-- Date-suffixed provider ids, such as `gpt-5.4-mini-2025-08-07`
+- Full ids, such as `openai/gpt-5.6-luna`
+- Bare ids, such as `gpt-5.6-luna`
+- Date-suffixed provider ids, such as `gpt-5.6-luna-2026-07-30`
 
 `models.image.findImageModelCard(model)` accepts:
 

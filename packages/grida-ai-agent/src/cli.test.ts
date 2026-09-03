@@ -346,14 +346,14 @@ describe("CLI — parseRunArgs", () => {
       "--mode",
       "auto",
       "--model",
-      "anthropic/claude-sonnet-4.6",
+      "anthropic/claude-sonnet-5",
       "draw",
       "a",
       "cat",
     ]);
     expect(r.workspace).toBe("/proj");
     expect(r.mode).toBe("auto");
-    expect(r.model_id).toBe("anthropic/claude-sonnet-4.6");
+    expect(r.model_id).toBe("anthropic/claude-sonnet-5");
     expect(r.message).toBe("draw a cat");
     // The -w alias works too.
     expect(parseRunArgs(["-w", "/p", "hi"]).workspace).toBe("/p");

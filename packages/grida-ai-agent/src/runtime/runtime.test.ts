@@ -168,7 +168,7 @@ describe("agent workspace bindings", () => {
       () =>
         new MockLanguageModelV3({
           provider: "openrouter",
-          modelId: "openai/gpt-5.4-nano",
+          modelId: "openai/gpt-5.6-luna",
           doStream: {
             stream: simulateReadableStream({
               chunks: [
@@ -242,7 +242,7 @@ describe("agent workspace bindings", () => {
     const providerHttp = new ProviderHttp({ request, download });
     const model = new MockLanguageModelV3({
       provider: "openrouter",
-      modelId: "openai/gpt-5.4-nano",
+      modelId: "openai/gpt-5.6-luna",
       supportedUrls: {},
       doStream: {
         stream: simulateReadableStream({
@@ -322,7 +322,7 @@ describe("agent workspace bindings", () => {
       () =>
         new MockLanguageModelV3({
           provider: "openrouter",
-          modelId: "openai/gpt-5.4-nano",
+          modelId: "openai/gpt-5.6-luna",
           doStream: {
             stream: simulateReadableStream({
               chunks: [

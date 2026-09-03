@@ -144,27 +144,27 @@ describe("methods.generateMusic", () => {
 });
 
 describe("costMillsFromTokenUsage", () => {
-  it("computes cost from a flat-rate model card", () => {
-    // openai/gpt-5.4-mini → input 0.75, output 4.50 per 1M
-    const mills = costMillsFromTokenUsage("openai/gpt-5.4-mini", {
+  it("computes cost from a base-rate model card", () => {
+    // openai/gpt-5.6-luna → input 0.20, output 1.20 per 1M
+    const mills = costMillsFromTokenUsage("openai/gpt-5.6-luna", {
       inputTokens: { total: 1000 },
       outputTokens: { total: 1000 },
     });
-    // 0.75e-3 + 4.5e-3 = 5.25e-3 USD = 5.25 mills (fractional —
+    // 0.2e-3 + 1.2e-3 = 1.4e-3 USD = 1.4 mills (fractional —
     // Metronome aggregates exactly, Stripe rounds once at invoice).
-    expect(mills).toBeCloseTo(5.25);
+    expect(mills).toBeCloseTo(1.4);
   });
 
   it("applies cacheRead rate for cached input tokens", () => {
-    // claude-sonnet-4.6: input 3, cacheRead 0.3, output 15 (per 1M).
-    const mills = costMillsFromTokenUsage("anthropic/claude-sonnet-4.6", {
+    // claude-sonnet-5: input 2, cacheRead 0.2, output 10 (per 1M).
+    const mills = costMillsFromTokenUsage("anthropic/claude-sonnet-5", {
       inputTokens: { total: 10000, cacheRead: 8000 },
       outputTokens: { total: 0 },
     });
-    // nonCached = 10000 - 8000 = 2000 → 2000*3/1e6 = 6e-3 USD
-    // cacheRead = 8000*0.3/1e6 = 2.4e-3 USD
-    // total = 8.4e-3 USD = 8.4 mills (fractional, un-rounded).
-    expect(mills).toBeCloseTo(8.4);
+    // nonCached = 10000 - 8000 = 2000 → 2000*2/1e6 = 4e-3 USD
+    // cacheRead = 8000*0.2/1e6 = 1.6e-3 USD
+    // total = 5.6e-3 USD = 5.6 mills (fractional, un-rounded).
+    expect(mills).toBeCloseTo(5.6);
   });
 
   // GRIDA-GG: gateway — pin request pricing used by hosted chat metering.
@@ -281,7 +281,7 @@ describe("withTransaction", () => {
       {
         organizationId: 7,
         feature: "test/feature",
-        model_id: "openai/gpt-5.4-mini",
+        model_id: "openai/gpt-5.6-luna",
         transactionId: "tx-1",
       },
       op
@@ -309,7 +309,7 @@ describe("withTransaction", () => {
         {
           organizationId: 7,
           feature: "test/feature",
-          model_id: "openai/gpt-5.4-mini",
+          model_id: "openai/gpt-5.6-luna",
         },
         op
       )
@@ -334,7 +334,7 @@ describe("withTransaction", () => {
         {
           organizationId: 7,
           feature: "test/feature",
-          model_id: "openai/gpt-5.4-mini",
+          model_id: "openai/gpt-5.6-luna",
         },
         op
       )
@@ -351,7 +351,7 @@ describe("withTransaction", () => {
         {
           organizationId: 0 as number,
           feature: "test/feature",
-          model_id: "openai/gpt-5.4-mini",
+          model_id: "openai/gpt-5.6-luna",
         },
         op
       )
@@ -382,7 +382,7 @@ describe("withTransaction", () => {
       {
         organizationId: 7,
         feature: "ai/chat",
-        model_id: "openai/gpt-5.4-mini",
+        model_id: "openai/gpt-5.6-luna",
         awaitIngest: true,
       },
       op
@@ -482,7 +482,7 @@ describe("checkGate", () => {
       checkGate({
         organizationId: 7,
         feature: "test",
-        model_id: "openai/gpt-5.4-mini",
+        model_id: "openai/gpt-5.6-luna",
       })
     ).rejects.toBeInstanceOf(BillingMetronomeError);
   });
@@ -497,7 +497,7 @@ describe("checkGate", () => {
       checkGate({
         organizationId: 7,
         feature: "test",
-        model_id: "openai/gpt-5.4-mini",
+        model_id: "openai/gpt-5.6-luna",
       })
     ).resolves.toBeUndefined();
   });

@@ -614,7 +614,7 @@ describe("SessionsStore rollups", () => {
       model: {
         provider_id: "openrouter",
         tier: "mini",
-        model_id: "openai/gpt-5.4-mini",
+        model_id: "openai/gpt-5.6-luna",
       },
       usage: { input: 50, output: 10 },
     });
@@ -654,7 +654,7 @@ describe("SessionsStore rollups", () => {
     const model = {
       provider_id: "openrouter",
       tier: "mini",
-      model_id: "openai/gpt-5.4-mini",
+      model_id: "openai/gpt-5.6-luna",
     } as const;
 
     await store.setMessageAccounting(a.id, {
@@ -697,7 +697,7 @@ describe("SessionsStore rollups", () => {
       model: {
         provider_id: "openrouter",
         tier: "mini",
-        model_id: "openai/gpt-5.4-mini",
+        model_id: "openai/gpt-5.6-luna",
       },
       usage: { input: 100, output: 10 },
     });
@@ -708,7 +708,7 @@ describe("SessionsStore rollups", () => {
       model: {
         provider_id: "openrouter",
         tier: "mini",
-        model_id: "openai/gpt-5.4-mini",
+        model_id: "openai/gpt-5.6-luna",
       },
       usage: { input: 50, output: 5 },
     });

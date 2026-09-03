@@ -469,7 +469,7 @@ export type GridaProvider = ((modelId: string) => LanguageModel) & {
  * is a bare provider that bypasses billing — see the BYOK carve-out in
  * this file's header / `models.ts` / SECURITY.md GRIDA-SEC-003.
  *
- *     grida("openai/gpt-5.4-mini")       // → LanguageModel (callable shorthand)
+ *     grida("openai/gpt-5.6-luna")       // → LanguageModel (callable shorthand)
  *     grida.languageModel("openai/...")  // → LanguageModel (explicit)
  *     grida.imageModel("bfl/flux-2-pro") // → ImageModel
  */

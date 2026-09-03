@@ -71,7 +71,7 @@ describe("resolveDefaultModelSelection", () => {
   });
 
   it("an explicit caller-seeded initial wins over the GG default", () => {
-    const initial = "openai/gpt-5.4-mini";
+    const initial = "openai/gpt-5.6-luna";
     expect(
       resolveDefaultModelSelection({
         initial,

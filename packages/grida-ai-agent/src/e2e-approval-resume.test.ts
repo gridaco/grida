@@ -64,7 +64,7 @@ function promptHasToolResult(prompt: unknown): boolean {
 function makeMockModel(): MockLanguageModelV3 {
   return new MockLanguageModelV3({
     provider: "openrouter",
-    modelId: "openai/gpt-5.4-nano",
+    modelId: "openai/gpt-5.6-luna",
     doStream: async (options) => {
       const prompt = options.prompt as unknown[];
       const wantsCommand =

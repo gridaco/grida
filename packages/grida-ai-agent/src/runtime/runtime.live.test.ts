@@ -55,7 +55,7 @@ const LIVE_AUTH_DIR = process.env.GRIDA_LIVE_AUTH_DIR?.trim() || undefined;
 const PROVIDER_ID = (process.env.GRIDA_BYOK_PROVIDER ?? "openrouter") as
   | "openrouter"
   | "vercel";
-const MODEL_ID = process.env.GRIDA_LIVE_MODEL ?? "anthropic/claude-sonnet-4.6";
+const MODEL_ID = process.env.GRIDA_LIVE_MODEL ?? "anthropic/claude-sonnet-5";
 const TIMEOUT_MS = 90_000;
 
 // The shipped bundled skills tree (<repo>/skills), four levels up from here.

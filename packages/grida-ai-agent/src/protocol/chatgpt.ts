@@ -28,7 +28,6 @@ export const CHATGPT_SUBSCRIPTION_MODEL_IDS = [
   "openai/gpt-5.6-luna",
   "openai/gpt-5.5",
   "openai/gpt-5.4",
-  "openai/gpt-5.4-mini",
 ] as const;
 
 export type ChatGptSubscriptionModelId =
@@ -41,7 +40,6 @@ export const CHATGPT_SUBSCRIPTION_MODEL_METADATA = {
   "openai/gpt-5.6-luna": { label: "GPT-5.6 Luna" },
   "openai/gpt-5.5": { label: "GPT-5.5" },
   "openai/gpt-5.4": { label: "GPT-5.4" },
-  "openai/gpt-5.4-mini": { label: "GPT-5.4 Mini" },
 } as const satisfies Record<
   ChatGptSubscriptionModelId,
   Readonly<{ label: string }>

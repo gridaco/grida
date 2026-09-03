@@ -63,6 +63,7 @@ describe("GET /api/v1/ai/models", () => {
     for (const id of [
       "anthropic/claude-fable-5.1",
       "anthropic/claude-opus-5",
+      "google/gemini-3.8-flash",
     ]) {
       expect(byId.get(id)?.grida).toMatchObject({
         modality: "text",
@@ -74,6 +75,7 @@ describe("GET /api/v1/ai/models", () => {
     for (const id of [
       "anthropic/claude-opus-4.8",
       "anthropic/claude-fable-5",
+      "google/gemini-3.7-flash",
     ]) {
       expect(byId.get(id)?.grida).toMatchObject({
         modality: "text",

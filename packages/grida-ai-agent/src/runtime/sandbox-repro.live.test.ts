@@ -49,7 +49,7 @@ const PROVIDER_KEY =
 const PROVIDER_ID = (process.env.GRIDA_BYOK_PROVIDER ?? "openrouter") as
   | "openrouter"
   | "vercel";
-const MODEL_ID = process.env.GRIDA_LIVE_MODEL ?? "anthropic/claude-sonnet-4.6";
+const MODEL_ID = process.env.GRIDA_LIVE_MODEL ?? "anthropic/claude-sonnet-5";
 const TIMEOUT_MS = 240_000;
 
 const liveDescribe = LIVE && PROVIDER_KEY ? describe : describe.skip;

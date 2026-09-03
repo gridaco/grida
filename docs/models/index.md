@@ -44,11 +44,10 @@ Claude Fable 5.1 and Claude Opus 5 remain active, non-tiered catalogue models.
 `nano` and `mini` currently resolve to the same model. `nano` is a floor —
 the cheapest model still good enough for background work (title generation,
 summarisation, compaction) — so it is never more expensive than `mini`, but
-it is not guaranteed to be strictly cheaper. OpenAI's 2026-07-30 price cut
-dropped GPT-5.6 Luna below the older GPT-5.4 Nano while giving it more
-context, leaving nothing that is both cheaper and adequate. Expect the two
-tiers to separate again as new models are released; picking `nano` is always
-safe for cost-sensitive work regardless.
+it is not guaranteed to be strictly cheaper. GPT-5.6 Luna is currently both
+the lowest-cost model considered adequate for background work and the best
+value at `mini`. Expect the two tiers to separate again as new models are
+released; picking `nano` is always safe for cost-sensitive work regardless.
 
 ### Cache Pricing
 
@@ -65,34 +64,34 @@ All tiers support prompt caching, which reduces cost for repeated context:
 
 Per 1M tokens.
 
-| Name                                                         | Input  | Cache Write | Cache Read | Output  |
-| ------------------------------------------------------------ | ------ | ----------- | ---------- | ------- |
-| GPT-5.4 Nano (`openai/gpt-5.4-nano`)                         | $0.20  | —           | $0.02      | $1.25   |
-| GPT-5.4 Mini (`openai/gpt-5.4-mini`)                         | $0.75  | —           | $0.075     | $4.50   |
-| Claude Sonnet 5 (`anthropic/claude-sonnet-5`)                | $2.00  | $2.50       | $0.20      | $10.00  |
-| Claude Sonnet 4.6 (`anthropic/claude-sonnet-4.6`) _(legacy)_ | $3.00  | $3.75       | $0.30      | $15.00  |
-| Claude Fable 5.1 (`anthropic/claude-fable-5.1`)              | $10.00 | $12.50      | $0.25      | $50.00  |
-| Claude Fable 5 (`anthropic/claude-fable-5`) _(legacy)_       | $10.00 | $12.50      | $1.00      | $50.00  |
-| Claude Opus 5 (`anthropic/claude-opus-5`)                    | $5.00  | $6.25       | $0.50      | $25.00  |
-| Claude Opus 4.8 (`anthropic/claude-opus-4.8`) _(legacy)_     | $5.00  | $6.25       | $0.50      | $25.00  |
-| Claude Opus 4.7 (`anthropic/claude-opus-4.7`) _(legacy)_     | $5.00  | $6.25       | $0.50      | $25.00  |
-| GPT-5.6 Sol (`openai/gpt-5.6-sol`)                           | $4.00  | $5.00       | $0.40      | $20.00  |
-| GPT-5.6 Terra (`openai/gpt-5.6-terra`)                       | $2.00  | $2.50       | $0.20      | $12.00  |
-| GPT-5.6 Luna (`openai/gpt-5.6-luna`)                         | $0.20  | $0.25       | $0.02      | $1.20   |
-| GPT-5.5 (`openai/gpt-5.5`) _(legacy)_                        | $5.00  | —           | $0.50      | $30.00  |
-| GPT-5.5 Pro (`openai/gpt-5.5-pro`)                           | $30.00 | —           | —          | $180.00 |
-| Gemini 3.7 Flash (`google/gemini-3.7-flash`)                 | $1.50  | —           | $0.15      | $7.50   |
-| Gemini 3.1 Pro Preview (`google/gemini-3.1-pro-preview`)     | $2.00  | —           | $0.20      | $12.00  |
+| Name                                                     | Input  | Cache Write | Cache Read | Output  |
+| -------------------------------------------------------- | ------ | ----------- | ---------- | ------- |
+| Claude Sonnet 5 (`anthropic/claude-sonnet-5`)            | $2.00  | $2.50       | $0.20      | $10.00  |
+| Claude Fable 5.1 (`anthropic/claude-fable-5.1`)          | $10.00 | $12.50      | $0.25      | $50.00  |
+| Claude Fable 5 (`anthropic/claude-fable-5`) _(legacy)_   | $10.00 | $12.50      | $1.00      | $50.00  |
+| Claude Opus 5 (`anthropic/claude-opus-5`)                | $5.00  | $6.25       | $0.50      | $25.00  |
+| Claude Opus 4.8 (`anthropic/claude-opus-4.8`) _(legacy)_ | $5.00  | $6.25       | $0.50      | $25.00  |
+| GPT-5.6 Sol (`openai/gpt-5.6-sol`)                       | $4.00  | $5.00       | $0.40      | $20.00  |
+| GPT-5.6 Terra (`openai/gpt-5.6-terra`)                   | $2.00  | $2.50       | $0.20      | $12.00  |
+| GPT-5.6 Luna (`openai/gpt-5.6-luna`)                     | $0.20  | $0.25       | $0.02      | $1.20   |
+| GPT-5.5 (`openai/gpt-5.5`) _(legacy)_                    | $5.00  | —           | $0.50      | $30.00  |
+| GPT-5.5 Pro (`openai/gpt-5.5-pro`)                       | $30.00 | —           | —          | $180.00 |
+| Gemini 3.8 Flash (`google/gemini-3.8-flash`)             | $1.50  | —           | $0.15      | $7.50   |
+| Gemini 3.7 Flash (`google/gemini-3.7-flash`) _(legacy)_  | $1.50  | —           | $0.15      | $7.50   |
+| Gemini 3.1 Pro Preview (`google/gemini-3.1-pro-preview`) | $2.00  | —           | $0.20      | $12.00  |
 
 GPT-5.6 and GPT-5.5 prices above are base rates. Requests with more than 272K
 input tokens are billed at 2x input and 1.5x output for the full request.
 `Gemini 3.1 Pro Preview` is tiered the same way at a 200K threshold ($4.00
 input / $18.00 output / $0.40 cache read for the full request).
 
-`Gemini 3.7 Flash` is listed at its steady-state rate. Google is running a
-promotion through 2026-12-31 at $0.75 input / $3.75 output / $0.075 cache
-read; the table holds the price that applies from 2027-01-01 so an expiring
-promotion is never a silent cost increase.
+`Gemini 3.8 Flash` is the current GA Flash model. Its catalogue ID is available
+through Vercel AI Gateway and OpenRouter. `Gemini 3.7 Flash` remains callable
+as a legacy option for compute-efficient workloads because Google notes that
+3.8 can consume more tokens. Both are listed at their steady-state rates.
+Google is running a promotion through 2026-12-31 at $0.75 input / $3.75 output
+/ $0.075 cache read; the table holds the price that applies from 2027-01-01 so
+an expiring promotion is never a silent cost increase.
 
 `GPT-5.5` is deprecated in Grida's catalogue in favor of `GPT-5.6 Sol`;
 this is not an upstream OpenAI retirement. `GPT-5.5 Pro` remains active.

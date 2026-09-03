@@ -114,11 +114,11 @@ describe("makeGridaGatewayFactory", () => {
     ) as { model: string };
     expect(body1.model).toBe(TIER_MODEL_IDS.pro);
 
-    await callModel(store, "openai/gpt-5.4-mini");
+    await callModel(store, "google/gemini-3.8-flash");
     const body2 = JSON.parse(
       (fetchMock.mock.calls[1]![1] as RequestInit).body as string
     ) as { model: string };
-    expect(body2.model).toBe("openai/gpt-5.4-mini");
+    expect(body2.model).toBe("google/gemini-3.8-flash");
   });
 
   it("missing/expired session → GridaGatewayAuthError before any fetch", async () => {

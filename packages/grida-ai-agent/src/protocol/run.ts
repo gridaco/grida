@@ -91,7 +91,7 @@ export type AgentRunOptions = {
   tier?: ModelTier;
   /**
    * Explicit catalog model id (`creator/model`, e.g.
-   * `"anthropic/claude-opus-4.7"`). When set, it overrides the
+   * `"anthropic/claude-opus-5"`). When set, it overrides the
    * tier-to-model mapping; the agent host runs this exact model instead of
    * the one `tier` would resolve to.
    */
