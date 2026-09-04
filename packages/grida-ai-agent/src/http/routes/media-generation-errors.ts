@@ -48,6 +48,16 @@ export function mediaGenerationError(
       402
     );
   }
+  if (code === "provider_access_denied") {
+    return c.json(
+      {
+        error: "provider_access_denied: provider access denied",
+        code,
+        provider_id: args.provider_id,
+      },
+      403
+    );
+  }
   const detail =
     args.error instanceof Error ? args.error.message : String(args.error);
   const upstream = (args.error as { responseBody?: unknown })?.responseBody;

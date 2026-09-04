@@ -389,6 +389,7 @@ describe("DaemonServer tenant seam", () => {
             three_d: true,
             music: true,
             sound_effects: false,
+            text_to_speech: true,
           },
           drain: () => order.push("drain"),
           cleanup: () => order.push("cleanup"),
@@ -428,10 +429,12 @@ describe("DaemonServer tenant seam", () => {
       expect(body.capabilities.three_d).toBe(true);
       expect(body.capabilities.music).toBe(true);
       expect(body.capabilities.sound_effects).toBe(false);
+      expect(body.capabilities.text_to_speech).toBe(true);
       expect(body.supports).toContain("sessions@1");
       expect(body.supports).toContain("three-d@1");
       expect(body.supports).toContain("music@1");
       expect(body.supports).not.toContain("sound-effects@1");
+      expect(body.supports).toContain("text-to-speech@1");
 
       const port = daemon.port;
       await daemon.stop();
@@ -470,11 +473,13 @@ describe("DaemonServer tenant seam", () => {
       expect(body.capabilities.three_d).toBe(false);
       expect(body.capabilities.music).toBe(false);
       expect(body.capabilities.sound_effects).toBe(false);
+      expect(body.capabilities.text_to_speech).toBe(false);
       expect(body.supports).toContain("files@1");
       expect(body.supports).not.toContain("agent@1");
       expect(body.supports).not.toContain("three-d@1");
       expect(body.supports).not.toContain("music@1");
       expect(body.supports).not.toContain("sound-effects@1");
+      expect(body.supports).not.toContain("text-to-speech@1");
 
       // Daemon-owned route groups answer; tenant groups are absent (404,
       // not 401 — the perimeter clears first, then no route matches).

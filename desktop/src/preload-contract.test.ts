@@ -32,7 +32,7 @@ describe("Desktop preload agent seam", () => {
     );
   });
 
-  it("delegates 3D, music, and sound-effect generation through the agent transport", () => {
+  it("delegates media generation through the agent transport", () => {
     expect(preloadSource).toContain(
       "generate: (req) => agentClient.threeD.generate(req)"
     );
@@ -41,6 +41,12 @@ describe("Desktop preload agent seam", () => {
     );
     expect(preloadSource).toContain(
       "generate: (req) => agentClient.audio.soundEffects.generate(req)"
+    );
+    expect(preloadSource).toContain(
+      "listVoices: () => agentClient.audio.textToSpeech.listVoices()"
+    );
+    expect(preloadSource).toContain(
+      "generate: (req) => agentClient.audio.textToSpeech.generate(req)"
     );
   });
 

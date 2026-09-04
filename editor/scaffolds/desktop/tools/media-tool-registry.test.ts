@@ -13,6 +13,7 @@ describe("DesktopMediaTool", () => {
       "3d-generator",
       "text-to-music",
       "text-to-sound-effects",
+      "text-to-speech",
       "3d-viewer",
       "audio-player",
     ]);
@@ -56,6 +57,11 @@ describe("DesktopMediaTool", () => {
     for (const modelId of models.audio.sound_effects.model_ids) {
       const selection = DesktopMediaTool.resolveSelection(null, modelId);
       expect(selection.tool.id).toBe("text-to-sound-effects");
+      expect(selection.initialModelId).toBe(modelId);
+    }
+    for (const modelId of models.audio.text_to_speech.model_ids) {
+      const selection = DesktopMediaTool.resolveSelection(null, modelId);
+      expect(selection.tool.id).toBe("text-to-speech");
       expect(selection.initialModelId).toBe(modelId);
     }
   });

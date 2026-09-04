@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AgentTransport } from "./transport";
 
 describe("AgentTransport media generation routes", () => {
-  it("owns the 3D, music, and sound-effect POST paths", async () => {
+  it("owns the 3D, music, sound-effect, and text-to-speech paths", async () => {
     const seen: Array<{ path: string; body: unknown }> = [];
     const client = new AgentTransport.Client({
       fetcher: async (path, init) => {
@@ -21,12 +21,23 @@ describe("AgentTransport media generation routes", () => {
             },
           });
         }
+        if (path === "/audio/text-to-speech/voices") {
+          return Response.json({
+            provider_id: "elevenlabs",
+            voices: [{ voice_id: "voice-a", name: "Alice" }],
+          });
+        }
         return Response.json({
           model_id:
             path === "/audio/music/generate"
               ? "google/lyria-3"
-              : "eleven_text_to_sound_v2",
+              : path === "/audio/sound-effects/generate"
+                ? "eleven_text_to_sound_v2"
+                : "eleven_v3",
           provider_id: path === "/audio/music/generate" ? "gg" : "elevenlabs",
+          ...(path === "/audio/text-to-speech/generate"
+            ? { voice_id: "voice-a" }
+            : {}),
           audio: {
             base64: "SUQz",
             media_type: "audio/mpeg",
@@ -48,12 +59,26 @@ describe("AgentTransport media generation routes", () => {
       model_id: "eleven_text_to_sound_v2",
       prompt: "boom",
     });
+    await client.audio.textToSpeech.listVoices();
+    await client.audio.textToSpeech.generate({
+      model_id: "eleven_v3",
+      voice_id: "voice-a",
+      text: "[happy] Hello!",
+    });
 
     expect(seen.map(({ path }) => path)).toEqual([
       "/three-d/generate",
       "/audio/music/generate",
       "/audio/sound-effects/generate",
+      "/audio/text-to-speech/voices",
+      "/audio/text-to-speech/generate",
     ]);
     expect(seen[0]?.body).toMatchObject({ model_id: "fal-ai/trellis-2" });
+    expect(seen[3]?.body).toBeUndefined();
+    expect(seen[4]?.body).toEqual({
+      model_id: "eleven_v3",
+      voice_id: "voice-a",
+      text: "[happy] Hello!",
+    });
   });
 });

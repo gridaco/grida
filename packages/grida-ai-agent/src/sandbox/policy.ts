@@ -24,8 +24,9 @@ const BYOK_PROVIDER_NETWORK_HOSTS = {
   // so the apexes are listed too. Same posture as the other BYOK hosts: the
   // provider sees the prompt by design — not a new exfil class.
   fal: ["fal.run", "*.fal.run", "fal.media", "*.fal.media"],
-  // ElevenLabs sound-effects generation returns bytes directly from the API;
-  // there is no separate provider-asset download origin to admit.
+  // ElevenLabs sound-effects and text-to-speech generation return bytes
+  // directly from the API; voice discovery uses the same origin. There is no
+  // separate provider-asset download origin to admit.
   elevenlabs: ["api.elevenlabs.io"],
 } as const satisfies Record<ByokProviderId, readonly string[]>;
 

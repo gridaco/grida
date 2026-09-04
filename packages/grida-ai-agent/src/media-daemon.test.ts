@@ -92,6 +92,7 @@ describe("createAgentDaemon media-root forwarding", () => {
         video: false,
         music: false,
         sound_effects: false,
+        text_to_speech: false,
         three_d: true,
         secrets: true,
         shell: false,

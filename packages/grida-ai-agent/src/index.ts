@@ -63,6 +63,12 @@ export type {
   SoundEffectGenerateRequest,
   SoundEffectGenerateResult,
 } from "./protocol/sound-effects";
+export type {
+  TextToSpeechGenerateRequest,
+  TextToSpeechGenerateResult,
+  TextToSpeechListVoicesResult,
+  TextToSpeechVoice,
+} from "./protocol/text-to-speech";
 export {
   OLLAMA_ENDPOINT_PRESET,
   isValidEndpointProviderId,

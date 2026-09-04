@@ -7,7 +7,7 @@
  * for the daemon-owned route groups (handshake, files, recents,
  * workspaces). This module extends that client with the agent tenant's
  * groups — sessions, agent run/stream, lifecycle events, secrets,
- * providers, image, video, 3D, music, and Sound Effects generation — and
+ * providers, image, video, 3D, music, Sound Effects, and Text to Speech — and
  * re-exposes the primitives under
  * `AgentTransport` so callers deal with ONE namespace. Consumers should
  * not hand-build route strings.
@@ -49,6 +49,11 @@ import type {
   SoundEffectGenerateRequest,
   SoundEffectGenerateResult,
 } from "./protocol/sound-effects";
+import type {
+  TextToSpeechGenerateRequest,
+  TextToSpeechGenerateResult,
+  TextToSpeechListVoicesResult,
+} from "./protocol/text-to-speech";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type { DirectoryScopeDescriptor } from "./protocol/context";
 import type {
@@ -245,8 +250,8 @@ export namespace AgentTransport {
     } as const;
 
     /**
-     * Output-format grouping only: hosted music and ElevenLabs Sound Effects
-     * remain independent provider/request contracts.
+     * Output-format grouping only: hosted music, ElevenLabs Sound Effects, and
+     * ElevenLabs Text to Speech remain independent provider/request contracts.
      */
     readonly audio = {
       music: {
@@ -264,6 +269,19 @@ export namespace AgentTransport {
         ): Promise<SoundEffectGenerateResult> =>
           await this.postJson<SoundEffectGenerateResult>(
             "/audio/sound-effects/generate",
+            req
+          ),
+      },
+      textToSpeech: {
+        listVoices: async (): Promise<TextToSpeechListVoicesResult> =>
+          await this.getJson<TextToSpeechListVoicesResult>(
+            "/audio/text-to-speech/voices"
+          ),
+        generate: async (
+          req: TextToSpeechGenerateRequest
+        ): Promise<TextToSpeechGenerateResult> =>
+          await this.postJson<TextToSpeechGenerateResult>(
+            "/audio/text-to-speech/generate",
             req
           ),
       },

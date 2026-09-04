@@ -38,6 +38,7 @@ const SUPPORTS_TAGS: Record<keyof DaemonCapabilities, string> = {
   three_d: "three-d@1",
   music: "music@1",
   sound_effects: "sound-effects@1",
+  text_to_speech: "text-to-speech@1",
   shell: "shell@1",
 };
 

@@ -6,7 +6,8 @@
  *
  * - `models.text.*`        — text-model spec table, tier→spec map, lookup
  * - `models.image.*`       — image-generation catalogue
- * - `models.audio.music.*` / `.sound_effects.*` — exact audio-output catalogues
+ * - `models.audio.music.*` / `.sound_effects.*` / `.text_to_speech.*`
+ *   — exact audio-output catalogues
  * - `models.three_d.*`     — 3D-generation catalogue
  * - `models.video.*`       — video-generation catalogue
  * - `models.image_tools.*` — non-generator image tools (background removal, upscale)
@@ -22,7 +23,7 @@
  * single source file is the workaround.
  *
  * Routing labels on the cards — `Provider` (text/image), the literal provider
- * bindings on music, sound-effect, and 3D cards, and video's per-binding
+ * bindings on music, sound-effect, text-to-speech, and 3D cards, and video's per-binding
  * `video.VideoProvider` — are data labels only; see the README for the full
  * contract.
  *
@@ -2015,9 +2016,10 @@ export namespace models {
   /**
    * Audio-output generation catalogues.
    *
-   * This namespace is organizational only. Music and sound effects have
-   * separate model ids, provider contracts, request shapes, lifecycle lists,
-   * and meters; there is deliberately no generic audio-model union.
+   * This namespace is organizational only. Music, sound effects, and
+   * text-to-speech have separate model ids, provider contracts, request
+   * shapes, lifecycle lists, and meters; there is deliberately no generic
+   * audio-model union.
    */
   export namespace audio {
     /** Replicate-backed Google Lyria music generation. */
@@ -2217,6 +2219,85 @@ export namespace models {
           },
           avg_cost_usd: null,
           url: "https://elevenlabs.io/docs/api-reference/text-to-sound-effects/convert",
+        },
+      } as const satisfies Record<ModelId, ModelCard>;
+
+      export const model_ids = Object.freeze(Object.keys(models) as ModelId[]);
+
+      let _staged: readonly ModelCard[] | null = null;
+      export const staged_models = (): readonly ModelCard[] =>
+        (_staged ??= Object.freeze(
+          Object.values(models).filter((card) => card.status === "staged")
+        ));
+    }
+
+    /** ElevenLabs expressive text-to-speech generation. */
+    export namespace text_to_speech {
+      /** Exact ElevenLabs Text to Speech API `model_id`. */
+      export type ModelId = "eleven_v3";
+
+      export type Input = {
+        type: "text";
+        max_characters: number;
+        /** Whether bracketed audio and emotion tags are accepted in text. */
+        audio_tags: boolean;
+      };
+
+      export type Output = {
+        default_format: "mp3";
+        formats: readonly "mp3"[];
+        sample_rate_hz: number;
+        bit_rate_kbps: number;
+      };
+
+      /** ElevenLabs' published API rate for Text to Speech v3. */
+      export type Pricing = {
+        type: "per_1000_characters";
+        usd: number;
+      };
+
+      export type ModelCard = {
+        id: ModelId;
+        label: string;
+        deprecated: boolean;
+        short_description: string;
+        vendor: "elevenlabs";
+        provider: "elevenlabs";
+        status: CatalogueStatus;
+        input: Input;
+        output: Output;
+        output_format: "mp3";
+        sample_rate_label: string;
+        pricing: Pricing;
+        url: string;
+      };
+
+      export const models = {
+        eleven_v3: {
+          id: "eleven_v3",
+          label: "Eleven v3",
+          deprecated: false,
+          short_description:
+            "Generate expressive speech with bracketed audio and emotion tags.",
+          vendor: "elevenlabs",
+          provider: "elevenlabs",
+          status: "staged",
+          input: {
+            type: "text",
+            max_characters: 5_000,
+            audio_tags: true,
+          },
+          output: {
+            default_format: "mp3",
+            formats: ["mp3"],
+            sample_rate_hz: 44_100,
+            bit_rate_kbps: 128,
+          },
+          output_format: "mp3",
+          sample_rate_label: "44.1 kHz · 128 kbps",
+          // Source: elevenlabs.io/pricing/api — $0.10 per 1,000 characters.
+          pricing: { type: "per_1000_characters", usd: 0.1 },
+          url: "https://elevenlabs.io/docs/api-reference/text-to-speech/convert",
         },
       } as const satisfies Record<ModelId, ModelCard>;
 
@@ -2435,8 +2516,8 @@ export namespace models {
    * The video provider ecosystem is **fragmented**: the same model is served
    * by several providers (Vercel AI Gateway, fal.ai, OpenRouter), each with a
    * *different id, a different meter, and different availability*. So unlike
-   * `models.image`/`models.audio.music`/`models.audio.sound_effects` — which
-   * bind one card to one provider — a
+   * `models.image`/`models.audio.music`/`models.audio.sound_effects`/
+   * `models.audio.text_to_speech` — which bind one card to one provider — a
    * video card is **canonical** (provider-agnostic id + intrinsic specs) and
    * holds a {@link VideoProviderBinding} per provider that serves it, keyed by
    * provider in {@link VideoModelCard.providers}. The default-provider choice

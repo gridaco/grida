@@ -8,7 +8,8 @@
  * module contributes everything AI: the run loop (`/agent/*`, `/events`),
  * chat sessions (`/sessions/*`), BYOK credentials vocabulary (`/secrets/*`),
  * endpoint providers (`/providers/*`), and generation (`/images/*`,
- * `/video/*`, `/three-d/*`, `/audio/music`, `/audio/sound-effects`).
+ * `/video/*`, `/three-d/*`, `/audio/music`, `/audio/sound-effects`,
+ * `/audio/text-to-speech`).
  * Dependency direction is one-way —
  * this package imports `@grida/daemon`; the daemon knows no tenant.
  *
@@ -36,6 +37,7 @@ import { registerVideoRoutes } from "./http/routes/video";
 import { registerThreeDRoutes } from "./http/routes/three-d";
 import { registerMusicRoutes } from "./http/routes/music";
 import { registerSoundEffectsRoutes } from "./http/routes/sound-effects";
+import { registerTextToSpeechRoutes } from "./http/routes/text-to-speech";
 import { registerAgentRoutes } from "./http/routes/agent";
 import { registerDirectoryScopesRoutes } from "./http/routes/directory-scopes";
 import { registerSessionsRoutes } from "./http/routes/sessions";
@@ -110,6 +112,7 @@ export const AGENT_DAEMON_DEFAULT_CAPABILITIES: DaemonCapabilities = {
   three_d: true,
   music: true,
   sound_effects: true,
+  text_to_speech: true,
   shell: false,
 };
 
@@ -131,6 +134,7 @@ export type AgentTenantOptions = {
       | "three_d"
       | "music"
       | "sound_effects"
+      | "text_to_speech"
     >
   >;
   /**
@@ -265,6 +269,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
     three_d: opts.capabilities?.three_d ?? true,
     music: opts.capabilities?.music ?? true,
     sound_effects: opts.capabilities?.sound_effects ?? true,
+    text_to_speech: opts.capabilities?.text_to_speech ?? true,
   };
   // GRIDA-SEC-004 — the ONLY routes where the credential may ride the
   // `auth_token` query parameter (header-less EventSource attach; WG daemon
@@ -411,6 +416,13 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       }
       if (caps.sound_effects) {
         registerSoundEffectsRoutes(app, {
+          secrets: services.secrets,
+          media: services.media,
+          provider_http: providerHttp,
+        });
+      }
+      if (caps.text_to_speech) {
+        registerTextToSpeechRoutes(app, {
           secrets: services.secrets,
           media: services.media,
           provider_http: providerHttp,

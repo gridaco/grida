@@ -20,7 +20,7 @@ export namespace ai {
 
   // Re-aggregate the media catalogues from `@grida/ai-models` under the
   // editor-side `ai.*` path. Audio remains an organizational parent with
-  // exact `music` and `sound_effects` children.
+  // exact `music`, `sound_effects`, and `text_to_speech` children.
   export import image = _catalog.image;
   export import audio = _catalog.audio;
   export import three_d = _catalog.three_d;

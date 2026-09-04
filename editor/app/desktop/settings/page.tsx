@@ -135,7 +135,7 @@ export default function DesktopSettingsPage() {
         >
           <ProviderListCard
             title="Media Provider Keys"
-            description="Provider keys for image, video, fal 3D, and ElevenLabs Sound Effects workflows. Providers that also serve LLMs may appear in both sections."
+            description="Provider keys for image, video, fal 3D, and ElevenLabs audio workflows. Providers that also serve LLMs may appear in both sections."
             providerIds={MEDIA_PROVIDER_IDS}
           />
           <MediaModelsSection />
@@ -544,8 +544,14 @@ type RowState =
 
 function ByokRow({ provider }: { provider: ByokProviderMetadata }) {
   const providerId = provider.id;
+  // Several providers appear in both the LLM and media cards, so assigning an
+  // id to every row would create duplicate hash targets. ElevenLabs has one
+  // canonical media row and is the audio tools' dedicated setup destination.
+  const deepLinkId =
+    providerId === "elevenlabs" ? "provider-elevenlabs" : undefined;
   const setup = BYOK_PROVIDER_SETUP[providerId];
   const label = setup.label;
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<RowState>({ kind: "loading" });
   const [value, setValue] = useState("");
@@ -570,6 +576,16 @@ function ByokRow({ provider }: { provider: ByokProviderMetadata }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!deepLinkId || window.location.hash !== `#${deepLinkId}`) return;
+    setOpen(true);
+    const frame = window.requestAnimationFrame(() => {
+      triggerRef.current?.scrollIntoView({ block: "center" });
+      triggerRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [deepLinkId]);
 
   const handleSave = useCallback(async () => {
     if (value.trim().length === 0) {
@@ -631,9 +647,15 @@ function ByokRow({ provider }: { provider: ByokProviderMetadata }) {
   const statusKind = stableKind(state);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible
+      id={deepLinkId}
+      className={deepLinkId ? "scroll-mt-8" : undefined}
+      open={open}
+      onOpenChange={setOpen}
+    >
       <CollapsibleTrigger asChild>
         <button
+          ref={triggerRef}
           type="button"
           className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
@@ -903,7 +925,7 @@ const VISUAL_BYOK_PROVIDER_IDS = [
 /**
  * Media-generation models. Readiness is scoped to each callable route rather
  * than inferred from one unrelated provider key: fal for 3D, ElevenLabs for
- * SFX, and an active hosted Grida session for music.
+ * SFX/Voice, and an active hosted Grida session for music.
  */
 function MediaModelsSection() {
   const [connectedVisualProviders, setConnectedVisualProviders] =
@@ -913,20 +935,22 @@ function MediaModelsSection() {
   );
   const [threeDReady, setThreeDReady] = useState<boolean | null>(null);
   const [musicReady, setMusicReady] = useState<boolean | null>(null);
-  const [soundEffectReady, setSoundEffectReady] = useState<boolean | null>(
-    null
-  );
+  const [elevenLabsReady, setElevenLabsReady] = useState<boolean | null>(null);
   const imageSupported = images.isSupported();
   const videoSupported = video.isSupported();
   const threeDSupported = threeD.isSupported();
   const musicSupported = audio.music.isSupported();
   const soundEffectSupported = audio.soundEffects.isSupported();
+  const voiceSupported = audio.textToSpeech.isSupported();
   const imageModels = imageSupported ? models.image.listed_models() : [];
   const videoModels = videoSupported ? models.video.listed_models() : [];
   const threeDModels = threeDSupported ? models.three_d.staged_models() : [];
   const musicModels = musicSupported ? models.audio.music.listed_models() : [];
   const soundEffectModels = soundEffectSupported
     ? models.audio.sound_effects.staged_models()
+    : [];
+  const voiceModels = voiceSupported
+    ? models.audio.text_to_speech.staged_models()
     : [];
 
   useEffect(() => {
@@ -953,10 +977,10 @@ function MediaModelsSection() {
         () => live && setThreeDReady(false)
       );
     }
-    if (soundEffectSupported) {
+    if (soundEffectSupported || voiceSupported) {
       void secrets.hasKey("elevenlabs").then(
-        (present) => live && setSoundEffectReady(present),
-        () => live && setSoundEffectReady(false)
+        (present) => live && setElevenLabsReady(present),
+        () => live && setElevenLabsReady(false)
       );
     }
     if (imageSupported || videoSupported || musicSupported) {
@@ -976,6 +1000,7 @@ function MediaModelsSection() {
     soundEffectSupported,
     threeDSupported,
     videoSupported,
+    voiceSupported,
   ]);
 
   if (
@@ -983,7 +1008,8 @@ function MediaModelsSection() {
     !videoSupported &&
     !threeDSupported &&
     !musicSupported &&
-    !soundEffectSupported
+    !soundEffectSupported &&
+    !voiceSupported
   ) {
     return null;
   }
@@ -1050,9 +1076,18 @@ function MediaModelsSection() {
           <MediaModelGroup
             title="Sound effects · ElevenLabs"
             models={soundEffectModels}
-            readyForModel={() => soundEffectReady}
+            readyForModel={() => elevenLabsReady}
             hrefForModel={mediaToolHref}
             actionLabel="Open in SFX generator"
+          />
+        )}
+        {voiceSupported && (
+          <MediaModelGroup
+            title="Voice · ElevenLabs"
+            models={voiceModels}
+            readyForModel={() => elevenLabsReady}
+            hrefForModel={mediaToolHref}
+            actionLabel="Open in voice generator"
           />
         )}
       </CardContent>

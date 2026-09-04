@@ -5,6 +5,9 @@ import type {
   MusicGenerateResult,
   SoundEffectGenerateRequest,
   SoundEffectGenerateResult,
+  TextToSpeechGenerateRequest,
+  TextToSpeechGenerateResult,
+  TextToSpeechListVoicesResult,
   ThreeDGenerateRequest,
   ThreeDGenerateResult,
 } from "@grida/agent";
@@ -49,6 +52,7 @@ describe("DesktopBridge media generation", () => {
     type Audio = NonNullable<DesktopBridge["audio"]>;
     type MusicGenerate = NonNullable<Audio["music"]>["generate"];
     type SoundEffectsGenerate = NonNullable<Audio["soundEffects"]>["generate"];
+    type TextToSpeech = NonNullable<Audio["textToSpeech"]>;
 
     expectTypeOf<
       Parameters<ThreeDGenerate>[0]
@@ -68,6 +72,15 @@ describe("DesktopBridge media generation", () => {
     expectTypeOf<
       Awaited<ReturnType<SoundEffectsGenerate>>
     >().toEqualTypeOf<SoundEffectGenerateResult>();
+    expectTypeOf<
+      Awaited<ReturnType<TextToSpeech["listVoices"]>>
+    >().toEqualTypeOf<TextToSpeechListVoicesResult>();
+    expectTypeOf<
+      Parameters<TextToSpeech["generate"]>[0]
+    >().toEqualTypeOf<TextToSpeechGenerateRequest>();
+    expectTypeOf<
+      Awaited<ReturnType<TextToSpeech["generate"]>>
+    >().toEqualTypeOf<TextToSpeechGenerateResult>();
   });
 });
 

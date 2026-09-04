@@ -46,6 +46,10 @@ import {
   type MusicGenerateResult,
   type SoundEffectGenerateRequest,
   type SoundEffectGenerateResult,
+  type TextToSpeechGenerateRequest,
+  type TextToSpeechGenerateResult,
+  type TextToSpeechListVoicesResult,
+  type TextToSpeechVoice,
   type ThreeDGenerateRequest,
   type ThreeDGenerateResult,
   type ThreeDInputImage,
@@ -101,6 +105,10 @@ export {
   type MusicGenerateResult,
   type SoundEffectGenerateRequest,
   type SoundEffectGenerateResult,
+  type TextToSpeechGenerateRequest,
+  type TextToSpeechGenerateResult,
+  type TextToSpeechListVoicesResult,
+  type TextToSpeechVoice,
   type ThreeDGenerateRequest,
   type ThreeDGenerateResult,
   type ThreeDInputImage,
@@ -610,7 +618,7 @@ export namespace threeD {
 
 /* ──────────────────────── audio namespace ───────────────────── */
 
-/** Organizational parent for the two exact audio-output routes. */
+/** Organizational parent for exact, independently optional audio routes. */
 export namespace audio {
   export namespace music {
     export function isSupported(): boolean {
@@ -635,6 +643,26 @@ export namespace audio {
       req: SoundEffectGenerateRequest
     ): Promise<SoundEffectGenerateResult> {
       const bridge = bridgeOrThrow().audio?.soundEffects;
+      if (!bridge) throw new DesktopBridgeMissingError();
+      return await bridge.generate(req);
+    }
+  }
+
+  export namespace textToSpeech {
+    export function isSupported(): boolean {
+      return getDesktopBridge()?.audio?.textToSpeech != null;
+    }
+
+    export async function listVoices(): Promise<TextToSpeechListVoicesResult> {
+      const bridge = bridgeOrThrow().audio?.textToSpeech;
+      if (!bridge) throw new DesktopBridgeMissingError();
+      return await bridge.listVoices();
+    }
+
+    export async function generate(
+      req: TextToSpeechGenerateRequest
+    ): Promise<TextToSpeechGenerateResult> {
+      const bridge = bridgeOrThrow().audio?.textToSpeech;
       if (!bridge) throw new DesktopBridgeMissingError();
       return await bridge.generate(req);
     }

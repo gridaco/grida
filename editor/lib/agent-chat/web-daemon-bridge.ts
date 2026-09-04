@@ -253,6 +253,19 @@ export function createWebDaemonBridge(
       status: () => client.gg.status(),
     },
 
+    // Browser-development parity for ElevenLabs BYOK audio. Credentials stay
+    // in the daemon secret store; this bridge carries only requests and
+    // path-free results, exactly like the Electron preload.
+    audio: {
+      soundEffects: {
+        generate: (req) => client.audio.soundEffects.generate(req),
+      },
+      textToSpeech: {
+        listVoices: () => client.audio.textToSpeech.listVoices(),
+        generate: (req) => client.audio.textToSpeech.generate(req),
+      },
+    },
+
     agent: {
       run: (opts, onChunk) =>
         // Fresh runs always return a stream (only `reconnect` may return

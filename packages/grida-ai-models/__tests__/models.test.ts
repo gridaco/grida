@@ -325,6 +325,37 @@ describe("models.audio.sound_effects catalogue invariants", () => {
   });
 });
 
+describe("models.audio.text_to_speech catalogue invariants", () => {
+  it("keeps the exact ElevenLabs v3 model staged", () => {
+    expect(models.audio.text_to_speech.model_ids).toEqual(["eleven_v3"]);
+    expect(
+      models.audio.text_to_speech.staged_models().map((card) => card.id)
+    ).toEqual(["eleven_v3"]);
+  });
+
+  it("grounds v3 audio tags, input limit, MP3 output, and character meter", () => {
+    const card = models.audio.text_to_speech.models.eleven_v3;
+    expect(card).toMatchObject({
+      id: "eleven_v3",
+      vendor: "elevenlabs",
+      provider: "elevenlabs",
+      status: "staged",
+      input: {
+        type: "text",
+        max_characters: 5_000,
+        audio_tags: true,
+      },
+      output: {
+        default_format: "mp3",
+        formats: ["mp3"],
+        sample_rate_hz: 44_100,
+        bit_rate_kbps: 128,
+      },
+      pricing: { type: "per_1000_characters", usd: 0.1 },
+    });
+  });
+});
+
 describe("models.three_d catalogue invariants", () => {
   const expectedIds = [
     "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
