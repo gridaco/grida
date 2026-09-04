@@ -1,35 +1,47 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import {
-  FolderSearch,
-  Music2,
-  Pause,
-  Play,
-  Volume2,
-  VolumeX,
-} from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Music2, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { Slider } from "@app/ui/components/slider";
-import { AudioCompatibility } from "../media-formats/audio-compatibility";
+import { cn } from "@app/ui/lib/utils";
 
-export function MusicPlayer({
-  file,
-  active = true,
-  title = trackTitle(file.name),
-  artist = "Local audio",
-  generated = false,
-  revealLabel = "Show in folder",
-  onReveal,
-}: {
-  file: File;
+export type AudioPlayerArtwork = {
+  src: string;
+  alt: string;
+};
+
+export type AudioPlayerAction = {
+  label: string;
+  icon: ReactNode;
+  onSelect: () => void;
+  disabled?: boolean;
+};
+
+export type AudioPlayerProps = {
+  source: string | Blob;
+  title: string;
+  subtitle?: string;
+  eyebrow?: string;
+  details?: string;
+  artwork?: AudioPlayerArtwork;
+  actions?: readonly AudioPlayerAction[];
   active?: boolean;
-  title?: string;
-  artist?: string;
-  generated?: boolean;
-  revealLabel?: string;
-  onReveal?: () => void;
-}) {
+  className?: string;
+};
+
+/** Opinionated single-track audio playback for URL and Blob sources. */
+export function AudioPlayer({
+  source,
+  title,
+  subtitle,
+  eyebrow,
+  details,
+  artwork,
+  actions = [],
+  active = true,
+  className,
+}: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [duration, setDuration] = useState(0);
   const [time, setTime] = useState(0);
@@ -38,7 +50,6 @@ export function MusicPlayer({
   const [muted, setMuted] = useState(false);
   const [metadataReady, setMetadataReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const support = AudioCompatibility.probe(file);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -50,13 +61,19 @@ export function MusicPlayer({
     setMetadataReady(false);
     setError(null);
 
-    let url: string;
+    let sourceUrl: string;
+    let objectUrl: string | undefined;
     try {
-      url = URL.createObjectURL(file);
-      audio.src = url;
+      if (typeof source === "string") {
+        sourceUrl = source;
+      } else {
+        objectUrl = URL.createObjectURL(source);
+        sourceUrl = objectUrl;
+      }
+      audio.src = sourceUrl;
       audio.load();
     } catch {
-      setError("This audio file could not be opened.");
+      setError("This audio source could not be opened.");
       return;
     }
 
@@ -64,9 +81,9 @@ export function MusicPlayer({
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
-      URL.revokeObjectURL(url);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [file]);
+  }, [source]);
 
   useEffect(() => {
     if (!active) audioRef.current?.pause();
@@ -113,8 +130,11 @@ export function MusicPlayer({
 
   return (
     <div
-      data-testid="player-music"
-      className="w-full rounded-2xl border bg-card p-5 shadow-sm sm:p-6"
+      data-testid="kit-audio-player"
+      className={cn(
+        "w-full rounded-2xl border bg-card p-5 shadow-sm sm:p-6",
+        className
+      )}
     >
       <audio
         ref={audioRef}
@@ -140,37 +160,28 @@ export function MusicPlayer({
         onError={() => {
           setMetadataReady(false);
           setPlaying(false);
-          setError("This audio codec could not be played.");
+          setError("This audio source could not be played.");
         }}
       />
 
       <div className="grid items-center gap-6 sm:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)] sm:gap-8">
-        <div
-          className="relative mx-auto flex aspect-square w-full max-w-64 items-center justify-center overflow-hidden rounded-xl border border-black/5 bg-gradient-to-br from-zinc-100 via-zinc-200 to-zinc-300 shadow-[0_18px_45px_-24px_rgba(0,0,0,0.55)] dark:border-white/10 dark:from-zinc-700 dark:via-zinc-800 dark:to-zinc-950"
-          role="img"
-          aria-label="Album artwork placeholder"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_20%,rgba(255,255,255,0.7),transparent_42%)] opacity-80 dark:opacity-15" />
-          <Music2
-            className="relative size-[34%] text-zinc-500/65 drop-shadow-sm dark:text-zinc-300/65"
-            strokeWidth={1.45}
-            aria-hidden
-          />
-        </div>
+        <Artwork artwork={artwork} />
 
         <div className="min-w-0">
           <div className="text-center sm:text-left">
-            {generated && (
+            {eyebrow && (
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                AI generated track
+                {eyebrow}
               </div>
             )}
             <h3 className="line-clamp-2 text-xl font-semibold tracking-tight sm:text-2xl">
               {title}
             </h3>
-            <p className="mt-1 truncate text-sm text-muted-foreground">
-              {artist}
-            </p>
+            {subtitle && (
+              <p className="mt-1 truncate text-sm text-muted-foreground">
+                {subtitle}
+              </p>
+            )}
           </div>
 
           <div className="mt-7">
@@ -235,24 +246,28 @@ export function MusicPlayer({
             </div>
           </div>
 
-          <div className="mt-5 flex min-w-0 items-center gap-2 border-t pt-3 text-xs text-muted-foreground">
-            <span className="min-w-0 flex-1 truncate">
-              {file.name} · {support.label}
-            </span>
-            {onReveal && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="-mr-2 shrink-0"
-                onClick={onReveal}
-                aria-label={revealLabel}
-                title={revealLabel}
-              >
-                <FolderSearch aria-hidden />
-              </Button>
-            )}
-          </div>
+          {(details || actions.length > 0) && (
+            <div className="mt-5 flex min-w-0 items-center gap-2 border-t pt-3 text-xs text-muted-foreground">
+              {details && (
+                <span className="min-w-0 flex-1 truncate">{details}</span>
+              )}
+              {actions.map((action) => (
+                <Button
+                  key={action.label}
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="-mr-2 shrink-0"
+                  onClick={action.onSelect}
+                  disabled={action.disabled}
+                  aria-label={action.label}
+                  title={action.label}
+                >
+                  {action.icon}
+                </Button>
+              ))}
+            </div>
+          )}
           {!metadataReady && !error && (
             <p className="mt-2 text-xs text-muted-foreground" role="status">
               Reading audio metadata…
@@ -269,9 +284,29 @@ export function MusicPlayer({
   );
 }
 
-function trackTitle(filename: string): string {
-  const withoutExtension = filename.replace(/\.[^.]+$/, "").trim();
-  return withoutExtension || "Untitled track";
+function Artwork({ artwork }: { artwork?: AudioPlayerArtwork }) {
+  return (
+    <div className="relative mx-auto flex aspect-square w-full max-w-64 items-center justify-center overflow-hidden rounded-xl border border-black/5 bg-gradient-to-br from-zinc-100 via-zinc-200 to-zinc-300 shadow-[0_18px_45px_-24px_rgba(0,0,0,0.55)] dark:border-white/10 dark:from-zinc-700 dark:via-zinc-800 dark:to-zinc-950">
+      {artwork ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={artwork.src}
+          alt={artwork.alt}
+          className="absolute inset-0 size-full object-cover"
+        />
+      ) : (
+        <>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_20%,rgba(255,255,255,0.7),transparent_42%)] opacity-80 dark:opacity-15" />
+          <Music2
+            className="relative size-[34%] text-zinc-500/65 drop-shadow-sm dark:text-zinc-300/65"
+            strokeWidth={1.45}
+            aria-hidden
+          />
+          <span className="sr-only">Album artwork placeholder</span>
+        </>
+      )}
+    </div>
+  );
 }
 
 function formatTime(seconds: number): string {

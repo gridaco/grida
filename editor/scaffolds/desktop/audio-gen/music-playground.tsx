@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
-import { FileUp, Music2, X } from "lucide-react";
+import { FileUp, FolderSearch, Music2, X } from "lucide-react";
 import { models } from "@grida/ai-models";
 import { Button } from "@app/ui/components/button";
 import {
@@ -11,6 +11,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@app/ui/components/empty";
+import { AudioPlayer } from "@/kits/audio-player";
 import { useDesktopBridge, type MediaItem } from "@/lib/desktop/bridge";
 import { AudioCompatibility } from "../media-formats/audio-compatibility";
 import { FileDownloadButton } from "../shared/file-download-button";
@@ -18,7 +19,6 @@ import {
   MusicGenerationControls,
   type MusicGeneratedPreview,
 } from "./music-generation-controls";
-import { MusicPlayer } from "./music-player";
 
 /** Hosted Lyria music playground with an MP3 output boundary. */
 export function MusicPlayground({
@@ -118,21 +118,33 @@ export function MusicPlayground({
           {file ? (
             <div className="flex h-full items-center justify-center overflow-auto rounded-lg border bg-muted/20 p-6">
               <div className="w-full max-w-2xl">
-                <MusicPlayer
-                  file={file}
+                <AudioPlayer
+                  source={file}
                   active
-                  generated={source === "generated"}
-                  title={source === "generated" ? "Generated track" : undefined}
-                  artist={
+                  title={
+                    source === "generated"
+                      ? "Generated track"
+                      : trackTitle(file.name)
+                  }
+                  subtitle={
                     generatedModelId
                       ? models.audio.music.models[generatedModelId].label
                       : "Local audio"
                   }
-                  revealLabel={revealLabel}
-                  onReveal={
+                  eyebrow={
+                    source === "generated" ? "AI generated track" : undefined
+                  }
+                  details={`${file.name} · ${AudioCompatibility.probe(file).label}`}
+                  actions={
                     storedMedia && onRevealStoredMedia
-                      ? () => onRevealStoredMedia(storedMedia)
-                      : undefined
+                      ? [
+                          {
+                            label: revealLabel,
+                            icon: <FolderSearch aria-hidden />,
+                            onSelect: () => onRevealStoredMedia(storedMedia),
+                          },
+                        ]
+                      : []
                   }
                 />
               </div>
@@ -165,4 +177,9 @@ export function MusicPlayground({
       </div>
     </section>
   );
+}
+
+function trackTitle(filename: string): string {
+  const withoutExtension = filename.replace(/\.[^.]+$/, "").trim();
+  return withoutExtension || "Untitled track";
 }
