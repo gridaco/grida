@@ -5,6 +5,7 @@ import {
   models as textModels,
   catalog as textCatalog,
   type CatalogId,
+  type ModelRelease,
   type ModelSpec,
   type ModelTier,
 } from "@/lib/ai/models";
@@ -46,7 +47,7 @@ import {
 export const metadata: Metadata = {
   title: "AI Models & Pricing — Grida",
   description:
-    "Compare text, image, video, music, sound effect, and 3D AI models on Grida, including provider-native pricing and staged compatibility.",
+    "Compare release dates and provider-native pricing for text, image, video, music, sound effect, and 3D AI models on Grida.",
   alternates: {
     canonical: "https://grida.co/ai/models",
   },
@@ -79,6 +80,48 @@ function MakerLogo({
   return (
     <span aria-hidden="true" className="inline-flex shrink-0">
       <Logo className={className} />
+    </span>
+  );
+}
+
+const releaseDateFormatter = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+function ReleaseDate({
+  release,
+  prefix = false,
+  className,
+}: {
+  release?: ModelRelease;
+  prefix?: boolean;
+  className?: string;
+}) {
+  const date = release?.date;
+  const label = date
+    ? releaseDateFormatter.format(new Date(`${date}T00:00:00.000Z`))
+    : "Date unavailable";
+  const content = date ? <time dateTime={date}>{label}</time> : label;
+
+  return (
+    <span className={className}>
+      {prefix && "Released "}
+      {release ? (
+        <a
+          href={release.source_url}
+          target="_blank"
+          rel="noreferrer"
+          className="underline decoration-muted-foreground/40 underline-offset-2 hover:text-foreground"
+          aria-label={`Release source: ${label}`}
+        >
+          {content}
+        </a>
+      ) : (
+        content
+      )}
     </span>
   );
 }
@@ -370,6 +413,10 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
             <span>Model ID</span>
             <code className="text-foreground">{model.id}</code>
           </div>
+          <div className="flex justify-between">
+            <span>Released</span>
+            <ReleaseDate release={model.release} className="text-foreground" />
+          </div>
           {model.deprecated && (
             <div className="flex justify-between">
               <span>Status</span>
@@ -411,6 +458,11 @@ function TextModelRow({ tier, spec }: { tier: ModelTier; spec: ModelSpec }) {
           <div>
             <div className="font-medium">{spec.label}</div>
             <code className="text-xs text-muted-foreground">{spec.id}</code>
+            <ReleaseDate
+              release={spec.release}
+              prefix
+              className="block text-xs text-muted-foreground md:hidden"
+            />
           </div>
         </div>
       </TableCell>
@@ -431,6 +483,9 @@ function TextModelRow({ tier, spec }: { tier: ModelTier; spec: ModelSpec }) {
       </TableCell>
       <TableCell className="text-right font-mono text-xs">
         {fmtCost(spec.cost.output)}
+      </TableCell>
+      <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+        <ReleaseDate release={spec.release} />
       </TableCell>
     </TableRow>
   );
@@ -465,6 +520,11 @@ function CatalogRow({ spec }: { spec: ModelSpec }) {
               )}
             </div>
             <code className="text-xs text-muted-foreground">{spec.id}</code>
+            <ReleaseDate
+              release={spec.release}
+              prefix
+              className="block text-xs text-muted-foreground md:hidden"
+            />
           </div>
         </div>
       </TableCell>
@@ -479,6 +539,9 @@ function CatalogRow({ spec }: { spec: ModelSpec }) {
       </TableCell>
       <TableCell className="text-right font-mono text-xs">
         {fmtCost(spec.cost.output)}
+      </TableCell>
+      <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+        <ReleaseDate release={spec.release} />
       </TableCell>
     </TableRow>
   );
@@ -506,6 +569,7 @@ function CatalogSection() {
               <TableHead className="text-right">Cache Write</TableHead>
               <TableHead className="text-right">Cache Read</TableHead>
               <TableHead className="text-right">Output</TableHead>
+              <TableHead className="hidden md:table-cell">Released</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -563,6 +627,7 @@ function TextModelsSection() {
                 <TableHead className="text-right">Cache Write</TableHead>
                 <TableHead className="text-right">Cache Read</TableHead>
                 <TableHead className="text-right">Output</TableHead>
+                <TableHead className="hidden md:table-cell">Released</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -613,6 +678,7 @@ export default function AIModelsCatalogPage() {
                 <TableHead className="hidden lg:table-cell">
                   Dimensions
                 </TableHead>
+                <TableHead className="hidden md:table-cell">Released</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -627,6 +693,11 @@ export default function AIModelsCatalogPage() {
                           <code className="text-xs text-muted-foreground">
                             {model.id}
                           </code>
+                          <ReleaseDate
+                            release={model.release}
+                            prefix
+                            className="block text-xs text-muted-foreground md:hidden"
+                          />
                         </div>
                       </div>
                     </TableCell>
@@ -646,6 +717,9 @@ export default function AIModelsCatalogPage() {
                     </TableCell>
                     <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
                       {dimLabel(model)}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                      <ReleaseDate release={model.release} />
                     </TableCell>
                   </TableRow>
                 ));
@@ -798,6 +872,7 @@ function VideoModelsSection() {
               <TableHead className="w-[320px]">Model</TableHead>
               <TableHead className="hidden md:table-cell">Output</TableHead>
               <TableHead>Provider pricing</TableHead>
+              <TableHead className="hidden md:table-cell">Released</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -815,6 +890,11 @@ function VideoModelsSection() {
                         <code className="text-xs text-muted-foreground">
                           {model.id}
                         </code>
+                        <ReleaseDate
+                          release={model.release}
+                          prefix
+                          className="block text-xs text-muted-foreground md:hidden"
+                        />
                         <div className="mt-1 max-w-sm text-xs font-normal text-muted-foreground">
                           {model.short_description}
                         </div>
@@ -826,6 +906,9 @@ function VideoModelsSection() {
                   </TableCell>
                   <TableCell className="align-top">
                     <VideoProviderPricing model={model} />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell align-top text-xs text-muted-foreground">
+                    <ReleaseDate release={model.release} />
                   </TableCell>
                 </TableRow>
               );
@@ -922,6 +1005,10 @@ function MusicModelCard({ model }: { model: AITypes.audio.music.ModelCard }) {
             <span>Model ID</span>
             <code className="text-foreground">{model.id}</code>
           </div>
+          <div className="flex justify-between">
+            <span>Released</span>
+            <ReleaseDate release={model.release} className="text-foreground" />
+          </div>
           {model.deprecated && (
             <div className="flex justify-between">
               <span>Status</span>
@@ -948,6 +1035,7 @@ function MusicModelsTable() {
               <TableHead>Pricing</TableHead>
               <TableHead className="hidden md:table-cell">Speed</TableHead>
               <TableHead className="hidden lg:table-cell">Output</TableHead>
+              <TableHead className="hidden md:table-cell">Released</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -962,6 +1050,11 @@ function MusicModelsTable() {
                         <code className="text-xs text-muted-foreground">
                           {model.id}
                         </code>
+                        <ReleaseDate
+                          release={model.release}
+                          prefix
+                          className="block text-xs text-muted-foreground md:hidden"
+                        />
                       </div>
                     </div>
                   </TableCell>
@@ -981,6 +1074,9 @@ function MusicModelsTable() {
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
                     {model.duration_label} · {model.sample_rate_label}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                    <ReleaseDate release={model.release} />
                   </TableCell>
                 </TableRow>
               ));
@@ -1031,8 +1127,7 @@ function SoundEffectModelsSection() {
         </h2>
         <p className="text-base text-muted-foreground max-w-2xl">
           Provider-specific text-to-sound-effect compatibility from ElevenLabs.
-          Status is reported explicitly; catalogue presence does not imply web
-          generation availability.
+          Catalogue presence does not imply web generation availability.
         </p>
       </div>
 
@@ -1044,7 +1139,7 @@ function SoundEffectModelsSection() {
               <TableHead className="hidden md:table-cell">Input</TableHead>
               <TableHead className="hidden lg:table-cell">Output</TableHead>
               <TableHead>Provider pricing</TableHead>
-              <TableHead className="text-right">Status</TableHead>
+              <TableHead className="hidden md:table-cell">Released</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1059,6 +1154,11 @@ function SoundEffectModelsSection() {
                         <code className="text-xs text-muted-foreground">
                           {model.id}
                         </code>
+                        <ReleaseDate
+                          release={model.release}
+                          prefix
+                          className="block text-xs text-muted-foreground md:hidden"
+                        />
                       </div>
                     </div>
                   </TableCell>
@@ -1080,13 +1180,8 @@ function SoundEffectModelsSection() {
                       ElevenLabs credits/s when specified
                     </div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Badge
-                      variant="outline"
-                      className="capitalize font-normal text-xs"
-                    >
-                      {model.status}
-                    </Badge>
+                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                    <ReleaseDate release={model.release} />
                   </TableCell>
                 </TableRow>
               );
@@ -1176,8 +1271,8 @@ function ThreeDModelsSection() {
         <p className="text-base text-muted-foreground max-w-2xl">
           fal-hosted text-to-3D and image-to-3D endpoints supported by Grida.
           GLB is the portable primary result; additional formats are endpoint
-          specific. Status is reported explicitly; catalogue presence does not
-          imply web generation availability.
+          specific. Catalogue presence does not imply web generation
+          availability.
         </p>
       </div>
 
@@ -1189,7 +1284,7 @@ function ThreeDModelsSection() {
               <TableHead className="hidden md:table-cell">Input</TableHead>
               <TableHead className="hidden lg:table-cell">Output</TableHead>
               <TableHead>Provider pricing</TableHead>
-              <TableHead className="text-right">Status</TableHead>
+              <TableHead className="hidden md:table-cell">Released</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1207,6 +1302,11 @@ function ThreeDModelsSection() {
                         <div className="text-xs text-muted-foreground mt-1">
                           via {model.provider}
                         </div>
+                        <ReleaseDate
+                          release={model.release}
+                          prefix
+                          className="block text-xs text-muted-foreground md:hidden"
+                        />
                       </div>
                     </div>
                   </TableCell>
@@ -1227,13 +1327,8 @@ function ThreeDModelsSection() {
                   <TableCell>
                     <ThreeDPricing pricing={model.pricing} />
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Badge
-                      variant="outline"
-                      className="capitalize font-normal text-xs"
-                    >
-                      {model.status}
-                    </Badge>
+                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                    <ReleaseDate release={model.release} />
                   </TableCell>
                 </TableRow>
               );
