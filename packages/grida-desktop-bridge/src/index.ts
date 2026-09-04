@@ -25,6 +25,9 @@ import type {
   MusicGenerateResult,
   SoundEffectGenerateRequest,
   SoundEffectGenerateResult,
+  TextToSpeechGenerateRequest,
+  TextToSpeechGenerateResult,
+  TextToSpeechListVoicesResult,
   ChatMessageWithParts,
   ChatSessionRow,
   ChatGptSubscriptionStatus,
@@ -474,9 +477,10 @@ export type DesktopBridge = {
     generate: (req: ThreeDGenerateRequest) => Promise<ThreeDGenerateResult>;
   };
   /**
-   * Audio-output generation taxonomy. Music and sound effects are independent
-   * optional capabilities because their providers, availability, and request
-   * contracts differ. The parent is optional for older Desktop hosts.
+   * Audio-output generation taxonomy. Music, sound effects, and text-to-speech
+   * are independent optional capabilities because their providers,
+   * availability, and request contracts differ. The parent is optional for
+   * older Desktop hosts.
    */
   audio?: {
     music?: {
@@ -486,6 +490,12 @@ export type DesktopBridge = {
       generate: (
         req: SoundEffectGenerateRequest
       ) => Promise<SoundEffectGenerateResult>;
+    };
+    textToSpeech?: {
+      listVoices: () => Promise<TextToSpeechListVoicesResult>;
+      generate: (
+        req: TextToSpeechGenerateRequest
+      ) => Promise<TextToSpeechGenerateResult>;
     };
   };
   agent: {

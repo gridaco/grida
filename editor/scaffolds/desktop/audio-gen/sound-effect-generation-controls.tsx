@@ -28,6 +28,10 @@ import { audio, type MediaItem } from "@/lib/desktop/bridge";
 import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
 import { MediaModelAvailability } from "../shared/media-model-availability";
 import { generatedMediaFile } from "../shared/generated-media-file";
+import {
+  ElevenLabsSetupNotice,
+  useElevenLabsConnection,
+} from "./elevenlabs-connection";
 
 const SOUND_EFFECT_MODELS = models.audio.sound_effects.model_ids.map(
   (id) => models.audio.sound_effects.models[id]
@@ -56,6 +60,9 @@ export function SoundEffectGenerationControls(
   );
   const fallbackModel = availableModels[0];
   if (!fallbackModel) return <SoundEffectGenerationUnavailable />;
+  if (!audio.soundEffects.isSupported()) {
+    return <SoundEffectGenerationUnsupported />;
+  }
 
   return (
     <AvailableSoundEffectGenerationControls
@@ -89,6 +96,8 @@ function AvailableSoundEffectGenerationControls({
   const [duration, setDuration] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Missing-key recovery: see test/desktop-audio-elevenlabs-key-setup.md.
+  const elevenLabs = useElevenLabsConnection();
 
   const submit = async (message: PromptInputMessage) => {
     if (busy || disabled) return;
@@ -112,13 +121,6 @@ function AvailableSoundEffectGenerationControls({
         "Sound-effect duration must be between 0.5 and 30 seconds."
       );
     }
-    if (!audio.soundEffects.isSupported()) {
-      throw setGenerationError(
-        setError,
-        "This Grida Desktop build does not expose sound-effect generation yet."
-      );
-    }
-
     setBusy(true);
     onBusyChange?.(true);
     setError(null);
@@ -139,13 +141,32 @@ function AvailableSoundEffectGenerationControls({
         ...(result.stored_media ? { storedMedia: result.stored_media } : {}),
       });
     } catch (cause) {
-      setError(errorMessage(cause));
+      const connection = await elevenLabs.refresh();
+      if (connection.kind === "missing") {
+        setError(null);
+      } else {
+        setError(errorMessage(cause));
+      }
       throw cause;
     } finally {
       setBusy(false);
       onBusyChange?.(false);
     }
   };
+
+  if (elevenLabs.state.kind === "loading") {
+    return <SoundEffectGenerationKeyCheck />;
+  }
+  if (elevenLabs.state.kind === "missing") {
+    return (
+      <div
+        data-testid="controls-sound-effect-generation"
+        className="mx-auto w-full max-w-2xl"
+      >
+        <ElevenLabsSetupNotice feature="sound effects" />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -218,6 +239,38 @@ function SoundEffectGenerationUnavailable() {
         role="status"
       >
         No sound-effect generation model is available for this tool.
+      </p>
+    </div>
+  );
+}
+
+function SoundEffectGenerationUnsupported() {
+  return (
+    <div
+      data-testid="controls-sound-effect-generation"
+      className="mx-auto w-full max-w-2xl"
+    >
+      <p
+        className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground shadow-lg"
+        role="status"
+      >
+        Update Grida Desktop to use ElevenLabs Sound Effects.
+      </p>
+    </div>
+  );
+}
+
+function SoundEffectGenerationKeyCheck() {
+  return (
+    <div
+      data-testid="controls-sound-effect-generation"
+      className="mx-auto w-full max-w-2xl"
+    >
+      <p
+        className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground shadow-lg"
+        role="status"
+      >
+        Checking ElevenLabs connection…
       </p>
     </div>
   );

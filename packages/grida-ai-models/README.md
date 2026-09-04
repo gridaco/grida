@@ -27,8 +27,8 @@ and lookup helpers.
   size constraints, defaults, and pricing
 - Video generation model cards: canonical (provider-agnostic) models, each with
   per-provider bindings carrying that provider's call id and pricing
-- Separate music and sound-effect catalogues with provider-native IO and
-  pricing contracts
+- Separate music, sound-effect, and text-to-speech catalogues with
+  provider-native IO and pricing contracts
 - Staged 3D generation endpoint cards for text-to-3D and image-to-3D
 - Image tool model cards, such as background removal and upscaling
 - Shared discriminator types for providers, vendors, speed labels, and pricing
@@ -52,6 +52,7 @@ const compactImageModel = imageModel && models.image.toCompact(imageModel);
 
 const musicModel = models.audio.music.models["google/lyria-3"];
 const sfxModel = models.audio.sound_effects.models.eleven_text_to_sound_v2;
+const voiceModel = models.audio.text_to_speech.models.eleven_v3;
 const staged3d = models.three_d.staged_models();
 const upscaleTool = models.image_tools.models["nightmareai/real-esrgan"];
 ```
@@ -116,6 +117,7 @@ Media model data lives under the `models` namespace:
 - `models.image`
 - `models.audio.music`
 - `models.audio.sound_effects`
+- `models.audio.text_to_speech`
 - `models.three_d`
 - `models.video`
 - `models.image_tools`
@@ -134,9 +136,11 @@ Image pricing is a discriminated union:
 `models.audio.music` describes Replicate Lyria with flat USD-per-run pricing;
 `models.audio.sound_effects` describes ElevenLabs Sound Effects with the
 provider's own credits meter (100 credits for automatic duration, or 11 credits
-per second when duration is specified). Credits intentionally are not converted
-to USD because their effective dollar value depends on the account plan. The
-two catalogues deliberately share no model-card or pricing union.
+per second when duration is specified); and `models.audio.text_to_speech`
+describes ElevenLabs v3 with its text limit, bracketed audio-tag support, MP3
+output, and per-character API rate. Credits intentionally are not converted to
+USD because their effective dollar value depends on the account plan. The three
+catalogues deliberately share no model-card or pricing union.
 
 Audio and 3D cards use `status: "listed" | "staged"`. `listed` means the model
 has an integrated execution surface and can appear in normal user-facing
@@ -147,8 +151,9 @@ model callable. Use `listed_models()` or `staged_models()` rather than
 inferring runtime availability from presence in `models`.
 
 Music execution accepts `models.audio.music.ModelId`; ElevenLabs SFX execution
-accepts `models.audio.sound_effects.ModelId`. There is intentionally no broader
-audio model id.
+accepts `models.audio.sound_effects.ModelId`; and ElevenLabs Text to Speech
+accepts `models.audio.text_to_speech.ModelId`. There is intentionally no
+broader audio model id.
 
 ### 3D models
 

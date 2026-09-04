@@ -15,6 +15,7 @@ import {
 import type { ImagesRoutesDeps } from "./http/routes/images";
 import type { MusicRoutesDeps } from "./http/routes/music";
 import type { SoundEffectsRoutesDeps } from "./http/routes/sound-effects";
+import type { TextToSpeechRoutesDeps } from "./http/routes/text-to-speech";
 import type { ThreeDRoutesDeps } from "./http/routes/three-d";
 import type { VideoRoutesDeps } from "./http/routes/video";
 
@@ -24,6 +25,7 @@ const registrations = vi.hoisted(() => ({
   threeD: vi.fn<(app: Hono, deps: ThreeDRoutesDeps) => void>(),
   music: vi.fn<(app: Hono, deps: MusicRoutesDeps) => void>(),
   soundEffects: vi.fn<(app: Hono, deps: SoundEffectsRoutesDeps) => void>(),
+  textToSpeech: vi.fn<(app: Hono, deps: TextToSpeechRoutesDeps) => void>(),
 }));
 
 vi.mock("./http/routes/images", () => ({
@@ -41,6 +43,9 @@ vi.mock("./http/routes/music", () => ({
 vi.mock("./http/routes/sound-effects", () => ({
   registerSoundEffectsRoutes: registrations.soundEffects,
 }));
+vi.mock("./http/routes/text-to-speech", () => ({
+  registerTextToSpeechRoutes: registrations.textToSpeech,
+}));
 
 import { createAgentTenant } from "./server";
 
@@ -52,6 +57,7 @@ type MediaRouteCapabilities = {
   three_d: boolean;
   music: boolean;
   sound_effects: boolean;
+  text_to_speech: boolean;
 };
 
 async function registerMediaTenant(capabilities: MediaRouteCapabilities) {
@@ -104,6 +110,7 @@ describe("agent tenant generated-media wiring", () => {
       three_d: true,
       music: true,
       sound_effects: true,
+      text_to_speech: true,
     });
 
     for (const register of [
@@ -112,6 +119,7 @@ describe("agent tenant generated-media wiring", () => {
       registrations.threeD,
       registrations.music,
       registrations.soundEffects,
+      registrations.textToSpeech,
     ]) {
       expect(register).toHaveBeenCalledOnce();
       expect(register.mock.calls[0]?.[1]).toEqual(
@@ -128,15 +136,22 @@ describe("agent tenant generated-media wiring", () => {
     expect(registrations.soundEffects.mock.calls[0]?.[1]).not.toHaveProperty(
       "gg_base_url"
     );
+    expect(registrations.textToSpeech.mock.calls[0]?.[1]).not.toHaveProperty(
+      "gg"
+    );
+    expect(registrations.textToSpeech.mock.calls[0]?.[1]).not.toHaveProperty(
+      "gg_base_url"
+    );
   });
 
-  it("mounts music and Sound Effects from independent capability bits", async () => {
+  it("mounts music, Sound Effects, and Text to Speech independently", async () => {
     await registerMediaTenant({
       images: false,
       video: false,
       three_d: false,
       music: true,
       sound_effects: false,
+      text_to_speech: false,
     });
     expect(registrations.music).toHaveBeenCalledOnce();
     expect(registrations.soundEffects).not.toHaveBeenCalled();
@@ -148,8 +163,22 @@ describe("agent tenant generated-media wiring", () => {
       three_d: false,
       music: false,
       sound_effects: true,
+      text_to_speech: false,
     });
     expect(registrations.music).not.toHaveBeenCalled();
     expect(registrations.soundEffects).toHaveBeenCalledOnce();
+
+    vi.clearAllMocks();
+    await registerMediaTenant({
+      images: false,
+      video: false,
+      three_d: false,
+      music: false,
+      sound_effects: false,
+      text_to_speech: true,
+    });
+    expect(registrations.music).not.toHaveBeenCalled();
+    expect(registrations.soundEffects).not.toHaveBeenCalled();
+    expect(registrations.textToSpeech).toHaveBeenCalledOnce();
   });
 });

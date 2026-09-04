@@ -43,12 +43,55 @@ export function assertHttpsUrl(url: string, label: string): URL {
   return u;
 }
 
-/** Read a response body for an error message, bounded and never throwing. */
+const MAX_ERROR_TEXT_BYTES = 4 * 1024;
+const MAX_ERROR_TEXT_CHARACTERS = 500;
+const MAX_ERROR_TEXT_CHUNKS = 64;
+
+/** Read a small response prefix for an error message, bounded and never throwing. */
 export async function safeText(res: Response): Promise<string> {
+  if (!res.body) return "";
+
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  let finished = false;
   try {
-    return (await res.text()).slice(0, 500);
+    for (
+      let reads = 0;
+      reads < MAX_ERROR_TEXT_CHUNKS && total < MAX_ERROR_TEXT_BYTES;
+      reads += 1
+    ) {
+      const { done, value } = await reader.read();
+      if (done) {
+        finished = true;
+        break;
+      }
+      const remaining = MAX_ERROR_TEXT_BYTES - total;
+      const chunk = value.subarray(0, remaining);
+      chunks.push(chunk);
+      total += chunk.byteLength;
+      if (
+        chunk.byteLength < value.byteLength ||
+        total === MAX_ERROR_TEXT_BYTES
+      ) {
+        await reader.cancel().catch(() => {});
+        finished = true;
+        break;
+      }
+    }
+    if (!finished) await reader.cancel().catch(() => {});
+
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return new TextDecoder().decode(bytes).slice(0, MAX_ERROR_TEXT_CHARACTERS);
   } catch {
     return "<unreadable>";
+  } finally {
+    reader.releaseLock();
   }
 }
 

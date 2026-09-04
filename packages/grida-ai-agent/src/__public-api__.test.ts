@@ -42,6 +42,10 @@ import {
   type MusicGenerateResult,
   type SoundEffectGenerateRequest,
   type SoundEffectGenerateResult,
+  type TextToSpeechGenerateRequest,
+  type TextToSpeechGenerateResult,
+  type TextToSpeechListVoicesResult,
+  type TextToSpeechVoice,
   type ChatMessageRow,
   type ChatMessageWithParts,
   type ChatModel,
@@ -187,6 +191,22 @@ describe("@grida/agent public API", () => {
       expectTypeOf<SoundEffectGenerateResult["stored_media"]>().toEqualTypeOf<
         MediaItem | undefined
       >();
+      expectTypeOf<TextToSpeechVoice>().toEqualTypeOf<{
+        voice_id: string;
+        name: string;
+      }>();
+      expectTypeOf<
+        TextToSpeechListVoicesResult["voices"][number]
+      >().toEqualTypeOf<TextToSpeechVoice>();
+      expectTypeOf<
+        TextToSpeechGenerateRequest["model_id"]
+      >().toEqualTypeOf<"eleven_v3">();
+      expectTypeOf<
+        TextToSpeechGenerateResult["audio"]["file_name"]
+      >().toEqualTypeOf<string>();
+      expectTypeOf<TextToSpeechGenerateResult["stored_media"]>().toEqualTypeOf<
+        MediaItem | undefined
+      >();
 
       // Tier constants.
       expect(AGENT_TIERS).toContain(AGENT_DEFAULT_TIER);
@@ -291,6 +311,7 @@ describe("@grida/agent public API", () => {
       expect(caps.three_d).toBe(true);
       expect(caps.music).toBe(true);
       expect(caps.sound_effects).toBe(true);
+      expect(caps.text_to_speech).toBe(true);
       expect(caps.shell).toBe(false);
       const handshake: DaemonHandshakeResponse = {
         protocol: DAEMON_PROTOCOL,

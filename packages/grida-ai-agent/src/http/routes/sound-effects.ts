@@ -70,6 +70,7 @@ export function registerSoundEffectsRoutes(
       return c.json(
         {
           error: "no ElevenLabs key is connected",
+          code: "provider_key_required",
           provider_id: "elevenlabs",
         },
         400

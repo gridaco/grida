@@ -23,9 +23,9 @@ export {
  * several: OpenRouter does text + image; Vercel does text + image + video; fal
  * does image + video. This vocabulary is intentionally limited to the generic
  * model resolvers that consume {@link byokProvidersFor}. Provider-shaped
- * endpoints such as fal 3D generation and ElevenLabs Sound Effects select
- * their exact provider directly; claiming broad `3d` or `audio` support here
- * would make this routing metadata dishonest.
+ * endpoints such as fal 3D generation and ElevenLabs Sound Effects/Text to
+ * Speech select their exact provider directly; claiming broad `3d` or `audio`
+ * support here would make this routing metadata dishonest.
  */
 export type ByokModality = "text" | "image" | "video";
 
@@ -48,9 +48,10 @@ export const BYOK_PROVIDER_METADATA = [
   {
     id: "elevenlabs",
     label: "ElevenLabs",
-    // Sound Effects is an exact provider endpoint, not a generic audio-model
-    // resolver. The provider remains in this identity table so its BYOK secret
-    // can be stored, while its readiness is checked by the SFX surface itself.
+    // Sound Effects and Text to Speech are exact provider endpoints, not a
+    // generic audio-model resolver. The provider remains in this identity
+    // table so its BYOK secret can be stored, while readiness is checked by
+    // the owning audio surfaces.
     modalities: [],
   },
 ] as const;

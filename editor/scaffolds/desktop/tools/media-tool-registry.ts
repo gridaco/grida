@@ -6,6 +6,7 @@ export type DesktopMediaToolId =
   | "3d-generator"
   | "text-to-music"
   | "text-to-sound-effects"
+  | "text-to-speech"
   | "image-viewer"
   | "video-viewer"
   | "3d-viewer"
@@ -62,6 +63,13 @@ const TOOL_SPECS = Object.freeze([
     label: "SFX",
     description: "Create a short sound effect from a written cue.",
     modelIds: models.audio.sound_effects.model_ids,
+  },
+  {
+    id: "text-to-speech",
+    group: "create",
+    label: "Voice",
+    description: "Turn dialogue with expression cues into spoken audio.",
+    modelIds: models.audio.text_to_speech.model_ids,
   },
   {
     id: "image-viewer",
@@ -188,6 +196,13 @@ export namespace DesktopMediaTool {
       )
     ) {
       return resolve("text-to-sound-effects");
+    }
+    if (
+      (models.audio.text_to_speech.model_ids as readonly string[]).includes(
+        modelId
+      )
+    ) {
+      return resolve("text-to-speech");
     }
     return null;
   }

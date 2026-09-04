@@ -604,6 +604,10 @@ const bridge: DesktopBridge = {
     soundEffects: {
       generate: (req) => agentClient.audio.soundEffects.generate(req),
     },
+    textToSpeech: {
+      listVoices: () => agentClient.audio.textToSpeech.listVoices(),
+      generate: (req) => agentClient.audio.textToSpeech.generate(req),
+    },
   },
 
   agent: {

@@ -122,6 +122,10 @@ describe("sound-effects generation route", () => {
 
     expect(unknown.status).toBe(400);
     expect(missingKey.status).toBe(400);
+    expect(await missingKey.json()).toMatchObject({
+      code: "provider_key_required",
+      provider_id: "elevenlabs",
+    });
     expect(soundEffectGenerate).not.toHaveBeenCalled();
   });
 

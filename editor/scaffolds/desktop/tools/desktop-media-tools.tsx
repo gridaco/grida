@@ -9,6 +9,7 @@ import {
   FolderSearch,
   ImageIcon,
   Loader2,
+  Mic2,
   Music2,
   Video,
   Volume2,
@@ -32,6 +33,7 @@ import { mediaLibrary, type MediaItem } from "@/lib/desktop/bridge";
 import { ThreeDPlayground } from "../3d-gen/three-d-playground";
 import { MusicPlayground } from "../audio-gen/music-playground";
 import { SoundEffectPlayground } from "../audio-gen/sound-effect-playground";
+import { VoicePlayground } from "../audio-gen/voice-playground";
 import { DesktopImagePlayground } from "../image-gen/image-playground";
 import { DesktopVideoPlayground } from "../video-gen/video-playground";
 import {
@@ -553,6 +555,22 @@ function DesktopMediaToolContent({
           onRevealStoredMedia={onRevealStoredMedia}
         />
       );
+    case "text-to-speech":
+      return (
+        <VoicePlayground
+          initialModelId={
+            (initialModelId as models.audio.text_to_speech.ModelId | null) ??
+            undefined
+          }
+          modelIds={
+            tool.modelIds as readonly models.audio.text_to_speech.ModelId[]
+          }
+          generationDisabled={generationDisabled}
+          onGenerationBusyChange={onGenerationBusyChange}
+          onStoredMediaCreated={onStoredMediaCreated}
+          onRevealStoredMedia={onRevealStoredMedia}
+        />
+      );
     case "3d-viewer":
       return <GltfViewerTool />;
     case "audio-player":
@@ -631,6 +649,8 @@ function ToolIcon({ id }: { id: DesktopMediaToolId }) {
       return <Music2 className={className} aria-hidden />;
     case "text-to-sound-effects":
       return <AudioWaveform className={className} aria-hidden />;
+    case "text-to-speech":
+      return <Mic2 className={className} aria-hidden />;
     case "audio-player":
       return <Volume2 className={className} aria-hidden />;
   }
