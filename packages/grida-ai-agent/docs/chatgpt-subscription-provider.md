@@ -105,8 +105,7 @@ supported set to the bare model names required by the subscription backend:
 - `openai/gpt-5.6-terra`;
 - `openai/gpt-5.6-luna`;
 - `openai/gpt-5.5`;
-- `openai/gpt-5.4`;
-- `openai/gpt-5.4-mini`.
+- `openai/gpt-5.4`.
 
 This allowlist mirrors the current observed Zed/Codex-compatible surface. It
 is not authenticated model discovery, may drift, and cannot prove that a

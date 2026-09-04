@@ -231,7 +231,6 @@ const CHATGPT_WIRE_MODEL_BY_ID: Record<ChatGptSubscriptionModelId, string> = {
   "openai/gpt-5.6-luna": "gpt-5.6-luna",
   "openai/gpt-5.5": "gpt-5.5",
   "openai/gpt-5.4": "gpt-5.4",
-  "openai/gpt-5.4-mini": "gpt-5.4-mini",
 };
 
 function toWireModelId(modelId: ChatGptSubscriptionModelId): string {

@@ -8,7 +8,7 @@ const endpoint: EndpointProviderConfig = {
   base_url: "http://127.0.0.1:11434/v1",
   models: [
     {
-      id: "openai/gpt-5.4-mini",
+      id: "openai/gpt-5.6-luna",
       label: "Local collision",
       multimodal: false,
       overrides: { imageInputMimes: ["image/png"] },
@@ -19,11 +19,11 @@ const endpoint: EndpointProviderConfig = {
 describe("registered_models", () => {
   it("resolves capabilities from the endpoint that a colliding id pins", () => {
     expect(
-      registered_models.providerIdForModel("openai/gpt-5.4-mini", [endpoint])
+      registered_models.providerIdForModel("openai/gpt-5.6-luna", [endpoint])
     ).toBe("endpoint-local");
     expect(
       registered_models.resolve(
-        "openai/gpt-5.4-mini",
+        "openai/gpt-5.6-luna",
         [endpoint],
         "endpoint-local"
       )
@@ -35,17 +35,17 @@ describe("registered_models", () => {
 
   it("does not leak endpoint capabilities into another explicit provider", () => {
     const resolved = registered_models.resolve(
-      "openai/gpt-5.4-mini",
+      "openai/gpt-5.6-luna",
       [endpoint],
       "gg"
     );
-    expect(resolved?.label).toBe("GPT-5.4 Mini");
+    expect(resolved?.label).toBe("GPT-5.6 Luna");
     expect(resolved?.imageInputMimes).toContain("image/jpeg");
   });
 
   it("still resolves the static catalog when no endpoint owns the id", () => {
-    expect(registered_models.resolve("openai/gpt-5.4-mini", [])).toMatchObject({
-      label: "GPT-5.4 Mini",
+    expect(registered_models.resolve("openai/gpt-5.6-luna", [])).toMatchObject({
+      label: "GPT-5.6 Luna",
     });
   });
 });

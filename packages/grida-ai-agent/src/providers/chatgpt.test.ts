@@ -34,7 +34,7 @@ const CONFIG: ChatGptProviderConfig = {
   originator: "grida-test",
   default_model_id: "openai/gpt-5.6-terra",
   tier_model_ids: {
-    nano: "openai/gpt-5.4-mini",
+    nano: "openai/gpt-5.6-luna",
     pro: "openai/gpt-5.6-terra",
     max: "openai/gpt-5.6-sol",
   },
@@ -60,14 +60,13 @@ afterEach(async () => {
 });
 
 describe("ChatGptProvider", () => {
-  it("pins the six-model namespaced allowlist mirrored from the reference client", () => {
+  it("pins the five-model namespaced allowlist mirrored from the reference client", () => {
     expect(CHATGPT_SUBSCRIPTION_MODEL_IDS).toEqual([
       "openai/gpt-5.6-sol",
       "openai/gpt-5.6-terra",
       "openai/gpt-5.6-luna",
       "openai/gpt-5.5",
       "openai/gpt-5.4",
-      "openai/gpt-5.4-mini",
     ]);
     for (const id of CHATGPT_SUBSCRIPTION_MODEL_IDS) {
       expect(isChatGptSubscriptionModelId(id)).toBe(true);
@@ -156,7 +155,7 @@ describe("ChatGptProvider", () => {
     let requestBody: Record<string, unknown> = {};
     const { factory } = runtime(async (_input, init) => {
       requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      return completedResponse("gpt-5.4-mini");
+      return completedResponse("gpt-5.6-luna");
     });
 
     await generateText({
@@ -554,7 +553,7 @@ function completedStreamEvent(): Record<string, unknown> {
 // chain has one definition.
 describe("tierModelId", () => {
   it("prefers the configured tier entry", () => {
-    expect(tierModelId(CONFIG, "nano")).toBe("openai/gpt-5.4-mini");
+    expect(tierModelId(CONFIG, "nano")).toBe("openai/gpt-5.6-luna");
     expect(tierModelId(CONFIG, "max")).toBe("openai/gpt-5.6-sol");
   });
 

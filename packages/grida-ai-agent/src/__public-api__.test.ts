@@ -191,7 +191,7 @@ describe("@grida/agent public API", () => {
       // Tier constants.
       expect(AGENT_TIERS).toContain(AGENT_DEFAULT_TIER);
       const tier: ModelTier = AGENT_DEFAULT_TIER;
-      const modelId: AgentModelId = "anthropic/claude-sonnet-4.6";
+      const modelId: AgentModelId = "anthropic/claude-sonnet-5";
       expect(typeof tier).toBe("string");
       expect(modelId).toContain("/");
 

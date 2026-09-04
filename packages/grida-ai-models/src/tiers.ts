@@ -41,12 +41,10 @@ export type ModelTier = "nano" | "mini" | "pro" | "max";
  * cheaper — when one model is both the lowest reasonable choice and
  * the best value at `mini`, the two tiers collapse onto the same id.
  *
- * That is the state today. OpenAI's 2026-07-30 cut dropped GPT-5.6
- * Luna to $0.20 in / $1.20 out, past the older GPT-5.4 Nano ($0.20 in
- * / $1.25 out) while carrying 1.05M context against Nano's 400K —
- * leaving nothing that is both cheaper and adequate. OpenAI positions
- * Luna as the 5.6 generation's nano-class model, so this is one model
- * serving two tiers, not a tier being over-served.
+ * That is the state today. OpenAI positions GPT-5.6 Luna as the 5.6
+ * generation's nano-class model, and its current rate and 1.05M context
+ * make it both the lowest reasonable choice and the best value at `mini`.
+ * This is one model serving two tiers, not a tier being over-served.
  * See https://github.com/gridaco/grida/pull/1009.
  *
  * Expect the tiers to separate again as new models land. The invariant

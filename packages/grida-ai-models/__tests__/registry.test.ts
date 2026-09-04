@@ -58,7 +58,7 @@ describe("models.text.registry.normalize", () => {
 describe("models.text.registry.resolve", () => {
   const custom = [
     { id: "llama3.1:8b" },
-    { id: "anthropic/claude-sonnet-4.6", label: "shadowed" },
+    { id: "anthropic/claude-sonnet-5", label: "shadowed" },
   ];
 
   it("resolves a catalogue id with custom: false and cost present", () => {
@@ -91,9 +91,9 @@ describe("models.text.registry.resolve", () => {
   });
 
   it("catalogue wins over a colliding custom entry", () => {
-    const spec = registry.resolve("anthropic/claude-sonnet-4.6", custom);
+    const spec = registry.resolve("anthropic/claude-sonnet-5", custom);
     expect(spec?.custom).toBe(false);
-    expect(spec?.label).toBe("Claude Sonnet 4.6");
+    expect(spec?.label).toBe("Claude Sonnet 5");
   });
 
   it("returns undefined for an unknown id", () => {

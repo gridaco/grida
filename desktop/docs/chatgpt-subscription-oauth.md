@@ -39,12 +39,11 @@ The authorization query also pins
 `codex_cli_simplified_flow=true`, and `originator=grida`. Inference sends
 `originator: grida`.
 
-The current closed model compatibility projection is
+The current closed model compatibility projection consists of
 `openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`,
-`openai/gpt-5.6-luna`, `openai/gpt-5.5`, `openai/gpt-5.4`, and
-`openai/gpt-5.4-mini`. It mirrors the observed Zed/Codex-compatible surface,
-not authenticated discovery; it may drift, and an account can refuse a listed
-model.
+`openai/gpt-5.6-luna`, `openai/gpt-5.5`, and `openai/gpt-5.4`. It mirrors the
+observed Zed/Codex-compatible surface, not authenticated discovery; it may
+drift, and an account can refuse a listed model.
 
 The main-owned provider network grant admits exact `auth.openai.com` and
 `chatgpt.com` HTTPS origins only on the credential-bearing provider lane.

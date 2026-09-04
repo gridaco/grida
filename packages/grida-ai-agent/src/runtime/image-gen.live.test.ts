@@ -42,7 +42,7 @@ const PROVIDER_ID = (process.env.GRIDA_BYOK_PROVIDER ?? "openrouter") as
   | "openrouter"
   | "vercel"
   | "fal";
-const MODEL_ID = process.env.GRIDA_LIVE_MODEL ?? "anthropic/claude-sonnet-4.6";
+const MODEL_ID = process.env.GRIDA_LIVE_MODEL ?? "anthropic/claude-sonnet-5";
 // The image model is HOST config (the user's selection), not an agent arg — the
 // tool is prompt-only. Inject a fast, reliable one for the test (seedream) via
 // the runtime's `image_model_id`, overridable per provider.

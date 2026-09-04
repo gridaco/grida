@@ -62,7 +62,7 @@ function makeMockModel(): MockLanguageModelV3 {
   let call = 0;
   return new MockLanguageModelV3({
     provider: "openrouter",
-    modelId: "openai/gpt-5.4-nano",
+    modelId: "openai/gpt-5.6-luna",
     doStream: async (options) => {
       call += 1;
       const prompt = options.prompt as unknown[];

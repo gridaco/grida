@@ -592,7 +592,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       method: "POST",
       body: JSON.stringify({
         messages: [{ id: "m", role: "user", content: "hi" }],
-        model_id: "anthropic/claude-opus-4.7",
+        model_id: "anthropic/claude-opus-5",
       }),
     });
     expect(res.status).toBe(200);
@@ -602,7 +602,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     // The catalog id the user picked is stamped on the row — so a
     // reload re-seeds the picker with the same model.
     const session = await sessionsStore.get(sessionId);
-    expect(session?.model?.model_id).toBe("anthropic/claude-opus-4.7");
+    expect(session?.model?.model_id).toBe("anthropic/claude-opus-5");
 
     // Settle the recorder's full async write chain before teardown
     // closes the DB — wait for the streamed text part to land, not just

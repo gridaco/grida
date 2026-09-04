@@ -20,7 +20,7 @@ describe("buildAgentSend", () => {
     const send = buildAgentSend({
       sendMessage,
       sessionId: null,
-      modelId: "anthropic/claude-sonnet-4.6",
+      modelId: "anthropic/claude-sonnet-5",
     });
 
     send("hello");
@@ -31,7 +31,7 @@ describe("buildAgentSend", () => {
       {
         body: {
           session_id: undefined,
-          model_id: "anthropic/claude-sonnet-4.6",
+          model_id: "anthropic/claude-sonnet-5",
         },
       }
     );
@@ -129,7 +129,7 @@ describe("buildAgentSend — explicit provider/model selection", () => {
     const send = buildAgentSend({
       sendMessage,
       sessionId: "s1",
-      modelId: "anthropic/claude-sonnet-4.6",
+      modelId: "anthropic/claude-sonnet-5",
     });
 
     send("hi");

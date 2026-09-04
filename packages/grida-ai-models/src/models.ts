@@ -271,26 +271,6 @@ export namespace models {
     } as const satisfies NonNullable<ModelCostPerMillion["longContext"]>;
 
     const catalogSpecs = {
-      "openai/gpt-5.4-nano": {
-        id: "openai/gpt-5.4-nano",
-        label: "GPT-5.4 Nano",
-        multimodal: true,
-        imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
-        tool_call: true,
-        contextWindow: 400_000,
-        outputLimit: 128_000,
-        cost: { input: 0.2, output: 1.25, cacheRead: 0.02 },
-      },
-      "openai/gpt-5.4-mini": {
-        id: "openai/gpt-5.4-mini",
-        label: "GPT-5.4 Mini",
-        multimodal: true,
-        imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
-        tool_call: true,
-        contextWindow: 400_000,
-        outputLimit: 128_000,
-        cost: { input: 0.75, output: 4.5, cacheRead: 0.075 },
-      },
       "openai/gpt-5.5": {
         id: "openai/gpt-5.5",
         label: "GPT-5.5",
@@ -386,18 +366,6 @@ export namespace models {
         outputLimit: 128_000,
         cost: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
       },
-      "anthropic/claude-sonnet-4.6": {
-        id: "anthropic/claude-sonnet-4.6",
-        label: "Claude Sonnet 4.6",
-        short_label: "Sonnet 4.6",
-        multimodal: true,
-        imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
-        tool_call: true,
-        contextWindow: 1_000_000,
-        outputLimit: 128_000,
-        cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
-        deprecated: true,
-      },
       // Same input/output/cacheWrite card as Claude Fable 5, with cache reads
       // cut to $0.25/MTok. Not a drop-in successor — forced tool choice
       // (`tool_choice` `any`/`tool`) is rejected here — which is why Fable 5
@@ -453,26 +421,33 @@ export namespace models {
         cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
         deprecated: true,
       },
-      "anthropic/claude-opus-4.7": {
-        id: "anthropic/claude-opus-4.7",
-        label: "Claude Opus 4.7",
-        short_label: "Opus 4.7",
-        multimodal: true,
-        imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
-        tool_call: true,
-        contextWindow: 1_000_000,
-        outputLimit: 128_000,
-        cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
-        deprecated: true,
-      },
       // Google's cache model is read + hourly storage (no one-time write
       // premium that matches `cacheWrite` semantics), so the field is omitted.
       //
       // Steady-state rates. Google is promoting $0.75 in / $3.75 out / $0.075
       // cacheRead through 2026-12-31; these are the prices that apply from
       // 2027-01-01. Checking Google's page before then will show the lower
-      // set — that is the promotion, not a correction.
+      // set — that is the promotion, not a correction. Gemini 3.8 Flash is GA,
+      // and this exact id is live on both Vercel AI Gateway and OpenRouter.
+      // https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash
       // https://ai.google.dev/gemini-api/docs/pricing
+      // https://vercel.com/ai-gateway/models/gemini-3.8-flash
+      // https://openrouter.ai/google/gemini-3.8-flash
+      "google/gemini-3.8-flash": {
+        id: "google/gemini-3.8-flash",
+        label: "Gemini 3.8 Flash",
+        multimodal: true,
+        imageInputMimes: GOOGLE_IMAGE_INPUT_MIMES,
+        tool_call: true,
+        contextWindow: 1_048_576,
+        outputLimit: 65_536,
+        cost: { input: 1.5, output: 7.5, cacheRead: 0.15 },
+      },
+      // 3.8 improves accuracy and reliability at the same rate, but Google
+      // still recommends 3.7 when compute efficiency matters because 3.8 can
+      // consume more tokens. Keep it callable as a deprecated choice rather
+      // than deleting a model that remains better on a real axis.
+      // https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-3-8-flash
       "google/gemini-3.7-flash": {
         id: "google/gemini-3.7-flash",
         label: "Gemini 3.7 Flash",
@@ -482,6 +457,7 @@ export namespace models {
         contextWindow: 1_048_576,
         outputLimit: 65_536,
         cost: { input: 1.5, output: 7.5, cacheRead: 0.15 },
+        deprecated: true,
       },
       "google/gemini-3.1-pro-preview": {
         id: "google/gemini-3.1-pro-preview",
@@ -532,9 +508,9 @@ export namespace models {
      * Look up a model spec by id.
      *
      * Accepts:
-     * - Namespaced id: `"openai/gpt-5.4-mini"` (exact match)
-     * - Bare id: `"gpt-5.4-mini"` (matches `openai/gpt-5.4-mini`)
-     * - Date-suffixed id: `"gpt-5.4-mini-2025-08-07"` (providers often
+     * - Namespaced id: `"openai/gpt-5.6-luna"` (exact match)
+     * - Bare id: `"gpt-5.6-luna"` (matches `openai/gpt-5.6-luna`)
+     * - Date-suffixed id: `"gpt-5.6-luna-2026-07-30"` (providers often
      *   append a snapshot date in their API responses)
      */
     export function modelSpecById(modelId: string): ModelSpec | undefined {

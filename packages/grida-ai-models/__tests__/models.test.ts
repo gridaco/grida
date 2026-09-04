@@ -709,6 +709,13 @@ describe("models.text current catalogue", () => {
       cost: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
     },
     {
+      id: "google/gemini-3.8-flash",
+      contextWindow: 1_048_576,
+      outputLimit: 65_536,
+      // Steady state, not Google's promotional rate through 2026-12-31.
+      cost: { input: 1.5, output: 7.5, cacheRead: 0.15 },
+    },
+    {
       id: "google/gemini-3.7-flash",
       contextWindow: 1_048_576,
       outputLimit: 65_536,
@@ -782,6 +789,12 @@ describe("models.text current catalogue", () => {
     expect(models.text.catalog["anthropic/claude-opus-4.8"].deprecated).toBe(
       true
     );
+    expect(
+      models.text.catalog["google/gemini-3.8-flash"].deprecated
+    ).toBeUndefined();
+    expect(models.text.catalog["google/gemini-3.7-flash"].deprecated).toBe(
+      true
+    );
   });
 });
 
@@ -815,10 +828,10 @@ describe("models.text image-input MIME capabilities", () => {
     }
 
     expect(
-      models.text.catalog["google/gemini-3.7-flash"].imageInputMimes
+      models.text.catalog["google/gemini-3.8-flash"].imageInputMimes
     ).toContain("image/heic");
     expect(
-      models.text.catalog["openai/gpt-5.4-mini"].imageInputMimes
+      models.text.catalog["openai/gpt-5.6-luna"].imageInputMimes
     ).not.toContain("image/heic");
   });
 });
@@ -831,7 +844,7 @@ describe("models.text.displayLabel", () => {
   });
 
   it("falls back to the full label when short_label is unset", () => {
-    const spec = models.text.catalog["openai/gpt-5.4-nano"];
+    const spec = models.text.catalog["openai/gpt-5.6-luna"];
     expect(spec.short_label).toBeUndefined();
     expect(models.text.displayLabel(spec)).toBe(spec.label);
   });
