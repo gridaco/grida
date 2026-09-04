@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
 """
-model_info.py - Look up model specs from models.dev
+model_info.py - Discover model specs from models.dev
 
 Fetches the models.dev catalog and prints context window, output limit,
-cost, and other metadata for a given model ID.
+cost, release-date hints, and other metadata for a given model ID. Release
+dates are discovery hints: verify them against an authoritative vendor source
+before adding release provenance to the catalogue.
 
 Source: https://models.dev/api.json
 
 Usage:
-    python .tools/model_info.py <model_id>
-    python .tools/model_info.py --image <model_id>
-    python .tools/model_info.py --image --all
+    python .agents/skills/ai-models/scripts/model_info.py <model_id>
+    python .agents/skills/ai-models/scripts/model_info.py --image <model_id>
+    python .agents/skills/ai-models/scripts/model_info.py --image --all
 
 Examples:
-    python .tools/model_info.py openai/gpt-5-mini
-    python .tools/model_info.py anthropic/claude-sonnet-4
-    python .tools/model_info.py claude-opus-4
-    python .tools/model_info.py --image gpt-image-1.5
-    python .tools/model_info.py --image flux-kontext
-    python .tools/model_info.py --image --all
+    python .agents/skills/ai-models/scripts/model_info.py openai/gpt-5-mini
+    python .agents/skills/ai-models/scripts/model_info.py anthropic/claude-sonnet-4
+    python .agents/skills/ai-models/scripts/model_info.py claude-opus-4
+    python .agents/skills/ai-models/scripts/model_info.py --image gpt-image-1.5
+    python .agents/skills/ai-models/scripts/model_info.py --image flux-kontext
+    python .agents/skills/ai-models/scripts/model_info.py --image --all
 
 The model ID can be an exact match (e.g. "openai/gpt-5-mini") or a
 substring search (e.g. "gpt-5-mini", "claude-sonnet-4"). When multiple
@@ -163,7 +165,10 @@ def print_model(model: dict, indent: str = "") -> None:
     if model.get("open_weights"):
         print(f"{indent}Open weights   : yes")
     if model.get("release_date"):
-        print(f"{indent}Released       : {model['release_date']}")
+        print(
+            f"{indent}Release hint   : {model['release_date']} "
+            "(models.dev discovery; verify with vendor)"
+        )
 
 
 def print_summary(groups: dict[str, list[dict]], *, image_mode: bool) -> None:
@@ -190,11 +195,16 @@ def print_summary(groups: dict[str, list[dict]], *, image_mode: bool) -> None:
                 detail = f"in=${cost.get('input')} out=${cost.get('output')}"
             else:
                 detail = "per-image"
-            print(f"  {base_id}: {detail}")
+            release = primary.get("release_date") or "?"
+            print(f"  {base_id}: {detail}, release_hint={release}")
         else:
             ctx = limit.get("context", "?")
             out = limit.get("output", "?")
-            print(f"  {base_id}: contextWindow={ctx}, outputLimit={out}")
+            release = primary.get("release_date") or "?"
+            print(
+                f"  {base_id}: contextWindow={ctx}, outputLimit={out}, "
+                f"release_hint={release}"
+            )
 
 
 def main() -> None:
@@ -205,14 +215,20 @@ def main() -> None:
 
     if not positional and not show_all:
         print(
-            "Usage: python .tools/model_info.py [--image] <model_id>\n"
-            "       python .tools/model_info.py --image --all\n"
+            "Usage: python .agents/skills/ai-models/scripts/model_info.py "
+            "[--image] <model_id>\n"
+            "       python .agents/skills/ai-models/scripts/model_info.py "
+            "--image --all\n"
             "\n"
             "Examples:\n"
-            "  python .tools/model_info.py openai/gpt-5-mini\n"
-            "  python .tools/model_info.py --image gpt-image-1.5\n"
-            "  python .tools/model_info.py --image flux-kontext\n"
-            "  python .tools/model_info.py --image --all",
+            "  python .agents/skills/ai-models/scripts/model_info.py "
+            "openai/gpt-5-mini\n"
+            "  python .agents/skills/ai-models/scripts/model_info.py "
+            "--image gpt-image-1.5\n"
+            "  python .agents/skills/ai-models/scripts/model_info.py "
+            "--image flux-kontext\n"
+            "  python .agents/skills/ai-models/scripts/model_info.py "
+            "--image --all",
             file=sys.stderr,
         )
         sys.exit(1)

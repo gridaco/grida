@@ -3,7 +3,7 @@ name: ai-models
 description: >
   Research, compare, and update AI model configurations.
   Covers text model tiers, image and video generation models, image tool models,
-  pricing data sourcing, and provider-cost metering against prepaid org credit.
+  release provenance, pricing data sourcing, and provider-cost metering against prepaid org credit.
   Use when bumping model versions, adding new models, updating pricing, or
   auditing model specs against provider documentation.
 ---
@@ -16,6 +16,7 @@ description: >
 - Adding a new image/video generation model or provider (Vercel gateway, Replicate, fal.ai)
 - Updating pricing data (per-token, per-image flat, per-image tiered, per-second)
 - Verifying model specs (context window, output limit, cost) against providers
+- Grounding a model's first broad public release date and source
 - Auditing hosted usage metering against prepaid organization credit
 
 ---
@@ -48,7 +49,7 @@ python .agents/skills/ai-models/scripts/model_info.py --image <model_id>
 python .agents/skills/ai-models/scripts/model_info.py --image --all
 ```
 
-Source: `models.dev/api.json`. Accepts exact IDs (`anthropic/claude-sonnet-4.6`) or substring search (`gpt-5.4`).
+Discovery source: `models.dev/api.json`. Accepts exact IDs (`anthropic/claude-sonnet-4.6`) or substring search (`gpt-5.4`). Its `release_date` is a lead to verify, not authoritative provenance to copy into the catalogue.
 
 Note: `models.dev` has per-token costs but not per-image tier breakdowns. For per-image pricing (OpenAI quality tiers, BFL flat rates), consult provider docs directly.
 
@@ -68,8 +69,10 @@ Note: `models.dev` has per-token costs but not per-image tier breakdowns. For pe
 The same model has different ids — and different availability and pricing — across
 providers; an id is never portable. Two cataloguing patterns:
 
-- **text / image / audio / image_tools** — one card = one provider; `id` is in that
-  provider's format, and the `provider` field (or the namespace) fixes the route.
+- **text / audio / image_tools / 3D** — one card = one provider or exact endpoint;
+  `id` is in that provider's format, and the `provider` field (or namespace) fixes the route.
+- **image** — one intrinsic card carries per-provider bindings, like video, plus a
+  primary provider retained for older single-provider consumers.
 - **video** — the ecosystem is fragmented, so a card is **canonical** (`vendor/model`,
   e.g. `google/veo-3.1`) and carries a `providers` record (keyed by provider) of bindings,
   each with its own call id + meter. Default-provider choice is deferred (see Video Models).
@@ -84,7 +87,8 @@ providers; an id is never portable. Two cataloguing patterns:
 
 - **Availability + price differ per provider.** **Veo 3.1 Lite** is on OpenRouter/fal.ai but **not** the Vercel gateway — a canonical card just omits the Vercel binding. Veo 3.1 audio-on is `$0.40/s` on both Vercel and fal, but fal also meters silent (`$0.20/s`) and 4K, while **OpenRouter exposes only `$0/MTok` token pricing for video — no usable per-second meter (don't invent one).**
 - **fal.ai** is the broadest video/image catalogue (pay-per-use); billing unit is per-model — per-image, per-megapixel, or per-second video — retrievable from its Platform pricing API.
-- Image is still Vercel-gateway-only in code; a non-Vercel image provider would mirror video's binding shape (or add a `provider` label like audio's `"replicate"`).
+- Image cards are multi-homed across Vercel, fal, and OpenRouter where verified;
+  `listed` cards must retain the catalogue's one-key/universal-provider promise.
 
 ---
 
@@ -111,6 +115,49 @@ published catalogue that reaches installed clients within a refresh interval
 (`docs/wg/platform/hosted-ai.md`). That decisiveness is the point; it also means
 removal is the wrong tool for tidying.
 
+## Release dates and provenance
+
+Every bundled entry carries a `release` object:
+
+```ts
+{
+  date: "2026-07-09", // YYYY-MM-DD, or null only when an endpoint day is unknown
+  basis: "model", // or "provider_endpoint"
+  source_url: "https://vendor.example/release-note"
+}
+```
+
+The date means the earliest day the exact named model or variant became broadly
+available. A public preview counts; a closed, invitation-only, or limited
+preview does not. This is intrinsic model metadata, so adding a provider binding
+does not change a `basis: "model"` release. Use `basis: "provider_endpoint"`
+only when the release fact describes a serving route because no exact upstream
+model launch can be established. An endpoint-shaped card may still use
+`basis: "model"` when its exact underlying model and launch are documented.
+
+Do not substitute any of these:
+
+- snapshot `generated_at`
+- the date Grida added the card
+- the date one provider added a binding
+- a later GA date when an exact public preview date exists
+- an API object's opaque `created` timestamp
+
+Source priority for release facts:
+
+1. Vendor release note, changelog, announcement, or model card that names the exact variant.
+2. Vendor-maintained repository or official provider documentation for the exact endpoint.
+3. First-party vendor social announcement when no durable release page exists.
+4. Serving-provider history, only for `basis: "provider_endpoint"` or when the vendor has no usable record.
+5. `models.dev` only to discover candidates; verify its date against one of the sources above.
+
+If no authoritative source establishes the exact day, keep `date: null` with an
+HTTPS source showing the endpoint's history. Never infer a day from search-result
+ordering, repository commit time, or Grida history. Base snapshot types keep the
+field optional solely for older snapshots and custom models; every bundled card
+must include it, and tests enforce valid calendar dates, complete provenance,
+and the narrow `null` rule.
+
 ## Text Models
 
 Live in `packages/grida-ai-models/src/models.ts` under `models.text.catalog: Record<CatalogId, ModelSpec>`. The tier set and tier→model id table sit in `packages/grida-ai-models/src/tiers.ts` and type-use `models.text.CatalogId` from `models.ts` — so every tier id must resolve to a real catalogued spec.
@@ -119,6 +166,7 @@ Fields to update per tier:
 
 - `id` — gateway format: `provider/model-name`
 - `label` — human-readable name
+- `release` — grounded date, basis, and first-party source under the contract above
 - `contextWindow`, `outputLimit` — from `model_info.py`
 - `cost` — `{ input, output, cacheRead?, cacheWrite? }` per 1M tokens
 
@@ -145,6 +193,7 @@ per_token         — charged by token (e.g. Google Gemini)
 
 - `pricing` — real provider data, one of the three types above
 - `avg_cost_usd` — fallback billable-cost estimate, not displayed to users. Mid-tier for tiered, flat rate for flat, conservative estimate for per-token.
+- `release` — intrinsic model release; do not use a provider-binding date
 - `min_width`, `max_width`, `min_height`, `max_height`, `sizes` — dimension constraints
 - Add new model IDs to the `ImageModelId` type union
 
@@ -162,7 +211,7 @@ Live in `models.video.models` in `packages/grida-ai-models/src/models.ts`. The v
 
 ### Card shape
 
-- **Model (intrinsic):** `id` (canonical), `label`, `vendor`, `aspect_ratios`, `min_duration`/`max_duration`, `audio`, `default` (resolution/aspect/duration/audio), `url` (original vendor's model card).
+- **Model (intrinsic):** `id` (canonical), `label`, `release`, `vendor`, `aspect_ratios`, `min_duration`/`max_duration`, `audio`, `default` (resolution/aspect/duration/audio), `url` (original vendor's model card).
 - **`providers: Partial<Record<VideoProvider, VideoProviderBinding>>`** — one binding per serving provider: `provider`, `id`, `pricing`, `avg_cost_usd`, optional `url`/`deprecated`. **No preference order** — the default-provider choice is deliberately deferred to the runtime. Look a route up with `video.binding(card, provider)`.
 
 Cards catalogue the **image-to-video** route only (canvas-relevant; Grok's sole mode), so each binding has a single `id` — on fal the capability is keyed into the id (`fal-ai/veo3.1/image-to-video`). Don't add a per-capability `endpoints` map until a second capability is actually served: identical ids across capabilities are YAGNI, and divergent ones (other fal endpoints) are a new binding/id when needed.
@@ -222,6 +271,8 @@ credit. Unit: **mills** (1 mill = $0.001 USD).
 
 ## After Any Update
 
+- [ ] Every bundled model has a complete `release`; date semantics and source priority were followed
+- [ ] `models.dev` dates were treated as discovery hints and verified against authoritative sources
 - [ ] `pnpm tsc --noEmit` passes
 - [ ] `docs/models/index.md` matches the code
 - [ ] `/ai/models` page renders correctly

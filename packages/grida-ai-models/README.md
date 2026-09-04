@@ -2,10 +2,10 @@
 
 A standalone model catalog.
 
-This package publishes typed data for AI model selection, display, pricing, and
-size validation. It does not create provider clients, make network requests,
-enforce billing, or decide access. Its scope ends at exported objects, types,
-and lookup helpers.
+This package publishes typed data for AI model selection, display, release
+provenance, pricing, and size validation. It does not create provider clients,
+make network requests, enforce billing, or decide access. Its scope ends at
+exported objects, types, and lookup helpers.
 
 ## Anti-goals
 
@@ -23,6 +23,7 @@ and lookup helpers.
 - Agentic model: `nano`, `mini`, `pro`, and `max`
 - Text model specs: labels, modality, context windows, output limits, and token
   pricing
+- Source-backed release dates shared across model families
 - Image generation model cards: labels, vendors, speed hints, supported sizes,
   size constraints, defaults, and pricing
 - Video generation model cards: canonical (provider-agnostic) models, each with
@@ -74,6 +75,8 @@ Each `ModelSpec` contains:
 - `label` — full human-readable name (e.g. `"Claude Opus 4.8"`)
 - `short_label` — optional, manually-curated compact name for space-constrained
   UI (e.g. `"Opus 4.8"`); falls back to `label` when unset
+- `release` — earliest broad public availability of the exact model or variant,
+  with its basis and authoritative source URL
 - `multimodal`
 - `imageInputMimes` — exact provider-documented image MIME types accepted as
   native model input. This list is independent of `multimodal`: a broad
@@ -121,6 +124,14 @@ Media model data lives under the `models` namespace:
 - `models.three_d`
 - `models.video`
 - `models.image_tools`
+
+Every bundled model card includes `release`. Public preview counts as release;
+closed or limited preview does not. A model-level date is intrinsic and does
+not change when a new serving provider adds a binding. Endpoint-shaped tools
+may instead use `basis: "provider_endpoint"`; when their official history does
+not expose an exact day, `date` is `null` rather than guessed. The base text,
+image, and video types keep `release` optional only so older published
+snapshots and custom model records remain readable.
 
 Image cards can describe both preset sizes and continuous size constraints.
 When both are present, `constraints` is the validation envelope and `sizes` is a
@@ -224,6 +235,12 @@ Keep the stored data literal and portable:
   `avg_cost_usd`, which is explicitly a coarse invocation estimate.
 - Keep provider and vendor values as data labels. This package should not
   import SDKs or contain routing logic.
+- Ground `release` in a first-party vendor release note, changelog,
+  announcement, or model card. Treat models.dev dates as discovery hints, not
+  final provenance; use serving-provider history only for endpoint facts.
+- Never substitute snapshot generation time, Grida insertion time, provider
+  binding availability, or a later GA date for the model's first broad public
+  release.
 - Prefer adding explicit types before widening existing ones.
 
 ## Scripts

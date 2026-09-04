@@ -126,6 +126,11 @@ describe("models.snapshot.parse — acceptance", () => {
     const rich = spec("acme/rich", {
       short_label: "Rich",
       deprecated: true,
+      release: {
+        date: "2026-02-03",
+        basis: "model",
+        source_url: "https://example.com/releases/acme-rich",
+      },
       multimodal: true,
       imageInputMimes: ["image/png", "image/webp"],
       cost: {
@@ -259,6 +264,40 @@ describe("models.snapshot.parse — rejection", () => {
     ],
     ["a non-boolean deprecated", { deprecated: 1 }],
     ["an empty short_label", { short_label: "" }],
+    [
+      "an impossible release date",
+      {
+        release: {
+          date: "2026-02-30",
+          basis: "model",
+          source_url: "https://example.com/release",
+        },
+      },
+    ],
+    [
+      "a non-HTTPS release source",
+      {
+        release: {
+          date: "2026-02-03",
+          basis: "model",
+          source_url: "http://example.com/release",
+        },
+      },
+    ],
+    [
+      "a half-populated release",
+      { release: { date: "2026-02-03", basis: "model" } },
+    ],
+    [
+      "a null intrinsic model date",
+      {
+        release: {
+          date: null,
+          basis: "model",
+          source_url: "https://example.com/release",
+        },
+      },
+    ],
   ])("rejects a spec with %s", (_label, over) => {
     expect(
       snapshot.parse(mutateSpec(over as Record<string, unknown>))
@@ -475,6 +514,16 @@ describe("models.snapshot media — image validation", () => {
       { default: { width: 1, height: 1, aspect_ratio: "square" } },
     ],
     ["an unknown pricing arm", { pricing: { type: "per_furlong", usd: 1 } }],
+    [
+      "a malformed release",
+      {
+        release: {
+          date: "not-a-date",
+          basis: "model",
+          source_url: "https://example.com/release",
+        },
+      },
+    ],
     ["no provider bindings", { providers: {} }],
   ])("rejects %s", (_label, over) => {
     const parsed = snapshot.parse(mutateCard("openai/gpt-image-2", over));
@@ -659,6 +708,16 @@ describe("models.snapshot media — video validation", () => {
     ["a missing url", { url: "" }],
     ["a bad aspect ratio", { aspect_ratios: ["wide"] }],
     ["a non-boolean audio", { audio: "yes" }],
+    [
+      "a malformed release",
+      {
+        release: {
+          date: "2026-13-01",
+          basis: "model",
+          source_url: "https://example.com/release",
+        },
+      },
+    ],
   ])("rejects %s", (_label, over) => {
     const video = seedVideo();
     video["google/veo-3.1"] = {

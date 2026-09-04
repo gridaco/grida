@@ -29,6 +29,7 @@ export type { ModelTier } from "@grida/ai-models";
 
 export type ModelCostPerMillion = _catalog.text.ModelCostPerMillion;
 export type ModelSpec = _catalog.text.ModelSpec;
+export type ModelRelease = _catalog.ModelRelease;
 export type CatalogId = _catalog.text.CatalogId;
 
 export const catalog = _catalog.text.catalog;

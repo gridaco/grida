@@ -158,6 +158,35 @@ export namespace models {
    */
   export type CatalogueStatus = "listed" | "staged";
 
+  /** Calendar date serialized as `YYYY-MM-DD`. Runtime snapshot parsing also
+   * validates that the value is a real Gregorian calendar date. */
+  export type ISODate = `${number}-${number}-${number}`;
+
+  /** What the release date describes. Model dates are intrinsic and therefore
+   * shared by every provider binding; endpoint dates describe a serving route
+   * when no exact upstream model launch can be established. */
+  export type ModelReleaseBasis = "model" | "provider_endpoint";
+
+  /**
+   * Source-backed release metadata.
+   *
+   * `date` is the first broad public availability of the exact named model or
+   * variant; public preview counts, closed/limited preview does not. A missing
+   * exact date is represented as `null`, never guessed, and is only valid for
+   * a provider endpoint whose linked history does not expose a day.
+   */
+  export type ModelRelease =
+    | Readonly<{
+        date: ISODate;
+        basis: ModelReleaseBasis;
+        source_url: string;
+      }>
+    | Readonly<{
+        date: null;
+        basis: "provider_endpoint";
+        source_url: string;
+      }>;
+
   // ── models.text ───────────────────────────────────────────────────
   //
   // Text-model spec catalogue. Single source of truth for per-model
@@ -205,6 +234,12 @@ export namespace models {
        * unset; use {@link displayLabel} to resolve.
        */
       short_label?: string;
+      /**
+       * Source-backed first public release. Optional only so custom models and
+       * pre-field catalogue snapshots remain readable; every bundled entry has
+       * it.
+       */
+      release?: ModelRelease;
       /** Whether the model accepts image/file inputs. */
       multimodal: boolean;
       /**
@@ -232,6 +267,10 @@ export namespace models {
        */
       deprecated?: boolean;
     }
+
+    /** A bundled text-model spec. Unlike the snapshot-compatible base shape,
+     * every built-in has grounded release metadata. */
+    type BundledModelSpec = ModelSpec & { release: ModelRelease };
 
     // Provider-family capabilities are kept private so catalogue entries remain
     // explicit while sharing one source-backed value. Do not derive these from
@@ -275,6 +314,11 @@ export namespace models {
       "openai/gpt-5.5": {
         id: "openai/gpt-5.5",
         label: "GPT-5.5",
+        release: {
+          date: "2026-04-23",
+          basis: "model",
+          source_url: "https://openai.com/index/introducing-gpt-5-5/",
+        },
         multimodal: true,
         imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
         tool_call: true,
@@ -291,6 +335,11 @@ export namespace models {
       "openai/gpt-5.5-pro": {
         id: "openai/gpt-5.5-pro",
         label: "GPT-5.5 Pro",
+        release: {
+          date: "2026-04-23",
+          basis: "model",
+          source_url: "https://openai.com/index/introducing-gpt-5-5/",
+        },
         multimodal: true,
         imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
         tool_call: true,
@@ -307,6 +356,11 @@ export namespace models {
       "openai/gpt-5.6-sol": {
         id: "openai/gpt-5.6-sol",
         label: "GPT-5.6 Sol",
+        release: {
+          date: "2026-07-09",
+          basis: "model",
+          source_url: "https://openai.com/index/gpt-5-6/",
+        },
         multimodal: true,
         imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
         tool_call: true,
@@ -323,6 +377,11 @@ export namespace models {
       "openai/gpt-5.6-terra": {
         id: "openai/gpt-5.6-terra",
         label: "GPT-5.6 Terra",
+        release: {
+          date: "2026-07-09",
+          basis: "model",
+          source_url: "https://openai.com/index/gpt-5-6/",
+        },
         multimodal: true,
         imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
         tool_call: true,
@@ -339,6 +398,11 @@ export namespace models {
       "openai/gpt-5.6-luna": {
         id: "openai/gpt-5.6-luna",
         label: "GPT-5.6 Luna",
+        release: {
+          date: "2026-07-09",
+          basis: "model",
+          source_url: "https://openai.com/index/gpt-5-6/",
+        },
         multimodal: true,
         imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
         tool_call: true,
@@ -359,6 +423,12 @@ export namespace models {
       "anthropic/claude-sonnet-5": {
         id: "anthropic/claude-sonnet-5",
         label: "Claude Sonnet 5",
+        release: {
+          date: "2026-06-30",
+          basis: "model",
+          source_url:
+            "https://platform.claude.com/docs/en/release-notes/overview",
+        },
         short_label: "Sonnet 5",
         multimodal: true,
         imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
@@ -375,6 +445,12 @@ export namespace models {
       "anthropic/claude-fable-5.1": {
         id: "anthropic/claude-fable-5.1",
         label: "Claude Fable 5.1",
+        release: {
+          date: "2026-09-01",
+          basis: "model",
+          source_url:
+            "https://platform.claude.com/docs/en/release-notes/overview",
+        },
         short_label: "Fable 5.1",
         multimodal: true,
         imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
@@ -389,6 +465,12 @@ export namespace models {
       "anthropic/claude-fable-5": {
         id: "anthropic/claude-fable-5",
         label: "Claude Fable 5",
+        release: {
+          date: "2026-06-09",
+          basis: "model",
+          source_url:
+            "https://platform.claude.com/docs/en/release-notes/overview",
+        },
         short_label: "Fable 5",
         multimodal: true,
         imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
@@ -402,6 +484,12 @@ export namespace models {
       "anthropic/claude-opus-5": {
         id: "anthropic/claude-opus-5",
         label: "Claude Opus 5",
+        release: {
+          date: "2026-07-24",
+          basis: "model",
+          source_url:
+            "https://platform.claude.com/docs/en/release-notes/overview",
+        },
         short_label: "Opus 5",
         multimodal: true,
         imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
@@ -413,6 +501,12 @@ export namespace models {
       "anthropic/claude-opus-4.8": {
         id: "anthropic/claude-opus-4.8",
         label: "Claude Opus 4.8",
+        release: {
+          date: "2026-05-28",
+          basis: "model",
+          source_url:
+            "https://platform.claude.com/docs/en/release-notes/overview",
+        },
         short_label: "Opus 4.8",
         multimodal: true,
         imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
@@ -437,6 +531,11 @@ export namespace models {
       "google/gemini-3.8-flash": {
         id: "google/gemini-3.8-flash",
         label: "Gemini 3.8 Flash",
+        release: {
+          date: "2026-09-02",
+          basis: "model",
+          source_url: "https://ai.google.dev/gemini-api/docs/changelog",
+        },
         multimodal: true,
         imageInputMimes: GOOGLE_IMAGE_INPUT_MIMES,
         tool_call: true,
@@ -452,6 +551,11 @@ export namespace models {
       "google/gemini-3.7-flash": {
         id: "google/gemini-3.7-flash",
         label: "Gemini 3.7 Flash",
+        release: {
+          date: "2026-08-13",
+          basis: "model",
+          source_url: "https://ai.google.dev/gemini-api/docs/changelog",
+        },
         multimodal: true,
         imageInputMimes: GOOGLE_IMAGE_INPUT_MIMES,
         tool_call: true,
@@ -463,6 +567,11 @@ export namespace models {
       "google/gemini-3.1-pro-preview": {
         id: "google/gemini-3.1-pro-preview",
         label: "Gemini 3.1 Pro Preview",
+        release: {
+          date: "2026-02-19",
+          basis: "model",
+          source_url: "https://ai.google.dev/gemini-api/docs/changelog",
+        },
         short_label: "Gemini 3.1 Pro",
         multimodal: true,
         imageInputMimes: GOOGLE_IMAGE_INPUT_MIMES,
@@ -485,20 +594,26 @@ export namespace models {
           },
         },
       },
-    } as const satisfies Record<string, ModelSpec>;
+    } as const satisfies Record<string, BundledModelSpec>;
 
     /** Catalogued text-model id. The literal key set of {@link catalog}. */
     export type CatalogId = keyof typeof catalogSpecs;
 
     /** Read-only map of catalog model id → spec. */
-    export const catalog: Record<CatalogId, ModelSpec> = catalogSpecs;
+    export const catalog: Record<
+      CatalogId,
+      ModelSpec & { release: ModelRelease }
+    > = catalogSpecs;
 
     /**
      * Text-model spec for each tier. Derived from `TIER_MODEL_IDS` +
      * `catalog`; the compiler enforces that every tier's id resolves to
      * a real catalog entry.
      */
-    export const byTier: Record<ModelTier, ModelSpec> = {
+    export const byTier: Record<
+      ModelTier,
+      ModelSpec & { release: ModelRelease }
+    > = {
       nano: catalog[TIER_MODEL_IDS.nano],
       mini: catalog[TIER_MODEL_IDS.mini],
       pro: catalog[TIER_MODEL_IDS.pro],
@@ -893,6 +1008,7 @@ export namespace models {
       label: string;
       deprecated: boolean;
       short_description: string;
+      release?: ModelRelease;
       speed_label: SpeedLabel;
       /** Real provider pricing data. */
       pricing: ImageModelPricing;
@@ -903,6 +1019,8 @@ export namespace models {
       label: string;
       deprecated: boolean;
       short_description: string;
+      /** Optional only for backwards-compatible snapshot parsing. */
+      release?: ModelRelease;
       vendor: Vendor;
       /**
        * Primary/default provider for legacy single-provider readers (the web
@@ -953,18 +1071,23 @@ export namespace models {
       };
     };
 
+    type CatalogCard = ImageModelCard & {
+      release: ModelRelease;
+    };
+
     export const toCompact = (card: ImageModelCard): ImageModelCardCompact => {
       return {
         id: card.id,
         label: card.label,
         deprecated: card.deprecated,
         short_description: card.short_description,
+        release: card.release,
         speed_label: card.speed_label,
         pricing: card.pricing,
       };
     };
 
-    export const models: Partial<Record<ImageModelId, ImageModelCard>> = {
+    export const models: Partial<Record<ImageModelId, CatalogCard>> = {
       // -----------------------------------------------------------------
       // OpenAI
       // -----------------------------------------------------------------
@@ -972,6 +1095,12 @@ export namespace models {
       "openai/gpt-image-2": {
         id: "openai/gpt-image-2",
         label: "GPT Image 2",
+        release: {
+          date: "2026-04-21",
+          basis: "model",
+          source_url:
+            "https://developers.openai.com/api/docs/models/gpt-image-2",
+        },
         deprecated: false,
         short_description:
           "State-of-the-art image generation and editing with flexible resolutions",
@@ -1058,6 +1187,11 @@ export namespace models {
       "openai/gpt-image-1.5": {
         id: "openai/gpt-image-1.5",
         label: "GPT Image 1.5",
+        release: {
+          date: "2025-12-16",
+          basis: "model",
+          source_url: "https://openai.com/index/new-chatgpt-images-is-here/",
+        },
         deprecated: true,
         short_description:
           "Previous-generation image model. Superseded by GPT Image 2.",
@@ -1116,6 +1250,11 @@ export namespace models {
       "openai/gpt-image-1-mini": {
         id: "openai/gpt-image-1-mini",
         label: "GPT Image Mini",
+        release: {
+          date: "2025-10-06",
+          basis: "model",
+          source_url: "https://openai.com/devday/",
+        },
         deprecated: false,
         short_description: "Cost-efficient image generation model",
         vendor: "openai",
@@ -1178,6 +1317,11 @@ export namespace models {
       "google/gemini-3.1-flash-image-preview": {
         id: "google/gemini-3.1-flash-image-preview",
         label: "Gemini 3.1 Flash Image",
+        release: {
+          date: "2026-02-26",
+          basis: "model",
+          source_url: "https://ai.google.dev/gemini-api/docs/changelog",
+        },
         deprecated: false,
         short_description:
           "Fast, efficient multimodal model with native image generation",
@@ -1234,6 +1378,12 @@ export namespace models {
       "google/gemini-3-pro-image": {
         id: "google/gemini-3-pro-image",
         label: "Gemini 3 Pro Image",
+        release: {
+          date: "2025-11-20",
+          basis: "model",
+          source_url:
+            "https://blog.google/innovation-and-ai/products/nano-banana-pro/",
+        },
         deprecated: false,
         short_description:
           "High-quality multimodal model with native image generation",
@@ -1288,6 +1438,11 @@ export namespace models {
       "google/gemini-3.1-flash-lite-image": {
         id: "google/gemini-3.1-flash-lite-image",
         label: "Gemini 3.1 Flash Lite Image",
+        release: {
+          date: "2026-06-30",
+          basis: "model",
+          source_url: "https://ai.google.dev/gemini-api/docs/changelog",
+        },
         deprecated: false,
         short_description:
           "Fastest, most cost-efficient Gemini image model; 1K output only.",
@@ -1335,6 +1490,11 @@ export namespace models {
       "bfl/flux-2-pro": {
         id: "bfl/flux-2-pro",
         label: "Flux 2 Pro",
+        release: {
+          date: "2025-11-25",
+          basis: "model",
+          source_url: "https://bfl.ai/blog/flux-2",
+        },
         deprecated: false,
         short_description:
           "Latest Flux model with best-in-class image quality and prompt adherence",
@@ -1394,6 +1554,11 @@ export namespace models {
       "bfl/flux-2-max": {
         id: "bfl/flux-2-max",
         label: "Flux 2 Max",
+        release: {
+          date: "2025-12-16",
+          basis: "model",
+          source_url: "https://playground.bfl.ai/changelog",
+        },
         deprecated: false,
         short_description:
           "Black Forest Labs' highest-fidelity Flux 2 — maximum prompt adherence and detail.",
@@ -1442,6 +1607,11 @@ export namespace models {
       "bfl/flux-kontext-max": {
         id: "bfl/flux-kontext-max",
         label: "Flux Kontext Max",
+        release: {
+          date: "2025-05-29",
+          basis: "model",
+          source_url: "https://bfl.ai/blog/flux-1-kontext",
+        },
         deprecated: false,
         short_description:
           "Highest quality Flux model for context-aware image generation and editing",
@@ -1481,6 +1651,11 @@ export namespace models {
       "bfl/flux-kontext-pro": {
         id: "bfl/flux-kontext-pro",
         label: "Flux Kontext Pro",
+        release: {
+          date: "2025-05-29",
+          basis: "model",
+          source_url: "https://bfl.ai/blog/flux-1-kontext",
+        },
         deprecated: false,
         short_description: "Fast context-aware image generation and editing",
         vendor: "black-forest-labs",
@@ -1523,6 +1698,11 @@ export namespace models {
       "bfl/flux-pro-1.1": {
         id: "bfl/flux-pro-1.1",
         label: "Flux Pro 1.1",
+        release: {
+          date: "2024-10-02",
+          basis: "model",
+          source_url: "https://bfl.ai/blog/24-10-02-flux",
+        },
         deprecated: false,
         short_description:
           "Faster, better FLUX Pro. Text-to-image model with excellent image quality and output diversity.",
@@ -1562,6 +1742,12 @@ export namespace models {
       "bytedance/seedream-5.0-pro": {
         id: "bytedance/seedream-5.0-pro",
         label: "Seedream 5.0 Pro",
+        release: {
+          date: "2026-07-08",
+          basis: "model",
+          source_url:
+            "https://seed.bytedance.com/en/blog/beyond-generation-it-understands-design-introducing-seedream-5-0-pro",
+        },
         deprecated: false,
         short_description:
           "ByteDance's flagship image model — dense layouts, infographics and text-heavy compositions at 1K–2K.",
@@ -1622,6 +1808,12 @@ export namespace models {
       "bytedance/seedream-5.0-lite": {
         id: "bytedance/seedream-5.0-lite",
         label: "Seedream 5.0 Lite",
+        release: {
+          date: "2026-02-13",
+          basis: "model",
+          source_url:
+            "https://seed.bytedance.com/en/blog/deeper-thinking-more-accurate-generation-introducing-seedream-5-0-lite",
+        },
         deprecated: false,
         short_description:
           "ByteDance's fast 2K–4K image model — Seedream 5.0 quality at the 4.5 price point.",
@@ -1679,6 +1871,12 @@ export namespace models {
       "bytedance/seedream-4.5": {
         id: "bytedance/seedream-4.5",
         label: "Seedream 4.5",
+        release: {
+          date: "2025-12-03",
+          basis: "model",
+          source_url:
+            "https://blog.fal.ai/seedream-4-5-is-now-available-on-fal/",
+        },
         deprecated: true,
         short_description:
           "ByteDance's unified image generation and editing model.",
@@ -1736,6 +1934,11 @@ export namespace models {
       "xai/grok-imagine-image-2.0": {
         id: "xai/grok-imagine-image-2.0",
         label: "Grok Imagine Image 2.0",
+        release: {
+          date: "2026-08-07",
+          basis: "model",
+          source_url: "https://x.ai/news/grok-imagine-image-2",
+        },
         deprecated: false,
         short_description:
           "SpaceXAI's image model — fast 1K/2K generation with a low-cost quality tier.",
@@ -1822,6 +2025,12 @@ export namespace models {
       "meta/muse-image-1.0": {
         id: "meta/muse-image-1.0",
         label: "Muse Image 1.0",
+        release: {
+          date: "2026-07-07",
+          basis: "model",
+          source_url:
+            "https://about.fb.com/news/2026/07/introducing-muse-image-meta-ai/",
+        },
         deprecated: false,
         short_description:
           "Meta's agentic image model — reasons before it renders; generates and edits from text and references.",
@@ -1872,6 +2081,12 @@ export namespace models {
       "recraft/recraft-v4.1": {
         id: "recraft/recraft-v4.1",
         label: "Recraft V4.1",
+        release: {
+          date: "2026-05-14",
+          basis: "model",
+          source_url:
+            "https://www.recraft.ai/blog/recraft-v4-1-more-beautiful-by-nature",
+        },
         deprecated: false,
         short_description:
           "Design-first image model — sharper prompt control and production-ready raster for brand and editorial work.",
@@ -1927,6 +2142,12 @@ export namespace models {
       "recraft/recraft-v3": {
         id: "recraft/recraft-v3",
         label: "Recraft V3",
+        release: {
+          date: "2024-10-30",
+          basis: "model",
+          source_url:
+            "https://www.recraft.ai/blog/recraft-introduces-a-revolutionary-ai-model-that-thinks-in-design-language",
+        },
         deprecated: true,
         short_description:
           "Design-grade image model with strong text rendering and vector styles.",
@@ -2052,6 +2273,7 @@ export namespace models {
       export type ModelCard = {
         id: ModelId;
         label: string;
+        release: ModelRelease;
         deprecated: boolean;
         short_description: string;
         vendor: "google";
@@ -2074,6 +2296,11 @@ export namespace models {
         "google/lyria-3": {
           id: "google/lyria-3",
           label: "Lyria 3",
+          release: {
+            date: "2026-02-18",
+            basis: "model",
+            source_url: "https://deepmind.google/models/model-cards/lyria-3/",
+          },
           deprecated: false,
           short_description:
             "Generate 30-second 48kHz stereo music clips from text or images.",
@@ -2101,6 +2328,12 @@ export namespace models {
         "google/lyria-3-pro": {
           id: "google/lyria-3-pro",
           label: "Lyria 3 Pro",
+          release: {
+            date: "2026-03-25",
+            basis: "model",
+            source_url:
+              "https://blog.google/innovation-and-ai/technology/developers-tools/lyria-3-developers/",
+          },
           deprecated: false,
           short_description:
             "Generate full-length tracks up to ~3 minutes from text or images.",
@@ -2171,6 +2404,7 @@ export namespace models {
       export type ModelCard = {
         id: ModelId;
         label: string;
+        release: ModelRelease;
         deprecated: boolean;
         short_description: string;
         vendor: "elevenlabs";
@@ -2191,6 +2425,12 @@ export namespace models {
         eleven_text_to_sound_v2: {
           id: "eleven_text_to_sound_v2",
           label: "Eleven Text to Sound v2",
+          release: {
+            date: "2025-09-02",
+            basis: "model",
+            source_url:
+              "https://www.linkedin.com/posts/elevenlabsio_introducing-v2-of-our-sfx-model-generate-activity-7368680062662909953-aeBg",
+          },
           deprecated: false,
           short_description:
             "Generate loopable sound effects up to 30 seconds from text.",
@@ -2259,6 +2499,7 @@ export namespace models {
       export type ModelCard = {
         id: ModelId;
         label: string;
+        release: ModelRelease;
         deprecated: boolean;
         short_description: string;
         vendor: "elevenlabs";
@@ -2276,6 +2517,11 @@ export namespace models {
         eleven_v3: {
           id: "eleven_v3",
           label: "Eleven v3",
+          release: {
+            date: "2025-06-03",
+            basis: "model",
+            source_url: "https://elevenlabs.io/blog/eleven-v3",
+          },
           deprecated: false,
           short_description:
             "Generate expressive speech with bracketed audio and emotion tags.",
@@ -2380,6 +2626,7 @@ export namespace models {
       /** Exact fal endpoint id; unlike video, there is no canonical indirection. */
       id: ThreeDModelId;
       label: string;
+      release: ModelRelease;
       deprecated: boolean;
       short_description: string;
       vendor: Vendor;
@@ -2405,6 +2652,11 @@ export namespace models {
       "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d": {
         id: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
         label: "Hunyuan 3D v3.1 Pro — Text",
+        release: {
+          date: "2026-01-16",
+          basis: "model",
+          source_url: "https://cloud.tencent.com/document/product/1804/120694",
+        },
         deprecated: false,
         short_description: "Generate a textured 3D asset from a text prompt.",
         vendor: "tencent",
@@ -2424,6 +2676,11 @@ export namespace models {
       "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d": {
         id: "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
         label: "Hunyuan 3D v3.1 Pro — Image",
+        release: {
+          date: "2026-01-16",
+          basis: "model",
+          source_url: "https://cloud.tencent.com/document/product/1804/120694",
+        },
         deprecated: false,
         short_description:
           "Generate a textured 3D asset from one image or up to eight views.",
@@ -2448,6 +2705,11 @@ export namespace models {
       "fal-ai/trellis-2": {
         id: "fal-ai/trellis-2",
         label: "TRELLIS.2",
+        release: {
+          date: "2025-12-16",
+          basis: "model",
+          source_url: "https://huggingface.co/microsoft/TRELLIS.2-4B",
+        },
         deprecated: false,
         short_description:
           "Generate a textured GLB asset from a single reference image.",
@@ -2645,6 +2907,8 @@ export namespace models {
       /** Canonical, provider-agnostic id. */
       id: VideoModelId;
       label: string;
+      /** Optional only for backwards-compatible snapshot parsing. */
+      release?: ModelRelease;
       deprecated: boolean;
       short_description: string;
       vendor: Vendor;
@@ -2679,13 +2943,22 @@ export namespace models {
       providers: Partial<Record<VideoProvider, VideoProviderBinding>>;
     };
 
-    export const models: Partial<Record<VideoModelId, VideoModelCard>> = {
+    type CatalogCard = VideoModelCard & {
+      release: ModelRelease;
+    };
+
+    export const models: Partial<Record<VideoModelId, CatalogCard>> = {
       // -----------------------------------------------------------------
       // Google — Veo 3.1
       // -----------------------------------------------------------------
       "google/veo-3.1": {
         id: "google/veo-3.1",
         label: "Veo 3.1",
+        release: {
+          date: "2025-10-15",
+          basis: "model",
+          source_url: "https://ai.google.dev/gemini-api/docs/changelog",
+        },
         deprecated: false,
         short_description:
           "Google's flagship video model — strong prompt adherence with native, synchronized audio.",
@@ -2779,6 +3052,11 @@ export namespace models {
       "google/veo-3.1-fast": {
         id: "google/veo-3.1-fast",
         label: "Veo 3.1 Fast",
+        release: {
+          date: "2025-10-15",
+          basis: "model",
+          source_url: "https://ai.google.dev/gemini-api/docs/changelog",
+        },
         deprecated: false,
         short_description:
           "Faster, cheaper Veo 3.1 — the same envelope and native audio at a fraction of the price.",
@@ -2839,6 +3117,12 @@ export namespace models {
       "google/veo-3.1-lite": {
         id: "google/veo-3.1-lite",
         label: "Veo 3.1 Lite",
+        release: {
+          date: "2026-03-31",
+          basis: "model",
+          source_url:
+            "https://blog.google/innovation-and-ai/technology/ai/veo-3-1-lite/",
+        },
         deprecated: false,
         short_description:
           "Budget Veo 3.1 — 720p/1080p clips with native audio for a few cents a second.",
@@ -2896,6 +3180,12 @@ export namespace models {
       "alibaba/wan-3.0": {
         id: "alibaba/wan-3.0",
         label: "Wan 3.0",
+        release: {
+          date: "2026-08-06",
+          basis: "model",
+          source_url:
+            "https://www.alibabacloud.com/help/en/model-studio/newly-released-models",
+        },
         deprecated: false,
         short_description:
           "Alibaba's flagship video model — long clips (up to 30s) with bundled audio at the lowest per-second rates in the catalogue.",
@@ -2951,6 +3241,12 @@ export namespace models {
       "bytedance/seedance-2.0": {
         id: "bytedance/seedance-2.0",
         label: "Seedance 2.0",
+        release: {
+          date: "2026-02-12",
+          basis: "model",
+          source_url:
+            "https://seed.bytedance.com/en/blog/seedance-2-0-%E6%AD%A3%E5%BC%8F%E5%8F%91%E5%B8%83",
+        },
         deprecated: false,
         short_description:
           "ByteDance's video model — image-to-video with reference modes, up to 4K, at roughly two-thirds the price of Seedance 2.5.",
@@ -3020,7 +3316,7 @@ export namespace models {
       // -----------------------------------------------------------------
       // ByteDance — Seedance 2.5
       // -----------------------------------------------------------------
-      // Newer generation (2026-08-07), NOT a drop-in successor: ~55% more
+      // Newer generation (2026-07-31), NOT a drop-in successor: ~55% more
       // per token on the gateway ($10.70/MTok at 480p/720p, $11.70 at 1080p
       // vs 2.0's $7.00/$7.70), ~56–71% more per second on fal, and no 4K.
       // It buys 4–30s clips, video-editing and extend-video. 2.0 is cheaper
@@ -3031,6 +3327,12 @@ export namespace models {
       "bytedance/seedance-2.5": {
         id: "bytedance/seedance-2.5",
         label: "Seedance 2.5",
+        release: {
+          date: "2026-07-31",
+          basis: "model",
+          source_url:
+            "https://seed.bytedance.com/en/blog/one-take-creation-flexible-referencing-introducing-seedance-2-5",
+        },
         deprecated: false,
         short_description:
           "ByteDance's latest video model — up to 30-second clips with native audio, reference and editing modes.",
@@ -3079,6 +3381,11 @@ export namespace models {
       "xai/grok-imagine-video-1.5": {
         id: "xai/grok-imagine-video-1.5",
         label: "Grok Imagine Video 1.5",
+        release: {
+          date: "2026-06-03",
+          basis: "model",
+          source_url: "https://x.ai/news/grok-imagine-1-5",
+        },
         deprecated: false,
         short_description:
           "SpaceXAI's image-to-video model — animates a still into cinematic video with native, lip-synced audio.",
@@ -3181,6 +3488,7 @@ export namespace models {
     export type ImageToolModelCard = {
       id: ImageToolModelId;
       label: string;
+      release: ModelRelease;
       url: string;
       category: ImageToolModelCategory;
       /** Cost per invocation in USD (flat rate from provider). */
@@ -3191,6 +3499,12 @@ export namespace models {
       "recraft-ai/recraft-remove-background": {
         id: "recraft-ai/recraft-remove-background",
         label: "Recraft Remove Background",
+        release: {
+          date: null,
+          basis: "provider_endpoint",
+          source_url:
+            "https://replicate.com/recraft-ai/recraft-remove-background/versions",
+        },
         url: "https://replicate.com/recraft-ai/recraft-remove-background",
         category: "image/tool/remove-background",
         cost_usd: 0.01,
@@ -3198,6 +3512,12 @@ export namespace models {
       "851-labs/background-remover": {
         id: "851-labs/background-remover",
         label: "851 Labs Background Remover",
+        release: {
+          date: null,
+          basis: "provider_endpoint",
+          source_url:
+            "https://replicate.com/851-labs/background-remover/versions",
+        },
         url: "https://replicate.com/851-labs/background-remover",
         category: "image/tool/remove-background",
         cost_usd: 0.00048,
@@ -3205,6 +3525,12 @@ export namespace models {
       "bria/remove-background": {
         id: "bria/remove-background",
         label: "Bria Remove Background",
+        release: {
+          date: "2024-11-12",
+          basis: "model",
+          source_url:
+            "https://bria.ai/blog/brias-new-state-of-the-art-remove-background-outperforms-the-competition",
+        },
         url: "https://replicate.com/bria/remove-background",
         category: "image/tool/remove-background",
         cost_usd: 0.018,
@@ -3212,6 +3538,12 @@ export namespace models {
       "nightmareai/real-esrgan": {
         id: "nightmareai/real-esrgan",
         label: "Real-ESRGAN",
+        release: {
+          date: "2021-07-22",
+          basis: "model",
+          source_url:
+            "https://github.com/xinntao/Real-ESRGAN/releases/tag/v0.1.0",
+        },
         url: "https://replicate.com/nightmareai/real-esrgan",
         category: "image/tool/upscale",
         cost_usd: 0.002,
@@ -3256,6 +3588,7 @@ export namespace models {
     export type EmbeddingModelCard = {
       id: EmbeddingModelId;
       label: string;
+      release: ModelRelease;
       deprecated: boolean;
       short_description: string;
       vendor: Vendor;
@@ -3291,6 +3624,11 @@ export namespace models {
       "google/gemini-embedding-2": {
         id: "google/gemini-embedding-2",
         label: "Gemini Embedding 2",
+        release: {
+          date: "2026-03-10",
+          basis: "model",
+          source_url: "https://ai.google.dev/gemini-api/docs/changelog",
+        },
         deprecated: false,
         short_description:
           "Natively multimodal embedding (text + image into one space); 3072-d, MRL-truncatable.",
@@ -3476,6 +3814,39 @@ export namespace models {
       return typeof v === "string" && v.length > 0;
     }
 
+    function isISODate(v: unknown): v is ISODate {
+      if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+        return false;
+      }
+      const parsed = new Date(`${v}T00:00:00.000Z`);
+      return (
+        !Number.isNaN(parsed.valueOf()) &&
+        parsed.toISOString().slice(0, 10) === v
+      );
+    }
+
+    function isHttpsUrl(v: unknown): v is string {
+      return isText(v) && /^https:\/\/[^\s]+$/.test(v);
+    }
+
+    /**
+     * `undefined` means the additive field is absent on an older snapshot;
+     * `null` means it was present but malformed and the containing record must
+     * be rejected.
+     */
+    function parseRelease(v: unknown): ModelRelease | null | undefined {
+      if (v === undefined) return undefined;
+      if (!isRecord(v) || !isHttpsUrl(v.source_url)) return null;
+      if (v.basis !== "model" && v.basis !== "provider_endpoint") return null;
+      if (v.date === null) {
+        return v.basis === "provider_endpoint"
+          ? { date: null, basis: v.basis, source_url: v.source_url }
+          : null;
+      }
+      if (!isISODate(v.date)) return null;
+      return { date: v.date, basis: v.basis, source_url: v.source_url };
+    }
+
     /** A token count: positive and exactly representable. */
     function isCount(v: unknown): v is number {
       return typeof v === "number" && Number.isSafeInteger(v) && v > 0;
@@ -3539,6 +3910,8 @@ export namespace models {
       }
       const cost = parseCost(v.cost);
       if (!cost) return undefined;
+      const release = parseRelease(v.release);
+      if (release === null) return undefined;
 
       const spec: text.ModelSpec = {
         id: key,
@@ -3550,6 +3923,7 @@ export namespace models {
         outputLimit: v.outputLimit,
         cost,
       };
+      if (release) spec.release = release;
       if (v.short_label !== undefined) {
         if (!isText(v.short_label)) return undefined;
         spec.short_label = v.short_label;
@@ -3866,6 +4240,8 @@ export namespace models {
       if (typeof v.deprecated !== "boolean") return undefined;
       if (typeof v.listed !== "boolean") return undefined;
       if (!isRate(v.avg_cost_usd)) return undefined;
+      const release = parseRelease(v.release);
+      if (release === null) return undefined;
 
       const pricing = parseImagePricing(v.pricing);
       if (!pricing) return undefined;
@@ -3924,6 +4300,7 @@ export namespace models {
           aspect_ratio: v.default.aspect_ratio,
         },
       };
+      if (release) card.release = release;
       if (!optional(card, v, "listed_reason", isText)) return undefined;
       return card;
     }
@@ -3944,6 +4321,8 @@ export namespace models {
       // otherwise is malformed, not a hidden card.
       if (v.listed !== true) return undefined;
       if (typeof v.audio !== "boolean") return undefined;
+      const release = parseRelease(v.release);
+      if (release === null) return undefined;
       if (!isCount(v.min_duration) || !isCount(v.max_duration))
         return undefined;
       if (v.min_duration > v.max_duration) return undefined;
@@ -4004,6 +4383,7 @@ export namespace models {
         url: v.url,
         providers,
       };
+      if (release) card.release = release;
       return card;
     }
 

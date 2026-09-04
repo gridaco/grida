@@ -1,5 +1,67 @@
 import models, { TIER_MODEL_IDS } from "..";
 
+describe("bundled model release metadata", () => {
+  const cards: readonly { id: string; release?: models.ModelRelease }[] = [
+    ...Object.values(models.text.catalog),
+    ...Object.values(models.image.models).filter((card) => card !== undefined),
+    ...Object.values(models.audio.music.models),
+    ...Object.values(models.audio.sound_effects.models),
+    ...Object.values(models.audio.text_to_speech.models),
+    ...Object.values(models.three_d.models),
+    ...Object.values(models.video.models).filter((card) => card !== undefined),
+    ...Object.values(models.image_tools.models),
+    ...Object.values(models.embedding.models),
+  ];
+  const grounded = cards.filter(
+    (card): card is { id: string; release: models.ModelRelease } =>
+      card.release !== undefined
+  );
+
+  it("grounds every built-in card with a valid HTTPS source", () => {
+    expect(
+      cards.filter((card) => !card.release).map((card) => card.id)
+    ).toEqual([]);
+    for (const card of grounded) {
+      expect(card.release.source_url).toMatch(/^https:\/\/[^\s]+$/);
+    }
+  });
+
+  it("stores real YYYY-MM-DD calendar dates and never guesses model dates", () => {
+    const dated = grounded.flatMap((card) =>
+      card.release.date === null
+        ? []
+        : [{ id: card.id, date: card.release.date }]
+    );
+    for (const release of dated) {
+      expect(release.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      const parsed = new Date(`${release.date}T00:00:00.000Z`);
+      expect(parsed.toISOString().slice(0, 10)).toBe(release.date);
+    }
+  });
+
+  it("uses null only for endpoints whose exact first day is unavailable", () => {
+    expect(
+      cards.filter((card) => card.release?.date === null).map((card) => card.id)
+    ).toEqual([
+      "recraft-ai/recraft-remove-background",
+      "851-labs/background-remover",
+    ]);
+    expect(
+      grounded
+        .filter((card) => card.release.date === null)
+        .map((card) => card.release.basis)
+    ).toEqual(["provider_endpoint", "provider_endpoint"]);
+  });
+
+  it("gives both Hunyuan routes the intrinsic model release", () => {
+    expect(
+      models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/text-to-3d"].release
+    ).toEqual(
+      models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"].release
+    );
+  });
+});
+
 describe("models.image.findImageModelCard", () => {
   it("resolves a full vercel id", () => {
     const card = models.image.findImageModelCard("bfl/flux-pro-1.1");
@@ -45,7 +107,7 @@ describe("models.image catalogue invariants", () => {
     }
   });
 
-  it("toCompact preserves id, label, pricing, speed_label, deprecated", () => {
+  it("toCompact preserves id, label, release, pricing, speed_label, deprecated", () => {
     const card = models.image.models["bfl/flux-pro-1.1"]!;
     const compact = models.image.toCompact(card);
     expect(compact).toEqual({
@@ -53,6 +115,7 @@ describe("models.image catalogue invariants", () => {
       label: card.label,
       deprecated: card.deprecated,
       short_description: card.short_description,
+      release: card.release,
       speed_label: card.speed_label,
       pricing: card.pricing,
     });
