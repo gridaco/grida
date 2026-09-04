@@ -195,12 +195,12 @@ def print_summary(groups: dict[str, list[dict]], *, image_mode: bool) -> None:
                 detail = f"in=${cost.get('input')} out=${cost.get('output')}"
             else:
                 detail = "per-image"
-            release = primary.get("release_date", "?")
+            release = primary.get("release_date") or "?"
             print(f"  {base_id}: {detail}, release_hint={release}")
         else:
             ctx = limit.get("context", "?")
             out = limit.get("output", "?")
-            release = primary.get("release_date", "?")
+            release = primary.get("release_date") or "?"
             print(
                 f"  {base_id}: contextWindow={ctx}, outputLimit={out}, "
                 f"release_hint={release}"
