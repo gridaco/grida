@@ -11,9 +11,9 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@app/ui/components/empty";
-import type { MediaItem } from "@/lib/desktop/bridge";
+import { AudioPlayer } from "@/kits/audio-player";
+import { useDesktopBridge, type MediaItem } from "@/lib/desktop/bridge";
 import { AudioCompatibility } from "../media-formats/audio-compatibility";
-import { LocalAudioPlayer } from "../media-formats/local-audio-player";
 import { FileDownloadButton } from "../shared/file-download-button";
 import {
   MusicGenerationControls,
@@ -38,8 +38,13 @@ export function MusicPlayground({
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [source, setSource] = useState<"local" | "generated" | null>(null);
+  const [generatedModelId, setGeneratedModelId] =
+    useState<models.audio.music.ModelId | null>(null);
   const [storedMedia, setStoredMedia] = useState<MediaItem | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const bridge = useDesktopBridge();
+  const revealLabel =
+    bridge?.app.platform === "darwin" ? "Show in Finder" : "Show in folder";
 
   const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.currentTarget.files?.[0] ?? null;
@@ -47,12 +52,14 @@ export function MusicPlayground({
     if (!nextFile) return;
     setFile(nextFile);
     setSource("local");
+    setGeneratedModelId(null);
     setStoredMedia(null);
   };
 
   const onGenerated = (result: MusicGeneratedPreview) => {
     setFile(result.file);
     setSource("generated");
+    setGeneratedModelId(result.modelId);
     setStoredMedia(result.storedMedia ?? null);
     if (result.storedMedia) onStoredMediaCreated?.(result.storedMedia);
   };
@@ -60,6 +67,7 @@ export function MusicPlayground({
   const clear = () => {
     setFile(null);
     setSource(null);
+    setGeneratedModelId(null);
     setStoredMedia(null);
   };
 
@@ -74,17 +82,6 @@ export function MusicPlayground({
         </h2>
         <div className="ml-auto flex items-center gap-2">
           {source === "generated" && file && <FileDownloadButton file={file} />}
-          {storedMedia && onRevealStoredMedia && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onRevealStoredMedia(storedMedia)}
-            >
-              <FolderSearch aria-hidden />
-              Show in folder
-            </Button>
-          )}
           {file && (
             <>
               <Button
@@ -121,7 +118,35 @@ export function MusicPlayground({
           {file ? (
             <div className="flex h-full items-center justify-center overflow-auto rounded-lg border bg-muted/20 p-6">
               <div className="w-full max-w-2xl">
-                <LocalAudioPlayer file={file} active />
+                <AudioPlayer
+                  source={file}
+                  active
+                  title={
+                    source === "generated"
+                      ? "Generated track"
+                      : trackTitle(file.name)
+                  }
+                  subtitle={
+                    generatedModelId
+                      ? models.audio.music.models[generatedModelId].label
+                      : "Local audio"
+                  }
+                  eyebrow={
+                    source === "generated" ? "AI generated track" : undefined
+                  }
+                  details={`${file.name} · ${AudioCompatibility.probe(file).label}`}
+                  actions={
+                    storedMedia && onRevealStoredMedia
+                      ? [
+                          {
+                            label: revealLabel,
+                            icon: <FolderSearch aria-hidden />,
+                            onSelect: () => onRevealStoredMedia(storedMedia),
+                          },
+                        ]
+                      : []
+                  }
+                />
               </div>
             </div>
           ) : (
@@ -152,4 +177,9 @@ export function MusicPlayground({
       </div>
     </section>
   );
+}
+
+function trackTitle(filename: string): string {
+  const withoutExtension = filename.replace(/\.[^.]+$/, "").trim();
+  return withoutExtension || "Untitled track";
 }
