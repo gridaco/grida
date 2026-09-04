@@ -1,10 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { Music2, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { Slider } from "@app/ui/components/slider";
 import { cn } from "@app/ui/lib/utils";
+import { AudioWaveform } from "./waveform";
 
 export type AudioPlayerArtwork = {
   src: string;
@@ -18,17 +26,34 @@ export type AudioPlayerAction = {
   disabled?: boolean;
 };
 
-export type AudioPlayerProps = {
+type AudioPlayerSharedProps = {
   source: string | Blob;
   title: string;
   subtitle?: string;
   eyebrow?: string;
   details?: string;
-  artwork?: AudioPlayerArtwork;
   actions?: readonly AudioPlayerAction[];
   active?: boolean;
   className?: string;
 };
+
+export type AudioPlayerVisualization = "artwork" | "waveform";
+
+export type AudioPlayerProps = AudioPlayerSharedProps &
+  (
+    | {
+        visualization?: "artwork";
+        artwork?: AudioPlayerArtwork;
+      }
+    | {
+        visualization: "waveform";
+        artwork?: never;
+      }
+  );
+
+type WaveformState =
+  | { kind: "idle" | "loading" | "failed" }
+  | { kind: "ready"; peaks: number[] };
 
 /** Opinionated single-track audio playback for URL and Blob sources. */
 export function AudioPlayer({
@@ -38,6 +63,7 @@ export function AudioPlayer({
   eyebrow,
   details,
   artwork,
+  visualization = "artwork",
   actions = [],
   active = true,
   className,
@@ -50,6 +76,7 @@ export function AudioPlayer({
   const [muted, setMuted] = useState(false);
   const [metadataReady, setMetadataReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [waveform, setWaveform] = useState<WaveformState>({ kind: "idle" });
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -86,6 +113,30 @@ export function AudioPlayer({
   }, [source]);
 
   useEffect(() => {
+    if (visualization !== "waveform") {
+      setWaveform({ kind: "idle" });
+      return;
+    }
+
+    const controller = new AbortController();
+    setWaveform({ kind: "loading" });
+    void AudioWaveform.decode(
+      source,
+      AudioWaveform.DEFAULT_BAR_COUNT,
+      controller.signal
+    )
+      .then((peaks) => {
+        if (!controller.signal.aborted) {
+          setWaveform({ kind: "ready", peaks });
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setWaveform({ kind: "failed" });
+      });
+    return () => controller.abort();
+  }, [source, visualization]);
+
+  useEffect(() => {
     if (!active) audioRef.current?.pause();
   }, [active]);
 
@@ -103,11 +154,16 @@ export function AudioPlayer({
     }
   };
 
-  const seek = ([nextTime]: number[]) => {
+  const seekTo = (nextTime: number) => {
     const audio = audioRef.current;
-    if (!audio || nextTime === undefined) return;
-    audio.currentTime = nextTime;
-    setTime(nextTime);
+    if (!audio) return;
+    const boundedTime = Math.max(0, Math.min(nextTime, duration));
+    audio.currentTime = boundedTime;
+    setTime(boundedTime);
+  };
+
+  const seek = ([nextTime]: number[]) => {
+    if (nextTime !== undefined) seekTo(nextTime);
   };
 
   const changeVolume = ([nextVolume]: number[]) => {
@@ -164,8 +220,14 @@ export function AudioPlayer({
         }}
       />
 
-      <div className="grid items-center gap-6 sm:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)] sm:gap-8">
-        <Artwork artwork={artwork} />
+      <div
+        className={cn(
+          "grid items-center gap-6",
+          visualization === "artwork" &&
+            "sm:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)] sm:gap-8"
+        )}
+      >
+        {visualization === "artwork" && <Artwork artwork={artwork} />}
 
         <div className="min-w-0">
           <div className="text-center sm:text-left">
@@ -184,17 +246,30 @@ export function AudioPlayer({
             )}
           </div>
 
-          <div className="mt-7">
-            <Slider
-              min={0}
-              max={duration || 1}
-              step={0.01}
-              value={[Math.min(time, duration || 0)]}
-              disabled={!metadataReady || Boolean(error)}
-              onValueChange={seek}
-              aria-label="Track position"
-              className="[&_[data-slot=slider-thumb]]:size-3"
-            />
+          <div className={visualization === "waveform" ? "mt-6" : "mt-7"}>
+            {visualization === "waveform" && waveform.kind !== "failed" ? (
+              <WaveformScrubber
+                peaks={waveform.kind === "ready" ? waveform.peaks : []}
+                currentTime={time}
+                duration={duration}
+                disabled={
+                  !metadataReady || Boolean(error) || waveform.kind !== "ready"
+                }
+                loading={waveform.kind === "loading"}
+                onSeek={seekTo}
+              />
+            ) : (
+              <Slider
+                min={0}
+                max={duration || 1}
+                step={0.01}
+                value={[Math.min(time, duration || 0)]}
+                disabled={!metadataReady || Boolean(error)}
+                onValueChange={seek}
+                aria-label="Track position"
+                className="[&_[data-slot=slider-thumb]]:size-3"
+              />
+            )}
             <div className="mt-2 flex justify-between font-mono text-[11px] tabular-nums text-muted-foreground">
               <span>{formatTime(time)}</span>
               <span>{metadataReady ? formatTime(duration) : "--:--"}</span>
@@ -280,6 +355,139 @@ export function AudioPlayer({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function WaveformScrubber({
+  peaks,
+  currentTime,
+  duration,
+  disabled,
+  loading,
+  onSeek,
+}: {
+  peaks: readonly number[];
+  currentTime: number;
+  duration: number;
+  disabled: boolean;
+  loading: boolean;
+  onSeek: (time: number) => void;
+}) {
+  const values =
+    peaks.length > 0
+      ? peaks
+      : Array<number>(AudioWaveform.DEFAULT_BAR_COUNT).fill(0);
+  const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
+  const step = 4;
+  const barWidth = 2.5;
+  const width = values.length * step - (step - barWidth);
+  const height = 80;
+
+  const seekFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position = Math.max(
+      0,
+      Math.min(1, (event.clientX - bounds.left) / bounds.width)
+    );
+    onSeek(position * duration);
+  };
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    seekFromPointer(event);
+  };
+
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      seekFromPointer(event);
+    }
+  };
+
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    const stepSeconds = Math.max(0.5, duration / 100);
+    let nextTime: number | undefined;
+    switch (event.key) {
+      case "ArrowLeft":
+      case "ArrowDown":
+        nextTime = currentTime - stepSeconds;
+        break;
+      case "ArrowRight":
+      case "ArrowUp":
+        nextTime = currentTime + stepSeconds;
+        break;
+      case "Home":
+        nextTime = 0;
+        break;
+      case "End":
+        nextTime = duration;
+        break;
+    }
+    if (nextTime === undefined) return;
+    event.preventDefault();
+    onSeek(nextTime);
+  };
+
+  return (
+    <div
+      role="slider"
+      aria-label="Track position"
+      aria-orientation="horizontal"
+      aria-valuemin={0}
+      aria-valuemax={duration}
+      aria-valuenow={currentTime}
+      aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
+      aria-disabled={disabled}
+      aria-busy={loading}
+      tabIndex={disabled ? -1 : 0}
+      className={cn(
+        "relative h-28 touch-none overflow-hidden rounded-xl border bg-muted/20 px-3 py-2 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        disabled ? "cursor-default" : "cursor-pointer",
+        loading && "animate-pulse"
+      )}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onKeyDown={onKeyDown}
+    >
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        className="size-full"
+        aria-hidden
+      >
+        {values.map((value, index) => {
+          const barHeight = Math.max(5, Math.sqrt(value) * 64);
+          const played =
+            progress > 0 && (index + 0.5) / values.length <= progress;
+          return (
+            <rect
+              key={index}
+              x={index * step}
+              y={(height - barHeight) / 2}
+              width={barWidth}
+              height={barHeight}
+              rx={barWidth / 2}
+              fill="currentColor"
+              opacity={played ? 0.95 : loading ? 0.12 : 0.24}
+            />
+          );
+        })}
+        {progress > 0 && (
+          <line
+            x1={progress * width}
+            x2={progress * width}
+            y1={4}
+            y2={height - 4}
+            stroke="currentColor"
+            strokeWidth={1.5}
+            vectorEffect="non-scaling-stroke"
+            opacity={0.85}
+          />
+        )}
+      </svg>
     </div>
   );
 }

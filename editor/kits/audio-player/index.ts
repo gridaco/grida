@@ -3,4 +3,5 @@ export type {
   AudioPlayerAction,
   AudioPlayerArtwork,
   AudioPlayerProps,
+  AudioPlayerVisualization,
 } from "./audio-player";
