@@ -31,6 +31,8 @@ import { AudioPlayer } from "@/kits/audio-player";
 
 Pass `artwork={{ src, alt }}` when real artwork is available. Without it, the
 kit renders a deliberate, platform-neutral music placeholder.
+`active={false}` pauses audio and disables the play control without discarding
+the current position.
 
 For short voice or sound-effect clips, select the waveform visualization:
 

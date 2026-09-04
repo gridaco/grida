@@ -12,6 +12,7 @@ import { Music2, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { Slider } from "@app/ui/components/slider";
 import { cn } from "@app/ui/lib/utils";
+import { AudioPlayback } from "./playback";
 import { AudioWaveform } from "./waveform";
 
 export type AudioPlayerArtwork = {
@@ -69,6 +70,8 @@ export function AudioPlayer({
   className,
 }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const playbackAttemptRef = useRef(0);
+  const lastAudibleVolumeRef = useRef(1);
   const [duration, setDuration] = useState(0);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -77,10 +80,13 @@ export function AudioPlayer({
   const [metadataReady, setMetadataReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [waveform, setWaveform] = useState<WaveformState>({ kind: "idle" });
+  const showTenths = duration > 0 && duration < 1;
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    playbackAttemptRef.current += 1;
 
     setDuration(0);
     setTime(0);
@@ -105,6 +111,7 @@ export function AudioPlayer({
     }
 
     return () => {
+      playbackAttemptRef.current += 1;
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
@@ -137,20 +144,32 @@ export function AudioPlayer({
   }, [source, visualization]);
 
   useEffect(() => {
-    if (!active) audioRef.current?.pause();
+    if (!active) {
+      playbackAttemptRef.current += 1;
+      audioRef.current?.pause();
+    }
   }, [active]);
 
   const togglePlayback = async () => {
     const audio = audioRef.current;
-    if (!audio || error) return;
+    if (!audio || !active || error) return;
+    const attempt = ++playbackAttemptRef.current;
     if (!audio.paused) {
       audio.pause();
       return;
     }
     try {
       await audio.play();
-    } catch {
-      setError("Playback could not be started.");
+    } catch (cause) {
+      if (
+        AudioPlayback.shouldReportPlayError(
+          cause,
+          attempt,
+          playbackAttemptRef.current
+        )
+      ) {
+        setError("Playback could not be started.");
+      }
     }
   };
 
@@ -169,6 +188,7 @@ export function AudioPlayer({
   const changeVolume = ([nextVolume]: number[]) => {
     const audio = audioRef.current;
     if (!audio || nextVolume === undefined) return;
+    if (nextVolume > 0) lastAudibleVolumeRef.current = nextVolume;
     const nextMuted = nextVolume === 0;
     audio.volume = nextVolume;
     audio.muted = nextMuted;
@@ -179,9 +199,20 @@ export function AudioPlayer({
   const toggleMuted = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    const nextMuted = !audio.muted;
-    audio.muted = nextMuted;
-    setMuted(nextMuted);
+    const currentlySilent = audio.muted || audio.volume === 0;
+    if (currentlySilent) {
+      const nextVolume = AudioPlayback.volumeAfterUnmute(
+        audio.volume,
+        lastAudibleVolumeRef.current
+      );
+      audio.volume = nextVolume;
+      audio.muted = false;
+      setVolume(nextVolume);
+      setMuted(false);
+      return;
+    }
+    audio.muted = true;
+    setMuted(true);
   };
 
   return (
@@ -210,7 +241,9 @@ export function AudioPlayer({
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
         onVolumeChange={(event) => {
-          setVolume(event.currentTarget.volume);
+          const nextVolume = event.currentTarget.volume;
+          if (nextVolume > 0) lastAudibleVolumeRef.current = nextVolume;
+          setVolume(nextVolume);
           setMuted(event.currentTarget.muted);
         }}
         onError={() => {
@@ -271,8 +304,12 @@ export function AudioPlayer({
               />
             )}
             <div className="mt-2 flex justify-between font-mono text-[11px] tabular-nums text-muted-foreground">
-              <span>{formatTime(time)}</span>
-              <span>{metadataReady ? formatTime(duration) : "--:--"}</span>
+              <span>{AudioPlayback.formatTime(time, showTenths)}</span>
+              <span>
+                {metadataReady
+                  ? AudioPlayback.formatTime(duration, showTenths)
+                  : "--:--"}
+              </span>
             </div>
           </div>
 
@@ -283,7 +320,7 @@ export function AudioPlayer({
               size="icon-lg"
               className="size-12 rounded-full shadow-sm"
               onClick={() => void togglePlayback()}
-              disabled={!metadataReady || Boolean(error)}
+              disabled={!active || !metadataReady || Boolean(error)}
               aria-label={playing ? "Pause" : "Play"}
             >
               {playing ? (
@@ -300,7 +337,7 @@ export function AudioPlayer({
                 className="shrink-0"
                 onClick={toggleMuted}
                 disabled={!metadataReady || Boolean(error)}
-                aria-label={muted ? "Unmute" : "Mute"}
+                aria-label={muted || volume === 0 ? "Unmute" : "Mute"}
               >
                 {muted || volume === 0 ? (
                   <VolumeX aria-hidden />
@@ -439,7 +476,13 @@ function WaveformScrubber({
       aria-valuemin={0}
       aria-valuemax={duration}
       aria-valuenow={currentTime}
-      aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
+      aria-valuetext={`${AudioPlayback.formatTime(
+        currentTime,
+        duration > 0 && duration < 1
+      )} of ${AudioPlayback.formatTime(
+        duration,
+        duration > 0 && duration < 1
+      )}`}
       aria-disabled={disabled}
       aria-busy={loading}
       tabIndex={disabled ? -1 : 0}
@@ -515,11 +558,4 @@ function Artwork({ artwork }: { artwork?: AudioPlayerArtwork }) {
       )}
     </div>
   );
-}
-
-function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
-  const minutes = Math.floor(seconds / 60);
-  const remainder = Math.floor(seconds % 60);
-  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
 }
