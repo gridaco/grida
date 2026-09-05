@@ -165,5 +165,8 @@ describe("CHATGPT_SUBSCRIPTION_CONFIG.tier_model_ids", () => {
     expect(
       subscriptionModelIds.has(CHATGPT_SUBSCRIPTION_CONFIG.default_model_id)
     ).toBe(true);
+    expect(CHATGPT_SUBSCRIPTION_CONFIG.default_model_id).toBe(
+      CHATGPT_SUBSCRIPTION_CONFIG.tier_model_ids?.pro
+    );
   });
 });

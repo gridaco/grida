@@ -22,8 +22,8 @@ const knows =
     typeof id === "string" && ids.includes(id);
 
 describe("resolveDefaultModelSelection", () => {
-  it("keeps GPT-5.6 Terra as the generic fallback", () => {
-    expect(DEFAULT_MODEL_ID).toBe("openai/gpt-5.6-terra");
+  it("uses GPT-5.6 Sol as the generic pro-tier fallback", () => {
+    expect(DEFAULT_MODEL_ID).toBe("openai/gpt-5.6-sol");
   });
 
   it("keeps the generic fallback compatible with the first-priority ChatGPT provider", () => {

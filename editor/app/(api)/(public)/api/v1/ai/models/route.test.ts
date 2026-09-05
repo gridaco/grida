@@ -49,14 +49,12 @@ describe("GET /api/v1/ai/models", () => {
     expect(body.object).toBe("list");
 
     const byId = new Map(body.data.map((entry) => [entry.id, entry]));
-    // Tier annotation via the reverse TIER_MODEL_IDS map. `nano` and
-    // `mini` currently collapse onto GPT-5.6 Luna, and a collapsed id is
-    // reported at the lowest tier it serves — so no id is annotated
-    // `mini` today. See TIER_BY_MODEL_ID in lib/ai/openai-compat/hosted-models.ts.
+    // Tier annotation follows the reverse TIER_MODEL_IDS map.
     for (const [tier, id] of [
       ["nano", "openai/gpt-5.6-luna"],
-      ["pro", "openai/gpt-5.6-terra"],
-      ["max", "openai/gpt-5.6-sol"],
+      ["mini", "openai/gpt-5.6-terra"],
+      ["pro", "openai/gpt-5.6-sol"],
+      ["max", "openai/gpt-6-astra"],
     ] as const) {
       expect(byId.get(id)?.grida).toMatchObject({ modality: "text", tier });
     }

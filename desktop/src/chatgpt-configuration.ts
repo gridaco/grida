@@ -52,7 +52,7 @@ export const CHATGPT_SUBSCRIPTION_CONFIG: ChatGptProviderConfig = {
   },
   responses_url: CHATGPT_RESPONSES_URL,
   originator: "grida",
-  default_model_id: "openai/gpt-5.6-terra",
+  default_model_id: "openai/gpt-5.6-sol",
   // Mirrors `TIER_MODEL_IDS` from the catalogue. It is a SEPARATE table
   // because the subscription serves its own model set — a catalogue tier
   // model the subscription does not offer is the only reason these may
@@ -60,8 +60,8 @@ export const CHATGPT_SUBSCRIPTION_CONFIG: ChatGptProviderConfig = {
   // silent and expensive (background titler/compactor run on `nano`).
   tier_model_ids: {
     nano: "openai/gpt-5.6-luna",
-    mini: "openai/gpt-5.6-luna",
-    pro: "openai/gpt-5.6-terra",
+    mini: "openai/gpt-5.6-terra",
+    pro: "openai/gpt-5.6-sol",
     max: "openai/gpt-5.6-sol",
   },
 };
