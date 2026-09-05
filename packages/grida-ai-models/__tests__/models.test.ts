@@ -681,16 +681,16 @@ describe("models.text.byTier", () => {
   it("pins the accepted capability and cost topology", () => {
     expect(TIER_MODEL_IDS).toEqual({
       nano: "openai/gpt-5.6-luna",
-      mini: "openai/gpt-5.6-luna",
-      pro: "openai/gpt-5.6-terra",
-      max: "openai/gpt-5.6-sol",
+      mini: "openai/gpt-5.6-terra",
+      pro: "openai/gpt-5.6-sol",
+      max: "openai/gpt-6-astra",
     });
+    expect(new Set(Object.values(TIER_MODEL_IDS)).size).toBe(4);
   });
 
   // `nano` is the cheapest model still good enough for background work,
-  // so it may equal `mini` (it does today — see TIER_MODEL_IDS in
-  // ../src/tiers.ts) but must never cost more. Guards the tier order
-  // against a repoint that quietly makes cheap work expensive.
+  // so it must never cost more than `mini`. Guards the tier order against a
+  // repoint that quietly makes cheap work expensive.
   it("keeps nano at or below mini on every cost bucket", () => {
     const nano = models.text.byTier.nano.cost;
     const mini = models.text.byTier.mini.cost;
@@ -738,6 +738,18 @@ describe("models.text current catalogue", () => {
   } as const;
 
   const newModels = [
+    {
+      id: "openai/gpt-6-astra",
+      contextWindow: 1_050_000,
+      outputLimit: 128_000,
+      cost: {
+        input: 10,
+        output: 50,
+        cacheRead: 1,
+        cacheWrite: 12.5,
+        longContext,
+      },
+    },
     {
       id: "openai/gpt-5.6-sol",
       contextWindow: 1_050_000,
@@ -840,12 +852,27 @@ describe("models.text current catalogue", () => {
     expect(spec.cost).toEqual(expected.cost);
   });
 
+  it("pins the grounded Astra and Fable 5.1 release facts", () => {
+    expect(models.text.catalog["openai/gpt-6-astra"].release).toEqual({
+      date: "2026-09-04",
+      basis: "provider_endpoint",
+      source_url: "https://vercel.com/ai-gateway/models/gpt-6-astra",
+    });
+    expect(models.text.catalog["anthropic/claude-fable-5.1"].release).toEqual({
+      date: "2026-09-01",
+      basis: "model",
+      source_url:
+        "https://platform.claude.com/docs/en/models/fable-5-1/overview",
+    });
+  });
+
   it("keeps the published long-context rule on every affected OpenAI card", () => {
     for (const id of [
       "openai/gpt-5.5",
       "openai/gpt-5.6-sol",
       "openai/gpt-5.6-terra",
       "openai/gpt-5.6-luna",
+      "openai/gpt-6-astra",
     ] as const) {
       expect(models.text.catalog[id].cost.longContext).toEqual(longContext);
     }
@@ -867,6 +894,12 @@ describe("models.text current catalogue", () => {
   });
 
   it("keeps catalogue lifecycle markers scoped to the requested models", () => {
+    expect(
+      models.text.catalog["openai/gpt-6-astra"].deprecated
+    ).toBeUndefined();
+    expect(
+      models.text.catalog["openai/gpt-5.6-sol"].deprecated
+    ).toBeUndefined();
     expect(models.text.catalog["openai/gpt-5.5"].deprecated).toBe(true);
     expect(
       models.text.catalog["openai/gpt-5.5-pro"].deprecated

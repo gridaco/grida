@@ -48,15 +48,19 @@ export const DEFAULT_MODEL_ID: string = TIER_MODEL_IDS.pro;
  */
 export const GG_INCLUDED_MODEL_ID: string = TIER_MODEL_IDS.pro;
 
-/** Desktop-only default for an untouched, ready subscription-backed chat. */
+/**
+ * Desktop-only default for an untouched, ready subscription-backed chat.
+ * The compile-time check keeps the catalogue's `pro` tier on the closed,
+ * observed ChatGPT subscription allowlist even when `max` moves ahead of it.
+ */
 export const CHATGPT_READY_DEFAULT_MODEL_ID =
-  TIER_MODEL_IDS.max satisfies ChatGptSubscriptionModelId;
+  TIER_MODEL_IDS.pro satisfies ChatGptSubscriptionModelId;
 
 /**
  * The initial default for a new chat. An explicit caller-seeded `initial`
  * (a known id — e.g. the welcome handoff carrying the home composer's pick)
  * always wins. Otherwise a ready subscription chooses ChatGPT/Sol, a live
- * Grida session chooses Grida/Terra, and the unresolved fallback stays
+ * Grida session chooses Grida/Sol, and the unresolved fallback stays
  * provider-less until availability resolves.
  */
 export function resolveDefaultModelSelection(opts: {

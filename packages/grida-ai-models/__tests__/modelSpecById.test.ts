@@ -3,6 +3,10 @@ import models, { TIER_MODEL_IDS } from "..";
 describe("models.text.modelSpecById", () => {
   it.each([
     {
+      id: "openai/gpt-6-astra",
+      label: "GPT-6 Astra",
+    },
+    {
       id: "openai/gpt-5.6-sol",
       label: "GPT-5.6 Sol",
     },

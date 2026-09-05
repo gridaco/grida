@@ -49,10 +49,8 @@ const TIER_ORDER = [
 /**
  * Reverse of `TIER_MODEL_IDS`.
  *
- * Tiers can collapse onto one id: `nano` is a floor (the cheapest model
- * still good enough), so when that model is also the best value at
- * `mini`, both tiers name it — the state today. See `TIER_MODEL_IDS` in
- * `@grida/ai-models` for why.
+ * Tiers can collapse onto one id, although the current capability ladder
+ * assigns a distinct model to every tier.
  *
  * The payload carries one tier per model, so a collapsed id is reported
  * at the LOWEST tier it serves. Walking `TIER_ORDER` ascending with

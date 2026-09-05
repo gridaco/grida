@@ -203,6 +203,24 @@ describe("costMillsFromTokenUsage", () => {
     );
   });
 
+  it("meters GPT-6 Astra at its published long-context rates", () => {
+    const mills = costMillsFromTokenUsage("openai/gpt-6-astra", {
+      inputTokens: {
+        total: 272_001,
+        noCache: 180_001,
+        cacheRead: 72_000,
+        cacheWrite: 20_000,
+      },
+      outputTokens: { total: 10_000, reasoning: 2_000 },
+    });
+
+    expect(mills).toBeCloseTo(
+      (((180_001 * 10 + 72_000 * 1 + 20_000 * 12.5) * 2 + 10_000 * 50 * 1.5) /
+        1_000_000) *
+        1000
+    );
+  });
+
   it("derives total input from normalized buckets before applying the band", () => {
     const mills = costMillsFromTokenUsage("openai/gpt-5.6-terra", {
       inputTokens: {

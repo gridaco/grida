@@ -35,27 +35,17 @@ export type ModelTier = "nano" | "mini" | "pro" | "max";
  * tier mapped to an id that lacks a matching entry in the text
  * catalogue (see `./models`).
  *
- * `nano` is a floor, not a price point: it holds the cheapest model
- * still good enough for background work. So it is **never more
- * expensive than `mini`**, but it is *not* guaranteed to be strictly
- * cheaper — when one model is both the lowest reasonable choice and
- * the best value at `mini`, the two tiers collapse onto the same id.
- *
- * That is the state today. OpenAI positions GPT-5.6 Luna as the 5.6
- * generation's nano-class model, and its current rate and 1.05M context
- * make it both the lowest reasonable choice and the best value at `mini`.
- * This is one model serving two tiers, not a tier being over-served.
- * See https://github.com/gridaco/grida/pull/1009.
- *
- * Expect the tiers to separate again as new models land. The invariant
- * that survives either way is `nano <= mini` on every cost bucket,
- * pinned by a catalogue test in `__tests__/models.test.ts`.
+ * Each tier is one adjacent rung in the current capability ladder:
+ * GPT-6 Astra > GPT-5.6 Sol > GPT-5.6 Terra > GPT-5.6 Luna. When a new
+ * model becomes the capability leader, shift the existing assignments by
+ * one rung; do not skip a still-current model or collapse tiers without a
+ * separate reason to change the topology.
  */
 export const TIER_MODEL_IDS = {
   nano: "openai/gpt-5.6-luna",
-  mini: "openai/gpt-5.6-luna",
-  pro: "openai/gpt-5.6-terra",
-  max: "openai/gpt-5.6-sol",
+  mini: "openai/gpt-5.6-terra",
+  pro: "openai/gpt-5.6-sol",
+  max: "openai/gpt-6-astra",
 } as const satisfies Record<ModelTier, models.text.CatalogId>;
 
 /** Literal union of tier-mapped model ids (values of {@link TIER_MODEL_IDS}). */

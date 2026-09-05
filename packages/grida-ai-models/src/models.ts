@@ -300,10 +300,11 @@ export namespace models {
     ] as const satisfies readonly ImageInputMime[];
 
     // OpenAI bills the full request at these multipliers once its total input
-    // exceeds 272K tokens. The same rule is published for GPT-5.5 and every
-    // GPT-5.6 family member.
+    // exceeds 272K tokens. The same rule is published for GPT-5.5, every
+    // GPT-5.6 family member, and GPT-6 Astra.
     // https://developers.openai.com/api/docs/models/gpt-5.5
     // https://developers.openai.com/api/docs/models/gpt-5.6-sol
+    // https://developers.openai.com/api/docs/models/gpt-6-astra
     const OPENAI_LONG_CONTEXT_PRICING = {
       inputTokensAbove: 272_000,
       inputMultiplier: 2,
@@ -416,6 +417,32 @@ export namespace models {
           longContext: OPENAI_LONG_CONTEXT_PRICING,
         },
       },
+      // OpenAI's September 3 introduction remained a limited rollout. The
+      // September 4 date below is the exact Vercel route's broad availability,
+      // which is the release fact relevant to this gateway-shaped card.
+      // https://openai.com/products/release-notes/
+      // https://vercel.com/ai-gateway/models/gpt-6-astra
+      "openai/gpt-6-astra": {
+        id: "openai/gpt-6-astra",
+        label: "GPT-6 Astra",
+        release: {
+          date: "2026-09-04",
+          basis: "provider_endpoint",
+          source_url: "https://vercel.com/ai-gateway/models/gpt-6-astra",
+        },
+        multimodal: true,
+        imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
+        tool_call: true,
+        contextWindow: 1_050_000,
+        outputLimit: 128_000,
+        cost: {
+          input: 10,
+          output: 50,
+          cacheRead: 1,
+          cacheWrite: 12.5,
+          longContext: OPENAI_LONG_CONTEXT_PRICING,
+        },
+      },
       // $2/$10 is the standard rate, not a live discount: it launched as an
       // introductory rate and Anthropic made it permanent, cancelling the
       // announced step up to $3/$15. Do not restore the higher card.
@@ -441,7 +468,7 @@ export namespace models {
       // cut to $0.25/MTok. Not a drop-in successor — forced tool choice
       // (`tool_choice` `any`/`tool`) is rejected here — which is why Fable 5
       // stays catalogued rather than being removed.
-      // https://platform.claude.com/docs/en/about-claude/pricing
+      // https://platform.claude.com/docs/en/models/fable-5-1/overview
       "anthropic/claude-fable-5.1": {
         id: "anthropic/claude-fable-5.1",
         label: "Claude Fable 5.1",
@@ -449,7 +476,7 @@ export namespace models {
           date: "2026-09-01",
           basis: "model",
           source_url:
-            "https://platform.claude.com/docs/en/release-notes/overview",
+            "https://platform.claude.com/docs/en/models/fable-5-1/overview",
         },
         short_label: "Fable 5.1",
         multimodal: true,
