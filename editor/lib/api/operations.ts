@@ -26,6 +26,14 @@ export namespace apiOperations {
       binding: "account",
       cache: "no-store",
     },
+    // GRIDA-EE: billing — cached credit observation, never provider work.
+    "account.credits": {
+      path: "/api/v1/account/credits",
+      methods: ["GET", "HEAD", "OPTIONS"],
+      authority: "native-account",
+      binding: "account",
+      cache: "no-store",
+    },
     "gg.chat": {
       path: "/api/v1/ai/chat/completions",
       methods: ["POST"],

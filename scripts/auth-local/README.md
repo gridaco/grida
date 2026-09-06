@@ -170,9 +170,19 @@ removes only that new membership; the same native credential immediately sees
 both changes. Seeded owner memberships remain intact. This exercises current
 PostgreSQL RLS, unlike the separate synthetic production request-pipeline proof.
 
-Its restart check copies the built package and manifest outside the repository
+The same proof reads cached credits through the auth package and the independent
+`@grida/account` client. Sole/name/ID selection and multiple-membership errors are
+exercised before the server rechecks membership. A removed member receives no
+credits with the same credential. Existing fixture setup RPCs link synthetic
+billing identifiers and seed cache values; no billing provider is contacted.
+Unprovisioned/unobserved credit data remains distinct from observed zero, and the
+existing gate floor and entitlement flag are preserved. Cache snapshots before
+and after each read prove the read leaves billing state unchanged. Direct REST
+checks verify the safe view columns and other-user denial under real RLS.
+
+Its restart check copies both built packages and manifests outside the repository
 and runs separate Node processes with disposable `0700`/`0600` test custody.
-It lists organizations before and after restart and checks a terminal cursor.
+It lists organizations and reads credits before and after restart, and checks a terminal cursor.
 That proves independent package use and this test adapter's restart behavior;
 it does not establish product credential storage or cross-process coordination.
 No hosted service or deployment is covered by the local result. Normal output

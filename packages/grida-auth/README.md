@@ -86,13 +86,18 @@ const next =
     : await auth.requestAccount("organizations.list", {
         after: page.next_cursor,
       });
+const credits = await auth.requestAccount("credits.read", {
+  organization_id: 7,
+});
 ```
 
-This is the only account request operation. It sends GET to the configured
-API origin's `/api/v1/account/organizations`, with only the optional canonical
-`?after=<positive-safe-integer>` query. Unknown operations and input keys are
-rejected before custody or network access. No user ID, page size, URL, method,
-headers, raw response, or registration hook can be supplied.
+These are the only account operations. Both send GET to the configured API
+origin: `organizations.list` uses `/api/v1/account/organizations`, with only
+the optional canonical `?after=<positive-safe-integer>` query; `credits.read`
+requires `/api/v1/account/credits?organization_id=<positive-safe-integer>`.
+Unknown operations and input keys are rejected before custody or network
+access. Input values are captured once before awaiting. No user ID, page size,
+URL, method, headers, raw response, or registration hook can be supplied.
 
 `AuthClient.OrganizationsPage` is a secret-free wire view. Each page contains at
 most 100 records with positive safe-integer IDs strictly increasing beyond
@@ -103,16 +108,41 @@ page is a successful result, never a substitute for failure. Account selection,
 iteration, presentation, and authorization rules stay with their respective
 account and server owners; this package does not choose an organization.
 
+`AuthClient.Credits` projects only `{organization, account_present, state,
+source, currency, balance_cents, cache_updated_at, billing_gate}`. The organization
+has the same safe fields as a page record and must match the requested ID.
+`source` is `cache`; `currency` is `USD`. Signed safe-integer cents are cached
+estimates, including genuine zero or negative values. A full RFC3339 timestamp
+with timezone, optionally fractional, records cache updates, including optimistic
+debits; it is not evidence of a fresh provider reconciliation.
+
+- `not_provisioned`: no linked credit customer; balance and timestamp are null,
+  gate is false/`not_provisioned`. `account_present` distinguishes an absent
+  account from an account without a linked customer.
+- `uncached`: the account and linked customer exist, but the display balance
+  and timestamp are null. The server's cached gate can still allow or deny.
+- `cached`: the account and linked customer exist, with integer balance and
+  timestamp.
+
+The gate is `{allowed: true, reason: null}` or `{allowed: false, reason:
+"not_provisioned" | "below_floor" | "no_balance"}`. The last two reasons apply
+to linked accounts only. Auth checks wire consistency and discards extras; it
+does not calculate the billing floor, infer eligibility from the amount, apply
+a freshness rule, contact providers, or promise AI readiness. Missing or
+invisible organizations are the server's same forbidden result, never an
+invented unprovisioned account or zero balance. Selection is caller-owned;
+server authorization must be applied on every read.
+
 Each request rereads custody and refreshes within the existing 30-second expiry
-window before sending the page request. There is no automatic replay: 401 is
+window before sending the account request. There is no automatic replay: 401 is
 `token_rejected`, 403 is `forbidden`, other non-200 statuses are `unavailable`,
-and invalid pages are `invalid_response`. A network error does not trigger a
-refresh/retry. Accepted rotations remain stored if a later page request fails.
+and invalid replies are `invalid_response`. A network error does not trigger a
+refresh/retry. Accepted rotations remain stored if a later account request fails.
 The Node transport's existing deadline, response-size limit, cookie omission,
 and redirect refusal apply unchanged.
 
 Coordinated custody holds profile authority through the fresh read, any refresh,
-the page request, and result acceptance. Another process's logout or replacement
+the account request, and result acceptance. Another process's logout or replacement
 waits for that acceptance; acceptance is ordered before the later clear, though
 process scheduling can deliver already accepted data afterward. Same-instance
 logout cancels transport and fences results immediately, including a transport
@@ -286,10 +316,10 @@ can still require login; no local adapter can make those two systems atomic.
 
 - No supported `grida` commands, browser launcher, credential export command,
   or presentation layer.
-- No account interpretation, selection, billing/media operations, GG token
-  minting, provider OAuth registry, or generic authenticated URL fetch. The fixed
-  organization-page capability is wire transport only; other operations require
-  a new producer contract.
+- No account selection, billing policy or mutations, subscription/media operations,
+  GG token minting, provider OAuth registry, or generic authenticated URL fetch.
+  Fixed organization pages and cached credits are wire transport only; other
+  operations require a new producer contract.
 - No bespoke tokens, token-claim identity inference, social-PKCE fallback,
   Desktop deep links/cookies, global logout, or grant revocation.
 - No Desktop/provider credential sharing, machine-wide store, or daemon lifetime.

@@ -15,6 +15,7 @@ import {
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 
 const scripts = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,9 @@ const copiedFiles = [
   "lib/api/account.ts",
   "lib/account/account.ts",
   "lib/supabase/account-data.ts",
+  "lib/supabase/credits-data.ts",
+  "lib/billing/credits.ts",
+  "lib/billing/fees.ts",
   "lib/auth/bearer.ts",
   "lib/auth/oauth-server.ts",
   "lib/desktop/csp.ts",
@@ -38,6 +42,7 @@ const copiedFiles = [
   "lib/platform/index.ts",
   "app/(api)/(public)/api/v1/auth/me/route.ts",
   "app/(api)/(public)/api/v1/account/organizations/route.ts",
+  "app/(api)/(public)/api/v1/account/credits/route.ts",
 ];
 
 function check(condition, label) {
@@ -117,9 +122,37 @@ function issuerFixture() {
     users,
     calls: 0,
     databaseCalls: 0,
+    creditsCalls: 0,
     mode: "ok",
     databaseMode: "ok",
     databaseLimit: 100,
+    creditsMode: "ok",
+    credits: [
+      [
+        {
+          organization_id: 1,
+          organization_name: "alpha-1",
+          organization_display_name: "Alpha 1",
+          account_present: true,
+          credits_provisioned: true,
+          cached_balance_cents: 25,
+          cached_balance_at: "2026-01-02T03:04:05.000Z",
+          customer_entitled: true,
+        },
+      ],
+      [
+        {
+          organization_id: 1001,
+          organization_name: "beta",
+          organization_display_name: "Beta organization",
+          account_present: true,
+          credits_provisioned: true,
+          cached_balance_cents: 500,
+          cached_balance_at: "2026-01-02T03:04:05.000Z",
+          customer_entitled: true,
+        },
+      ],
+    ],
     organizations: [
       Array.from({ length: 101 }, (_, index) => ({
         id: index + 1,
@@ -151,12 +184,16 @@ function issuerFixture() {
   fixture.server = createServer((req, response) => {
     const url = new URL(req.url, fixture.origin);
     const database = url.pathname === "/rest/v1/organization";
-    if (database) fixture.databaseCalls++;
+    const credits = url.pathname === "/rest/v1/v_billing_credits";
+    if (credits) {
+      fixture.creditsCalls++;
+      fixture.databaseCalls++;
+    } else if (database) fixture.databaseCalls++;
     else fixture.calls++;
     response.setHeader("cache-control", "no-store");
     if (
       req.method !== "GET" ||
-      (!database && req.url !== "/auth/v1/oauth/userinfo") ||
+      (!database && !credits && req.url !== "/auth/v1/oauth/userinfo") ||
       req.headers.apikey !== "synthetic-publishable-key"
     ) {
       response.writeHead(500).end();
@@ -166,6 +203,80 @@ function issuerFixture() {
     const index = tokens.get(token);
     if (index === undefined || fixture.mode === "revoked") {
       response.writeHead(401).end();
+      return;
+    }
+    if (credits) {
+      const selector = url.searchParams.get("organization_id");
+      const projection = [
+        "organization_id",
+        "organization_name",
+        "organization_display_name",
+        "account_present",
+        "credits_provisioned",
+        "cached_balance_cents",
+        "cached_balance_at",
+        "customer_entitled",
+      ].join(",");
+      if (
+        url.searchParams.get("select") !== projection ||
+        url.searchParams.get("limit") !== "2" ||
+        !/^eq\.[1-9]\d*$/.test(selector ?? "") ||
+        [...url.searchParams.keys()].sort().join(",") !==
+          "limit,organization_id,select" ||
+        req.headers["accept-profile"] !== "public" ||
+        req.headers.prefer !== "count=exact" ||
+        req.headers.cookie !== undefined
+      ) {
+        response.writeHead(500).end();
+        return;
+      }
+      const mode = fixture.creditsMode;
+      const failure = { unauthorized: 401, forbidden: 403, unavailable: 503 }[
+        mode
+      ];
+      if (failure) {
+        response.writeHead(failure).end();
+        return;
+      }
+      if (mode === "redirect") {
+        response
+          .writeHead(302, { location: `${fixture.origin}/unexpected-credits` })
+          .end();
+        return;
+      }
+      const id = Number(selector.slice(3));
+      // This is a visibility fixture, not an implementation of Postgres RLS.
+      // The exact bearer determines which organization rows can be returned.
+      let rows = fixture.credits[index].filter(
+        (row) => row.organization_id === id
+      );
+      if (mode === "duplicate" && rows.length) rows = [rows[0], rows[0]];
+      if (mode === "wrong-org" && rows.length)
+        rows = [{ ...rows[0], organization_id: id + 1 }];
+      if (mode === "empty-nonzero-count") rows = [];
+      response.statusCode = mode === "partial" ? 206 : 200;
+      response.setHeader(
+        "content-type",
+        mode === "content-type" ? "text/plain" : "application/json"
+      );
+      const range = rows.length ? `0-${rows.length - 1}/${rows.length}` : "*/0";
+      if (mode !== "missing-count")
+        response.setHeader(
+          "content-range",
+          {
+            "unknown-count": "0-0/*",
+            "truncated-count": "0-0/2",
+            "bad-range": "1-1/1",
+            "empty-nonzero-count": "*/1",
+          }[mode] ?? range
+        );
+      response.end(
+        mode === "malformed"
+          ? "invalid JSON"
+          : JSON.stringify(
+              rows.map((row) => ({ ...row, ignored: "upstream-only-field" }))
+            )
+      );
       return;
     }
     if (database) {
@@ -570,6 +681,386 @@ async function organizationAssertions(port, issuer, safe, alpha, beta) {
   issuer.databaseMode = "ok";
 }
 
+async function creditsAssertions(port, issuer, safe, alpha, beta) {
+  const endpoint = "/api/v1/account/credits";
+  const auth = (token) => ({ authorization: `Bearer ${token}` });
+  const alphaRows = issuer.credits[0];
+  const betaRows = issuer.credits[1];
+  const alphaRow = alphaRows[0];
+  const betaRow = betaRows[0];
+  const url = (id) => `${endpoint}?organization_id=${id}`;
+  const expected = (row, state, balance, at, allowed, reason) => ({
+    organization: {
+      id: row.organization_id,
+      name: row.organization_name,
+      display_name: row.organization_display_name,
+    },
+    account_present: row.account_present,
+    state,
+    source: "cache",
+    currency: "USD",
+    balance_cents: balance,
+    cache_updated_at: at,
+    billing_gate: { allowed, reason },
+  });
+  const read = async (token, row, reply, label) => {
+    const body = safe(
+      await request(port, url(row.organization_id), {
+        headers: {
+          ...auth(token),
+          cookie: "sb-session=conflicting-browser-organization",
+          "x-grida-organization-id": "9999",
+        },
+      }),
+      200,
+      label
+    );
+    check(
+      isDeepStrictEqual(body, reply),
+      `${label}: cached credits projection or gate mismatch`
+    );
+  };
+
+  await read(
+    alpha,
+    alphaRow,
+    expected(alphaRow, "cached", 25, alphaRow.cached_balance_at, true, null),
+    "own credits at the existing gate floor"
+  );
+  await read(
+    beta,
+    betaRow,
+    expected(betaRow, "cached", 500, betaRow.cached_balance_at, true, null),
+    "second user's independent credits"
+  );
+  await read(
+    alpha,
+    alphaRow,
+    expected(alphaRow, "cached", 25, alphaRow.cached_balance_at, true, null),
+    "credits do not leak through another user's cache"
+  );
+  issuer.creditsMode = "partial";
+  await read(
+    alpha,
+    alphaRow,
+    expected(alphaRow, "cached", 25, alphaRow.cached_balance_at, true, null),
+    "complete credits row with HTTP206"
+  );
+  issuer.creditsMode = "ok";
+
+  for (const [token, id] of [
+    [alpha, betaRow.organization_id],
+    [beta, alphaRow.organization_id],
+    [alpha, 9999],
+  ]) {
+    const body = safe(
+      await request(port, url(id), { headers: auth(token) }),
+      403,
+      "invisible or unknown credits organization"
+    );
+    check(
+      body.error?.code === "forbidden",
+      "Unknown and invisible organizations must share the forbidden result"
+    );
+  }
+  issuer.credits[0] = [];
+  safe(
+    await request(port, url(alphaRow.organization_id), {
+      headers: auth(alpha),
+    }),
+    403,
+    "removed membership is not recovered from cookies or a cached organization"
+  );
+  issuer.credits[0] = alphaRows;
+
+  // Expected gate decisions are explicit fixtures, independent of the server's
+  // gate implementation. No provider, clock freshness rule, or billing write
+  // supplies these results; the intentionally old timestamp remains valid.
+  const cases = [
+    {
+      label: "missing account",
+      raw: {
+        account_present: false,
+        credits_provisioned: false,
+        cached_balance_cents: null,
+        cached_balance_at: null,
+        customer_entitled: null,
+      },
+      state: "not_provisioned",
+      balance: null,
+      at: null,
+      allowed: false,
+      reason: "not_provisioned",
+    },
+    {
+      label: "account without linked credits customer",
+      raw: {
+        credits_provisioned: false,
+        cached_balance_cents: 0,
+        cached_balance_at: null,
+        customer_entitled: false,
+      },
+      state: "not_provisioned",
+      balance: null,
+      at: null,
+      allowed: false,
+      reason: "not_provisioned",
+    },
+    {
+      label: "unobserved cache is not a displayed zero",
+      raw: {
+        cached_balance_cents: 0,
+        cached_balance_at: null,
+        customer_entitled: false,
+      },
+      state: "uncached",
+      balance: null,
+      at: null,
+      allowed: false,
+      reason: "below_floor",
+    },
+    {
+      label: "unobserved cache does not introduce a new freshness gate",
+      raw: { cached_balance_cents: 25, cached_balance_at: null },
+      state: "uncached",
+      balance: null,
+      at: null,
+      allowed: true,
+      reason: null,
+    },
+    {
+      label: "observed zero balance",
+      raw: { cached_balance_cents: 0 },
+      state: "cached",
+      balance: 0,
+      at: alphaRow.cached_balance_at,
+      allowed: false,
+      reason: "below_floor",
+    },
+    {
+      label: "negative cached balance remains a valid estimate",
+      raw: { cached_balance_cents: -25 },
+      state: "cached",
+      balance: -25,
+      at: alphaRow.cached_balance_at,
+      allowed: false,
+      reason: "below_floor",
+    },
+    {
+      label: "positive balance below the existing floor",
+      raw: { cached_balance_cents: 24 },
+      state: "cached",
+      balance: 24,
+      at: alphaRow.cached_balance_at,
+      allowed: false,
+      reason: "below_floor",
+    },
+    {
+      label: "eligible balance with a denied customer gate",
+      raw: { cached_balance_cents: 25, customer_entitled: false },
+      state: "cached",
+      balance: 25,
+      at: alphaRow.cached_balance_at,
+      allowed: false,
+      reason: "no_balance",
+    },
+  ];
+  for (const fixture of cases) {
+    const row = { ...alphaRow, ...fixture.raw };
+    issuer.credits[0] = [row];
+    await read(
+      alpha,
+      row,
+      expected(
+        row,
+        fixture.state,
+        fixture.balance,
+        fixture.at,
+        fixture.allowed,
+        fixture.reason
+      ),
+      fixture.label
+    );
+  }
+  issuer.credits[0] = alphaRows;
+
+  let beforeAuth = issuer.calls;
+  let beforeData = issuer.databaseCalls;
+  for (const headers of [
+    {},
+    { cookie: "sb-session=synthetic-web-cookie" },
+    auth("gg_synthetic_credential"),
+    auth(issuer.token(0, { client_id: randomUUID() })),
+  ]) {
+    safe(
+      await request(port, url(1), { headers }),
+      401,
+      "credits credential rejection"
+    );
+  }
+  check(
+    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    "Invalid credits credential reached issuer/database"
+  );
+  issuer.mode = "revoked";
+  safe(
+    await request(port, url(1), { headers: auth(alpha) }),
+    401,
+    "credits require a live account session"
+  );
+  check(
+    issuer.databaseCalls === beforeData,
+    "Revoked account reached cached credit data"
+  );
+  issuer.mode = "ok";
+
+  beforeAuth = issuer.calls;
+  for (const query of [
+    "",
+    "organization_id=",
+    "organization_id=0",
+    "organization_id=-1",
+    "organization_id=01",
+    "organization_id=1.0",
+    "organization_id=1e2",
+    "organization_id=9007199254740992",
+    "organization_id=1&organization_id=2",
+    "organization_id=1&refresh=1",
+    "organization_id=1&user_id=other",
+    "organization_id=1&organization=beta",
+  ]) {
+    safe(
+      await request(port, endpoint + (query ? `?${query}` : ""), {
+        headers: auth(alpha),
+      }),
+      400,
+      "credits selector rejection"
+    );
+  }
+  for (const method of ["GET", "OPTIONS"]) {
+    safe(
+      await request(port, url(1), {
+        method,
+        headers: { ...auth(alpha), "content-length": "1" },
+        body: "x",
+      }),
+      400,
+      "credits body rejection",
+      method !== "OPTIONS"
+    );
+  }
+  safe(
+    await request(port, `${endpoint}?organization_id=01`, {
+      method: "OPTIONS",
+    }),
+    400,
+    "credits OPTIONS validates a supplied selector",
+    false
+  );
+  check(
+    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    "Rejected credits input reached issuer/database"
+  );
+  safe(
+    await request(port, url(1), { method: "HEAD", headers: auth(alpha) }),
+    200,
+    "credits authenticated HEAD",
+    false
+  );
+  safe(
+    await request(port, url(1), { method: "HEAD" }),
+    401,
+    "credits unauthenticated HEAD",
+    false
+  );
+
+  beforeAuth = issuer.calls;
+  beforeData = issuer.databaseCalls;
+  for (const target of [endpoint, url(1)]) {
+    const response = await request(port, target, { method: "OPTIONS" });
+    safe(response, 204, "credits OPTIONS", false);
+    check(
+      response.headers.allow === "GET, HEAD, OPTIONS",
+      "Credits OPTIONS Allow mismatch"
+    );
+  }
+  for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+    const response = await request(port, url(1), {
+      method,
+      headers: auth(alpha),
+    });
+    const body = safe(response, 405, "credits method rejection");
+    check(
+      body.error?.code === "method_not_allowed" &&
+        response.headers.allow === "GET, HEAD, OPTIONS",
+      "Credits method policy mismatch"
+    );
+  }
+  check(
+    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    "Credits method policy reached issuer/database"
+  );
+
+  for (const [mode, status] of [
+    ["unauthorized", 401],
+    ["forbidden", 403],
+    ["unavailable", 503],
+    ["redirect", 503],
+    ["malformed", 503],
+    ["content-type", 503],
+    ["missing-count", 503],
+    ["unknown-count", 503],
+    ["truncated-count", 503],
+    ["bad-range", 503],
+    ["empty-nonzero-count", 503],
+    ["duplicate", 503],
+    ["wrong-org", 503],
+  ]) {
+    issuer.creditsMode = mode;
+    const body = safe(
+      await request(port, url(1), { headers: auth(alpha) }),
+      status,
+      `credits database ${mode}`
+    );
+    check(
+      body.error &&
+        !Object.hasOwn(body, "balance_cents") &&
+        !Object.hasOwn(body, "account_present"),
+      "Credits failure became an empty or zero balance snapshot"
+    );
+  }
+  issuer.creditsMode = "ok";
+  for (const raw of [
+    { cached_balance_cents: 1.5 },
+    { cached_balance_cents: Number.MAX_SAFE_INTEGER + 1 },
+    { cached_balance_cents: null },
+    { cached_balance_at: "not-a-time" },
+    { organization_display_name: null },
+    { organization_name: "Invalid Slug" },
+    { account_present: false },
+    { credits_provisioned: "true" },
+    { customer_entitled: null },
+  ]) {
+    issuer.credits[0] = [{ ...alphaRow, ...raw }];
+    const body = safe(
+      await request(port, url(1), { headers: auth(alpha) }),
+      503,
+      "malformed credit row rejected"
+    );
+    check(
+      body.error?.code === "auth_unavailable",
+      "Malformed credits row leaked an unexpected error contract"
+    );
+  }
+  issuer.credits[0] = alphaRows;
+  await read(
+    alpha,
+    alphaRow,
+    expected(alphaRow, "cached", 25, alphaRow.cached_balance_at, true, null),
+    "credits recover after upstream errors without a fallback snapshot"
+  );
+}
+
 async function assertions(port, issuer, tripwire) {
   let count = 0;
   const alpha = issuer.token(0);
@@ -673,6 +1164,7 @@ async function assertions(port, issuer, tripwire) {
   }
   issuer.mode = "ok";
   await organizationAssertions(port, issuer, safe, alpha, beta);
+  await creditsAssertions(port, issuer, safe, alpha, beta);
   safe(
     await request(port, "/api/v1/auth/me", {
       method: "HEAD",
@@ -984,6 +1476,7 @@ async function main() {
         for (const endpoint of [
           "/api/v1/auth/me",
           "/api/v1/account/organizations",
+          "/api/v1/account/credits?organization_id=1",
         ]) {
           const before = issuer.calls;
           const beforeData = issuer.databaseCalls;

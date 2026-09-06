@@ -5,6 +5,9 @@ import { oauthServer } from "../auth/oauth-server";
 import { apiOperations } from "./operations";
 import { account } from "../account/account";
 import { accountData } from "../supabase/account-data";
+// GRIDA-EE: billing — host composition; account/identity owners remain independent.
+import { credits } from "../billing/credits";
+import { creditsData } from "../supabase/credits-data";
 
 /** Fixed account adapter. Routes select an operation, never supply authority. */
 export namespace accountApi {
@@ -19,11 +22,13 @@ export namespace accountApi {
   type Handler = (request: Request) => Promise<Response>;
 
   export function bind(
-    operation: "auth.me" | "account.organizations"
+    operation: "auth.me" | "account.organizations" | "account.credits"
   ): Readonly<Record<Method, Handler>> {
     const definition = apiOperations.definitions[operation];
     if (
-      !["auth.me", "account.organizations"].includes(operation) ||
+      !["auth.me", "account.organizations", "account.credits"].includes(
+        operation
+      ) ||
       !definition ||
       definition.authority !== "native-account" ||
       definition.binding !== "account" ||
@@ -55,7 +60,7 @@ export namespace accountApi {
           if (url.pathname !== definition.path) {
             throw new oauthServer.Failure("invalid_request");
           }
-          const after = cursor(operation, url);
+          const input = query(operation, url, request.method);
           await requireEmptyBody(request);
           if (request.method === "OPTIONS") {
             response = new Response(null, {
@@ -90,17 +95,27 @@ export namespace accountApi {
                     email: identity.email,
                     display_name: identity.display_name,
                   }
-                : await account.organizations(
-                    accountData.forBearer(authorization, config, fetcher),
-                    after
-                  );
+                : operation === "account.organizations"
+                  ? await account.organizations(
+                      accountData.forBearer(authorization, config, fetcher),
+                      input
+                    )
+                  : // GRIDA-EE: billing — one passive membership-scoped read.
+                    await credits.read(
+                      creditsData.forBearer(authorization, config, fetcher),
+                      input!
+                    );
             response = Response.json(result, {
               headers: oauthServer.responseHeaders,
             });
           }
         }
       } catch (error) {
-        response = oauthServer.errorResponse(error);
+        response = oauthServer.errorResponse(
+          error instanceof credits.NotFound
+            ? new oauthServer.Failure("forbidden")
+            : error
+        );
       }
       if (request.method === "HEAD" || request.method === "OPTIONS") {
         const headers = new Headers(response.headers);
@@ -121,7 +136,20 @@ export namespace accountApi {
     });
   }
 
-  function cursor(operation: string, url: URL): number | undefined {
+  function query(
+    operation: string,
+    url: URL,
+    method: string
+  ): number | undefined {
+    if (operation === "account.credits") {
+      if (!url.search && method === "OPTIONS") return undefined;
+      if (!/^\?organization_id=[1-9]\d*$/.test(url.search))
+        throw new oauthServer.Failure("invalid_request");
+      const organizationId = Number(url.searchParams.get("organization_id"));
+      if (!Number.isSafeInteger(organizationId) || organizationId <= 0)
+        throw new oauthServer.Failure("invalid_request");
+      return organizationId;
+    }
     if (!url.search) return undefined;
     if (
       operation !== "account.organizations" ||

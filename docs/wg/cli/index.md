@@ -38,7 +38,9 @@ interface. It does not require Desktop to be running or automate its UI.
 Auth and account access, model discovery, provider credentials, and media
 generation are the [immediate scope](./v1.md). The [AI tools design](./media.md)
 defines GG/BYOK availability and schema-driven invocation. Agent and render
-commands, Canvas integration, and MCP are deferred.
+commands, Canvas integration, subscription billing, and MCP are deferred.
+Account work starts with login, organization membership and the credit check
+needed before generation.
 
 The [credential custody study](./credential-custody.md) compares established
 CLIs and defines durable login storage and refresh coordination.

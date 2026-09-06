@@ -45,8 +45,30 @@ and malformed data fail safely. A zero-membership page succeeds; issuer/database
 failures never become an empty result. Each page reads current memberships;
 pagination is not a transaction snapshot across requests. A cursor grants no access.
 
-Both account operations support authenticated HEAD and bodyless OPTIONS;
+`GET /api/v1/account/credits?organization_id=1` reads the selected organization's
+cached AI credits. The ID is required and must be a canonical positive safe
+integer. The same verified bearer queries `public.v_billing_credits`, a
+`security_invoker` view anchored on current membership; unknown and invisible
+organizations both return 403. An earlier organization selection grants no access.
+
+The response identifies the organization and contains `account_present`,
+`state` (`not_provisioned`, `uncached`, or `cached`), `source: "cache"`,
+`currency: "USD"`, nullable `balance_cents` and `cache_updated_at`, and
+`billing_gate: {allowed, reason}`. No linked customer or no cache observation means
+an unknown balance; recorded zero and negative estimates are preserved. Cache
+timestamps include optimistic usage deductions. Gate eligibility follows the
+existing billing policy and does not promise GG/provider readiness.
+
+[The passive credits owner](../billing/credits.ts) contains the shared pure gate
+and projection; [its query adapter](../supabase/credits-data.ts) imports no
+cookie client, privileged client or provider SDK. The read performs no provider
+refresh, provisioning or writes. Missing schema, invalid rows and DB failures
+remain errors; they never become zero credits. Subscription billing is outside
+this operation. Account identity and organization listing need no billing setup.
+
+All account operations support authenticated HEAD and bodyless OPTIONS;
 other methods return 405. Input and output share the existing no-store policy.
+Credits OPTIONS accepts the bare route; any supplied query still must be valid.
 
 Domain operations belong in their own modules and receive explicit authority
 and inputs. They do not import Next, cookies or UI. HTTP adapters do not acquire

@@ -297,6 +297,24 @@ describe("apiAudit.check bound route structure", () => {
 });
 
 describe("apiAudit.check dependency boundaries", () => {
+  it("traverses a passive credits owner and rejects a transitive cookie client", async () => {
+    expect(
+      await fixture({
+        "lib/api/account.ts": 'import "../billing/credits";',
+        "lib/billing/credits.ts": 'import "./service";',
+        "lib/billing/service.ts": 'import "../supabase/server";',
+        "lib/supabase/server.ts": 'import "next/headers";',
+      })
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "forbidden-source",
+          file: "lib/supabase/server.ts",
+        }),
+      ])
+    );
+  });
+
   it.each([
     "next/server",
     "next/headers",

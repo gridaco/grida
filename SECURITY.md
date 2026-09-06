@@ -1593,13 +1593,16 @@ credential through reuse of an existing browser or daemon bridge.
    running lock. The lock carries no credentials and never rolls back completed
    custody writes. Accepted rotation survives later identity failure. Unpublished
    temporary credential files are cleaned under authority, never adopted.
-7. **Fixed native account transport.** `requestAccount("organizations.list")`
-   owns the credential-bearing request to the configured API origin, with only
-   an optional positive safe-integer cursor. There is no arbitrary URL, method,
+7. **Fixed native account transport.** `requestAccount` owns credential-bearing
+   requests to the configured API origin: `organizations.list` accepts only an
+   optional positive safe-integer cursor; `credits.read` requires a positive
+   safe-integer organization ID. There is no arbitrary URL, method,
    header, user selector, token getter, or caller-installed operation. The
-   package validates and projects bounded ordered pages; failures expose safe
-   codes. Near-expiry refresh and page acceptance share coordinated custody;
-   accepted rotations survive page failure. HTTP failures are never replayed.
+   package validates bounded ordered pages and credits with a matching organization,
+   explicit cache states, safe integer amounts, valid timestamps and consistent
+   gate fields. Extra fields are discarded; failures expose safe codes. Billing
+   policy remains server-owned. Near-expiry refresh and result acceptance share
+   coordinated custody; accepted rotations survive read failure. HTTP failures are never replayed.
    Same-instance logout fences pending reads; another process's logout is
    ordered after any read already accepted under the profile lock. Accepted
    data and already-sent remote work cannot be retracted.
@@ -1612,6 +1615,17 @@ credential through reuse of an existing browser or daemon bridge.
    Exact RLS-visible counts and validated ascending IDs preserve page continuation
    despite a lower database row cap. Zero visible rows succeed explicitly;
    database failures and malformed/incomplete results never become empty accounts.
+9. **Passive credits retain membership authority.** The fixed credits GET uses
+   the same live-verified bearer for `public.v_billing_credits`. The view runs as
+   the caller and combines existing RLS with an explicit current-user membership
+   predicate in the read statement. Its organization anchor distinguishes denied
+   access from missing billing data. SELECT-only grants and a safe column list
+   expose no provider identifiers or new billing write operation. The query
+   requires an explicit org ID and exact zero/one-row count; a truncated or
+   malformed result never becomes a balance. The billing owner shares the existing
+   pure cached gate and performs no provider call, provisioning or refresh. An
+   already-authorized read may finish after removal; client selection is not
+   authority or an instantaneous revocation mechanism.
 
 **Limits and adoption gates.** Producer tests are not deployment certification.
 The real local Auth 2.196.0 consumer proof has passed login/denial/consent reuse,
@@ -1621,6 +1635,11 @@ The public native organization-page operation also passed the real local API/RLS
 proof: separate users see their own organizations, a temporary non-owner
 membership becomes visible and then disappears with the same native token, and
 the copied package lists organizations across process restarts.
+The credits extension passed member/outsider/removal reads, direct REST isolation,
+unprovisioned and unobserved cache versus zero, the shared gate's boundary cases,
+and unchanged cache snapshots around each read. The account client and copied
+auth/account packages also passed explicit/sole-member selection and credits
+across process restarts. Subscription billing remains outside this milestone.
 It also passed separate-process restart using a copied package and disposable
 test custody. This verifies the local fixture and that test adapter; separate
 durable custody tests exercise the Node storage and cross-process contract.
@@ -1675,6 +1694,17 @@ membership separately, without a snapshot guarantee across page requests.
   [RLS data source](editor/lib/supabase/account-data.ts) and
   [data-source tests](editor/lib/supabase/account-data.test.ts) — native authority
   reaches fixed user-scoped reads without cookie or privileged-client dependencies.
+- [Credits route](<editor/app/(api)/(public)/api/v1/account/credits/route.ts>) and
+  [route tests](editor/lib/api/credits.test.ts),
+  [passive credit owner](editor/lib/billing/credits.ts) and
+  [tests](editor/lib/billing/credits.test.ts),
+  [credit query](editor/lib/supabase/credits-data.ts) and
+  [tests](editor/lib/supabase/credits-data.test.ts) — fixed read-only credit access
+  with explicit unknown data and no provider or privileged dependency.
+- [Credits view migration](supabase/migrations/20260906184233_grida_billing_credits.sql),
+  [schema reference](supabase/schemas/grida_billing.sql), and
+  [pgTAP contract](supabase/tests/test_grida_billing_credits_test.sql) — narrow
+  columns, member RLS and SELECT-only grants; also GRIDA-SEC-012.
 - [Analytics-free layout](<editor/app/(untracked)/layout.tsx>) and
   [response headers](editor/next.config.ts) — retain GRIDA-SEC-005 while also
   protecting this consent ceremony.
@@ -1812,8 +1842,10 @@ browser cookies, UI code or request-global state into account operations.
    operation, and owns all seven method exports. HEAD retains authentication;
    OPTIONS discloses only allowed methods. Rejected methods and input never call
    the issuer. Empty-body inspection has a deadline and rejects actual payloads.
-   Organization listing accepts only a canonical cursor, creates its fixed RLS
-   source after verification, and projects bounded pages without browser defaults.
+   Organization listing accepts only a canonical cursor and projects bounded pages.
+   Credits require a canonical org ID, query a fixed membership-scoped view and
+   return a passive projection. Both create the RLS source only after verification,
+   preserve that exact bearer and ignore browser defaults.
 4. **Source checks reject drift.** `audit-api.ts` compares real App/Pages route
    placements with the inventory and verifies the complete account binding AST.
    New handlers cannot use the six pinned legacy GG/catalogue exceptions.
@@ -1836,7 +1868,7 @@ browser cookies, UI code or request-global state into account operations.
 checks are not a sandbox against malicious repository authors. Existing GG and
 catalogue handlers remain explicit legacy bindings with their own credential,
 streaming, error and cache contracts. Native mint, billing and account operations
-beyond identity/organization listing are not implemented by this boundary. Next may normalize malformed repeated
+beyond identity, organization listing and cached credits are not implemented by this boundary. Next may normalize malformed repeated
 slashes or backslashes with a redirect before proxy; the machine response
 contract applies to paths admitted by that framework parsing layer.
 The local HTTP proof replaces unrelated web services with tripwires and uses a
@@ -1859,6 +1891,13 @@ release requirement.
   [tests](editor/lib/account/account.test.ts), and
   [RLS data source](editor/lib/supabase/account-data.ts) and
   [tests](editor/lib/supabase/account-data.test.ts) — also GRIDA-SEC-010.
+- [Credits binding](<editor/app/(api)/(public)/api/v1/account/credits/route.ts>) and
+  [operation tests](editor/lib/api/credits.test.ts),
+  [credit owner](editor/lib/billing/credits.ts) and [tests](editor/lib/billing/credits.test.ts),
+  [credit query](editor/lib/supabase/credits-data.ts) and [tests](editor/lib/supabase/credits-data.test.ts),
+  [view migration](supabase/migrations/20260906184233_grida_billing_credits.sql),
+  [schema reference](supabase/schemas/grida_billing.sql), and
+  [pgTAP tests](supabase/tests/test_grida_billing_credits_test.sql) — also GRIDA-SEC-010.
 - [Proxy](editor/proxy.ts), [dispatch tests](editor/lib/api/proxy.test.ts),
   [Next config](editor/next.config.ts), and [routing tests](editor/lib/api/routing.test.ts).
 - [Source audit](editor/scripts/audit-api.ts), [audit tests](editor/scripts/audit-api.test.ts),

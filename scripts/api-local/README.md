@@ -5,7 +5,7 @@
 
 This proof builds and starts Next.js in **production mode**, then sends real
 HTTP requests to the current `/api/v1/auth/me` and
-`/api/v1/account/organizations` implementations. It needs Node.js
+`/api/v1/account/organizations` and `/api/v1/account/credits` implementations. It needs Node.js
 24+ and the repository's installed dependencies. It does not install packages,
 start Docker, use Supabase services, or read account credentials.
 
@@ -15,7 +15,8 @@ node scripts/api-local/proof.mjs
 ```
 
 The proof copies the current API operation inventory, request policy, account
-adapter, account projection, RLS data adapter, bearer verifier, OAuth HTTP client,
+adapter, account and cached-credit projections, RLS data adapters, shared credit
+gate, bearer verifier, OAuth HTTP client,
 routes, proxy, and Next configuration
 into a fresh private `.cache/api-local` directory. It records their source
 hashes. Existing installed dependencies are linked into the snapshot; dotenv
@@ -38,8 +39,8 @@ record all three calls and emit its synthetic cookie, proving the tripwires are
 active. This verifies dispatch and calls, not import-time behavior of the
 original web modules. A fixture insiders handler must never run in production.
 
-A newly owned loopback HTTP server supplies `/auth/v1/oauth/userinfo` and a
-synthetic `/rest/v1/organization` response. It accepts
+A newly owned loopback HTTP server supplies `/auth/v1/oauth/userinfo` and
+synthetic `/rest/v1/organization` and `/rest/v1/v_billing_credits` responses. It accepts
 only exact synthetic tokens issued in memory for two synthetic users. The real
 bearer verifier performs its normal preflight and HTTP request. The database
 fixture requires the exact caller bearer, publishable key, public schema and
@@ -58,6 +59,17 @@ Next configuration. Next normalizes repeated slashes and backslashes before
 proxy; those raw syntax cases intentionally prove the framework's `308` response
 without invoking account or web middleware. Other HTTP-parser failures can also
 precede application JSON policy.
+
+Cached-credit cases distinguish an absent account, an unprovisioned account,
+an unobserved cache, and observed zero or negative balances. Explicit fixtures
+exercise the existing credit floor and customer gate without deriving expected
+results from the server implementation. An old cache timestamp does not add a
+new freshness gate. Cases also cover exact organization selection, two-user
+isolation, removed visibility, unknown organizations, body/query/method policy,
+malformed rows, duplicate rows and inconsistent counts. Errors must never become
+successful empty or zero-balance snapshots. The credits projection cannot expose
+extra upstream fields. The fixture admits only the fixed read request; it does
+not implement provider refresh, provisioning, subscription reads or mutations.
 
 This proves the **Next request pipeline**, not Supabase token cryptography,
 OAuth consent, grant revocation, RLS, or hosted infrastructure. The separate

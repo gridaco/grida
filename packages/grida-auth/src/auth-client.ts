@@ -145,20 +145,26 @@ export class AuthClient {
   }
 
   /** Fixed account wire capability. Selection and account policy belong to the caller/server. */
-  async requestAccount(
+  requestAccount(
     operation: "organizations.list",
     input?: Readonly<{ after?: number }>
-  ): Promise<AuthClient.OrganizationsPage> {
-    if (operation !== "organizations.list")
-      throw new AuthClient.Failure("unsupported_operation");
-    const after = accountCursor(input);
+  ): Promise<AuthClient.OrganizationsPage>;
+  requestAccount(
+    operation: "credits.read",
+    input: Readonly<{ organization_id: number }>
+  ): Promise<AuthClient.Credits>;
+  async requestAccount(
+    operation: "organizations.list" | "credits.read",
+    input?: Readonly<{ after?: number }> | Readonly<{ organization_id: number }>
+  ): Promise<AuthClient.OrganizationsPage | AuthClient.Credits> {
+    const read = accountRead(operation, input);
     if (this.attempt) throw new AuthClient.Failure("session_busy");
     const generation = this.generation;
     ++this.protectedReads;
     try {
-      let page: AuthClient.OrganizationsPage;
+      let reply: AuthClient.OrganizationsPage | AuthClient.Credits;
       if (this.coordinatedCustody()) {
-        page = await this.exclusive(async (transaction) => {
+        reply = await this.exclusive(async (transaction) => {
           this.check(generation);
           let session = (await this.snapshot(transaction)).session;
           if (!session) throw new AuthClient.Failure("signed_out");
@@ -166,7 +172,7 @@ export class AuthClient {
           if (session.expiresAt <= this.host.now() + 30_000)
             session = await this.rotate(transaction, generation, session);
           this.check(generation);
-          const result = await this.organizations(session.accessToken, after);
+          const result = await this.account(session.accessToken, read);
           // Acceptance occurs under authority, before another writer can clear
           // or replace this session. Already accepted data cannot be retracted.
           this.check(generation);
@@ -184,7 +190,7 @@ export class AuthClient {
           session = await this.requireSession();
         }
         this.check(generation);
-        page = await this.organizations(session.accessToken, after);
+        reply = await this.account(session.accessToken, read);
         this.check(generation);
         const current = await this.read();
         if (
@@ -194,7 +200,7 @@ export class AuthClient {
           throw new AuthClient.Failure("session_changed");
       }
       this.check(generation);
-      return page;
+      return reply;
     } catch (error) {
       this.check(generation);
       throw safeFailure(error);
@@ -427,12 +433,16 @@ export class AuthClient {
     };
   }
 
-  private async organizations(
+  private async account(
     accessToken: string,
-    after: number | undefined
-  ): Promise<AuthClient.OrganizationsPage> {
+    read: AccountRead
+  ): Promise<AuthClient.OrganizationsPage | AuthClient.Credits> {
+    const path =
+      read.operation === "organizations.list"
+        ? `/api/v1/account/organizations${read.after === undefined ? "" : `?after=${read.after}`}`
+        : `/api/v1/account/credits?organization_id=${read.organizationId}`;
     const response = await this.request({
-      url: `${this.config.apiOrigin}/api/v1/account/organizations${after === undefined ? "" : `?after=${after}`}`,
+      url: `${this.config.apiOrigin}${path}`,
       method: "GET",
       headers: { authorization: `Bearer ${accessToken}` },
     });
@@ -444,41 +454,9 @@ export class AuthClient {
             ? "forbidden"
             : "unavailable"
       );
-    const body = record(response.body);
-    if (
-      !body ||
-      !Array.isArray(body.organizations) ||
-      body.organizations.length > 100
-    )
-      throw new AuthClient.Failure("invalid_response");
-    let last = after ?? 0;
-    const organizations = body.organizations.map((value: unknown) => {
-      const organization = record(value);
-      if (
-        !organization ||
-        !positiveInteger(organization.id) ||
-        organization.id <= last ||
-        typeof organization.name !== "string" ||
-        organization.name.length < 1 ||
-        organization.name.length > 39 ||
-        typeof organization.display_name !== "string"
-      )
-        throw new AuthClient.Failure("invalid_response");
-      last = organization.id;
-      return {
-        id: organization.id,
-        name: organization.name,
-        display_name: organization.display_name,
-      };
-    });
-    if (
-      body.next_cursor !== null &&
-      (!positiveInteger(body.next_cursor) ||
-        organizations.length === 0 ||
-        body.next_cursor !== last)
-    )
-      throw new AuthClient.Failure("invalid_response");
-    return { organizations, next_cursor: body.next_cursor };
+    return read.operation === "organizations.list"
+      ? organizationsPage(response.body, read.after)
+      : credits(response.body, read.organizationId);
   }
 
   private async request(
@@ -668,6 +646,45 @@ export namespace AuthClient {
     }>[];
     next_cursor: number | null;
   }>;
+  /** Cached server observation, not a live balance or a promise of AI readiness. */
+  export type Credits = Readonly<
+    {
+      organization: OrganizationsPage["organizations"][number];
+      source: "cache";
+      currency: "USD";
+    } & (
+      | {
+          account_present: boolean;
+          state: "not_provisioned";
+          balance_cents: null;
+          cache_updated_at: null;
+          billing_gate: Readonly<{
+            allowed: false;
+            reason: "not_provisioned";
+          }>;
+        }
+      | ({
+          account_present: true;
+          billing_gate:
+            | Readonly<{ allowed: true; reason: null }>
+            | Readonly<{
+                allowed: false;
+                reason: "below_floor" | "no_balance";
+              }>;
+        } & (
+          | {
+              state: "uncached";
+              balance_cents: null;
+              cache_updated_at: null;
+            }
+          | {
+              state: "cached";
+              balance_cents: number;
+              cache_updated_at: string;
+            }
+        ))
+    )
+  >;
   /** Secret-bearing host boundary. Never serialize this object into presentation or logs. */
   export type Session = {
     issuer: string;
@@ -771,9 +788,33 @@ function positiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
-function accountCursor(
-  input: Readonly<{ after?: number }> | undefined
-): number | undefined {
+type AccountRead =
+  | { operation: "organizations.list"; after: number | undefined }
+  | { operation: "credits.read"; organizationId: number };
+
+function accountRead(operation: string, input: unknown): AccountRead {
+  if (operation === "organizations.list")
+    return { operation, after: accountCursor(input) };
+  if (operation !== "credits.read")
+    throw new AuthClient.Failure("unsupported_operation");
+  try {
+    const value = record(input);
+    if (
+      !value ||
+      Reflect.ownKeys(value).length !== 1 ||
+      !Object.hasOwn(value, "organization_id")
+    )
+      throw new AuthClient.Failure("invalid_input");
+    const organizationId = value.organization_id;
+    if (!positiveInteger(organizationId))
+      throw new AuthClient.Failure("invalid_input");
+    return { operation, organizationId };
+  } catch {
+    throw new AuthClient.Failure("invalid_input");
+  }
+}
+
+function accountCursor(input: unknown): number | undefined {
   if (input === undefined) return undefined;
   try {
     const value = record(input);
@@ -788,6 +829,148 @@ function accountCursor(
   } catch {
     throw new AuthClient.Failure("invalid_input");
   }
+}
+
+function organization(
+  value: unknown
+): AuthClient.OrganizationsPage["organizations"][number] {
+  const row = record(value);
+  if (
+    !row ||
+    !positiveInteger(row.id) ||
+    typeof row.name !== "string" ||
+    row.name.length < 1 ||
+    row.name.length > 39 ||
+    typeof row.display_name !== "string"
+  )
+    throw new AuthClient.Failure("invalid_response");
+  return { id: row.id, name: row.name, display_name: row.display_name };
+}
+
+function organizationsPage(
+  value: unknown,
+  after: number | undefined
+): AuthClient.OrganizationsPage {
+  const body = record(value);
+  if (
+    !body ||
+    !Array.isArray(body.organizations) ||
+    body.organizations.length > 100
+  )
+    throw new AuthClient.Failure("invalid_response");
+  let last = after ?? 0;
+  const organizations = body.organizations.map((value: unknown) => {
+    const row = organization(value);
+    if (row.id <= last) throw new AuthClient.Failure("invalid_response");
+    last = row.id;
+    return row;
+  });
+  if (
+    body.next_cursor !== null &&
+    (!positiveInteger(body.next_cursor) ||
+      organizations.length === 0 ||
+      body.next_cursor !== last)
+  )
+    throw new AuthClient.Failure("invalid_response");
+  return { organizations, next_cursor: body.next_cursor };
+}
+
+function credits(value: unknown, organizationId: number): AuthClient.Credits {
+  const body = record(value);
+  const gate = record(body?.billing_gate);
+  if (
+    !body ||
+    !gate ||
+    body.source !== "cache" ||
+    body.currency !== "USD" ||
+    typeof body.account_present !== "boolean"
+  )
+    throw new AuthClient.Failure("invalid_response");
+  const org = organization(body.organization);
+  if (org.id !== organizationId)
+    throw new AuthClient.Failure("invalid_response");
+  const common = {
+    organization: org,
+    source: "cache",
+    currency: "USD",
+  } as const;
+  if (body.state === "not_provisioned") {
+    if (
+      body.balance_cents !== null ||
+      body.cache_updated_at !== null ||
+      gate.allowed !== false ||
+      gate.reason !== "not_provisioned"
+    )
+      throw new AuthClient.Failure("invalid_response");
+    return {
+      ...common,
+      account_present: body.account_present,
+      state: "not_provisioned",
+      balance_cents: null,
+      cache_updated_at: null,
+      billing_gate: { allowed: false, reason: "not_provisioned" },
+    };
+  }
+  if (body.account_present !== true)
+    throw new AuthClient.Failure("invalid_response");
+  // Only wire consistency is checked: amount, cache age and the gate's policy
+  // are independent server observations. No local threshold or freshness rule.
+  let billingGate: Extract<
+    AuthClient.Credits,
+    { state: "cached" }
+  >["billing_gate"];
+  if (gate.allowed === true && gate.reason === null)
+    billingGate = { allowed: true, reason: null };
+  else if (
+    gate.allowed === false &&
+    (gate.reason === "below_floor" || gate.reason === "no_balance")
+  )
+    billingGate = { allowed: false, reason: gate.reason };
+  else throw new AuthClient.Failure("invalid_response");
+  if (
+    body.state === "uncached" &&
+    body.balance_cents === null &&
+    body.cache_updated_at === null
+  )
+    return {
+      ...common,
+      account_present: true,
+      state: "uncached",
+      balance_cents: null,
+      cache_updated_at: null,
+      billing_gate: billingGate,
+    };
+  if (
+    body.state === "cached" &&
+    typeof body.balance_cents === "number" &&
+    Number.isSafeInteger(body.balance_cents) &&
+    timestamp(body.cache_updated_at)
+  )
+    return {
+      ...common,
+      account_present: true,
+      state: "cached",
+      balance_cents: body.balance_cents,
+      cache_updated_at: body.cache_updated_at,
+      billing_gate: billingGate,
+    };
+  throw new AuthClient.Failure("invalid_response");
+}
+
+function timestamp(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 64) return false;
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(
+      value
+    );
+  if (!match || !Number.isFinite(Date.parse(value))) return false;
+  // Date.parse normalizes impossible month days; validate the calendar too.
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1]!;
 }
 
 function validateConfig(config: AuthClient.Config) {

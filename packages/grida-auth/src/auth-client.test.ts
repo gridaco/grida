@@ -202,15 +202,324 @@ function accountReply(
 ) {
   const original = h.host.request;
   h.host.request = vi.fn<AuthClient.Host["request"]>((request) => {
-    if (
-      request.url.startsWith(`${config.apiOrigin}/api/v1/account/organizations`)
-    ) {
+    if (request.url.startsWith(`${config.apiOrigin}/api/v1/account/`)) {
       h.requests.push(request);
       return { result: Promise.resolve(response), cancel() {} };
     }
     return original(request);
   });
 }
+
+const cachedCredits: AuthClient.Credits = {
+  organization: { id: 7, name: "example", display_name: "" },
+  account_present: true,
+  state: "cached",
+  source: "cache",
+  currency: "USD",
+  balance_cents: 75,
+  cache_updated_at: "2026-09-07T01:02:03.123456+00:00",
+  billing_gate: { allowed: true, reason: null },
+};
+
+describe("AuthClient.requestAccount credits.read", () => {
+  it("sends only the selected organization to the fixed path and projects every reply level", async () => {
+    const h = harness(session());
+    accountReply(h, {
+      status: 200,
+      body: {
+        ...cachedCredits,
+        organization: { ...cachedCredits.organization, token: "secret" },
+        billing_gate: { ...cachedCredits.billing_gate, provider_id: "secret" },
+        access_token: "secret",
+      },
+    });
+    expect(
+      await h.client.requestAccount("credits.read", { organization_id: 7 })
+    ).toEqual(cachedCredits);
+    expect(h.requests).toEqual([
+      {
+        url: `${config.apiOrigin}/api/v1/account/credits?organization_id=7`,
+        method: "GET",
+        headers: { authorization: "Bearer old-access-secret" },
+      },
+    ]);
+    expect(h.writes).toHaveLength(0);
+  });
+
+  it.each([
+    {
+      ...cachedCredits,
+      state: "not_provisioned",
+      account_present: false,
+      balance_cents: null,
+      cache_updated_at: null,
+      billing_gate: { allowed: false, reason: "not_provisioned" },
+    },
+    {
+      ...cachedCredits,
+      state: "not_provisioned",
+      balance_cents: null,
+      cache_updated_at: null,
+      billing_gate: { allowed: false, reason: "not_provisioned" },
+    },
+    {
+      ...cachedCredits,
+      state: "uncached",
+      balance_cents: null,
+      cache_updated_at: null,
+    },
+    {
+      ...cachedCredits,
+      state: "uncached",
+      balance_cents: null,
+      cache_updated_at: null,
+      billing_gate: { allowed: false, reason: "below_floor" },
+    },
+    {
+      ...cachedCredits,
+      balance_cents: 0,
+      billing_gate: { allowed: false, reason: "below_floor" },
+    },
+    {
+      ...cachedCredits,
+      balance_cents: -1,
+      billing_gate: { allowed: false, reason: "no_balance" },
+    },
+    { ...cachedCredits, balance_cents: Number.MIN_SAFE_INTEGER },
+    { ...cachedCredits, cache_updated_at: "2026-09-07T01:02:03.12345678901Z" },
+    {
+      ...cachedCredits,
+      balance_cents: Number.MAX_SAFE_INTEGER,
+      cache_updated_at: "2000-02-29T00:00:00Z",
+    },
+  ])(
+    "preserves valid cache states without interpreting amounts, freshness or the server gate: %j",
+    async (body) => {
+      const h = harness(session());
+      accountReply(h, { status: 200, body });
+      expect(
+        await h.client.requestAccount("credits.read", { organization_id: 7 })
+      ).toEqual(body);
+    }
+  );
+
+  it.each([
+    undefined,
+    null,
+    [],
+    {},
+    { organization_id: undefined },
+    { organization_id: 0 },
+    { organization_id: -1 },
+    { organization_id: 1.5 },
+    { organization_id: "7" },
+    { organization_id: NaN },
+    { organization_id: Infinity },
+    { organization_id: Number.MAX_SAFE_INTEGER + 1 },
+    { organization_id: 7, user_id: "other" },
+    { organization_id: 7, [Symbol("headers")]: "secret" },
+    Object.create({ organization_id: 7 }),
+  ])(
+    "rejects noncanonical input before custody or transport: %j",
+    async (input) => {
+      const h = harness(session());
+      const read = vi.spyOn(h.host.custody, "read");
+      await expect(
+        h.client.requestAccount("credits.read", input as never)
+      ).rejects.toMatchObject({ code: "invalid_input" });
+      expect(read).not.toHaveBeenCalled();
+      expect(h.host.request).not.toHaveBeenCalled();
+    }
+  );
+
+  it("snapshots the organization once before awaiting and sanitizes throwing accessors", async () => {
+    const h = harness(session());
+    accountReply(h, { status: 200, body: cachedCredits });
+    let reads = 0;
+    await h.client.requestAccount("credits.read", {
+      get organization_id() {
+        return ++reads === 1 ? 7 : ("7&user_id=other" as never);
+      },
+    });
+    expect(reads).toBe(1);
+    const input = { organization_id: 7 };
+    const pending = h.client.requestAccount("credits.read", input);
+    input.organization_id = 9;
+    await pending;
+    const custodyRead = vi.spyOn(h.host.custody, "read");
+    await expect(
+      h.client.requestAccount("credits.read", {
+        get organization_id(): number {
+          throw new Error("private-accessor-secret");
+        },
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_input",
+      message: "Grida authentication failed (invalid_input)",
+    });
+    expect(custodyRead).not.toHaveBeenCalled();
+    expect(h.requests.map((request) => request.url)).toEqual(
+      Array(2).fill(
+        `${config.apiOrigin}/api/v1/account/credits?organization_id=7`
+      )
+    );
+  });
+
+  it.each([
+    { organization: null },
+    { organization: { ...cachedCredits.organization, id: 8 } },
+    { organization: { ...cachedCredits.organization, display_name: null } },
+    { organization: { ...cachedCredits.organization, name: "" } },
+    { organization: { ...cachedCredits.organization, id: "7" } },
+    { source: "live" },
+    { currency: "EUR" },
+    { account_present: false },
+    { account_present: 1 },
+    { state: "missing" },
+    { state: "uncached" },
+    { state: "not_provisioned" },
+    { balance_cents: null },
+    { balance_cents: 0.5 },
+    { balance_cents: "75" },
+    { balance_cents: Number.MAX_SAFE_INTEGER + 1 },
+    { balance_cents: NaN },
+    { cache_updated_at: null },
+    { cache_updated_at: "2026-09-07" },
+    { cache_updated_at: "2026-09-07T01:02:03" },
+    { cache_updated_at: "2026-02-30T01:02:03Z" },
+    { cache_updated_at: "1900-02-29T01:02:03Z" },
+    { cache_updated_at: "2026-09-07T24:00:00Z" },
+    { cache_updated_at: `2026-09-07T00:00:00.${"1".repeat(65)}Z` },
+    { billing_gate: null },
+    { billing_gate: { allowed: true, reason: "below_floor" } },
+    { billing_gate: { allowed: false, reason: null } },
+    { billing_gate: { allowed: false, reason: "not_provisioned" } },
+    { billing_gate: { allowed: "true", reason: null } },
+    {
+      state: "uncached",
+      balance_cents: null,
+      cache_updated_at: null,
+      account_present: false,
+    },
+    { state: "not_provisioned", balance_cents: null, cache_updated_at: null },
+  ])(
+    "refuses inconsistent or malformed credits without returning upstream fields: %j",
+    async (change) => {
+      const h = harness(session());
+      accountReply(h, {
+        status: 200,
+        body: { ...cachedCredits, ...change, access_token: "secret" },
+      });
+      await expect(
+        h.client.requestAccount("credits.read", { organization_id: 7 })
+      ).rejects.toMatchObject({
+        code: "invalid_response",
+        message: "Grida authentication failed (invalid_response)",
+      });
+      expect(h.requests).toHaveLength(1);
+      expect(h.writes).toHaveLength(0);
+    }
+  );
+
+  it.each([
+    [401, "token_rejected"],
+    [403, "forbidden"],
+    [503, "unavailable"],
+    [302, "unavailable"],
+  ])(
+    "maps HTTP %i without exposing the response, refreshing or replaying",
+    async (status, code) => {
+      const h = harness(session());
+      accountReply(h, { status: status as number, body: "private-diagnostic" });
+      await expect(
+        h.client.requestAccount("credits.read", { organization_id: 7 })
+      ).rejects.toMatchObject({
+        code,
+        message: `Grida authentication failed (${code})`,
+      });
+      expect(h.requests).toHaveLength(1);
+      expect(h.writes).toHaveLength(0);
+    }
+  );
+
+  it.each([false, true])(
+    "retains accepted rotation after a failed credits read (coordinated=%s)",
+    async (coordinated) => {
+      const initial = session({ expiresAt: now - 1 });
+      const store = sharedCustody(initial);
+      const h = coordinated ? store.client() : harness(initial);
+      accountReply(h, { status: 503, body: "private-diagnostic" });
+      await expect(
+        h.client.requestAccount("credits.read", { organization_id: 7 })
+      ).rejects.toMatchObject({ code: "unavailable" });
+      expect((coordinated ? store.stored() : h.stored())?.refreshToken).toBe(
+        "new-refresh-secret"
+      );
+      expect(
+        h.requests.filter((request) => request.url.includes("/account/credits"))
+      ).toEqual([
+        {
+          url: `${config.apiOrigin}/api/v1/account/credits?organization_id=7`,
+          method: "GET",
+          headers: { authorization: "Bearer new-access-secret" },
+        },
+      ]);
+    }
+  );
+
+  it.each([false, true])(
+    "fences credits after logout even when transport ignores cancellation (coordinated=%s)",
+    async (coordinated) => {
+      const store = sharedCustody(session());
+      const h = coordinated ? store.client() : harness(session());
+      const entered = deferred<void>();
+      const reply = deferred<AuthClient.Response>();
+      const original = h.host.request;
+      const cancel = vi.fn<() => void>();
+      h.host.request = (request) => {
+        if (request.url.includes("/account/credits")) {
+          entered.resolve();
+          return { result: reply.promise, cancel };
+        }
+        return original(request);
+      };
+      const read = h.client
+        .requestAccount("credits.read", { organization_id: 7 })
+        .catch((error: unknown) => error);
+      await entered.promise;
+      const logout = h.client.logout();
+      expect(cancel).toHaveBeenCalledOnce();
+      reply.resolve({ status: 200, body: cachedCredits });
+      expect(await read).toMatchObject({ code: "cancelled" });
+      await logout;
+      expect(coordinated ? store.stored() : h.stored()).toBeNull();
+    }
+  );
+
+  it("holds shared authority through credits acceptance before another writer clears custody", async () => {
+    const store = sharedCustody(session());
+    const first = store.client();
+    const second = store.client();
+    const entered = deferred<void>();
+    const reply = deferred<AuthClient.Response>();
+    first.host.request = () => {
+      entered.resolve();
+      return { result: reply.promise, cancel() {} };
+    };
+    const read = first.client.requestAccount("credits.read", {
+      organization_id: 7,
+    });
+    await entered.promise;
+    const logout = second.client.logout();
+    expect(store.stored()).not.toBeNull();
+    reply.resolve({ status: 200, body: cachedCredits });
+    expect(await read).toEqual(cachedCredits);
+    await logout;
+    await expect(
+      first.client.requestAccount("credits.read", { organization_id: 7 })
+    ).rejects.toMatchObject({ code: "signed_out" });
+  });
+});
 
 describe("AuthClient.requestAccount", () => {
   it("sends only the fixed GET and projects one ordered page without credentials or upstream extras", async () => {

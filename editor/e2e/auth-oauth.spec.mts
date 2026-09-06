@@ -1,6 +1,7 @@
 // GRIDA-SEC-010, GRIDA-SEC-011 — native authority proof within the owned local fixture.
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import type { AuthClient } from "@grida/auth";
+import { AccountClient } from "@grida/account";
 import { createNativeAuth } from "@grida/auth/node";
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -641,6 +642,34 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         expect(acmePage.next_cursor).toBeNull();
         const local = localPage.organizations[0]!;
         const acme = acmePage.organizations[0]!;
+        const account = new AccountClient(first.auth);
+        expect(await account.selectOrganization()).toEqual(local);
+        expect(await account.selectOrganization({ name: local.name })).toEqual(
+          local
+        );
+        expect((await account.credits({ id: local.id })).organization).toEqual(
+          local
+        );
+        const localCredits = await first.auth.requestAccount("credits.read", {
+          organization_id: local.id,
+        });
+        expect(localCredits).toMatchObject({
+          organization: local,
+          state: "not_provisioned",
+          balance_cents: null,
+        });
+        await expect(
+          aliceClient.auth.requestAccount("credits.read", {
+            organization_id: local.id,
+          })
+        ).rejects.toMatchObject({ code: "forbidden" });
+        expect(
+          (
+            await aliceClient.auth.requestAccount("credits.read", {
+              organization_id: acme.id,
+            })
+          ).organization
+        ).toEqual(acme);
         expect(
           await first.auth.requestAccount("organizations.list", {
             after: local.id,
@@ -682,7 +711,30 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           ),
           next_cursor: null,
         });
+        expect(
+          await aliceClient.auth.requestAccount("credits.read", {
+            organization_id: local.id,
+          })
+        ).toEqual(localCredits);
+        await expect(
+          new AccountClient(aliceClient.auth).credits()
+        ).rejects.toMatchObject({
+          code: "organization_required",
+          choices_truncated: false,
+        });
+        expect(
+          (
+            await new AccountClient(aliceClient.auth).credits({
+              name: local.name,
+            })
+          ).organization
+        ).toEqual(local);
         await removeAddedMembership();
+        await expect(
+          aliceClient.auth.requestAccount("credits.read", {
+            organization_id: local.id,
+          })
+        ).rejects.toMatchObject({ code: "forbidden" });
         expect(
           await aliceClient.auth.requestAccount("organizations.list")
         ).toEqual(acmePage);
@@ -691,6 +743,106 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         );
         // Membership visibility changes without a login or token replacement.
         expect(aliceClient.session()!.accessToken === aliceAccess).toBe(true);
+      }
+    );
+
+    await phase(
+      "native cached credits distinguish unobserved cache and zero without writes",
+      async () => {
+        const organization = (
+          await first.auth.requestAccount("organizations.list")
+        ).organizations[0]!;
+        const id = organization.id;
+        const accountSnapshot = async () => {
+          const response = await request(
+            "/rest/v1/rpc/fn_billing_get_metronome_account",
+            { admin: true, method: "POST", body: { p_org: id } }
+          );
+          expect(response.status).toBe(200);
+          return createHash("sha256")
+            .update(JSON.stringify(await json(response)))
+            .digest("hex");
+        };
+        const read = async () => {
+          const before = await accountSnapshot();
+          const result = await first.auth.requestAccount("credits.read", {
+            organization_id: id,
+          });
+          expect(result.organization).toEqual(organization);
+          expect(result.currency).toBe("USD");
+          expect(result.source).toBe("cache");
+          expect(await accountSnapshot()).toBe(before);
+          return result;
+        };
+        expect(await read()).toMatchObject({
+          account_present: true,
+          state: "not_provisioned",
+          balance_cents: null,
+          cache_updated_at: null,
+          billing_gate: { allowed: false, reason: "not_provisioned" },
+        });
+        // Existing fixture-only setup RPCs; no provider account or payment is created.
+        const linked = await request(
+          "/rest/v1/rpc/fn_billing_set_metronome_ids",
+          {
+            admin: true,
+            method: "POST",
+            body: {
+              p_org: id,
+              p_customer_id: "credits_local_customer",
+              p_contract_id: "credits_local_contract",
+            },
+          }
+        );
+        expect(linked.status).toBe(204);
+        expect(await read()).toMatchObject({
+          state: "uncached",
+          balance_cents: null,
+          cache_updated_at: null,
+          billing_gate: { allowed: false, reason: "below_floor" },
+        });
+        for (const [balance, entitled, reason] of [
+          [0, false, "below_floor"],
+          [24, true, "below_floor"],
+          [25, false, "no_balance"],
+          [25, true, null],
+        ] as const) {
+          const updated = await request(
+            "/rest/v1/rpc/fn_billing_set_balance_cache",
+            {
+              admin: true,
+              method: "POST",
+              body: {
+                p_org: id,
+                p_balance_cents: balance,
+                p_entitled: entitled,
+              },
+            }
+          );
+          expect(updated.status).toBe(204);
+          const result = await read();
+          expect(result).toMatchObject({
+            state: "cached",
+            balance_cents: balance,
+            billing_gate: { allowed: reason === null, reason },
+          });
+          expect(typeof result.cache_updated_at).toBe("string");
+        }
+        const columns =
+          "organization_id,organization_name,organization_display_name,account_present,credits_provisioned,cached_balance_cents,cached_balance_at,customer_entitled";
+        const route = `/rest/v1/v_billing_credits?select=${columns}&organization_id=eq.${id}`;
+        const own = await request(route, {
+          token: first.session()!.accessToken,
+        });
+        expect(own.status).toBe(200);
+        const rows = await json(own);
+        expect(Array.isArray(rows) && rows.length === 1).toBe(true);
+        expect(Object.keys(rows[0]).sort()).toEqual(columns.split(",").sort());
+        const other = await request(route, {
+          token: aliceClient.session()!.accessToken,
+        });
+        expect(other.status).toBe(200);
+        expect(await json(other)).toEqual([]);
       }
     );
 
@@ -727,6 +879,20 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         await fs.copyFile(
           path.join(state.repoRoot, "packages/grida-auth/package.json"),
           path.join(packageRoot, "package.json")
+        );
+        const accountPackage = path.join(
+          probeRoot,
+          "node_modules/@grida/account"
+        );
+        await fs.mkdir(accountPackage, { recursive: true, mode: 0o700 });
+        await fs.cp(
+          path.join(state.repoRoot, "packages/grida-account/dist"),
+          path.join(accountPackage, "dist"),
+          { recursive: true }
+        );
+        await fs.copyFile(
+          path.join(state.repoRoot, "packages/grida-account/package.json"),
+          path.join(accountPackage, "package.json")
         );
         const script = path.join(probeRoot, "native-probe.mjs");
         await fs.copyFile(
@@ -794,8 +960,13 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         const organizations =
           await second.auth.requestAccount("organizations.list");
         expect(await probe("organizations")).toEqual(organizations);
+        const credits = await new AccountClient(second.auth).credits();
+        expect(await probe("credits")).toEqual(credits);
         expect((await probe("restart")).state).toBe("signed-in");
         expect(await probe("organizations")).toEqual(organizations);
+        expect(await probe("credits", credits.organization.id)).toEqual(
+          credits
+        );
         expect(
           await probe("organizations", organizations.organizations[0]!.id)
         ).toEqual({ organizations: [], next_cursor: null });

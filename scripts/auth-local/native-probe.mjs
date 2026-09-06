@@ -5,11 +5,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createNativeAuth } from "@grida/auth/node";
+import { AccountClient } from "@grida/account";
 
 const [operation, configPath, sessionPath, after] = process.argv.slice(2);
 assert(
   after === undefined ||
-    (operation === "organizations" &&
+    (["organizations", "credits"].includes(operation) &&
       /^[1-9]\d*$/.test(after) &&
       Number.isSafeInteger(Number(after)))
 );
@@ -95,9 +96,12 @@ try {
     await auth.verify();
     result = await auth.refresh();
   } else if (operation === "organizations") {
-    result = await auth.requestAccount(
-      "organizations.list",
+    result = await new AccountClient(auth).organizations(
       after === undefined ? undefined : { after: Number(after) }
+    );
+  } else if (operation === "credits") {
+    result = await new AccountClient(auth).credits(
+      after === undefined ? undefined : { id: Number(after) }
     );
   } else if (operation === "logout") result = await auth.logout();
   else throw new Error("Unknown probe operation");
