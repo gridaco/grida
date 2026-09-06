@@ -1147,14 +1147,14 @@ produce a Grida webview cookie session.
 > governed by the same skill. Domain spec:
 > [Hosted AI](https://grida.co/docs/wg/platform/hosted-ai).
 
-**What it protects.** The desktop app's hosted ("no-BYOK") AI calls are
+**What it protects.** Hosted ("no-BYOK") AI calls from Desktop or an independent native host are
 authenticated by a **purpose-scoped, short-lived, org-bound JWT** — and
 by nothing else. The `/api/v1/ai/*` endpoints never accept a Supabase
-access token, a cookie session, or an API key; the mint route
-(`/desktop/auth/token`) is the only place the token is created, and it
-requires a live cookie session with verified org membership. The
+access token, a cookie session, or an API key. Desktop's `/desktop/auth/token`
+and native `/api/v1/auth/gg` use one shared mint owner; each requires its own
+live account authentication and verified org membership. The
 boundary is the rule that **the credential a native process holds for
-AI must be worth at most 15 minutes of AI calls billed to an org the
+AI grants only a 15-minute window (with 60 seconds of clock tolerance) of AI calls billed to an org the
 user was a member of — and nothing more.**
 
 **Vulnerable scenario (prevented).** A desktop process credential leaks
@@ -1163,7 +1163,8 @@ snapshot. If that credential were the user's Supabase access token, the
 attacker gets the user's whole API surface: RLS-scoped database reads,
 storage, profile — the account, for up to an hour, renewable if the
 refresh token ever traveled with it. With the scoped token the blast
-radius is: AI calls, on one org's credit, for ≤15 minutes, and the
+radius is: AI calls, on one org's credit, for the 900-second signed window
+plus the accepted 60-second clock tolerance, and the
 token is structurally useless everywhere else (audience check) —
 Supabase never even sees it.
 
@@ -1176,27 +1177,35 @@ levels into one.
 
 **How the code prevents it.**
 
-1. **Mint only from a live cookie session, same-origin** —
+1. **Two authenticated adapters, one mint policy** —
    [editor/app/desktop/auth/token/route.ts](editor/app/desktop/auth/token/route.ts)
    requires `auth.getUser()` and resolves the org through the
    GRIDA-SEC-003 verified resolver (session fallback, or explicit
    `org_id` through `requireOrganizationId` → `assertOrgMember`). The
    route accepts no org header — no new org-id trust input. CSRF is
    bounded by SameSite=Lax auth cookies + same-origin-only readability
-   (no CORS on `/desktop/*`).
+   (no CORS on `/desktop/*`). Native `/api/v1/auth/gg` instead uses GRIDA-SEC-010's
+   live OAuth verification and an explicit positive safe-integer organization ID.
+   Its fixed membership query retains that exact bearer and filters the verified
+   user and organization in the same statement. Unknown/invisible membership is
+   denied without a service-role read or browser fallback. Both adapters call
+   `gg.mint`: per-user quota → host-owned member lookup → one signer. Neither
+   mint reads credits or performs provider/billing work.
 2. **Scope is cryptographic, not conventional** —
-   [editor/lib/auth/gg-token.ts](editor/lib/auth/gg-token.ts) signs
+   [the GG token policy](editor/lib/gg/tokens.ts) signs
    HS256 with a dedicated server-only secret (`GG_TOKEN_SECRET`),
    pins `algorithms: ["HS256"]` (no alg-swap) and `aud: "gg:ai"`.
    A Supabase token fails verification structurally (different keys),
    and this token fails everywhere Supabase tokens are accepted.
-3. **15-minute expiry, 60s clock tolerance** — the token is the unit of
-   revocation; abandoning a leaked token requires no server state.
+3. **15-minute expiry, 60s clock tolerance** — verification requires integer
+   issue/expiry claims, a positive window no longer than 900 seconds, and no
+   issue time beyond the tolerance. Expiry is the unit of revocation; abandoning
+   a leaked token requires no server state.
 4. **Fail-closed secret handling** — unset or <32-byte secret →
    `not_configured` → 503. There is no fallback path to a weaker
    credential. Rotation via `GG_TOKEN_SECRET_PREVIOUS`
-   (verify-only; signing always uses current; drop previous after
-   > 15 min).
+   is verify-only; signing always uses current. Retire the previous key only
+   after the last old-key token's 900-second lifetime plus 60-second tolerance.
 5. **Verification is local and exclusive** — every `/api/v1/ai/*`
    handler authenticates via `verifyGgToken` only; none construct a
    Supabase client from the bearer value (`createClientFromBearer` is
@@ -1209,12 +1218,21 @@ levels into one.
    the GRIDA-SEC-004 host transport: Electron main necessarily observes the
    scoped bearer header and request body in transit, but does not retain,
    persist, return, or log them and never receives the durable webview session.
+   Independent native hosts keep their own account custody under GRIDA-SEC-010.
+   The fixed exchange delivers a frozen GG grant only to a construction-time
+   trusted synchronous memory sink; its public result contains only org/expiry
+   metadata. The sink invocation is acceptance under profile authority: logout
+   before it prevents handoff, while later logout cannot recall a grant. A sink
+   failure cannot undo a token it already retained. The initial local consumer
+   uses one fixed model-list request and discards the grant; reusable native GG
+   custody and paid execution remain a later contract.
 7. **Mint rate limit** — `rl:v1-ai:mint` per-user sliding window
    (fail-open when Upstash is unconfigured; the billing gate on the AI
-   endpoints is the actual spend control).
+   endpoints is the actual spend control). Both mint routes use the same
+   `rl:v1-ai:mint` key space and 10/user/60s quota, not separate host allowances.
 
 **Residual risks (accepted, documented).** Org-membership revocation is
-not re-checked within a token's ≤15-minute lifetime. The mint rate
+not re-checked within a token's 900-second window plus clock tolerance. The mint rate
 limit fails open without Upstash. In-flight AI requests at sign-out
 complete on their token rather than being aborted — expiry is the
 revocation mechanism. Electron main and any OS-trusted TLS-inspection proxy can
@@ -1228,11 +1246,40 @@ Every file below also carries the `GRIDA-GG` surface marker (`token` /
 `gateway` / `provider`); the [`gg`](.agents/skills/gg/SKILL.md) skill
 governs the surface, this record governs its security half.
 
-- [editor/lib/auth/gg-token.ts](editor/lib/auth/gg-token.ts) — sign/verify + secret handling (`GG_TOKEN_SECRET`; pinned by `gg-token.test.ts`).
+- [GG owner](editor/lib/gg/gg.ts), [policy](editor/lib/gg/tokens.ts),
+  [configuration](editor/lib/gg/config.ts), and [contract](editor/lib/gg/README.md)
+  — one policy with injected clock/key/quota capabilities, one configured server
+  binding, one environment reader. Tests pin the
+  [binding](editor/lib/gg/gg.test.ts), [policy](editor/lib/gg/tokens.test.ts)
+  and [configuration](editor/lib/gg/config.test.ts).
+- [editor/lib/auth/gg-token.ts](editor/lib/auth/gg-token.ts) — compatibility exports only;
+  [existing compatibility tests](editor/lib/auth/gg-token.test.ts) still test those exports.
+- [Native mint route](<editor/app/(api)/(public)/api/v1/auth/gg/route.ts>),
+  [binding](editor/lib/api/gg.ts) and [tests](editor/lib/api/gg.test.ts),
+  [member query](editor/lib/supabase/gg-data.ts) and [tests](editor/lib/supabase/gg-data.test.ts)
+  — live native account authority and explicit current membership; also GRIDA-SEC-010/012.
+- [Native auth lifecycle](packages/grida-auth/src/auth-client.ts),
+  [Node factories](packages/grida-auth/src/node.ts),
+  [public export](packages/grida-auth/src/index.ts),
+  [lifecycle tests](packages/grida-auth/src/auth-client.test.ts),
+  [Node tests](packages/grida-auth/src/node.test.ts), and
+  [contract](packages/grida-auth/README.md) — fixed mint transport and guarded memory handoff;
+  independent account custody remains GRIDA-SEC-010.
+  [Credential-store tests](packages/grida-auth/src/credential-store.test.ts)
+  also pin invalid sink configuration before durable I/O.
+- [Local fixture bootstrap](scripts/auth-local/stack.mjs),
+  [native probe](scripts/auth-local/native-probe.mjs),
+  [browser consumer proof](editor/e2e/auth-oauth.spec.mts), and
+  [production HTTP proof](scripts/api-local/proof.mjs), with the
+  [fixture guide](scripts/auth-local/README.md) — fresh test-only GG
+  authority and bounded, memory-only access verification. Their infrastructure
+  isolation remains GRIDA-SEC-011/012; no generation or provider call is required.
 - [editor/app/desktop/auth/token/route.ts](editor/app/desktop/auth/token/route.ts) — the mint route (pinned by its `route.test.ts`).
 - `editor/app/(api)/(public)/api/v1/ai/**` — the hosted GG endpoints: OpenAI-compat chat/completions + models, Grida-native image/video/music generation. Verify with `verifyGgToken` EXCLUSIVELY; billed through the seam (pinned by route and seam contract tests).
 - `editor/app/(api)/(public)/api/v1/models/catalog/route.ts` — deliberately OUTSIDE the glob above, and deliberately unauthenticated: an agent host fetches the published model catalogue at boot, before any session token exists. It accepts NO credential (strictly stronger than accepting the wrong one), spends nothing, and returns only catalogue data already public on the models page. Listed here so it is not "fixed" into the token-gated family, which would break the boot fetch. See [catalogue distribution](docs/wg/platform/hosted-ai.md).
 - [editor/lib/ai/openai-compat/](editor/lib/ai/openai-compat/codec.ts) — the wire codec + error envelope + allowlist + rate limits.
+  The [allowlist test](editor/lib/ai/openai-compat/hosted-models.test.ts) pins direct
+  catalogue consumption without importing provider factories for a model-list read.
 - [packages/grida-ai-agent/src/providers/gg-session.ts](packages/grida-ai-agent/src/providers/gg-session.ts) — the daemon's in-memory custody (30s expiry slack; `status()` never returns the token; pinned by its test).
 - [packages/grida-ai-agent/src/http/routes/gg-auth.ts](packages/grida-ai-agent/src/http/routes/gg-auth.ts) — `/auth/gg/set|clear|status` behind the daemon perimeter; token never logged (pinned by its test).
 - [packages/grida-ai-agent/src/providers/gg.ts](packages/grida-ai-agent/src/providers/gg.ts) + [gg-media.ts](packages/grida-ai-agent/src/providers/gg-media.ts) — hosted text/image/video/music adapters: per-request token reads, editor-origin-only egress, code-led typed errors (401→`gg_token_expired`, 402→`insufficient_credits`), no upstream body text in thrown messages.
@@ -1244,7 +1291,7 @@ governs the surface, this record governs its security half.
 access tokens or cookies. A mint path without a live session or without
 membership verification. The token (or a refresh token) persisted by
 the daemon, main process, or `auth.json`. A signing fallback when the
-secret is unset. A second minting location.
+secret is unset. A parallel mint policy or signer behind a new host adapter.
 
 ---
 
@@ -1521,9 +1568,10 @@ Today:
 **What it protects.** A registered first-party native application obtains its
 own Supabase OAuth account session. Browser consent does not export the
 browser's session, and a loopback callback cannot establish identity by itself.
-The bearer-only `/api/v1/auth/me` accepts only configured OAuth clients through
-the configured issuer. Desktop cookie custody (GRIDA-SEC-005) and GG's separate
-AI credential (GRIDA-SEC-006) remain unchanged.
+Native identity/account reads and `/api/v1/auth/gg` accept only configured OAuth
+clients through the configured issuer. Desktop cookie custody (GRIDA-SEC-005)
+stays separate. Native minting exchanges this account authority for GG's scoped
+AI credential (GRIDA-SEC-006); gateway endpoints never accept the account token.
 
 **Vulnerable scenario (prevented).** A callback substitutes another account or
 destination; a forged consent POST approves an unseen client or scope; or a
@@ -1626,6 +1674,19 @@ credential through reuse of an existing browser or daemon bridge.
    pure cached gate and performs no provider call, provisioning or refresh. An
    already-authorized read may finish after removal; client selection is not
    authority or an instantaneous revocation mechanism.
+10. **Fixed scoped-GG exchange.** `requestGgAccess` accepts only an explicit
+    positive safe-integer organization ID and posts to the configured API origin's
+    `/api/v1/auth/gg`. A missing construction-time memory sink fails before custody
+    or I/O. The package validates and freezes a bounded grant matching that org,
+    with expiry in the future and at most 960 seconds from its clock. It rechecks
+    expiry before invoking the captured synchronous sink under the same custody
+    and generation authority as account reads. Only the sink receives the GG
+    token; the public result contains organization/expiry metadata. Neither
+    account custody nor storage gains a GG token. Logout before invocation fences
+    delivery; a later logout or throwing sink cannot recall an accepted grant.
+    There is no automatic replay, remint or weaker credential fallback. The
+    server independently verifies the live OAuth bearer and explicit current-user
+    membership before the shared GG mint policy signs a token.
 
 **Limits and adoption gates.** Producer tests are not deployment certification.
 The real local Auth 2.196.0 consumer proof has passed login/denial/consent reuse,
@@ -1640,6 +1701,13 @@ unprovisioned and unobserved cache versus zero, the shared gate's boundary cases
 and unchanged cache snapshots around each read. The account client and copied
 auth/account packages also passed explicit/sole-member selection and credits
 across process restarts. Subscription billing remains outside this milestone.
+The GG extension also passed against local Auth 2.196.0 and PostgreSQL
+15.8.1.085: native OAuth mint, GG-only model-list access, cross-user and
+removed-membership denial, revocation, and copied-package restart/remint with
+unchanged billing snapshots and no persisted GG grant. An accepted grant retained
+its documented expiry window. Neither this local result nor offline checks
+substitute for hosted upload-limit verification under GRIDA-SEC-012. A model-list
+result establishes access, not credit eligibility or provider readiness.
 It also passed separate-process restart using a copied package and disposable
 test custody. This verifies the local fixture and that test adapter; separate
 durable custody tests exercise the Node storage and cross-process contract.
@@ -1683,10 +1751,19 @@ membership separately, without a snapshot guarantee across page requests.
   [oauth-bearer.test.ts](editor/lib/auth/__tests__/oauth-bearer.test.ts),
   [oauth-consent.test.ts](editor/lib/auth/__tests__/oauth-consent.test.ts), and
   [oauth-web.test.tsx](editor/lib/auth/__tests__/oauth-web.test.tsx).
+- [Shared native HTTP owner](editor/lib/api/native.ts) and
+  [shared bearer data transport](editor/lib/supabase/native-data.ts) — one live
+  authenticator, safe HTTP envelope and bounded public-schema REST reader for
+  the fixed account/GG adapters; covered by their adapter and data-source tests.
 - [Account HTTP adapter](editor/lib/api/account.ts) and its
   [tests](editor/lib/api/account.test.ts) — the identity binding owns live bearer
   verification, input/output validation, bodyless HEAD/OPTIONS, and safe errors.
   Machine request dispatch is separately governed by GRIDA-SEC-012.
+- [Native GG route](<editor/app/(api)/(public)/api/v1/auth/gg/route.ts>),
+  [GG adapter](editor/lib/api/gg.ts) and [tests](editor/lib/api/gg.test.ts),
+  [member query](editor/lib/supabase/gg-data.ts) and
+  [tests](editor/lib/supabase/gg-data.test.ts) — fixed account-to-GG exchange,
+  shared live verification and explicit same-user membership; also GRIDA-SEC-006/012.
 - [Organization route](<editor/app/(api)/(public)/api/v1/account/organizations/route.ts>)
   and [route tests](editor/lib/api/organizations.test.ts),
   [account projection](editor/lib/account/account.ts) and
@@ -1770,11 +1847,16 @@ defaults would cross those boundaries.
    issuer discovery, and disabled dynamic registration, then creates or reuses
    a fixture public client with `token_endpoint_auth_method=none` and exact
    callbacks. Public client configuration excludes administrative credentials.
+   Bootstrap creates fresh independent consent and GG signing secrets in the
+   private fixture output; neither is inherited from the developer environment.
 5. **Contained proof execution.** The dedicated editor uses Node fetch/TCP
    guards; the consumer restricts browser and fetch destinations to exact
    fixture origins. Its dedicated runner disables traces, video, screenshots,
    and service workers; the ordinary runner excludes this test. The standalone
-   probe uses private disposable custody and safe IPC results. Offline configs
+   probe uses private disposable custody and safe IPC results. Its scoped GG
+   recipient holds the grant in memory for one fixed same-origin model-list
+   request and discards it; it exports no account/GG token through IPC. Fresh
+   fixture signing authority is separately governed by GRIDA-SEC-006. Offline configs
    skip env loading. CI verifies the downloaded CLI checksum, supplies no hosted
    credentials, cleans up only its fixture, and uploads no credential artifacts.
 
@@ -1836,9 +1918,10 @@ browser cookies, UI code or request-global state into account operations.
    tests match actual header/redirect/rewrite rules against API paths; the local
    production-mode proof also exercises real Next routing and web positive controls.
 3. **Bindings enforce authority.** `operations.ts` is the complete inventory.
-   `account.ts` accepts only its implemented operations and validates their declared
-   credential/response policy. Its fixed dispatch verifies the live OAuth bearer,
-   validates/project identity fields, rejects input on the input-free identity
+   `account.ts` and `gg.ts` accept only their implemented operations. The shared
+   `native.ts` owner validates the declared credential/response policy and
+   verifies the live OAuth bearer,
+   validates and projects identity fields, rejects input on the input-free identity
    operation, and owns all seven method exports. HEAD retains authentication;
    OPTIONS discloses only allowed methods. Rejected methods and input never call
    the issuer. Empty-body inspection has a deadline and rejects actual payloads.
@@ -1846,8 +1929,15 @@ browser cookies, UI code or request-global state into account operations.
    Credits require a canonical org ID, query a fixed membership-scoped view and
    return a passive projection. Both create the RLS source only after verification,
    preserve that exact bearer and ignore browser defaults.
+   Native GG mint accepts only POST with one explicit JSON organization ID;
+   bodyless OPTIONS declares its methods, while GET/HEAD and other methods are 405. The parser rejects extra/duplicate fields, query input, malformed UTF-8,
+   invalid media/encoding/length declarations and noncanonical IDs before issuer
+   work. It bounds route-entry body reads to 1024 bytes and one second. The shared
+   REST transport retains the verified bearer; the mint's member query filters
+   that user and organization together before the GG owner signs. Authentication,
+   parsing, membership and signing failures keep the native no-store envelope.
 4. **Source checks reject drift.** `audit-api.ts` compares real App/Pages route
-   placements with the inventory and verifies the complete account binding AST.
+   placements with the inventory and verifies the complete native binding AST.
    New handlers cannot use the six pinned legacy GG/catalogue exceptions.
    Resolved import traversal checks API/account/GG owners, including aliases,
    re-exports and installed package runtime entries, for Next/React, browser/UI,
@@ -1858,6 +1948,9 @@ browser cookies, UI code or request-global state into account operations.
    loopback issuer and web tripwires verify two-user identity/cache separation,
    credential rejection, method/input errors, configured hosts, API maintenance,
    organization pagination and failure semantics, and production insiders gating.
+   The GG extension uses a fresh synthetic signing key with the real mint and
+   model-list implementations, including credential-family separation and
+   missing-signing-configuration cases, without a credit query or provider call.
    Its synthetic database exposes rows for the exact bearer only; this exercises
    request wiring, while real Supabase RLS is proved separately. It constructs the child environment, copies
    no dotenv/session files, bounds requests/process waits and removes owned
@@ -1867,10 +1960,17 @@ browser cookies, UI code or request-global state into account operations.
 **Limits.** This protects the managed namespace and binding conventions; source
 checks are not a sandbox against malicious repository authors. Existing GG and
 catalogue handlers remain explicit legacy bindings with their own credential,
-streaming, error and cache contracts. Native mint, billing and account operations
-beyond identity, organization listing and cached credits are not implemented by this boundary. Next may normalize malformed repeated
+streaming, error and cache contracts. Fixed native operations currently cover
+identity, organization listing, cached credits and GG access; billing mutations
+and generation lifecycle are outside this contract. Next may normalize malformed repeated
 slashes or backslashes with a redirect before proxy; the machine response
 contract applies to paths admitted by that framework parsing layer.
+Next.js 16.2.6's Node proxy clones POST bodies in `next-server.js` and awaits
+`requestData.body.finalize()` before route entry. In `body-streams.js`, that
+finalizer awaits the original stream's `endPromise`. The application's
+1024-byte/one-second mint parser therefore does not bound pre-route upload
+buffering or upload time. An external hosting/reverse-proxy body-size limit and
+upload deadline, verified on the deployed path, are release requirements.
 The local HTTP proof replaces unrelated web services with tripwires and uses a
 synthetic issuer. It does not certify the full web build, actual Supabase
 cryptography/RLS, those web modules' import side effects, or deployment routing.
@@ -1885,6 +1985,14 @@ release requirement.
   [policy](editor/lib/api/policy.ts), and [policy tests](editor/lib/api/policy.test.ts).
 - [Account adapter](editor/lib/api/account.ts), [adapter tests](editor/lib/api/account.test.ts),
   and [identity binding](<editor/app/(api)/(public)/api/v1/auth/me/route.ts>) — also GRIDA-SEC-010.
+- [Shared native HTTP owner](editor/lib/api/native.ts) and
+  [shared bearer REST transport](editor/lib/supabase/native-data.ts) — fixed
+  bindings share authentication, response policy and bounded reads; also GRIDA-SEC-010.
+- [Native GG binding](<editor/app/(api)/(public)/api/v1/auth/gg/route.ts>),
+  [adapter](editor/lib/api/gg.ts) and [tests](editor/lib/api/gg.test.ts),
+  [member source](editor/lib/supabase/gg-data.ts) and
+  [tests](editor/lib/supabase/gg-data.test.ts) — explicit native authority and
+  member lookup before the shared GRIDA-SEC-006 token owner; also GRIDA-SEC-010.
 - [Organization binding](<editor/app/(api)/(public)/api/v1/account/organizations/route.ts>),
   [operation tests](editor/lib/api/organizations.test.ts),
   [account projection](editor/lib/account/account.ts) and

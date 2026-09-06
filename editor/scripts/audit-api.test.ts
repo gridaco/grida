@@ -546,3 +546,92 @@ describe("apiAudit.check dependency boundaries", () => {
     ).toEqual([]);
   });
 });
+
+describe("native GG binding", () => {
+  const route = "app/(api)/(public)/api/v1/auth/gg/route.ts";
+  const template = TEMPLATE.replaceAll("accountApi", "ggApi")
+    .replace('"@/lib/api/account"', '"@/lib/api/gg"')
+    .replace('"auth.me"', '"gg.access"');
+  const definition = {
+    path: "/api/v1/auth/gg",
+    methods: ["POST", "OPTIONS"],
+    authority: "native-account",
+    binding: "gg",
+    cache: "no-store",
+  };
+  const entries = {
+    [route]: template,
+    "lib/api/gg.ts": "export namespace ggApi {}",
+  };
+  it("accepts only the canonical fixed GG mint binding", async () => {
+    expect(
+      await fixture(entries, { ...DEFINITIONS, "gg.access": definition })
+    ).toEqual([]);
+  });
+  it.each([
+    { authority: "gg" },
+    { binding: "account" },
+    { methods: ["GET", "POST", "OPTIONS"] },
+    { cache: "public" },
+    { path: "/api/v1/ai/token" },
+  ])("rejects authority and route drift %#", async (change) => {
+    expect(
+      await fixture(entries, {
+        ...DEFINITIONS,
+        "gg.access": { ...definition, ...change },
+      })
+    ).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "registry" })])
+    );
+  });
+  it("rejects using GG binding for another operation", async () => {
+    expect(
+      await fixture(entries, { ...DEFINITIONS, "other.mint": definition })
+    ).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "registry" })])
+    );
+  });
+  it("rejects direct shared-native callbacks in a route", async () => {
+    expect(
+      await fixture(
+        {
+          ...entries,
+          [route]: template
+            .replaceAll("ggApi", "nativeApi")
+            .replace('"@/lib/api/gg"', '"@/lib/api/native"'),
+        },
+        { ...DEFINITIONS, "gg.access": definition }
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "route-binding" }),
+      ])
+    );
+  });
+  it("permits the one GG config owner, while still traversing its dependencies", async () => {
+    expect(
+      await fixture({
+        "lib/gg/config.ts": "export const value = process.env.GG_TOKEN_SECRET;",
+      })
+    ).toEqual([]);
+    expect(
+      await fixture({
+        "lib/gg/config.ts":
+          'import "next/headers"; export const value = process.env.GG_TOKEN_SECRET;',
+      })
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "forbidden-import" }),
+      ])
+    );
+    expect(
+      await fixture({
+        "lib/gg/other.ts": "export const value = process.env.GG_TOKEN_SECRET;",
+      })
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "environment-owner" }),
+      ])
+    );
+  });
+});

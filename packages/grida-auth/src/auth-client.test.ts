@@ -1,4 +1,5 @@
 // GRIDA-SEC-010 — native custody, verified identity, and lifecycle regressions.
+// GRIDA-SEC-006 / GRIDA-GG: token — fixed mint and scoped handoff regressions.
 import { describe, expect, it, vi } from "vitest";
 import { AuthClient } from "./index";
 
@@ -39,7 +40,10 @@ function session(
   };
 }
 
-function harness(initial: AuthClient.Session | null = null) {
+function harness(
+  initial: AuthClient.Session | null = null,
+  gg?: AuthClient.GgSink
+) {
   let stored = initial;
   const callback = deferred<AuthClient.Callback>();
   const bound = deferred<void>();
@@ -54,6 +58,7 @@ function harness(initial: AuthClient.Session | null = null) {
     close: vi.fn<AuthClient.Listener["close"]>(async () => undefined),
   };
   const host: AuthClient.Host & { custody: AuthClient.Custody } = {
+    gg,
     now: () => now,
     pkce: async () => ({
       state,
@@ -163,8 +168,8 @@ function sharedCustody(initial: AuthClient.Session | null) {
       return result;
     },
   };
-  function client() {
-    const h = harness();
+  function client(gg?: AuthClient.GgSink) {
+    const h = harness(null, gg);
     const host: AuthClient.Host = { ...h.host, custody };
     return { ...h, host, client: new AuthClient(config, host) };
   }
@@ -220,6 +225,521 @@ const cachedCredits: AuthClient.Credits = {
   cache_updated_at: "2026-09-07T01:02:03.123456+00:00",
   billing_gate: { allowed: true, reason: null },
 };
+
+const ggGrant: AuthClient.GgGrant = {
+  token: "synthetic.scoped.signature",
+  expires_at: new Date(now + 15 * 60_000).toISOString(),
+  organization: { id: 7, name: "example" },
+};
+const ggAccess: AuthClient.GgAccess = {
+  expires_at: ggGrant.expires_at,
+  organization: ggGrant.organization,
+};
+
+function ggReply(
+  h: { host: AuthClient.Host; requests: AuthClient.Request[] },
+  response: AuthClient.Response = { status: 200, body: ggGrant }
+) {
+  const original = h.host.request;
+  h.host.request = (request) => {
+    if (request.url === `${config.apiOrigin}/api/v1/auth/gg`) {
+      h.requests.push(request);
+      return { result: Promise.resolve(response), cancel() {} };
+    }
+    return original(request);
+  };
+}
+
+describe("AuthClient.requestGgAccess", () => {
+  it("keeps returned metadata independent of sink mutation attempts", async () => {
+    const changes: boolean[] = [];
+    let retained: AuthClient.GgGrant | undefined;
+    const h = harness(session(), {
+      accept(grant) {
+        retained = grant;
+        changes.push(Reflect.set(grant, "expires_at", grant.token));
+        changes.push(Reflect.set(grant.organization, "name", grant.token));
+        changes.push(Reflect.set(grant.organization, "token", grant.token));
+      },
+    });
+    ggReply(h);
+    const result = await h.client.requestGgAccess({ organization_id: 7 });
+    expect(changes).toEqual([false, false, false]);
+    expect(result).toEqual(ggAccess);
+    expect(result).not.toBe(retained);
+    expect(result.organization).not.toBe(retained?.organization);
+    expect(JSON.stringify(result)).not.toContain(ggGrant.token);
+  });
+
+  it("hands off one projected scoped grant while returning only safe metadata", async () => {
+    const accept = vi.fn<AuthClient.GgSink["accept"]>(() => undefined);
+    const h = harness(session(), { accept });
+    ggReply(h, {
+      status: 200,
+      body: {
+        ...ggGrant,
+        access_token: "must-not-leak",
+        organization: { ...ggGrant.organization, private: "must-not-leak" },
+      },
+    });
+    expect(await h.client.requestGgAccess({ organization_id: 7 })).toEqual(
+      ggAccess
+    );
+    expect(h.requests).toEqual([
+      {
+        url: `${config.apiOrigin}/api/v1/auth/gg`,
+        method: "POST",
+        headers: {
+          authorization: "Bearer old-access-secret",
+          "content-type": "application/json",
+        },
+        body: '{"organization_id":7}',
+      },
+    ]);
+    expect(accept).toHaveBeenCalledExactlyOnceWith(ggGrant);
+    const grant = accept.mock.calls[0]![0];
+    expect(Object.isFrozen(grant)).toBe(true);
+    expect(Object.isFrozen(grant.organization)).toBe(true);
+    expect(h.writes).toEqual([]);
+    expect(h.stored()).toEqual(session());
+    expect(JSON.stringify(await h.client.status())).not.toContain(
+      ggGrant.token
+    );
+  });
+
+  it("requires a sink before custody or refresh and captures the bound callable once", async () => {
+    const missing = harness(session({ expiresAt: now - 1 }));
+    const read = vi.spyOn(missing.host.custody, "read");
+    await expect(
+      missing.client.requestGgAccess({ organization_id: 7 })
+    ).rejects.toMatchObject({ code: "gg_unavailable" });
+    expect(read).not.toHaveBeenCalled();
+    expect(missing.requests).toEqual([]);
+
+    const receiver = {
+      grants: [] as AuthClient.GgGrant[],
+      accept(grant: AuthClient.GgGrant): undefined {
+        this.grants.push(grant);
+      },
+    };
+    const h = harness(session(), receiver);
+    receiver.accept = () => {
+      throw new Error("replacement-must-not-run");
+    };
+    h.host.gg = {
+      accept: () => {
+        throw new Error("replacement-must-not-run");
+      },
+    };
+    ggReply(h);
+    expect(await h.client.requestGgAccess({ organization_id: 7 })).toEqual(
+      ggAccess
+    );
+    expect(receiver.grants).toEqual([ggGrant]);
+  });
+
+  it("sanitizes invalid or throwing sink configuration at construction", () => {
+    const h = harness();
+    for (const gg of [
+      null,
+      {},
+      { accept: 1 },
+      {
+        get accept() {
+          throw new Error("private-configuration");
+        },
+      },
+    ]) {
+      expect(
+        () => new AuthClient(config, { ...h.host, gg: gg as never })
+      ).toThrow("Grida authentication failed (invalid_config)");
+    }
+    expect(
+      () =>
+        new AuthClient(config, {
+          ...h.host,
+          get gg(): AuthClient.GgSink {
+            throw new Error("private-configuration");
+          },
+        })
+    ).toThrow("Grida authentication failed (invalid_config)");
+  });
+
+  it.each([
+    undefined,
+    null,
+    {},
+    [],
+    { organization_id: 0 },
+    { organization_id: -1 },
+    { organization_id: 1.5 },
+    { organization_id: Number.MAX_SAFE_INTEGER + 1 },
+    { organization_id: "7" },
+    { organization_id: 7, url: "https://elsewhere.invalid" },
+    Object.create({ organization_id: 7 }),
+    { organization_id: 7, [Symbol("extra")]: true },
+  ])("rejects invalid mint input before custody or I/O: %j", async (input) => {
+    const accept = vi.fn<AuthClient.GgSink["accept"]>(() => undefined);
+    const h = harness(session(), { accept });
+    const read = vi.spyOn(h.host.custody, "read");
+    await expect(
+      h.client.requestGgAccess(input as never)
+    ).rejects.toMatchObject({ code: "invalid_input" });
+    expect(read).not.toHaveBeenCalled();
+    expect(h.requests).toEqual([]);
+    expect(accept).not.toHaveBeenCalled();
+  });
+
+  it("snapshots the organization once and contains throwing input accessors", async () => {
+    const h = harness(session(), { accept: () => undefined });
+    ggReply(h);
+    let reads = 0;
+    await h.client.requestGgAccess({
+      get organization_id() {
+        return ++reads === 1 ? 7 : 8;
+      },
+    });
+    expect(reads).toBe(1);
+    const input = { organization_id: 7 };
+    const pending = h.client.requestGgAccess(input);
+    input.organization_id = 8;
+    expect(await pending).toEqual(ggAccess);
+    await expect(
+      h.client.requestGgAccess({
+        get organization_id(): number {
+          throw new Error("private-input");
+        },
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_input",
+      message: "Grida authentication failed (invalid_input)",
+    });
+    expect(h.requests.map((request) => request.body)).toEqual([
+      '{"organization_id":7}',
+      '{"organization_id":7}',
+    ]);
+  });
+
+  it.each([
+    null,
+    { ...ggGrant, token: "" },
+    { ...ggGrant, token: "not-a-scoped-jwt" },
+    { ...ggGrant, token: "a.b.c\n" },
+    { ...ggGrant, token: `${"a".repeat(16384)}.b.c` },
+    { ...ggGrant, organization: { id: 8, name: "example" } },
+    { ...ggGrant, organization: { id: 7, name: "Invalid Name" } },
+    { ...ggGrant, expires_at: new Date(now).toISOString() },
+    { ...ggGrant, expires_at: new Date(now + 16 * 60_000 + 1).toISOString() },
+    { ...ggGrant, expires_at: "2027-02-30T00:00:00Z" },
+    { ...ggGrant, expires_at: now + 60_000 },
+  ])(
+    "rejects malformed or mismatched mint envelopes without handoff: %j",
+    async (body) => {
+      const accept = vi.fn<AuthClient.GgSink["accept"]>(() => undefined);
+      const h = harness(session(), { accept });
+      ggReply(h, { status: 200, body });
+      await expect(
+        h.client.requestGgAccess({ organization_id: 7 })
+      ).rejects.toMatchObject({ code: "invalid_response" });
+      expect(accept).not.toHaveBeenCalled();
+      expect(h.requests).toHaveLength(1);
+    }
+  );
+
+  it.each(["accessToken", "refreshToken"] as const)(
+    "refuses an echoed account %s even when it has JWT shape",
+    async (key) => {
+      const accept = vi.fn<AuthClient.GgSink["accept"]>(() => undefined);
+      const h = harness(session({ [key]: ggGrant.token }), { accept });
+      ggReply(h);
+      await expect(
+        h.client.requestGgAccess({ organization_id: 7 })
+      ).rejects.toMatchObject({ code: "invalid_response" });
+      expect(accept).not.toHaveBeenCalled();
+    }
+  );
+
+  it("checks expiry again immediately before memory handoff", async () => {
+    const accept = vi.fn<AuthClient.GgSink["accept"]>(() => undefined);
+    const h = harness(session(), { accept });
+    ggReply(h);
+    let reads = 0;
+    h.host.custody.read = async () => {
+      if (++reads === 2) h.host.now = () => now + 15 * 60_000;
+      return session();
+    };
+    await expect(
+      h.client.requestGgAccess({ organization_id: 7 })
+    ).rejects.toMatchObject({ code: "invalid_response" });
+    expect(accept).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [400, "unavailable"],
+    [401, "token_rejected"],
+    [403, "forbidden"],
+    [429, "rate_limited"],
+    [503, "unavailable"],
+    [302, "unavailable"],
+  ])(
+    "sanitizes HTTP %i as %s without remint or replay",
+    async (status, code) => {
+      const accept = vi.fn<AuthClient.GgSink["accept"]>(() => undefined);
+      const h = harness(session(), { accept });
+      ggReply(h, {
+        status: status as number,
+        body: { token: ggGrant.token, error: "private-upstream" },
+      });
+      await expect(
+        h.client.requestGgAccess({ organization_id: 7 })
+      ).rejects.toMatchObject({
+        code,
+        message: `Grida authentication failed (${code})`,
+      });
+      expect(accept).not.toHaveBeenCalled();
+      expect(h.requests).toHaveLength(1);
+      expect(h.writes).toEqual([]);
+    }
+  );
+
+  it.each([false, true])(
+    "retains accepted rotation after mint failure (coordinated=%s)",
+    async (coordinated) => {
+      const initial = session({ expiresAt: now - 1 });
+      const store = sharedCustody(initial);
+      const accept = vi.fn<AuthClient.GgSink["accept"]>(() => undefined);
+      const h = coordinated
+        ? store.client({ accept })
+        : harness(initial, { accept });
+      ggReply(h, { status: 503, body: "private-upstream" });
+      await expect(
+        h.client.requestGgAccess({ organization_id: 7 })
+      ).rejects.toMatchObject({ code: "unavailable" });
+      expect((coordinated ? store.stored() : h.stored())?.refreshToken).toBe(
+        "new-refresh-secret"
+      );
+      expect(h.requests.at(-1)?.headers.authorization).toBe(
+        "Bearer new-access-secret"
+      );
+      expect(accept).not.toHaveBeenCalled();
+      expect(
+        h.requests.filter((request) => request.url.endsWith("/auth/gg"))
+      ).toHaveLength(1);
+    }
+  );
+
+  it.each([false, true])(
+    "blocks mint if live identity fails after accepted rotation (coordinated=%s)",
+    async (coordinated) => {
+      const previous = session({ expiresAt: now - 1 });
+      const store = sharedCustody(previous);
+      const accept = vi.fn<AuthClient.GgSink["accept"]>(() => undefined);
+      const h = coordinated
+        ? store.client({ accept })
+        : harness(previous, { accept });
+      const original = h.host.request;
+      h.host.request = (request) =>
+        request.url.endsWith("/auth/me")
+          ? {
+              result: Promise.resolve({ status: 503, body: null }),
+              cancel() {},
+            }
+          : original(request);
+      await expect(
+        h.client.requestGgAccess({ organization_id: 7 })
+      ).rejects.toMatchObject({ code: "unavailable" });
+      expect(coordinated ? store.stored() : h.stored()).toEqual({
+        ...previous,
+        refreshToken: "new-refresh-secret",
+      });
+      expect(accept).not.toHaveBeenCalled();
+      expect(
+        h.requests.some((request) => request.url.endsWith("/auth/gg"))
+      ).toBe(false);
+    }
+  );
+
+  it.each([false, true])(
+    "prevents handoff after logout even when transport ignores cancellation (coordinated=%s)",
+    async (coordinated) => {
+      const store = sharedCustody(session());
+      const accept = vi.fn<AuthClient.GgSink["accept"]>(() => undefined);
+      const h = coordinated
+        ? store.client({ accept })
+        : harness(session(), { accept });
+      const entered = deferred<void>();
+      const response = deferred<AuthClient.Response>();
+      const original = h.host.request;
+      const cancel = vi.fn<() => void>();
+      h.host.request = (request) => {
+        if (request.url.endsWith("/auth/gg")) {
+          entered.resolve();
+          return { result: response.promise, cancel };
+        }
+        return original(request);
+      };
+      const pending = h.client
+        .requestGgAccess({ organization_id: 7 })
+        .catch((error: unknown) => error);
+      await entered.promise;
+      const logout = h.client.logout();
+      expect(cancel).toHaveBeenCalledOnce();
+      response.resolve({ status: 200, body: ggGrant });
+      expect(await pending).toMatchObject({ code: "cancelled" });
+      await logout;
+      expect(accept).not.toHaveBeenCalled();
+      expect(coordinated ? store.stored() : h.stored()).toBeNull();
+    }
+  );
+
+  it("orders a different writer's logout after the synchronous handoff", async () => {
+    const store = sharedCustody(session());
+    const accept = vi.fn<AuthClient.GgSink["accept"]>(() => {
+      expect(store.active()).toBe(1);
+      expect(store.stored()).not.toBeNull();
+    });
+    const first = store.client({ accept });
+    const second = store.client();
+    const entered = deferred<void>();
+    const response = deferred<AuthClient.Response>();
+    first.host.request = () => {
+      entered.resolve();
+      return { result: response.promise, cancel() {} };
+    };
+    const pending = first.client.requestGgAccess({ organization_id: 7 });
+    await entered.promise;
+    const logout = second.client.logout();
+    response.resolve({ status: 200, body: ggGrant });
+    expect(await pending).toEqual(ggAccess);
+    await logout;
+    expect(accept).toHaveBeenCalledExactlyOnceWith(ggGrant);
+    expect(store.stored()).toBeNull();
+    await expect(
+      first.client.requestGgAccess({ organization_id: 7 })
+    ).rejects.toMatchObject({ code: "signed_out" });
+    expect(accept).toHaveBeenCalledOnce();
+  });
+
+  it("refuses a memory handoff if a concurrent refresh replaced its account credentials", async () => {
+    const accept = vi.fn<AuthClient.GgSink["accept"]>(() => undefined);
+    const h = harness(session(), { accept });
+    const entered = deferred<void>();
+    const response = deferred<AuthClient.Response>();
+    const original = h.host.request;
+    h.host.request = (request) => {
+      if (request.url.endsWith("/auth/gg")) {
+        entered.resolve();
+        return { result: response.promise, cancel() {} };
+      }
+      return original(request);
+    };
+    const pending = h.client
+      .requestGgAccess({ organization_id: 7 })
+      .catch((error: unknown) => error);
+    await entered.promise;
+    await h.client.refresh();
+    response.resolve({ status: 200, body: ggGrant });
+    expect(await pending).toMatchObject({ code: "session_changed" });
+    expect(accept).not.toHaveBeenCalled();
+    expect(h.stored()?.refreshToken).toBe("new-refresh-secret");
+  });
+
+  it.each([false, true])(
+    "does not rollback a retained grant or retry after the sink throws (coordinated=%s)",
+    async (coordinated) => {
+      let retained: AuthClient.GgGrant | undefined;
+      const accept = vi.fn<AuthClient.GgSink["accept"]>((grant) => {
+        retained = grant;
+        throw new Error(`private-sink-${grant.token}`);
+      });
+      const initial = session({ expiresAt: now - 1 });
+      const store = sharedCustody(initial);
+      const h = coordinated
+        ? store.client({ accept })
+        : harness(initial, { accept });
+      ggReply(h);
+      await expect(
+        h.client.requestGgAccess({ organization_id: 7 })
+      ).rejects.toMatchObject({
+        code: "gg_handoff_failed",
+        message: "Grida authentication failed (gg_handoff_failed)",
+      });
+      expect(retained).toEqual(ggGrant);
+      expect(accept).toHaveBeenCalledOnce();
+      expect((coordinated ? store.stored() : h.stored())?.refreshToken).toBe(
+        "new-refresh-secret"
+      );
+      expect(
+        h.requests.filter((request) => request.url.endsWith("/auth/gg"))
+      ).toHaveLength(1);
+    }
+  );
+
+  it.each([false, true])(
+    "does not retract a delivered grant when logout starts before the caller resumes (coordinated=%s)",
+    async (coordinated) => {
+      const delivered = deferred<void>();
+      const accept = vi.fn<AuthClient.GgSink["accept"]>(() => {
+        delivered.resolve();
+      });
+      const store = sharedCustody(session());
+      const h = coordinated
+        ? store.client({ accept })
+        : harness(session(), { accept });
+      ggReply(h);
+      const pending = h.client.requestGgAccess({ organization_id: 7 });
+      await delivered.promise;
+      const logout = h.client.logout();
+      expect(await pending).toEqual(ggAccess);
+      await logout;
+      expect(accept).toHaveBeenCalledExactlyOnceWith(ggGrant);
+      expect(coordinated ? store.stored() : h.stored()).toBeNull();
+    }
+  );
+
+  it("excludes login during mint and releases that exclusion after a transport error", async () => {
+    const h = harness(session(), { accept: () => undefined });
+    const entered = deferred<void>();
+    const response = deferred<AuthClient.Response>();
+    h.host.request = () => {
+      entered.resolve();
+      return { result: response.promise, cancel() {} };
+    };
+    const mint = h.client
+      .requestGgAccess({ organization_id: 7 })
+      .catch((error: unknown) => error);
+    await entered.promise;
+    await expect(h.client.login()).rejects.toMatchObject({
+      code: "session_busy",
+    });
+    response.reject(new Error("private-transport"));
+    expect(await mint).toMatchObject({
+      code: "unavailable",
+      message: "Grida authentication failed (unavailable)",
+    });
+    const login = h.client.login().catch((error: unknown) => error);
+    await h.bound;
+    await expect(
+      h.client.requestGgAccess({ organization_id: 7 })
+    ).rejects.toMatchObject({ code: "session_busy" });
+    await h.client.cancelLogin();
+    expect(await login).toMatchObject({ code: "cancelled" });
+  });
+
+  it("rejects an async sink without awaiting it or exposing its rejection", async () => {
+    const asyncResult = deferred<void>();
+    const accept = vi.fn<() => Promise<void>>(() => asyncResult.promise);
+    const h = harness(session(), { accept: accept as never });
+    ggReply(h);
+    await expect(
+      h.client.requestGgAccess({ organization_id: 7 })
+    ).rejects.toMatchObject({ code: "gg_handoff_failed" });
+    asyncResult.reject(new Error("private-async-sink"));
+    await Promise.resolve();
+    expect(accept).toHaveBeenCalledOnce();
+    expect(await h.client.logout()).toMatchObject({ state: "signed-out" });
+  });
+});
 
 describe("AuthClient.requestAccount credits.read", () => {
   it("sends only the selected organization to the fixed path and projects every reply level", async () => {

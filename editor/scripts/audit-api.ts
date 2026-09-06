@@ -32,7 +32,11 @@ export namespace apiAudit {
     "gg.music": ["/api/v1/ai/music/generations", "POST", "gg"],
     "models.catalog": ["/api/v1/models/catalog", "GET", "public"],
   } as const;
-  const ENV_OWNERS = new Set(["lib/api/policy.ts", "lib/auth/oauth-server.ts"]);
+  const ENV_OWNERS = new Set([
+    "lib/api/policy.ts",
+    "lib/auth/oauth-server.ts",
+    "lib/gg/config.ts",
+  ]);
   const slash = (value: string) => value.split(path.sep).join("/");
   const inside = (root: string, file: string) => {
     const relative = path.relative(root, file);
@@ -127,17 +131,21 @@ export namespace apiAudit {
     });
   }
 
-  function canonicalBinding(ast: ts.SourceFile, id: string): boolean {
+  function canonicalBinding(
+    ast: ts.SourceFile,
+    id: string,
+    binding: string
+  ): boolean {
     // Compare AST structure to a complete template. Comments/formatting
     // remain free; extra logic, aliases, swapped methods, and extra imports do
     // not. In particular, a matching bind() call somewhere in a file is not
     // sufficient evidence that its exported handlers use that boundary.
     const expected = source(
       "route.ts",
-      `import { accountApi } from "@/lib/api/account";
+      `import { ${binding === "gg" ? "ggApi" : "accountApi"} } from "@/lib/api/${binding === "gg" ? "gg" : "account"}";
        export const runtime = "nodejs";
        export const dynamic = "force-dynamic";
-       const handlers = accountApi.bind(${JSON.stringify(id)});
+       const handlers = ${binding === "gg" ? "ggApi" : "accountApi"}.bind(${JSON.stringify(id)});
        ${METHODS.map((method) => `export const ${method} = handlers.${method};`).join("\n")}`
     );
     function shape(node: ts.Node): unknown {
@@ -359,7 +367,7 @@ export namespace apiAudit {
           );
         }
       } else if (
-        definition.binding !== "account" ||
+        !["account", "gg"].includes(definition.binding) ||
         definition.authority !== "native-account" ||
         definition.cache !== "no-store"
       ) {
@@ -367,6 +375,23 @@ export namespace apiAudit {
           "registry",
           registryFile,
           `${id}: unsupported authority/binding/cache combination.`
+        );
+      }
+      if (
+        (id === "gg.access" ||
+          definition.path === "/api/v1/auth/gg" ||
+          definition.binding === "gg") &&
+        (id !== "gg.access" ||
+          definition.path !== "/api/v1/auth/gg" ||
+          definition.methods.join(",") !== "POST,OPTIONS" ||
+          definition.binding !== "gg" ||
+          definition.authority !== "native-account" ||
+          definition.cache !== "no-store")
+      ) {
+        report(
+          "registry",
+          registryFile,
+          "gg.access must retain its exact mint path, methods, and native binding."
         );
       }
     }
@@ -431,11 +456,11 @@ export namespace apiAudit {
               `${id}: exported methods differ from its fixed registry entry.`
             );
           }
-        } else if (!canonicalBinding(ast, id)) {
+        } else if (!canonicalBinding(ast, id, definition.binding)) {
           report(
             "route-binding",
             file,
-            `${id}: use only the canonical accountApi.bind route template with all seven method exports.`
+            `${id}: use only the canonical ${definition.binding} binding template with all seven method exports.`
           );
         }
       }
@@ -595,7 +620,7 @@ export namespace apiAudit {
             report(
               "environment-owner",
               resolved,
-              "Environment reads belong to api/policy or the existing OAuth configuration owner.",
+              "Environment reads belong to the exact API, OAuth, or GG configuration owner.",
               node
             );
           }

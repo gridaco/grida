@@ -1,4 +1,5 @@
-// GRIDA-SEC-010, GRIDA-SEC-011 — native authority proof within the owned local fixture.
+// GRIDA-SEC-006, GRIDA-SEC-010, GRIDA-SEC-011 — owned local native authority proof.
+// GRIDA-GG: token — real OAuth handoff to model discovery, never paid generation.
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import type { AuthClient } from "@grida/auth";
 import { AccountClient } from "@grida/account";
@@ -85,9 +86,17 @@ async function navigate(page: Page, url: string) {
 
 function native(page: Page, config: AuthClient.Config) {
   let session: AuthClient.Session | null = null;
+  let grant: AuthClient.GgGrant | undefined;
   let opened!: () => void;
   let failed!: (error: Error) => void;
   const auth = createNativeAuth(config, {
+    gg: {
+      accept(value) {
+        if (grant) throw new Error("Test GG sink was not consumed");
+        grant = value;
+        return undefined;
+      },
+    },
     custody: {
       async read() {
         return session;
@@ -117,6 +126,11 @@ function native(page: Page, config: AuthClient.Config) {
   return {
     auth,
     session: () => session,
+    takeGrant() {
+      const value = grant;
+      grant = undefined;
+      return value;
+    },
     begin() {
       const navigation = new Promise<void>((resolve, reject) => {
         opened = resolve;
@@ -438,6 +452,32 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     return response.status;
   }
+  async function mintStatus(token: string, organizationId: number) {
+    const response = await request(`${web}/api/v1/auth/gg`, {
+      method: "POST",
+      token,
+      body: { organization_id: organizationId },
+    });
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    await response.body?.cancel();
+    return response.status;
+  }
+  async function modelCount(token: string) {
+    const response = await request(`${web}/api/v1/ai/models`, { token });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    const catalogue = await json(response);
+    expect(catalogue.object).toBe("list");
+    expect(Array.isArray(catalogue.data) && catalogue.data.length > 0).toBe(
+      true
+    );
+    expect(
+      catalogue.data.every(
+        (model: { id: unknown }) => typeof model.id === "string"
+      )
+    ).toBe(true);
+    return catalogue.data.length as number;
+  }
   async function names(token: string) {
     const response = await request(
       "/rest/v1/organization?select=name&order=name",
@@ -614,6 +654,7 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
 
     const alicePage = await (await context()).newPage();
     const aliceClient = client(alicePage);
+    let logoutGrant: AuthClient.GgGrant | undefined;
     await phase(
       "OAuth tokens retain seeded organization RLS boundaries",
       async () => {
@@ -729,7 +770,25 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
             })
           ).organization
         ).toEqual(local);
+        const ggAccess = await aliceClient.auth.requestGgAccess({
+          organization_id: local.id,
+        });
+        expect(ggAccess.organization).toEqual({
+          id: local.id,
+          name: local.name,
+        });
+        const membershipGrant = aliceClient.takeGrant();
+        expect(!!membershipGrant).toBe(true);
+        const modelsBeforeRemoval = await modelCount(membershipGrant!.token);
         await removeAddedMembership();
+        await expect(
+          aliceClient.auth.requestGgAccess({ organization_id: local.id })
+        ).rejects.toMatchObject({ code: "forbidden" });
+        expect(aliceClient.takeGrant()).toBeUndefined();
+        // Existing scoped authority is bounded by its own expiry, not live membership.
+        expect(await modelCount(membershipGrant!.token)).toBe(
+          modelsBeforeRemoval
+        );
         await expect(
           aliceClient.auth.requestAccount("credits.read", {
             organization_id: local.id,
@@ -847,6 +906,70 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
     );
 
     await phase(
+      "native GG handoff discovers models without changing credit records",
+      async () => {
+        const snapshot = async (id: number) => {
+          const response = await request(
+            "/rest/v1/rpc/fn_billing_get_metronome_account",
+            {
+              admin: true,
+              method: "POST",
+              body: { p_org: id },
+            }
+          );
+          expect(response.status).toBe(200);
+          return createHash("sha256")
+            .update(JSON.stringify(await json(response)))
+            .digest("hex");
+        };
+        for (const host of [first, aliceClient]) {
+          const organization = await new AccountClient(
+            host.auth
+          ).selectOrganization();
+          const before = await snapshot(organization.id);
+          const sessionBefore = JSON.stringify(host.session());
+          const access = await host.auth.requestGgAccess({
+            organization_id: organization.id,
+          });
+          expect(Object.keys(access).sort()).toEqual([
+            "expires_at",
+            "organization",
+          ]);
+          expect(access.organization).toEqual({
+            id: organization.id,
+            name: organization.name,
+          });
+          expect(Date.parse(access.expires_at) > Date.now()).toBe(true);
+          const grant = host.takeGrant();
+          expect(
+            !!grant &&
+              Object.isFrozen(grant) &&
+              Object.isFrozen(grant.organization)
+          ).toBe(true);
+          expect(await modelCount(grant!.token)).toBeGreaterThan(0);
+          expect(await snapshot(organization.id)).toBe(before);
+          expect(JSON.stringify(host.session()) === sessionBefore).toBe(true);
+          expect(sessionBefore.includes(grant!.token)).toBe(false);
+          expect(await accountStatus(grant!.token)).toBe(401);
+          expect(await mintStatus(grant!.token, organization.id)).toBe(401);
+          const accountAsGg = await request(`${web}/api/v1/ai/models`, {
+            token: host.session()!.accessToken,
+          });
+          expect(accountAsGg.status).toBe(401);
+          await accountAsGg.body?.cancel();
+          if (host === first) logoutGrant = grant;
+        }
+        expect(
+          (
+            await insiderContext.request.get(`${web}/api/v1/ai/models`, {
+              maxRedirects: 0,
+            })
+          ).status()
+        ).toBe(401);
+      }
+    );
+
+    await phase(
       "local logout revokes only the captured native session",
       async () => {
         const oldAccess = first.session()!.accessToken;
@@ -855,6 +978,11 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           revocation: "confirmed",
         });
         expect(await accountStatus(oldAccess)).toBe(401);
+        expect(await mintStatus(oldAccess, logoutGrant!.organization.id)).toBe(
+          401
+        );
+        expect(await modelCount(logoutGrant!.token)).toBeGreaterThan(0);
+        logoutGrant = undefined;
         expect((await second.auth.verify()).state).toBe("signed-in");
         const stillBrowser = client(page);
         expect(
@@ -962,7 +1090,23 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         expect(await probe("organizations")).toEqual(organizations);
         const credits = await new AccountClient(second.auth).credits();
         expect(await probe("credits")).toEqual(credits);
+        const ggBeforeRestart = await probe("gg");
+        expect(ggBeforeRestart.organization).toEqual({
+          id: credits.organization.id,
+          name: credits.organization.name,
+        });
+        expect(ggBeforeRestart.model_count).toBeGreaterThan(0);
+        expect(Object.keys(ggBeforeRestart).sort()).toEqual([
+          "expires_at",
+          "model_count",
+          "organization",
+        ]);
         expect((await probe("restart")).state).toBe("signed-in");
+        const ggAfterRestart = await probe("gg", credits.organization.id);
+        expect(ggAfterRestart.organization).toEqual(
+          ggBeforeRestart.organization
+        );
+        expect(ggAfterRestart.model_count).toBe(ggBeforeRestart.model_count);
         expect(await probe("organizations")).toEqual(organizations);
         expect(await probe("credits", credits.organization.id)).toEqual(
           credits
@@ -992,6 +1136,10 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           true
         );
         await revokeGrant(control);
+        await expect(
+          second.auth.requestGgAccess({ organization_id: 1 })
+        ).rejects.toMatchObject({ code: "token_rejected" });
+        expect(second.takeGrant()).toBeUndefined();
         await rejected(second.auth);
         await rejected(another.auth);
         expect(

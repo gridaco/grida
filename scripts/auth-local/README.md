@@ -2,6 +2,8 @@
 
 > **GRIDA-SEC-011** — local provisioning and fixture isolation are bound by
 > [SECURITY.md](../../SECURITY.md).
+> **GRIDA-SEC-006 / GRIDA-GG: token** — GG access uses fresh fixture signing
+> authority and a memory-only scoped grant.
 
 This developer harness runs Grida's OAuth proof against a disposable local
 Supabase project. It requires Node.js 24, Git, a running local Docker engine, and
@@ -96,8 +98,12 @@ mode `0700`. Outputs have mode `0600`:
 
 The editor environment includes the local Supabase URL and keys, insiders auth,
 the exact loopback `GRIDA_API_ORIGIN`,
-the allowed OAuth client ID, fixed callback allowlist, editor origin, and a fresh
-32-byte consent-signing secret. The seed accounts are `insider@grida.co`,
+the allowed OAuth client ID, fixed callback allowlist, editor origin, and fresh
+independent 32-byte consent and GG signing secrets. `GG_TOKEN_SECRET` is generated
+by bootstrap and stored only with the private fixture settings; it is never
+inherited from the ordinary environment. Repeating bootstrap rotates those
+fixture secrets and requires restarting the editor. No Upstash or provider
+credential is supplied. The seed accounts are `insider@grida.co`,
 `alice@acme.com`, and `random@example.com`, with password `password`; their
 organization membership comes from the repository seed.
 
@@ -179,6 +185,28 @@ Unprovisioned/unobserved credit data remains distinct from observed zero, and th
 existing gate floor and entitlement flag are preserved. Cache snapshots before
 and after each read prove the read leaves billing state unchanged. Direct REST
 checks verify the safe view columns and other-user denial under real RLS.
+
+The GG extension has passed against local Auth 2.196.0 and PostgreSQL
+15.8.1.085. A native client opts into
+the public `requestGgAccess({organization_id})` contract with a trusted
+synchronous memory sink. The account bearer goes only to the fixed native mint;
+the returned GG credential goes only to the configured origin's existing
+`GET /api/v1/ai/models`, then is discarded. Safe IPC/public results contain
+organization, expiry and model-list metadata, never the grant or account tokens.
+The model list imports the static catalog directly and requires no provider
+initialization. Minting uses the shared GG quota/member/sign policy and does not
+query or refresh credits.
+
+The local GG pass exercises two-user and removed-membership denial, wrong
+credential families and conflicting cookies, revoked-account remint refusal,
+and restart/remint through copied public package exports. Existing scoped tokens
+retain their 900-second window plus server clock tolerance after membership or
+account revocation; this does not establish immediate GG revocation. Fixture
+billing/cache snapshots remain unchanged around access, and restart/remint
+retains no GG grant in the copied package's custody. No generation endpoint, billing
+mutation or provider request belongs in this check. Offline tests cover quota,
+clock/key rotation, malformed responses and handoff races; those tests do not
+substitute for the real local acceptance run or prove provider readiness.
 
 Its restart check copies both built packages and manifests outside the repository
 and runs separate Node processes with disposable `0700`/`0600` test custody.

@@ -1,4 +1,5 @@
 // GRIDA-SEC-010 — fixed loopback ceremony and destination-bound native transport.
+// GRIDA-SEC-006 / GRIDA-GG: token — scoped grants stay with the explicit memory sink.
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type Server, type ServerResponse } from "node:http";
 import type { Socket } from "node:net";
@@ -11,11 +12,15 @@ export function createNativeAuth(
   options: {
     custody: AuthClient.Custody | AuthClient.CoordinatedCustody;
     openBrowser(url: string): Promise<void>;
+    gg?: AuthClient.GgSink;
   }
 ): AuthClient {
   return new AuthClient(config, {
     custody: options.custody,
     openBrowser: options.openBrowser,
+    get gg() {
+      return options.gg;
+    },
     now: Date.now,
     async pkce() {
       const verifier = randomBytes(32).toString("base64url");
@@ -42,6 +47,7 @@ export async function createPersistentNativeAuth(
     storage?: "keyring" | "file";
     /** Trusted process configuration only; never read this from a repository. */
     home?: string;
+    gg?: AuthClient.GgSink;
   }
 ): Promise<{
   client: AuthClient;
@@ -55,6 +61,9 @@ export async function createPersistentNativeAuth(
   const client = createNativeAuth(config, {
     custody: { exclusive: (operation) => store.exclusive(operation) },
     openBrowser: options.openBrowser,
+    get gg() {
+      return options.gg;
+    },
   });
   store = await CredentialStore.open(client.config, options);
   return {

@@ -532,6 +532,9 @@ async function bootstrap(state) {
     GRIDA_OAUTH_CLIENT_IDS: client.client_id,
     GRIDA_OAUTH_REDIRECT_URIS: fixture.redirectUris.join(","),
     GRIDA_OAUTH_CONSENT_SECRET: randomBytes(32).toString("base64url"),
+    // GRIDA-SEC-006 / GRIDA-SEC-011: fresh fixture-only GG authority, never inherited.
+    // GRIDA-GG: token — independent disposable signing key.
+    GG_TOKEN_SECRET: randomBytes(32).toString("base64url"),
   };
   await privateJson(state.publicClientPath, publicClient);
   await privateJson(state.setupPath, {

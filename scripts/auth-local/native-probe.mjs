@@ -1,4 +1,5 @@
-// GRIDA-SEC-010, GRIDA-SEC-011 — public native account requests in disposable custody.
+// GRIDA-SEC-006, GRIDA-SEC-010, GRIDA-SEC-011 — native requests in disposable custody.
+// GRIDA-GG: token — one-shot public handoff consumer; no persisted GG authority.
 // Test-only subprocess host, copied beside a standalone package before execution.
 // This deliberately limited file custody is not a product persistence contract.
 import assert from "node:assert/strict";
@@ -10,7 +11,7 @@ import { AccountClient } from "@grida/account";
 const [operation, configPath, sessionPath, after] = process.argv.slice(2);
 assert(
   after === undefined ||
-    (["organizations", "credits"].includes(operation) &&
+    (["organizations", "credits", "gg"].includes(operation) &&
       /^[1-9]\d*$/.test(after) &&
       Number.isSafeInteger(Number(after)))
 );
@@ -70,8 +71,16 @@ const custody = {
 };
 
 let browserOpened;
+let ggGrant;
 const auth = createNativeAuth(config, {
   custody,
+  gg: {
+    accept(grant) {
+      assert.equal(ggGrant, undefined);
+      ggGrant = grant;
+      return undefined;
+    },
+  },
   async openBrowser(url) {
     const parsed = new URL(url);
     assert.equal(parsed.origin, "http://127.0.0.1:55431");
@@ -103,6 +112,64 @@ try {
     result = await new AccountClient(auth).credits(
       after === undefined ? undefined : { id: Number(after) }
     );
+  } else if (operation === "gg") {
+    const organization = await new AccountClient(auth).selectOrganization(
+      after === undefined ? undefined : { id: Number(after) }
+    );
+    const before = await fs.readFile(sessionPath, "utf8");
+    const access = await auth.requestGgAccess({
+      organization_id: organization.id,
+    });
+    assert(ggGrant && Object.isFrozen(ggGrant));
+    assert.deepEqual(Object.keys(access).sort(), [
+      "expires_at",
+      "organization",
+    ]);
+    assert.deepEqual(access.organization, {
+      id: organization.id,
+      name: organization.name,
+    });
+    try {
+      const response = await fetch(`${config.apiOrigin}/api/v1/ai/models`, {
+        headers: { authorization: `Bearer ${ggGrant.token}` },
+        credentials: "omit",
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      });
+      assert.equal(response.status, 200);
+      const reader = response.body.getReader();
+      const chunks = [];
+      let size = 0;
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          assert(
+            size <= 65_536,
+            "GG model response exceeded the fixture bound"
+          );
+          chunks.push(value);
+        }
+      } finally {
+        await reader.cancel().catch(() => undefined);
+        reader.releaseLock();
+      }
+      const catalogue = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      assert.equal(catalogue.object, "list");
+      assert(Array.isArray(catalogue.data) && catalogue.data.length > 0);
+      assert(catalogue.data.every((model) => typeof model.id === "string"));
+      const afterMint = await fs.readFile(sessionPath, "utf8");
+      assert.equal(afterMint.includes(ggGrant.token), false);
+      assert.equal(
+        afterMint === before,
+        true,
+        "GG exchange changed test custody"
+      );
+      result = { ...access, model_count: catalogue.data.length };
+    } finally {
+      ggGrant = undefined;
+    }
   } else if (operation === "logout") result = await auth.logout();
   else throw new Error("Unknown probe operation");
   await browserOpened;
@@ -111,5 +178,6 @@ try {
   process.send({ type: "failed" });
   process.exitCode = 1;
 } finally {
+  ggGrant = undefined;
   process.disconnect();
 }

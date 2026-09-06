@@ -1,4 +1,5 @@
 /** GRIDA-SEC-010 — native OAuth lifecycle and host-owned credential custody. */
+// GRIDA-SEC-006 / GRIDA-GG: token — one-shot scoped grant to a trusted memory sink.
 export class AuthClient {
   readonly config: Readonly<AuthClient.Config>;
   private generation = 0;
@@ -10,6 +11,7 @@ export class AuthClient {
   private protectedReads = 0;
   private mutations: Promise<unknown> = Promise.resolve();
   private requests = new Set<AuthClient.RequestOperation>();
+  private readonly acceptGg?: AuthClient.GgSink["accept"];
 
   constructor(
     config: AuthClient.Config,
@@ -20,6 +22,16 @@ export class AuthClient {
       ...config,
       redirectUris: Object.freeze([...config.redirectUris]),
     });
+    try {
+      const sink = host.gg;
+      if (sink !== undefined) {
+        const accept = sink.accept;
+        if (typeof accept !== "function") throw new Error();
+        this.acceptGg = accept.bind(sink);
+      }
+    } catch {
+      throw new AuthClient.Failure("invalid_config");
+    }
   }
 
   /** Local metadata only. Use verify() when live account authority is needed. */
@@ -158,11 +170,70 @@ export class AuthClient {
     input?: Readonly<{ after?: number }> | Readonly<{ organization_id: number }>
   ): Promise<AuthClient.OrganizationsPage | AuthClient.Credits> {
     const read = accountRead(operation, input);
+    return this.protectedRequest((session) =>
+      this.account(session.accessToken, read)
+    );
+  }
+
+  /** The trusted host receives the scoped secret; callers receive only metadata. */
+  async requestGgAccess(
+    input: Readonly<{ organization_id: number }>
+  ): Promise<AuthClient.GgAccess> {
+    const organizationId = organizationInput(input);
+    const accept = this.acceptGg;
+    if (!accept) throw new AuthClient.Failure("gg_unavailable");
+    const grant = await this.protectedRequest(
+      (session) => this.ggGrant(session, organizationId),
+      {
+        validate: (grant) => {
+          if (Date.parse(grant.expires_at) <= this.host.now())
+            throw new AuthClient.Failure("invalid_response");
+        },
+        accept: (grant) => {
+          try {
+            const result = accept(grant);
+            if (result !== undefined) {
+              // An async sink violates the host contract. Do not await it under
+              // authority; contain rejection without claiming its work was undone.
+              void Promise.resolve(result).catch(() => undefined);
+              throw new Error();
+            }
+          } catch {
+            throw new AuthClient.Failure("gg_handoff_failed");
+          }
+        },
+      }
+    );
+    return {
+      organization: {
+        id: grant.organization.id,
+        name: grant.organization.name,
+      },
+      expires_at: grant.expires_at,
+    };
+  }
+
+  private async protectedRequest<T>(
+    operation: (session: AuthClient.Session) => Promise<T>,
+    handoff?: { validate(value: T): void; accept(value: T): void }
+  ): Promise<T> {
     if (this.attempt) throw new AuthClient.Failure("session_busy");
     const generation = this.generation;
+    let handedOff = false;
+    const complete = (value: T) => {
+      handoff?.validate(value);
+      this.check(generation);
+      if (handoff) {
+        // Invoking the synchronous recipient is acceptance, even if it retains
+        // the value and then throws. Later logout cannot retract that handoff.
+        handedOff = true;
+        handoff.accept(value);
+      }
+      return value;
+    };
     ++this.protectedReads;
     try {
-      let reply: AuthClient.OrganizationsPage | AuthClient.Credits;
+      let reply: T;
       if (this.coordinatedCustody()) {
         reply = await this.exclusive(async (transaction) => {
           this.check(generation);
@@ -172,11 +243,10 @@ export class AuthClient {
           if (session.expiresAt <= this.host.now() + 30_000)
             session = await this.rotate(transaction, generation, session);
           this.check(generation);
-          const result = await this.account(session.accessToken, read);
+          const result = await operation(session);
           // Acceptance occurs under authority, before another writer can clear
           // or replace this session. Already accepted data cannot be retracted.
-          this.check(generation);
-          return result;
+          return complete(result);
         });
       } else {
         let session = await this.requireSession();
@@ -190,7 +260,7 @@ export class AuthClient {
           session = await this.requireSession();
         }
         this.check(generation);
-        reply = await this.account(session.accessToken, read);
+        reply = await operation(session);
         this.check(generation);
         const current = await this.read();
         if (
@@ -198,11 +268,12 @@ export class AuthClient {
           current.refreshToken !== session.refreshToken
         )
           throw new AuthClient.Failure("session_changed");
+        reply = complete(reply);
       }
-      this.check(generation);
+      if (!handedOff) this.check(generation);
       return reply;
     } catch (error) {
-      this.check(generation);
+      if (!handedOff) this.check(generation);
       throw safeFailure(error);
     } finally {
       --this.protectedReads;
@@ -459,6 +530,58 @@ export class AuthClient {
       : credits(response.body, read.organizationId);
   }
 
+  private async ggGrant(
+    session: AuthClient.Session,
+    organizationId: number
+  ): Promise<AuthClient.GgGrant> {
+    const response = await this.request({
+      url: `${this.config.apiOrigin}/api/v1/auth/gg`,
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${session.accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ organization_id: organizationId }),
+    });
+    if (response.status !== 200)
+      throw new AuthClient.Failure(
+        response.status === 401
+          ? "token_rejected"
+          : response.status === 403
+            ? "forbidden"
+            : response.status === 429
+              ? "rate_limited"
+              : "unavailable"
+      );
+    const body = record(response.body);
+    const org = record(body?.organization);
+    const token = body?.token;
+    const expiresAt = body?.expires_at;
+    const id = org?.id;
+    const name = org?.name;
+    const now = this.host.now();
+    if (
+      !opaque(token) ||
+      !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token) ||
+      token === session.accessToken ||
+      token === session.refreshToken ||
+      id !== organizationId ||
+      typeof name !== "string" ||
+      !/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/.test(name) ||
+      !timestamp(expiresAt) ||
+      Date.parse(expiresAt) <= now ||
+      Date.parse(expiresAt) > now + 16 * 60_000
+    )
+      throw new AuthClient.Failure("invalid_response");
+    // Scope/signature authority is the fixed server mint, not decoded client
+    // claims. Bound metadata and reject accidental account-credential echoes.
+    return Object.freeze({
+      token,
+      expires_at: expiresAt,
+      organization: Object.freeze({ id: organizationId, name }),
+    });
+  }
+
   private async request(
     request: AuthClient.Request
   ): Promise<AuthClient.Response> {
@@ -637,6 +760,19 @@ export namespace AuthClient {
     state: "signed-out";
     revocation: "confirmed" | "unconfirmed" | "not-needed";
   };
+  export type GgAccess = Readonly<{
+    organization: Readonly<{ id: number; name: string }>;
+    /** Full timestamp from the scoped mint, not an account-session expiry. */
+    expires_at: string;
+  }>;
+  /** Secret-bearing trusted host input. Memory only: never persist, return or log it. */
+  export type GgGrant = GgAccess & Readonly<{ token: string }>;
+  export type GgSink = Readonly<{
+    /** Synchronous and bounded. Invocation accepts the grant; throws cannot recall it.
+     * Must not return a Promise or start an auth operation under this authority.
+     */
+    accept(grant: GgGrant): undefined;
+  }>;
   /** One server-ordered page; a null cursor is the only end-of-list signal. */
   export type OrganizationsPage = Readonly<{
     organizations: readonly Readonly<{
@@ -749,6 +885,8 @@ export namespace AuthClient {
   /** Platform adapter contract. Use the supplied Node factory for native applications. */
   export type Host = {
     custody: Custody | CoordinatedCustody;
+    /** Optional trusted recipient, captured once at construction. No durable GG cache. */
+    gg?: GgSink;
     now(): number;
     pkce(): Promise<{ state: string; verifier: string; challenge: string }>;
     listen(redirectUris: readonly string[], state: string): Promise<Listener>;
@@ -771,6 +909,9 @@ export namespace AuthClient {
     | "unsupported_operation"
     | "invalid_input"
     | "invalid_response"
+    | "gg_unavailable"
+    | "gg_handoff_failed"
+    | "rate_limited"
     | "signed_out"
     | "custody_failed"
     | "session_binding_mismatch"
@@ -797,6 +938,10 @@ function accountRead(operation: string, input: unknown): AccountRead {
     return { operation, after: accountCursor(input) };
   if (operation !== "credits.read")
     throw new AuthClient.Failure("unsupported_operation");
+  return { operation, organizationId: organizationInput(input) };
+}
+
+function organizationInput(input: unknown): number {
   try {
     const value = record(input);
     if (
@@ -808,7 +953,7 @@ function accountRead(operation: string, input: unknown): AccountRead {
     const organizationId = value.organization_id;
     if (!positiveInteger(organizationId))
       throw new AuthClient.Failure("invalid_input");
-    return { operation, organizationId };
+    return organizationId;
   } catch {
     throw new AuthClient.Failure("invalid_input");
   }

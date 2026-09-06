@@ -1,5 +1,9 @@
 // GRIDA-SEC-010 — loopback callbacks and credential transport regressions.
+// GRIDA-SEC-006 / GRIDA-GG: token — both native factories hand off only in memory.
 import { createHash } from "node:crypto";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   createServer,
   request as httpRequest,
@@ -8,7 +12,7 @@ import {
 import type { AddressInfo, Socket } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthClient } from "./index";
-import { createNativeAuth } from "./node";
+import { createNativeAuth, createPersistentNativeAuth } from "./node";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -53,6 +57,11 @@ async function redirect() {
 
 async function fixture() {
   const calls: { path: string; body: string; authorization?: string }[] = [];
+  const ggRequests: {
+    method?: string;
+    cookie?: string;
+    contentType?: string;
+  }[] = [];
   const upstream = await server();
   upstream.instance.on("request", (request, response) => {
     const parts: Buffer[] = [];
@@ -90,6 +99,21 @@ async function fixture() {
             ignored: "not-public",
           })
         );
+      } else if (call.path === "/api/v1/auth/gg") {
+        ggRequests.push({
+          method: request.method,
+          cookie: request.headers.cookie,
+          contentType: request.headers["content-type"],
+        });
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            token: "synthetic.scoped.signature",
+            expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+            organization: { id: 7, name: "example", private: "not-public" },
+            access_token: "not-public",
+          })
+        );
       } else if (call.path === "/auth/v1/logout?scope=local") {
         response.writeHead(204);
         response.end();
@@ -117,7 +141,14 @@ async function fixture() {
     apiOrigin: upstream.origin,
     redirectUris: [await redirect()],
   };
-  return { config, custody, calls, session: () => session, upstream };
+  return {
+    config,
+    custody,
+    calls,
+    ggRequests,
+    session: () => session,
+    upstream,
+  };
 }
 
 function callback(authorizationUrl: string) {
@@ -159,6 +190,99 @@ async function provesClosed(uri: string) {
 }
 
 describe("createNativeAuth", () => {
+  it.each(["memory", "file"] as const)(
+    "accepts scoped GG access through the %s factory without persisting or returning its secret",
+    async (storage) => {
+      const f = await fixture();
+      const grants: AuthClient.GgGrant[] = [];
+      const gg: AuthClient.GgSink = {
+        accept(grant) {
+          grants.push(grant);
+        },
+      };
+      const openBrowser = async (url: string) => {
+        expect(await rawCallback(callback(url))).toBe(200);
+      };
+      const directory =
+        storage === "file"
+          ? await mkdtemp(join(tmpdir(), "grida-native-gg-"))
+          : undefined;
+      if (directory)
+        cleanups.push(() => rm(directory, { recursive: true, force: true }));
+      const native = directory
+        ? await createPersistentNativeAuth(f.config, {
+            home: directory,
+            storage: "file",
+            gg,
+            openBrowser,
+          })
+        : undefined;
+      const client =
+        native?.client ??
+        createNativeAuth(f.config, { custody: f.custody, gg, openBrowser });
+      await client.login();
+      const access = await client.requestGgAccess({ organization_id: 7 });
+      expect(access).toEqual({
+        organization: { id: 7, name: "example" },
+        expires_at: grants[0]?.expires_at,
+      });
+      expect(grants).toEqual([
+        { ...access, token: "synthetic.scoped.signature" },
+      ]);
+      expect(f.calls.filter((call) => call.path === "/api/v1/auth/gg")).toEqual(
+        [
+          {
+            path: "/api/v1/auth/gg",
+            body: '{"organization_id":7}',
+            authorization: "Bearer initial-access-secret",
+          },
+        ]
+      );
+      expect(JSON.stringify(access)).not.toContain(
+        "synthetic.scoped.signature"
+      );
+      expect(f.ggRequests).toEqual([
+        { method: "POST", cookie: undefined, contentType: "application/json" },
+      ]);
+      const entries = directory
+        ? await readdir(directory, {
+            recursive: true,
+            withFileTypes: true,
+          })
+        : [];
+      const storedFiles = await Promise.all(
+        entries
+          .filter((entry) => entry.isFile())
+          .map((entry) => readFile(join(entry.parentPath, entry.name), "utf8"))
+      );
+      expect(storedFiles.join("\n")).not.toContain(
+        "synthetic.scoped.signature"
+      );
+      const restarted = directory
+        ? (
+            await createPersistentNativeAuth(f.config, {
+              home: directory,
+              storage: "file",
+              openBrowser,
+            })
+          ).client
+        : createNativeAuth(f.config, { custody: f.custody, openBrowser });
+      expect(await restarted.status()).toMatchObject({
+        state: "signed-in",
+      });
+      await expect(
+        restarted.requestGgAccess({ organization_id: 7 })
+      ).rejects.toMatchObject({ code: "gg_unavailable" });
+      expect(
+        f.calls.filter((call) => call.path === "/api/v1/auth/gg")
+      ).toHaveLength(1);
+      await client.logout();
+      // A host which retained the grant still has it; account logout cannot recall it.
+      expect(grants[0]?.token).toBe("synthetic.scoped.signature");
+      grants.length = 0;
+    }
+  );
+
   it.each(["organizations.list", "credits.read"] as const)(
     "carries %s over bounded native HTTP without cookies, redirects or raw response fields",
     async (operation) => {

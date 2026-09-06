@@ -2,6 +2,8 @@
 
 > **GRIDA-SEC-010** — registered native account boundary; see the
 > [security registry](https://github.com/gridaco/grida/blob/main/SECURITY.md).
+> **GRIDA-SEC-006 / GRIDA-GG: token** — scoped GG grants go only to an explicit
+> trusted memory sink.
 
 Independent Grida native OAuth lifecycle. Private, experimental `0.0.0`; no
 compatibility guarantees yet. This package can be consumed without a CLI,
@@ -150,6 +152,81 @@ that ignores cancellation. Logout cannot undo remote work or retract accepted
 data. Memory custody retains its one-writer limitation and rejects a read if a
 concurrent refresh changes its captured credentials. Login and account reads
 cannot overlap on the same client; they fail with `session_busy`.
+
+## Scoped GG access
+
+`requestGgAccess({organization_id})` exchanges account authority for one scoped
+Grida Gateway grant. The public result is only
+`AuthClient.GgAccess`: `{organization: {id, name}, expires_at}`. There is no
+account-token getter, caller-supplied destination, model-list operation or GG
+cache. Organization selection belongs to the account owner; membership and
+mint policy belong to the server. Minting does not establish credit eligibility
+or provider readiness.
+
+The trusted host opts in at construction with `gg: AuthClient.GgSink`. The
+neutral `Host`, `createNativeAuth`, and `createPersistentNativeAuth` all accept
+that same capability. Its bound `accept` function is captured once; replacing
+the object or method later cannot redirect delivery. Only this host capability
+receives `AuthClient.GgGrant`, the safe metadata plus `token`.
+
+```ts
+let grant: AuthClient.GgGrant | undefined;
+const auth = createNativeAuth(config, {
+  custody,
+  openBrowser: launchSystemBrowser,
+  gg: {
+    accept(value) {
+      grant = value;
+    },
+  },
+});
+
+try {
+  const access = await auth.requestGgAccess({ organization_id: 7 });
+  // The host may use the grant for its fixed GG operation, then discard it.
+  // Only access is suitable for presentation; never log or return grant.
+} finally {
+  grant = undefined;
+}
+```
+
+This sink is a **trusted synchronous, bounded memory recipient**, not a general
+callback or an authorization extension. It must return `undefined`, never a
+Promise, and must not start auth operations while custody authority is held.
+It owns keeping the grant in memory and discarding it after use. The package
+passes a frozen, projected grant and never adds it to the account session,
+keyring, file envelope, status, or public method result. Those storage guarantees
+do not constrain code the trusted host itself chooses to run.
+
+Input is exactly one own positive-safe-integer `organization_id`, captured
+before awaiting. The only request is POST to the configured API origin at
+`/api/v1/auth/gg`, with that JSON body and the account bearer. The reply must
+match the organization, contain a bounded compact-JWT-shaped token distinct
+from the current account credentials, and provide a valid full timestamp in
+the future, at most 16 minutes from the host clock. This bounds the existing
+15-minute mint plus one minute of clock tolerance. Expiry is checked again
+immediately before delivery. Extra fields are discarded. This validates the
+trusted mint's envelope; it does not verify the GG signature locally or infer
+account identity from token claims.
+
+The exchange uses the same fresh custody read, near-expiry refresh and fixed
+Node transport protections as account reads. A completed rotation survives
+later mint or handoff failure. There is no automatic replay, remint or fallback.
+HTTP 401 is `token_rejected`, 403 is `forbidden`, 429 is `rate_limited`, and
+other non-200 statuses are `unavailable`; malformed replies are
+`invalid_response`. A missing sink is `gg_unavailable` before custody or I/O;
+invalid sink configuration is `invalid_config` at construction. Upstream bodies
+and thrown sink errors are never exposed.
+
+**Invoking the sink is acceptance**, under the existing custody authority and
+generation fence. Same-client logout before invocation prevents delivery even
+if transport ignores cancellation. Coordinated custody orders another writer's
+logout before or after that acceptance. A later logout cannot recall an accepted
+grant; it remains usable within the server's existing expiry window. A sink
+that retains the grant and then throws (or incorrectly returns a Promise) yields
+`gg_handoff_failed`, without claiming rollback or trying again. There is no
+reusable GG session lifecycle here. Cache renewal, invalidation and paid-request
+retry policy require a separate producer contract with the media owner.
 
 ## Native ceremony and transport
 
@@ -317,9 +394,9 @@ can still require login; no local adapter can make those two systems atomic.
 - No supported `grida` commands, browser launcher, credential export command,
   or presentation layer.
 - No account selection, billing policy or mutations, subscription/media operations,
-  GG token minting, provider OAuth registry, or generic authenticated URL fetch.
-  Fixed organization pages and cached credits are wire transport only; other
-  operations require a new producer contract.
+  GG cache/catalogue/generation, provider OAuth registry, or generic authenticated
+  URL fetch. Fixed organization pages, cached credits and the scoped GG exchange
+  are transport only; other operations require a new producer contract.
 - No bespoke tokens, token-claim identity inference, social-PKCE fallback,
   Desktop deep links/cookies, global logout, or grant revocation.
 - No Desktop/provider credential sharing, machine-wide store, or daemon lifetime.

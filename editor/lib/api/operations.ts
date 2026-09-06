@@ -4,7 +4,7 @@ export namespace apiOperations {
     path: string;
     methods: readonly string[];
     authority: "native-account" | "gg" | "public";
-    binding: "account" | "legacy";
+    binding: "account" | "gg" | "legacy";
     cache: "no-store" | "owner" | "public";
   }>;
 
@@ -17,6 +17,14 @@ export namespace apiOperations {
       methods: ["GET", "HEAD", "OPTIONS"],
       authority: "native-account",
       binding: "account",
+      cache: "no-store",
+    },
+    // GRIDA-GG: token — native account credentials mint a separate GG grant.
+    "gg.access": {
+      path: "/api/v1/auth/gg",
+      methods: ["POST", "OPTIONS"],
+      authority: "native-account",
+      binding: "gg",
       cache: "no-store",
     },
     "account.organizations": {

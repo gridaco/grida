@@ -1,4 +1,5 @@
 // GRIDA-SEC-010 — disposable custody, failure recovery, and backend separation.
+// GRIDA-SEC-006 / GRIDA-GG: token — invalid sink configuration precedes durable I/O.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -382,5 +383,20 @@ describe.skipIf(process.platform === "win32")("durable native custody", () => {
       )
     ).rejects.toMatchObject({ code: "invalid_config" });
     expect(await readdir(directory)).not.toContain("must-not-exist");
+    await expect(
+      createPersistentNativeAuth(config, {
+        home: join(directory, "invalid-sink-must-not-exist"),
+        openBrowser: async () => {},
+        get gg(): AuthClient.GgSink {
+          throw new Error("private-sink-config");
+        },
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_config",
+      message: "Grida authentication failed (invalid_config)",
+    });
+    expect(await readdir(directory)).not.toContain(
+      "invalid-sink-must-not-exist"
+    );
   });
 });

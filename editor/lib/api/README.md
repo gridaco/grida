@@ -12,13 +12,21 @@ Desktop, consent, and webhook surfaces retain their existing contracts.
 - `policy.ts` admits only configured API hosts and registered paths before any
   browser dependency loads. Admission grants no identity. Unknown/encoded/cased
   paths return JSON 404; API maintenance returns JSON 503.
-- `account.ts` binds registered account operations to live OAuth authentication,
-  input/output validation, safe errors and `no-store`. Account routes only
-  export those handlers; they cannot provide an alternative authenticator.
+- `native.ts` owns live OAuth authentication, fixed method dispatch, safe errors
+  and `no-store` for native account bindings. `account.ts` and `gg.ts` contribute
+  their fixed input parsers and domain operations. Routes only export the
+  declared handlers; they cannot provide an alternative authenticator.
 - [Account projections](../account/account.ts) own organization pages;
   [the database adapter](../supabase/account-data.ts) supplies fixed queries with
   the same verified bearer and publishable key. It imports no cookie client and
   uses no privileged credential.
+- [Shared native REST transport](../supabase/native-data.ts) owns bounded
+  public-schema reads, exact-count validation and credential destinations.
+  Account, credit and GG data adapters supply their fixed queries.
+- [GG token owner](../gg/README.md) owns the shared mint policy. Its core receives
+  clock, key and quota capabilities; the server binding has one configuration
+  reader. Native and Desktop adapters retain their own authentication and
+  organization-selection rules.
 
 ## Account reads
 
@@ -66,13 +74,54 @@ refresh, provisioning or writes. Missing schema, invalid rows and DB failures
 remain errors; they never become zero credits. Subscription billing is outside
 this operation. Account identity and organization listing need no billing setup.
 
-All account operations support authenticated HEAD and bodyless OPTIONS;
+All account reads support authenticated HEAD and bodyless OPTIONS;
 other methods return 405. Input and output share the existing no-store policy.
 Credits OPTIONS accepts the bare route; any supplied query still must be valid.
 
 Domain operations belong in their own modules and receive explicit authority
 and inputs. They do not import Next, cookies or UI. HTTP adapters do not acquire
 browser organization preferences or duplicate billing policy.
+
+## Native GG access
+
+`POST /api/v1/auth/gg` exchanges a live native OAuth bearer for one scoped
+Grida Gateway token. Its JSON input is exactly one explicit organization ID:
+
+```json
+{ "organization_id": 1 }
+```
+
+The ID must be a positive safe integer written as a canonical decimal integer.
+Query parameters, duplicate/extra/escaped field names, unsupported media or
+content encodings, malformed UTF-8 and inconsistent length declarations are
+rejected. The parser accepts at most 1024 bytes and waits at most one second
+after route entry. Bodyless OPTIONS advertises POST/OPTIONS without contacting
+the issuer; all other methods, including GET/HEAD, return 405.
+
+After live bearer verification, [the member query](../supabase/gg-data.ts) uses
+that exact credential and the configured publishable key. It filters the
+verified user and explicit organization together, requires an exact zero/one-row
+result, and returns no organization preference. Unknown or invisible membership
+is 403. The shared mint policy checks the existing per-user quota before this
+lookup and signs only after it succeeds. Rate limitation is 429; unavailable
+signing setup or upstream failures are safe 503 responses. All responses are
+`no-store`; cookies and organization headers supply no authority.
+
+The response is `{token, expires_at, organization: {id, name}}`. Its dedicated
+HS256 credential has audience `gg:ai` and a 900-second signed lifetime with the
+existing 60-second verification tolerance. Minting checks no credits and performs
+no billing/provider work. The account token can mint but cannot call
+`/api/v1/ai/*`; a GG token can call that gateway but cannot read account data or
+mint another grant. The static model list establishes access, not spending
+eligibility. Desktop keeps its existing `/desktop/auth/token` response and
+session-organization fallback over the same mint owner.
+
+The native auth package's [scoped GG contract](../../../packages/grida-auth/README.md)
+delivers the token only to a construction-time trusted synchronous memory sink.
+Its public result contains organization/expiry metadata. This is a one-shot
+handoff: logout before acceptance prevents delivery; later logout or sink failure
+cannot recall a token already retained. Reusable GG custody and paid execution
+need their own lifecycle contract.
 
 ## Adding a route
 
@@ -82,7 +131,7 @@ browser organization preferences or duplicate billing policy.
    [the identity route](<../../app/(api)/(public)/api/v1/auth/me/route.ts>) as the pattern.
 4. Run the checks below and add real HTTP coverage for new boundary behavior.
 
-The source audit rejects unregistered routes, standalone account handlers,
+The source audit rejects unregistered routes, standalone native handlers,
 miswired exports, dependency leaks and unowned environment reads. It resolves
 relative imports, aliases and re-exports transitively. Tests include invalid
 source trees to prove these checks fail. This is a development check, not a
@@ -109,11 +158,24 @@ proofs must explicitly supply their loopback origin.
 Unset, empty or `0` serves normally; other values fail closed. This switch is
 separate from the web maintenance page. Neither setting logs or echoes configuration.
 
+The GG server's configuration owner reads `GG_TOKEN_SECRET` (at least 32 UTF-8
+bytes after trimming) and optional `GG_TOKEN_SECRET_PREVIOUS` for verify-only
+rotation. A current key is always required. Both mint adapters share the
+`rl:v1-ai:mint` quota: 10 requests per user per 60 seconds using the configured
+Upstash REST URL/token. The existing unconfigured-limiter allowance is preserved;
+configured upstream failures do not turn into an allowance. Signing and limiter
+configuration never comes from request input.
+
 Next configuration runs before proxy. Its web slash/connect redirects explicitly
 exclude the API namespace and percent-encoded aliases. Account headers are set by
 the adapter, never inherited from the legacy `/v1` CORS configuration.
 Next still normalizes malformed repeated slashes/backslashes before proxy;
 those framework redirects are outside the machine response contract.
+Next.js 16.2.6 also clones POST bodies for the Node proxy and waits for the
+original stream to end before entering the route. The mint parser's 1024-byte
+limit and one-second deadline start after that step. They are not upload limits:
+verify an external body-size limit and upload deadline at the hosting/reverse
+proxy layer before releasing the endpoint.
 
 ## Check locally
 
@@ -124,7 +186,8 @@ pnpm --filter editor test:api:http
 
 The first command audits real source and runs offline contracts without loading
 dotenv files. The second builds a minimal production-mode Next snapshot with the
-real proxy, configuration and identity implementation, an owned synthetic issuer,
+real proxy, configuration, native account/GG bindings, signer and model list,
+an owned synthetic issuer,
 and recording replacements for unrelated web services. See the
 [HTTP proof guide](../../../scripts/api-local/README.md) for coverage and limits.
 The [API workflow](../../../.github/workflows/api.yml) runs both on every PR.

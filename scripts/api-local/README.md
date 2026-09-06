@@ -4,8 +4,8 @@
 > [SECURITY.md](../../SECURITY.md).
 
 This proof builds and starts Next.js in **production mode**, then sends real
-HTTP requests to the current `/api/v1/auth/me` and
-`/api/v1/account/organizations` and `/api/v1/account/credits` implementations. It needs Node.js
+HTTP requests to the current `/api/v1/auth/me`, `/api/v1/account/organizations`,
+`/api/v1/account/credits`, `/api/v1/auth/gg`, and `/api/v1/ai/models` implementations. It needs Node.js
 24+ and the repository's installed dependencies. It does not install packages,
 start Docker, use Supabase services, or read account credentials.
 
@@ -15,8 +15,8 @@ node scripts/api-local/proof.mjs
 ```
 
 The proof copies the current API operation inventory, request policy, account
-adapter, account and cached-credit projections, RLS data adapters, shared credit
-gate, bearer verifier, OAuth HTTP client,
+adapters, account and cached-credit projections, RLS data adapters, shared credit
+gate, GG mint/signer/verifier, static model list, bearer verifier, OAuth HTTP client,
 routes, proxy, and Next configuration
 into a fresh private `.cache/api-local` directory. It records their source
 hashes. Existing installed dependencies are linked into the snapshot; dotenv
@@ -27,7 +27,7 @@ The configuration wrapper changes only Turbopack's dependency resolution root
 and its alias for the unrelated Edge Config test replacement. The original
 headers, redirects, and other settings remain in effect. The test runs the real
 Next build and server, without mocking `next/server`, requests, responses, the
-proxy, API handlers, or bearer verification.
+proxy, API handlers, bearer verification, or GG signing/verification.
 
 ## Coverage and deliberate fixtures
 
@@ -40,7 +40,8 @@ active. This verifies dispatch and calls, not import-time behavior of the
 original web modules. A fixture insiders handler must never run in production.
 
 A newly owned loopback HTTP server supplies `/auth/v1/oauth/userinfo` and
-synthetic `/rest/v1/organization` and `/rest/v1/v_billing_credits` responses. It accepts
+synthetic `/rest/v1/organization`, `/rest/v1/organization_member`, and
+`/rest/v1/v_billing_credits` responses. It accepts
 only exact synthetic tokens issued in memory for two synthetic users. The real
 bearer verifier performs its normal preflight and HTTP request. The database
 fixture requires the exact caller bearer, publishable key, public schema and
@@ -71,11 +72,36 @@ successful empty or zero-balance snapshots. The credits projection cannot expose
 extra upstream fields. The fixture admits only the fixed read request; it does
 not implement provider refresh, provisioning, subscription reads or mutations.
 
+GG access uses a fresh signing key generated in memory. The real native mint
+requires the exact same-user membership query and explicit organization before
+signing; tests independently inspect its signature, audience, subject, organization
+and 900-second lifetime. Its real GG token then reaches the existing model-list
+handler. Account tokens cannot access that handler, and GG tokens cannot access
+account operations or mint another token. Conflicting cookies or organization
+headers supply no authority. Removed membership and a revoked account prevent
+reminting; an already minted GG token retains its existing expiry window.
+
+Mint cases cover its strict JSON shape and 1 KiB body bound, methods,
+query rejection, exact database counts and safe upstream failures. Separate
+server runs prove missing or short signing keys fail closed. Minting and model
+listing make no credit query or fixture billing change. Upstash and provider
+credentials are absent: quota behavior is covered by separate unit contracts;
+no generation endpoint or paid provider is invoked. A model-list result proves
+GG access, not credit eligibility or provider readiness.
+
+Next.js 16.2.6 clones POST bodies for proxy and waits for their original EOF
+before invoking the route. A finite delayed-upload case verifies no issuer or
+membership work occurs before upload completion, then the valid request succeeds.
+The route's one-second read deadline starts only when it receives the stream;
+its separate unit contracts cover a stalled stream at that boundary. This HTTP
+proof does not establish a network upload deadline or a pre-route 1 KiB limit.
+Hosting upload time and body-size limits remain release requirements.
+
 This proves the **Next request pipeline**, not Supabase token cryptography,
 OAuth consent, grant revocation, RLS, or hosted infrastructure. The separate
 [local OAuth proof](../auth-local/README.md) covers the real Supabase flow.
-Legacy GG and public catalogue handlers are not built or exercised here; their
-registered paths remain part of the copied operation inventory.
+The other legacy GG generation and public catalogue handlers are not built or
+exercised here; their registered paths remain part of the copied inventory.
 
 ## Isolation and cleanup
 

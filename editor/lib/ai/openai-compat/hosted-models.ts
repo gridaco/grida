@@ -19,7 +19,8 @@
  * that drifts from Metronome.
  */
 import { models, TIER_MODEL_IDS, type ModelTier } from "@grida/ai-models";
-import { catalog } from "../models";
+
+const catalog = models.text.catalog;
 
 export type HostedModelEntry = {
   id: string;

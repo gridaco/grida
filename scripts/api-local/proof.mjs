@@ -1,4 +1,6 @@
 // GRIDA-SEC-012 — production Next pipeline proof with private, synthetic inputs.
+// GRIDA-SEC-006 — see /SECURITY.md
+// GRIDA-GG: token — fresh fixture authority proves mint and credential isolation.
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createServer, request as httpRequest } from "node:http";
@@ -29,18 +31,33 @@ const copiedFiles = [
   "proxy.ts",
   "lib/api/operations.ts",
   "lib/api/policy.ts",
+  "lib/api/native.ts",
   "lib/api/account.ts",
+  "lib/api/gg.ts",
   "lib/account/account.ts",
+  "lib/supabase/native-data.ts",
   "lib/supabase/account-data.ts",
   "lib/supabase/credits-data.ts",
+  "lib/supabase/gg-data.ts",
   "lib/billing/credits.ts",
   "lib/billing/fees.ts",
   "lib/auth/bearer.ts",
+  "lib/auth/gg-token.ts",
   "lib/auth/oauth-server.ts",
+  "lib/gg/gg.ts",
+  "lib/gg/tokens.ts",
+  "lib/gg/config.ts",
+  "lib/ai/openai-compat/codec.ts",
+  "lib/ai/openai-compat/errors.ts",
+  "lib/ai/openai-compat/hosted-models.ts",
+  "lib/ai/openai-compat/limits.ts",
+  "lib/ai/openai-compat/wire.ts",
   "lib/desktop/csp.ts",
   "lib/domains/index.ts",
   "lib/platform/index.ts",
   "app/(api)/(public)/api/v1/auth/me/route.ts",
+  "app/(api)/(public)/api/v1/auth/gg/route.ts",
+  "app/(api)/(public)/api/v1/ai/models/route.ts",
   "app/(api)/(public)/api/v1/account/organizations/route.ts",
   "app/(api)/(public)/api/v1/account/credits/route.ts",
 ];
@@ -77,7 +94,13 @@ async function close(server) {
 function request(
   port,
   pathname,
-  { method = "GET", headers = {}, body, timeoutMs = 12_000 } = {}
+  {
+    method = "GET",
+    headers = {},
+    body,
+    bodyEndDelayMs = 0,
+    timeoutMs = 12_000,
+  } = {}
 ) {
   return new Promise((resolve, reject) => {
     const req = httpRequest(
@@ -92,20 +115,28 @@ function request(
           else chunks.push(chunk);
         });
         response.on("error", reject);
-        response.on("end", () =>
+        response.on("end", () => {
+          if (bodyEndDelayMs) req.destroy();
           resolve({
             status: response.statusCode,
             headers: response.headers,
             body: Buffer.concat(chunks).toString("utf8"),
-          })
-        );
+          });
+        });
       }
     );
     req.setTimeout(timeoutMs, () =>
-      req.destroy(new Error("Proof request deadline"))
+      req.destroy(
+        new Error(`Proof request deadline: ${method} ${pathname.split("?")[0]}`)
+      )
     );
     req.on("error", reject);
-    req.end(body);
+    if (bodyEndDelayMs) {
+      req.flushHeaders();
+      if (body) req.write(body);
+      const timer = setTimeout(() => req.end(), bodyEndDelayMs);
+      req.once("close", () => clearTimeout(timer));
+    } else req.end(body);
   });
 }
 
@@ -123,10 +154,12 @@ function issuerFixture() {
     calls: 0,
     databaseCalls: 0,
     creditsCalls: 0,
+    ggCalls: 0,
     mode: "ok",
     databaseMode: "ok",
     databaseLimit: 100,
     creditsMode: "ok",
+    ggMode: "ok",
     credits: [
       [
         {
@@ -185,15 +218,22 @@ function issuerFixture() {
     const url = new URL(req.url, fixture.origin);
     const database = url.pathname === "/rest/v1/organization";
     const credits = url.pathname === "/rest/v1/v_billing_credits";
+    const membership = url.pathname === "/rest/v1/organization_member";
     if (credits) {
       fixture.creditsCalls++;
+      fixture.databaseCalls++;
+    } else if (membership) {
+      fixture.ggCalls++;
       fixture.databaseCalls++;
     } else if (database) fixture.databaseCalls++;
     else fixture.calls++;
     response.setHeader("cache-control", "no-store");
     if (
       req.method !== "GET" ||
-      (!database && !credits && req.url !== "/auth/v1/oauth/userinfo") ||
+      (!database &&
+        !credits &&
+        !membership &&
+        req.url !== "/auth/v1/oauth/userinfo") ||
       req.headers.apikey !== "synthetic-publishable-key"
     ) {
       response.writeHead(500).end();
@@ -203,6 +243,79 @@ function issuerFixture() {
     const index = tokens.get(token);
     if (index === undefined || fixture.mode === "revoked") {
       response.writeHead(401).end();
+      return;
+    }
+    if (membership) {
+      const selector = url.searchParams.get("organization_id");
+      if (
+        url.searchParams.get("select") !==
+          "organization_id,organization!inner(id,name)" ||
+        url.searchParams.get("user_id") !== `eq.${users[index].id}` ||
+        url.searchParams.get("limit") !== "2" ||
+        !/^eq\.[1-9]\d*$/.test(selector ?? "") ||
+        [...url.searchParams.keys()].sort().join(",") !==
+          "limit,organization_id,select,user_id" ||
+        req.headers["accept-profile"] !== "public" ||
+        req.headers.prefer !== "count=exact" ||
+        req.headers.cookie !== undefined
+      ) {
+        response.writeHead(500).end();
+        return;
+      }
+      const mode = fixture.ggMode;
+      const failure = { unauthorized: 401, forbidden: 403, unavailable: 503 }[
+        mode
+      ];
+      if (failure) {
+        response.writeHead(failure).end();
+        return;
+      }
+      if (mode === "redirect") {
+        response
+          .writeHead(302, { location: `${fixture.origin}/unexpected-gg` })
+          .end();
+        return;
+      }
+      const id = Number(selector.slice(3));
+      // Both the exact bearer and explicit same-user predicate are required.
+      // This is a request fixture; real PostgreSQL owns RLS verification.
+      let rows = fixture.organizations[index]
+        .filter((organization) => organization.id === id)
+        .map((organization) => ({
+          organization_id: id,
+          organization: { id, name: organization.name },
+        }));
+      if (mode === "duplicate" && rows.length) rows = [rows[0], rows[0]];
+      if (mode === "wrong-org" && rows.length)
+        rows = [{ ...rows[0], organization_id: id + 1 }];
+      if (mode === "wrong-join" && rows.length)
+        rows = [{ ...rows[0], organization: { id: id + 1, name: "wrong" } }];
+      if (mode === "invalid-slug" && rows.length)
+        rows = [{ ...rows[0], organization: { id, name: "Invalid Slug" } }];
+      if (mode === "empty-nonzero-count") rows = [];
+      response.statusCode = mode === "partial" ? 206 : 200;
+      response.setHeader(
+        "content-type",
+        mode === "content-type" ? "text/plain" : "application/json"
+      );
+      if (mode !== "missing-count")
+        response.setHeader(
+          "content-range",
+          {
+            "unknown-count": "0-0/*",
+            "truncated-count": "0-0/2",
+            "bad-range": "1-1/1",
+            "empty-nonzero-count": "*/1",
+          }[mode] ??
+            (rows.length ? `0-${rows.length - 1}/${rows.length}` : "*/0")
+        );
+      response.end(
+        mode === "malformed"
+          ? "invalid JSON"
+          : JSON.stringify(
+              rows.map((row) => ({ ...row, ignored: "upstream-only" }))
+            )
+      );
       return;
     }
     if (credits) {
@@ -1061,12 +1174,391 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
   );
 }
 
-async function assertions(port, issuer, tripwire) {
+async function ggAssertions(port, issuer, safe, alpha, beta, signingSecret) {
+  const endpoint = "/api/v1/auth/gg";
+  const models = "/api/v1/ai/models";
+  const auth = (token) => ({ authorization: `Bearer ${token}` });
+  const mint = (token, id, overrides = {}) =>
+    request(port, endpoint, {
+      method: "POST",
+      headers: { ...auth(token), "content-type": "application/json" },
+      body: JSON.stringify({ organization_id: id }),
+      ...overrides,
+    });
+  const billingBefore = JSON.stringify(issuer.credits);
+  const creditsCallsBefore = issuer.creditsCalls;
+  const grant = async (token, user, organization, headers = {}) => {
+    const before = Math.floor(Date.now() / 1000);
+    const body = safe(
+      await mint(token, organization.id, {
+        headers: {
+          ...auth(token),
+          "content-type": "application/json",
+          ...headers,
+        },
+      }),
+      200,
+      "GG grant"
+    );
+    check(
+      Object.keys(body).sort().join(",") === "expires_at,organization,token" &&
+        isDeepStrictEqual(body.organization, {
+          id: organization.id,
+          name: organization.name,
+        }) &&
+        typeof body.token === "string" &&
+        typeof body.expires_at === "string",
+      "GG grant projection or organization mismatch"
+    );
+    const parts = body.token.split(".");
+    check(parts.length === 3, "GG grant is not a JWT");
+    const header = JSON.parse(Buffer.from(parts[0], "base64url").toString());
+    const claims = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+    const signature = createHmac("sha256", signingSecret)
+      .update(`${parts[0]}.${parts[1]}`)
+      .digest("base64url");
+    check(
+      header.alg === "HS256" &&
+        header.typ === "JWT" &&
+        parts[2] === signature &&
+        Object.keys(claims).sort().join(",") === "aud,exp,iat,org,sub" &&
+        claims.aud === "gg:ai" &&
+        claims.sub === user.id &&
+        claims.org === organization.id &&
+        Number.isSafeInteger(claims.iat) &&
+        claims.iat >= before &&
+        claims.iat <= Math.floor(Date.now() / 1000) &&
+        claims.exp - claims.iat === 900 &&
+        new Date(claims.exp * 1000).toISOString() === body.expires_at,
+      "GG grant signature, scope or lifetime mismatch"
+    );
+    return body.token;
+  };
+  // Real signing and real gateway verification, with a newly generated test key.
+  const alphaOrg = issuer.organizations[0][0];
+  const betaOrg = issuer.organizations[1][0];
+  const alphaGrant = await grant(alpha, issuer.users[0], alphaOrg, {
+    cookie: "sb-session=synthetic-other-user; organization=beta",
+    "x-grida-organization-id": String(betaOrg.id),
+  });
+  const betaGrant = await grant(beta, issuer.users[1], betaOrg);
+  const tampered = alphaGrant.split(".");
+  tampered[2] = `${tampered[2][0] === "a" ? "b" : "a"}${tampered[2].slice(1)}`;
+  const beforeModelsAuth = issuer.calls;
+  const beforeModelsData = issuer.databaseCalls;
+  for (const token of [alphaGrant, betaGrant, alphaGrant]) {
+    const body = safe(
+      await request(port, models, {
+        headers: { ...auth(token), cookie: "sb-session=synthetic-other-user" },
+      }),
+      200,
+      "GG-scoped model list",
+      true,
+      false
+    );
+    check(
+      body.object === "list" &&
+        Array.isArray(body.data) &&
+        body.data.length > 0 &&
+        body.data.every(
+          (row) =>
+            row.object === "model" &&
+            typeof row.id === "string" &&
+            row.id.length > 0
+        ),
+      "GG model list has an invalid shape"
+    );
+  }
+  for (const headers of [
+    {},
+    { cookie: "sb-session=synthetic-web-cookie" },
+    auth(alpha),
+    auth(beta),
+    auth("synthetic-api-key"),
+    auth(tampered.join(".")),
+  ]) {
+    const body = safe(
+      await request(port, models, { headers }),
+      401,
+      "GG models credential-family rejection",
+      true,
+      false
+    );
+    check(body.error?.code === "invalid_token", "GG verifier error mismatch");
+  }
+  check(
+    issuer.calls === beforeModelsAuth &&
+      issuer.databaseCalls === beforeModelsData,
+    "GG model list sent a credential to the account issuer/database"
+  );
+
+  let beforeAuth = issuer.calls;
+  let beforeData = issuer.databaseCalls;
+  for (const headers of [
+    {},
+    { cookie: "sb-session=synthetic-web-cookie" },
+    auth(alphaGrant),
+    auth("synthetic-api-key"),
+    auth(issuer.token(0, { client_id: randomUUID() })),
+    auth(issuer.token(0, { exp: Math.floor(Date.now() / 1000) - 1 })),
+  ]) {
+    safe(
+      await mint(alpha, alphaOrg.id, {
+        headers: { ...headers, "content-type": "application/json" },
+      }),
+      401,
+      "Native GG mint credential-family rejection"
+    );
+  }
+  for (const target of [
+    "/api/v1/auth/me",
+    "/api/v1/account/organizations",
+    `/api/v1/account/credits?organization_id=${alphaOrg.id}`,
+  ]) {
+    safe(
+      await request(port, target, { headers: auth(alphaGrant) }),
+      401,
+      "GG grant cannot become an account credential"
+    );
+  }
+  check(
+    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    "Wrong native credential family reached issuer/database"
+  );
+
+  for (const [token, id] of [
+    [alpha, betaOrg.id],
+    [beta, alphaOrg.id],
+    [alpha, 999999],
+  ]) {
+    const body = safe(
+      await mint(token, id),
+      403,
+      "GG inaccessible organization"
+    );
+    check(body.error?.code === "forbidden", "GG membership error mismatch");
+  }
+  const betaRows = issuer.organizations[1];
+  issuer.organizations[1] = [alphaOrg, ...betaRows];
+  const temporaryGrant = await grant(beta, issuer.users[1], alphaOrg);
+  issuer.organizations[1] = betaRows;
+  safe(await mint(beta, alphaOrg.id), 403, "GG removed membership cannot mint");
+  safe(
+    await request(port, models, { headers: auth(temporaryGrant) }),
+    200,
+    "Existing GG grant retains its expiry window after membership removal",
+    true,
+    false
+  );
+  beforeData = issuer.databaseCalls;
+  issuer.mode = "revoked";
+  safe(await mint(alpha, alphaOrg.id), 401, "GG revoked account cannot remint");
+  check(issuer.databaseCalls === beforeData, "Revoked account reached GG data");
+  safe(
+    await request(port, models, { headers: auth(alphaGrant) }),
+    200,
+    "Existing GG grant retains its expiry window after account revocation",
+    true,
+    false
+  );
+  issuer.mode = "ok";
+
+  beforeAuth = issuer.calls;
+  beforeData = issuer.databaseCalls;
+  const options = await request(port, endpoint, { method: "OPTIONS" });
+  safe(options, 204, "GG OPTIONS", false);
+  check(options.headers.allow === "POST, OPTIONS", "GG OPTIONS Allow mismatch");
+  for (const method of ["GET", "HEAD", "PUT", "PATCH", "DELETE"]) {
+    const response = await request(port, endpoint, {
+      method,
+      headers: auth(alpha),
+    });
+    const body = safe(response, 405, "GG method rejection", method !== "HEAD");
+    check(
+      response.headers.allow === "POST, OPTIONS" &&
+        (method === "HEAD" || body.error?.code === "method_not_allowed"),
+      "GG method policy mismatch"
+    );
+  }
+  for (const body of [
+    "",
+    "{",
+    "null",
+    "[]",
+    "{}",
+    '{"organization_id":0}',
+    '{"organization_id":-1}',
+    '{"organization_id":1.0}',
+    '{"organization_id":1e0}',
+    '{"organization_id":9007199254740992}',
+    '{"organization_id":"1"}',
+    '{"organization_id":null}',
+    '{"organization_id":true}',
+    '{"organization_id":1,"user_id":"other"}',
+    '{"organization_id":1,"organization_id":1001}',
+    '{"organization_\\u0069d":1}',
+    `${" ".repeat(1024)}{"organization_id":1}`,
+  ]) {
+    const response = safe(
+      await mint(alpha, alphaOrg.id, { body }),
+      400,
+      "GG strict JSON body rejection"
+    );
+    check(
+      response.error?.code === "invalid_request",
+      "GG input error mismatch"
+    );
+  }
+  for (const headers of [
+    auth(alpha),
+    { ...auth(alpha), "content-type": "text/plain" },
+    { ...auth(alpha), "content-type": "application/json; charset=latin1" },
+    {
+      ...auth(alpha),
+      "content-type": "application/json",
+      "content-encoding": "gzip",
+    },
+  ]) {
+    safe(
+      await mint(alpha, alphaOrg.id, { headers }),
+      400,
+      "GG body media-type rejection"
+    );
+  }
+  for (const query of [
+    "organization_id=1",
+    "organization_id=1&organization_id=1001",
+    "user_id=other",
+  ]) {
+    safe(
+      await request(port, `${endpoint}?${query}`, {
+        method: "POST",
+        headers: { ...auth(alpha), "content-type": "application/json" },
+        body: '{"organization_id":1}',
+      }),
+      400,
+      "GG query rejection"
+    );
+  }
+  for (const overrides of [
+    { method: "OPTIONS", body: "x", headers: { "content-length": "1" } },
+    {
+      body: `${" ".repeat(1024)}{"organization_id":1}`,
+      headers: {
+        ...auth(alpha),
+        "content-type": "application/json",
+        "transfer-encoding": "chunked",
+      },
+    },
+  ]) {
+    safe(
+      await mint(alpha, alphaOrg.id, overrides),
+      400,
+      "GG body presence or chunked-size rejection",
+      overrides.method !== "OPTIONS"
+    );
+  }
+  safe(
+    await request(port, `${endpoint}?organization_id=1`, { method: "OPTIONS" }),
+    400,
+    "GG OPTIONS rejects query selectors",
+    false
+  );
+  check(
+    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    "Rejected GG method/input reached issuer/database"
+  );
+  await grant(alpha, issuer.users[0], alphaOrg, {
+    "content-type": "application/json; charset=utf-8",
+    "content-encoding": "identity",
+  });
+  for (const body of [
+    '{\n "organization_id" \t: 1\n}',
+    `${" ".repeat(1024 - '{"organization_id":1}'.length)}{"organization_id":1}`,
+  ]) {
+    safe(
+      await mint(alpha, alphaOrg.id, { body }),
+      200,
+      "GG accepts JSON whitespace up to its exact byte limit"
+    );
+  }
+  // Next 16.2.6 clones POST bodies for proxy and awaits the original EOF in
+  // getCloneableBody.finalize before invoking this route. Its upload wait is
+  // outside the route's own one-second read timer; hosting must bound that wait.
+  beforeAuth = issuer.calls;
+  beforeData = issuer.databaseCalls;
+  const delayed = mint(alpha, alphaOrg.id, { bodyEndDelayMs: 1500 });
+  void delayed.catch(() => undefined);
+  await delay(1100);
+  check(
+    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    "Incomplete GG upload reached issuer/database"
+  );
+  safe(
+    await delayed,
+    200,
+    "Next buffers the completed upload before the GG route read timer starts"
+  );
+
+  for (const [mode, status] of [
+    ["unavailable", 503],
+    ["mismatch", 401],
+    ["redirect", 503],
+  ]) {
+    beforeData = issuer.databaseCalls;
+    issuer.mode = mode;
+    safe(await mint(alpha, alphaOrg.id), status, `GG issuer ${mode}`);
+    check(
+      issuer.databaseCalls === beforeData,
+      "Rejected issuer reached GG data"
+    );
+  }
+  issuer.mode = "ok";
+  for (const [mode, status] of [
+    ["unauthorized", 401],
+    ["forbidden", 403],
+    ["unavailable", 503],
+    ["redirect", 503],
+    ["malformed", 503],
+    ["content-type", 503],
+    ["missing-count", 503],
+    ["unknown-count", 503],
+    ["truncated-count", 503],
+    ["bad-range", 503],
+    ["duplicate", 503],
+    ["wrong-org", 503],
+    ["wrong-join", 503],
+    ["invalid-slug", 503],
+    ["empty-nonzero-count", 503],
+  ]) {
+    issuer.ggMode = mode;
+    const body = safe(
+      await mint(alpha, alphaOrg.id),
+      status,
+      `GG database ${mode}`
+    );
+    check(
+      body.error && !Object.hasOwn(body, "token"),
+      "GG failure exposed a grant"
+    );
+  }
+  issuer.ggMode = "partial";
+  await grant(alpha, issuer.users[0], alphaOrg);
+  issuer.ggMode = "ok";
+  await grant(alpha, issuer.users[0], alphaOrg);
+  check(
+    issuer.creditsCalls === creditsCallsBefore &&
+      JSON.stringify(issuer.credits) === billingBefore,
+    "GG access or model discovery read or changed billing state"
+  );
+}
+
+async function assertions(port, issuer, tripwire, signingSecret) {
   let count = 0;
   const alpha = issuer.token(0);
   const beta = issuer.token(1);
   const auth = (token) => ({ authorization: `Bearer ${token}` });
-  const safe = (response, status, label, body = true) => {
+  const safe = (response, status, label, body = true, native = true) => {
     check(
       response.status === status,
       `${label}: expected HTTP ${status}, got ${response.status}`
@@ -1075,14 +1567,16 @@ async function assertions(port, issuer, tripwire) {
       response.headers["cache-control"]?.includes("no-store"),
       `${label}: missing no-store`
     );
-    check(
-      response.headers["x-content-type-options"] === "nosniff",
-      `${label}: missing nosniff`
-    );
-    check(
-      response.headers["referrer-policy"] === "no-referrer",
-      `${label}: missing referrer policy`
-    );
+    if (native) {
+      check(
+        response.headers["x-content-type-options"] === "nosniff",
+        `${label}: missing nosniff`
+      );
+      check(
+        response.headers["referrer-policy"] === "no-referrer",
+        `${label}: missing referrer policy`
+      );
+    }
     check(
       !response.headers["set-cookie"],
       `${label}: unexpected cookie mutation`
@@ -1165,6 +1659,7 @@ async function assertions(port, issuer, tripwire) {
   issuer.mode = "ok";
   await organizationAssertions(port, issuer, safe, alpha, beta);
   await creditsAssertions(port, issuer, safe, alpha, beta);
+  await ggAssertions(port, issuer, safe, alpha, beta, signingSecret);
   safe(
     await request(port, "/api/v1/auth/me", {
       method: "HEAD",
@@ -1414,6 +1909,7 @@ async function main() {
     const port = await listen(reservation);
     await close(reservation);
     const apiOrigin = `http://127.0.0.1:${port}`;
+    const signingSecret = randomBytes(32).toString("hex");
     const env = {
       PATH: [path.dirname(process.execPath), "/usr/bin", "/bin"].join(
         path.delimiter
@@ -1432,6 +1928,7 @@ async function main() {
       GRIDA_OAUTH_CLIENT_IDS: issuer.client,
       GRIDA_API_ORIGIN: apiOrigin,
       GRIDA_API_MAINTENANCE: "0",
+      GG_TOKEN_SECRET: signingSecret,
       GRIDA_API_TEST_PORTS: `${port},${issuerPort}`,
       GRIDA_API_TEST_TRIPWIRE: tripwire,
       NODE_OPTIONS: `--require=${JSON.stringify(path.join(scripts, "network.cjs"))}`,
@@ -1454,7 +1951,13 @@ async function main() {
     logs.push(active.log());
     active = undefined;
     check(built.code === 0, "Production Next build failed");
-    for (const mode of ["normal", "maintenance", "invalid-config"]) {
+    for (const mode of [
+      "normal",
+      "maintenance",
+      "invalid-config",
+      "gg-unconfigured",
+      "gg-short-secret",
+    ]) {
       check(!interrupted, "API proof interrupted");
       phase = `production HTTP ${mode}`;
       console.log(`API pipeline proof: ${phase}.`);
@@ -1467,21 +1970,73 @@ async function main() {
           ...(mode === "invalid-config"
             ? { GRIDA_API_ORIGIN: `${apiOrigin}/invalid` }
             : {}),
+          ...(mode === "gg-unconfigured" ? { GG_TOKEN_SECRET: "" } : {}),
+          ...(mode === "gg-short-secret" ? { GG_TOKEN_SECRET: "short" } : {}),
         }
       );
       await ready(active, port);
       if (mode === "normal")
-        report.cases += await assertions(port, issuer, tripwire);
-      else
-        for (const endpoint of [
-          "/api/v1/auth/me",
-          "/api/v1/account/organizations",
-          "/api/v1/account/credits?organization_id=1",
+        report.cases += await assertions(port, issuer, tripwire, signingSecret);
+      else if (mode.startsWith("gg-")) {
+        for (const [endpoint, options] of [
+          [
+            "/api/v1/auth/gg",
+            {
+              method: "POST",
+              headers: {
+                authorization: `Bearer ${issuer.token(0)}`,
+                "content-type": "application/json",
+              },
+              body: '{"organization_id":1}',
+            },
+          ],
+          [
+            "/api/v1/ai/models",
+            { headers: { authorization: "Bearer synthetic-gg" } },
+          ],
+        ]) {
+          const beforeCredits = issuer.creditsCalls;
+          const response = await request(port, endpoint, options);
+          check(
+            response.status === 503 &&
+              response.headers["content-type"]?.includes("application/json") &&
+              JSON.parse(response.body).error?.code === "not_configured",
+            `${mode} must fail closed with not_configured`
+          );
+          check(
+            response.headers["cache-control"]?.includes("no-store") &&
+              !response.headers["set-cookie"] &&
+              !response.headers.location &&
+              !Object.hasOwn(JSON.parse(response.body), "token") &&
+              issuer.creditsCalls === beforeCredits &&
+              (await readFile(tripwire, "utf8")) === "",
+            `${mode} exposed a grant or invoked billing/web work`
+          );
+          report.cases++;
+        }
+      } else
+        for (const [endpoint, options] of [
+          ["/api/v1/auth/me", {}],
+          ["/api/v1/account/organizations", {}],
+          ["/api/v1/account/credits?organization_id=1", {}],
+          [
+            "/api/v1/auth/gg",
+            {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: '{"organization_id":1}',
+            },
+          ],
+          ["/api/v1/ai/models", {}],
         ]) {
           const before = issuer.calls;
           const beforeData = issuer.databaseCalls;
           const response = await request(port, endpoint, {
-            headers: { authorization: `Bearer ${issuer.token(0)}` },
+            ...options,
+            headers: {
+              ...options.headers,
+              authorization: `Bearer ${issuer.token(0)}`,
+            },
           });
           check(
             response.status === 503 &&
