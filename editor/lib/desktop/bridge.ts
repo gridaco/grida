@@ -1061,7 +1061,7 @@ export namespace workspaces {
     return await bridgeOrThrow().workspaces.create(input);
   }
   /**
-   * The host's DEFAULT workspace — the managed root itself (`~/Documents/Grida`),
+   * The host's DEFAULT workspace — the managed root itself (`~/Documents/Grida Projects`),
    * surfaced by {@link list} with `is_default`. The home roots a fresh session
    * HERE instead of minting a per-session folder (the old auto-create flow
    * littered the managed root and pre-picked where to work). Null on a host with

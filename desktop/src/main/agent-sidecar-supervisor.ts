@@ -380,7 +380,7 @@ export class AgentSidecarSupervisor {
       // A visible, Finder-navigable location (files stay visible); the sidecar
       // may only mint project folders INSIDE this root. `documents` needs a
       // ready app, which holds at spawn time (post `app.whenReady`).
-      `--projects-root=${path.join(app.getPath("documents"), "Grida")}`,
+      `--projects-root=${path.join(app.getPath("documents"), "Grida Projects")}`,
       `--editor-base-url=${EDITOR_BASE_URL}`,
       // GRIDA-SEC-004 — attest the coarse outer SRT wrap. The sidecar exposes
       // `run_command` only when this is true AND main injected the private

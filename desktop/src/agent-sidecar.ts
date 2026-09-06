@@ -122,7 +122,7 @@ const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
 // expose an unsandboxed shell.
 const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
 // GRIDA-SEC-004 — host-injected managed root for auto-created projects
-// (`~/Documents/Grida`). The supervisor owns the path fact and forwards it;
+// (`~/Documents/Grida Projects`). The supervisor owns the path fact and forwards it;
 // absent (e.g. a future supervisor bug) means auto-create simply refuses.
 const projectsRoot = getCliArg("projects-root");
 // The host-bundled skills dir (repo-root `skills/`), resolved by the supervisor

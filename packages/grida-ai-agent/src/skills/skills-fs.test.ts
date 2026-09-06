@@ -182,7 +182,12 @@ describe("discoverSkills — bundled layer", () => {
         "find-skills",
         "name: find-skills\ndescription: meta finder"
       );
-      const project = path.join(fakeHome, "Documents", "Grida", "deck-proj");
+      const project = path.join(
+        fakeHome,
+        "Documents",
+        "Grida Projects",
+        "deck-proj"
+      );
       await fs.mkdir(project, { recursive: true });
       await writeManifest(bundled, "slides", "name: slides\ndescription: deck");
 

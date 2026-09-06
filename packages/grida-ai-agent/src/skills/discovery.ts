@@ -89,7 +89,7 @@ export async function discoverSkills(
   // 1. Project — upward from workspaceRoot, nearest first. The HOME dir is
   //    skipped here: `~/.claude/skills` / `~/.agents/skills` are the USER-scoped
   //    source (§2, gated by `include_user_scoped`), NOT project skills. Without
-  //    this skip a workspace under `~` (e.g. `~/Documents/Grida/<project>`) would
+  //    this skip a workspace under `~` (e.g. `~/Documents/Grida Projects/<project>`) would
   //    climb through home and re-discover the user's global skills as "project"
   //    ones — which is exactly how a `find-skills` meta-skill hijacked a deck task.
   if (opts.workspace_root) {

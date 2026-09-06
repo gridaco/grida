@@ -112,7 +112,7 @@ export type ServerOptions = {
   /**
    * GRIDA-SEC-004 — host-injected managed root under which the auto-create
    * flow (`POST /workspaces/create`) mints new project folders (desktop:
-   * `~/Documents/Grida`). Host-owned, never client-derived. Omitted on hosts
+   * `~/Documents/Grida Projects`). Host-owned, never client-derived. Omitted on hosts
    * that don't wire it (CLI/dev), where `createProject` throws.
    */
   projects_root?: string;

@@ -9,7 +9,7 @@
  * confusing up-front choice.
  *
  * `value === null` is the default: a fresh project is auto-created under the
- * managed `~/Documents/Grida` root on submit — surfaced here as
+ * managed `~/Documents/Grida Projects` root on submit — surfaced here as
  * "Default workspace" (not "New project"). Picking a recent workspace, or
  * "Open folder…", aims submissions at that existing project instead.
  */
