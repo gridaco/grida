@@ -1,16 +1,15 @@
-/** GRIDA-SEC-010 — live, registered OAuth bearer authority only. */
-import { bearer } from "@/lib/auth/bearer";
-import { oauthServer } from "@/lib/auth/oauth-server";
+/** GRIDA-SEC-010 / GRIDA-SEC-012 — registered OAuth account operation binding. */
+import { accountApi } from "@/lib/api/account";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** First-party OAuth account identity. Never falls back to browser cookies. */
-export async function GET(request: Request) {
-  try {
-    const { identity } = await bearer.authenticate(request);
-    return Response.json(identity, { headers: oauthServer.responseHeaders });
-  } catch (error) {
-    return oauthServer.errorResponse(error);
-  }
-}
+const handlers = accountApi.bind("auth.me");
+
+export const GET = handlers.GET;
+export const HEAD = handlers.HEAD;
+export const OPTIONS = handlers.OPTIONS;
+export const POST = handlers.POST;
+export const PUT = handlers.PUT;
+export const PATCH = handlers.PATCH;
+export const DELETE = handlers.DELETE;

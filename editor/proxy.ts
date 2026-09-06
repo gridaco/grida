@@ -10,11 +10,8 @@
  * Reference: https://nextjs.org/docs/app/getting-started/proxy
  */
 import { NextResponse } from "next/server";
-import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
-import { TenantMiddleware } from "./lib/tenant/middleware";
-import { updateSession } from "./lib/supabase/proxy";
-import { buildDesktopCsp } from "./lib/desktop/csp";
+import { apiPolicy } from "./lib/api/policy";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -35,7 +32,9 @@ type DesktopHeaderState = {
   requestHeaders?: Headers;
 };
 
-function prepareDesktopHeaders(req: NextRequest): DesktopHeaderState {
+async function prepareDesktopHeaders(
+  req: NextRequest
+): Promise<DesktopHeaderState> {
   const isDesktop =
     req.nextUrl.pathname === "/desktop" ||
     req.nextUrl.pathname.startsWith("/desktop/");
@@ -46,6 +45,7 @@ function prepareDesktopHeaders(req: NextRequest): DesktopHeaderState {
     req.headers.get("purpose") === "prefetch";
   if (isPrefetch) return { isDesktop };
 
+  const { buildDesktopCsp } = await import("./lib/desktop/csp");
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = buildDesktopCsp(nonce);
   const requestHeaders = new Headers(req.headers);
@@ -64,6 +64,13 @@ function applyDesktopResponseHeaders(res: NextResponse, csp?: string): void {
 }
 
 export async function proxy(req: NextRequest) {
+  // GRIDA-SEC-012 — machine dispatch precedes all browser/tenant work.
+  // Admission here grants no identity; each registered handler authenticates
+  // using its own declared credential family.
+  if (apiPolicy.matches(req.nextUrl.pathname)) {
+    return apiPolicy.respond(req) ?? NextResponse.next({ request: req });
+  }
+
   // Check if the request path starts with /dev/ and NODE_ENV is not development
   if (req.nextUrl.pathname.startsWith("/dev/") && !IS_DEV) {
     return new NextResponse("Not Found", { status: 404 });
@@ -111,6 +118,7 @@ export async function proxy(req: NextRequest) {
   // #region maintenance mode
   if (IS_PROD) {
     try {
+      const { get } = await import("@vercel/edge-config");
       // Check whether the maintenance page should be shown
       const isInMaintenanceMode = await get<boolean>("IS_IN_MAINTENANCE_MODE");
 
@@ -159,7 +167,7 @@ export async function proxy(req: NextRequest) {
   // The other GRIDA-SEC-004 layers (path-scoped preload,
   // `contextIsolation: true`, agent sidecar Basic Auth, agent sidecar Referer check)
   // remain load-bearing; CSP is one layer, not the only boundary.
-  const desktopHeaders = prepareDesktopHeaders(req);
+  const desktopHeaders = await prepareDesktopHeaders(req);
 
   let res: NextResponse;
 
@@ -182,10 +190,12 @@ export async function proxy(req: NextRequest) {
       "Learn more at https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md"
     );
   } else {
+    const { updateSession } = await import("./lib/supabase/proxy");
     res = await updateSession(req, desktopHeaders.requestHeaders);
   }
   // ------------------------------------------------------------
 
+  const { TenantMiddleware } = await import("./lib/tenant/middleware");
   const routed = await TenantMiddleware.routeProxyRequest(req, res);
   if (routed) return routed;
 

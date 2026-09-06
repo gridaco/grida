@@ -95,6 +95,7 @@ mode `0700`. Outputs have mode `0600`:
   redaction. Normal command output reports safe status and paths only.
 
 The editor environment includes the local Supabase URL and keys, insiders auth,
+the exact loopback `GRIDA_API_ORIGIN`,
 the allowed OAuth client ID, fixed callback allowlist, editor origin, and a fresh
 32-byte consent-signing secret. The seed accounts are `insider@grida.co`,
 `alice@acme.com`, and `random@example.com`, with password `password`; their

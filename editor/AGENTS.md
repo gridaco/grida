@@ -8,7 +8,10 @@ This package is the Next.js app that powers **`grida.co`** and tenant domains (e
 ## Key rules (things that bite later)
 
 - **Auth is special**: `app/(auth)` is security-critical. **Do not modify** routes/flows there.
-- **Public API is versioned**: treat `app/(api)/(public)/v1` as **backwards-compatible** (additive changes only unless you’re intentionally breaking/v2-ing).
+- **Public API is versioned**: treat `app/(api)/(public)/v1` as **backwards-compatible** (additive changes only unless you're intentionally breaking/v2-ing).
+- **Machine APIs have enforced bindings**: `/api/v1` is distinct from legacy `/v1`.
+  Read [`lib/api/README.md`](lib/api/README.md) before adding or changing its routes,
+  request policy, or Next redirects. Run `pnpm test:api` and `pnpm test:api:http`.
 - **Layouts are per route group**: there isn’t a single shared root layout across the whole `app/` tree — top-level route groups own their root `layout.tsx`/metadata.
 - **Edge entrypoint is `proxy.ts`**: on Next.js 16 this replaces `middleware.ts` (same runtime + semantics). Don’t add a new `middleware.ts`. In this repo it’s also where maintenance mode, Supabase session refresh, and host-based tenant routing are wired together (see “Multi-tenancy” below).
 - **Tenant pages are tenant-aware**: follow [`app/(tenant)/README.md`](<app/(tenant)/README.md>) for host-prefixed fetches (`server.HOST` / `web.HOST`) and tenant-friendly `href="/path"` patterns.
@@ -23,6 +26,7 @@ This package is the Next.js app that powers **`grida.co`** and tenant domains (e
 Tenant sites are primarily accessed via **tenant domains** (e.g. `xyz.grida.site`, `xyz.grida.app`, or a custom domain like `xyz.com`). Internally, tenant routes live under the **tenant root**: `/~/<www_name>/*` (see `app/(tenant)`).
 
 - **Entrypoint**: `proxy.ts`
+  - dispatches `/api/v1` through the machine policy before loading browser dependencies
   - refreshes Supabase auth cookies via `lib/supabase/proxy.ts` (`updateSession`)
   - then calls `lib/tenant/middleware.ts` (`TenantMiddleware.routeProxyRequest`) to perform host-based routing
 - **Host classes** (see `lib/domains/index.ts`)

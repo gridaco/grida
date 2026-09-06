@@ -52,11 +52,10 @@ of any tagged file naturally surfaces the others; an agent picks up the
 
 ### `GRIDA-SEC-001` — Ingest trust boundary
 
-**What it protects.** Webhook receivers — endpoints invoked by external
-machines on a publicly-reachable URL — are the only HTTP surface in
-this app intentionally exposed to the public internet without
-cookie-based authentication. Authority is established via the
-provider's signed payload. The boundary is the rule that **everything
+**What it protects.** Webhook receivers are public endpoints invoked by
+external machines. Their authority is established by the provider's signed
+payload, independently of browser cookies or the machine API credential
+families (GRIDA-SEC-012). The boundary is the rule that **everything
 reachable on `/webhooks/*` must verify a provider signature before
 doing anything else.** This applies to every current provider (Stripe,
 Metronome, …) and every future one (Replicate, GitHub, etc.).
@@ -114,9 +113,9 @@ Today:
 - [editor/scripts/billing/README.md](editor/scripts/billing/README.md) — dev docs.
 
 **What does NOT belong under `(ingest)/`.** Admin tools, internal RPC,
-anything that authenticates via cookie/session/bearer-token — those go
-under `(api)/private/**`. Anything user-facing goes under
-`(api)/(public)/v1/**`. Mixing categories breaks the trust contract.
+anything that authenticates via cookie/session/bearer-token — those use their
+own browser/private or registered `/api/v1` boundary. Legacy public endpoints
+live under `(api)/(public)/v1/**`. Mixing categories breaks the trust contract.
 
 ---
 
@@ -1638,6 +1637,10 @@ this identity endpoint supplies none of them implicitly.
   [oauth-bearer.test.ts](editor/lib/auth/__tests__/oauth-bearer.test.ts),
   [oauth-consent.test.ts](editor/lib/auth/__tests__/oauth-consent.test.ts), and
   [oauth-web.test.tsx](editor/lib/auth/__tests__/oauth-web.test.tsx).
+- [Account HTTP adapter](editor/lib/api/account.ts) and its
+  [tests](editor/lib/api/account.test.ts) — the identity binding owns live bearer
+  verification, input/output validation, bodyless HEAD/OPTIONS, and safe errors.
+  Machine request dispatch is separately governed by GRIDA-SEC-012.
 - [Analytics-free layout](<editor/app/(untracked)/layout.tsx>) and
   [response headers](editor/next.config.ts) — retain GRIDA-SEC-005 while also
   protecting this consent ceremony.
@@ -1738,9 +1741,91 @@ storage, hostile-local-user protection, or cross-process coordination contract.
 
 ---
 
+### `GRIDA-SEC-012` — Machine API request isolation
+
+**What it protects.** `/api/v1` requests cannot acquire browser authority or be
+handled as tenant pages through the shared Next.js web pipeline. Newly bound
+account routes select an operation whose adapter supplies authentication and
+HTTP policy; declaring a route does not let its author silently omit those rules.
+Native account credentials remain GRIDA-SEC-010; GG credentials remain GRIDA-SEC-006.
+
+**Vulnerable scenario (prevented).** A web redirect or maintenance page replaces
+an API response; cookie refresh mutates a machine caller's session; host-based
+tenant routing intercepts an API path; or a route declares account authentication
+but exports its own unguarded handler. A shared helper can also accidentally pull
+browser cookies, UI code or request-global state into account operations.
+
+**How the code prevents it.**
+
+1. **Early, explicit machine dispatch.** `proxy.ts` classifies the reserved
+   namespace before importing browser maintenance, cookie, tenant or Desktop
+   dependencies. `policy.ts` accepts configured Host authorities only, ignores
+   forwarded host claims, and admits registered paths only. Unknown paths,
+   unsupported hosts, encoded aliases and noncanonical casing receive safe 404s.
+   Invalid configuration and explicit API maintenance receive safe 503s. These
+   responses are uncached, carry no cookies or redirects, and grant no identity.
+2. **Pre-proxy routing is part of the boundary.** `next.config.ts` replaces
+   automatic trailing-slash redirection with its web-only equivalent and excludes
+   the reserved namespace from the existing generic web connect redirect. The
+   shared namespace pattern covers percent-encoded ASCII aliases too. Config
+   tests match actual header/redirect/rewrite rules against API paths; the local
+   production-mode proof also exercises real Next routing and web positive controls.
+3. **Bindings enforce authority.** `operations.ts` is the complete inventory.
+   `account.ts` accepts only its implemented operation and validates its declared
+   credential/response policy. Its fixed dispatch verifies the live OAuth bearer,
+   validates/project identity fields, rejects input on the input-free identity
+   operation, and owns all seven method exports. HEAD retains authentication;
+   OPTIONS discloses only allowed methods. Rejected methods and input never call
+   the issuer. Empty-body inspection has a deadline and rejects actual payloads.
+4. **Source checks reject drift.** `audit-api.ts` compares real App/Pages route
+   placements with the inventory and verifies the complete account binding AST.
+   New handlers cannot use the six pinned legacy GG/catalogue exceptions.
+   Resolved import traversal checks API/account/GG owners, including aliases,
+   re-exports and installed package runtime entries, for Next/React, browser/UI,
+   dynamic-loader and environment-ownership violations. Invalid fixture trees
+   prove the checks fail. The API workflow runs on every PR without path filters.
+5. **Runtime proof stays local.** `scripts/api-local` builds a private production
+   Next snapshot from the real API, proxy and config sources. Its synthetic
+   loopback issuer and web tripwires verify two-user identity/cache separation,
+   credential rejection, method/input errors, configured hosts, API maintenance,
+   and production insiders gating. It constructs the child environment, copies
+   no dotenv/session files, bounds requests/process waits and removes owned
+   source/build/listeners. Application network guards reject unowned destinations;
+   no hosted credentials or uploaded artifacts are required.
+
+**Limits.** This protects the managed namespace and binding conventions; source
+checks are not a sandbox against malicious repository authors. Existing GG and
+catalogue handlers remain explicit legacy bindings with their own credential,
+streaming, error and cache contracts. Native mint/account features beyond identity
+are not implemented by this boundary. Next may normalize malformed repeated
+slashes or backslashes with a redirect before proxy; the machine response
+contract applies to paths admitted by that framework parsing layer.
+The local HTTP proof replaces unrelated web services with tripwires and uses a
+synthetic issuer. It does not certify the full web build, actual Supabase
+cryptography/RLS, those web modules' import side effects, or deployment routing.
+GRIDA-SEC-011's real local OAuth proof remains separate. The runtime, repository,
+installed dependencies, native build tools and same-user host are trusted;
+application network hooks are not an OS sandbox. Hosted verification remains a
+release requirement.
+
+**Files bound by this id.**
+
+- [API guide](editor/lib/api/README.md), [inventory](editor/lib/api/operations.ts),
+  [policy](editor/lib/api/policy.ts), and [policy tests](editor/lib/api/policy.test.ts).
+- [Account adapter](editor/lib/api/account.ts), [adapter tests](editor/lib/api/account.test.ts),
+  and [identity binding](<editor/app/(api)/(public)/api/v1/auth/me/route.ts>) — also GRIDA-SEC-010.
+- [Proxy](editor/proxy.ts), [dispatch tests](editor/lib/api/proxy.test.ts),
+  [Next config](editor/next.config.ts), and [routing tests](editor/lib/api/routing.test.ts).
+- [Source audit](editor/scripts/audit-api.ts), [audit tests](editor/scripts/audit-api.test.ts),
+  [offline configuration](editor/vitest.api.config.ts), and [CI workflow](.github/workflows/api.yml).
+- [HTTP proof](scripts/api-local/proof.mjs), [network guards](scripts/api-local/network.cjs),
+  [guard tests](scripts/api-local/network.test.mjs), and [proof guide](scripts/api-local/README.md).
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-012` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-013` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

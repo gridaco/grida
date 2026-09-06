@@ -528,6 +528,7 @@ async function bootstrap(state) {
     SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
     NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH: "1",
     GRIDA_OAUTH_ORIGIN: fixture.editorOrigin,
+    GRIDA_API_ORIGIN: fixture.editorOrigin,
     GRIDA_OAUTH_CLIENT_IDS: client.client_id,
     GRIDA_OAUTH_REDIRECT_URIS: fixture.redirectUris.join(","),
     GRIDA_OAUTH_CONSENT_SECRET: randomBytes(32).toString("base64url"),

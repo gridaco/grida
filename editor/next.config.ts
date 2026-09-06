@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 import { Platform } from "@/lib/platform";
 import { withSentryConfig, type SentryBuildOptions } from "@sentry/nextjs";
 import createMDX from "@next/mdx";
+import { apiPolicy } from "./lib/api/policy";
 
 const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
 const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
@@ -15,6 +16,9 @@ const withMDX = createMDX({
 });
 
 const nextConfig: NextConfig = {
+  // GRIDA-SEC-012 — API errors must reach the machine boundary without a
+  // framework redirect. The explicit web-only rule below retains web behavior.
+  skipTrailingSlashRedirect: true,
   pageExtensions: ["js", "jsx", "mdx", "ts", "tsx"],
   // @app/ui is a workspace package shipping raw TSX; Next must transpile it.
   transpilePackages: ["@app/ui"],
@@ -53,6 +57,11 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      {
+        source: `/:path(${apiPolicy.webPathGuard}.+)/`,
+        destination: "/:path",
+        permanent: true,
+      },
       // Engine WG docs moved to the engine repo (gridaco/nothing) — the docs
       // site no longer produces these pages. Path-shape contract: the tree
       // stays docs/wg/<cluster>/<doc>.md over there; retarget these to the
@@ -114,7 +123,8 @@ const nextConfig: NextConfig = {
       //   permanent: true,
       // },
       {
-        source: "/:org/:proj/:id/connect",
+        // GRIDA-SEC-012 — this legacy web shape also matches /api/v1/*.
+        source: `/:org(${apiPolicy.webPathGuard}[^/]+)/:proj/:id/connect`,
         destination: "/:org/:proj/:id/connect/share",
         permanent: false,
       },
