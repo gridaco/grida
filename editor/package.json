@@ -242,6 +242,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@grida/auth": "workspace:*",
     "@playwright/test": "^1.52.0",
     "@supabase/storage-js": "^2.90.1",
     "@tailwindcss/postcss": "^4",

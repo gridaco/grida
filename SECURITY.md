@@ -1517,9 +1517,230 @@ Today:
 
 ---
 
+### `GRIDA-SEC-010` — Registered native OAuth account boundary
+
+**What it protects.** A registered first-party native application obtains its
+own Supabase OAuth account session. Browser consent does not export the
+browser's session, and a loopback callback cannot establish identity by itself.
+The bearer-only `/api/v1/auth/me` accepts only configured OAuth clients through
+the configured issuer. Desktop cookie custody (GRIDA-SEC-005) and GG's separate
+AI credential (GRIDA-SEC-006) remain unchanged.
+
+**Vulnerable scenario (prevented).** A callback substitutes another account or
+destination; a forged consent POST approves an unseen client or scope; or a
+cookie, GG token, ordinary browser token, or forged JWT is treated as native
+account authority. Sharing Desktop credentials or using global logout would
+also let the independent native client disturb another application's session.
+
+**Why it's specifically risky here.** A public OAuth client ID identifies a
+registration, not a trustworthy binary. The native host deliberately holds an
+account credential with the user's existing permissions. Identity scopes are
+not an account-data sandbox, and this credential must not become an agent/GG
+credential through reuse of an existing browser or daemon bridge.
+
+**How the code prevents it.**
+
+1. **Server-owned authority.** Issuer, allowed client IDs, web origin, and exact
+   callback URIs come from server configuration. Bearer preflight requires the
+   exact issuer, `authenticated` audience, expiry, user/session IDs, and an
+   allowed client ID. Decoded JWT claims are not identity: the same token must
+   then succeed at the fixed issuer's `/oauth/userinfo`, whose subject must
+   match. Cookies are never a fallback. Issuer calls reject redirects, bound
+   response size/time, and return safe errors.
+2. **Bound browser intent.** Consent reads the browser's verified user and the
+   issuer's pending authorization. A decision requires the configured HTTP
+   Host and browser Origin, a bounded form, and a ten-minute signed proof binding user,
+   authorization, client, callback, and scope. The pending details are read
+   again before mutation. Supabase owns approval, denial, and one-use code
+   issuance; Grida issues no account token. Existing-consent redirects may
+   omit details, but must still target an exact configured native callback;
+   native exchange and bearer APIs independently enforce client identity.
+3. **Contained ceremony.** Consent stays in the analytics-free layout, with
+   configured no-store, frame denial, and `strict-origin` referrers: authorization paths
+   and query values are excluded, while same-origin form POSTs retain their
+   Origin header. `no-referrer` can turn that Origin into `null` under the
+   [Fetch Origin-header algorithm](https://fetch.spec.whatwg.org/#append-a-request-origin-header).
+   The decision redirect and native callback retain `no-referrer`.
+   Native login binds a registered
+   `127.0.0.1` port before browser launch, uses fresh state and S256 PKCE, and
+   accepts one exact callback. Wrong state, path, host, method, or duplicate
+   parameters cannot consume the pending ceremony. Cancellation, denial,
+   timeout, and completion close the listener. Code and refresh grants use
+   the fixed OAuth token endpoint; credential-bearing requests never follow
+   redirects or acquire browser cookies.
+4. **Independent native custody.** `@grida/auth` returns safe metadata; only
+   the injected custody/transport capabilities receive account tokens. The package
+   reads no Desktop, browser, provider, or daemon credential store. Its
+   single-writer lifecycle serializes mutations, rejects overlapping login
+   and refresh, and invalidates stale work on logout/cancellation. Accepted
+   refresh rotations survive a later identity-check failure; the access token
+   and identity remain the last verified values until that check succeeds. Logout
+   clears this custody and requests only `scope=local`; failed remote
+   revocation is reported rather than changing to global/grant revocation.
+5. **Durable profile authority.** The Node factory binds a private profile to
+   canonical home, issuer, client ID, and API origin. Keyring is the initial
+   default; explicit file selection is remembered. Backend failure never
+   selects another store. Keyring writes require exact read-back, established
+   entries cannot disappear into a signed-out result, and logout retains a
+   secret-free revision. File custody validates ownership, permissions, links,
+   and macOS ACL grants; atomic replacement never publishes partial JSON.
+   Backend migration records intent before copying credentials and blocks auth
+   until old-backend cleanup completes. Pending migration resumes explicitly.
+6. **Cross-process mutation authority.** Every coordinated lifecycle mutation,
+   including verification and empty logout, shares one profile lock and advances
+   its durable revision. Login captures a revision before consent and compares
+   it on commit, without holding a lock during browser interaction. SQLite OS
+   locks release on process exit; acquisition times out without stealing a
+   running lock. The lock carries no credentials and never rolls back completed
+   custody writes. Accepted rotation survives later identity failure. Unpublished
+   temporary credential files are cleaned under authority, never adopted.
+
+**Limits and adoption gates.** Producer tests are not deployment certification.
+The real local Auth 2.196.0 consumer proof has passed login/denial/consent reuse,
+code replay rejection, bearer credential rejection, rotating refresh, seeded
+organization RLS, and session-local, grant-wide, and account-wide revocation.
+It also passed separate-process restart using a copied package and disposable
+test custody. This verifies the local fixture and that test adapter; separate
+durable custody tests exercise the Node storage and cross-process contract.
+The local proof uses Next.js development mode, whose page renderer replaces
+HTML Cache-Control with `no-cache, must-revalidate`. Consent remains
+`force-dynamic` with configured `no-store`; the actual hosted HTML header must
+be verified before deployment. JSON identity and consent decision responses
+retain `no-store` and are asserted by the local proof.
+The deployed issuer must enforce signature verification and live-session
+rejection on userinfo, with session-local logout proved against its actual
+version and gateway. Client registration remains administrative; dynamic
+registration is outside this boundary. Durable custody currently supports local
+macOS/Linux filesystems and main-thread Node hosts. Windows ACLs and worker-thread
+custody fail closed. The OS, dependencies, and same-user process are trusted;
+keyring storage does not isolate credentials from authorized same-user code.
+Native keyring access may prompt and cannot safely be cancelled mid-write. A
+crash between issuer rotation and saving can require login. Post-rename sync
+failure may report failure after a complete write; it never rolls back a spent
+token. Filesystem backups/snapshots are outside local cleanup guarantees.
+Explicit file recovery of uninitialized metadata cannot clean untracked keyring
+entries after manual metadata loss; deleting profile files is not logout.
+Existing web/Desktop global logout may revoke native
+sessions, and other APIs may accept already-issued JWTs until expiry. Account,
+organization, billing, and GG authorization still need their own permissions;
+this identity endpoint supplies none of them implicitly.
+
+**Files bound by this id.**
+
+- [editor/lib/auth/oauth-server.ts](editor/lib/auth/oauth-server.ts),
+  [bearer.ts](editor/lib/auth/bearer.ts), and
+  [oauth-consent.ts](editor/lib/auth/oauth-consent.ts) — configured authority,
+  issuer verification, consent proof, and callback policy.
+- [Consent page](<editor/app/(untracked)/oauth/consent/page.tsx>),
+  [decision route](<editor/app/(api)/private/oauth/decision/route.ts>), and
+  [identity route](<editor/app/(api)/(public)/api/v1/auth/me/route.ts>) — browser
+  and native entry points. Their producer tests are
+  [oauth-bearer.test.ts](editor/lib/auth/__tests__/oauth-bearer.test.ts),
+  [oauth-consent.test.ts](editor/lib/auth/__tests__/oauth-consent.test.ts), and
+  [oauth-web.test.tsx](editor/lib/auth/__tests__/oauth-web.test.tsx).
+- [Analytics-free layout](<editor/app/(untracked)/layout.tsx>) and
+  [response headers](editor/next.config.ts) — retain GRIDA-SEC-005 while also
+  protecting this consent ceremony.
+- [Native lifecycle](packages/grida-auth/src/auth-client.ts),
+  [Node adapter](packages/grida-auth/src/node.ts), and
+  [public export](packages/grida-auth/src/index.ts) — independent host contract,
+  loopback, transport, and secret custody; pinned by
+  [lifecycle tests](packages/grida-auth/src/auth-client.test.ts) and
+  [Node tests](packages/grida-auth/src/node.test.ts). The
+  [package contract](packages/grida-auth/README.md) records both custody modes
+  and their limits.
+- [Credential store](packages/grida-auth/src/credential-store.ts),
+  [keyring adapter](packages/grida-auth/src/keyring.ts),
+  [private files](packages/grida-auth/src/private-files.ts), and
+  [profile lock](packages/grida-auth/src/profile-lock.ts) — durable custody,
+  backend transitions, file protection, and crash-released authority. Adjacent
+  tests are [store](packages/grida-auth/src/credential-store.test.ts),
+  [keyring](packages/grida-auth/src/keyring.test.ts),
+  [files](packages/grida-auth/src/private-files.test.ts), and
+  [lock](packages/grida-auth/src/profile-lock.test.ts).
+- [Persistent native consumer](packages/grida-auth/src/persistent-auth.test.ts)
+  exercises the public package from isolated subprocesses. The
+  [build configuration](packages/grida-auth/tsdown.config.mts) retains standalone
+  file-mode consumption and leaves native keyring loading lazy.
+- The [local auth workflow](.github/workflows/auth-local.yml) also runs the
+  native custody suite on macOS/Linux, with an owned-entry macOS keyring smoke.
+- The [local consumer proof](editor/e2e/auth-oauth.spec.mts) also obeys the
+  separate local provisioning boundary, GRIDA-SEC-011.
+
+---
+
+### `GRIDA-SEC-011` — Local Supabase OAuth provisioning boundary
+
+**What it protects.** The OAuth proof provisions and stops only its owned,
+disposable `grida_auth_test` fixture. Its tooling does not inherit hosted
+credentials, linked-project state, or the ordinary editor environment.
+GRIDA-SEC-010 separately governs the account authority exercised by the proof.
+
+**Vulnerable scenario (prevented).** A developer or CI run accidentally uses
+an inherited Supabase token, linked project, Docker context, or dotenv file to
+provision against the wrong infrastructure; cleanup stops another local stack;
+or a test emits credentials through browser artifacts. This harness exercises
+administrative OAuth registration and real account sessions, so ordinary test
+defaults would cross those boundaries.
+
+**How the code prevents it.**
+
+1. **Fixed fixture authority.** Configuration pins project, origins, callback
+   allowlist, and tool versions. State validation checks canonical private
+   paths and the reviewed TOML hash. CLI calls use an explicit workdir and Unix
+   Docker socket, with no login, link, hosted management, or stop-all operation.
+2. **No ambient credentials.** Child environments are constructed from scratch
+   with a private home. Only allowlisted repository migrations and seed are
+   copied; linked metadata and ancestor dotenv files are refused before CLI
+   use. Editor snapshots exclude dotenv and generated files and load only
+   fixture settings. Outputs use a `0700` directory and `0600` secret files.
+3. **Owned lifecycle.** A fixture lock and state identity gate inspection and
+   cleanup. Start refuses occupied fixture ports, containers, or volumes;
+   stop names only the owned project and uses `--no-backup`.
+4. **Explicit local registration.** Bootstrap uses only the fixed local API
+   and does not follow redirects. It checks the actual Auth image/version,
+   issuer discovery, and disabled dynamic registration, then creates or reuses
+   a fixture public client with `token_endpoint_auth_method=none` and exact
+   callbacks. Public client configuration excludes administrative credentials.
+5. **Contained proof execution.** The dedicated editor uses Node fetch/TCP
+   guards; the consumer restricts browser and fetch destinations to exact
+   fixture origins. Its dedicated runner disables traces, video, screenshots,
+   and service workers; the ordinary runner excludes this test. The standalone
+   probe uses private disposable custody and safe IPC results. Offline configs
+   skip env loading. CI verifies the downloaded CLI checksum, supplies no hosted
+   credentials, cleans up only its fixture, and uploads no credential artifacts.
+
+**Limits.** This is local provisioning, not hosted deployment certification.
+The executable, repository, dependencies, Docker engine, and same-user process
+environment are trusted. Node guards are not an OS network sandbox: they allow
+other loopback ports and Unix sockets. The harness checks executable versions;
+checksum verification belongs to release acquisition and CI. Public container
+image downloads remain necessary. Disposable file custody proves no product
+storage, hostile-local-user protection, or cross-process coordination contract.
+
+**Files bound by this id.**
+
+- [guards.mjs](scripts/auth-local/guards.mjs),
+  [stack.mjs](scripts/auth-local/stack.mjs), and
+  [config.toml](scripts/auth-local/config.toml) — destinations, ownership,
+  environment, lifecycle, and registration.
+- [editor.mjs](scripts/auth-local/editor.mjs),
+  [network.cjs](scripts/auth-local/network.cjs), and
+  [native-probe.mjs](scripts/auth-local/native-probe.mjs) — isolated hosts.
+- [guards.test.mjs](scripts/auth-local/guards.test.mjs),
+  [network.test.mjs](scripts/auth-local/network.test.mjs), and
+  [consumer proof](editor/e2e/auth-oauth.spec.mts) — adjacent verification.
+- [Dedicated Playwright config](editor/playwright.auth.config.ts),
+  [ordinary Playwright config](editor/playwright.config.ts),
+  [offline Vitest config](editor/vitest.oauth.config.ts),
+  [CI workflow](.github/workflows/auth-local.yml), and
+  [harness contract](scripts/auth-local/README.md) — execution and adoption.
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-010` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-012` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

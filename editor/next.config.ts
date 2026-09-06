@@ -206,6 +206,17 @@ const nextConfig: NextConfig = {
   headers: async () => {
     return [
       {
+        // GRIDA-SEC-010 — no framing/cache; origin-only referrers preserve form
+        // Origin without exposing authorization paths or query values.
+        source: "/oauth/consent",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Cache-Control", value: "no-store" },
+          { key: "Referrer-Policy", value: "strict-origin" },
+        ],
+      },
+      {
         source: "/v1/:path*",
         headers: [
           {
