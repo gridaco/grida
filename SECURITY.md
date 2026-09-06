@@ -784,7 +784,7 @@ no manifest, no document of any kind). This adds a new renderer-reachable
 user had already picked through the OS dialog), so it is recorded here. The
 boundary holds by three rules, none of which trust the caller for a path: (a)
 the managed root is **host-injected** — the supervisor passes
-`--projects-root=<~/Documents/Grida>` (`desktop/src/main/agent-sidecar-supervisor.ts`),
+`--projects-root=<~/Documents/Grida Projects>` (`desktop/src/main/agent-sidecar-supervisor.ts`),
 never derived from the request; a host that wired no root refuses with a 400.
 (b) The request's `name` is **slugified to a single filesystem segment**
 (`WorkspaceRegistry.createProject` / `slugifyProjectName`): path separators,

@@ -5,7 +5,7 @@
  *
  * Composer-first and outcome-first: describe what you want, or gather references
  * from the gallery — then Grida AUTO-CREATES a fresh, EMPTY project for you (a
- * plain folder under `~/Documents/Grida`) and hands your prompt to that
+ * plain folder under `~/Documents/Grida Projects`) and hands your prompt to that
  * project's agent as its first turn via {@link welcome_handoff}. No workspace
  * picker, no folder dialog to get started: the newcomer never has to choose a
  * folder. "Open folder…" and the recents list stay for opening work that
@@ -15,12 +15,12 @@
  *
  * The home NEVER mints a per-session folder and NEVER dirties the user's
  * workspace. Starting a session roots the agent at the DEFAULT workspace — the
- * managed root itself (`~/Documents/Grida`), always registered — and the agent
+ * managed root itself (`~/Documents/Grida Projects`), always registered — and the agent
  * takes the wheel: whether the workspace becomes a board, a slides deck, or a
  * tree of files is the AGENT's choice on turn one (guided by the advertised
  * skills), and produced files land where the agent decides. The system provides
  * MINIMALLY — the default workspace + a per-session scratch dir. (The old flow
- * minted `~/Documents/Grida/<prompt>` folders per session and pre-picked where
+ * minted `~/Documents/Grida Projects/<prompt>` folders per session and pre-picked where
  * to work; that's the legacy this replaces.)
  *
  * A reference card opens related Library ideas; its Add action drops that
@@ -413,7 +413,7 @@ function WelcomeSurface({
     [modelId, modelProviderId, isUserPick, router]
   );
 
-  // Start a session in the DEFAULT workspace (`~/Documents/Grida`). We NEVER mint
+  // Start a session in the DEFAULT workspace (`~/Documents/Grida Projects`). We NEVER mint
   // a per-session folder — that littered the managed root and pre-picked where to
   // work; the agent roots at the default workspace and takes the wheel, writing
   // only what it decides. Optional `scratchSeed` (a picked template's unzipped
@@ -565,7 +565,7 @@ function WelcomeSurface({
             together (no nested scroll); the gallery virtualizes against this. */}
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
           {/* Top-left workspace picker — where a start lands (the managed
-              ~/Documents/Grida root by default, shown as "Default workspace")
+              ~/Documents/Grida Projects root by default, shown as "Default workspace")
               or which existing project to aim at. Borderless + friendly;
               replaces the old picker-above-composer + "start blank" row. */}
           <div className="px-3 pt-3">

@@ -53,7 +53,7 @@ export type Workspace = {
   opened_at: number;
   pinned: boolean;
   /** True for the host's DEFAULT workspace (the managed root itself, e.g.
-   *  `~/Documents/Grida`). The desktop home roots a fresh session here instead
+   *  `~/Documents/Grida Projects`). The desktop home roots a fresh session here instead
    *  of minting a per-session folder. Computed per `list()`, never persisted;
    *  absent on hosts with no managed root. */
   is_default?: boolean;

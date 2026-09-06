@@ -14,11 +14,17 @@ import type { OnboardingStepProps } from "../types";
 
 function displayWorkspaceRoot(root: string): string {
   return root
-    .replace(/^\/Users\/[^/]+\/Documents\/Grida(?=\/|$)/, "~/Documents/Grida")
-    .replace(/^\/home\/[^/]+\/Documents\/Grida(?=\/|$)/, "~/Documents/Grida")
     .replace(
-      /^[A-Z]:\\Users\\[^\\]+\\Documents\\Grida(?=\\|$)/i,
-      "~/Documents/Grida"
+      /^\/Users\/[^/]+\/Documents\/Grida Projects(?=\/|$)/,
+      "~/Documents/Grida Projects"
+    )
+    .replace(
+      /^\/home\/[^/]+\/Documents\/Grida Projects(?=\/|$)/,
+      "~/Documents/Grida Projects"
+    )
+    .replace(
+      /^[A-Z]:\\Users\\[^\\]+\\Documents\\Grida Projects(?=\\|$)/i,
+      "~/Documents/Grida Projects"
     );
 }
 

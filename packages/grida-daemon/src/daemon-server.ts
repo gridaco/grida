@@ -52,7 +52,7 @@ export type DaemonServerOptions = {
   user_data_path: string;
   /**
    * GRIDA-SEC-004 — host-injected managed root for the auto-create flow
-   * (`POST /workspaces/create`). The desktop supervisor passes `~/Documents/Grida`;
+   * (`POST /workspaces/create`). The desktop supervisor passes `~/Documents/Grida Projects`;
    * CLI/dev leave it unset (auto-create then refuses). Forwarded to
    * {@link ServerOptions} by the `...opts` spread below.
    */

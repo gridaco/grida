@@ -22,7 +22,7 @@
  * The client never sees absolute paths through this surface — wait,
  * yes it does, in `Workspace.root`. Unlike `/files/*` where the
  * client talks in opaque docIds, workspaces are inherently
- * user-facing ("you opened /Users/x/Documents/grida"). The display
+ * user-facing ("you opened /Users/x/Documents/Grida Projects"). The display
  * path is the file-name in this surface. Hiding it would break
  * "Recent Workspaces" UX.
  */
@@ -43,7 +43,7 @@ export type Workspace = {
   pinned: boolean;
   /**
    * True for the host's DEFAULT workspace — the managed root itself
-   * ({@link WorkspaceRegistry} `projects_root`, e.g. `~/Documents/Grida`).
+   * ({@link WorkspaceRegistry} `projects_root`, e.g. `~/Documents/Grida Projects`).
    * COMPUTED per {@link WorkspaceRegistry.list} (root === realpath'd
    * `projects_root`); never persisted. The desktop home roots a fresh session
    * HERE instead of minting a per-session folder — the agent takes the wheel
@@ -64,7 +64,7 @@ export class WorkspaceRegistry {
   /**
    * GRIDA-SEC-004 — the host-injected managed root under which
    * {@link createProject} mints new project folders (desktop:
-   * `~/Documents/Grida`). Host-owned, NEVER derived from client input — the
+   * `~/Documents/Grida Projects`). Host-owned, NEVER derived from client input — the
    * one writable root the auto-create path may touch. Undefined for hosts that
    * don't wire it (the CLI/dev daemon), where `createProject` throws.
    */
@@ -252,7 +252,7 @@ export class WorkspaceRegistry {
 
   /**
    * Ensure the host's DEFAULT workspace — the managed {@link projects_root}
-   * itself (e.g. `~/Documents/Grida`) — is registered, so {@link list} always
+   * itself (e.g. `~/Documents/Grida Projects`) — is registered, so {@link list} always
    * surfaces it and the desktop home can root a session there WITHOUT minting a
    * per-session folder or knowing the (host-owned, GRIDA-SEC-004) path. This is
    * the correction to the old auto-create flow: the managed root IS the
