@@ -1,4 +1,4 @@
-// GRIDA-SEC-011 — disposable fixture custody and destination-scoped native proof.
+// GRIDA-SEC-010, GRIDA-SEC-011 — public native account requests in disposable custody.
 // Test-only subprocess host, copied beside a standalone package before execution.
 // This deliberately limited file custody is not a product persistence contract.
 import assert from "node:assert/strict";
@@ -6,7 +6,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createNativeAuth } from "@grida/auth/node";
 
-const [operation, configPath, sessionPath] = process.argv.slice(2);
+const [operation, configPath, sessionPath, after] = process.argv.slice(2);
+assert(
+  after === undefined ||
+    (operation === "organizations" &&
+      /^[1-9]\d*$/.test(after) &&
+      Number.isSafeInteger(Number(after)))
+);
 const root = await fs.realpath(process.cwd());
 assert.match(path.basename(root), /^native-probe-/);
 assert.equal(path.dirname(configPath), root);
@@ -88,6 +94,11 @@ try {
     assert.equal((await auth.status()).state, "signed-in");
     await auth.verify();
     result = await auth.refresh();
+  } else if (operation === "organizations") {
+    result = await auth.requestAccount(
+      "organizations.list",
+      after === undefined ? undefined : { after: Number(after) }
+    );
   } else if (operation === "logout") result = await auth.logout();
   else throw new Error("Unknown probe operation");
   await browserOpened;

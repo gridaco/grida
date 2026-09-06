@@ -4,7 +4,8 @@
 > [SECURITY.md](../../SECURITY.md).
 
 This proof builds and starts Next.js in **production mode**, then sends real
-HTTP requests to the current `/api/v1/auth/me` implementation. It needs Node.js
+HTTP requests to the current `/api/v1/auth/me` and
+`/api/v1/account/organizations` implementations. It needs Node.js
 24+ and the repository's installed dependencies. It does not install packages,
 start Docker, use Supabase services, or read account credentials.
 
@@ -14,7 +15,8 @@ node scripts/api-local/proof.mjs
 ```
 
 The proof copies the current API operation inventory, request policy, account
-adapter, bearer verifier, OAuth HTTP client, route, proxy, and Next configuration
+adapter, account projection, RLS data adapter, bearer verifier, OAuth HTTP client,
+routes, proxy, and Next configuration
 into a fresh private `.cache/api-local` directory. It records their source
 hashes. Existing installed dependencies are linked into the snapshot; dotenv
 files, the ordinary editor environment, and existing build output are not copied.
@@ -36,13 +38,21 @@ record all three calls and emit its synthetic cookie, proving the tripwires are
 active. This verifies dispatch and calls, not import-time behavior of the
 original web modules. A fixture insiders handler must never run in production.
 
-A newly owned loopback HTTP server supplies `/auth/v1/oauth/userinfo`. It accepts
+A newly owned loopback HTTP server supplies `/auth/v1/oauth/userinfo` and a
+synthetic `/rest/v1/organization` response. It accepts
 only exact synthetic tokens issued in memory for two synthetic users. The real
-bearer verifier performs its normal preflight and HTTP request. Cases cover live
+bearer verifier performs its normal preflight and HTTP request. The database
+fixture requires the exact caller bearer, publishable key, public schema and
+fixed query shape; its per-user rows simulate visibility without implementing
+Postgres RLS. Cases cover live
 identity changes, two-user cache isolation, invalid credential classes, issuer
 failure/revocation/mismatch/redirects, HEAD/OPTIONS and rejected methods/input,
 unknown paths and hosts, forwarded-host spoofing, encoded path aliases, API
-maintenance, invalid configuration, and production insiders gating. Ordinary
+maintenance, invalid configuration, and production insiders gating. Organization
+cases also cover 100-row pagination, a lower upstream row limit with exact count,
+changed membership visibility using the same credential, empty pages, denied
+selectors/cursors, database failures and method policy. Database failures must
+never become successful empty pages. Ordinary
 web redirects and legacy CORS headers are positive controls for the actual
 Next configuration. Next normalizes repeated slashes and backslashes before
 proxy; those raw syntax cases intentionally prove the framework's `308` response

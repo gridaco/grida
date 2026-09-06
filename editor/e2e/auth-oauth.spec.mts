@@ -276,6 +276,9 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
   let blockedBrowserRequest = false;
   let otherClientId: string | undefined;
   let probeRoot: string | undefined;
+  let addedMembership:
+    | { organizationId: number; userId: string; id?: number }
+    | undefined;
 
   async function context() {
     const value = await browser.newContext({
@@ -354,6 +357,7 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
       method?: string;
       body?: unknown;
       form?: string;
+      representation?: boolean;
     } = {}
   ) {
     const url = new URL(route, api);
@@ -364,6 +368,9 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         method: options.method ?? "GET",
         headers: {
           apikey: options.admin ? setup.serviceRoleKey : setup.anonKey,
+          ...(options.representation
+            ? { prefer: "return=representation" }
+            : {}),
           ...(options.token
             ? { authorization: `Bearer ${options.token}` }
             : {}),
@@ -393,6 +400,19 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
     } catch {
       throw new Error("Fixture endpoint returned invalid JSON");
     }
+  }
+  function membershipRoute(value: NonNullable<typeof addedMembership>) {
+    return `/rest/v1/organization_member?organization_id=eq.${value.organizationId}&user_id=eq.${value.userId}${value.id === undefined ? "" : `&id=eq.${value.id}`}`;
+  }
+  async function removeAddedMembership() {
+    if (!addedMembership) return;
+    const response = await request(membershipRoute(addedMembership), {
+      admin: true,
+      method: "DELETE",
+    });
+    if (response.status !== 204)
+      throw new Error("Fixture membership cleanup failed");
+    addedMembership = undefined;
   }
   async function password(user: User) {
     const response = await request("/auth/v1/token?grant_type=password", {
@@ -606,6 +626,75 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
     );
 
     await phase(
+      "public native account requests observe two users and removed membership",
+      async () => {
+        const localPage = await first.auth.requestAccount("organizations.list");
+        const acmePage =
+          await aliceClient.auth.requestAccount("organizations.list");
+        expect(localPage.organizations.map((value) => value.name)).toEqual([
+          "local",
+        ]);
+        expect(acmePage.organizations.map((value) => value.name)).toEqual([
+          "acme",
+        ]);
+        expect(localPage.next_cursor).toBeNull();
+        expect(acmePage.next_cursor).toBeNull();
+        const local = localPage.organizations[0]!;
+        const acme = acmePage.organizations[0]!;
+        expect(
+          await first.auth.requestAccount("organizations.list", {
+            after: local.id,
+          })
+        ).toEqual({ organizations: [], next_cursor: null });
+        const aliceStatus = await aliceClient.auth.status();
+        if (aliceStatus.state === "signed-out")
+          throw new Error("Alice native session is missing");
+        const membership = {
+          organizationId: local.id,
+          userId: aliceStatus.identity.id,
+        };
+        const before = await request(membershipRoute(membership), {
+          admin: true,
+        });
+        expect(before.status).toBe(200);
+        expect(await json(before)).toEqual([]);
+        // Only a new non-owner membership is mutable. Seeded owner rows remain intact.
+        addedMembership = membership;
+        const created = await request("/rest/v1/organization_member", {
+          admin: true,
+          method: "POST",
+          representation: true,
+          body: { organization_id: local.id, user_id: membership.userId },
+        });
+        expect(created.status).toBe(201);
+        const inserted = await json(created);
+        expect(Array.isArray(inserted) && inserted.length === 1).toBe(true);
+        expect(Number.isSafeInteger(inserted[0].id) && inserted[0].id > 0).toBe(
+          true
+        );
+        addedMembership.id = inserted[0].id;
+        const aliceAccess = aliceClient.session()!.accessToken;
+        expect(
+          await aliceClient.auth.requestAccount("organizations.list")
+        ).toEqual({
+          organizations: [local, acme].sort(
+            (left, right) => left.id - right.id
+          ),
+          next_cursor: null,
+        });
+        await removeAddedMembership();
+        expect(
+          await aliceClient.auth.requestAccount("organizations.list")
+        ).toEqual(acmePage);
+        expect(await first.auth.requestAccount("organizations.list")).toEqual(
+          localPage
+        );
+        // Membership visibility changes without a login or token replacement.
+        expect(aliceClient.session()!.accessToken === aliceAccess).toBe(true);
+      }
+    );
+
+    await phase(
       "local logout revokes only the captured native session",
       async () => {
         const oldAccess = first.session()!.accessToken;
@@ -647,11 +736,17 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         const configPath = path.join(probeRoot, "public-client.json");
         await fs.writeFile(configPath, JSON.stringify(config), { mode: 0o600 });
         const sessionPath = path.join(probeRoot, "session.json");
-        const probe = (operation: string) =>
+        const probe = (operation: string, after?: number) =>
           new Promise<Record<string, unknown>>((resolve, reject) => {
             const child = spawn(
               process.execPath,
-              [script, operation, configPath, sessionPath],
+              [
+                script,
+                operation,
+                configPath,
+                sessionPath,
+                ...(after === undefined ? [] : [String(after)]),
+              ],
               {
                 cwd: probeRoot,
                 env: {
@@ -696,7 +791,14 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           });
         expect((await probe("login")).state).toBe("signed-in");
         expect((await fs.stat(sessionPath)).mode & 0o777).toBe(0o600);
+        const organizations =
+          await second.auth.requestAccount("organizations.list");
+        expect(await probe("organizations")).toEqual(organizations);
         expect((await probe("restart")).state).toBe("signed-in");
+        expect(await probe("organizations")).toEqual(organizations);
+        expect(
+          await probe("organizations", organizations.organizations[0]!.id)
+        ).toEqual({ organizations: [], next_cursor: null });
         expect(await probe("logout")).toEqual({
           state: "signed-out",
           revocation: "confirmed",
@@ -767,6 +869,11 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
     );
     expect(blockedBrowserRequest).toBe(false);
   } finally {
+    await removeAddedMembership().catch(() => {
+      console.info(
+        "[oauth-proof] owned membership cleanup failed; stop the disposable fixture"
+      );
+    });
     await Promise.allSettled(
       clients.map(async (value) => {
         await value.auth.cancelLogin();

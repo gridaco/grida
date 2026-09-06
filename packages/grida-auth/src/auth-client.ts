@@ -7,7 +7,7 @@ export class AuthClient {
     listener?: AuthClient.Listener;
   } | null = null;
   private refreshInFlight: Promise<AuthClient.Status> | null = null;
-  private coordinatedVerifications = 0;
+  private protectedReads = 0;
   private mutations: Promise<unknown> = Promise.resolve();
   private requests = new Set<AuthClient.RequestOperation>();
 
@@ -29,7 +29,7 @@ export class AuthClient {
 
   async login(): Promise<AuthClient.Status> {
     if (this.attempt) throw new AuthClient.Failure("login_in_progress");
-    if (this.refreshInFlight || this.coordinatedVerifications)
+    if (this.refreshInFlight || this.protectedReads)
       throw new AuthClient.Failure("session_busy");
     const attempt = {
       generation: ++this.generation,
@@ -144,12 +144,71 @@ export class AuthClient {
     await closeListener(this.attempt.listener);
   }
 
+  /** Fixed account wire capability. Selection and account policy belong to the caller/server. */
+  async requestAccount(
+    operation: "organizations.list",
+    input?: Readonly<{ after?: number }>
+  ): Promise<AuthClient.OrganizationsPage> {
+    if (operation !== "organizations.list")
+      throw new AuthClient.Failure("unsupported_operation");
+    const after = accountCursor(input);
+    if (this.attempt) throw new AuthClient.Failure("session_busy");
+    const generation = this.generation;
+    ++this.protectedReads;
+    try {
+      let page: AuthClient.OrganizationsPage;
+      if (this.coordinatedCustody()) {
+        page = await this.exclusive(async (transaction) => {
+          this.check(generation);
+          let session = (await this.snapshot(transaction)).session;
+          if (!session) throw new AuthClient.Failure("signed_out");
+          this.check(generation);
+          if (session.expiresAt <= this.host.now() + 30_000)
+            session = await this.rotate(transaction, generation, session);
+          this.check(generation);
+          const result = await this.organizations(session.accessToken, after);
+          // Acceptance occurs under authority, before another writer can clear
+          // or replace this session. Already accepted data cannot be retracted.
+          this.check(generation);
+          return result;
+        });
+      } else {
+        let session = await this.requireSession();
+        this.check(generation);
+        if (
+          this.refreshInFlight ||
+          session.expiresAt <= this.host.now() + 30_000
+        ) {
+          await (this.refreshInFlight ?? this.refresh());
+          this.check(generation);
+          session = await this.requireSession();
+        }
+        this.check(generation);
+        page = await this.organizations(session.accessToken, after);
+        this.check(generation);
+        const current = await this.read();
+        if (
+          current?.accessToken !== session.accessToken ||
+          current.refreshToken !== session.refreshToken
+        )
+          throw new AuthClient.Failure("session_changed");
+      }
+      this.check(generation);
+      return page;
+    } catch (error) {
+      this.check(generation);
+      throw safeFailure(error);
+    } finally {
+      --this.protectedReads;
+    }
+  }
+
   /** Live identity from the fixed bearer API; decoded token claims are never identity. */
   async verify(): Promise<AuthClient.Status> {
     if (this.coordinatedCustody()) {
       if (this.attempt) throw new AuthClient.Failure("session_busy");
       const generation = this.generation;
-      ++this.coordinatedVerifications;
+      ++this.protectedReads;
       try {
         return await this.exclusive(async (transaction) => {
           this.check(generation);
@@ -170,7 +229,7 @@ export class AuthClient {
           return this.view(verified);
         });
       } finally {
-        --this.coordinatedVerifications;
+        --this.protectedReads;
       }
     }
     let session = await this.requireSession();
@@ -368,6 +427,60 @@ export class AuthClient {
     };
   }
 
+  private async organizations(
+    accessToken: string,
+    after: number | undefined
+  ): Promise<AuthClient.OrganizationsPage> {
+    const response = await this.request({
+      url: `${this.config.apiOrigin}/api/v1/account/organizations${after === undefined ? "" : `?after=${after}`}`,
+      method: "GET",
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    if (response.status !== 200)
+      throw new AuthClient.Failure(
+        response.status === 401
+          ? "token_rejected"
+          : response.status === 403
+            ? "forbidden"
+            : "unavailable"
+      );
+    const body = record(response.body);
+    if (
+      !body ||
+      !Array.isArray(body.organizations) ||
+      body.organizations.length > 100
+    )
+      throw new AuthClient.Failure("invalid_response");
+    let last = after ?? 0;
+    const organizations = body.organizations.map((value: unknown) => {
+      const organization = record(value);
+      if (
+        !organization ||
+        !positiveInteger(organization.id) ||
+        organization.id <= last ||
+        typeof organization.name !== "string" ||
+        organization.name.length < 1 ||
+        organization.name.length > 39 ||
+        typeof organization.display_name !== "string"
+      )
+        throw new AuthClient.Failure("invalid_response");
+      last = organization.id;
+      return {
+        id: organization.id,
+        name: organization.name,
+        display_name: organization.display_name,
+      };
+    });
+    if (
+      body.next_cursor !== null &&
+      (!positiveInteger(body.next_cursor) ||
+        organizations.length === 0 ||
+        body.next_cursor !== last)
+    )
+      throw new AuthClient.Failure("invalid_response");
+    return { organizations, next_cursor: body.next_cursor };
+  }
+
   private async request(
     request: AuthClient.Request
   ): Promise<AuthClient.Response> {
@@ -546,6 +659,15 @@ export namespace AuthClient {
     state: "signed-out";
     revocation: "confirmed" | "unconfirmed" | "not-needed";
   };
+  /** One server-ordered page; a null cursor is the only end-of-list signal. */
+  export type OrganizationsPage = Readonly<{
+    organizations: readonly Readonly<{
+      id: number;
+      name: string;
+      display_name: string;
+    }>[];
+    next_cursor: number | null;
+  }>;
   /** Secret-bearing host boundary. Never serialize this object into presentation or logs. */
   export type Session = {
     issuer: string;
@@ -628,6 +750,9 @@ export namespace AuthClient {
     | "authorization_failed"
     | "token_rejected"
     | "unavailable"
+    | "forbidden"
+    | "unsupported_operation"
+    | "invalid_input"
     | "invalid_response"
     | "signed_out"
     | "custody_failed"
@@ -639,6 +764,29 @@ export namespace AuthClient {
       super(`Grida authentication failed (${code})`);
       this.name = "AuthFailure";
     }
+  }
+}
+
+function positiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function accountCursor(
+  input: Readonly<{ after?: number }> | undefined
+): number | undefined {
+  if (input === undefined) return undefined;
+  try {
+    const value = record(input);
+    if (!value || Reflect.ownKeys(value).some((key) => key !== "after"))
+      throw new AuthClient.Failure("invalid_input");
+    // Snapshot once before any await: accessors and caller mutation cannot
+    // substitute an unvalidated value between validation and serialization.
+    const after = value.after;
+    if (after !== undefined && !positiveInteger(after))
+      throw new AuthClient.Failure("invalid_input");
+    return after;
+  } catch {
+    throw new AuthClient.Failure("invalid_input");
   }
 }
 

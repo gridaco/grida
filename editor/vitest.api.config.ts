@@ -16,6 +16,8 @@ export default defineConfig({
   test: {
     include: [
       "lib/api/**/*.test.ts",
+      "lib/account/**/*.test.ts",
+      "lib/supabase/account-data.test.ts",
       "scripts/audit-api.test.ts",
       "lib/auth/__tests__/oauth-*.test.{ts,tsx}",
       "lib/tenant/middleware.test.ts",

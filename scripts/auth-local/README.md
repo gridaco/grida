@@ -162,8 +162,17 @@ bearer credential rejection, independent native sessions, rotating refresh,
 seeded `local`/`acme` organization RLS, and the distinct effects of session-local
 logout, application-grant revocation, and account-wide logout.
 
+The account check calls the package's public
+`auth.requestAccount("organizations.list", { after })` operation through Grida's
+HTTP API. Two native users see their own seeded organizations. The fixture's
+setup authority temporarily adds a non-owner Alice membership in `local`, then
+removes only that new membership; the same native credential immediately sees
+both changes. Seeded owner memberships remain intact. This exercises current
+PostgreSQL RLS, unlike the separate synthetic production request-pipeline proof.
+
 Its restart check copies the built package and manifest outside the repository
 and runs separate Node processes with disposable `0700`/`0600` test custody.
+It lists organizations before and after restart and checks a terminal cursor.
 That proves independent package use and this test adapter's restart behavior;
 it does not establish product credential storage or cross-process coordination.
 No hosted service or deployment is covered by the local result. Normal output

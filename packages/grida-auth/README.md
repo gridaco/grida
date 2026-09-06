@@ -75,6 +75,52 @@ integration proof.
 Failures are `AuthClient.Failure` with a stable `code` and a fixed message.
 Upstream error bodies and thrown host error messages are not exposed.
 
+## Fixed account requests
+
+```ts
+const page = await auth.requestAccount("organizations.list");
+// {organizations: [{id, name, display_name}], next_cursor: number | null}
+const next =
+  page.next_cursor === null
+    ? null
+    : await auth.requestAccount("organizations.list", {
+        after: page.next_cursor,
+      });
+```
+
+This is the only account request operation. It sends GET to the configured
+API origin's `/api/v1/account/organizations`, with only the optional canonical
+`?after=<positive-safe-integer>` query. Unknown operations and input keys are
+rejected before custody or network access. No user ID, page size, URL, method,
+headers, raw response, or registration hook can be supplied.
+
+`AuthClient.OrganizationsPage` is a secret-free wire view. Each page contains at
+most 100 records with positive safe-integer IDs strictly increasing beyond
+`after`, names of 1–39 characters, and string `display_name` values (including
+empty strings). Extra response fields are discarded. `next_cursor` is null or
+the final returned ID; null is the only completion signal. An empty terminal
+page is a successful result, never a substitute for failure. Account selection,
+iteration, presentation, and authorization rules stay with their respective
+account and server owners; this package does not choose an organization.
+
+Each request rereads custody and refreshes within the existing 30-second expiry
+window before sending the page request. There is no automatic replay: 401 is
+`token_rejected`, 403 is `forbidden`, other non-200 statuses are `unavailable`,
+and invalid pages are `invalid_response`. A network error does not trigger a
+refresh/retry. Accepted rotations remain stored if a later page request fails.
+The Node transport's existing deadline, response-size limit, cookie omission,
+and redirect refusal apply unchanged.
+
+Coordinated custody holds profile authority through the fresh read, any refresh,
+the page request, and result acceptance. Another process's logout or replacement
+waits for that acceptance; acceptance is ordered before the later clear, though
+process scheduling can deliver already accepted data afterward. Same-instance
+logout cancels transport and fences results immediately, including a transport
+that ignores cancellation. Logout cannot undo remote work or retract accepted
+data. Memory custody retains its one-writer limitation and rejects a read if a
+concurrent refresh changes its captured credentials. Login and account reads
+cannot overlap on the same client; they fail with `session_busy`.
+
 ## Native ceremony and transport
 
 - Configuration accepts canonical HTTPS issuer/API origins or explicit local
@@ -160,7 +206,7 @@ trigger rollback. Issuer rotation and local persistence cannot be atomic; a
 failure between them may still require a fresh login.
 
 Refresh remains single-flight within one instance. Login cannot overlap that
-instance's refresh or coordinated verification; coordinated verification also
+instance's refresh, account reads, or coordinated verification; coordinated verification also
 refuses an ongoing login with `session_busy`. Platform cancellation is
 synchronous, idempotent, and nonthrowing. Pending host acquisition and I/O must
 settle before their resources can be released; cancellation cannot revoke a
@@ -240,8 +286,10 @@ can still require login; no local adapter can make those two systems atomic.
 
 - No supported `grida` commands, browser launcher, credential export command,
   or presentation layer.
-- No account/billing/media operations, GG token minting, provider OAuth registry,
-  or generic authenticated URL fetch.
+- No account interpretation, selection, billing/media operations, GG token
+  minting, provider OAuth registry, or generic authenticated URL fetch. The fixed
+  organization-page capability is wire transport only; other operations require
+  a new producer contract.
 - No bespoke tokens, token-claim identity inference, social-PKCE fallback,
   Desktop deep links/cookies, global logout, or grant revocation.
 - No Desktop/provider credential sharing, machine-wide store, or daemon lifetime.

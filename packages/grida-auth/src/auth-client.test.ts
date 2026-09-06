@@ -192,6 +192,443 @@ function tokenResponse(suffix: string): AuthClient.Response {
   };
 }
 
+const organizations: AuthClient.OrganizationsPage = {
+  organizations: [{ id: 7, name: "example", display_name: "Example" }],
+  next_cursor: null,
+};
+function accountReply(
+  h: { host: AuthClient.Host; requests: AuthClient.Request[] },
+  response: AuthClient.Response = { status: 200, body: organizations }
+) {
+  const original = h.host.request;
+  h.host.request = vi.fn<AuthClient.Host["request"]>((request) => {
+    if (
+      request.url.startsWith(`${config.apiOrigin}/api/v1/account/organizations`)
+    ) {
+      h.requests.push(request);
+      return { result: Promise.resolve(response), cancel() {} };
+    }
+    return original(request);
+  });
+}
+
+describe("AuthClient.requestAccount", () => {
+  it("sends only the fixed GET and projects one ordered page without credentials or upstream extras", async () => {
+    const h = harness(session());
+    accountReply(h, {
+      status: 200,
+      body: {
+        organizations: [
+          { id: 7, name: "example", display_name: "", access_token: "secret" },
+          {
+            id: 12,
+            name: "another",
+            display_name: "Another",
+            owner: "private",
+          },
+        ],
+        next_cursor: 12,
+        refresh_token: "secret",
+      },
+    });
+    expect(
+      await h.client.requestAccount("organizations.list", { after: 3 })
+    ).toEqual({
+      organizations: [
+        { id: 7, name: "example", display_name: "" },
+        { id: 12, name: "another", display_name: "Another" },
+      ],
+      next_cursor: 12,
+    });
+    expect(h.requests).toEqual([
+      {
+        url: `${config.apiOrigin}/api/v1/account/organizations?after=3`,
+        method: "GET",
+        headers: { authorization: "Bearer old-access-secret" },
+      },
+    ]);
+    expect(h.writes).toHaveLength(0);
+  });
+
+  it("accepts an explicit empty terminal page without inventing memberships", async () => {
+    const h = harness(session());
+    const empty = { organizations: [], next_cursor: null };
+    accountReply(h, { status: 200, body: empty });
+    expect(await h.client.requestAccount("organizations.list")).toEqual(empty);
+    expect(h.requests[0]?.url).toBe(
+      `${config.apiOrigin}/api/v1/account/organizations`
+    );
+  });
+
+  it("snapshots the validated cursor once despite an accessor or later caller mutation", async () => {
+    const h = harness(session());
+    accountReply(h);
+    let reads = 0;
+    const accessor = {
+      get after() {
+        return ++reads === 1 ? 3 : ("7&user_id=other" as never);
+      },
+    };
+    await h.client.requestAccount("organizations.list", accessor);
+    expect(reads).toBe(1);
+    const input = { after: 3 };
+    const pending = h.client.requestAccount("organizations.list", input);
+    input.after = 99;
+    await pending;
+    expect(h.requests.map((request) => request.url)).toEqual([
+      `${config.apiOrigin}/api/v1/account/organizations?after=3`,
+      `${config.apiOrigin}/api/v1/account/organizations?after=3`,
+    ]);
+  });
+
+  it("sanitizes a throwing cursor accessor before custody or transport access", async () => {
+    const h = harness(session());
+    const read = vi.spyOn(h.host.custody, "read");
+    await expect(
+      h.client.requestAccount("organizations.list", {
+        get after(): number {
+          throw new Error("private-accessor-details");
+        },
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_input",
+      message: "Grida authentication failed (invalid_input)",
+    });
+    expect(read).not.toHaveBeenCalled();
+    expect(h.host.request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    null,
+    [],
+    { user_id: "other" },
+    { after: 0 },
+    { after: -1 },
+    { after: 1.5 },
+    { after: "7" },
+    { after: Number.MAX_SAFE_INTEGER + 1 },
+    { after: NaN },
+    { after: 7, limit: 200 },
+    { [Symbol("headers")]: "secret" },
+  ])(
+    "rejects invalid fixed-operation input before custody or network I/O: %j",
+    async (input) => {
+      const h = harness(session());
+      const read = vi.spyOn(h.host.custody, "read");
+      await expect(
+        h.client.requestAccount("organizations.list", input as never)
+      ).rejects.toMatchObject({ code: "invalid_input" });
+      expect(read).not.toHaveBeenCalled();
+      expect(h.host.request).not.toHaveBeenCalled();
+    }
+  );
+
+  it("refuses caller-defined operations and signed-out access before transport", async () => {
+    const h = harness();
+    await expect(
+      h.client.requestAccount("https://elsewhere.invalid" as never)
+    ).rejects.toMatchObject({ code: "unsupported_operation" });
+    await expect(
+      h.client.requestAccount("organizations.list")
+    ).rejects.toMatchObject({ code: "signed_out" });
+    expect(h.host.request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [401, "token_rejected"],
+    [403, "forbidden"],
+    [429, "unavailable"],
+    [503, "unavailable"],
+    [302, "unavailable"],
+    [204, "unavailable"],
+  ])("maps HTTP %i safely without refresh or replay", async (status, code) => {
+    const h = harness(session());
+    accountReply(h, {
+      status: status as number,
+      body: { message: "private-provider-diagnostic" },
+    });
+    await expect(
+      h.client.requestAccount("organizations.list")
+    ).rejects.toMatchObject({
+      code,
+      message: `Grida authentication failed (${code})`,
+    });
+    expect(h.requests).toHaveLength(1);
+    expect(h.writes).toHaveLength(0);
+  });
+
+  it.each([
+    null,
+    {},
+    { organizations: [], next_cursor: 1 },
+    { organizations: [], next_cursor: undefined },
+    { organizations: organizations.organizations, next_cursor: 8 },
+    { organizations: organizations.organizations, next_cursor: "7" },
+    {
+      organizations: [{ id: 7, name: "example", display_name: null }],
+      next_cursor: null,
+    },
+    {
+      organizations: [{ id: 7, name: "", display_name: "" }],
+      next_cursor: null,
+    },
+    {
+      organizations: [{ id: 7, name: "a".repeat(40), display_name: "" }],
+      next_cursor: null,
+    },
+    {
+      organizations: [{ id: 0, name: "example", display_name: "" }],
+      next_cursor: null,
+    },
+    {
+      organizations: [
+        { id: Number.MAX_SAFE_INTEGER + 1, name: "example", display_name: "" },
+      ],
+      next_cursor: null,
+    },
+    {
+      organizations: [
+        ...organizations.organizations,
+        ...organizations.organizations,
+      ],
+      next_cursor: null,
+    },
+    {
+      organizations: [
+        { id: 8, name: "eight", display_name: "" },
+        ...organizations.organizations,
+      ],
+      next_cursor: null,
+    },
+    {
+      organizations: Array.from({ length: 101 }, (_, i) => ({
+        id: i + 1,
+        name: "example",
+        display_name: "",
+      })),
+      next_cursor: null,
+    },
+  ])(
+    "rejects malformed, unbounded or non-progressing wire pages: %j",
+    async (body) => {
+      const h = harness(session());
+      accountReply(h, { status: 200, body });
+      await expect(
+        h.client.requestAccount("organizations.list")
+      ).rejects.toMatchObject({ code: "invalid_response" });
+      expect(h.writes).toHaveLength(0);
+    }
+  );
+
+  it("refuses records at or before the requested cursor", async () => {
+    const h = harness(session());
+    accountReply(h);
+    await expect(
+      h.client.requestAccount("organizations.list", { after: 7 })
+    ).rejects.toMatchObject({ code: "invalid_response" });
+  });
+
+  it("shares near-expiry refresh across memory reads and sends only the verified replacement bearer", async () => {
+    const h = harness(session({ expiresAt: now + 30_000 }));
+    accountReply(h);
+    await Promise.all([
+      h.client.requestAccount("organizations.list"),
+      h.client.requestAccount("organizations.list"),
+    ]);
+    expect(
+      h.requests.filter((r) => r.url.endsWith("/oauth/token"))
+    ).toHaveLength(1);
+    const reads = h.requests.filter((r) =>
+      r.url.includes("/account/organizations")
+    );
+    expect(reads).toHaveLength(2);
+    expect(
+      reads.every((r) => r.headers.authorization === "Bearer new-access-secret")
+    ).toBe(true);
+  });
+
+  it("serializes independent near-expiry readers and reuses the latest verified session", async () => {
+    const store = sharedCustody(session({ expiresAt: now - 1 }));
+    const first = store.client();
+    const second = store.client();
+    accountReply(first);
+    accountReply(second);
+    await Promise.all([
+      first.client.requestAccount("organizations.list"),
+      second.client.requestAccount("organizations.list"),
+    ]);
+    expect(
+      [...first.requests, ...second.requests].filter((r) =>
+        r.url.endsWith("/oauth/token")
+      )
+    ).toHaveLength(1);
+    expect(second.requests[0]?.headers.authorization).toBe(
+      "Bearer new-access-secret"
+    );
+    expect(store.acquisitions()).toBe(2);
+    expect(store.active()).toBe(0);
+  });
+
+  it("keeps an accepted rotation when the account request fails without replaying the read", async () => {
+    const store = sharedCustody(session({ expiresAt: now - 1 }));
+    const h = store.client();
+    accountReply(h, { status: 503, body: "private-diagnostic" });
+    await expect(
+      h.client.requestAccount("organizations.list")
+    ).rejects.toMatchObject({ code: "unavailable" });
+    expect(store.stored()?.refreshToken).toBe("new-refresh-secret");
+    expect(store.stored()?.accessToken).toBe("new-access-secret");
+    expect(
+      h.requests.filter((r) => r.url.includes("/account/organizations"))
+    ).toHaveLength(1);
+    expect(store.active()).toBe(0);
+  });
+
+  it.each([false, true])(
+    "preserves accepted rotation if live identity fails before the account request (coordinated=%s)",
+    async (coordinated) => {
+      const previous = session({ expiresAt: now - 1 });
+      const store = sharedCustody(previous);
+      const h = coordinated ? store.client() : harness(previous);
+      accountReply(h);
+      const original = h.host.request;
+      let unavailable = true;
+      h.host.request = (request) => {
+        if (request.url.endsWith("/api/v1/auth/me") && unavailable) {
+          h.requests.push(request);
+          return {
+            result: Promise.resolve({ status: 503, body: null }),
+            cancel() {},
+          };
+        }
+        return original(request);
+      };
+      await expect(
+        h.client.requestAccount("organizations.list")
+      ).rejects.toMatchObject({ code: "unavailable" });
+      expect(coordinated ? store.stored() : h.stored()).toEqual({
+        ...previous,
+        refreshToken: "new-refresh-secret",
+      });
+      expect(
+        h.requests.some((r) => r.url.includes("/account/organizations"))
+      ).toBe(false);
+      unavailable = false;
+      expect(await h.client.requestAccount("organizations.list")).toEqual(
+        organizations
+      );
+      const grants = h.requests.filter((r) => r.url.endsWith("/oauth/token"));
+      expect(new URLSearchParams(grants[1]?.body).get("refresh_token")).toBe(
+        "new-refresh-secret"
+      );
+    }
+  );
+
+  it.each([false, true])(
+    "logout fences an outstanding result even when transport ignores cancellation (coordinated=%s)",
+    async (coordinated) => {
+      const store = sharedCustody(session());
+      const h = coordinated ? store.client() : harness(session());
+      const entered = deferred<void>();
+      const response = deferred<AuthClient.Response>();
+      const cancel = vi.fn<() => void>();
+      const original = h.host.request;
+      h.host.request = (request) => {
+        if (request.url.includes("/account/organizations")) {
+          entered.resolve();
+          return { result: response.promise, cancel };
+        }
+        return original(request);
+      };
+      const result = h.client
+        .requestAccount("organizations.list")
+        .catch((error: unknown) => error);
+      await entered.promise;
+      const logout = h.client.logout();
+      expect(cancel).toHaveBeenCalledOnce();
+      response.resolve({ status: 200, body: organizations });
+      expect(await result).toMatchObject({ code: "cancelled" });
+      await logout;
+      expect(coordinated ? store.stored() : h.stored()).toBeNull();
+    }
+  );
+
+  it("holds shared authority until result acceptance, so a different writer's logout waits", async () => {
+    const store = sharedCustody(session());
+    const first = store.client();
+    const second = store.client();
+    const entered = deferred<void>();
+    const response = deferred<AuthClient.Response>();
+    first.host.request = () => {
+      entered.resolve();
+      return { result: response.promise, cancel() {} };
+    };
+    const read = first.client.requestAccount("organizations.list");
+    await entered.promise;
+    const logout = second.client.logout();
+    expect(store.active()).toBe(1);
+    expect(store.stored()).not.toBeNull();
+    response.resolve({ status: 200, body: organizations });
+    expect(await read).toEqual(organizations);
+    await logout;
+    expect(store.stored()).toBeNull();
+    await expect(
+      first.client.requestAccount("organizations.list")
+    ).rejects.toMatchObject({ code: "signed_out" });
+  });
+
+  it("rejects a memory read if a concurrent refresh replaced its captured credentials", async () => {
+    const h = harness(session());
+    const entered = deferred<void>();
+    const response = deferred<AuthClient.Response>();
+    const original = h.host.request;
+    h.host.request = (request) => {
+      if (request.url.includes("/account/organizations")) {
+        entered.resolve();
+        return { result: response.promise, cancel() {} };
+      }
+      return original(request);
+    };
+    const read = h.client
+      .requestAccount("organizations.list")
+      .catch((error: unknown) => error);
+    await entered.promise;
+    await h.client.refresh();
+    response.resolve({ status: 200, body: organizations });
+    expect(await read).toMatchObject({ code: "session_changed" });
+    expect(h.stored()?.refreshToken).toBe("new-refresh-secret");
+  });
+
+  it("refuses login during an account read and releases that exclusion after transport failure", async () => {
+    const h = harness(session());
+    const entered = deferred<void>();
+    const response = deferred<AuthClient.Response>();
+    h.host.request = () => {
+      entered.resolve();
+      return { result: response.promise, cancel() {} };
+    };
+    const read = h.client
+      .requestAccount("organizations.list")
+      .catch((error: unknown) => error);
+    await entered.promise;
+    await expect(h.client.login()).rejects.toMatchObject({
+      code: "session_busy",
+    });
+    response.reject(new Error("private-network-details"));
+    expect(await read).toMatchObject({
+      code: "unavailable",
+      message: "Grida authentication failed (unavailable)",
+    });
+    const login = h.client.login().catch((error: unknown) => error);
+    await h.bound;
+    await expect(
+      h.client.requestAccount("organizations.list")
+    ).rejects.toMatchObject({ code: "session_busy" });
+    await h.client.cancelLogin();
+    expect(await login).toMatchObject({ code: "cancelled" });
+  });
+});
+
 describe("AuthClient", () => {
   it.each([
     { issuer: "http://auth.example.com/auth/v1" },

@@ -159,6 +159,94 @@ async function provesClosed(uri: string) {
 }
 
 describe("createNativeAuth", () => {
+  it("carries the fixed account page over bounded native HTTP without cookies, redirects or raw response fields", async () => {
+    let mode: "ok" | "oversized" | "redirect" = "ok";
+    let calls = 0;
+    const upstream = await server();
+    upstream.instance.on("request", (request, response) => {
+      ++calls;
+      expect(request.url).toBe("/api/v1/account/organizations?after=1");
+      expect(request.method).toBe("GET");
+      expect(request.headers.authorization).toBe(
+        "Bearer account-access-secret"
+      );
+      expect(request.headers.cookie).toBeUndefined();
+      if (mode === "redirect") {
+        response.writeHead(302, { location: "/unexpected" }).end();
+        return;
+      }
+      response.writeHead(200, {
+        "content-type": "application/json",
+        "x-private": "secret",
+      });
+      response.end(
+        JSON.stringify({
+          organizations: [
+            {
+              id: 2,
+              name: "example",
+              display_name:
+                mode === "oversized" ? "x".repeat(65_536) : "Example",
+              private: "secret",
+            },
+          ],
+          next_cursor: null,
+          access_token: "secret",
+        })
+      );
+    });
+    const config: AuthClient.Config = {
+      issuer: `${upstream.origin}/auth/v1`,
+      apiOrigin: upstream.origin,
+      clientId: "synthetic-public-client",
+      redirectUris: ["http://127.0.0.1:55435/callback"],
+    };
+    const session: AuthClient.Session = {
+      issuer: config.issuer,
+      apiOrigin: config.apiOrigin,
+      clientId: config.clientId,
+      identity: {
+        id: "synthetic-user",
+        email: null,
+        display_name: "Synthetic",
+      },
+      accessToken: "account-access-secret",
+      refreshToken: "account-refresh-secret",
+      expiresAt: Date.now() + 3_600_000,
+    };
+    const client = createNativeAuth(config, {
+      custody: {
+        async read() {
+          return session;
+        },
+        async write() {
+          throw new Error("Unexpected custody write");
+        },
+        async clear() {
+          throw new Error("Unexpected custody clear");
+        },
+      },
+      async openBrowser() {
+        throw new Error("Unexpected browser launch");
+      },
+    });
+    expect(
+      await client.requestAccount("organizations.list", { after: 1 })
+    ).toEqual({
+      organizations: [{ id: 2, name: "example", display_name: "Example" }],
+      next_cursor: null,
+    });
+    mode = "oversized";
+    await expect(
+      client.requestAccount("organizations.list", { after: 1 })
+    ).rejects.toMatchObject({ code: "invalid_response" });
+    mode = "redirect";
+    await expect(
+      client.requestAccount("organizations.list", { after: 1 })
+    ).rejects.toMatchObject({ code: "unavailable" });
+    expect(calls).toBe(3);
+  });
+
   it("runs S256 login, live verification, refresh, and session-local logout over owned loopback servers", async () => {
     const f = await fixture();
     let launched = "";

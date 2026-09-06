@@ -29,12 +29,15 @@ const copiedFiles = [
   "lib/api/operations.ts",
   "lib/api/policy.ts",
   "lib/api/account.ts",
+  "lib/account/account.ts",
+  "lib/supabase/account-data.ts",
   "lib/auth/bearer.ts",
   "lib/auth/oauth-server.ts",
   "lib/desktop/csp.ts",
   "lib/domains/index.ts",
   "lib/platform/index.ts",
   "app/(api)/(public)/api/v1/auth/me/route.ts",
+  "app/(api)/(public)/api/v1/account/organizations/route.ts",
 ];
 
 function check(condition, label) {
@@ -109,7 +112,24 @@ function issuerFixture() {
   ];
   const key = randomBytes(32);
   const tokens = new Map();
-  const fixture = { client, users, calls: 0, mode: "ok", origin: "" };
+  const fixture = {
+    client,
+    users,
+    calls: 0,
+    databaseCalls: 0,
+    mode: "ok",
+    databaseMode: "ok",
+    databaseLimit: 100,
+    organizations: [
+      Array.from({ length: 101 }, (_, index) => ({
+        id: index + 1,
+        name: `alpha-${index + 1}`,
+        display_name: `Alpha ${index + 1}`,
+      })),
+      [{ id: 1001, name: "beta", display_name: "Beta organization" }],
+    ],
+    origin: "",
+  };
   fixture.token = (index, claims = {}) => {
     const payload = {
       iss: `${fixture.origin}/auth/v1`,
@@ -129,11 +149,14 @@ function issuerFixture() {
     return token;
   };
   fixture.server = createServer((req, response) => {
-    fixture.calls++;
+    const url = new URL(req.url, fixture.origin);
+    const database = url.pathname === "/rest/v1/organization";
+    if (database) fixture.databaseCalls++;
+    else fixture.calls++;
     response.setHeader("cache-control", "no-store");
     if (
       req.method !== "GET" ||
-      req.url !== "/auth/v1/oauth/userinfo" ||
+      (!database && req.url !== "/auth/v1/oauth/userinfo") ||
       req.headers.apikey !== "synthetic-publishable-key"
     ) {
       response.writeHead(500).end();
@@ -143,6 +166,58 @@ function issuerFixture() {
     const index = tokens.get(token);
     if (index === undefined || fixture.mode === "revoked") {
       response.writeHead(401).end();
+      return;
+    }
+    if (database) {
+      const after = url.searchParams.get("id");
+      if (
+        url.searchParams.get("select") !== "id,name,display_name" ||
+        url.searchParams.get("order") !== "id.asc" ||
+        url.searchParams.get("limit") !== "100" ||
+        [...url.searchParams.keys()].some(
+          (key) => !["select", "order", "limit", "id"].includes(key)
+        ) ||
+        (after !== null && !/^gt\.[1-9]\d*$/.test(after)) ||
+        req.headers["accept-profile"] !== "public" ||
+        req.headers.prefer !== "count=exact" ||
+        req.headers.cookie !== undefined
+      ) {
+        response.writeHead(500).end();
+        return;
+      }
+      const status = { unauthorized: 401, forbidden: 403, unavailable: 503 }[
+        fixture.databaseMode
+      ];
+      if (status) {
+        response.writeHead(status).end();
+        return;
+      }
+      if (fixture.databaseMode === "redirect") {
+        response
+          .writeHead(302, { location: `${fixture.origin}/unexpected-database` })
+          .end();
+        return;
+      }
+      const cursor = after === null ? 0 : Number(after.slice(3));
+      const visible = fixture.organizations[index]
+        .filter((row) => row.id > cursor)
+        .toSorted((left, right) => left.id - right.id);
+      const rows = visible.slice(0, Math.min(100, fixture.databaseLimit));
+      response.statusCode = rows.length < visible.length ? 206 : 200;
+      response.setHeader("content-type", "application/json");
+      if (fixture.databaseMode !== "missing-count") {
+        response.setHeader(
+          "content-range",
+          rows.length === 0 ? "*/0" : `0-${rows.length - 1}/${visible.length}`
+        );
+      }
+      response.end(
+        fixture.databaseMode === "malformed"
+          ? "invalid JSON"
+          : JSON.stringify(
+              rows.map((row) => ({ ...row, ignored: "upstream-only" }))
+            )
+      );
       return;
     }
     if (fixture.mode === "unavailable") {
@@ -319,6 +394,182 @@ async function ready(process, port) {
   throw new Error("Next readiness deadline exceeded");
 }
 
+async function organizationAssertions(port, issuer, safe, alpha, beta) {
+  const endpoint = "/api/v1/account/organizations";
+  const auth = (token) => ({ authorization: `Bearer ${token}` });
+  const page = async (token, rows, cursor = null, after) => {
+    const value = safe(
+      await request(
+        port,
+        endpoint + (after === undefined ? "" : `?after=${after}`),
+        {
+          headers: {
+            ...auth(token),
+            cookie: "sb-session=synthetic-web-cookie",
+          },
+        }
+      ),
+      200,
+      "organization page"
+    );
+    check(
+      JSON.stringify(value) ===
+        JSON.stringify({ organizations: rows, next_cursor: cursor }),
+      "Organization page identity, projection, order or continuation mismatch"
+    );
+  };
+  const alphaRows = issuer.organizations[0];
+  const betaRows = issuer.organizations[1];
+  await page(alpha, alphaRows.slice(0, 100), 100);
+  await page(beta, betaRows);
+  await page(alpha, alphaRows.slice(0, 100), 100);
+  await page(alpha, alphaRows.slice(100), null, 100);
+  await page(alpha, [], null, 101);
+  issuer.databaseLimit = 2;
+  await page(alpha, alphaRows.slice(0, 2), 2);
+  await page(alpha, alphaRows.slice(2, 4), 4, 2);
+  issuer.databaseLimit = 100;
+
+  // Simulated row visibility only. The separate Supabase proof owns actual RLS.
+  issuer.organizations[1] = [alphaRows[0], ...betaRows];
+  await page(beta, [alphaRows[0], ...betaRows]);
+  issuer.organizations[1] = betaRows;
+  await page(beta, betaRows);
+  issuer.organizations[1] = [];
+  await page(beta, []);
+  issuer.organizations[1] = betaRows;
+
+  let beforeAuth = issuer.calls;
+  let beforeData = issuer.databaseCalls;
+  for (const headers of [
+    {},
+    { cookie: "sb-session=synthetic-web-cookie" },
+    auth("gg_synthetic_credential"),
+    auth(issuer.token(0, { exp: Math.floor(Date.now() / 1000) - 1 })),
+    auth(issuer.token(0, { client_id: randomUUID() })),
+  ]) {
+    safe(
+      await request(port, endpoint, { headers }),
+      401,
+      "organization credential rejection"
+    );
+  }
+  check(
+    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    "Invalid organization credential reached issuer/database"
+  );
+  issuer.mode = "revoked";
+  safe(
+    await request(port, endpoint, { headers: auth(alpha) }),
+    401,
+    "organization live-session rejection"
+  );
+  check(
+    issuer.databaseCalls === beforeData,
+    "Revoked session reached organization data"
+  );
+  issuer.mode = "ok";
+
+  beforeAuth = issuer.calls;
+  for (const query of [
+    "after=0",
+    "after=-1",
+    "after=01",
+    "after=1.0",
+    "after=1e2",
+    "after=9007199254740992",
+    "after=1&after=2",
+    "limit=1",
+    "user_id=another-user",
+    "organization_id=1",
+  ]) {
+    safe(
+      await request(port, `${endpoint}?${query}`, { headers: auth(alpha) }),
+      400,
+      "organization input rejection"
+    );
+  }
+  safe(
+    await request(port, endpoint, {
+      headers: { ...auth(alpha), "content-length": "1" },
+      body: "x",
+    }),
+    400,
+    "organization GET body rejection"
+  );
+  safe(
+    await request(port, endpoint, {
+      method: "OPTIONS",
+      headers: { "content-length": "1" },
+      body: "x",
+    }),
+    400,
+    "organization OPTIONS body rejection",
+    false
+  );
+  check(
+    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    "Rejected organization input reached issuer/database"
+  );
+
+  safe(
+    await request(port, endpoint, { method: "HEAD", headers: auth(alpha) }),
+    200,
+    "organization authenticated HEAD",
+    false
+  );
+  safe(
+    await request(port, endpoint, { method: "HEAD" }),
+    401,
+    "organization unauthenticated HEAD",
+    false
+  );
+  beforeAuth = issuer.calls;
+  beforeData = issuer.databaseCalls;
+  const options = await request(port, endpoint, { method: "OPTIONS" });
+  safe(options, 204, "organization OPTIONS", false);
+  check(
+    options.headers.allow === "GET, HEAD, OPTIONS",
+    "Organization OPTIONS Allow mismatch"
+  );
+  for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+    const response = await request(port, endpoint, {
+      method,
+      headers: auth(alpha),
+    });
+    const body = safe(response, 405, "organization method rejection");
+    check(
+      body.error.code === "method_not_allowed" &&
+        response.headers.allow === "GET, HEAD, OPTIONS",
+      "Organization method policy mismatch"
+    );
+  }
+  check(
+    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    "Organization method rejection reached issuer/database"
+  );
+  for (const [mode, status] of [
+    ["unauthorized", 401],
+    ["forbidden", 403],
+    ["unavailable", 503],
+    ["malformed", 503],
+    ["missing-count", 503],
+    ["redirect", 503],
+  ]) {
+    issuer.databaseMode = mode;
+    const body = safe(
+      await request(port, endpoint, { headers: auth(alpha) }),
+      status,
+      `organization database ${mode}`
+    );
+    check(
+      body.error && !Object.hasOwn(body, "organizations"),
+      "Database failure became an empty organization page"
+    );
+  }
+  issuer.databaseMode = "ok";
+}
+
 async function assertions(port, issuer, tripwire) {
   let count = 0;
   const alpha = issuer.token(0);
@@ -421,6 +672,7 @@ async function assertions(port, issuer, tripwire) {
     );
   }
   issuer.mode = "ok";
+  await organizationAssertions(port, issuer, safe, alpha, beta);
   safe(
     await request(port, "/api/v1/auth/me", {
       method: "HEAD",
@@ -728,28 +980,35 @@ async function main() {
       await ready(active, port);
       if (mode === "normal")
         report.cases += await assertions(port, issuer, tripwire);
-      else {
-        const before = issuer.calls;
-        const response = await request(port, "/api/v1/auth/me", {
-          headers: { authorization: `Bearer ${issuer.token(0)}` },
-        });
-        check(
-          response.status === 503 &&
-            response.headers["content-type"]?.includes("application/json"),
-          `${mode} must return JSON 503`
-        );
-        check(
-          response.headers["cache-control"]?.includes("no-store") &&
-            !response.headers["set-cookie"] &&
-            !response.headers.location,
-          `${mode} response isolation`
-        );
-        check(
-          issuer.calls === before && (await readFile(tripwire, "utf8")) === "",
-          `${mode} invoked auth/web side effects`
-        );
-        report.cases++;
-      }
+      else
+        for (const endpoint of [
+          "/api/v1/auth/me",
+          "/api/v1/account/organizations",
+        ]) {
+          const before = issuer.calls;
+          const beforeData = issuer.databaseCalls;
+          const response = await request(port, endpoint, {
+            headers: { authorization: `Bearer ${issuer.token(0)}` },
+          });
+          check(
+            response.status === 503 &&
+              response.headers["content-type"]?.includes("application/json"),
+            `${mode} must return JSON 503`
+          );
+          check(
+            response.headers["cache-control"]?.includes("no-store") &&
+              !response.headers["set-cookie"] &&
+              !response.headers.location,
+            `${mode} response isolation`
+          );
+          check(
+            issuer.calls === before &&
+              issuer.databaseCalls === beforeData &&
+              (await readFile(tripwire, "utf8")) === "",
+            `${mode} invoked auth/web side effects`
+          );
+          report.cases++;
+        }
       await active.stop();
       logs.push(active.log());
       active = undefined;

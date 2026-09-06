@@ -19,6 +19,13 @@ export namespace apiOperations {
       binding: "account",
       cache: "no-store",
     },
+    "account.organizations": {
+      path: "/api/v1/account/organizations",
+      methods: ["GET", "HEAD", "OPTIONS"],
+      authority: "native-account",
+      binding: "account",
+      cache: "no-store",
+    },
     "gg.chat": {
       path: "/api/v1/ai/chat/completions",
       methods: ["POST"],

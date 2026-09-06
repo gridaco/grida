@@ -3,6 +3,8 @@ import "server-only";
 import { bearer } from "../auth/bearer";
 import { oauthServer } from "../auth/oauth-server";
 import { apiOperations } from "./operations";
+import { account } from "../account/account";
+import { accountData } from "../supabase/account-data";
 
 /** Fixed account adapter. Routes select an operation, never supply authority. */
 export namespace accountApi {
@@ -17,11 +19,11 @@ export namespace accountApi {
   type Handler = (request: Request) => Promise<Response>;
 
   export function bind(
-    operation: "auth.me"
+    operation: "auth.me" | "account.organizations"
   ): Readonly<Record<Method, Handler>> {
     const definition = apiOperations.definitions[operation];
     if (
-      operation !== "auth.me" ||
+      !["auth.me", "account.organizations"].includes(operation) ||
       !definition ||
       definition.authority !== "native-account" ||
       definition.binding !== "account" ||
@@ -50,9 +52,10 @@ export namespace accountApi {
           );
         } else {
           const url = new URL(request.url);
-          if (url.pathname !== definition.path || url.search) {
+          if (url.pathname !== definition.path) {
             throw new oauthServer.Failure("invalid_request");
           }
+          const after = cursor(operation, url);
           await requireEmptyBody(request);
           if (request.method === "OPTIONS") {
             response = new Response(null, {
@@ -60,7 +63,13 @@ export namespace accountApi {
               headers: { ...oauthServer.responseHeaders, allow },
             });
           } else {
-            const { identity } = await bearer.authenticate(request);
+            const config = oauthServer.config();
+            const fetcher = globalThis.fetch;
+            const authorization = request.headers.get("authorization") ?? "";
+            const { identity } = await bearer.authenticate(request, {
+              config,
+              fetch: fetcher,
+            });
             if (
               !oauthServer.record(identity) ||
               !oauthServer.uuid(identity.id) ||
@@ -74,14 +83,20 @@ export namespace accountApi {
             ) {
               throw new oauthServer.Failure("auth_unavailable");
             }
-            response = Response.json(
-              {
-                id: identity.id,
-                email: identity.email,
-                display_name: identity.display_name,
-              },
-              { headers: oauthServer.responseHeaders }
-            );
+            const result =
+              operation === "auth.me"
+                ? {
+                    id: identity.id,
+                    email: identity.email,
+                    display_name: identity.display_name,
+                  }
+                : await account.organizations(
+                    accountData.forBearer(authorization, config, fetcher),
+                    after
+                  );
+            response = Response.json(result, {
+              headers: oauthServer.responseHeaders,
+            });
           }
         }
       } catch (error) {
@@ -104,6 +119,20 @@ export namespace accountApi {
       PATCH: handle,
       DELETE: handle,
     });
+  }
+
+  function cursor(operation: string, url: URL): number | undefined {
+    if (!url.search) return undefined;
+    if (
+      operation !== "account.organizations" ||
+      !/^\?after=[1-9]\d*$/.test(url.search)
+    ) {
+      throw new oauthServer.Failure("invalid_request");
+    }
+    const after = Number(url.searchParams.get("after"));
+    if (!account.validCursor(after))
+      throw new oauthServer.Failure("invalid_request");
+    return after;
   }
 
   async function requireEmptyBody(request: Request): Promise<void> {

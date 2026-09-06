@@ -13,8 +13,40 @@ Desktop, consent, and webhook surfaces retain their existing contracts.
   browser dependency loads. Admission grants no identity. Unknown/encoded/cased
   paths return JSON 404; API maintenance returns JSON 503.
 - `account.ts` binds registered account operations to live OAuth authentication,
-  input/output validation, safe errors and `no-store`. The identity route only
-  exports those handlers; it cannot provide an alternative authenticator.
+  input/output validation, safe errors and `no-store`. Account routes only
+  export those handlers; they cannot provide an alternative authenticator.
+- [Account projections](../account/account.ts) own organization pages;
+  [the database adapter](../supabase/account-data.ts) supplies fixed queries with
+  the same verified bearer and publishable key. It imports no cookie client and
+  uses no privileged credential.
+
+## Account reads
+
+`GET /api/v1/auth/me` returns the verified caller's identity.
+`GET /api/v1/account/organizations` returns the caller's RLS-visible organizations:
+
+```json
+{
+  "organizations": [{ "id": 1, "name": "example", "display_name": "Example" }],
+  "next_cursor": null
+}
+```
+
+Organization pages contain at most 100 records ordered by increasing ID. Follow
+a non-null cursor with `?after=<next_cursor>`; null means complete. Cursors must
+be canonical positive safe integers. An empty `display_name` is preserved.
+There is no user/org selector, page-size option, active-organization cookie,
+membership role projection, or billing/provider information in this operation.
+
+The database query selects only these fields from `public.organization`; its
+membership RLS is the authority. Exact RLS-visible counts detect further pages
+even when PostgREST's configured row limit is lower. Missing/inconsistent counts
+and malformed data fail safely. A zero-membership page succeeds; issuer/database
+failures never become an empty result. Each page reads current memberships;
+pagination is not a transaction snapshot across requests. A cursor grants no access.
+
+Both account operations support authenticated HEAD and bodyless OPTIONS;
+other methods return 405. Input and output share the existing no-store policy.
 
 Domain operations belong in their own modules and receive explicit authority
 and inputs. They do not import Next, cookies or UI. HTTP adapters do not acquire

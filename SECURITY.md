@@ -1593,11 +1593,34 @@ credential through reuse of an existing browser or daemon bridge.
    running lock. The lock carries no credentials and never rolls back completed
    custody writes. Accepted rotation survives later identity failure. Unpublished
    temporary credential files are cleaned under authority, never adopted.
+7. **Fixed native account transport.** `requestAccount("organizations.list")`
+   owns the credential-bearing request to the configured API origin, with only
+   an optional positive safe-integer cursor. There is no arbitrary URL, method,
+   header, user selector, token getter, or caller-installed operation. The
+   package validates and projects bounded ordered pages; failures expose safe
+   codes. Near-expiry refresh and page acceptance share coordinated custody;
+   accepted rotations survive page failure. HTTP failures are never replayed.
+   Same-instance logout fences pending reads; another process's logout is
+   ordered after any read already accepted under the profile lock. Accepted
+   data and already-sent remote work cannot be retracted.
+8. **Membership-scoped organization reads.** The enforcing account adapter
+   verifies the live native bearer before creating a database source with that
+   exact Authorization value and the same configured project's publishable key.
+   The fixed GET selects only `id,name,display_name` from `public.organization`;
+   existing membership RLS decides visibility. No cookie client, service role,
+   RPC, browser organization preference, or caller-selected user is involved.
+   Exact RLS-visible counts and validated ascending IDs preserve page continuation
+   despite a lower database row cap. Zero visible rows succeed explicitly;
+   database failures and malformed/incomplete results never become empty accounts.
 
 **Limits and adoption gates.** Producer tests are not deployment certification.
 The real local Auth 2.196.0 consumer proof has passed login/denial/consent reuse,
 code replay rejection, bearer credential rejection, rotating refresh, seeded
 organization RLS, and session-local, grant-wide, and account-wide revocation.
+The public native organization-page operation also passed the real local API/RLS
+proof: separate users see their own organizations, a temporary non-owner
+membership becomes visible and then disappears with the same native token, and
+the copied package lists organizations across process restarts.
 It also passed separate-process restart using a copied package and disposable
 test custody. This verifies the local fixture and that test adapter; separate
 durable custody tests exercise the Node storage and cross-process contract.
@@ -1620,9 +1643,13 @@ token. Filesystem backups/snapshots are outside local cleanup guarantees.
 Explicit file recovery of uninitialized metadata cannot clean untracked keyring
 entries after manual metadata loss; deleting profile files is not logout.
 Existing web/Desktop global logout may revoke native
-sessions, and other APIs may accept already-issued JWTs until expiry. Account,
-organization, billing, and GG authorization still need their own permissions;
-this identity endpoint supplies none of them implicitly.
+sessions, and other APIs may accept already-issued JWTs until expiry. Native
+OAuth retains the user's existing account authority beyond the CLI command
+vocabulary; neither identity scopes nor client-side transport restrict existing
+database/API permissions. Organization listing uses existing RLS. Other account,
+billing, and GG operations still need their own server authorization; identity
+verification supplies none implicitly. Organization pages observe current
+membership separately, without a snapshot guarantee across page requests.
 
 **Files bound by this id.**
 
@@ -1641,6 +1668,13 @@ this identity endpoint supplies none of them implicitly.
   [tests](editor/lib/api/account.test.ts) — the identity binding owns live bearer
   verification, input/output validation, bodyless HEAD/OPTIONS, and safe errors.
   Machine request dispatch is separately governed by GRIDA-SEC-012.
+- [Organization route](<editor/app/(api)/(public)/api/v1/account/organizations/route.ts>)
+  and [route tests](editor/lib/api/organizations.test.ts),
+  [account projection](editor/lib/account/account.ts) and
+  [projection tests](editor/lib/account/account.test.ts),
+  [RLS data source](editor/lib/supabase/account-data.ts) and
+  [data-source tests](editor/lib/supabase/account-data.test.ts) — native authority
+  reaches fixed user-scoped reads without cookie or privileged-client dependencies.
 - [Analytics-free layout](<editor/app/(untracked)/layout.tsx>) and
   [response headers](editor/next.config.ts) — retain GRIDA-SEC-005 while also
   protecting this consent ceremony.
@@ -1667,7 +1701,8 @@ this identity endpoint supplies none of them implicitly.
   file-mode consumption and leaves native keyring loading lazy.
 - The [local auth workflow](.github/workflows/auth-local.yml) also runs the
   native custody suite on macOS/Linux, with an owned-entry macOS keyring smoke.
-- The [local consumer proof](editor/e2e/auth-oauth.spec.mts) also obeys the
+- The [local consumer proof](editor/e2e/auth-oauth.spec.mts) and
+  [copied-package probe](scripts/auth-local/native-probe.mjs) also obey the
   separate local provisioning boundary, GRIDA-SEC-011.
 
 ---
@@ -1771,12 +1806,14 @@ browser cookies, UI code or request-global state into account operations.
    tests match actual header/redirect/rewrite rules against API paths; the local
    production-mode proof also exercises real Next routing and web positive controls.
 3. **Bindings enforce authority.** `operations.ts` is the complete inventory.
-   `account.ts` accepts only its implemented operation and validates its declared
+   `account.ts` accepts only its implemented operations and validates their declared
    credential/response policy. Its fixed dispatch verifies the live OAuth bearer,
    validates/project identity fields, rejects input on the input-free identity
    operation, and owns all seven method exports. HEAD retains authentication;
    OPTIONS discloses only allowed methods. Rejected methods and input never call
    the issuer. Empty-body inspection has a deadline and rejects actual payloads.
+   Organization listing accepts only a canonical cursor, creates its fixed RLS
+   source after verification, and projects bounded pages without browser defaults.
 4. **Source checks reject drift.** `audit-api.ts` compares real App/Pages route
    placements with the inventory and verifies the complete account binding AST.
    New handlers cannot use the six pinned legacy GG/catalogue exceptions.
@@ -1788,7 +1825,9 @@ browser cookies, UI code or request-global state into account operations.
    Next snapshot from the real API, proxy and config sources. Its synthetic
    loopback issuer and web tripwires verify two-user identity/cache separation,
    credential rejection, method/input errors, configured hosts, API maintenance,
-   and production insiders gating. It constructs the child environment, copies
+   organization pagination and failure semantics, and production insiders gating.
+   Its synthetic database exposes rows for the exact bearer only; this exercises
+   request wiring, while real Supabase RLS is proved separately. It constructs the child environment, copies
    no dotenv/session files, bounds requests/process waits and removes owned
    source/build/listeners. Application network guards reject unowned destinations;
    no hosted credentials or uploaded artifacts are required.
@@ -1796,8 +1835,8 @@ browser cookies, UI code or request-global state into account operations.
 **Limits.** This protects the managed namespace and binding conventions; source
 checks are not a sandbox against malicious repository authors. Existing GG and
 catalogue handlers remain explicit legacy bindings with their own credential,
-streaming, error and cache contracts. Native mint/account features beyond identity
-are not implemented by this boundary. Next may normalize malformed repeated
+streaming, error and cache contracts. Native mint, billing and account operations
+beyond identity/organization listing are not implemented by this boundary. Next may normalize malformed repeated
 slashes or backslashes with a redirect before proxy; the machine response
 contract applies to paths admitted by that framework parsing layer.
 The local HTTP proof replaces unrelated web services with tripwires and uses a
@@ -1814,6 +1853,12 @@ release requirement.
   [policy](editor/lib/api/policy.ts), and [policy tests](editor/lib/api/policy.test.ts).
 - [Account adapter](editor/lib/api/account.ts), [adapter tests](editor/lib/api/account.test.ts),
   and [identity binding](<editor/app/(api)/(public)/api/v1/auth/me/route.ts>) — also GRIDA-SEC-010.
+- [Organization binding](<editor/app/(api)/(public)/api/v1/account/organizations/route.ts>),
+  [operation tests](editor/lib/api/organizations.test.ts),
+  [account projection](editor/lib/account/account.ts) and
+  [tests](editor/lib/account/account.test.ts), and
+  [RLS data source](editor/lib/supabase/account-data.ts) and
+  [tests](editor/lib/supabase/account-data.test.ts) — also GRIDA-SEC-010.
 - [Proxy](editor/proxy.ts), [dispatch tests](editor/lib/api/proxy.test.ts),
   [Next config](editor/next.config.ts), and [routing tests](editor/lib/api/routing.test.ts).
 - [Source audit](editor/scripts/audit-api.ts), [audit tests](editor/scripts/audit-api.test.ts),
