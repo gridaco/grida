@@ -14,65 +14,26 @@
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { ModelFactory } from "../agent";
-import type { GridaGatewaySessionStore } from "./gg-session";
+import type { GgTokenSource } from "@grida/ai";
 import { ProviderHttp } from "./http";
 import { BUNDLED_TIER_MODEL_IDS, type TierModelIds } from "./byok";
 
-/**
- * The hosted session is missing or expired. The literal code LEADS the
- * message: mid-run errors cross Electron's `contextBridge`, which strips
- * custom props — the renderer detects by message substring (the
- * `isWriteConflict` idiom).
- */
-export class GridaGatewayAuthError extends Error {
-  readonly code = "gg_token_expired" as const;
-  constructor() {
-    super("gg_token_expired: the Grida session token is missing or expired");
-    this.name = "GridaGatewayAuthError";
-  }
-}
-
-/** The org's AI credit balance can't cover the call (server 402). */
-export class GridaGatewayCreditsError extends Error {
-  readonly code = "insufficient_credits" as const;
-  constructor() {
-    super(
-      "insufficient_credits: the organization's AI credit balance is too low"
-    );
-    this.name = "GridaGatewayCreditsError";
-  }
-}
-
-/** `<base>/api/v1/ai` — `@ai-sdk/openai-compatible` appends the paths. */
-export function gridaGatewayApiBase(baseUrl: string): string {
-  return new URL("/api/v1/ai", baseUrl).toString();
-}
-
-/** The live scoped token, or throw the typed auth error (never a bare null). */
-export function readGgToken(session: GridaGatewaySessionStore): string {
-  const token = session.getAccessToken();
-  if (!token) throw new GridaGatewayAuthError();
-  return token;
-}
-
-/**
- * Map the two actionable hosted-response failures to typed, model-safe
- * errors — the single source for this contract, shared by the text factory
- * and the media adapters. Every other status is left to the caller. Never
- * embed upstream body text (GRIDA-SEC-004 posture). Drains the unconsumed
- * body before throwing so undici can return the socket to the pool
- * (unconsumed bodies pin the connection).
- */
-export async function throwOnGgHttpError(res: Response): Promise<void> {
-  if (res.status === 401 || res.status === 402) {
-    await res.body?.cancel().catch(() => {});
-    if (res.status === 401) throw new GridaGatewayAuthError();
-    throw new GridaGatewayCreditsError();
-  }
-}
+// Shared scoped-token semantics belong to the AI producer; tiers stay agent-owned.
+import {
+  readGgToken,
+  throwOnGgHttpError,
+  gridaGatewayApiBase,
+} from "@grida/ai/providers";
+export {
+  GridaGatewayAuthError,
+  GridaGatewayCreditsError,
+  readGgToken,
+  throwOnGgHttpError,
+  gridaGatewayApiBase,
+} from "@grida/ai/providers";
 
 export function makeGridaGatewayFactory(
-  session: GridaGatewaySessionStore,
+  session: GgTokenSource,
   baseUrl: string,
   providerHttp: ProviderHttp = new ProviderHttp(),
   tierModelIds: TierModelIds = BUNDLED_TIER_MODEL_IDS

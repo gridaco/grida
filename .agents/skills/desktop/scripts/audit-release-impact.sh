@@ -47,6 +47,7 @@ readonly -a release_paths=(
   desktop
   skills
   packages/grida-ai-agent
+  packages/grida-ai
   packages/grida-daemon
   packages/grida-ai-models
   packages/grida-desktop-bridge

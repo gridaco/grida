@@ -11,7 +11,6 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { lstatSync, realpathSync } from "node:fs";
 import { realpath } from "node:fs/promises";
-import { generateImage } from "ai";
 import { AgentFs } from "../fs";
 import { containsPath } from "@grida/daemon/server";
 import { isProtectedWrite } from "../fs/scope";
@@ -411,9 +410,8 @@ function extForMime(mime: string): string {
  * pixels to a media block. Expected failures (no key, provider error) come back
  * as the typed `ok: false` — never thrown into the agent loop.
  *
- * NB billing (#908): like `/images/generate`, this calls `generateImage` WITHOUT
- * `providerOptions.grida`, so the user's own key pays the provider and no Grida
- * credit is metered. Do not add `providerOptions.grida` here.
+ * Provider shaping, credentials, safe failures and paid-request retry policy
+ * belong to @grida/ai. This adapter owns reference reads and scratch persistence.
  */
 function createImageGenerator(
   imageDeps: import("../providers/resolve-image").ResolveImageDeps,
@@ -441,8 +439,8 @@ function createImageGenerator(
       }
       // Image-to-image when the host supplied reference images (the curated
       // board's pins). The model-facing tool stays prompt-only; references are
-      // resolved below and ride our internal `grida` provider-options namespace,
-      // which the BYOK adapter maps to the provider's own field.
+      // resolved below and passed to the shared image operation, which maps
+      // them to the provider's own field.
       const wantsRefs = (input.references?.length ?? 0) > 0;
       let resolved;
       try {
@@ -461,7 +459,11 @@ function createImageGenerator(
               : `No connected provider can generate "${modelId}". Ask the user to connect an image-provider key in settings.`,
           };
         }
-        throw e;
+        return {
+          ok: false,
+          reason: "generation_failed",
+          message: "Image generation could not access its provider.",
+        };
       }
       // Resolve each reference to something a provider can ingest. The caller
       // passes dumb inputs — a workspace path, an https URL, or a data URL — and
@@ -487,25 +489,12 @@ function createImageGenerator(
       }
       let generation;
       try {
-        // TODO(image-quality): pin a `quality: "medium"` default for gpt-image-2
-        // instead of inheriting the provider default (OpenAI defaults to high/auto
-        // → pricier; the catalog's avg_cost_usd is the medium tier). Quality is an
-        // OpenAI-specific knob (low|medium|high|auto) and the resolved provider
-        // varies (vercel `openai` ns / openrouter `orExtra` / fal `falExtra`), so
-        // it must be threaded per-namespace. Track + add later.
-        generation = await generateImage({
-          model: resolved.model,
+        generation = await resolved.generate({
           prompt: input.prompt,
           n: 1,
-          ...(references ? { providerOptions: { grida: { references } } } : {}),
+          ...(references ? { references } : {}),
         });
-      } catch (e) {
-        // Upstream detail (may embed provider body text) stays in the sidecar
-        // log only; the model gets a generic, actionable message.
-        const detail = e instanceof Error ? e.message : String(e);
-        console.error(
-          `[agent-host-image-gen] generation failed provider=${resolved.provider_id} model=${modelId}: ${detail}`
-        );
+      } catch {
         return {
           ok: false,
           reason: "generation_failed",
@@ -520,18 +509,16 @@ function createImageGenerator(
           message: "The provider returned no image.",
         };
       }
-      const bytes = file.uint8Array;
+      const bytes = file.data;
       // Sniff for the honest mime + dimensions; fall back to the provider's
       // declared media type when the format isn't one we parse.
       const sniffed = AgentVision.sniff(bytes);
-      const mime = sniffed?.mime ?? file.mediaType;
+      const mime = sniffed?.mime ?? file.media_type;
       const filename = `image-${Date.now()}.${extForMime(mime)}`;
       let savedPath: string;
       try {
         savedPath = await writeScratchFile(scratchDir, filename, bytes);
-      } catch (e) {
-        const detail = e instanceof Error ? e.message : String(e);
-        console.error(`[agent-host-image-gen] scratch write failed: ${detail}`);
+      } catch {
         return {
           ok: false,
           reason: "generation_failed",
@@ -550,7 +537,7 @@ function createImageGenerator(
         ...(sniffed?.width ? { width: sniffed.width } : {}),
         ...(sniffed?.height ? { height: sniffed.height } : {}),
         bytes: bytes.byteLength,
-        data: file.base64,
+        data: Buffer.from(file.data).toString("base64"),
       };
     },
   };
@@ -569,7 +556,7 @@ export class ReferenceResolveError extends Error {}
  *     fetch.
  *   - a **data:** URL is decoded and validated exactly like a file (size cap +
  *     image sniff), then re-emitted canonically — so a non-image or oversized
- *     data URL can't skip the checks a path gets and reach `generateImage()`.
+ *     data URL can't skip the checks a path gets and reach image execution.
  *   - a **path** is read via the shared vision {@link AgentVision.ByteReader}
  *     (same scoping + size cap as `view_image`) and inlined as a base64 data URL.
  * Throws {@link ReferenceResolveError} with an agent-readable message when a

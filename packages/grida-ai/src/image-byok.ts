@@ -1,18 +1,5 @@
-/**
- * BYOK image-model factories — the image counterpart of {@link ./byok.ts}.
- *
- * Like the language factories, these are isolated `@ai-sdk/*` provider
- * consumers so client-safe entries never pull provider SDKs. Given the user's
- * stored key and a provider-specific binding id (from a
- * {@link models.image.ImageProviderBinding}), each returns an `ImageModelV3`
- * that `ai`'s `generateImage()` can drive.
- *
- * Only the Vercel gateway speaks an SDK-native image protocol (`@ai-sdk/gateway`
- * `.imageModel()`). The others need hand-written adapters: OpenRouter has its own
- * dedicated Unified Image API (`POST /api/v1/images`; it 404s on OpenAI's
- * `/images/generations`), and fal is queue-based REST (submit → poll → fetch).
- * See {@link OpenRouterImageModel} and {@link FalImageModel}.
- */
+// GRIDA-SEC-004 — provider-owned submissions and credential-free result downloads.
+/** Internal AI SDK adapters; ImageClient owns the safe public operation boundary. */
 
 import { createGateway } from "@ai-sdk/gateway";
 import type { ImageModelV3, ImageModelV3CallOptions } from "@ai-sdk/provider";
@@ -85,9 +72,8 @@ const OPENROUTER_IMAGE_URL = "https://openrouter.ai/api/v1/images";
  * `data[].b64_json` (verified live 2026-06-29).
  *
  * NOTE: a thrown error may include a truncated provider response body (`safeText`)
- * — it is NOT model-safe. The only caller, `createImageGenerator`, catches and
- * downgrades it to a generic message before the model sees anything; a new caller
- * that lets it propagate must not surface it to the agent verbatim.
+ * — it is NOT model-safe. ImageClient catches and
+ * replaces it with a safe Failure; callers of internal adapters must not expose it.
  */
 export class OpenRouterImageModel implements ImageModelV3 {
   readonly specificationVersion = "v3" as const;
@@ -193,8 +179,8 @@ type FalStatus = "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | (string & {});
  * `fal-ai/flux-2-pro` or `fal-ai/bytedance/seedream/v4.5/text-to-image`.
  *
  * NOTE: like {@link OpenRouterImageModel}, a thrown error may include a truncated
- * provider response body — NOT model-safe. `createImageGenerator` catches and
- * downgrades it; don't surface it to the agent verbatim from a new caller.
+ * provider response body — NOT model-safe. ImageClient catches and
+ * replaces it with a safe Failure.
  */
 export class FalImageModel implements ImageModelV3 {
   readonly specificationVersion = "v3" as const;

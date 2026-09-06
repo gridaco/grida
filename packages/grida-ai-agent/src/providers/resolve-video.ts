@@ -15,6 +15,7 @@
  */
 
 import { models } from "@grida/ai-models";
+import type { GgTokenSource } from "@grida/ai";
 import type { Experimental_VideoModelV3 as VideoModelV3 } from "@ai-sdk/provider";
 import type { SecretsStore } from "@grida/daemon/server";
 import { byokProvidersFor, GG_PROVIDER_ID } from "../protocol/provider-ids";
@@ -88,7 +89,7 @@ export type ResolveVideoOptions = {
 function resolvedGgVideo(
   modelId: string,
   card: models.video.VideoModelCard,
-  hosted: { session: GridaGatewaySessionStore; base_url: string },
+  hosted: { session: GgTokenSource; base_url: string },
   providerHttp?: ProviderHttp
 ): ResolvedVideoModel {
   return {

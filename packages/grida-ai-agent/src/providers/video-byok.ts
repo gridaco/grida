@@ -1,5 +1,5 @@
 /**
- * BYOK video-model factories — the video counterpart of {@link ./image-byok.ts}.
+ * BYOK video-model factories — image operations are owned by @grida/ai.
  *
  * Given the user's stored key and a provider-specific binding id (from a
  * {@link models.video.VideoProviderBinding}), each returns a `VideoModelV3`

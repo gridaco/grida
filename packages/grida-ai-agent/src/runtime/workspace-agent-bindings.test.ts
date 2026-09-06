@@ -710,8 +710,8 @@ describe("createWorkspaceAgentBindings — scratch reach", () => {
  * WG `scratch.md` S3 — `generate_image` binding gating. The generator is wired
  * only when ALL of: the host enabled image gen, a scratch sink exists, and the
  * user actually holds a provider key (the vision-style "don't advertise an
- * unanswerable capability" gate). Generation itself is exercised by the live
- * test; here we pin the presence/absence of the binding, no provider call.
+ * unanswerable capability" gate). `image-generation.test.ts` exercises the
+ * public operation with fake transport; here we pin binding presence only.
  */
 describe("createWorkspaceAgentBindings — image_gen gating", () => {
   let baseDir: string;

@@ -1,10 +1,18 @@
 # `@grida/agent`
 
-Grida's AI agent system in one package. Private, `workspace:*`, in
-active development. The **agent tenant** of
+Grida's configured agent and its application runtime. Private, `workspace:*`,
+in active development. The **agent tenant** of
 [`@grida/daemon`](../grida-daemon/README.md) (issue #927): the daemon
 owns the loopback perimeter and the host capability routes; this package
-depends on it and mounts everything AI behind it.
+depends on it and currently mounts the agent and media routes behind it.
+
+Shared model operations belong to [`@grida/ai`](../grida-ai/README.md).
+This package owns Grida's prompts, installed tools and skills, model defaults,
+chat sessions, workspace bindings, and external-agent integration. Runtime-neutral
+code can still be Grida-specific: `createAgent` remains here because it assembles
+the Grida agent. Reusable agent primitives may move to `@grida/ai` once their
+contracts work without this application policy; a hypothetical future caller is
+not a reason to extract them.
 
 It owns three agent-system concerns:
 
@@ -45,6 +53,21 @@ bundle.
 
 The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
 public subpath; workspace bindings use it in-process.
+
+## Shared image operations
+
+The image HTTP route and `generate_image` tool use `@grida/ai`'s `ImageClient`.
+This package adapts its secret store and provider transport, chooses the agent's
+default model, and explicitly selects the existing automatic provider policy.
+The SDK resolves compatibility and executes the selected provider. The host
+reads reference files and persists returned bytes to media storage or session
+scratch.
+
+The shared operation does not retry a failed paid batch. Requesting multiple
+images can still require multiple submissions under the provider's batch limit.
+Image failures contain safe codes; raw upstream errors and warnings do not enter
+the host's image error logs. Other media operations retain their existing
+implementations until promoted with their callers.
 
 ## Provider HTTP
 

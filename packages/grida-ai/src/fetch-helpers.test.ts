@@ -1,3 +1,4 @@
+// GRIDA-SEC-004 — bounded provider error bodies release their streams.
 import { describe, expect, it, vi } from "vitest";
 import { safeText } from "./fetch-helpers";
 

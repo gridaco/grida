@@ -1,3 +1,4 @@
+// GRIDA-SEC-004 — synthetic image adapters retain provider/request and download separation.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ImageModelV3CallOptions } from "@ai-sdk/provider";
 import {

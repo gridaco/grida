@@ -37,7 +37,8 @@ describe("resolveImageModel", () => {
     expect(r.provider_id).toBe("fal");
     expect(r.model_id).toBe(LISTED);
     expect(r.binding_id).toBe("fal-ai/gpt-image-2");
-    expect(r.model.provider).toBe("fal");
+    expect(r.generate).toBeTypeOf("function");
+    expect(r).not.toHaveProperty("model");
   });
 
   it("follows precedence when multiple keys exist (openrouter before fal)", async () => {
@@ -111,15 +112,14 @@ describe("resolveImageModel", () => {
       ).rejects.toBeInstanceOf(ImageModelUnavailableError);
     });
 
-    it("names the i2i-capable provider(s) when an i2i resolution fails", async () => {
-      // A fal-only user picks references → no fal i2i route. The error must tell
-      // the agent WHICH key unlocks i2i (openrouter today), not a bare
-      // "unavailable", so it can ask the user to connect the right provider.
+    it("keeps an actionable reference capability message when resolution fails", async () => {
+      // The agent preserves a reference-specific hint without duplicating
+      // shared provider capability resolution in its error formatting.
       await expect(
         resolveImageModel({ secrets: fakeSecrets({ fal: "sk-fal" }) }, LISTED, {
           references: true,
         })
-      ).rejects.toThrow(/reference images.*connect a key for: .*openrouter/is);
+      ).rejects.toThrow(/reference images/i);
     });
 
     it("leaves references_max unset for a plain t2i resolution", async () => {

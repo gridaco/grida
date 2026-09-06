@@ -12,7 +12,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { generateImage } from "ai";
 import { resolveImageModel } from "./resolve-image";
 import type { SecretsStore } from "@grida/daemon/server";
 
@@ -48,22 +47,21 @@ describe.skipIf(!LIVE || !KEY)("LIVE OpenRouter image generation", () => {
     expect(resolved.provider_id).toBe("openrouter");
     console.log(`[live] binding_id=${resolved.binding_id}`);
 
-    const result = await generateImage({
-      model: resolved.model,
+    const result = await resolved.generate({
       prompt: "a single red apple on a white table, soft studio light",
       n: 1,
     });
     const img = result.images[0];
     expect(img).toBeTruthy();
-    expect(img.uint8Array.length).toBeGreaterThan(1000);
-    fs.writeFileSync("/tmp/grida-live-or.png", img.uint8Array);
+    expect(img.data.length).toBeGreaterThan(1000);
+    fs.writeFileSync("/tmp/grida-live-or.png", img.data);
     console.log(
-      `[live] ✅ mediaType=${img.mediaType} bytes=${img.uint8Array.length} → /tmp/grida-live-or.png`
+      `[live] ✅ mediaType=${img.media_type} bytes=${img.data.length} → /tmp/grida-live-or.png`
     );
   }, 120_000);
 
   // image-to-image through the real product path: resolve for references, then
-  // condition on a reference delivered via our internal `grida` namespace.
+  // condition on a host-resolved reference through the shared operation.
   // Self-contained — generates its own reference, then edits it.
   it(`resolves + edits with a reference (${MODEL})`, async () => {
     const secrets = {
@@ -74,12 +72,11 @@ describe.skipIf(!LIVE || !KEY)("LIVE OpenRouter image generation", () => {
     const base = await resolveImageModel({ secrets }, MODEL, {
       explicit: "openrouter",
     });
-    const seed = await generateImage({
-      model: base.model,
+    const seed = await base.generate({
       prompt: "a single red apple on a white table, soft studio light",
       n: 1,
     });
-    const ref = `data:${seed.images[0].mediaType};base64,${seed.images[0].base64}`;
+    const ref = `data:${seed.images[0].media_type};base64,${Buffer.from(seed.images[0].data).toString("base64")}`;
 
     // 2. resolve for i2i and condition on the reference
     const edit = await resolveImageModel({ secrets }, MODEL, {
@@ -87,19 +84,18 @@ describe.skipIf(!LIVE || !KEY)("LIVE OpenRouter image generation", () => {
       references: true,
     });
     expect(edit.references_max).toBeGreaterThan(0);
-    const result = await generateImage({
-      model: edit.model,
+    const result = await edit.generate({
       prompt: "make it a dramatic neon-lit night scene, keep the apple",
       n: 1,
-      providerOptions: { grida: { references: [ref] } },
+      references: [ref],
     });
     const img = result.images[0];
     expect(img).toBeTruthy();
-    expect(img.uint8Array.length).toBeGreaterThan(1000);
+    expect(img.data.length).toBeGreaterThan(1000);
     const out = path.join(os.tmpdir(), "grida-live-or-i2i.png");
-    fs.writeFileSync(out, img.uint8Array);
+    fs.writeFileSync(out, img.data);
     console.log(
-      `[live] ✅ i2i binding=${edit.binding_id} cap=${edit.references_max} bytes=${img.uint8Array.length} → ${out}`
+      `[live] ✅ i2i binding=${edit.binding_id} cap=${edit.references_max} bytes=${img.data.length} → ${out}`
     );
   }, 180_000);
 });

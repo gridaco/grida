@@ -49,4 +49,35 @@ describe("GridaGatewaySessionStore", () => {
     expect(JSON.stringify(status)).not.toContain("jwt-secret-token");
     expect(store(10_000).status(NOW)).toEqual({ active: false });
   });
+
+  it("snapshots input and status metadata without exposing credential fields", () => {
+    const session = {
+      access_token: "private-token",
+      expires_at: NOW + 900_000,
+      organization: { id: 7, name: "acme", access_token: "private-token" },
+    };
+    const current = new GridaGatewaySessionStore();
+    current.set(session);
+    session.access_token = "changed";
+    session.organization.name = "changed";
+    const status = current.status(NOW);
+    status.organization!.name = "changed-again";
+    expect(current.getAccessToken(NOW)).toBe("private-token");
+    expect(current.status(NOW)).toEqual({
+      active: true,
+      expires_at: NOW + 900_000,
+      organization: { id: 7, name: "acme" },
+    });
+    expect(JSON.stringify(current)).toBe("{}");
+  });
+
+  it("malformed expiry or empty token cannot become active", () => {
+    const current = new GridaGatewaySessionStore();
+    for (const expires_at of [NaN, Infinity, NOW + 0.5]) {
+      current.set({ access_token: "private-token", expires_at });
+      expect(current.status(NOW)).toEqual({ active: false });
+    }
+    current.set({ access_token: " ", expires_at: NOW + 900_000 });
+    expect(current.getAccessToken(NOW)).toBeNull();
+  });
 });
