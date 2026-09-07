@@ -1,12 +1,15 @@
 // GRIDA-SEC-004 — fixed ElevenLabs voice/speech authority, safe projections, bounded execution.
 import { models } from "@grida/ai-models";
+import { InputSchema } from "./input-schema";
+import { MediaInputs } from "./media-inputs";
+import { MediaRoutes } from "./media-routes";
 import { ProviderHttp } from "./http";
 import { MediaRequest } from "./media-request";
 
-const MODEL_ID = "eleven_v3";
+const MODEL_ID = MediaRoutes.speechId;
 const VOICES_URL = "https://api.elevenlabs.io/v2/voices";
 const SPEECH_URL = "https://api.elevenlabs.io/v1/text-to-speech";
-const MAX_AUDIO_BYTES = 16 * 1024 * 1024;
+const MAX_AUDIO_BYTES = MediaInputs.limits.speech;
 const MAX_PAGE_BYTES = 2 * 1024 * 1024;
 
 /** Bounded ElevenLabs voice discovery and the existing v3 speech operation. */
@@ -92,13 +95,7 @@ export class TextToSpeechClient {
     let request: MediaRequest | undefined;
     try {
       const { model_id, voice_id } = selection(input);
-      const card = models.audio.text_to_speech.models[model_id];
-      // Existing v3 execution is independent of its staged publication status.
-      if (
-        card.provider !== "elevenlabs" ||
-        card.input.type !== "text" ||
-        card.output.default_format !== "mp3"
-      )
+      if (!MediaRoutes.speech(model_id))
         throw new TextToSpeechClient.Failure("model_unavailable");
       request = new MediaRequest(this.#http);
       await this.#key(request);
@@ -249,11 +246,7 @@ function selection(value: TextToSpeechClient.Selection): {
     )
       throw 0;
     id = model_id;
-    voice = boundedText(voice_id, 256);
-    if (voice === "." || voice === "..") throw 0;
-    // Consume the encoding result so bundled builds retain this validation
-    // before key lookup (including refusal of an unpaired surrogate).
-    if (!encodeURIComponent(voice)) throw 0;
+    voice = MediaInputs.voice.parse(voice_id);
   } catch {
     throw new TextToSpeechClient.Failure("invalid_input");
   }
@@ -283,19 +276,7 @@ function generationInput(
   value: TextToSpeechClient.Input
 ): TextToSpeechClient.Input {
   try {
-    exactKeys(value, ["text", "signal"]);
-    const { text, signal } = value;
-    if (
-      typeof text !== "string" ||
-      !text.trim() ||
-      !withinCodepoints(
-        text,
-        models.audio.text_to_speech.models[MODEL_ID].input.max_characters
-      ) ||
-      (signal !== undefined && !(signal instanceof AbortSignal))
-    )
-      throw 0;
-    return { text, signal };
+    return InputSchema.native(MediaInputs.speech, value);
   } catch {
     throw new TextToSpeechClient.Failure("invalid_input");
   }

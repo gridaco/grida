@@ -2,6 +2,9 @@
 // GRIDA-SEC-006 — scoped GG credential is re-read at use; no mint or persistent custody.
 // GRIDA-GG: token — explicit GG selection never falls back to BYOK.
 import { models } from "@grida/ai-models";
+import { InputSchema } from "./input-schema";
+import { MediaInputs } from "./media-inputs";
+import { MediaRoutes } from "./media-routes";
 import type { ImageModelV3 } from "@ai-sdk/provider";
 import { generateImage } from "ai";
 import { makeImageModelFor } from "./image-byok";
@@ -61,19 +64,15 @@ export class ImageClient {
         (v) => !v.image.cardById(selected.model_id)
       );
       const card = view.image.cardById(selected.model_id);
-      if (!card?.listed) throw new ImageClient.Failure("model_unavailable");
-
+      if (!MediaRoutes.imageModel(card))
+        throw new ImageClient.Failure("model_unavailable");
       if (selected.provider === "gg") {
         if (selected.references)
           throw new ImageClient.Failure("references_unsupported");
-        if (!view.image.binding(card, "vercel"))
-          throw new ImageClient.Failure("provider_unavailable");
+        const route = MediaRoutes.image(card, "gg", false);
+        if (!route) throw new ImageClient.Failure("provider_unavailable");
         this.#hosted();
-        return this.#operation({
-          provider_id: "gg",
-          model_id: card.id,
-          binding_id: card.id,
-        });
+        return this.#operation(route);
       }
       const order =
         selected.provider === "auto"
@@ -83,32 +82,26 @@ export class ImageClient {
           : [selected.provider];
       let referenceCapable = false;
       for (const provider of order) {
-        const binding = view.image.binding(card, provider);
-        if (!binding || (selected.references && !binding.references)) continue;
+        const route = MediaRoutes.image(
+          card,
+          provider,
+          selected.references ?? false
+        );
+        if (!route) continue;
         referenceCapable = true;
         if (!(await this.#key(provider))) continue;
-        return this.#operation({
-          provider_id: provider,
-          model_id: card.id,
-          binding_id: selected.references ? binding.references!.id : binding.id,
-          ...(selected.references
-            ? { references_max: binding.references!.max }
-            : {}),
-        });
+        return this.#operation(route);
       }
+      const hostedRoute = MediaRoutes.image(card, "gg", false);
       if (
         selected.provider === "auto" &&
         !selected.references &&
-        view.image.binding(card, "vercel")
+        hostedRoute &&
+        liveGgMediaDeps({ gg: this.#gg, gg_base_url: this.#ggBaseUrl })
       ) {
-        if (liveGgMediaDeps({ gg: this.#gg, gg_base_url: this.#ggBaseUrl })) {
-          return this.#operation({
-            provider_id: "gg",
-            model_id: card.id,
-            binding_id: card.id,
-          });
-        }
+        return this.#operation(hostedRoute);
       }
+
       throw new ImageClient.Failure(
         selected.references && !referenceCapable
           ? "references_unsupported"
@@ -211,7 +204,7 @@ export class ImageClient {
         total += data.byteLength;
         if (
           !data.byteLength ||
-          total > 64 * 1024 * 1024 ||
+          total > MediaInputs.limits.image ||
           !/^image\/[a-z0-9.+-]+$/i.test(image.mediaType)
         ) {
           throw new ImageClient.Failure("invalid_response");
@@ -257,7 +250,7 @@ export namespace ImageClient {
   };
   export type Input = {
     prompt: string;
-    /** Positive image count. Provider batch limits may require multiple submissions. */
+    /** Image count 1–16. Provider batch limits may require multiple submissions. */
     n?: number;
     size?: `${number}x${number}`;
     aspect_ratio?: `${number}:${number}`;
@@ -323,101 +316,14 @@ function generationInput(
   descriptor: ImageClient.Descriptor
 ) {
   try {
-    exactKeys(value, [
-      "prompt",
-      "n",
-      "size",
-      "aspect_ratio",
-      "seed",
-      "quality",
-      "references",
-      "signal",
-    ]);
-    const {
-      prompt,
-      n = 1,
-      size,
-      aspect_ratio,
-      seed,
-      quality,
-      references,
-      signal,
-    } = value;
-    if (
-      typeof prompt !== "string" ||
-      !prompt.trim() ||
-      !Number.isSafeInteger(n) ||
-      n < 1
-    )
-      throw 0;
-    if (size !== undefined && !positivePair(size, "x")) throw 0;
-    if (aspect_ratio !== undefined && !positivePair(aspect_ratio, ":", false))
-      throw 0;
-    if (seed !== undefined && !Number.isSafeInteger(seed)) throw 0;
-    if (
-      quality !== undefined &&
-      (typeof quality !== "string" || quality.length > 128)
-    )
-      throw 0;
-    if (signal !== undefined && !(signal instanceof AbortSignal)) throw 0;
-    let refs: string[] | undefined;
-    if (references !== undefined) {
-      if (
-        !Array.isArray(references) ||
-        !references.length ||
-        !descriptor.references_max ||
-        references.length > descriptor.references_max
-      )
-        throw 0;
-      refs = references.map((reference) => {
-        if (typeof reference !== "string") throw 0;
-        const url = new URL(reference);
-        if (
-          (url.protocol !== "https:" &&
-            !(
-              url.protocol === "data:" &&
-              /^data:image\/[a-z0-9.+-]+[;,]/i.test(reference)
-            )) ||
-          url.username ||
-          url.password
-        )
-          throw 0;
-        return reference;
-      });
-    }
-    if (descriptor.references_max !== undefined && !refs) throw 0;
-    return {
-      prompt,
-      n,
-      size,
-      aspect_ratio,
-      seed,
-      quality,
-      references: refs,
-      signal,
-    };
+    return InputSchema.native(
+      MediaInputs.image(descriptor),
+      value,
+      descriptor.references_max === undefined ? ["references"] : []
+    );
   } catch {
     throw new ImageClient.Failure("invalid_input");
   }
-}
-
-function positivePair(
-  value: unknown,
-  delimiter: string,
-  integer = true
-): boolean {
-  if (typeof value !== "string") return false;
-  const parts = value.split(delimiter);
-  return (
-    parts.length === 2 &&
-    parts.every(
-      (part) =>
-        (integer
-          ? /^\d+$/.test(part) && Number.isSafeInteger(Number(part))
-          : /^\d+(?:\.\d+)?$/.test(part) && Number.isFinite(Number(part))) &&
-        Number(part) > 0
-    )
-  );
 }
 
 function exactKeys(value: unknown, allowed: readonly string[]): void {

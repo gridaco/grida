@@ -2,6 +2,9 @@
 // GRIDA-SEC-006 — scoped GG is checked at submission; accepted work cannot be recalled.
 // GRIDA-GG: token — no account credentials, mint, persistence, or implicit provider switching.
 import { models } from "@grida/ai-models";
+import { InputSchema } from "./input-schema";
+import { MediaInputs } from "./media-inputs";
+import { MediaRoutes } from "./media-routes";
 import { GridaGatewayAuthError, GridaGatewayCreditsError } from "./gg";
 import { liveGgMediaDeps, type GgTokenSource } from "./gg-session";
 import { ProviderHttp } from "./http";
@@ -53,21 +56,17 @@ export class VideoClient {
         (v) => !v.video.cardById(selected.model_id)
       );
       const card = view.video.cardById(selected.model_id);
-      if (!card?.listed) throw new VideoClient.Failure("model_unavailable");
-      const vercelInput = models.video.input(card, "vercel");
-      const hostedEligible = !selected.image && supports(vercelInput, false);
+      if (!MediaRoutes.videoModel(card))
+        throw new VideoClient.Failure("model_unavailable");
+      const hostedRoute = MediaRoutes.video(
+        card,
+        "gg",
+        selected.image ?? false
+      );
       if (selected.provider === "gg") {
-        if (!hostedEligible) throw new VideoClient.Failure("input_unsupported");
+        if (!hostedRoute) throw new VideoClient.Failure("input_unsupported");
         this.#hosted();
-        return this.#operation(
-          {
-            model_id: card.id,
-            binding_id: card.id,
-            provider_id: "gg",
-            input: "text",
-          },
-          false
-        );
+        return this.#operation(hostedRoute, false);
       }
       const order =
         selected.provider === "auto"
@@ -77,36 +76,24 @@ export class VideoClient {
           : [selected.provider];
       let capable = false;
       for (const provider of order) {
-        const binding = view.video.binding(card, provider);
-        const mode = models.video.input(card, provider);
-        if (!binding || !supports(mode, selected.image ?? false)) continue;
-        capable = true;
-        if (!(await this.#key(provider))) continue;
-        return this.#operation(
-          {
-            model_id: card.id,
-            binding_id: binding.id,
-            provider_id: provider,
-            input: mode!,
-          },
+        const route = MediaRoutes.video(
+          card,
+          provider,
           selected.image ?? false
         );
+        if (!route) continue;
+        capable = true;
+        if (!(await this.#key(provider))) continue;
+        return this.#operation(route, selected.image ?? false);
       }
       if (
         selected.provider === "auto" &&
-        hostedEligible &&
+        hostedRoute &&
         liveGgMediaDeps({ gg: this.#gg, gg_base_url: this.#ggBaseUrl })
       ) {
-        return this.#operation(
-          {
-            model_id: card.id,
-            binding_id: card.id,
-            provider_id: "gg",
-            input: "text",
-          },
-          false
-        );
+        return this.#operation(hostedRoute, false);
       }
+
       throw new VideoClient.Failure(
         capable ? "provider_unavailable" : "input_unsupported"
       );
@@ -148,11 +135,7 @@ export class VideoClient {
   ): Promise<VideoClient.Result> {
     let request: MediaRequest | undefined;
     try {
-      const args = generationInput(input, image);
-      // The pinned gateway video serializer silently omits zero. Refuse it
-      // before authority lookup instead of pretending that request is honored.
-      if (descriptor.provider_id === "vercel" && args.seed === 0)
-        throw new VideoClient.Failure("invalid_input");
+      const args = generationInput(input, image, descriptor.provider_id);
       request = new MediaRequest(this.#http, args.signal);
       request.check();
       let raw: videoModels.Video[];
@@ -183,7 +166,11 @@ export class VideoClient {
         );
       }
       request.check();
-      if (!Array.isArray(raw) || !raw.length || raw.length > 16)
+      if (
+        !Array.isArray(raw) ||
+        !raw.length ||
+        raw.length > MediaInputs.limits.video_items
+      )
         throw new VideoClient.Failure("invalid_response");
       let total = 0;
       const videos: VideoClient.Result["videos"] = [];
@@ -314,54 +301,15 @@ function selection(value: VideoClient.Selection): VideoClient.Selection {
 
 function generationInput(
   value: VideoClient.Input,
-  image: boolean
+  image: boolean,
+  provider: VideoClient.Provider
 ): VideoClient.Input {
   try {
-    exactKeys(value, [
-      "prompt",
-      "aspect_ratio",
-      "resolution",
-      "duration",
-      "fps",
-      "seed",
-      "image_url",
-      "signal",
-    ]);
-    const {
-      prompt,
-      aspect_ratio,
-      resolution,
-      duration,
-      fps,
-      seed,
-      image_url,
-      signal,
-    } = value;
-    if (typeof prompt !== "string" || !prompt.trim()) throw 0;
-    if (aspect_ratio !== undefined && !pair(aspect_ratio, ":")) throw 0;
-    if (resolution !== undefined && !pair(resolution, "x")) throw 0;
-    if (duration !== undefined && !(Number.isFinite(duration) && duration > 0))
-      throw 0;
-    if (fps !== undefined && !(Number.isFinite(fps) && fps > 0)) throw 0;
-    if (seed !== undefined && !Number.isSafeInteger(seed)) throw 0;
-    if (image !== (image_url !== undefined)) throw 0;
-    if (image_url !== undefined) {
-      if (typeof image_url !== "string") throw 0;
-      const url = new URL(image_url);
-      if (url.protocol !== "https:" || url.username || url.password || url.hash)
-        throw 0;
-    }
-    if (signal !== undefined && !(signal instanceof AbortSignal)) throw 0;
-    return {
-      prompt,
-      aspect_ratio,
-      resolution,
-      duration,
-      fps,
-      seed,
-      image_url,
-      signal,
-    };
+    return InputSchema.native(
+      MediaInputs.video(image, provider),
+      value,
+      image ? [] : ["image_url"]
+    );
   } catch {
     throw new VideoClient.Failure("invalid_input");
   }
@@ -401,20 +349,6 @@ function decode(value: string, maximum: number): Uint8Array {
   }
 }
 
-function pair(value: string, delimiter: string): boolean {
-  return (
-    typeof value === "string" &&
-    value.split(delimiter).length === 2 &&
-    value
-      .split(delimiter)
-      .every(
-        (part) =>
-          /^\d+$/.test(part) &&
-          Number.isSafeInteger(Number(part)) &&
-          Number(part) > 0
-      )
-  );
-}
 function exactKeys(value: unknown, allowed: readonly string[]): void {
   if (
     !value ||
@@ -428,12 +362,6 @@ function exactKeys(value: unknown, allowed: readonly string[]): void {
 }
 function isProvider(value: string): value is VideoClient.ByokProvider {
   return (models.video.providers as readonly string[]).includes(value);
-}
-function supports(
-  mode: models.video.VideoInput | null,
-  image: boolean
-): boolean {
-  return mode === "text-or-image" || mode === (image ? "image" : "text");
 }
 function safeFailure(error: unknown): VideoClient.Failure {
   try {

@@ -1,12 +1,15 @@
 // GRIDA-SEC-004 — fixed ElevenLabs authority, bounded sound-effect execution, safe byte results.
 import { models } from "@grida/ai-models";
+import { InputSchema } from "./input-schema";
+import { MediaInputs } from "./media-inputs";
+import { MediaRoutes } from "./media-routes";
 import { ProviderHttp } from "./http";
 import { MediaRequest } from "./media-request";
 
-const MODEL_ID = "eleven_text_to_sound_v2";
+const MODEL_ID = MediaRoutes.soundEffectId;
 const ENDPOINT =
   "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128";
-const MAX_BYTES = 16 * 1024 * 1024;
+const MAX_BYTES = MediaInputs.limits.sound_effect;
 
 /** Existing ElevenLabs sound effects. Hosts own provider-key custody and authorized egress. */
 export class SoundEffectClient {
@@ -32,13 +35,7 @@ export class SoundEffectClient {
     let request: MediaRequest | undefined;
     try {
       const id = selection(input);
-      // This exact existing capability is executable while its catalogue status is staged.
-      const card = models.audio.sound_effects.models[id];
-      if (
-        card.provider !== "elevenlabs" ||
-        card.input.type !== "text" ||
-        card.output.default_format !== "mp3"
-      )
+      if (!MediaRoutes.soundEffect(id))
         throw new SoundEffectClient.Failure("model_unavailable");
       request = new MediaRequest(this.#http);
       await this.#key(request);
@@ -209,49 +206,7 @@ function generationInput(
   value: SoundEffectClient.Input
 ): SoundEffectClient.Input {
   try {
-    exactKeys(value, [
-      "prompt",
-      "duration_seconds",
-      "loop",
-      "prompt_influence",
-      "signal",
-    ]);
-    const { prompt, duration_seconds, loop, prompt_influence, signal } = value;
-    if (typeof prompt !== "string") throw 0;
-    const trimmed = prompt.trim();
-    if (!trimmed) throw 0;
-    // Count only through the bound; do not allocate an array for an arbitrary prompt.
-    let count = 0;
-    for (const _character of trimmed) if (++count > 450) throw 0;
-    const duration =
-      models.audio.sound_effects.models[MODEL_ID].output.duration;
-    if (
-      duration_seconds !== undefined &&
-      !(
-        Number.isFinite(duration_seconds) &&
-        duration_seconds >= duration.min_seconds &&
-        duration_seconds <= duration.max_seconds
-      )
-    )
-      throw 0;
-    if (loop !== undefined && typeof loop !== "boolean") throw 0;
-    if (
-      prompt_influence !== undefined &&
-      !(
-        Number.isFinite(prompt_influence) &&
-        prompt_influence >= 0 &&
-        prompt_influence <= 1
-      )
-    )
-      throw 0;
-    if (signal !== undefined && !(signal instanceof AbortSignal)) throw 0;
-    return {
-      prompt: trimmed,
-      duration_seconds,
-      loop,
-      prompt_influence,
-      signal,
-    };
+    return InputSchema.native(MediaInputs.soundEffect, value);
   } catch {
     throw new SoundEffectClient.Failure("invalid_input");
   }

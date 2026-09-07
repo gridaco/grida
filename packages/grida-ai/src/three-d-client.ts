@@ -1,15 +1,14 @@
 // GRIDA-SEC-004 — exact fal operations, private key snapshot, bounded queue and GLB result.
-import { models } from "@grida/ai-models";
+import { InputSchema } from "./input-schema";
+import { MediaInputs } from "./media-inputs";
+import { MediaRoutes } from "./media-routes";
 import { delay } from "./fetch-helpers";
 import { ProviderHttp } from "./http";
 import { MediaRequest } from "./media-request";
 
-const TEXT_ID = "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d";
-const IMAGE_ID = "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d";
-const TRELLIS_ID = "fal-ai/trellis-2";
+const [TEXT_ID, IMAGE_ID, TRELLIS_ID] = MediaRoutes.threeDIds;
 const QUEUE_ORIGIN = "https://queue.fal.run";
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const MAX_GLB_BYTES = 64 * 1024 * 1024;
+const MAX_GLB_BYTES = MediaInputs.limits.glb;
 
 /** The three existing fal endpoints, with endpoint-specific input and result types. */
 export class ThreeDClient {
@@ -43,15 +42,7 @@ export class ThreeDClient {
     let request: MediaRequest | undefined;
     try {
       const id = selection(input);
-      const card = models.three_d.models[id];
-      // Publication status does not erase these existing staged operations.
-      if (
-        card.id !== id ||
-        card.provider !== "fal" ||
-        card.deprecated ||
-        card.output.primary !== "glb" ||
-        card.input.type !== inputKind(id)
-      )
+      if (!MediaRoutes.threeD(id))
         throw new ThreeDClient.Failure("model_unavailable");
       request = new MediaRequest(this.#http);
       await this.#key(request);
@@ -247,57 +238,12 @@ function generationInput(
   value: ThreeDClient.Input<ThreeDClient.ModelId>
 ): { prompt?: string; image?: ThreeDClient.Image; signal?: AbortSignal } {
   try {
-    const kind = inputKind(id);
-    exactKeys(
-      value,
-      kind === "text" ? ["prompt", "signal"] : ["image", "signal"]
-    );
-    const signal = value.signal;
-    if (signal !== undefined && !(signal instanceof AbortSignal)) throw 0;
-    if (kind === "text") {
-      const raw = (value as ThreeDClient.Input<typeof TEXT_ID>).prompt;
-      if (typeof raw !== "string") throw 0;
-      const prompt = raw.trim();
-      if (
-        !prompt ||
-        !withinCodepoints(
-          prompt,
-          models.three_d.models[TEXT_ID].input.max_utf8_characters
-        )
-      )
-        throw 0;
-      return { prompt, signal };
-    }
-    const image = (value as ThreeDClient.Input<typeof IMAGE_ID>).image;
-    exactKeys(image, ["data", "media_type"]);
-    const { data, media_type } = image;
-    if (
-      !(data instanceof Uint8Array) ||
-      !data.byteLength ||
-      data.byteLength > MAX_IMAGE_BYTES ||
-      !["image/png", "image/jpeg", "image/webp"].includes(media_type)
-    )
-      throw 0;
-    return { image: { data: new Uint8Array(data), media_type }, signal };
+    return InputSchema.native(MediaInputs.threeD(id), value);
   } catch {
     throw new ThreeDClient.Failure("invalid_input");
   }
 }
 
-// These switches deliberately enumerate each executable endpoint. Extending the
-// public operation map must also choose its input, wire and output semantics.
-function inputKind(id: ThreeDClient.ModelId): "text" | "image" {
-  switch (id) {
-    case TEXT_ID:
-      return "text";
-    case IMAGE_ID:
-      return "image";
-    case TRELLIS_ID:
-      return "image";
-    default:
-      return assertNever(id);
-  }
-}
 function falInput(
   id: ThreeDClient.ModelId,
   input: ReturnType<typeof generationInput>
@@ -403,11 +349,7 @@ function imageDataUrl(image: ThreeDClient.Image): string {
     );
   return `data:${image.media_type};base64,${btoa(binary)}`;
 }
-function withinCodepoints(value: string, maximum: number): boolean {
-  let count = 0;
-  for (const _character of value) if (++count > maximum) return false;
-  return true;
-}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

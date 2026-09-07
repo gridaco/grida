@@ -1,6 +1,9 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — bounded GG-only music, safe output, no account/BYOK authority.
 // GRIDA-GG: token — live scoped credential at the single submission; no mint or persistence.
 import { models } from "@grida/ai-models";
+import { InputSchema } from "./input-schema";
+import { MediaInputs } from "./media-inputs";
+import { MediaRoutes } from "./media-routes";
 import {
   GridaGatewayAuthError,
   GridaGatewayCreditsError,
@@ -10,7 +13,7 @@ import type { GgTokenSource } from "./gg-session";
 import { ProviderHttp } from "./http";
 import { MediaRequest } from "./media-request";
 
-const MAX_BYTES = 32 * 1024 * 1024;
+const MAX_BYTES = MediaInputs.limits.music;
 const MAX_BASE64_CHARACTERS = Math.ceil(MAX_BYTES / 3) * 4;
 const MAX_RESPONSE_BYTES = MAX_BASE64_CHARACTERS + 4 * 1024;
 
@@ -47,13 +50,7 @@ export class MusicClient {
   async resolve(input: MusicClient.Selection): Promise<MusicClient.Resolved> {
     try {
       const id = selection(input);
-      const card = models.audio.music.models[id];
-      // Upstream Replicate/image metadata does not grant this client another route.
-      if (
-        card.status !== "listed" ||
-        !card.input.modalities.includes("text") ||
-        card.output.default_format !== "mp3"
-      )
+      if (!MediaRoutes.music(id))
         throw new MusicClient.Failure("model_unavailable");
       if (!this.#gg.getAccessToken())
         throw new MusicClient.Failure("gg_token_expired");
@@ -182,24 +179,14 @@ function selection(value: MusicClient.Selection): MusicClient.ModelId {
 
 function generationInput(value: MusicClient.Input): MusicClient.Input {
   try {
-    exactKeys(value, ["prompt", "seed", "signal"]);
-    const { prompt, seed, signal } = value;
-    if (typeof prompt !== "string") throw 0;
-    const trimmed = prompt.trim();
-    if (
-      !trimmed.length ||
-      trimmed.length > 4096 ||
-      (seed !== undefined && !Number.isSafeInteger(seed)) ||
-      (signal !== undefined && !(signal instanceof AbortSignal))
-    )
-      throw 0;
-    return { prompt: trimmed, seed, signal };
+    return InputSchema.native(MediaInputs.music, value);
   } catch {
     throw new MusicClient.Failure("invalid_input");
   }
 }
 
-/** Preserve the existing hosted wire checks; only decoded audio leaves this operation. */
+/** Preserve existing hosted wire checks; only decoded audio leaves this operation. */
+
 function parseAudio(
   value: unknown,
   id: MusicClient.ModelId

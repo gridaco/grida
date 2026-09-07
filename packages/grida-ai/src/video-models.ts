@@ -5,10 +5,11 @@ import { assertAllowedUrl, falQueueOutcome, pollQueue } from "./fetch-helpers";
 import { postHosted } from "./gg";
 import type { GgTokenSource } from "./gg-session";
 import { MediaRequest } from "./media-request";
+import { MediaInputs } from "./media-inputs";
 
 /** Internal adapters. No raw model, credentials, provider metadata, or queue handles are public. */
 export namespace videoModels {
-  export const maxBytes = 64 * 1024 * 1024;
+  export const maxBytes = MediaInputs.limits.video;
   export const maxEnvelopeBytes = Math.ceil(maxBytes / 3) * 4 + 64 * 1024;
   export const vercelBase = "https://ai-gateway.vercel.sh/v3/ai";
   const falHosts = ["fal.run", "*.fal.run", "fal.media", "*.fal.media"];

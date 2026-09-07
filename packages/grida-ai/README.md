@@ -28,6 +28,99 @@ host/framework adapters, credential persistence, and product defaults stay outsi
 Do not duplicate catalogue data, add a plugin registry, or invent universal schema
 or executor scaffolding to anticipate future operations.
 
+## Discovery and JSON inputs
+
+`MediaOperations` describes the existing executable media operations without
+constructing a client, reading credentials, refreshing a catalogue, or making
+network requests. Its descriptors and schemas are deeply immutable and JSON
+serializable. They describe route support, not account access, credits, pricing,
+or a promise that an upstream provider will accept a request.
+
+```ts
+import { MediaOperations, ImageClient } from "@grida/ai";
+
+const operations = new MediaOperations();
+const choices = operations.list({ kind: "image", provider: "openrouter" });
+const selector = {
+  kind: "image",
+  model_id: choices[0].model_id,
+  provider: "openrouter",
+  variant: "text",
+} as const;
+const descriptor = operations.inspect(selector);
+// descriptor.input_schema describes this route's serializable input contract.
+const parsed = operations.parseInput(selector, {
+  prompt: "A pine forest",
+  n: 1,
+});
+if (parsed.kind === "image") {
+  const client = new ImageClient({ keys, http });
+  const operation = await client.resolve(parsed.selection);
+  const result = await operation.generate({ ...parsed.input, signal });
+}
+```
+
+`list` optionally filters by `kind`, canonical `model_id`, and concrete `provider`.
+The kinds are `image`, `video`, `music`, `sound-effect`, `text-to-speech`, and
+`three-d`. Discovery excludes `auto` and custom endpoints: each descriptor names
+one provider, binding, and input variant. Existing staged SFX, speech, and 3D
+operations remain discoverable with their actual `status`; discovery does not
+change catalogue publication policy.
+
+`inspect` takes those three selector fields and an optional `variant`. Image
+variants are `text` and, where supported, `references`; video variants are `text`
+and `image`. The default is `text`, so an image-only video binding requires
+`variant: "image"`. Each exact 3D model has one inferred variant and its own input
+signature. Other current operations use `text`. Unsupported combinations fail
+with `operation_unavailable`; malformed options, selectors, and inputs fail with
+`invalid_input`. `MediaOperations.Failure` exposes only that code as its message
+and JSON representation.
+
+Pass `{ snapshot }` to pin an explicitly supplied catalogue. The constructor owns
+a validated copy; later caller mutations cannot alter descriptors. Image and video
+use that view's bindings and capability facts, including explicit removals and
+the catalogue's exact-match legacy video fallback. Absent snapshot sections retain
+the existing bundled-section behavior. Audio and 3D use their existing fixed
+bundled contracts. There is no implicit refresh or provider discovery.
+
+The input schema uses JSON Schema 2020-12 plus the following `x-grida-*` rules.
+**`parseInput` is normative**: a general JSON Schema validator alone does not
+perform these normalizations or all JavaScript numeric/URI checks. Native clients
+and this parser use the same field definitions and route eligibility checks.
+
+| Rule                                             | Meaning                                                                                                                                                             |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `x-grida-trim`                                   | Apply JavaScript string trimming before further checks.                                                                                                             |
+| `x-grida-nonblank`                               | The trimmed value must contain a character, even when the original text is preserved.                                                                               |
+| `x-grida-max-length`, `x-grida-length-unit`      | Bound the normalized string in Unicode code points or UTF-16 code units as specified. Standard `maxLength` applies where no trimming or UTF-16 exception is needed. |
+| `x-grida-uri-segment`, `x-grida-excluded-values` | The normalized voice ID must be URI-encodable and must not equal the excluded values.                                                                               |
+| `x-grida-positive-pair`                          | Both numeric components matched by `pattern` must be positive finite numbers or positive safe integers, as specified.                                               |
+| `x-grida-url`                                    | Apply the stated scheme, userinfo, and fragment restrictions using URL parsing; `image-data` means an inline image data URL.                                        |
+| `x-grida-decoded-max-bytes`                      | Decode nonempty, padded, whitespace-free base64 into a fresh byte array within the stated byte limit.                                                               |
+
+Objects reject extra fields. Optional fields may be omitted; explicit `null` and
+`undefined` are not omissions in this JSON contract. Image `n` defaults to 1 and
+is capped at 16 before generation can acquire authority or submit batches. Text
+normalization remains operation-specific: music uses trimmed UTF-16 length;
+SFX and 3D use trimmed code-point length; image, video, and speech preserve input
+text. Direct Vercel video rejects `seed: 0` because its pinned upstream serializer
+drops zero. The inspected schema describes accepted SDK fields, not every option
+or value advertised by a provider's model card.
+
+`parseInput` returns a `kind`-discriminated native `{ selection, input }` pair.
+Speech JSON includes `voice_id` and `text`; the normalized voice ID moves into the
+selection. Exact image-input 3D JSON uses
+`{ "image": { "data": "AQID", "media_type": "image/png" } }`, with base64 data
+decoded to `Uint8Array`. Local paths are not inputs to this package. `AbortSignal`
+is a separate native execution control and is never accepted from JSON.
+
+`descriptor.output` describes the existing native result field, cardinality,
+MIME types or families (`image/*`, `video/*`), and decoded byte/item bounds. It is
+not a JSON output schema: results contain `Uint8Array`, and hosts choose their
+serialization, filenames, persistence, and receipts. Image output has at most the
+accepted `n` items. Discovery neither executes nor adds a universal media executor;
+callers dispatch to the existing typed clients, including the exact 3D model union.
+
 ## Image operation
 
 ```ts
@@ -72,7 +165,7 @@ generation without references on that binding, or references on a text-only
 binding, fails before submission. The package does not read local files. The
 caller trims or rejects excess references before loading assets.
 
-Generation accepts a positive safe-integer `n`, positive integer `size`, positive
+Generation accepts an integer `n` from 1 through 16, positive integer `size`, positive
 numeric `aspect_ratio`, integer `seed`, optional `quality`, and `signal`.
 `auto` quality is omitted; other quality values keep the existing provider option
 namespace. Provider batch limits remain authoritative: a requested count may
