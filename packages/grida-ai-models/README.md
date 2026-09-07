@@ -195,9 +195,44 @@ Video is different: the provider ecosystem is fragmented, so a video card is
 `providers` record of bindings — one per serving provider (`vercel` / `fal` /
 `openrouter`), each with its own call `id` and `per_second` pricing (nested
 `resolution → audio-mode → USD/s`, plus any provider-published input-image
-surcharge). Cards catalogue the image-to-video route only.
+surcharge). A binding's `input` fact describes text-only generation (`text`),
+required starting-image generation (`image`), or either (`text-or-image`). It
+does not describe arbitrary references, ending frames, editing, or video/audio
+inputs. Image modes can also accept or require a text prompt.
 No default provider is encoded; resolve a route with
-`models.video.binding(card, provider)`.
+`models.video.binding(card, provider)` and its effective input fact with
+`models.video.input(card, provider)`.
+
+All bundled bindings carry a verified input fact. Older published snapshots
+can omit it: only an exact canonical model id, provider, and binding id match
+can borrow the bundled fact. A replacement binding without a fact is unknown;
+removed bindings and models stay removed. Explicit `null` means unknown, and
+the parser normalizes an invalid present fact to `null` while preserving the
+rest of the video section. This avoids restoring bundled capabilities through
+the section fallback. The helper returns `null` for unknown input support;
+consumers must also apply availability, deprecation, and their own wire limits
+(for example, GG currently accepts text-to-video only).
+
+The following facts were checked against official provider documentation on
+2026-09-07. Route identifiers and pricing are unchanged; a provider's generated
+code snippet or input-image price alone is not evidence of input support.
+
+| Provider   | Exact binding (source)                                                                                             | Input         |
+| ---------- | ------------------------------------------------------------------------------------------------------------------ | ------------- |
+| Vercel     | [google/veo-3.1-generate-001](https://vercel.com/ai-gateway/models/veo-3.1-generate-001/api)                       | text-or-image |
+| Vercel     | [google/veo-3.1-fast-generate-001](https://vercel.com/ai-gateway/models/veo-3.1-fast-generate-001/api)             | text-or-image |
+| Vercel     | [google/veo-3.1-lite-generate-001](https://vercel.com/ai-gateway/models/veo-3.1-lite-generate-001/faq)             | text-or-image |
+| Vercel     | [alibaba/wan-v3.0-video](https://vercel.com/ai-gateway/models/wan-v3.0-video/api)                                  | text-or-image |
+| Vercel     | [spacexai/grok-imagine-video-1.5](https://vercel.com/ai-gateway/models/grok-imagine-video-1.5/faq)                 | image         |
+| fal        | [fal-ai/veo3.1/image-to-video](https://fal.ai/models/fal-ai/veo3.1/image-to-video/api)                             | image         |
+| fal        | [fal-ai/veo3.1/fast/image-to-video](https://fal.ai/models/fal-ai/veo3.1/fast/image-to-video/api)                   | image         |
+| fal        | [fal-ai/veo3.1/lite/image-to-video](https://fal.ai/models/fal-ai/veo3.1/lite/image-to-video/api)                   | image         |
+| fal        | [alibaba/wan-3.0/image-to-video](https://fal.ai/models/alibaba/wan-3.0/image-to-video/api)                         | image         |
+| fal        | [bytedance/seedance-2.0/image-to-video](https://fal.ai/models/bytedance/seedance-2.0/image-to-video/api)           | image         |
+| fal        | [bytedance/seedance-2.5/image-to-video](https://fal.ai/models/bytedance/seedance-2.5/image-to-video/api)           | image         |
+| fal        | [xai/grok-imagine-video/v1.5/image-to-video](https://fal.ai/models/xai/grok-imagine-video/v1.5/image-to-video/api) | image         |
+| OpenRouter | [google/veo-3.1](https://openrouter.ai/google/veo-3.1)                                                             | text-or-image |
+| OpenRouter | [bytedance/seedance-2.0](https://openrouter.ai/bytedance/seedance-2.0)                                             | text-or-image |
 
 The video catalogue contains only models Grida can call: every card must have at
 least one verified provider binding with grounded pricing and be enabled in

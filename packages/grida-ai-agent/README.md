@@ -54,7 +54,7 @@ bundle.
 The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
 public subpath; workspace bindings use it in-process.
 
-## Shared image operations
+## Shared image and video operations
 
 The image HTTP route and `generate_image` tool use `@grida/ai`'s `ImageClient`.
 This package adapts its secret store and provider transport, chooses the agent's
@@ -66,8 +66,20 @@ scratch.
 The shared operation does not retry a failed paid batch. Requesting multiple
 images can still require multiple submissions under the provider's batch limit.
 Image failures contain safe codes; raw upstream errors and warnings do not enter
-the host's image error logs. Other media operations retain their existing
-implementations until promoted with their callers.
+the host's image error logs.
+
+The video HTTP route uses `VideoClient` with the same host capabilities. The SDK
+checks the selected binding's text/start-frame support before submitting, reads
+the selected credential at invocation, and returns video bytes with safe failure
+codes. One video submission, its polling, and result reads share a five-minute
+deadline and the caller's abort signal. A BYOK credential stays fixed for that
+job; changing credentials cannot move accepted work to another account. Clearing
+GG custody blocks subsequent invocations but cannot recall an accepted request.
+The route retains its wire protocol, GG status mapping and media receipts.
+
+Other media operations retain their existing implementations until promoted
+with their callers. Media routes still mount with the agent tenant; independent
+Desktop media startup is a separate host change.
 
 ## Provider HTTP
 

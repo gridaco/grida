@@ -1,7 +1,51 @@
 import { describe, expect, it } from "vitest";
 import { AgentTransport } from "./transport";
+import type {
+  VideoGenerateRequest,
+  VideoGenerateResult,
+} from "./protocol/video";
 
 describe("AgentTransport media generation routes", () => {
+  it("preserves the video request and receipt wire through the fixed route", async () => {
+    const request: VideoGenerateRequest = {
+      model_id: "google/veo-3.1",
+      provider: "fal",
+      prompt: "a wave",
+      aspect_ratio: "16:9",
+      resolution: "1280x720",
+      duration: 8,
+      fps: 24,
+      seed: 7,
+      image_url: "https://inputs.example/start.png",
+    };
+    const result: VideoGenerateResult = {
+      model_id: request.model_id,
+      provider_id: "fal",
+      videos: [
+        {
+          base64: "AAAY",
+          media_type: "video/mp4",
+          stored_media: {
+            id: "7ccb8e68-a201-40d9-a793-44de9e6c6fc6",
+            file_name: "video-1.mp4",
+            media_type: "video/mp4",
+            byte_size: 3,
+            created_at: 1,
+          },
+        },
+      ],
+    };
+    const client = new AgentTransport.Client({
+      fetcher: async (path, init) => {
+        expect(path).toBe("/video/generate");
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toEqual(request);
+        return Response.json(result);
+      },
+    });
+    expect(await client.video.generate(request)).toEqual(result);
+  });
+
   it("owns the 3D, music, sound-effect, and text-to-speech paths", async () => {
     const seen: Array<{ path: string; body: unknown }> = [];
     const client = new AgentTransport.Client({

@@ -1,6 +1,21 @@
 // GRIDA-SEC-004 — bounded provider error bodies release their streams.
 import { describe, expect, it, vi } from "vitest";
-import { safeText } from "./fetch-helpers";
+import { delay, safeText } from "./fetch-helpers";
+
+describe("poll delay cleanup", () => {
+  it("removes completed waits and settles an already-aborted wait", async () => {
+    const controller = new AbortController();
+    const add = vi.spyOn(controller.signal, "addEventListener");
+    const remove = vi.spyOn(controller.signal, "removeEventListener");
+    await delay(0, controller.signal);
+    expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0][1]);
+    controller.abort();
+    await expect(delay(10_000, controller.signal)).rejects.toThrow(
+      "The operation was aborted."
+    );
+    expect(remove).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe("safeText", () => {
   it("returns a short error body", async () => {

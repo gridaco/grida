@@ -1,42 +1,22 @@
-// GRIDA-GG: provider — the `gg` video-provider arm (docs/wg/platform/hosted-ai.md)
-/**
- * GRIDA-SEC-004 — video-model provider resolver. The video counterpart of
- * {@link ./resolve-image.ts}.
- *
- * Given a canonical video-model id, picks a provider the user has a key for and
- * which serves that model, then builds the runnable `VideoModelV3`. Reads the
- * package-owned `SecretsStore` (credentials never cross IPC); never calls the
- * model.
- *
- * Precedence: `byokProvidersFor("video")` order (Vercel → fal), intersected
- * with providers this card binds and providers with a stored key. Unlike image,
- * video is NOT universal — a connected provider may not serve every listed
- * model, so resolution is genuinely per-model. Non-`listed` cards are rejected.
- */
-
-import { models } from "@grida/ai-models";
-import type { GgTokenSource } from "@grida/ai";
-import type { Experimental_VideoModelV3 as VideoModelV3 } from "@ai-sdk/provider";
+// GRIDA-GG: provider — agent auto selection over the shared video operation.
+// GRIDA-SEC-004 / GRIDA-SEC-006 — host credentials and transport stay inside the operation.
+import { VideoClient, ProviderHttp } from "@grida/ai";
 import type { SecretsStore } from "@grida/daemon/server";
-import { byokProvidersFor, GG_PROVIDER_ID } from "../protocol/provider-ids";
-import { makeVideoModelFor } from "./video-byok";
-import { GridaGatewayVideoModel } from "./gg-media";
-import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
-import type { ProviderHttp } from "./http";
-import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
+import type { GridaGatewaySessionStore } from "./gg-session";
+import type { ModelCatalogStore } from "./model-catalog";
 
-type VideoProvider = models.video.VideoProvider;
-
-function isVideoProvider(id: string): id is VideoProvider {
-  return (models.video.providers as readonly string[]).includes(id);
-}
-
-export type ResolvedVideoModel = {
-  /** A BYOK video provider, or the hosted `grida` provider (GRIDA-SEC-006). */
-  provider_id: VideoProvider | typeof GG_PROVIDER_ID;
-  model_id: string;
-  binding_id: string;
-  model: VideoModelV3;
+export type ResolvedVideoModel = VideoClient.Resolved;
+export type ResolveVideoDeps = {
+  secrets: SecretsStore;
+  catalog?: ModelCatalogStore;
+  provider_http?: ProviderHttp;
+  gg?: GridaGatewaySessionStore;
+  gg_base_url?: string;
+};
+export type ResolveVideoOptions = {
+  explicit?: VideoClient.Provider;
+  /** Select a route that accepts the request's starting image. */
+  image?: boolean;
 };
 
 export class VideoModelUnavailableError extends Error {
@@ -54,118 +34,37 @@ export class VideoModelUnavailableError extends Error {
   }
 }
 
-export type ResolveVideoDeps = {
-  secrets: SecretsStore;
-  /**
-   * The video catalogue to resolve against. Absent ⇒ the bundled one,
-   * which is what this file read directly before the store existed.
-   */
-  catalog?: ModelCatalogStore;
-  /** Host-fed provider HTTP, resolved at the server construction edge. */
-  provider_http?: ProviderHttp;
-  /** Grida Cloud session (GRIDA-SEC-006) — optional; absent or token-less
-   *  ⇒ the hosted provider never resolves. */
-  gg?: GridaGatewaySessionStore;
-  /** Origin of the hosted endpoints; absent ⇒ hosted provider disabled. */
-  gg_base_url?: string;
-};
-
-export type ResolveVideoOptions = {
-  explicit?: VideoProvider | typeof GG_PROVIDER_ID;
-  /**
-   * Image-to-video: the request carries a start frame. The hosted `gg`
-   * provider is text-to-video only and would drop the frame, so it is
-   * skipped (implicit) or rejected (explicit) here — the request falls back
-   * to a BYOK route that can honor the image instead of silently becoming
-   * text-to-video. Mirrors the image resolver's `references` guard.
-   */
-  image?: boolean;
-};
-
-/**
- * Build the resolved hosted video model — shared by the explicit-pick and
- * post-BYOK fallback arms, which produce the identical descriptor.
- */
-function resolvedGgVideo(
-  modelId: string,
-  card: models.video.VideoModelCard,
-  hosted: { session: GgTokenSource; base_url: string },
-  providerHttp?: ProviderHttp
-): ResolvedVideoModel {
-  return {
-    provider_id: GG_PROVIDER_ID,
-    model_id: modelId,
-    binding_id: card.id,
-    model: new GridaGatewayVideoModel(
-      hosted.session,
-      hosted.base_url,
-      card.id,
-      providerHttp
-    ),
-  };
-}
-
+/** The agent deliberately retains its existing BYOK-then-GG automatic choice. */
 export async function resolveVideoModel(
   deps: ResolveVideoDeps,
   modelId: string,
   options: ResolveVideoOptions = {}
 ): Promise<ResolvedVideoModel> {
-  // One read for the whole resolution: a mid-resolution refresh must not
-  // let the listed-gate and the binding lookup disagree — with a single
-  // exception for a MISS, which may just mean this host has not fetched
-  // the catalogue the renderer offered from. See `resolveImageModel`.
-  const view = await catalogViewOnMiss(
-    deps.catalog,
-    (v) => !v.video.cardById(modelId)
-  );
-  const card = view.video.cardById(modelId);
-  if (!card || !card.listed) {
-    throw new VideoModelUnavailableError(modelId, options.explicit);
-  }
-
-  // Explicit hosted pick (GRIDA-SEC-006). Hosted video is
-  // text-to-video only in v1 — the route rejects image_url server-side.
-  if (options.explicit === GG_PROVIDER_ID) {
-    // t2v only — an image-to-video pick can't ride the hosted provider.
-    const hosted = !options.image && liveGgMediaDeps(deps);
-    if (!hosted || !view.video.binding(card, "vercel")) {
-      throw new VideoModelUnavailableError(modelId, GG_PROVIDER_ID);
-    }
-    return resolvedGgVideo(modelId, card, hosted, deps.provider_http);
-  }
-
-  const order: VideoProvider[] = options.explicit
-    ? [options.explicit as VideoProvider]
-    : byokProvidersFor("video")
-        .map((p) => p.id)
-        .filter(isVideoProvider);
-
-  for (const provider of order) {
-    const binding = view.video.binding(card, provider);
-    if (!binding) continue;
-    const key = await deps.secrets._getKey(provider);
-    if (!key) continue;
-    return {
-      provider_id: provider,
+  const videos = new VideoClient({
+    keys: { get: (provider) => deps.secrets._getKey(provider) },
+    // Explicit legacy host choice: standalone requests may use ambient fetch;
+    // remote downloads still require a supplied host transport.
+    http: deps.provider_http ?? new ProviderHttp(),
+    catalog: deps.catalog,
+    gg: deps.gg,
+    gg_base_url: deps.gg_base_url,
+  });
+  try {
+    return await videos.resolve({
       model_id: modelId,
-      binding_id: binding.id,
-      model: makeVideoModelFor(
-        provider,
-        key.trim(),
-        binding.id,
-        deps.provider_http
-      ),
-    };
-  }
-
-  // Grida hosted (GRIDA-SEC-006) — after BYOK, before giving up. Serves
-  // cards the hosted gateway can (a vercel binding).
-  if (!options.explicit && !options.image) {
-    const hosted = liveGgMediaDeps(deps);
-    if (hosted && view.video.binding(card, "vercel")) {
-      return resolvedGgVideo(modelId, card, hosted, deps.provider_http);
+      provider: options.explicit ?? "auto",
+      image: options.image,
+    });
+  } catch (error) {
+    if (
+      error instanceof VideoClient.Failure &&
+      (error.code === "model_unavailable" ||
+        error.code === "provider_unavailable" ||
+        error.code === "input_unsupported" ||
+        error.code === "gg_token_expired")
+    ) {
+      throw new VideoModelUnavailableError(modelId, options.explicit);
     }
+    throw error;
   }
-
-  throw new VideoModelUnavailableError(modelId, options.explicit);
 }

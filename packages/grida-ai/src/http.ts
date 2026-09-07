@@ -246,6 +246,10 @@ export class ProviderHttp {
         text,
         options?.signal ? { signal: options.signal } : undefined
       );
+      if (options?.signal?.aborted) {
+        void response.body?.cancel().catch(() => undefined);
+        throw new Error("download aborted");
+      }
     } catch (cause) {
       // Fetch failures commonly embed the full signed URL in their message.
       // Preserve that URL and cause on the internal error object, but keep the
@@ -270,7 +274,7 @@ export class ProviderHttp {
     }
     try {
       return {
-        data: await readBodyBounded(response, text, maxBytes),
+        data: await readBodyBounded(response, text, maxBytes, options?.signal),
         mediaType: response.headers.get("content-type") ?? undefined,
       };
     } catch (error) {
@@ -515,7 +519,8 @@ function isPrivateIpLiteral(host: string): boolean {
 async function readBodyBounded(
   response: Response,
   url: string,
-  maxBytes: number
+  maxBytes: number,
+  signal?: AbortSignal
 ): Promise<Uint8Array> {
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > maxBytes) {
@@ -525,15 +530,38 @@ async function readBodyBounded(
   if (!response.body) return new Uint8Array();
 
   const reader = response.body.getReader();
+  let rejectRead: ((error: Error) => void) | undefined;
+  const abort = () => {
+    rejectRead?.(new Error("download aborted"));
+    void reader.cancel().catch(() => undefined);
+  };
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
   // Grow one accumulator instead of retaining every stream chunk and then
   // allocating a second full-size contiguous result. At a growth boundary the
   // old and new arrays overlap briefly, but both are package-bounded and the
   // returned subarray reuses the final backing store without another copy.
   let data = new Uint8Array();
   let total = 0;
+  let reads = 0;
   try {
     for (;;) {
-      const { done, value } = await reader.read();
+      // Even an always-ready zero-byte stream must let cancellation/deadline
+      // timers run; otherwise its microtasks could starve the host indefinitely.
+      if (reads++ > 0 && reads % 64 === 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        if (signal?.aborted) throw new Error("download aborted");
+      }
+      // Each read owns one settlement; no ever-pending shared race retains old chunks.
+      const { done, value } = await new Promise<
+        ReadableStreamReadResult<Uint8Array>
+      >((resolve, reject) => {
+        rejectRead = reject;
+        reader.read().then(resolve, reject);
+        if (signal?.aborted) reject(new Error("download aborted"));
+      });
+      rejectRead = undefined;
+      if (signal?.aborted) throw new Error("download aborted");
       if (done) break;
       const nextTotal = total + value.byteLength;
       if (nextTotal > maxBytes) {
@@ -556,7 +584,10 @@ async function readBodyBounded(
       total = nextTotal;
     }
   } finally {
-    await reader.cancel().catch(() => undefined);
+    signal?.removeEventListener("abort", abort);
+    rejectRead = undefined;
+    // A host stream may never settle cancellation. Do not let it retain the caller.
+    void reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
   return data.subarray(0, total);

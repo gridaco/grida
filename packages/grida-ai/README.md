@@ -1,8 +1,8 @@
 # @grida/ai
 
-Private, experimental SDK for shared model-driven operations. The first complete
-operation is catalogue-backed image generation through BYOK OpenRouter, Vercel,
-fal, or scoped Grida Gateway credentials.
+Private, experimental SDK for shared model-driven operations. Catalogue-backed
+image and video generation use BYOK OpenRouter, Vercel, fal, or scoped Grida
+Gateway credentials.
 
 ## Ownership
 
@@ -87,6 +87,72 @@ arbitrary cause or prompt. Codes are `invalid_input`, `model_unavailable`,
 Catalogue/key presence is a routing decision, not proof of provider account
 readiness, entitlement, affordability, or eventual generation success.
 
+## Video operation
+
+```ts
+import { VideoClient } from "@grida/ai";
+
+const videos = new VideoClient({ keys, http, catalog, gg, gg_base_url });
+const operation = await videos.resolve({
+  model_id: chosenCatalogId,
+  provider: "fal",
+  image: true,
+});
+const result = await operation.generate({
+  prompt: "Clouds moving over a mountain lake",
+  image_url: authorizedHttpsStartFrame,
+  duration: 4,
+  signal,
+});
+// result.videos: { data: Uint8Array; media_type: string }[]
+```
+
+Selection is explicit, with the same opt-in `auto` precedence as images.
+The frozen descriptor includes `input: "text" | "image" | "text-or-image"` from
+the selected catalogue binding. `image: true` selects a start-frame operation;
+its generation requires an authorized HTTPS `image_url`. A text selection rejects
+an image URL. Capability facts are owned by `@grida/ai-models`; absent facts in old
+snapshots use only exact canonical/provider/binding matches to bundled facts.
+Changed, removed, or explicitly unknown bindings do not inherit capabilities.
+GG remains text-only and requires a text-eligible Vercel binding. The current fal
+bindings and Vercel Grok require a start frame. OpenRouter uses `frame_images` with
+`first_frame`; the exact fal Wan binding uses `start_image_url`.
+
+Generation accepts `aspect_ratio` as positive integer `W:H`, `resolution` as
+positive integer `WxH` (not a catalogue price label such as `720p`), positive finite
+`duration`/`fps`, and a safe-integer `seed`. The pinned Vercel adapter silently omits
+zero upstream, so direct Vercel `seed: 0` is rejected as `invalid_input` before key
+lookup or submission; the other adapters preserve zero. It requests **one video once**. There
+is no arbitrary provider-options object, raw SDK model, or retry setting. Queue
+status reads do not resubmit the job. Multiple returned videos remain supported
+within a 16-item, 64 MiB decoded aggregate bound. Submission/poll JSON, GG/SSE
+encoded envelopes, inline data, authenticated OpenRouter content, and result
+download streams are bounded before retention or decoding. Vercel result URLs
+must use its exact gateway origin or inline data; fal queue/result URLs stay on
+its allowed hosts. OpenRouter's authenticated content endpoint is used instead of
+provider-advertised unsigned URLs. Hosts still authorize DNS and redirect hops.
+
+A generation has one five-minute deadline covering credential lookup, submission,
+polling, and result reads. The deadline settles the caller even when an injected
+async operation ignores cancellation; checks after awaits prevent an abandoned
+lookup from later submitting a paid job. Readers and waits are released on
+completion, cancellation, and limits. Synchronous host work cannot be preempted;
+a monotonic deadline refuses its late continuation.
+
+Resolution retains no key. Generation reads the selected BYOK key once and keeps
+that private snapshot through the submitted job's polls/content. Key rotation or
+removal never silently switches that job's account or provider. GG uses a live
+scoped token for its single POST. Cancellation, timeout, or clearing custody cannot
+undo an accepted job or its charge, and this operation does not retry or mint.
+
+Only byte arrays and video media types are returned; warnings, URLs, job handles,
+and provider metadata are discarded without logging. `VideoClient.Failure` has
+the same code-only error shape as images. Codes are `invalid_input`,
+`model_unavailable`, `provider_unavailable`, `input_unsupported`,
+`gg_token_expired`, `insufficient_credits`, `aborted`, `timeout`,
+`invalid_response`, `generation_failed`, and `unsupported_untrusted_result_origin`.
+The host owns persistence, receipts, HTTP status mapping, and GG acquisition.
+
 ## Authority and construction foundations
 
 <!-- GRIDA-SEC-004 / GRIDA-SEC-006: explicit host transport and scoped memory custody. -->
@@ -100,7 +166,7 @@ credentials; data URLs are decoded locally. Automatic downloads are limited to
 16 assets and 64 MiB in aggregate; a separately requested single asset has a
 256 MiB ceiling that its owning adapter can lower.
 
-`ImageClient` requires an explicit `ProviderHttp`. The lower-level constructor's
+`ImageClient` and `VideoClient` require an explicit `ProviderHttp`. The lower-level constructor's
 legacy omitted-transport behavior permits ambient provider requests but refuses
 remote downloads; supplying both host operations is the intended independent-host
 integration. Private methods and fields use runtime private slots: the client
@@ -130,11 +196,11 @@ work; server expiry and entitlement policy remain authoritative.
 `@grida/ai/providers` supplies existing text/video/audio/3D implementations with
 the promoted catalogue gates, provider identity/precedence, scoped GG request and
 error helpers, and fal queue/URL/error-prefix helpers. These are trusted provider
-building blocks, not the safe image operation facade. `safeText` bounds text; it
+building blocks, not the safe image/video operation facades. `safeText` bounds text; it
 does **not** redact it. Direct helper failures can carry upstream details and must
 be handled by the calling operation's safe error boundary. `postHosted` does not
 authorize its caller-provided URL: the provider implementation and host transport
-own that decision. Raw image SDK adapters are internal and are not package exports.
+own that decision. Raw image/video SDK adapters are internal and are not package exports.
 
 ## Runtime and verification
 
@@ -154,9 +220,9 @@ Built exports work unbundled when their declared dependencies are supplied. A
 distributed host must package that private dependency closure; a public CLI cannot
 ship an unresolved `workspace:*` dependency and expect npm to supply it.
 
-Producer tests exercise synthetic authorized transports, each image route,
+Producer tests exercise synthetic authorized transports, each image/video route,
 reference/option preservation, selected-provider stability, safe failures,
-no retry of failed submissions, and scoped-token expiry. Promoted helper tests
+no retry of failed submissions, bounded video lifecycle/results, and scoped-token expiry. Promoted helper tests
 cover catalogue refresh and bounded downloads. No test calls a real provider,
 opens a real credential store, or starts a Grida host. Packaging and host consumers
 must use public exports; source aliases are not a substitute for that proof.

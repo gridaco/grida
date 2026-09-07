@@ -2813,10 +2813,10 @@ export namespace models {
    * is **deliberately not encoded here** — bindings carry no preference order;
    * selection is a runtime concern. Look up a route with {@link binding}.
    *
-   * The cards catalogue the **image-to-video** route (a still → clip) — the
-   * canvas-relevant mode and the only one some models (e.g. Grok) offer. Other
-   * capabilities (text-to-video, editing) aren't modelled until used; on fal
-   * they are distinct endpoint ids, so adding one is a new binding id, not a flag.
+   * Each binding records whether its route accepts text alone, requires a
+   * starting image, or supports both. These are provider-documented facts;
+   * neither the canonical model name nor the endpoint id implies them.
+   * Editing, reference-to-video, and other inputs are outside this contract.
    *
    * **Pricing.** Video bills by output **duration**, and the rate varies by
    * both resolution and whether audio is generated, so `per_second` is keyed
@@ -2903,6 +2903,14 @@ export namespace models {
     export type VideoModelPricing = PerSecondPricing;
 
     /**
+     * Input modes for one concrete route. `text` does not accept a starting
+     * image; `image` requires one; `text-or-image` accepts either. An image
+     * mode may also accept or require a text prompt. This does not describe
+     * arbitrary references, ending frames, edits, or video/audio inputs.
+     */
+    export type VideoInput = "text" | "image" | "text-or-image";
+
+    /**
      * How one provider serves a canonical model: the id you actually call on
      * that provider, plus that provider's own meter. The unit of
      * provider-selection. Keyed by {@link VideoProvider} in
@@ -2911,11 +2919,17 @@ export namespace models {
     export type VideoProviderBinding = {
       provider: VideoProvider;
       /**
-       * Provider-specific call id for the image-to-video route. Format varies —
+       * Provider-specific call id. Format varies —
        * `google/veo-3.1-generate-001` (Vercel), `fal-ai/veo3.1/image-to-video`
        * (fal, where the capability is keyed into the endpoint id).
        */
       id: string;
+      /**
+       * Verified input modes of this route. Absent only for older snapshots;
+       * `null` explicitly means unknown and disables input-mode resolution.
+       * Use {@link input} for the exact-binding legacy fallback.
+       */
+      input?: VideoInput | null;
       /** Real upstream pricing for **this** provider — meters differ across providers. */
       pricing: VideoModelPricing;
       /**
@@ -2972,6 +2986,9 @@ export namespace models {
 
     type CatalogCard = VideoModelCard & {
       release: ModelRelease;
+      providers: Partial<
+        Record<VideoProvider, VideoProviderBinding & { input: VideoInput }>
+      >;
     };
 
     export const models: Partial<Record<VideoModelId, CatalogCard>> = {
@@ -3021,6 +3038,7 @@ export namespace models {
           vercel: {
             provider: "vercel",
             id: "google/veo-3.1-generate-001",
+            input: "text-or-image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3040,6 +3058,7 @@ export namespace models {
           fal: {
             provider: "fal",
             id: "fal-ai/veo3.1/image-to-video",
+            input: "image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3057,6 +3076,7 @@ export namespace models {
           openrouter: {
             provider: "openrouter",
             id: "google/veo-3.1",
+            input: "text-or-image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3106,6 +3126,7 @@ export namespace models {
           vercel: {
             provider: "vercel",
             id: "google/veo-3.1-fast-generate-001",
+            input: "text-or-image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3121,6 +3142,7 @@ export namespace models {
           fal: {
             provider: "fal",
             id: "fal-ai/veo3.1/fast/image-to-video",
+            input: "image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3138,9 +3160,9 @@ export namespace models {
       // Google — Veo 3.1 Lite
       // -----------------------------------------------------------------
       // The budget Veo: 720p/1080p only, 4/6/8s, native audio. Rates
-      // identical on Vercel and fal (verified 2026-09-02). The gateway lists
-      // Lite as text-to-video only — the hosted route is t2v-only anyway;
-      // fal serves the image-to-video endpoint catalogued here.
+      // identical on Vercel and fal (verified 2026-09-02). Vercel supports
+      // both text and image input (FAQ verified 2026-09-07); the fal binding
+      // below requires an image. Hosted GG's narrower wire is a host concern.
       "google/veo-3.1-lite": {
         id: "google/veo-3.1-lite",
         label: "Veo 3.1 Lite",
@@ -3172,6 +3194,7 @@ export namespace models {
           vercel: {
             provider: "vercel",
             id: "google/veo-3.1-lite-generate-001",
+            input: "text-or-image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3186,6 +3209,7 @@ export namespace models {
           fal: {
             provider: "fal",
             id: "fal-ai/veo3.1/lite/image-to-video",
+            input: "image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3235,6 +3259,7 @@ export namespace models {
           vercel: {
             provider: "vercel",
             id: "alibaba/wan-v3.0-video",
+            input: "text-or-image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3250,6 +3275,7 @@ export namespace models {
           fal: {
             provider: "fal",
             id: "alibaba/wan-3.0/image-to-video",
+            input: "image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3311,6 +3337,7 @@ export namespace models {
           fal: {
             provider: "fal",
             id: "bytedance/seedance-2.0/image-to-video",
+            input: "image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3328,6 +3355,7 @@ export namespace models {
           openrouter: {
             provider: "openrouter",
             id: "bytedance/seedance-2.0",
+            input: "text-or-image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3384,6 +3412,7 @@ export namespace models {
           fal: {
             provider: "fal",
             id: "bytedance/seedance-2.5/image-to-video",
+            input: "image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3438,6 +3467,7 @@ export namespace models {
           vercel: {
             provider: "vercel",
             id: "spacexai/grok-imagine-video-1.5",
+            input: "image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3455,6 +3485,7 @@ export namespace models {
           fal: {
             provider: "fal",
             id: "xai/grok-imagine-video/v1.5/image-to-video",
+            input: "image",
             pricing: {
               type: "per_second",
               usd_per_second: {
@@ -3482,6 +3513,36 @@ export namespace models {
       provider: VideoProvider
     ): VideoProviderBinding | null {
       return card.providers[provider] ?? null;
+    }
+
+    /**
+     * Effective input fact for a binding on the caller's current card.
+     *
+     * Older snapshots omit `input`. Only an exact canonical id, provider,
+     * and binding id match may borrow the bundled fact. A removed binding
+     * is never restored; a replacement without a fact remains unknown.
+     * Explicit `null` or an unrecognized value never triggers fallback.
+     * Availability and deprecation checks remain the consumer's concern.
+     */
+    export function input(
+      card: VideoModelCard,
+      provider: VideoProvider
+    ): VideoInput | null {
+      const current = binding(card, provider);
+      if (!current || current.provider !== provider) return null;
+      if (Object.prototype.hasOwnProperty.call(current, "input")) {
+        switch (current.input) {
+          case "text":
+          case "image":
+          case "text-or-image":
+            return current.input;
+          default:
+            return null;
+        }
+      }
+      if (!Object.prototype.hasOwnProperty.call(models, card.id)) return null;
+      const bundled = models[card.id]?.providers[provider];
+      return bundled?.id === current.id ? bundled.input : null;
     }
 
     let _listed: readonly VideoModelCard[] | null = null;
@@ -4187,7 +4248,19 @@ export namespace models {
       provider: video.VideoProvider,
       v: unknown
     ): video.VideoProviderBinding | undefined {
-      return parseMediaBinding(provider, v, parseVideoPricing);
+      const out = parseMediaBinding(provider, v, parseVideoPricing);
+      if (!out) return undefined;
+      const card: video.VideoProviderBinding = out;
+      if (Object.prototype.hasOwnProperty.call(v, "input")) {
+        const input = (v as Record<string, unknown>).input;
+        // Preserve an unusable fact as unknown, rather than dropping this
+        // whole section and allowing view() to restore the bundled catalogue.
+        card.input =
+          input === "text" || input === "image" || input === "text-or-image"
+            ? input
+            : null;
+      }
+      return card;
     }
 
     /** `T | null` — null is meaningful here, a missing key is not. */

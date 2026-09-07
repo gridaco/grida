@@ -401,6 +401,10 @@ async function main() {
       fileURLToPath(new URL("./consumer.mjs", import.meta.url)),
       path.join(runtime, "consumer.mjs")
     );
+    await cp(
+      fileURLToPath(new URL("./video-consumer.mjs", import.meta.url)),
+      path.join(runtime, "video-consumer.mjs")
+    );
     report.consumers = {};
     for (const format of ["esm", "cjs"]) {
       report.phase = `public ${format} consumer`;
@@ -420,7 +424,7 @@ async function main() {
       await writeFile(
         path.join(runtime, `consumer.${extension}`),
         `
-import { ImageClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
+import { ImageClient, VideoClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
 import { byokProvidersFor } from "@grida/ai/providers";
 import { models } from "@grida/ai-models";
 declare const http: ProviderHttp;
@@ -432,7 +436,15 @@ async function image(): Promise<Uint8Array> {
   const mediaType: string = result.images[0].media_type;
   return result.images[0].data;
 }
-void [client, image, providers, models];
+async function video(): Promise<Uint8Array> {
+  const client = new VideoClient({ http, keys: { get: () => null }, gg: new GridaGatewaySessionStore() });
+  const operation = await client.resolve({ model_id: "example", provider: "fal", image: true });
+  const input: models.video.VideoInput = operation.input;
+  const result = await operation.generate({ prompt: "Synthetic type probe", image_url: "https://assets.example.invalid/frame.png", signal: new AbortController().signal });
+  const mediaType: string = result.videos[0].media_type;
+  return result.videos[0].data;
+}
+void [client, image, video, providers, models];
 `,
         { mode: 0o600 }
       );

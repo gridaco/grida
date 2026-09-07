@@ -1,6 +1,6 @@
 // GRIDA-GG: provider — see docs/wg/platform/hosted-ai.md
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GridaGatewayMusicProvider, GridaGatewayVideoModel } from "./gg-media";
+import { GridaGatewayMusicProvider } from "./gg-media";
 import { GridaGatewaySessionStore } from "./gg-session";
 import { ProviderHttp } from "./http";
 
@@ -11,53 +11,6 @@ function liveStore(): GridaGatewaySessionStore {
 }
 
 afterEach(() => vi.unstubAllGlobals());
-
-describe("GridaGatewayVideoModel.doGenerate", () => {
-  it("hosted video requests use request, never download", async () => {
-    const urls: string[] = [];
-    const request = vi.fn<
-      (input: string | URL | Request, init?: RequestInit) => Promise<Response>
-    >(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      urls.push(url);
-      expect(new Headers(init?.headers).get("authorization")).toBe(
-        "Bearer tok"
-      );
-      return new Response(
-        JSON.stringify({
-          model_id: "video-model",
-          provider_id: "gg",
-          videos: [{ base64: "YmFy", media_type: "video/mp4" }],
-        }),
-        { status: 200 }
-      );
-    });
-    const download = vi.fn<typeof globalThis.fetch>();
-    const providerHttp = new ProviderHttp({
-      request: request as unknown as typeof globalThis.fetch,
-      download,
-    });
-    await new GridaGatewayVideoModel(
-      liveStore(),
-      "https://grida.test",
-      "video-model",
-      providerHttp
-    ).doGenerate({
-      prompt: "a wave",
-      n: 1,
-      aspectRatio: undefined,
-      resolution: undefined,
-      duration: undefined,
-      fps: undefined,
-      seed: undefined,
-      image: undefined,
-      providerOptions: {},
-    });
-
-    expect(urls).toEqual(["https://grida.test/api/v1/ai/videos/generations"]);
-    expect(download).not.toHaveBeenCalled();
-  });
-});
 
 describe("GridaGatewayMusicProvider.generate", () => {
   it("posts the closed request to hosted audio and accepts base64 bytes only", async () => {

@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { proveVideo } from "./video-consumer.mjs";
 
 const require = createRequire(import.meta.url);
 const format = process.argv[2];
@@ -281,6 +282,7 @@ await check(
     assert.equal(gg.status().active, false);
   }
 );
+const video = await proveVideo({ load, require, check });
 await check(
   "no ambient network, credential discovery or filesystem state",
   async () => {
@@ -299,6 +301,7 @@ process.stdout.write(
     cases,
     requests: requests.length,
     downloads: downloads.length,
+    video,
     guard: proof.counts,
     loaded_modules: proof.loaded.size,
   })

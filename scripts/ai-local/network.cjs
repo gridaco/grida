@@ -70,7 +70,8 @@ if (process.env.GRIDA_AI_PROOF_CONSUMER === "1") {
       !path.isAbsolute(relative) &&
       /\.(?:[cm]?js|json)$/.test(relative) &&
       (relative.startsWith(`node_modules${path.sep}`) ||
-        relative === "consumer.mjs")
+        relative === "consumer.mjs" ||
+        relative === "video-consumer.mjs")
     );
   };
   const modulePath = (value) => {

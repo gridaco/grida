@@ -7,8 +7,7 @@ import {
 } from "./byok";
 import { ProviderHttp } from "./http";
 import { probeEndpointModels } from "./probe";
-import { ImageClient } from "@grida/ai";
-import { makeVideoModelFor } from "./video-byok";
+import { ImageClient, VideoClient } from "@grida/ai";
 
 const PROMPT = {
   prompt: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
@@ -207,19 +206,11 @@ describe("ProviderHttp", () => {
       });
       await operation.generate({ prompt: "image" }).catch(() => undefined);
     }
-    await Promise.resolve(
-      makeVideoModelFor("vercel", "sk-v", "google/veo", http).doGenerate({
-        prompt: "video",
-        n: 1,
-        aspectRatio: undefined,
-        resolution: undefined,
-        duration: undefined,
-        fps: undefined,
-        seed: undefined,
-        image: undefined,
-        providerOptions: {},
-      })
-    ).catch(() => undefined);
+    const video = await new VideoClient({
+      keys: { get: () => "synthetic-key" },
+      http,
+    }).resolve({ model_id: "google/veo-3.1", provider: "vercel" });
+    await video.generate({ prompt: "video" }).catch(() => undefined);
 
     expect(urls).toEqual([
       "https://openrouter.ai/api/v1/images",

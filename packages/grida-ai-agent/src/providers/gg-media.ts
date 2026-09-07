@@ -1,9 +1,9 @@
 // GRIDA-GG: provider — see docs/wg/platform/hosted-ai.md
 /**
- * GRIDA-SEC-006 — Grida hosted media adapters.
+ * GRIDA-SEC-006 — Grida hosted music adapter.
  *
- * `VideoModelV3` and the typed music adapter call the hosted
- * `/api/v1/ai/{videos,music}/generations` endpoints using Grida-native
+ * The typed music adapter calls the hosted
+ * `/api/v1/ai/music/generations` endpoint using Grida-native
  * request/result contracts. The daemon contacts ONLY the configured editor
  * origin for this provider; results are base64 by contract, so nothing from
  * the response body is ever followed as a URL.
@@ -15,13 +15,8 @@
  * route or operation must sanitize them before they reach a user or model.
  */
 
-import type {
-  Experimental_VideoModelV3 as VideoModelV3,
-  Experimental_VideoModelV3CallOptions as VideoModelV3CallOptions,
-} from "@ai-sdk/provider";
 import type { GgTokenSource } from "@grida/ai";
 import { postHosted, joinApi } from "@grida/ai/providers";
-import type { VideoGenerateResult } from "../protocol/video";
 import type {
   MusicGenerateRequest,
   MusicGenerateResult,
@@ -34,63 +29,6 @@ const MAX_HOSTED_MUSIC_BASE64_CHARACTERS =
 const MAX_HOSTED_MUSIC_JSON_ENVELOPE_BYTES = 4 * 1024;
 const MAX_HOSTED_MUSIC_RESPONSE_BYTES =
   MAX_HOSTED_MUSIC_BASE64_CHARACTERS + MAX_HOSTED_MUSIC_JSON_ENVELOPE_BYTES;
-
-export class GridaGatewayVideoModel implements VideoModelV3 {
-  readonly specificationVersion = "v3" as const;
-  readonly provider = "gg";
-  readonly maxVideosPerCall = 1;
-
-  constructor(
-    private readonly session: GgTokenSource,
-    private readonly baseUrl: string,
-    readonly modelId: string,
-    private readonly providerHttp: ProviderHttp = new ProviderHttp()
-  ) {}
-
-  async doGenerate(
-    options: VideoModelV3CallOptions
-  ): Promise<Awaited<ReturnType<VideoModelV3["doGenerate"]>>> {
-    const {
-      prompt,
-      aspectRatio,
-      resolution,
-      duration,
-      fps,
-      seed,
-      abortSignal,
-    } = options;
-    const result = await postHosted<VideoGenerateResult>({
-      session: this.session,
-      url: joinApi(this.baseUrl, "/api/v1/ai/videos/generations"),
-      scope: "grida-video",
-      abortSignal,
-      provider_http: this.providerHttp,
-      body: {
-        model_id: this.modelId,
-        prompt,
-        aspect_ratio: aspectRatio,
-        resolution,
-        duration,
-        fps,
-        seed,
-      },
-    });
-    return {
-      videos: result.videos.map((video) => ({
-        type: "base64" as const,
-        data: video.base64,
-        mediaType: video.media_type,
-      })),
-      warnings: [],
-      response: {
-        timestamp: new Date(),
-        modelId: this.modelId,
-        headers: undefined,
-      },
-      providerMetadata: {},
-    };
-  }
-}
 
 /**
  * Hosted Lyria client. Music has no AI SDK provider interface in this package,

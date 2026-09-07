@@ -23,13 +23,15 @@ application packages are supplied. Optional dependencies absent from the current
 platform remain absent.
 
 The public consumer runs once using ESM imports and once using CJS `require`.
-Both root and `/providers` exports must work; private image adapters and Grida
+Both root and `/providers` exports must work; private image/video adapters and Grida
 agent, daemon, auth, account, CLI, Desktop and framework packages are unavailable.
 Synthetic transports exercise OpenRouter, Vercel, fal and scoped GG image
-generation, reference capability discovery, credential-free result downloads,
+generation and video submit/poll/result chains, input capability discovery, credential-free result downloads,
 explicit provider selection, missing credentials, single submission on failure,
-safe error projection, and cleared GG authority. Returned PNG signature bytes
-test transport and result contracts, not image decoding or real model quality.
+safe error projection, cleared GG authority, and video cancellation during a
+stalled credential lookup without a late submission. Returned PNG signature bytes
+and synthetic video bytes test transport and result contracts, not media decoding
+or real model quality.
 
 Separate `.mts` and `.cts` consumers compile through the packed public exports
 with NodeNext resolution, `types: []`, and `skipLibCheck: false`. Source and emitted

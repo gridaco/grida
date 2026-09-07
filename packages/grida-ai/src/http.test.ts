@@ -447,4 +447,34 @@ describe("ProviderHttp", () => {
     expect(request).not.toHaveBeenCalled();
     expect(download).not.toHaveBeenCalled();
   });
+
+  it("releases a repeated-chunk download and its single abort subscription", async () => {
+    const controller = new AbortController();
+    const add = vi.spyOn(controller.signal, "addEventListener");
+    const remove = vi.spyOn(controller.signal, "removeEventListener");
+    let chunks = 0;
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        pull(stream) {
+          if (chunks++ === 1024) {
+            stream.close();
+            return;
+          }
+          stream.enqueue(new Uint8Array([1]));
+        },
+      })
+    );
+    const http = new ProviderHttp({
+      request: vi.fn<typeof fetch>(),
+      download: async () => response,
+    });
+    const result = await http.downloadProviderAsset(
+      new URL("https://assets.example/video"),
+      { signal: controller.signal }
+    );
+    expect(result.data.byteLength).toBe(1024);
+    expect(add).toHaveBeenCalledOnce();
+    expect(remove).toHaveBeenCalledWith("abort", add.mock.calls[0][1]);
+    expect(response.body!.locked).toBe(false);
+  });
 });

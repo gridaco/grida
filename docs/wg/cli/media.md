@@ -60,7 +60,9 @@ Current execution also differs from broad catalogue capabilities:
 - GG images accept text prompts, while reference-image support exists in
   deeper BYOK adapters and is absent from the direct image HTTP request.
 - GG video execution rejects start images even though its HTTP parser accepts
-  the field. The effective operation is text-to-video.
+  the field. The effective operation is text-to-video. The shared video client
+  rejects unsupported input modes before submission using facts for the selected
+  provider binding; several BYOK bindings require a start image.
 - The public catalogue snapshot distributes text/image/video; it does not yet
   distribute the bundled audio families. GG music execution nevertheless exists.
 - Direct media routes wait for final bytes. They do not expose a general,
@@ -74,7 +76,7 @@ These are implementation observations, grounded in the
 [hosted execution](https://github.com/gridaco/grida/blob/main/editor/lib/ai/server.ts),
 [snapshot definition](https://github.com/gridaco/grida/blob/main/packages/grida-ai-models/src/models.ts),
 [music protocol](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/protocol/music.ts),
-and [image adapter](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/providers/image-byok.ts).
+and [shared image/video operations](https://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md).
 Presence in a catalogue or request parser is insufficient evidence of support.
 
 ## Immediate: list, inspect, generate

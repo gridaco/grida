@@ -99,15 +99,18 @@ export async function safeText(res: Response): Promise<string> {
 /** Sleep `ms`, rejecting early with an AbortError if `abortSignal` fires. */
 export function delay(ms: number, abortSignal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    abortSignal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(t);
-        reject(abortError());
-      },
-      { once: true }
-    );
+    const cleanup = () => abortSignal?.removeEventListener("abort", abort);
+    const t = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(t);
+      cleanup();
+      reject(abortError());
+    };
+    abortSignal?.addEventListener("abort", abort, { once: true });
+    if (abortSignal?.aborted) abort();
   });
 }
 
