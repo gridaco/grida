@@ -1,4 +1,5 @@
-// GRIDA-SEC-010 — local destination, custody and browser-launch containment.
+// GRIDA-SEC-010 / GRIDA-SEC-006 — local registration, custody and scoped handoff.
+// GRIDA-GG: token — only an explicit construction-time sink receives the grant.
 import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
 import {
@@ -33,6 +34,7 @@ const config = {
     "http://127.0.0.1:55436/callback",
   ],
 };
+const nativeFactory = vi.mocked(createPersistentNativeAuth);
 const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
 let root: string;
 let env: NodeJS.ProcessEnv;
@@ -441,4 +443,16 @@ describe("CliHost browser capability", () => {
     });
     expect(spawn).not.toHaveBeenCalled();
   });
+});
+
+it("forwards only the explicitly supplied scoped sink into native custody", async () => {
+  const gg = {
+    accept: vi.fn<NonNullable<CliHost.Options["gg"]>["accept"]>(
+      () => undefined
+    ),
+  };
+  await CliHost.open({ gg }, env);
+  const options = nativeFactory.mock.calls.at(-1)![1];
+  expect(options.gg).toBe(gg);
+  expect(gg.accept).not.toHaveBeenCalled();
 });

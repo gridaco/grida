@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@grida/account": "workspace:*",
+    "@grida/ai": "workspace:*",
     "@grida/auth": "workspace:*",
     "@types/node": "^24",
     "tsdown": "^0.22.1",

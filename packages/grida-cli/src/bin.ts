@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// GRIDA-SEC-010 — safe process output; offline commands never open account custody.
+// GRIDA-SEC-010 / GRIDA-SEC-013 — safe process output and explicit account/media dispatch.
 import { Cli } from "./cli";
 import { Output } from "./output";
 import { version } from "../package.json";
@@ -29,6 +29,15 @@ try {
     case "docs":
       process.stdout.write(Cli.docsUrl(invocation.topic) + "\n");
       break;
+    case "models list":
+    case "models inspect":
+    case "providers list":
+    case "generate":
+    case "voices list": {
+      const { MediaCommands } = await import("./media-run");
+      process.exitCode = await MediaCommands.run(invocation, output);
+      break;
+    }
     default: {
       const { run } = await import("./run");
       process.exitCode = await run(invocation, output);

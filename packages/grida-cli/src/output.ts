@@ -1,4 +1,4 @@
-// GRIDA-SEC-010 — public DTOs and safe errors only; terminal control text is escaped.
+// GRIDA-SEC-010 / GRIDA-SEC-013 — safe DTOs/errors and escaped terminal text; no credentials.
 /** Result serialization and terminal escaping; callers supply only safe public DTOs. */
 export class Output {
   constructor(
@@ -19,6 +19,10 @@ export class Output {
     if (this.json) this.stdout(JSON.stringify({ error }) + "\n");
     else {
       this.stderr(`grida: ${Output.text(error.message)} (${error.code})\n`);
+      if (error.directory)
+        this.stderr(`  Output: ${Output.text(error.directory)}\n`);
+      for (const saved of error.saved ?? [])
+        this.stderr(`  Saved: ${Output.text(saved.path)}\n`);
       for (const choice of error.choices ?? [])
         this.stderr(`  ${Output.text(choice.name)} (ID ${choice.id})\n`);
       if (error.choices_truncated)
@@ -46,5 +50,12 @@ export namespace Output {
     message: string;
     choices?: readonly { id: number; name: string; display_name: string }[];
     choices_truncated?: boolean;
+    directory?: string;
+    saved?: readonly {
+      path: string;
+      media_type: string;
+      bytes: number;
+      sha256: string;
+    }[];
   };
 }

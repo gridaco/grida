@@ -60,7 +60,12 @@ function setup(json = true) {
     if (
       invocation.command === "help" ||
       invocation.command === "docs" ||
-      invocation.command === "version"
+      invocation.command === "version" ||
+      invocation.command === "models list" ||
+      invocation.command === "models inspect" ||
+      invocation.command === "providers list" ||
+      invocation.command === "generate" ||
+      invocation.command === "voices list"
     )
       throw new Error("Fixture requires a runtime command");
     return run(invocation, output);

@@ -1,4 +1,4 @@
-// GRIDA-SEC-010 — command grammar and noninteractive authority regression checks.
+// GRIDA-SEC-010 / GRIDA-SEC-013 — command grammar and explicit authority regression checks.
 import { describe, expect, it } from "vitest";
 import { Cli } from "./cli";
 
@@ -50,7 +50,7 @@ describe("CLI grammar", () => {
     ["account", "view", "--json", "--json"],
     ["auth", "status", "--token", "secret-do-not-echo"],
     ["secret-do-not-echo"],
-    ["models", "list"],
+    ["models", "missing"],
     ["docs", "missing"],
   ])("rejects invalid invocation before host work: %j", (...argv) => {
     let error: unknown;
@@ -84,5 +84,127 @@ describe("CLI grammar", () => {
     expect(
       Cli.parse(["auth", "storage", "migrate", "keyring", "--no-input"])
     ).toMatchObject({ backend: "keyring", noInput: true });
+  });
+});
+
+describe("media command grammar", () => {
+  it("keeps discovery credential-free and provider selection explicit", () => {
+    expect(Cli.parse(["models", "list"])).toMatchObject({
+      command: "models list",
+      available: false,
+    });
+    expect(
+      Cli.parse([
+        "models",
+        "list",
+        "--provider",
+        "gg",
+        "--available",
+        "--org",
+        "studio",
+      ])
+    ).toMatchObject({
+      provider: "gg",
+      available: true,
+      selector: { name: "studio" },
+    });
+    expect(
+      Cli.parse([
+        "models",
+        "inspect",
+        "--provider",
+        "fal",
+        "--model",
+        "fal-ai/trellis-2",
+      ])
+    ).toMatchObject({ command: "models inspect", model: "fal-ai/trellis-2" });
+    expect(Cli.docsUrl("models inspect")).toBe(
+      "https://grida.co/docs/wg/cli/media"
+    );
+  });
+  it("accepts explicit file input and a separately owned stdin key", () => {
+    expect(
+      Cli.parse([
+        "generate",
+        "--provider",
+        "elevenlabs",
+        "--model",
+        "eleven_v3",
+        "--input",
+        "@speech.json",
+        "--out",
+        "./speech",
+        "--key-stdin",
+        "--json",
+        "--no-input",
+      ])
+    ).toMatchObject({
+      command: "generate",
+      keyStdin: true,
+      input: "@speech.json",
+      out: "./speech",
+      json: true,
+    });
+  });
+  it.each([
+    ["models", "list", "--available"],
+    ["models", "list", "--provider", "fal", "--org", "studio"],
+    ["models", "inspect", "--model", "x"],
+    ["models", "inspect", "--provider", "auto", "--model", "x"],
+    ["voices", "list", "--provider", "fal"],
+    ["providers", "list", "--key-stdin"],
+    [
+      "generate",
+      "--provider",
+      "fal",
+      "--model",
+      "x",
+      "--input",
+      "-",
+      "--out",
+      "result",
+      "--key-stdin",
+    ],
+    [
+      "generate",
+      "--provider",
+      "gg",
+      "--model",
+      "x",
+      "--input",
+      "@input.json",
+      "--out",
+      "result",
+      "--key-stdin",
+    ],
+    [
+      "generate",
+      "--provider",
+      "fal",
+      "--model",
+      "x",
+      "--input",
+      "@input.json",
+      "--out",
+      "result",
+      "--org-id",
+      "1",
+    ],
+    [
+      "generate",
+      "--provider",
+      "fal",
+      "--model",
+      "x",
+      "--input",
+      '{"prompt":"secret"}',
+      "--out",
+      "result",
+    ],
+    ["generate", "--provider", "fal", "--model", "x", "--input", "@input.json"],
+  ])("rejects ambiguous authority/input before host work: %j", (...argv) => {
+    expect(() => Cli.parse(argv)).toThrow(
+      expect.objectContaining({ code: "invalid_usage" })
+    );
   });
 });

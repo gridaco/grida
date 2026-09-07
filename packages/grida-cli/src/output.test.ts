@@ -1,4 +1,4 @@
-// GRIDA-SEC-010 — safe structured failures and escaped human-readable metadata.
+// GRIDA-SEC-010 / GRIDA-SEC-013 — safe structured failures and escaped result metadata.
 import { describe, expect, it } from "vitest";
 import { Output } from "./output";
 
@@ -68,4 +68,30 @@ describe("CLI output", () => {
     expect(stdout).toEqual([]);
     expect(stderr).toEqual(["grida: Run grida auth login. (signed_out)\n"]);
   });
+});
+
+it("reports partial saves on stderr with escaped local paths", () => {
+  const stdout: string[] = [],
+    stderr: string[] = [];
+  const output = new Output(
+    false,
+    (value) => stdout.push(value),
+    (value) => stderr.push(value)
+  );
+  output.failure({
+    code: "save_failed",
+    message: "Saving failed.",
+    directory: "/chosen/\u001b[2J",
+    saved: [
+      {
+        path: "/chosen/artifact.png",
+        media_type: "image/png",
+        bytes: 1,
+        sha256: "0".repeat(64),
+      },
+    ],
+  });
+  expect(stdout).toEqual([]);
+  expect(stderr.join("")).toContain("Saved: /chosen/artifact.png");
+  expect(stderr.join("")).not.toContain("\u001b");
 });

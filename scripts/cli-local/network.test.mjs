@@ -1,4 +1,4 @@
-// GRIDA-SEC-010, GRIDA-SEC-011 — guard positive controls use no external connections.
+// GRIDA-SEC-010, GRIDA-SEC-011, GRIDA-SEC-013 — shared guard controls make no external connections.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";

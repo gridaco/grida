@@ -1,6 +1,6 @@
 # Grida CLI
 
-> **GRIDA-SEC-010** — independent native account custody and safe command output;
+> **GRIDA-SEC-010 / GRIDA-SEC-013** — independent account custody and CLI media authority;
 > see [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md).
 
 The `grida` command composes Grida's account services and tools for people and
@@ -9,7 +9,9 @@ their own harnesses. It runs independently of Desktop.
 **Private development preview.** This package is not published. The legacy npm
 release does not provide these commands. Current commands cover auth, credential
 storage, identity, organization membership, cached credits, help/version and docs.
-AI commands follow the shared media capabilities; agent, render and MCP are deferred.
+Media commands discover models/schemas, inspect provider key presence, list speech
+voices and generate image, video, music, sound effects, speech and supported 3D.
+Agent, render and MCP are deferred.
 
 Documentation has one canonical home: the
 [CLI contract](https://grida.co/docs/wg/cli/v1) and
@@ -22,7 +24,7 @@ canonical URL without fetching it or opening a browser. No guide tree is bundled
 This is the branded executable and host adapter. Parsing, terminal output,
 trusted registration, system-browser launch and process lifetime belong here.
 Auth/custody belong to `@grida/auth`; account selection and reads belong to
-`@grida/account`. Future media commands consume `@grida/ai`. A command does not
+`@grida/account`. Media commands consume `@grida/ai` through its public exports. A command does not
 move its product's implementation into this package.
 
 Do not import agent, daemon, Electron, Next.js or browser application state.
@@ -33,7 +35,7 @@ observations, not an atomic identity/membership snapshot.
 
 ## Local development
 
-Build the auth/account workspace dependencies, then `pnpm --filter grida build`.
+Build the auth/account/AI workspace dependencies, then `pnpm --filter grida build`.
 Use `node packages/grida-cli/dist/bin.mjs --help` from the repository root.
 The build bundles private workspace dependencies; the optional native
 `@github/keytar` binding stays external and declared in the packed manifest.
@@ -58,3 +60,29 @@ and 2 (usage). `--no-input` prevents terminal questions; OS keyring access may
 still ask for permission. Interactive login rejects `--json` and `--no-input`.
 `auth login --no-browser` prints a sign-in URL for manual opening on the same
 machine. Signals cancel login; an in-flight credential write is allowed to settle.
+
+## Media access and files
+
+`grida models list` and `models inspect` are offline and credential-free.
+The [media contract](https://grida.co/docs/wg/cli/media) owns examples, schemas,
+variants, availability and result rules. Installed help stays minimal.
+
+BYOK uses explicit environment slots or `--key-stdin`, without Grida login; no
+provider credential is persisted or discovered from Desktop. `providers list`
+shows presence, not verified access. GG needs the local native registration
+above, login and an organization. The auth owner hands a scoped grant into
+one invocation's memory store; account tokens never enter provider execution.
+
+`generate` validates JSON and probes a fresh output directory before authority
+or paid submission. It saves artifacts and a safe receipt with local paths and
+hashes. Existing files are never replaced. A failed save reports already
+published files; no paid operation is automatically replayed. Signals abort
+media requests, while credential writes and saving already-returned bytes are
+allowed to settle.
+
+The CLI owns a Node HTTP adapter with fixed provider routes, DNS-address
+validation and pinning, and credential-free result downloads. It is independent
+of the Desktop transport and sandbox. The
+[installed synthetic media proof](https://github.com/gridaco/grida/tree/main/scripts/cli-media-local)
+checks the packed executable without real provider calls. Hosted registration,
+actual provider compatibility and cross-platform release checks remain release gates.

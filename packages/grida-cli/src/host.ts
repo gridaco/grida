@@ -1,4 +1,5 @@
-// GRIDA-SEC-010 — explicit local registration and independent native custody.
+// GRIDA-SEC-010 / GRIDA-SEC-006 — independent account custody and trusted scoped handoff.
+// GRIDA-GG: token — construction-time sink only; no account token enters media.
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { open, realpath } from "node:fs/promises";
@@ -12,6 +13,7 @@ export namespace CliHost {
   export type Runtime = Awaited<ReturnType<typeof createPersistentNativeAuth>>;
   export type Options = {
     storage?: "keyring" | "file";
+    gg?: AuthClient.GgSink;
     noBrowser?: boolean;
     /** Explicit manual-login output, supplied by the CLI's stderr owner. */
     onAuthorizationUrl?: (url: string) => void | Promise<void>;
@@ -62,6 +64,7 @@ export namespace CliHost {
     const { createPersistentNativeAuth } = await import("@grida/auth/node");
     return createPersistentNativeAuth(config, {
       home,
+      ...(options.gg === undefined ? {} : { gg: options.gg }),
       ...(storage === undefined ? {} : { storage }),
       async openBrowser(url) {
         validateAuthorizationUrl(url, config);

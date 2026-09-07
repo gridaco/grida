@@ -1,4 +1,4 @@
-// GRIDA-SEC-010, GRIDA-SEC-011 — installed CLI fixture transport, never ambient authority.
+// GRIDA-SEC-010, GRIDA-SEC-011, GRIDA-SEC-013 — shared installed CLI fixture perimeter.
 // Tripwires for a trusted local proof, not an OS sandbox. No credential contents are recorded.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");

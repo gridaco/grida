@@ -9,7 +9,10 @@ import type { Cli } from "./cli";
 
 /** Command dispatch owns presentation and process lifetime, not account policy. */
 export async function run(
-  invocation: Exclude<Cli.Invocation, { command: "help" | "version" | "docs" }>,
+  invocation: Exclude<
+    Cli.Invocation,
+    Cli.MediaInvocation | { command: "help" | "version" | "docs" }
+  >,
   output: Output
 ): Promise<number> {
   let runtime: AuthCommands.Runtime | undefined;

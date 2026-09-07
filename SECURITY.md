@@ -1262,6 +1262,13 @@ levels into one.
    uses one fixed model-list request and discards the grant. Reusable memory
    custody and image/video/music execution live in `@grida/ai`; native command composition
    remains separate from the account exchange.
+   The CLI obtains one scoped grant per generation command through that fixed
+   exchange and puts it in the same SDK memory store. Only the construction-time
+   sink receives the grant; account JWTs never enter its media key reader or
+   HTTP transport. GG commands inspect no BYOK environment keys. The invocation
+   clears both its scoped store and any BYOK references in `finally`; it neither
+   persists, refreshes nor automatically re-mints a GG grant. CLI destination and
+   output controls are independently registered under GRIDA-SEC-013.
    The shared media/provider host composition owns exactly one GG store for
    all mounted media and optional agent routes. Stopping that composition
    clears its store after the daemon drains active requests. Restarting can
@@ -1317,6 +1324,21 @@ governs the surface, this record governs its security half.
   independent account custody remains GRIDA-SEC-010.
   [Credential-store tests](packages/grida-auth/src/credential-store.test.ts)
   also pin invalid sink configuration before durable I/O.
+- [CLI account host](packages/grida-cli/src/host.ts) and
+  [host tests](packages/grida-cli/src/host.test.ts),
+  [media composition](packages/grida-cli/src/media-run.ts) and
+  [composition tests](packages/grida-cli/src/media-run.test.ts) — fixed native
+  exchange into an invocation-only GG store, empty BYOK authority on the GG path,
+  and cleanup without credential output. Account custody remains GRIDA-SEC-010;
+  CLI media egress and artifacts remain GRIDA-SEC-013.
+- [Installed CLI media proof](scripts/cli-media-local/proof.mjs),
+  [its transport guard](scripts/cli-media-local/network.cjs),
+  [guard tests](scripts/cli-media-local/network.test.mjs), and
+  [proof contract](scripts/cli-media-local/README.md) — synthetic native exchange
+  into the real invocation-scoped store, owned local GG HTTP, and assertions
+  that scoped authority does not enter persistent account custody or output.
+  This does not verify hosted minting, token cryptography or provider execution;
+  the installed-process and media egress controls remain GRIDA-SEC-013.
 - [Local fixture bootstrap](scripts/auth-local/stack.mjs),
   [native probe](scripts/auth-local/native-probe.mjs),
   [browser consumer proof](editor/e2e/auth-oauth.spec.mts), and
@@ -1749,8 +1771,9 @@ credential through reuse of an existing browser or daemon bridge.
     There is no automatic replay, remint or weaker credential fallback. The
     server independently verifies the live OAuth bearer and explicit current-user
     membership before the shared GG mint policy signs a token.
-11. **Thin CLI host.** The private `grida` preview accepts only an explicit bounded,
-    owner-controlled local public-client file and separate `GRIDA_HOME`; it does
+11. **Thin CLI account host.** Account commands in the private `grida` preview
+    accept only an explicit bounded, owner-controlled local public-client file
+    and separate `GRIDA_HOME`; the account host does
     not discover repository configuration, hosted registration, Desktop cookies
     or provider keys. It refuses the process home and ordinary Grida home,
     including existing filesystem aliases, before opening native custody. Browser
@@ -1762,6 +1785,9 @@ credential through reuse of an existing browser or daemon bridge.
     never arbitrary exception objects. Help, version and docs do not open custody
     or network. Cancellation closes pending login but waits for noncancellable
     custody work, reporting that a write may have completed.
+    Media commands' explicit BYOK environment/stdin input is separate under
+    GRIDA-SEC-013 and is never consulted by account custody. Native GG generation
+    consumes the fixed scoped handoff in rule 10, not an account-token getter.
 
 **Limits and adoption gates.** Producer tests are not deployment certification.
 The real local Auth 2.196.0 consumer proof has passed login/denial/consent reuse,
@@ -2136,9 +2162,129 @@ release requirement.
 
 ---
 
+### `GRIDA-SEC-013` — CLI media credential, egress and output boundary
+
+**What it protects.** An independent `grida` process consumes explicit BYOK keys
+or a scoped GG grant and writes generated media to a user-selected local directory.
+Provider data cannot choose credential destinations or output filenames. Account
+credentials stay with GRIDA-SEC-010; GG's cryptographic scope stays with
+GRIDA-SEC-006. This is a CLI host boundary, separate from the Electron renderer,
+sidecar channel and OS sandbox in GRIDA-SEC-004.
+
+**Vulnerable scenario (prevented).** A generic fetch path sends a provider or
+account credential to a result URL or a redirected/private address; repository
+configuration silently supplies authority; malformed input reaches a paid operation
+before local validation; or a provider filename overwrites a chosen local file.
+Raw provider errors, prompts or credentials could also enter terminal output or
+generation receipts without a fixed projection.
+
+**How the code prevents it.**
+
+1. **Explicit inputs and shared operation rules.** The fixed grammar requires a
+   provider/model and explicit JSON source/output directory for generation. It
+   accepts no literal key argument, custom provider origin or raw provider-option
+   passthrough. `--key-stdin` cannot share stdin with JSON or select GG. Bundled
+   `MediaOperations` descriptors and the SDK's normative parser establish the
+   exact executable route and validate JSON before credential custody is opened.
+   Ordinary listing/inspection needs no credential or network. An availability
+   filter reports key presence or cached organization eligibility explicitly;
+   neither establishes provider access or generation success.
+2. **Invocation-owned credentials.** `ProviderCredentials` reads only the four
+   named process environment slots (`OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY`,
+   `FAL_KEY`, `ELEVENLABS_API_KEY`) or an explicitly allocated stdin key. Execution
+   inspects only its selected provider; provider status may inspect all four.
+   There is no dotenv, repository, Desktop store, account store or alias lookup.
+   Stdin replaces only the matching provider slot. Keys are bounded to 4 KiB,
+   normalized and header-safe; stdin has a cancellable 30-second bound. Only the
+   trusted SDK key reader receives secret strings. Status projects presence and
+   source; disposal drops private references. GG obtains an org-bound grant through
+   the auth owner's fixed exchange into one invocation's memory store and supplies
+   an empty BYOK reader. The media transport never receives the account JWT.
+3. **Destination-bound egress.** `MediaHttp` admits credential-bearing requests
+   only on its reviewed provider host/path/method allowlist, with provider-specific
+   header families. GG currently permits only the explicit local API origin and
+   fixed image/video/music POST paths. Provider redirects are rejected without
+   replay. The download lane is HTTPS GET/HEAD with no credential, cookie, body or
+   caller-selected Host header. Each connection and download redirect resolves
+   fresh DNS, rejects the entire answer if any address is non-public, and pins one
+   validated address in Node's lookup callback while retaining the original TLS
+   hostname and certificate verification. The configured GG loopback is the sole
+   private-address exception. Direct requests use no ambient fetch, proxy agent,
+   cookie jar or pooled connection. Header/body sizes, DNS/connect time, total
+   request lifetime and streamed responses are bounded; SDK-specific limits may
+   be lower. No failed paid request is automatically resubmitted.
+4. **Output preflight and publication.** Explicit UTF-8 JSON file/stdin input is
+   bounded to 16 MiB; no URL is fetched as input. A new private output directory
+   must have an existing parent. Before opening keys or account custody, a probe
+   exercises the same exclusive write/fsync/hard-link publication used for results.
+   Saving checks the reserved directory's identity, writes private temporary
+   files and atomically links them under fixed numbered names without replacing
+   an existing destination. Only known MIME types select an extension; other
+   content uses `.bin`. A final receipt projects model/provider/binding, sizes,
+   hashes and local paths, never prompts, tokens or provider metadata. A failed
+   save reports already published artifact paths without restarting generation.
+   Cleanup removes only owned temporary files and a still-empty reservation,
+   never recursively deletes an output directory.
+5. **Safe completion and presentation.** Process signals abort pending media
+   work and are checked before submission. Once the SDK returns bytes, saving
+   finishes even after a signal; cancellation cannot undo upstream charges.
+   Failure output contains classified safe values, including partial-save metadata,
+   with no arbitrary exception, response body or stack. Human-readable paths and
+   metadata have terminal controls escaped. Credentials and GG memory are cleared
+   in the invocation's `finally`; the binary uses exit codes without forcing exit
+   through a pending custody or file write.
+
+**Limits and verification.** The executable, SDK dependencies, runtime, OS trust
+store, process environment and same-user code are trusted. This is not an OS
+sandbox or protection from same-user malware, hostile filesystem replacement,
+credential-bearing shell history supplied outside the CLI, or memory inspection.
+JavaScript strings cannot be reliably zeroized, and disposal cannot erase a
+parent process's environment. The hard-link probe proves that publication works
+at preflight time, not future disk capacity, crash durability or uninterrupted
+filesystem access. Signals, local cleanup and no-resubmission do not cancel an
+accepted provider job or recall a spent/accepted GG grant. Provider-internal
+execution retries are outside this host's control. Hosted OAuth/GG registration,
+real provider availability, proxy compatibility and platform release certification
+remain separate gates. Synthetic socket/installed-package checks do not prove
+those services or replace GRIDA-SEC-011's real local OAuth proof.
+
+**Files bound by this id.**
+
+- [Command grammar](packages/grida-cli/src/cli.ts) and
+  [grammar tests](packages/grida-cli/src/cli.test.ts),
+  [process entry](packages/grida-cli/src/bin.ts) — explicit syntax and dispatch.
+- [Provider credential owner](packages/grida-cli/src/provider-credentials.ts) and
+  [tests](packages/grida-cli/src/provider-credentials.test.ts) — scoped process
+  inputs, safe presence metadata and invocation cleanup.
+- [Media composition](packages/grida-cli/src/media-run.ts) and
+  [tests](packages/grida-cli/src/media-run.test.ts) — public SDK parsing,
+  preflight, authority selection and safe completion; also GRIDA-SEC-006.
+- [Media transport](packages/grida-cli/src/media-http.ts) and
+  [tests](packages/grida-cli/src/media-http.test.ts) — fixed credential routes,
+  DNS pinning, TLS authority, credential-free redirects and bounded streams.
+- [Input/artifact owner](packages/grida-cli/src/media-files.ts) and
+  [tests](packages/grida-cli/src/media-files.test.ts) — explicit input, publication
+  preflight, no overwrite and partial-save reporting.
+- [Output projection](packages/grida-cli/src/output.ts) and
+  [tests](packages/grida-cli/src/output.test.ts),
+  [build](packages/grida-cli/tsdown.config.mts), and
+  [package contract](packages/grida-cli/README.md) — safe presentation and the
+  bundled public SDK boundary. These retain GRIDA-SEC-010 for account commands.
+- [Installed media proof](scripts/cli-media-local/proof.mjs),
+  [its transport guard](scripts/cli-media-local/network.cjs),
+  [guard tests](scripts/cli-media-local/network.test.mjs), and
+  [proof contract](scripts/cli-media-local/README.md) — separate installed
+  processes, synthetic provider sockets and owned local GG HTTP; test authority
+  is never a production credential or provider call. The copied
+  [base process/module guard](scripts/cli-local/network.cjs) and
+  [its tests](scripts/cli-local/network.test.mjs) are shared with the
+  GRIDA-SEC-011 fixture proof.
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-013` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-014` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

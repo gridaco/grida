@@ -1462,6 +1462,9 @@ importers:
       '@grida/account':
         specifier: workspace:*
         version: link:../grida-account
+      '@grida/ai':
+        specifier: workspace:*
+        version: link:../grida-ai
       '@grida/auth':
         specifier: workspace:*
         version: link:../grida-auth

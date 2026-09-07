@@ -10,197 +10,167 @@ format: md
 
 # AI tools
 
-> **Status: study and proposal, awaiting ratification.** Sources reviewed
-> September 6, 2026; no authenticated generation was performed. Grida commands
-> below are proposed. Exporting Desktop's existing AI capabilities is in the
-> immediate [v1 scope](./v1.md); broader provider-native execution is planned.
+> **Command contract for the private development preview.** These commands are
+> implemented locally; the replacement npm CLI has not been released. Broader
+> provider-native execution and detached jobs remain proposals below.
 
-**Discover by modality. Invoke an exact operation through a provider.** Start
-with one `generate` command and discoverable input/output schemas. A provider
-key should eventually also let you address endpoints outside Grida's curated
-catalogue through a supported provider adapter.
-
-## Immediate: export Desktop's existing AI tools
-
-Expose model discovery, GG/BYOK access, and existing image, video, audio, and 3D
-operations through `grida models`, `grida providers`, and `grida generate`.
-These are root commands; there is no `ai` family. Their implementations have
-independent owners shared with Desktop. No agent loop, Canvas integration,
-or running Desktop process is required.
-
-Start with the effective contracts already available to Desktop. Existing
-music, speech, and sound effects remain distinct operations. The CLI needs
-independent account access, provider credential configuration, schemas, and
-local file handling to make these capabilities usable from a terminal. Speech
-also needs voice discovery; model schemas alone cannot supply your provider's
-current voices.
-
-| Existing Desktop capability   | Immediate export boundary                                                              |
-| ----------------------------- | -------------------------------------------------------------------------------------- |
-| GG image, video, and music    | Preserve each operation's effective hosted inputs and credit requirements.             |
-| BYOK image and video          | Export currently implemented provider/model bindings and their input limits.           |
-| BYOK speech and sound effects | Preserve the separate ElevenLabs contracts, including voice discovery.                 |
-| BYOK 3D                       | Export the existing fal bindings, supported text/image inputs, and primary GLB output. |
-
-These families come from Desktop's [media tool registry](https://github.com/gridaco/grida/blob/main/editor/scaffolds/desktop/tools/media-tool-registry.ts).
-
-The immediate export does not imply support for every catalogue entry or every
-endpoint a provider key can access. Unlisted endpoints and detached job
-management are the planned extensions described below.
-
-## Start from what Grida can actually execute
-
-The [model catalogue](https://github.com/gridaco/grida/blob/main/packages/grida-ai-models/README.md)
-is descriptive data; it does not decide access. Audio already has separate
-music, speech, and sound-effect contracts. A single audio input schema would
-hide meaningful differences.
-
-Current execution also differs from broad catalogue capabilities:
-
-- GG images accept text prompts, while reference-image support exists in
-  deeper BYOK adapters and is absent from the direct image HTTP request.
-- GG video execution rejects start images even though its HTTP parser accepts
-  the field. The effective operation is text-to-video. The shared video client
-  rejects unsupported input modes before submission using facts for the selected
-  provider binding; several BYOK bindings require a start image.
-- The public catalogue snapshot distributes text/image/video; it does not yet
-  distribute the bundled audio families. GG music execution nevertheless exists.
-- Direct media routes wait for final bytes. They do not expose a general,
-  durable Grida run/status/cancel service.
-- Current image/video resolvers reject unknown catalogue IDs. Their internal
-  fal adapters also impose media-specific inputs and outputs; removing the
-  catalogue check would not produce a generic endpoint runner.
-
-These are implementation observations, grounded in the
-[image protocol](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/protocol/images.ts),
-[hosted execution](https://github.com/gridaco/grida/blob/main/editor/lib/ai/server.ts),
-[snapshot definition](https://github.com/gridaco/grida/blob/main/packages/grida-ai-models/src/models.ts),
-[music protocol](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/protocol/music.ts),
-and [shared image/video operations](https://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md).
-Presence in a catalogue or request parser is insufficient evidence of support.
+**Discover by modality. Invoke one exact operation through a provider.**
+`models`, `providers`, `voices` and `generate` are root commands. Desktop does
+not need to run, and no Grida agent or Canvas is involved.
 
 ## Immediate: list, inspect, generate
 
-Proposed discovery:
-
 ```sh
 grida models list --modality image
-grida models list --provider gg --org studio --available
+grida models list --modality audio
 grida models inspect --provider gg --model openai/gpt-image-2 --json
-```
 
-`list` presents Grida's curated catalogue and its execution routes. Modality
-filters describe outputs; each result also identifies input modalities and
-operations. `inspect` reports the callable contract and its input/output
-schemas where available. Missing or inaccessible schemas and unknown operation
-metadata remain explicit. Addressing an endpoint without a catalogue entry is
-part of the planned provider-native extension.
-
-The same submission shape handles image, music, and video. These illustrative
-JSON files contain arguments for the inspected operation:
-
-```sh
 grida generate --provider gg --model openai/gpt-image-2 \
   --org studio --input @image.json --out ./images
-
-grida generate --provider gg --model google/lyria-3 \
-  --org studio --input @music.json --out ./music
-
-grida generate --provider fal --model fal-ai/veo3.1/image-to-video \
-  --input @video.json --out ./video
 ```
 
-`--provider` is required initially. IDs are scoped to it: GG uses Grida's
-supported model IDs; fal uses exact fal endpoint IDs. No command silently
-changes provider, substitutes a model, or moves between provider billing and
-Grida credits. Catalogue cards can associate equivalent models across routes
-without pretending their IDs or inputs are interchangeable.
+`image.json` contains the selected operation's arguments, for example
+`{"prompt":"A blue ceramic teapot"}`. `--out` names a **new directory** under an
+existing parent. Inspect before writing inputs; a catalogue card does not
+promise an executable operation.
 
-## Immediate: inspect the callable contract
+| Kind             | Current boundary                                                         |
+| ---------------- | ------------------------------------------------------------------------ |
+| `image`          | Existing GG/BYOK bindings; reference inputs require a supported variant. |
+| `video`          | Existing GG/BYOK bindings; GG is text-to-video.                          |
+| `music`          | GG Lyria operations.                                                     |
+| `sound-effect`   | ElevenLabs sound effects.                                                |
+| `text-to-speech` | ElevenLabs speech with an explicit voice.                                |
+| `three-d`        | Exact fal text/image contracts returning a primary GLB.                  |
 
-The identity is **provider + model/endpoint + operation**, with a contract
-revision when the owner supplies one. Never invent a revision for an
-unversioned provider alias.
-An endpoint may encode the operation in its path. If a model has several
-operations, require `--operation` unless its descriptor names a single one.
+`models list` presents bundled executable operations. `--modality` accepts
+`image`, `video`, `audio` or `3d`; `--kind` distinguishes the audio operations.
+Staged models remain marked `staged`. Listing and inspection use no credentials,
+network, account storage or provider probes.
 
-The descriptor carries known values, with explicit unknowns for native
-endpoints that do not publish them:
+Choose `--provider` and the returned **`model_id`**. For curated image/video,
+this is the canonical Grida model ID; `binding_id` reports its provider route.
+They are not interchangeable. The staged 3D contracts use exact endpoint IDs.
+No command substitutes a provider, model or billing route after failure.
 
-- Input and output schemas, their dialect/version, and any provider revision.
-- Required fields, defaults, enums, ranges, and accepted file representations.
-- The actual operation: text-to-image, image-to-video, speech, music, and so on.
-- Lifecycle support: submit, status, result, and cancellation where available.
+## Immediate: inspect the input contract
 
-GG and curated BYOK schemas describe what the selected executor accepts,
-including its narrower constraints. The planned native provider path describes
-that endpoint's own payload.
-For Grida-owned contracts, validation and schema publication share an owner;
-the CLI must not maintain a second hand-written model schema.
+An operation is identified by provider, model, kind and input variant. The kind
+is inferred when unambiguous. Image/video default to `text`; select another
+advertised variant explicitly:
 
-`--input @request.json` reads a JSON object; `--input -` reads stdin. Model
-arguments stay inside that object. Credentials, organization selection, output
-paths, and waiting policy are invocation options outside it.
+```sh
+grida models inspect --provider fal --model google/veo-3.1 \
+  --variant image --json
+grida generate --provider fal --model google/veo-3.1 \
+  --variant image --input @video.json --out ./video
+```
 
-Modality-specific convenience commands can later translate into this contract.
-We do not need separate image/video/audio implementations or a giant union of
-all their flags. Speech, music, sound effects, and video-with-audio remain
-distinct operations even when their outputs overlap.
+Inspection returns the effective JSON input schema, model/provider binding,
+status, variant and native output description. Validation and schema publication
+share the execution owner's definitions. Unknown arguments fail before submission.
+The schema uses JSON Schema 2020-12, with `x-grida` annotations for normalization
+and constraints such as UTF-16 length that ordinary schema keywords cannot express.
+The operation parser is authoritative; a generic JSON Schema check is not a
+substitute for it. No provider revision or remote job lifecycle is invented.
 
-## Immediate: report availability
+`--input @request.json` reads one UTF-8 JSON object from an explicit file;
+`--input -` reads stdin. The envelope is bounded to 16 MiB. Model arguments stay
+in that object. Provider keys, organization selection and output paths stay
+outside it. Inspect the selected variant for accepted HTTPS or inline inputs;
+local paths inside JSON are not automatically read or uploaded.
 
-Availability belongs to the selected **operation and route**, evaluated
-against this installation and the relevant account. Report the underlying
-facts as well as a summary:
+For 3D image input, `image.data` is a base64 string and `image.media_type` is an
+accepted image MIME type. It becomes bytes for the native operation. Each 3D
+endpoint retains its own schema; new capabilities do not inherit a universal
+3D signature. Native outputs are described as bytes and media types; the CLI's
+result is a local file receipt, not JSON pretending to contain native bytes.
 
-| Fact        | What can be claimed                                                           |
-| ----------- | ----------------------------------------------------------------------------- |
-| Support     | The installed executor can address this operation and contract revision.      |
-| Credentials | Missing, configured, verified, or rejected. A stored key is only configured.  |
-| Eligibility | GG organization entitlement, or provider access information where observable. |
-| Observation | When the check ran, whether it used cached data, and what remains unknown.    |
+## Immediate: supply access explicitly
 
-Use summary states such as `ready`, `configured`, `blocked`, `unsupported`, and
-`unknown`. `--available` includes only `ready`: observable required checks have
-passed. Configured-but-unverified routes remain visible in the unfiltered list.
-Inspection explains missing keys, login, credit, permission, unsupported
-operations, or unavailable checks. Readiness is not a guarantee of capacity or
-successful generation, and no paid generation is used as an availability probe.
+BYOK uses the selected provider's environment slot or `--key-stdin` and needs
+no Grida login. GG requires a separate native CLI login and organization.
+There is no Desktop credential discovery or persistent provider configuration
+in this preview.
 
-GG checks use the selected organization's session and credit eligibility.
-BYOK calls use that provider's credential and access rules. Grida credit
-balance is irrelevant to BYOK calls. Offline catalogue inspection
-still works from cached data; current access may be unknown.
+| Provider     | Explicit environment slot |
+| ------------ | ------------------------- |
+| `openrouter` | `OPENROUTER_API_KEY`      |
+| `vercel`     | `AI_GATEWAY_API_KEY`      |
+| `fal`        | `FAL_KEY`                 |
+| `elevenlabs` | `ELEVENLABS_API_KEY`      |
+
+`providers list` reports key presence and source, never contents. It does not
+verify keys. `--key-stdin` replaces the selected environment slot for one
+invocation; it cannot share stdin with `--input -`. Keys are never literal
+command arguments. Grida logout affects its own OAuth session; provider keys
+remain controlled by the caller's environment or secret manager.
+
+Speech needs a provider voice in addition to its model:
+
+```sh
+grida voices list --provider elevenlabs --json
+grida models inspect --provider elevenlabs --model eleven_v3 --json
+grida generate --provider elevenlabs --model eleven_v3 \
+  --input @speech.json --out ./speech
+```
+
+`speech.json` includes `voice_id` and `text`. Voice listing is an authenticated,
+bounded provider read. It does not start a generation.
+
+## Immediate: distinguish configured access from readiness
+
+Unfiltered discovery reports `access.checked: false`. An explicit availability
+filter requires a provider:
+
+```sh
+grida models list --provider fal --available
+grida models list --provider gg --org studio --available
+```
+
+For BYOK, `--available` includes routes with a configured key. For GG, it reads
+the selected organization's cached credit eligibility and includes routes when
+the existing gate allows them. Results report the basis and keep provider access
+`unverified`. Missing keys or a blocked gate produce an empty filtered list;
+failed account reads remain errors rather than a claim of no access.
+
+These are configuration and cached eligibility filters. They do not establish
+model entitlement, provider capacity or generation success. Listing neither
+mints a GG grant nor spends a generation to probe access. Grida credits have no
+bearing on BYOK. Full provider readiness checks are outside this preview.
 
 ## Immediate: save results locally
 
-The CLI reads local inputs and explicitly uploads files selected for a remote
-operation. Provider adapters handle file transport; a schema alone does not
-make a local path usable by a remote API.
+Generation validates the operation and JSON, then reserves the new output
+directory and checks its file-publication mechanism before opening credentials
+or submitting work. Existing directories are refused. Results use the same
+persistence behavior in terminal and JSON modes.
 
-`generate` initially waits and saves results under `--out`, with the same
-behavior in a terminal and with `--json`. Keep a receipt identifying provider,
-endpoint, operation, and any known contract revision or provider request ID.
-Save result metadata and media files; retain raw provider JSON when available.
-Report generation success separately from a failed download or local write.
+The directory contains media artifacts and `receipt.json`. The receipt records
+local paths, byte sizes, SHA-256 hashes, model/provider/binding, kind, variant,
+and a local result ID/time. It contains no prompt, credential, remote result URL
+or raw provider response. The ID is a local receipt identity, not a resumable
+provider job ID. Provider filenames never choose local paths.
 
-## Immediate: shared execution foundations
+Writes do not overwrite existing files. If saving fails after generation,
+`save_failed` identifies the directory and files already published. Keep those
+files and inspect them before retrying. Disk space or a later filesystem failure
+can still prevent saving despite preflight.
 
-Keep ownership under the [CLI doctrine](./index.md): catalogue data, provider
-execution, and the branded command are separate concerns. Existing media
-adapters currently housed in the agent package need an independent owner before
-the CLI can reuse them without importing the agent runtime. Both Desktop and
-CLI must consume the same domain validation and execution contracts.
+The CLI waits for bounded completion; it never automatically retries a possibly
+accepted paid submission. An image count can require several provider batches,
+so one command is not necessarily one provider request. Image count is bounded
+to 16. Interrupting or timing out a request does not prove upstream cancellation
+or prevent a charge. Once complete result bytes arrive, saving is allowed to
+finish even after an interrupt.
 
-The proposed order is discovery and effective schemas, local provider
-credential configuration and GG session minting, then complete generation with
-artifact saving. A GG image call and an existing BYOK call are the first proofs
-of the two access paths. Extend the same contract across existing audio/video/3D
-operations as their adapters become independently usable. This is immediate
-CLI work; integrating the Grida agent and rendering remain deferred.
+## Shared foundations
 
-The planned native endpoint mode needs a generic provider executor; extraction
-of the existing modality adapters alone is insufficient.
+The [CLI doctrine](./index.md) assigns the branded command only composition,
+process interaction and local files. The shared AI owner supplies descriptors,
+input parsing and execution for both Desktop and CLI. Account custody and
+scoped GG access retain their separate authorities. No agent runtime, server
+framework or Desktop process is needed to execute these operations.
 
 ## Planned: provider-native endpoints
 
@@ -271,9 +241,8 @@ Grida Desktop or a local agent loop.
   an exported Grida contract. Validation failure must never switch contracts.
 - For the planned provider-native extension, allow explicit raw JSON when
   schema-based validation is unavailable or insufficient.
-- Let BYOK execution depend on provider credentials alone, without requiring
-  Grida account login. GG continues to require Grida login and organization
-  access. This is a proposed product policy, not an existing CLI behavior.
+- Add persistent CLI provider configuration only after its custody and removal
+  contract is defined; current BYOK uses explicit environment or stdin inputs.
 
 ## What the other CLIs establish
 
