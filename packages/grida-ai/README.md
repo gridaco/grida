@@ -2,7 +2,8 @@
 
 Private, experimental SDK for shared model-driven operations. Catalogue-backed
 image and video generation use BYOK OpenRouter, Vercel, fal, or scoped Grida
-Gateway credentials. Music generation uses the existing GG-only Lyria route.
+Gateway credentials. Music generation uses the existing GG-only Lyria route;
+sound effects use the existing ElevenLabs BYOK operation.
 
 ## Ownership
 
@@ -202,6 +203,57 @@ deterministic output.
 custody prevents a later submission; cancellation, timeout, or sign-out cannot
 recall an accepted job or its charge.
 
+## Sound-effect operation
+
+```ts
+import { SoundEffectClient } from "@grida/ai";
+
+const sounds = new SoundEffectClient({ keys, http });
+const operation = await sounds.resolve({
+  model_id: "eleven_text_to_sound_v2",
+  provider: "elevenlabs",
+});
+const result = await operation.generate({
+  prompt: "A door creaking slowly",
+  duration_seconds: 4,
+  loop: false,
+  prompt_influence: 0,
+  signal,
+});
+// result.audio: { data: Uint8Array; media_type: "audio/mpeg" }
+```
+
+The key capability reads only `elevenlabs`, synchronously or asynchronously.
+Resolution checks that key's presence and retains no credential; generation reads
+the current key again. Missing or blank keys fail as `provider_key_required`.
+Only the existing `eleven_text_to_sound_v2` binding is executable, including its
+current **staged** catalogue status. That publication status is unchanged and is
+not a new runtime eligibility requirement. There is no `auto`, GG, custom origin,
+format selector, voice, or arbitrary provider-options input.
+
+Generation trims its prompt and applies Grida's existing 450 **Unicode code point**
+limit. This is a Grida operation policy, not an API Unicode-counting guarantee.
+Optional duration uses the bundled binding's current 0.5–30 second range; prompt
+influence is finite from 0–1 and loop is boolean. Omitted options stay omitted,
+preserving provider defaults; explicit `false` and zero stay present. Null values
+and unrequested fields are rejected before generation's key lookup.
+
+One POST goes to the fixed ElevenLabs sound-generation endpoint with
+`output_format=mp3_44100_128` and `xi-api-key`. There are no result URL downloads
+or retries. The shared internal lifecycle bounds generation, including key lookup
+and the response stream, to five minutes; resolution's separate key check is also
+bounded. Late key lookup completion cannot submit after timeout/cancellation.
+Success requires nonempty `audio/mpeg` bytes within 16 MiB and returns only a fresh
+byte array and that media type. The host owns `sound-effect.mp3`, base64 wire
+encoding, and persistence receipts.
+
+`SoundEffectClient.Failure` codes are `invalid_input`, `model_unavailable`,
+`provider_key_required`, `aborted`, `timeout`, `invalid_response`, and
+`generation_failed`. Provider HTTP failures, including 401/403, stay generic safe
+failures without upstream bodies or GG error remapping. Token/key presence does
+not establish provider readiness or affordability. Cancellation cannot undo an
+accepted paid request.
+
 ## Authority and construction foundations
 
 <!-- GRIDA-SEC-004 / GRIDA-SEC-006: explicit host transport and scoped memory custody. -->
@@ -215,7 +267,7 @@ credentials; data URLs are decoded locally. Automatic downloads are limited to
 16 assets and 64 MiB in aggregate; a separately requested single asset has a
 256 MiB ceiling that its owning adapter can lower.
 
-`ImageClient`, `VideoClient`, and `MusicClient` require an explicit `ProviderHttp`. The lower-level constructor's
+Media operation clients require an explicit `ProviderHttp`. The lower-level constructor's
 legacy omitted-transport behavior permits ambient provider requests but refuses
 remote downloads; supplying both host operations is the intended independent-host
 integration. Private methods and fields use runtime private slots: the client
@@ -245,7 +297,7 @@ work; server expiry and entitlement policy remain authoritative.
 `@grida/ai/providers` supplies existing text/video/audio/3D implementations with
 the promoted catalogue gates, provider identity/precedence, scoped GG request and
 error helpers, and fal queue/URL/error-prefix helpers. These are trusted provider
-building blocks, not the safe image/video/music operation facades. `safeText` bounds text; it
+building blocks, not the safe media operation facades. `safeText` bounds text; it
 does **not** redact it. Direct helper failures can carry upstream details and must
 be handled by the calling operation's safe error boundary. `postHosted` does not
 authorize its caller-provided URL: the provider implementation and host transport
@@ -269,7 +321,7 @@ Built exports work unbundled when their declared dependencies are supplied. A
 distributed host must package that private dependency closure; a public CLI cannot
 ship an unresolved `workspace:*` dependency and expect npm to supply it.
 
-Producer tests exercise synthetic authorized transports, each image/video/music route,
+Producer tests exercise synthetic authorized transports, each supported media route,
 reference/option preservation, selected-provider stability, safe failures,
 no retry of failed submissions, bounded video/music lifecycle/results, and scoped-token expiry. Promoted helper tests
 cover catalogue refresh and bounded downloads. No test calls a real provider,

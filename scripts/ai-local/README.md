@@ -35,6 +35,10 @@ or real model quality. Music exercises both existing GG Lyria models, text/seed
 validation, token rotation/clearing, safe failures, bounded responses, and late
 response cancellation. It grants no download destination. Synthetic MP3 prefix
 bytes test the transport contract without producing or decoding a recording.
+Sound effects exercise the existing ElevenLabs BYOK model, exact option forwarding
+and omission, key rotation/removal, safe failures, bounded MP3 responses, and
+cancellation during key lookup and submission. The provider key never enters a
+download lane or result; synthetic signature bytes carry no recording.
 
 Separate `.mts` and `.cts` consumers compile through the packed public exports
 with NodeNext resolution, `types: []`, and `skipLibCheck: false`. Source and emitted

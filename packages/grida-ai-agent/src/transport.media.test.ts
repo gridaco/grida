@@ -8,6 +8,10 @@ import type {
   MusicGenerateRequest,
   MusicGenerateResult,
 } from "./protocol/music";
+import type {
+  SoundEffectGenerateRequest,
+  SoundEffectGenerateResult,
+} from "./protocol/sound-effects";
 
 describe("AgentTransport media generation routes", () => {
   it("preserves the video request and receipt wire through the fixed route", async () => {
@@ -81,6 +85,41 @@ describe("AgentTransport media generation routes", () => {
       },
     });
     expect(await client.audio.music.generate(request)).toEqual(result);
+  });
+
+  it("preserves sound-effect false/zero options and its root-level receipt", async () => {
+    const request: SoundEffectGenerateRequest = {
+      model_id: "eleven_text_to_sound_v2",
+      prompt: "a door closing",
+      duration_seconds: 2,
+      loop: false,
+      prompt_influence: 0,
+    };
+    const result: SoundEffectGenerateResult = {
+      model_id: request.model_id,
+      provider_id: "elevenlabs",
+      audio: {
+        base64: "SUQz",
+        media_type: "audio/mpeg",
+        file_name: "sound-effect.mp3",
+      },
+      stored_media: {
+        id: "cbb1523d-e740-45fd-bbac-17610609d062",
+        file_name: "sound-effect.mp3",
+        media_type: "audio/mpeg",
+        byte_size: 3,
+        created_at: 2,
+      },
+    };
+    const client = new AgentTransport.Client({
+      fetcher: async (path, init) => {
+        expect(path).toBe("/audio/sound-effects/generate");
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toEqual(request);
+        return Response.json(result);
+      },
+    });
+    expect(await client.audio.soundEffects.generate(request)).toEqual(result);
   });
 
   it("owns the 3D, music, sound-effect, and text-to-speech paths", async () => {

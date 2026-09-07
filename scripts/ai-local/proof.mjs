@@ -410,6 +410,10 @@ async function main() {
       path.join(runtime, "music-consumer.mjs")
     );
     report.consumers = {};
+    await cp(
+      fileURLToPath(new URL("./sound-effect-consumer.mjs", import.meta.url)),
+      path.join(runtime, "sound-effect-consumer.mjs")
+    );
     for (const format of ["esm", "cjs"]) {
       report.phase = `public ${format} consumer`;
       const { stdout, stderr } = await run(
@@ -428,7 +432,7 @@ async function main() {
       await writeFile(
         path.join(runtime, `consumer.${extension}`),
         `
-import { ImageClient, VideoClient, MusicClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
+import { ImageClient, VideoClient, MusicClient, SoundEffectClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
 import { byokProvidersFor } from "@grida/ai/providers";
 import { models } from "@grida/ai-models";
 declare const http: ProviderHttp;
@@ -455,7 +459,14 @@ async function music(): Promise<Uint8Array> {
   const mediaType: "audio/mpeg" = result.audio.media_type;
   return result.audio.data;
 }
-void [client, image, video, music, providers, models];
+async function soundEffect(): Promise<Uint8Array> {
+  const client = new SoundEffectClient({ http, keys: { get: provider => null } });
+  const operation = await client.resolve({ model_id: "eleven_text_to_sound_v2", provider: "elevenlabs" });
+  const result = await operation.generate({ prompt: "Synthetic type probe", duration_seconds: 0.5, loop: false, prompt_influence: 0, signal: new AbortController().signal });
+  const mediaType: "audio/mpeg" = result.audio.media_type;
+  return result.audio.data;
+}
+void [client, image, video, music, soundEffect, providers, models];
 `,
         { mode: 0o600 }
       );

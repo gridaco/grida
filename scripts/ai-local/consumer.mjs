@@ -6,6 +6,7 @@ import { chmodSync, existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { proveVideo } from "./video-consumer.mjs";
 import { proveMusic } from "./music-consumer.mjs";
+import { proveSoundEffects } from "./sound-effect-consumer.mjs";
 
 const require = createRequire(import.meta.url);
 const format = process.argv[2];
@@ -25,7 +26,8 @@ assert.throws(() =>
 );
 assert.throws(() => process.env.AI_GATEWAY_API_KEY);
 assert.throws(() => process.env.VERCEL_OIDC_TOKEN);
-assert.deepEqual(proof.counts, { network: 1, state: 3, credentials: 2 });
+assert.throws(() => process.env.ELEVENLABS_API_KEY);
+assert.deepEqual(proof.counts, { network: 1, state: 3, credentials: 3 });
 Object.assign(proof.counts, { network: 0, state: 0, credentials: 0 });
 
 const load = (name) => (format === "cjs" ? require(name) : import(name));
@@ -285,6 +287,7 @@ await check(
 );
 const video = await proveVideo({ load, require, check });
 const music = await proveMusic({ load, require, check });
+const sound_effects = await proveSoundEffects({ load, require, check });
 await check(
   "no ambient network, credential discovery or filesystem state",
   async () => {
@@ -305,6 +308,7 @@ process.stdout.write(
     downloads: downloads.length,
     video,
     music,
+    sound_effects,
     guard: proof.counts,
     loaded_modules: proof.loaded.size,
   })

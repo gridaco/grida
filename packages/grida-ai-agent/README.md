@@ -54,7 +54,7 @@ bundle.
 The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
 public subpath; workspace bindings use it in-process.
 
-## Shared image, video and music operations
+## Shared media operations
 
 The image HTTP route and `generate_image` tool use `@grida/ai`'s `ImageClient`.
 This package adapts its secret store and provider transport, chooses the agent's
@@ -83,6 +83,12 @@ text/seed input and a bounded MP3 response. The route converts bytes to its
 existing wire shape, derives the canonical model filename, and adds an optional
 root-level storage receipt. GG refresh remains with the host. Music, sound
 effects and speech have separate contracts under the audio modality.
+
+The sound-effects HTTP route uses `SoundEffectClient` with only an ElevenLabs
+key reader and provider transport. The SDK owns the existing model selection,
+text/duration/loop/influence validation and bounded MP3 execution. The route owns
+base64 output, `sound-effect.mp3`, optional root-level receipts and missing-key
+recovery status. It supplies no GG authority and performs no result download.
 
 Other media operations retain their existing implementations until promoted
 with their callers. Media routes still mount with the agent tenant; independent
