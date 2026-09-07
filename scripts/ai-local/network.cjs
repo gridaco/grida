@@ -74,7 +74,8 @@ if (process.env.GRIDA_AI_PROOF_CONSUMER === "1") {
         relative === "video-consumer.mjs" ||
         relative === "music-consumer.mjs" ||
         relative === "sound-effect-consumer.mjs" ||
-        relative === "text-to-speech-consumer.mjs")
+        relative === "text-to-speech-consumer.mjs" ||
+        relative === "three-d-consumer.mjs")
     );
   };
   const modulePath = (value) => {
@@ -156,7 +157,7 @@ if (process.env.GRIDA_AI_PROOF_CONSUMER === "1") {
     get(target, key) {
       if (
         typeof key === "string" &&
-        /(?:API_KEY|OIDC|ACCESS_TOKEN|REFRESH_TOKEN|AUTH_TOKEN|GG_TOKEN|SUPABASE)/i.test(
+        /(?:^FAL_KEY$|API_KEY|OIDC|ACCESS_TOKEN|REFRESH_TOKEN|AUTH_TOKEN|GG_TOKEN|SUPABASE)/i.test(
           key
         )
       ) {

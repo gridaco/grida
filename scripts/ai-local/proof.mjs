@@ -418,6 +418,10 @@ async function main() {
       fileURLToPath(new URL("./text-to-speech-consumer.mjs", import.meta.url)),
       path.join(runtime, "text-to-speech-consumer.mjs")
     );
+    await cp(
+      fileURLToPath(new URL("./three-d-consumer.mjs", import.meta.url)),
+      path.join(runtime, "three-d-consumer.mjs")
+    );
     for (const format of ["esm", "cjs"]) {
       report.phase = `public ${format} consumer`;
       const { stdout, stderr } = await run(
@@ -436,7 +440,7 @@ async function main() {
       await writeFile(
         path.join(runtime, `consumer.${extension}`),
         `
-import { ImageClient, VideoClient, MusicClient, SoundEffectClient, TextToSpeechClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
+import { ImageClient, VideoClient, MusicClient, SoundEffectClient, TextToSpeechClient, ThreeDClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
 import { byokProvidersFor } from "@grida/ai/providers";
 import { models } from "@grida/ai-models";
 declare const http: ProviderHttp;
@@ -479,7 +483,31 @@ async function speech(): Promise<Uint8Array> {
   const mediaType: "audio/mpeg" = result.audio.media_type;
   return result.audio.data;
 }
-void [client, image, video, music, soundEffect, speech, providers, models];
+async function threeD(): Promise<Uint8Array> {
+  const client = new ThreeDClient({ http, keys: { get: provider => null } });
+  const text = await client.resolve({ model_id: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d", provider: "fal" });
+  const result = await text.generate({ prompt: "Synthetic type probe" });
+  const mediaType: "model/gltf-binary" = result.glb.media_type;
+  const image = await client.resolve({ model_id: "fal-ai/trellis-2", provider: "fal" });
+  const frame: ThreeDClient.Image = { data: new Uint8Array([0, 1, 2]), media_type: "image/png" };
+  await image.generate({ image: frame });
+  // @ts-expect-error A text endpoint does not acquire an image signature.
+  await text.generate({ image: frame });
+  // @ts-expect-error An image endpoint does not acquire a prompt signature.
+  await image.generate({ prompt: "Unsupported" });
+  // @ts-expect-error Unimplemented provider options are not a passthrough.
+  await image.generate({ image: frame, resolution: "1536" });
+  const id: string = "selected-at-runtime";
+  const selected = await client.resolve({ model_id: id, provider: "fal" });
+  switch (selected.model_id) {
+    case "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d": await selected.generate({ prompt: "Synthetic type probe" }); break;
+    case "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d":
+    case "fal-ai/trellis-2": await selected.generate({ image: frame }); break;
+    default: { const exhaustive: never = selected; return exhaustive; }
+  }
+  return result.glb.data;
+}
+void [client, image, video, music, soundEffect, speech, threeD, providers, models];
 `,
         { mode: 0o600 }
       );

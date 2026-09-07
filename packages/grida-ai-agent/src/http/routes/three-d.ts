@@ -8,36 +8,23 @@
  */
 
 import type { Hono } from "hono";
-import { models } from "@grida/ai-models";
+import { ProviderHttp, ThreeDClient } from "@grida/ai";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
-import type {
-  ThreeDGenerateRequest,
-  ThreeDInputImage,
-} from "../../protocol/three-d";
-import { FalThreeDProvider } from "../../providers/fal-three-d";
-import { ProviderHttp } from "../../providers/http";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
 import { mediaGenerationError } from "./media-generation-errors";
 
-const THREE_D_MODEL_IDS = models.three_d.three_d_model_ids;
-const IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const MAX_IMAGE_BASE64_CHARACTERS = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
+// Bound the wire allocation before decoding. The SDK independently validates
+// the decoded image's exact byte ceiling and MIME type.
+const MAX_IMAGE_BASE64_CHARACTERS = Math.ceil((8 * 1024 * 1024) / 3) * 4;
 
-const optionalImage = v.optional<ThreeDInputImage>((raw) => {
+const optionalImage = v.optional<ThreeDClient.Image>((raw) => {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return { ok: false, error: "must be an image object" };
   }
   const image = raw as Record<string, unknown>;
-  if (
-    typeof image.media_type !== "string" ||
-    !(IMAGE_MEDIA_TYPES as readonly string[]).includes(image.media_type)
-  ) {
-    return {
-      ok: false,
-      error: `media_type must be one of: ${IMAGE_MEDIA_TYPES.join(", ")}`,
-    };
+  if (typeof image.media_type !== "string") {
+    return { ok: false, error: "media_type must be a string" };
   }
   if (
     typeof image.base64 !== "string" ||
@@ -46,15 +33,13 @@ const optionalImage = v.optional<ThreeDInputImage>((raw) => {
   ) {
     return { ok: false, error: "base64 must be valid non-empty base64" };
   }
-  const bytes = Buffer.from(image.base64, "base64");
-  if (bytes.byteLength > MAX_IMAGE_BYTES) {
-    return { ok: false, error: "must not exceed 8 MiB" };
-  }
   return {
     ok: true,
     value: {
-      base64: image.base64,
-      media_type: image.media_type as ThreeDInputImage["media_type"],
+      data: Buffer.from(image.base64, "base64"),
+      // This is untrusted wire data; the public operation validates the MIME
+      // value before reading a generation credential or submitting work.
+      media_type: image.media_type as ThreeDClient.Image["media_type"],
     },
   };
 });
@@ -74,88 +59,99 @@ export function registerThreeDRoutes(app: Hono, deps: ThreeDRoutesDeps) {
 
   app.post("/three-d/generate", async (c) => {
     const r = await body(c, {
-      model_id: v.oneOf(THREE_D_MODEL_IDS),
+      model_id: v.string,
       prompt: v.optional(v.string),
       image: optionalImage,
     });
     if (!r.ok) return r.res;
-    const modelId = r.data.model_id;
-    const prompt = r.data.prompt?.trim();
-    let request: ThreeDGenerateRequest;
-
-    if (models.three_d.is_text_to_three_d_model_id(modelId)) {
-      const textInput = models.three_d.models[modelId].input;
-      if (!prompt || r.data.image) {
-        return c.json(
-          { error: "text-to-3D requires prompt and does not accept image" },
-          400
-        );
-      }
-      if ([...prompt].length > textInput.max_utf8_characters) {
-        return c.json(
-          {
-            error: `prompt must not exceed ${textInput.max_utf8_characters} characters`,
-          },
-          400
-        );
-      }
-      request = { model_id: modelId, prompt };
-    } else {
-      const image = r.data.image;
-      if (!image || prompt) {
-        return c.json(
-          {
-            error: "image-to-3D requires one image and does not accept prompt",
-          },
-          400
-        );
-      }
-      request = { model_id: modelId, image };
-    }
-
-    const apiKey = await deps.secrets._getKey("fal");
-    if (!apiKey?.trim()) {
-      return c.json(
-        { error: "no fal key is connected", provider_id: "fal" },
-        400
-      );
-    }
-
-    if (generationActive) {
-      return c.json(
-        {
-          error: "another 3D generation is already in progress",
-          code: "three_d_generation_busy",
-        },
-        429
-      );
-    }
-    generationActive = true;
-
+    const { model_id, prompt, image } = r.data;
+    let ownsGeneration = false;
     try {
-      const glb = await new FalThreeDProvider(
-        apiKey.trim(),
-        providerHttp
-      ).generate(request, c.req.raw.signal);
+      const operation = await new ThreeDClient({
+        keys: { get: (provider) => deps.secrets._getKey(provider) },
+        http: providerHttp,
+      }).resolve({ model_id, provider: "fal" });
+      const signal = c.req.raw.signal;
+      let generate: () => Promise<ThreeDClient.Glb>;
+      // Adapt each exact public operation to this host's existing GLB wire.
+      // Structural presence checks prevent dropping incompatible input fields;
+      // text normalization and decoded-image policy remain SDK-owned.
+      switch (operation.model_id) {
+        case "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d":
+          if (prompt === undefined || image !== undefined) {
+            throw new ThreeDClient.Failure("invalid_input");
+          }
+          generate = async () =>
+            (await operation.generate({ prompt, signal })).glb;
+          break;
+        case "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d":
+        case "fal-ai/trellis-2":
+          if (image === undefined || prompt !== undefined) {
+            throw new ThreeDClient.Failure("invalid_input");
+          }
+          generate = async () =>
+            (await operation.generate({ image, signal })).glb;
+          break;
+        default:
+          return unsupportedOperation(operation);
+      }
+      if (generationActive) {
+        return c.json(
+          {
+            error: "another 3D generation is already in progress",
+            code: "three_d_generation_busy",
+          },
+          429
+        );
+      }
+      generationActive = true;
+      ownsGeneration = true;
+      const result = await generate();
+      const glb = {
+        base64: Buffer.from(result.data).toString("base64"),
+        media_type: result.media_type,
+        file_name: "model.glb",
+      };
       const storedMedia = await GeneratedMediaPersistence.save(deps.media, glb);
       return c.json({
-        model_id: request.model_id,
-        provider_id: "fal" as const,
+        model_id: operation.model_id,
+        provider_id: operation.provider_id,
         glb,
         ...(storedMedia ? { stored_media: storedMedia } : {}),
       });
     } catch (error) {
+      if (error instanceof ThreeDClient.Failure) {
+        if (error.code === "provider_key_required") {
+          return c.json(
+            { error: "no fal key is connected", provider_id: "fal" },
+            400
+          );
+        }
+        if (error.code === "invalid_input") {
+          return c.json({ error: "invalid 3D input", code: error.code }, 400);
+        }
+        if (error.code === "model_unavailable") {
+          return c.json({ error: "3D model is unavailable", model_id }, 400);
+        }
+      }
       return mediaGenerationError(c, {
-        error,
+        error:
+          error instanceof ThreeDClient.Failure
+            ? error
+            : new ThreeDClient.Failure("generation_failed"),
         scope: "agent-host-three-d",
         label: "3D generation failed",
-        model_id: request.model_id,
+        model_id,
         provider_id: "fal",
       });
     } finally {
-      generationActive = false;
+      if (ownsGeneration) generationActive = false;
     }
   });
+}
+
+function unsupportedOperation(_operation: never): never {
+  throw new ThreeDClient.Failure("generation_failed");
 }
 
 function validBase64(value: string): boolean {

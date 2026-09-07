@@ -96,7 +96,13 @@ voice IDs/names, while the host owns picker choices, missing-key/access-denied
 status, `speech.mp3`, wire encoding and optional root-level receipts. Speech
 text is preserved verbatim; the SDK descriptor supplies the normalized voice ID.
 
-3D generation retains its existing implementation until promoted with its caller.
+The 3D route uses `ThreeDClient`'s exact model contracts. The SDK owns input
+semantics, fal queue execution and bounded primary GLB bytes; the host owns
+structural request admission, bounded base64 decoding, `model.glb`, wire encoding,
+optional root-level receipts and its one-generation-at-a-time memory budget.
+Catalogue options beyond the implemented single-image/text paths are not exposed
+by this route. Future 3D workflows need their own reviewed host wire adaptations.
+
 Media routes still mount with the agent tenant; independent
 Desktop media startup is a separate host change.
 

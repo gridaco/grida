@@ -3,6 +3,7 @@ export { VideoClient } from "./video-client";
 export { MusicClient } from "./music-client";
 export { SoundEffectClient } from "./sound-effect-client";
 export { TextToSpeechClient } from "./text-to-speech-client";
+export { ThreeDClient } from "./three-d-client";
 export { ProviderHttp, type ProviderHttpTransport } from "./http";
 export {
   ModelCatalogStore,

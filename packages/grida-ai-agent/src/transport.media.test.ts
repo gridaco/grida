@@ -17,8 +17,56 @@ import type {
   TextToSpeechGenerateResult,
   TextToSpeechListVoicesResult,
 } from "./protocol/text-to-speech";
+import type {
+  ThreeDGenerateRequest,
+  ThreeDGenerateResult,
+} from "./protocol/three-d";
 
 describe("AgentTransport media generation routes", () => {
+  it.each<ThreeDGenerateRequest>([
+    {
+      model_id: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+      prompt: "  a brass robot  ",
+    },
+    {
+      model_id: "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+      image: { base64: "AQID", media_type: "image/jpeg" },
+    },
+    {
+      model_id: "fal-ai/trellis-2",
+      image: { base64: "AQID", media_type: "image/webp" },
+    },
+  ])(
+    "preserves the exact $model_id request and root GLB receipt",
+    async (request) => {
+      const result: ThreeDGenerateResult = {
+        model_id: request.model_id,
+        provider_id: "fal",
+        glb: {
+          base64: "Z2xURgIAAAAMAAAA",
+          media_type: "model/gltf-binary",
+          file_name: "model.glb",
+        },
+        stored_media: {
+          id: "7ccb8e68-a201-40d9-a793-44de9e6c6fc6",
+          file_name: "model.glb",
+          media_type: "model/gltf-binary",
+          byte_size: 12,
+          created_at: 1,
+        },
+      };
+      const client = new AgentTransport.Client({
+        fetcher: async (path, init) => {
+          expect(path).toBe("/three-d/generate");
+          expect(init?.method).toBe("POST");
+          expect(JSON.parse(String(init?.body))).toEqual(request);
+          return Response.json(result);
+        },
+      });
+      expect(await client.threeD.generate(request)).toEqual(result);
+    }
+  );
+
   it("preserves the video request and receipt wire through the fixed route", async () => {
     const request: VideoGenerateRequest = {
       model_id: "google/veo-3.1",

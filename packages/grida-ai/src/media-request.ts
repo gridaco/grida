@@ -13,14 +13,18 @@ export class MediaRequest {
   #timedOut = false;
   readonly #abort = () => this.#controller.abort();
 
-  constructor(http: ProviderHttp, signal?: AbortSignal) {
+  constructor(
+    http: ProviderHttp,
+    signal?: AbortSignal,
+    timeoutMs: 300_000 | 600_000 = 300_000
+  ) {
     this.#http = http;
     this.#source = signal;
-    this.#deadline = performance.now() + 300_000;
+    this.#deadline = performance.now() + timeoutMs;
     this.#timer = setTimeout(() => {
       this.#timedOut = true;
       this.#controller.abort();
-    }, 300_000);
+    }, timeoutMs);
     try {
       signal?.addEventListener("abort", this.#abort, { once: true });
       if (signal?.aborted) this.#abort();

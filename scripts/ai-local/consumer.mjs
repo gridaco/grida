@@ -8,6 +8,7 @@ import { proveVideo } from "./video-consumer.mjs";
 import { proveMusic } from "./music-consumer.mjs";
 import { proveSoundEffects } from "./sound-effect-consumer.mjs";
 import { proveTextToSpeech } from "./text-to-speech-consumer.mjs";
+import { proveThreeD } from "./three-d-consumer.mjs";
 
 const require = createRequire(import.meta.url);
 const format = process.argv[2];
@@ -28,7 +29,8 @@ assert.throws(() =>
 assert.throws(() => process.env.AI_GATEWAY_API_KEY);
 assert.throws(() => process.env.VERCEL_OIDC_TOKEN);
 assert.throws(() => process.env.ELEVENLABS_API_KEY);
-assert.deepEqual(proof.counts, { network: 1, state: 3, credentials: 3 });
+assert.throws(() => process.env.FAL_KEY);
+assert.deepEqual(proof.counts, { network: 1, state: 3, credentials: 4 });
 Object.assign(proof.counts, { network: 0, state: 0, credentials: 0 });
 
 const load = (name) => (format === "cjs" ? require(name) : import(name));
@@ -290,6 +292,7 @@ const video = await proveVideo({ load, require, check });
 const music = await proveMusic({ load, require, check });
 const sound_effects = await proveSoundEffects({ load, require, check });
 const text_to_speech = await proveTextToSpeech({ load, require, check });
+const three_d = await proveThreeD({ load, require, check });
 await check(
   "no ambient network, credential discovery or filesystem state",
   async () => {
@@ -312,6 +315,7 @@ process.stdout.write(
     music,
     sound_effects,
     text_to_speech,
+    three_d,
     guard: proof.counts,
     loaded_modules: proof.loaded.size,
   })

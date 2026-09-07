@@ -3,7 +3,8 @@
 Private, experimental SDK for shared model-driven operations. Catalogue-backed
 image and video generation use BYOK OpenRouter, Vercel, fal, or scoped Grida
 Gateway credentials. Music generation uses the existing GG-only Lyria route;
-sound effects and speech use their existing ElevenLabs BYOK operations.
+sound effects and speech use their existing ElevenLabs BYOK operations. Three
+existing fal 3D endpoints return a primary GLB asset.
 
 ## Ownership
 
@@ -315,6 +316,78 @@ provider HTTP 401/403 as access-denied failures; other failures have safe code-o
 messages without provider bodies. Presence of a key does not establish voice
 access, account readiness, or affordability.
 
+## Current 3D operations
+
+```ts
+import { ThreeDClient } from "@grida/ai";
+
+const threeD = new ThreeDClient({ keys, http });
+const text = await threeD.resolve({
+  model_id: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+  provider: "fal",
+});
+const result = await text.generate({ prompt: "A small brass robot", signal });
+// result.glb: { data: Uint8Array; media_type: "model/gltf-binary" }
+
+const image = await threeD.resolve({
+  model_id: "fal-ai/trellis-2",
+  provider: "fal",
+});
+await image.generate({
+  image: { data: authorizedImageBytes, media_type: "image/png" },
+  signal,
+});
+```
+
+The public `Operations` type maps each exact endpoint to its own input and result.
+Literal selection infers that endpoint's `generate` signature; dynamic selection
+returns an operation union that narrows by `model_id`. A frozen descriptor contains
+only model, binding and provider IDs plus that method. The currently executable,
+staged bindings are Hunyuan v3.1 Pro text-to-3D, Hunyuan v3.1 Pro image-to-3D, and
+TRELLIS.2. Catalogue publication is unchanged. There is no `auto`, GG, custom
+endpoint, raw provider object or option passthrough.
+
+Hunyuan text accepts only a trimmed nonblank prompt and signal, with the existing
+1,024 Unicode code point limit. This is Grida's interpretation of the provider's
+"UTF-8 characters" wording, not a claimed byte limit. Both current image operations
+accept exactly one PNG, JPEG or WebP byte array and signal. The SDK copies its
+nonempty, at-most-8-MiB contents before awaiting credentials. The host owns image
+decoding and preparation; this local cap does not prove upstream dimensions,
+decodability or account eligibility. Mixed prompt/image inputs and unrequested
+fields are rejected, including an otherwise empty extra prompt.
+
+The exact provider fields remain distinct: `prompt`, `input_image_url`, and
+`image_url`, respectively. Broader Hunyuan catalogue capabilities such as eight
+views, optional formats or paid options do not become executable here. Neither do
+TRELLIS resolution or texture options. Each current operation guarantees only its
+primary GLB; this is not a universal promise about future 3D operations. A future
+SAM3D or Tripo operation must earn its own proven input/result shape. There are no
+reserved fields or capability registry, and exhaustive internal dispatch forces a
+new endpoint to choose its semantics rather than inherit an existing model's wire.
+
+Resolution checks the live `fal` key under a separate five-minute bound and retains
+no credential. Generation reads one private key snapshot for its single submission,
+polls and result request. Its ten-minute deadline covers lookup, submission, polling
+and download; the old adapter bounded only polling. Other media deadlines remain
+unchanged. Grida does not resubmit a failed operation; this makes no claim about
+fal's internal execution retries. Cancellation or timeout cannot recall accepted
+remote work or its charge, and no remote cancellation endpoint is invoked.
+
+Authenticated queue requests use the fixed HTTPS `queue.fal.run` origin. Public
+GLB downloads use the credential-free lane and the existing fal.run/fal.media
+host families; URL credentials, nondefault ports and fragments are refused.
+The host still authorizes DNS, routes and redirect hops. Each queue/result JSON
+body is bounded to 1 MiB. An error-bearing `COMPLETED` status fails the operation.
+Only the primary GLB is downloaded, bounded to 64 MiB; its magic, version 2 and
+declared total length are checked. This is header validation, not a complete glTF
+parser. Provider filenames, MIME claims, optional assets, URLs and metadata are
+discarded. Hosts own `model.glb`, base64 wire encoding, persistence and concurrency.
+
+`ThreeDClient.Failure` codes are `invalid_input`, `model_unavailable`,
+`provider_key_required`, `aborted`, `timeout`, `invalid_response` and
+`generation_failed`. Errors contain only safe codes and messages, with no provider
+bodies, credentials or arbitrary causes. Key presence is not proof of readiness.
+
 ## Authority and construction foundations
 
 <!-- GRIDA-SEC-004 / GRIDA-SEC-006: explicit host transport and scoped memory custody. -->
@@ -355,7 +428,7 @@ work; server expiry and entitlement policy remain authoritative.
 
 ## Shared provider implementation entry
 
-`@grida/ai/providers` supplies existing text/video/audio/3D implementations with
+`@grida/ai/providers` supplies trusted provider implementations with
 the promoted catalogue gates, provider identity/precedence, scoped GG request and
 error helpers, and fal queue/URL/error-prefix helpers. These are trusted provider
 building blocks, not the safe media operation facades. `safeText` bounds text; it

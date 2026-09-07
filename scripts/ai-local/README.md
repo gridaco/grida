@@ -45,6 +45,12 @@ snapshot, projected and sorted voices, and default-voice pages larger than the
 requested page size. Key removal, safe provider denial, malformed responses and
 cancellation cannot leak credentials or cause a retry. Its MP3 prefix bytes are
 synthetic, and neither speech nor voice discovery grants a download destination.
+3D exercises the three current fal endpoints and their distinct prompt/image
+fields, private image/key snapshots, credential-free GLB download, safe failures
+and cancellation without resubmission. The synthetic twelve-byte GLB header tests
+transport and header validation, not a renderable scene or full glTF validity.
+Typed consumers pin endpoint-specific inputs and reject mixed signatures or
+unimplemented provider options; future 3D operations need explicit contracts.
 
 Separate `.mts` and `.cts` consumers compile through the packed public exports
 with NodeNext resolution, `types: []`, and `skipLibCheck: false`. Source and emitted
@@ -59,7 +65,7 @@ Vercel OIDC helpers that import filesystem modules. Runtime guards allow package
 module loading, but reject ambient credential environment lookups and filesystem
 state reads, existence/metadata probes, or writes. The pinned OIDC path's
 `existsSync`, `readFileSync`, `mkdirSync`, `writeFileSync`, and `chmodSync` operations
-are covered. Positive controls verify the guards before the SDK loads; importing
+are covered. Positive controls verify the guards, including fal's `FAL_KEY`, before the SDK loads; importing
 and exercising the SDK must then cause zero rejected accesses. Global fetch,
 HTTP/socket and DNS entry points are denied, so only the injected synthetic
 transport can service a provider operation. These are test tripwires, not an OS
