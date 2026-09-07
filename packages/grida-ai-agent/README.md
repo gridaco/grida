@@ -54,7 +54,7 @@ bundle.
 The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
 public subpath; workspace bindings use it in-process.
 
-## Shared image and video operations
+## Shared image, video and music operations
 
 The image HTTP route and `generate_image` tool use `@grida/ai`'s `ImageClient`.
 This package adapts its secret store and provider transport, chooses the agent's
@@ -76,6 +76,13 @@ deadline and the caller's abort signal. A BYOK credential stays fixed for that
 job; changing credentials cannot move accepted work to another account. Clearing
 GG custody blocks subsequent invocations but cannot recall an accepted request.
 The route retains its wire protocol, GG status mapping and media receipts.
+
+The music HTTP route uses `MusicClient` with GG authority and provider transport;
+it does not receive BYOK keys. The SDK validates the two bundled Lyria models,
+text/seed input and a bounded MP3 response. The route converts bytes to its
+existing wire shape, derives the canonical model filename, and adds an optional
+root-level storage receipt. GG refresh remains with the host. Music, sound
+effects and speech have separate contracts under the audio modality.
 
 Other media operations retain their existing implementations until promoted
 with their callers. Media routes still mount with the agent tenant; independent

@@ -23,7 +23,7 @@ application packages are supplied. Optional dependencies absent from the current
 platform remain absent.
 
 The public consumer runs once using ESM imports and once using CJS `require`.
-Both root and `/providers` exports must work; private image/video adapters and Grida
+Both root and `/providers` exports must work; private media implementations and Grida
 agent, daemon, auth, account, CLI, Desktop and framework packages are unavailable.
 Synthetic transports exercise OpenRouter, Vercel, fal and scoped GG image
 generation and video submit/poll/result chains, input capability discovery, credential-free result downloads,
@@ -31,7 +31,10 @@ explicit provider selection, missing credentials, single submission on failure,
 safe error projection, cleared GG authority, and video cancellation during a
 stalled credential lookup without a late submission. Returned PNG signature bytes
 and synthetic video bytes test transport and result contracts, not media decoding
-or real model quality.
+or real model quality. Music exercises both existing GG Lyria models, text/seed
+validation, token rotation/clearing, safe failures, bounded responses, and late
+response cancellation. It grants no download destination. Synthetic MP3 prefix
+bytes test the transport contract without producing or decoding a recording.
 
 Separate `.mts` and `.cts` consumers compile through the packed public exports
 with NodeNext resolution, `types: []`, and `skipLibCheck: false`. Source and emitted
@@ -57,4 +60,4 @@ on completion or a handled failure. It writes a local, ignored report to
 `.cache/ai-local/result.json` containing source hashes, package versions, archive
 integrities, case names and counts. It verifies source hashes again at the end so
 concurrent source changes cannot receive a successful report. No tokens, prompts,
-response bodies or generated images are retained in the report.
+response bodies or generated media are retained in the report.

@@ -2,11 +2,8 @@
 // GRIDA-GG: token — cancellation prevents later submissions; accepted jobs are not recalled.
 import { ProviderHttp } from "./http";
 
-/** Internal video invocation: one deadline, including uncooperative host promises. */
-export class VideoRequest {
-  static readonly maxBytes = 64 * 1024 * 1024;
-  static readonly maxEnvelopeBytes =
-    Math.ceil(VideoRequest.maxBytes / 3) * 4 + 64 * 1024;
+/** Internal media invocation: one deadline, including uncooperative host promises. */
+export class MediaRequest {
   readonly #http: ProviderHttp;
   readonly #controller = new AbortController();
   readonly #timer: ReturnType<typeof setTimeout>;
@@ -45,7 +42,7 @@ export class VideoRequest {
       this.#controller.abort();
     }
     if (this.signal.aborted)
-      throw new VideoRequest.Failure(this.#timedOut ? "timeout" : "aborted");
+      throw new MediaRequest.Failure(this.#timedOut ? "timeout" : "aborted");
   }
 
   /** Settles on deadline even when a supplied promise ignores its signal. */
@@ -62,7 +59,7 @@ export class VideoRequest {
       const abort = () => {
         remove();
         reject(
-          new VideoRequest.Failure(this.#timedOut ? "timeout" : "aborted")
+          new MediaRequest.Failure(this.#timedOut ? "timeout" : "aborted")
         );
       };
       const remove = () => this.signal.removeEventListener("abort", abort);
@@ -107,7 +104,7 @@ export class VideoRequest {
   async json<T>(url: string, init?: RequestInit): Promise<T> {
     const response = await this.request(url, init);
     this.check();
-    if (!response.ok) throw new VideoRequest.Failure("generation_failed");
+    if (!response.ok) throw new MediaRequest.Failure("generation_failed");
     return this.wait(response.json() as Promise<T>);
   }
 
@@ -126,7 +123,7 @@ export class VideoRequest {
     return new ProviderHttp({
       request: (input, init) => this.request(input, init, maximum),
       download: async () => {
-        throw new VideoRequest.Failure("invalid_response");
+        throw new MediaRequest.Failure("invalid_response");
       },
     });
   }
@@ -147,11 +144,12 @@ export class VideoRequest {
     const declared = Number(response.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > maximum) {
       void response.body?.cancel().catch(() => undefined);
-      throw new VideoRequest.Failure("invalid_response");
+      throw new MediaRequest.Failure("invalid_response");
     }
     if (!response.body) return response;
     const reader = response.body.getReader();
     let total = 0;
+    let reads = 0;
     let closed = false;
     let controller: ReadableStreamDefaultController<Uint8Array>;
     const finish = (error?: unknown) => {
@@ -165,13 +163,16 @@ export class VideoRequest {
       reader.releaseLock();
     };
     const abort = () =>
-      finish(new VideoRequest.Failure(this.#timedOut ? "timeout" : "aborted"));
+      finish(new MediaRequest.Failure(this.#timedOut ? "timeout" : "aborted"));
     const stream = new ReadableStream<Uint8Array>({
       start: (value) => {
         controller = value;
       },
       pull: async () => {
         try {
+          // Ready/empty chunks must not starve the host's cancellation timer.
+          if (reads++ > 0 && reads % 64 === 0)
+            await new Promise<void>((resolve) => setTimeout(resolve, 0));
           this.check();
           const item = await this.wait(reader.read());
           if (closed) return;
@@ -182,7 +183,7 @@ export class VideoRequest {
           }
           total += item.value.byteLength;
           if (total > maximum)
-            throw new VideoRequest.Failure("invalid_response");
+            throw new MediaRequest.Failure("invalid_response");
           controller.enqueue(item.value);
         } catch (error) {
           finish(error);
@@ -200,7 +201,7 @@ export class VideoRequest {
   }
 }
 
-export namespace VideoRequest {
+export namespace MediaRequest {
   export class Failure extends Error {
     constructor(
       readonly code:

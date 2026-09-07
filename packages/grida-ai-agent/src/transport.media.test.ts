@@ -4,6 +4,10 @@ import type {
   VideoGenerateRequest,
   VideoGenerateResult,
 } from "./protocol/video";
+import type {
+  MusicGenerateRequest,
+  MusicGenerateResult,
+} from "./protocol/music";
 
 describe("AgentTransport media generation routes", () => {
   it("preserves the video request and receipt wire through the fixed route", async () => {
@@ -44,6 +48,39 @@ describe("AgentTransport media generation routes", () => {
       },
     });
     expect(await client.video.generate(request)).toEqual(result);
+  });
+
+  it("preserves music seed zero and its root-level receipt through the fixed route", async () => {
+    const request: MusicGenerateRequest = {
+      model_id: "google/lyria-3-pro",
+      prompt: "a quiet waltz",
+      seed: 0,
+    };
+    const result: MusicGenerateResult = {
+      model_id: request.model_id,
+      provider_id: "gg",
+      audio: {
+        base64: "SUQz",
+        media_type: "audio/mpeg",
+        file_name: "lyria-3-pro.mp3",
+      },
+      stored_media: {
+        id: "7ccb8e68-a201-40d9-a793-44de9e6c6fc6",
+        file_name: "lyria-3-pro.mp3",
+        media_type: "audio/mpeg",
+        byte_size: 3,
+        created_at: 1,
+      },
+    };
+    const client = new AgentTransport.Client({
+      fetcher: async (path, init) => {
+        expect(path).toBe("/audio/music/generate");
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toEqual(request);
+        return Response.json(result);
+      },
+    });
+    expect(await client.audio.music.generate(request)).toEqual(result);
   });
 
   it("owns the 3D, music, sound-effect, and text-to-speech paths", async () => {

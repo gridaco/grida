@@ -4,10 +4,12 @@ import { createGateway } from "@ai-sdk/gateway";
 import { assertAllowedUrl, falQueueOutcome, pollQueue } from "./fetch-helpers";
 import { postHosted } from "./gg";
 import type { GgTokenSource } from "./gg-session";
-import { VideoRequest } from "./video-request";
+import { MediaRequest } from "./media-request";
 
 /** Internal adapters. No raw model, credentials, provider metadata, or queue handles are public. */
 export namespace videoModels {
+  export const maxBytes = 64 * 1024 * 1024;
+  export const maxEnvelopeBytes = Math.ceil(maxBytes / 3) * 4 + 64 * 1024;
   export const vercelBase = "https://ai-gateway.vercel.sh/v3/ai";
   const falHosts = ["fal.run", "*.fal.run", "fal.media", "*.fal.media"];
   const openRouterBase = "https://openrouter.ai/api/v1/videos";
@@ -30,7 +32,7 @@ export namespace videoModels {
     key: string,
     id: string,
     input: Input,
-    request: VideoRequest
+    request: MediaRequest
   ): Promise<Video[]> {
     request.check();
     if (provider === "fal") return fal(key, id, input, request);
@@ -38,7 +40,7 @@ export namespace videoModels {
     const model = createGateway({
       apiKey: key,
       baseURL: vercelBase,
-      fetch: request.transport(VideoRequest.maxEnvelopeBytes).request,
+      fetch: request.transport(videoModels.maxEnvelopeBytes).request,
     }).videoModel(id);
     // Call the model directly: the high-level SDK adds retries and automatic URL downloads.
     const result = await request.wait(
@@ -65,7 +67,7 @@ export namespace videoModels {
     base: string,
     id: string,
     input: Input,
-    request: VideoRequest
+    request: MediaRequest
   ): Promise<Video[]> {
     request.check();
     const result = await request.wait(
@@ -75,8 +77,8 @@ export namespace videoModels {
         body: { model_id: id, ...wire(input) },
         scope: "video",
         abortSignal: request.signal,
-        provider_http: request.transport(VideoRequest.maxEnvelopeBytes),
-        max_response_bytes: VideoRequest.maxEnvelopeBytes,
+        provider_http: request.transport(videoModels.maxEnvelopeBytes),
+        max_response_bytes: videoModels.maxEnvelopeBytes,
       })
     );
     if (
@@ -96,7 +98,7 @@ export namespace videoModels {
     key: string,
     id: string,
     input: Input,
-    request: VideoRequest
+    request: MediaRequest
   ): Promise<Video[]> {
     const headers = {
       authorization: `Key ${key}`,
@@ -154,7 +156,7 @@ export namespace videoModels {
     key: string,
     id: string,
     input: Input,
-    request: VideoRequest
+    request: MediaRequest
   ): Promise<Video[]> {
     const headers = {
       authorization: `Bearer ${key}`,
@@ -214,9 +216,9 @@ export namespace videoModels {
     const response = await request.request(
       `${url}/content?index=0`,
       { headers },
-      VideoRequest.maxBytes
+      videoModels.maxBytes
     );
-    if (!response.ok) throw new VideoRequest.Failure("generation_failed");
+    if (!response.ok) throw new MediaRequest.Failure("generation_failed");
     const data = new Uint8Array(await request.wait(response.arrayBuffer()));
     return [
       {
@@ -244,6 +246,6 @@ export namespace videoModels {
     if (url.username || url.password || url.hash) invalid();
   }
   function invalid(): never {
-    throw new VideoRequest.Failure("invalid_response");
+    throw new MediaRequest.Failure("invalid_response");
   }
 }

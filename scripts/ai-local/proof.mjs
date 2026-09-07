@@ -405,6 +405,10 @@ async function main() {
       fileURLToPath(new URL("./video-consumer.mjs", import.meta.url)),
       path.join(runtime, "video-consumer.mjs")
     );
+    await cp(
+      fileURLToPath(new URL("./music-consumer.mjs", import.meta.url)),
+      path.join(runtime, "music-consumer.mjs")
+    );
     report.consumers = {};
     for (const format of ["esm", "cjs"]) {
       report.phase = `public ${format} consumer`;
@@ -424,7 +428,7 @@ async function main() {
       await writeFile(
         path.join(runtime, `consumer.${extension}`),
         `
-import { ImageClient, VideoClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
+import { ImageClient, VideoClient, MusicClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
 import { byokProvidersFor } from "@grida/ai/providers";
 import { models } from "@grida/ai-models";
 declare const http: ProviderHttp;
@@ -444,7 +448,14 @@ async function video(): Promise<Uint8Array> {
   const mediaType: string = result.videos[0].media_type;
   return result.videos[0].data;
 }
-void [client, image, video, providers, models];
+async function music(): Promise<Uint8Array> {
+  const client = new MusicClient({ http, gg: new GridaGatewaySessionStore(), gg_base_url: "https://gg.example.invalid" });
+  const operation = await client.resolve({ model_id: "google/lyria-3", provider: "gg" });
+  const result = await operation.generate({ prompt: "Synthetic type probe", seed: 0, signal: new AbortController().signal });
+  const mediaType: "audio/mpeg" = result.audio.media_type;
+  return result.audio.data;
+}
+void [client, image, video, music, providers, models];
 `,
         { mode: 0o600 }
       );

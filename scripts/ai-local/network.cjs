@@ -71,7 +71,8 @@ if (process.env.GRIDA_AI_PROOF_CONSUMER === "1") {
       /\.(?:[cm]?js|json)$/.test(relative) &&
       (relative.startsWith(`node_modules${path.sep}`) ||
         relative === "consumer.mjs" ||
-        relative === "video-consumer.mjs")
+        relative === "video-consumer.mjs" ||
+        relative === "music-consumer.mjs")
     );
   };
   const modulePath = (value) => {

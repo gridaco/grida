@@ -8,7 +8,7 @@ import { ProviderHttp } from "./http";
 import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
 import { byokProvidersFor } from "./provider-ids";
 import { videoModels } from "./video-models";
-import { VideoRequest } from "./video-request";
+import { MediaRequest } from "./media-request";
 
 /** Catalogue-backed video execution. Hosts own keys, egress, inputs, and persistence. */
 export class VideoClient {
@@ -146,14 +146,14 @@ export class VideoClient {
     image: boolean,
     input: VideoClient.Input
   ): Promise<VideoClient.Result> {
-    let request: VideoRequest | undefined;
+    let request: MediaRequest | undefined;
     try {
       const args = generationInput(input, image);
       // The pinned gateway video serializer silently omits zero. Refuse it
       // before authority lookup instead of pretending that request is honored.
       if (descriptor.provider_id === "vercel" && args.seed === 0)
         throw new VideoClient.Failure("invalid_input");
-      request = new VideoRequest(this.#http, args.signal);
+      request = new MediaRequest(this.#http, args.signal);
       request.check();
       let raw: videoModels.Video[];
       if (descriptor.provider_id === "gg") {
@@ -200,14 +200,14 @@ export class VideoClient {
             throw new VideoClient.Failure("invalid_response");
           data = item.data;
         } else if (item.type === "base64") {
-          data = decode(item.data, VideoRequest.maxBytes - total);
+          data = decode(item.data, videoModels.maxBytes - total);
         } else if (item.type === "url") {
           const url = resultUrl(item.url, descriptor.provider_id);
-          data = (await request.download(url, VideoRequest.maxBytes - total))
+          data = (await request.download(url, videoModels.maxBytes - total))
             .data;
         } else throw new VideoClient.Failure("invalid_response");
         total += data.byteLength;
-        if (!data.byteLength || total > VideoRequest.maxBytes)
+        if (!data.byteLength || total > videoModels.maxBytes)
           throw new VideoClient.Failure("invalid_response");
         videos.push({
           data: Uint8Array.from(data),
@@ -439,7 +439,7 @@ function safeFailure(error: unknown): VideoClient.Failure {
   try {
     if (
       error instanceof VideoClient.Failure ||
-      error instanceof VideoRequest.Failure
+      error instanceof MediaRequest.Failure
     )
       return new VideoClient.Failure(error.code);
     if (error instanceof GridaGatewayAuthError)

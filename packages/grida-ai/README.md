@@ -2,7 +2,7 @@
 
 Private, experimental SDK for shared model-driven operations. Catalogue-backed
 image and video generation use BYOK OpenRouter, Vercel, fal, or scoped Grida
-Gateway credentials.
+Gateway credentials. Music generation uses the existing GG-only Lyria route.
 
 ## Ownership
 
@@ -153,6 +153,55 @@ the same code-only error shape as images. Codes are `invalid_input`,
 `invalid_response`, `generation_failed`, and `unsupported_untrusted_result_origin`.
 The host owns persistence, receipts, HTTP status mapping, and GG acquisition.
 
+## Music operation
+
+```ts
+import { MusicClient } from "@grida/ai";
+
+const music = new MusicClient({ http, gg, gg_base_url });
+const operation = await music.resolve({
+  model_id: "google/lyria-3",
+  provider: "gg",
+});
+const result = await operation.generate({
+  prompt: "Quiet ambient piano",
+  seed: 0,
+  signal,
+});
+// result.audio: { data: Uint8Array; media_type: "audio/mpeg" }
+```
+
+This operation serves exactly the bundled `google/lyria-3` and
+`google/lyria-3-pro` models through GG. It requires an explicit host transport,
+scoped-token source, and GG origin. It has no BYOK key capability, `auto` provider,
+audio catalogue refresh, or direct Replicate path. Broader image-input metadata
+on the upstream model cards does not make that input available through this
+text-only hosted contract. Sound effects and speech remain separate operations.
+
+`resolve` returns an immutable model/provider/binding selection without network
+work. Generation trims the prompt and accepts 1–4096 **UTF-16 code units**, matching
+the hosted parser, plus an optional safe-integer seed (including zero) and abort
+signal. Extra input fields are rejected. The live scoped token is read for the
+single fixed `POST /api/v1/ai/music/generations`; no retries, refresh, or provider
+fallback occur. Video and music share one internal five-minute invocation
+lifecycle, including monotonic deadline checks, bounded stream reads, cancellation,
+and late-result cleanup. There is no public generic executor.
+
+The response must match the selected model and GG provider and contain the
+existing inline MP3 wire fields. Encoded response size and a 32 MiB decoded ceiling
+are checked before decoding. Only a fresh byte array and `audio/mpeg` leave the
+operation; filenames, URLs, warnings, metadata, and persistence receipts are
+discarded without logging. No result URL is followed. The host derives its
+filename and owns persistence. The hosted server owns provider execution, output
+download/MP3 materialization, and metering. A supplied seed does not promise
+deterministic output.
+
+`MusicClient.Failure` has the same code-only error shape as the other operations:
+`invalid_input`, `model_unavailable`, `gg_token_expired`, `insufficient_credits`,
+`aborted`, `timeout`, `invalid_response`, or `generation_failed`. Clearing scoped
+custody prevents a later submission; cancellation, timeout, or sign-out cannot
+recall an accepted job or its charge.
+
 ## Authority and construction foundations
 
 <!-- GRIDA-SEC-004 / GRIDA-SEC-006: explicit host transport and scoped memory custody. -->
@@ -166,7 +215,7 @@ credentials; data URLs are decoded locally. Automatic downloads are limited to
 16 assets and 64 MiB in aggregate; a separately requested single asset has a
 256 MiB ceiling that its owning adapter can lower.
 
-`ImageClient` and `VideoClient` require an explicit `ProviderHttp`. The lower-level constructor's
+`ImageClient`, `VideoClient`, and `MusicClient` require an explicit `ProviderHttp`. The lower-level constructor's
 legacy omitted-transport behavior permits ambient provider requests but refuses
 remote downloads; supplying both host operations is the intended independent-host
 integration. Private methods and fields use runtime private slots: the client
@@ -196,7 +245,7 @@ work; server expiry and entitlement policy remain authoritative.
 `@grida/ai/providers` supplies existing text/video/audio/3D implementations with
 the promoted catalogue gates, provider identity/precedence, scoped GG request and
 error helpers, and fal queue/URL/error-prefix helpers. These are trusted provider
-building blocks, not the safe image/video operation facades. `safeText` bounds text; it
+building blocks, not the safe image/video/music operation facades. `safeText` bounds text; it
 does **not** redact it. Direct helper failures can carry upstream details and must
 be handled by the calling operation's safe error boundary. `postHosted` does not
 authorize its caller-provided URL: the provider implementation and host transport
@@ -220,9 +269,9 @@ Built exports work unbundled when their declared dependencies are supplied. A
 distributed host must package that private dependency closure; a public CLI cannot
 ship an unresolved `workspace:*` dependency and expect npm to supply it.
 
-Producer tests exercise synthetic authorized transports, each image/video route,
+Producer tests exercise synthetic authorized transports, each image/video/music route,
 reference/option preservation, selected-provider stability, safe failures,
-no retry of failed submissions, bounded video lifecycle/results, and scoped-token expiry. Promoted helper tests
+no retry of failed submissions, bounded video/music lifecycle/results, and scoped-token expiry. Promoted helper tests
 cover catalogue refresh and bounded downloads. No test calls a real provider,
 opens a real credential store, or starts a Grida host. Packaging and host consumers
 must use public exports; source aliases are not a substitute for that proof.

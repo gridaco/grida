@@ -1,5 +1,6 @@
 export { ImageClient } from "./image-client";
 export { VideoClient } from "./video-client";
+export { MusicClient } from "./music-client";
 export { ProviderHttp, type ProviderHttpTransport } from "./http";
 export {
   ModelCatalogStore,
