@@ -317,7 +317,12 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
   ) {
     result.push({
       kind,
-      ...metadata,
+      model_id: metadata.model_id,
+      provider_id: metadata.provider_id,
+      binding_id: metadata.binding_id,
+      ...(metadata.references_max === undefined
+        ? {}
+        : { references_max: metadata.references_max }),
       variant,
       status,
       input_schema: {

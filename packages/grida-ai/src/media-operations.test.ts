@@ -114,6 +114,21 @@ describe("MediaOperations discovery", () => {
     const descriptors = operations.list();
     expect(Object.isFrozen(descriptors)).toBe(true);
     for (const descriptor of descriptors) {
+      expect(Object.keys(descriptor).sort()).toEqual(
+        [
+          "kind",
+          "model_id",
+          "provider_id",
+          "binding_id",
+          "variant",
+          "status",
+          "input_schema",
+          "output",
+          ...(descriptor.references_max === undefined
+            ? []
+            : ["references_max"]),
+        ].sort()
+      );
       expect(Object.isFrozen(descriptor)).toBe(true);
       expect(Object.isFrozen(descriptor.input_schema)).toBe(true);
       expect(Object.isFrozen(descriptor.input_schema.properties)).toBe(true);
