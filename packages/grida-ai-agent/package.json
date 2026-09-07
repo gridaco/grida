@@ -37,6 +37,16 @@
         "default": "./dist/server.cjs"
       }
     },
+    "./media-server": {
+      "import": {
+        "types": "./dist/media-server.d.mts",
+        "default": "./dist/media-server.mjs"
+      },
+      "require": {
+        "types": "./dist/media-server.d.cts",
+        "default": "./dist/media-server.cjs"
+      }
+    },
     "./sandbox": {
       "import": {
         "types": "./dist/sandbox/index.d.mts",

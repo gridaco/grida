@@ -48,6 +48,7 @@ bundle.
 | `./todos`            | plan store + `todo_write` ([README](./src/todos/README.md))                                                                                                                           | neutral  |
 | `./surface`          | server-executed artifact-surface tools, turn snapshot, and browser observer                                                                                                           | neutral  |
 | `./server`           | `createAgentTenant` + `createAgentDaemon` (the composed daemon), daemon re-exports                                                                                                    | Node     |
+| `./media-server`     | `createMediaTenant` + `createMediaDaemon`, media options and provider transport type; no chat startup                                                                                 | Node     |
 | `./sandbox`          | composed sandbox policy (`buildAgentDaemonSandboxPolicy` — daemon frame + AI upstream hosts)                                                                                          | Node     |
 | `./transport`        | `AgentTransport` namespace — extends `DaemonTransport.Client` with the agent tenant's routes                                                                                          | neutral  |
 
@@ -103,8 +104,49 @@ optional root-level receipts and its one-generation-at-a-time memory budget.
 Catalogue options beyond the implemented single-image/text paths are not exposed
 by this route. Future 3D workflows need their own reviewed host wire adaptations.
 
-Media routes still mount with the agent tenant; independent
-Desktop media startup is a separate host change.
+## Independent media startup
+
+Hosts can import `createMediaDaemon` from `@grida/agent/media-server` to run the
+existing media routes without importing the chat runtime, SQLite, skill
+discovery or ACP. It uses the same daemon perimeter and host-owned credentials,
+provider transport and media store. Media and BYOK settings default on; GG
+routes require `gg_base_url`. Chat, sessions, endpoint-provider settings,
+native ChatGPT auth and shell remain absent. `createMediaTenant` supplies the
+same composition for hosts that already own a `DaemonServer`.
+
+```ts
+import { createMediaDaemon } from "@grida/agent/media-server";
+
+const daemon = createMediaDaemon({
+  password,
+  user_data_path,
+  media_root,
+  http_access,
+  provider_http,
+  gg_base_url,
+});
+await daemon.start({ listen: false });
+// Deliver authenticated Requests through daemon.fetch(request).
+// Stop aborts and joins active delivered requests before clearing GG custody
+// and disposing the catalogue. Persisted BYOK keys remain host-owned.
+await daemon.stop();
+```
+
+The full `createAgentDaemon` defaults and routes remain unchanged. Its media
+routes and chat runtime share one private media owner, with one GG memory store,
+catalogue and provider transport per launch. Explicitly disabling both `agent`
+and `sessions` also skips chat allocation and scratch sweeping in the legacy
+entry, but that entry still imports chat modules. Use `media-server` for module
+isolation. Choosing one composition per launch avoids duplicate credential
+stores or routes; there is no fallback from failed chat startup to media mode.
+This is startup independence within the existing package, not a separate
+installation or a runtime plugin system.
+
+Native host setup can import `defaultScratchBase` and `prepareScratchAuthority`
+from `@grida/agent/sandbox`, and `CHATGPT_AUTH_ROUTE_PATHS` and the
+`ChatGptAuthStart` wire type from the neutral root. Their existing `server`
+exports remain compatible. Route names and wire types grant no native auth
+authority; the host still owns that ceremony.
 
 ## Provider HTTP
 

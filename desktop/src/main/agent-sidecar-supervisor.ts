@@ -49,10 +49,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { home } from "@grida/home";
 import {
-  defaultScratchBase,
-  prepareScratchAuthority,
-} from "@grida/agent/server";
-import {
   ensureInitialized,
   wrap,
   dispose,
@@ -80,6 +76,7 @@ const BACKOFF_INITIAL_MS = 250;
 const BACKOFF_MAX_MS = 10_000;
 
 export class AgentSidecarSupervisor {
+  private readonly agentEnabled: boolean;
   private child: ChildProcess | null = null;
   private activeGeneration = 0;
   private nextGeneration = 0;
@@ -127,7 +124,8 @@ export class AgentSidecarSupervisor {
     this.log.write(stream, line);
   }
 
-  constructor() {
+  constructor(options: { agent?: boolean } = {}) {
+    this.agentEnabled = options.agent !== false;
     app.on("before-quit", () => {
       this.isShuttingDown = true;
       if (this.restartTimer) {
@@ -250,15 +248,18 @@ export class AgentSidecarSupervisor {
     // TMPDIR to its shared compatibility directory. Session scratch must live
     // outside those unconditional write defaults so a per-command deny of the
     // shared base can carve back exactly one session.
-    this.scratchBase = defaultScratchBase(
-      this.user_data_path,
-      app.getPath("temp")
-    );
-    // Establish the predictable temp authority before any listing/removal.
-    // This rejects a foreign-owned or symlinked base, then safely reclaims
-    // command-temp remnants left by a prior crash.
-    prepareScratchAuthority(this.scratchBase, this.user_data_path);
-    await sweepAgentCommandTemps(this.scratchBase);
+    if (this.agentEnabled) {
+      const { defaultScratchBase, prepareScratchAuthority } =
+        await import("@grida/agent/sandbox");
+      this.scratchBase = defaultScratchBase(
+        this.user_data_path,
+        app.getPath("temp")
+      );
+      // Establish the authority before listing/removal. Media-only startup
+      // neither prepares nor sweeps any agent scratch directory.
+      prepareScratchAuthority(this.scratchBase, this.user_data_path);
+      await sweepAgentCommandTemps(this.scratchBase);
+    }
     if (!isSupportedPlatform()) {
       // Windows or another unsupported platform. Log loudly and let
       // the spawn proceed unwrapped — the alternative is refusing
@@ -305,13 +306,15 @@ export class AgentSidecarSupervisor {
         denyWrite: policy.filesystem.deny_write,
       },
     });
-    this.commandHost = new AgentCommandHost({
-      scratchBase: this.scratchBase,
-      userData: this.user_data_path,
-      mediaRoot: this.media_root,
-      home: app.getPath("home"),
-      filesystemPolicy: policy.filesystem,
-    });
+    if (this.scratchBase) {
+      this.commandHost = new AgentCommandHost({
+        scratchBase: this.scratchBase,
+        userData: this.user_data_path,
+        mediaRoot: this.media_root,
+        home: app.getPath("home"),
+        filesystemPolicy: policy.filesystem,
+      });
+    }
     this.sandboxReady = true;
   }
 
@@ -364,15 +367,17 @@ export class AgentSidecarSupervisor {
     // work under cmd.exe.
     const supportedSandbox = isSupportedPlatform();
 
-    const skillsRoot = this.skillsRootPath();
-    if (!this.scratchBase) {
+    const agentEnabled = this.agentEnabled;
+    const skillsRoot = agentEnabled ? this.skillsRootPath() : undefined;
+    if (agentEnabled && !this.scratchBase) {
       throw new Error("agent scratch authority was not initialized");
     }
     const args = [
       scriptPath,
       `--user-data=${this.user_data_path}`,
       `--media-root=${this.media_root}`,
-      `--scratch-base=${this.scratchBase}`,
+      `--agent=${agentEnabled ? "enabled" : "disabled"}`,
+      ...(this.scratchBase ? [`--scratch-base=${this.scratchBase}`] : []),
       // Host-bundled skills dir (repo-root `skills/`) — the built-in skills the
       // agent advertises + loads on demand. Read-only; omitted if unresolved.
       ...(skillsRoot ? [`--skills-root=${skillsRoot}`] : []),
@@ -679,7 +684,10 @@ function shellQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
-const supervisor = new AgentSidecarSupervisor();
+// Host launch configuration only; never a renderer-controlled capability.
+const supervisor = new AgentSidecarSupervisor({
+  agent: !process.argv.includes("--disable-agent"),
+});
 
 export function startAgentSidecar(): Promise<AgentSidecarInfo> {
   return supervisor.start();

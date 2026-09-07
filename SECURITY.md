@@ -310,19 +310,29 @@ clause; its current nonconformance is recorded below.**
 (files, recents, workspaces, the secrets store) are owned by
 [`packages/grida-daemon`](packages/grida-daemon) (`@grida/daemon` —
 `DaemonServer`, `http/auth.ts`, `http/origin.ts`, `http/server.ts`).
-The AI surface (`/agent`, `/sessions`, `/secrets`, `/providers`,
-`/images`, `/video`, `/three-d`, `/audio/music`, `/audio/sound-effects`,
-`/audio/text-to-speech`, the run loop and tools) is a **tenant** —
-[`packages/grida-ai-agent`](packages/grida-ai-agent)'s
-`createAgentTenant` — mounted behind that perimeter through the typed
-`DaemonTenant` seam. Everything in this record applies to the composed
-server (`createAgentDaemon`) that desktop and the CLI actually run;
-the split moves code, not the wire contract.
+The media/provider HTTP adapters and the agent are mounted behind that
+perimeter through the typed `DaemonTenant` seam. Both currently ship in
+[`packages/grida-ai-agent`](packages/grida-ai-agent). Its separate
+`@grida/agent/media-server` entry starts the existing media routes, BYOK
+configuration and scoped GG custody without importing the chat runtime,
+SQLite, skills or ACP. The full `createAgentDaemon` composition uses the same
+media/provider owner and adds agent/session behavior. This is runtime startup
+isolation; the media entry still belongs to the agent package and does not
+promise independent package installation.
+
+Desktop selects the composition before importing the server. A media-only
+launch does not prepare agent scratch, discover skills, construct a command
+executor or enable native ChatGPT OAuth. It retains the same main-owned
+listener, authenticated perimeter, provider transport and media root. The
+choice is explicit host configuration, never an automatic fallback after
+agent initialization fails. No second daemon or credential store is created:
+the existing state location and daemon-owned `AuthStore` write chain remain
+shared, with one memory-only GG session and one catalogue per composition.
 
 Shared image, video, audio and 3D operations and provider HTTP belong to
 [`@grida/ai`](packages/grida-ai/README.md). The tenant supplies narrow key/token
-readers and the same host-authorized transport; it retains request admission,
-workspace reads, media persistence, and chat lifecycle. The SDK does not mount
+readers and the same host-authorized transport; host adapters retain request admission,
+workspace reads, media persistence, and optional chat lifecycle. The SDK does not mount
 a route or create a daemon. Extracting an operation grants no additional network
 or filesystem authority.
 
@@ -841,6 +851,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 Today:
 
+- [Media server entry](packages/grida-ai-agent/src/media-server.ts), [shared host composition](packages/grida-ai-agent/src/media-host.ts), [media server tests](packages/grida-ai-agent/src/media-server.test.ts), [built-entry isolation tests](packages/grida-ai-agent/src/media-server-isolation.test.ts), and [full-server startup tests](packages/grida-ai-agent/src/server-startup.test.ts) — the media composition mounts existing routes behind the daemon perimeter and receives the same narrow credential, provider-HTTP and media-persistence capabilities. It adds no SSE query-token exception, native-provider route, endpoint-provider route or command executor. The full server reuses its GG/catalogue instances and preserves agent recovery ordering.
+- [Full-agent media wiring tests](packages/grida-ai-agent/src/server-media-wiring.test.ts) — all route groups and the runtime receive the same credential, GG, catalogue, transport and persistence owners; start and cleanup do not duplicate catalogue lifecycle or retain a scoped grant.
+- [Desktop composition](desktop/src/sidecar/daemon.ts) and [its tests](desktop/src/sidecar/daemon.test.ts) — select the media or full-agent public entry before loading the server, preserve explicit full-agent settings, and withhold native OAuth and command capabilities in media mode. The [supervisor tests](desktop/src/main/agent-sidecar-supervisor.test.ts) pin disabled-mode argv and the absence of scratch preparation while retaining the outer network fence.
+- [Native-provider auth routes](packages/grida-ai-agent/src/http/routes/chatgpt-auth.ts) — the full-agent composition alone mounts the existing private ceremony behind the same perimeter; fixed paths now come from their neutral protocol owner. Credential and callback mechanisms remain GRIDA-SEC-008.
+- [Desktop media startup proof](desktop/src/sidecar/media-startup.test.ts), [build fixture](desktop/src/sidecar/testing/media-startup-build.mjs), and [runtime guard](desktop/src/sidecar/testing/media-startup-guard.cjs) — actual Vite sidecar output, private framed provider/control traffic and main-transferred loopback sockets, with synthetic BYOK/GG responses and owned temporary state. Import/network tripwires and absent chat/scratch files test startup isolation; they are not an OS-sandbox, installed-app or provider integration certification.
 - [Host media error mapping](packages/grida-ai-agent/src/http/routes/media-generation-errors.ts) — callers supply safely projected SDK failures before logging/status adaptation. The mapper logs supplied details and must never receive raw upstream errors; provider details are removed by each operation and route boundary.
 - [Shared 3D operations](packages/grida-ai/src/three-d-client.ts) and [endpoint tests](packages/grida-ai/src/three-d-client.test.ts), and [lifecycle tests](packages/grida-ai/src/three-d-lifecycle.test.ts) — three explicit fal model contracts with private input/key snapshots and safe byte-only results. Authenticated queue URLs must use exact `queue.fal.run`; primary GLB downloads use the existing fal asset namespaces without credentials. The shared [media invocation](packages/grida-ai/src/media-request.ts) bounds the ten-minute generation, including key lookup, polling and download. JSON is capped at 1 MiB and GLB at 64 MiB with header/version/length checks; no paid retry, provider URL, raw error or filename reaches the result. The [3D host route](packages/grida-ai-agent/src/http/routes/three-d.ts), [its tests](packages/grida-ai-agent/src/http/routes/three-d.test.ts), [wire protocol](packages/grida-ai-agent/src/protocol/three-d.ts), and [composed-daemon storage proof](packages/grida-ai-agent/src/media-daemon.test.ts) retain wire admission, bounded base64 decoding, exclusive generation, fixed filenames and optional receipts. This replaces the former agent `fal-three-d.ts` adapter; it grants no new provider or GG authority.
 - [editor/lib/supabase/server.ts](editor/lib/supabase/server.ts) — `createClientFromBearer` (bearer-auth shim for existing private editor routes that allow Desktop-originated calls without browser cookies).
@@ -877,7 +892,7 @@ Today:
 - [packages/grida-desktop-bridge/src/index.ts](packages/grida-desktop-bridge/src/index.ts) — renderer-safe bridge protocol and DTO vocabulary, including the optional path-free media library contract.
 - `desktop/src/bridge/contract.ts` — Desktop-local IPC channel vocabulary plus re-export of the renderer-safe bridge contract.
 - `desktop/src/window.ts` — blocks exposed desktop windows from navigating outside `/desktop/*`; injects non-secret preload arguments.
-- `desktop/src/agent-sidecar.ts` — sidecar entrypoint; constructs the composed agent daemon (`createAgentDaemon`) in socketless mode and accepts only main-transferred daemon sockets.
+- `desktop/src/agent-sidecar.ts` — sidecar entrypoint; selects the explicit media or full-agent composition in socketless mode and accepts only main-transferred daemon sockets.
 - `desktop/src/agent-sidecar-daemon-sockets.ts` — injects only validated, already-connected socket capabilities into the unbound HTTP server; it exposes no listen, bind, connect, or target-selection operation.
 - `desktop/src/agent-sidecar-channel.ts`, `agent-network-policy.ts`, and `agent-sidecar-network.ts` — strict private stdio framing, destination/header policy, the sidecar's explicit provider/provider-asset transport client, and the bounded finite-command request/result client. Command output is sequenced and capped; abort remains pending until main returns `command.aborted` after worker cleanup; malformed or unknown frames fail the channel.
 - `desktop/src/main/agent-daemon-socket-host.ts` — owns the exact loopback listener, pauses accepted sockets, rejects non-loopback peers, and transfers the bounded connected capability over per-spawn Node IPC.
@@ -890,7 +905,7 @@ Today:
 - `desktop/src/main/media-root.ts` and `desktop/src/main/media-host.ts` — one main-owned app media-root fact plus its purpose-scoped native adapter. The renderer can list/read/reveal an opaque item id or open the fixed library folder; raw paths and path-bearing native failures stay in main, whole-file reads are serialized, and the recent view is capped at 20 records.
 - `desktop/src/main/ipc-handlers.ts`, `desktop/src/main/ipc-sender.ts`, and `desktop/src/main/ipc-admission.ts` — validate every native IPC sender frame, exact controller-owned window role, pathname, and channel before executing OS capabilities; redact query/fragment/userinfo from denied-sender diagnostics; and give sign-in/onboarding only their closed entry-role allowlists. Media list/read/reveal/open-folder channels are additionally admitted only from the exact main-role `/desktop/tools` route. Custom endpoint set/probe/delete additionally owns the native exact-origin grant ceremony.
 - `packages/grida-daemon/src/daemon-server.ts` — lifecycle owner for the same guarded Hono app in either loopback-listening or socketless host-delivered `fetch(Request)` mode; shutdown cancels and joins active response streams.
-- `packages/grida-daemon/src/http/server.ts` — daemon route registration and the `DaemonTenant` seam behind shared guards; `packages/grida-ai-agent/src/server.ts` — the agent tenant that mounts the AI route groups through it.
+- `packages/grida-daemon/src/http/server.ts` — daemon route registration and the `DaemonTenant` seam behind shared guards; `packages/grida-ai-agent/src/server.ts` — the full-agent composition using the same private media/provider owner.
 - `packages/grida-ai-agent/src/http/routes/secrets.ts` — BYOK key presence/set/delete route group; no key-read route.
 - `packages/grida-daemon/src/transport.ts` — Basic Auth signing, fetch/SSE plumbing, typed HTTP errors, and the daemon route methods; `packages/grida-ai-agent/src/transport.ts` — the agent tenant client extending it (run/stream/sessions/events, stream resume headers).
 - `packages/grida-daemon/src/http/auth.ts` — Basic Auth middleware.
@@ -898,6 +913,7 @@ Today:
 - `packages/grida-daemon/src/auth/file.ts` — `auth.json` chmod 0o600 read/write.
 - `packages/grida-daemon/src/secrets.ts` — `auth.json`-backed BYOK key store; exposes only `has`, `set`, and `delete` to routes.
 - `packages/grida-daemon/src/sandbox/policy.ts` — daemon sandbox policy frame (secret-path denies and an optional development-network baseline); `packages/grida-ai-agent/src/sandbox/policy.ts` — the agent tenant's external-agent/provider policy and the Desktop construction switches that remove direct external networking.
+- [Agent sandbox entry](packages/grida-ai-agent/src/sandbox/index.ts) — exports the existing scratch authority helpers for explicit agent host setup without importing the full server. Exporting the helper does not prepare scratch or grant a command executor.
 - [editor/proxy.ts](editor/proxy.ts) — Next.js 16 proxy that sets the CSP + `X-Robots-Tag` + `Referrer-Policy` + `X-Content-Type-Options` headers on every `/desktop/*` response.
 - [editor/lib/desktop/csp.ts](editor/lib/desktop/csp.ts) — the desktop CSP template (`buildDesktopCsp`), kept out of `proxy.ts` per Next.js 16 route-export rules. Owns the directive set, the `grida-workspace:` img/media scope (#924), and the first-party library `img-src` carve-out. Pinned by `proxy.test.ts`.
 - [editor/app/desktop/layout.tsx](editor/app/desktop/layout.tsx) — root layout for the desktop route group; gates all children through `DesktopBridgeGate`.
@@ -1156,7 +1172,7 @@ produce a Grida webview cookie session.
 
 > **Surface.** This is the **security half of Grida Gateway (GG)** — the
 > `token` surface. Every file here carries **both** `GRIDA-SEC-006` and
-> `GRIDA-GG: token`; touching it runs the [`security`](.agents/skills/security/SKILL.md)
+> its appropriate `GRIDA-GG` surface marker; touching it runs the [`security`](.agents/skills/security/SKILL.md)
 > review first, then the [`gg`](.agents/skills/gg/SKILL.md) surface skill.
 > The gateway endpoints, the `gg` client provider, and the desktop token
 > wiring are the other GG surfaces (`GRIDA-GG: gateway|provider|desktop`),
@@ -1243,6 +1259,11 @@ levels into one.
    uses one fixed model-list request and discards the grant. Reusable memory
    custody and image/video/music execution live in `@grida/ai`; native command composition
    remains separate from the account exchange.
+   The shared media/provider host composition owns exactly one GG store for
+   all mounted media and optional agent routes. Stopping that composition
+   clears its store after the daemon drains active requests. Restarting can
+   reuse the existing BYOK file but requires a newly pushed GG grant; switching
+   startup modes neither copies nor persists that grant.
 7. **Mint rate limit** — `rl:v1-ai:mint` per-user sliding window
    (fail-open when Upstash is unconfigured; the billing gate on the AI
    endpoints is the actual spend control). Both mint routes use the same
@@ -1262,9 +1283,14 @@ Today:
 - [Host media error mapping](packages/grida-ai-agent/src/http/routes/media-generation-errors.ts) — preserves actionable expired-GG and insufficient-credit codes from safely projected operation failures. BYOK adapters cannot pass arbitrary upstream codes through as GG authority.
 
 Every file below also carries the `GRIDA-GG` surface marker (`token` /
-`gateway` / `provider`); the [`gg`](.agents/skills/gg/SKILL.md) skill
+`gateway` / `provider` / `desktop`); the [`gg`](.agents/skills/gg/SKILL.md) skill
 governs the surface, this record governs its security half.
 
+- [Media server entry](packages/grida-ai-agent/src/media-server.ts), [shared media/provider host](packages/grida-ai-agent/src/media-host.ts), [media server tests](packages/grida-ai-agent/src/media-server.test.ts), and [built-entry isolation tests](packages/grida-ai-agent/src/media-server-isolation.test.ts) — a single memory store feeds the existing GG routes and operations and is cleared on composition cleanup. The full agent composition consumes that same store.
+- [Full-agent wiring tests](packages/grida-ai-agent/src/server-media-wiring.test.ts) — the runtime and media routes use one scoped store, and cleanup clears the grant visible to both.
+- [Desktop composition](desktop/src/sidecar/daemon.ts) and [its tests](desktop/src/sidecar/daemon.test.ts) — forward the same editor origin and provider transport into either composition; the startup choice grants no additional token authority.
+- [Agent public exports](packages/grida-ai-agent/src/index.ts) — hosted-session DTO exports remain type-only; the memory store and its credential reads stay in the host/provider layer.
+- [Desktop media startup proof](desktop/src/sidecar/media-startup.test.ts) — synthetic GG push/use/clear/restart through the real sidecar channels; confirms the token is absent from persistent BYOK state and logs without minting or spending a real grant.
 - [GG owner](editor/lib/gg/gg.ts), [policy](editor/lib/gg/tokens.ts),
   [configuration](editor/lib/gg/config.ts), and [contract](editor/lib/gg/README.md)
   — one policy with injected clock/key/quota capabilities, one configured server
@@ -1471,6 +1497,11 @@ trusted merely because it is “local.”
 7. **No credential borrowing and no ACP fallback.** Grida never reads
    `~/.codex/auth.json`, browser cookies, or another app's credential store.
    ChatGPT auth failure never launches or selects Codex ACP.
+   Media-only startup mounts no ChatGPT auth/provider routes and constructs no
+   native credential manager. Moving the fixed route constants and ceremony
+   DTO to the neutral protocol module changes import ownership only; the
+   ceremony, exact destination grants and secret-free renderer contract remain
+   unchanged when the full agent is enabled.
 
 **Current experimental trust posture.** The implementation follows the public
 Codex/Zed-compatible native flow: unless
@@ -1505,6 +1536,8 @@ The load-bearing groups are:
   `desktop/src/bridge/contract.ts`, `desktop/src/main/ipc-handlers.ts`, and
   `desktop/src/main.ts` — fixed configuration, callback/orchestration,
   exact network grants, sidecar construction, guarded bridge, and shutdown.
+- [Desktop composition](desktop/src/sidecar/daemon.ts), [its tests](desktop/src/sidecar/daemon.test.ts), and [built media-entry isolation tests](packages/grida-ai-agent/src/media-server-isolation.test.ts) — native-provider construction is confined to the full-agent startup branch; fixed auth wire constants remain available without importing the credential manager.
+- [Full-server startup tests](packages/grida-ai-agent/src/server-startup.test.ts) — preserve the single credential-store owner and native-provider configuration while bounding chat allocation by enabled capabilities.
 - `packages/grida-ai-agent/src/protocol/{chatgpt,provider-ids,endpoints}.ts`,
   `providers/{chatgpt-credentials,chatgpt,index}.ts`,
   `http/routes/chatgpt-auth.ts`, `server.ts`, `runtime/{index,run-input}.ts`,

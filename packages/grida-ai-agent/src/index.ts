@@ -1,6 +1,6 @@
 // Curated client-safe root surface — explicit named re-exports only, no
 // star. Anything not listed here is internal; promote on dogfooding.
-// GRIDA-SEC-008 — export only renderer-safe ChatGPT identity/status types.
+// GRIDA-SEC-008 — neutral ChatGPT wire facts expose no credential implementation.
 
 // Outward protocol — provider identity, handshake, run options, wire vocab.
 export {
@@ -23,12 +23,15 @@ export {
   type ProviderId,
 } from "./protocol/provider-ids";
 export type {
+  ChatGptAuthStart,
   ChatGptSubscriptionAccount,
   ChatGptSubscriptionModelId,
   ChatGptSubscriptionStatus,
 } from "./protocol/chatgpt";
+export { CHATGPT_AUTH_ROUTE_PATHS } from "./protocol/chatgpt";
 // GRIDA-SEC-006 — hosted-session wire shapes (types only; the store is
 // internal daemon state).
+// GRIDA-GG: provider — neutral status and session DTOs, no credential store.
 export type {
   GridaGatewaySession,
   GridaGatewaySessionStatus,

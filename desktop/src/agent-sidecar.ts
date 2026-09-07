@@ -1,12 +1,13 @@
 // GRIDA-GG: desktop — pass the GG base URL to the daemon (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-006 — the selected composition receives the scoped GG custody owner.
 // GRIDA-SEC-008 — construct the native provider inside Grida's agent tenant.
 /**
  * Agent sidecar entry point.
  *
  * Thin: argv parsing + daemon lifecycle + tidy shutdown. All HTTP
- * surface lives in `@grida/daemon` (perimeter + files / workspaces /
- * recents) with the agent tenant mounted by `@grida/agent/server`'s
- * `createAgentDaemon` (agent / sessions / secrets / providers).
+ * surface lives in packages. `sidecar/daemon.ts` chooses the media-only or
+ * full agent composition before importing chat. Both use `@grida/daemon`'s
+ * perimeter and the same package-owned media adapters.
  *
  * Spawned by `desktop/src/main/agent-sidecar-supervisor.ts` as
  * `child_process.spawn(electron, [this script], { env: {
@@ -28,6 +29,9 @@
  *   stdin              framed host→sidecar control and provider responses
  *   Node IPC           main-accepted connected daemon sockets only
  *   process.argv[2+]   optional `--key=value` flags. Currently:
+ *                        --agent=enabled|disabled
+ *                          Host launch choice; enabled by default. Disabled
+ *                          does not require scratch or discover skills.
  *                        --user-data=<absolute path>
  *                          the agent home dir (`~/.grida/agent`, resolved
  *                          via `@grida/home`). We can't import that (or
@@ -52,7 +56,6 @@
 import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 import { AgentSidecarNetwork } from "./agent-sidecar-network";
 import { AgentSidecarDaemonSockets } from "./agent-sidecar-daemon-sockets";
-import { CHATGPT_SUBSCRIPTION_CONFIG } from "./chatgpt-configuration";
 
 // Route Node's built-in `fetch` (undici) through whatever proxy is in
 // `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`. Without this, undici v6+
@@ -108,8 +111,13 @@ if (!mediaRoot) {
   process.exit(1);
 }
 const requiredMediaRoot = mediaRoot;
+const agentMode = getCliArg("agent") ?? "enabled";
+if (agentMode !== "enabled" && agentMode !== "disabled") {
+  console.error("[agent-sidecar] fatal: --agent must be enabled or disabled");
+  process.exit(1);
+}
 const scratchBase = getCliArg("scratch-base");
-if (!scratchBase) {
+if (agentMode === "enabled" && !scratchBase) {
   console.error("[agent-sidecar] fatal: missing --scratch-base");
   process.exit(1);
 }
@@ -127,8 +135,9 @@ const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
 const projectsRoot = getCliArg("projects-root");
 // The host-bundled skills dir (repo-root `skills/`), resolved by the supervisor
 // (dev = repo path; packaged = resources). Absent ⇒ no built-in skills.
-const skillsRoot = getCliArg("skills-root");
-if (!skillsRoot) {
+const skillsRoot =
+  agentMode === "enabled" ? getCliArg("skills-root") : undefined;
+if (agentMode === "enabled" && !skillsRoot) {
   // A silent undefined here is exactly how the built-ins first shipped dormant
   // (see the `agentTenantOptionsFromDaemon` regression). Warn so a repeat —
   // a dropped/misnamed flag from the supervisor — is visible at startup
@@ -170,43 +179,23 @@ async function main() {
 
   // Dynamic by design: no package top-level console output may run before
   // stdout is reserved for the framed channel above.
-  const { createAgentDaemon } = await import("@grida/agent/server");
-
-  const editorOrigin = new URL(runtimeEditorBaseUrl).origin;
-  const host = createAgentDaemon({
+  const { DesktopDaemon } = await import("./sidecar/daemon");
+  const host = await DesktopDaemon.create({
     password,
     user_data_path: requiredUserDataPath,
     media_root: requiredMediaRoot,
-    scratch_base: requiredScratchBase,
     projects_root: projectsRoot,
-    skills_root: skillsRoot,
-    http_access: {
-      allowed_origins: [editorOrigin],
-      allowed_referer_paths: ["/desktop"],
-    },
-    // GRIDA-SEC-004 — the boolean attests the coarse outer process wrap; the
-    // private callback below is the actual finite-command capability. Both are
-    // present only when main can enforce SRT on this platform.
-    sandbox_enforced: sandboxEnforced,
-    shell_executor: sandboxEnforced ? network.shellExecutor : undefined,
-    // External ACP owns a subprocess and network stack that cannot consume the
-    // host-routed provider transport. Keep it unavailable in Desktop until it
-    // has a separately confined, route-compatible authority domain.
-    external_agent_execution: "disabled",
-    // A human is at the keyboard — the locked `question` tool pauses for their
-    // answer (RFC `tools` §question) instead of returning the headless refusal.
-    interactive: true,
-    // The desktop renderer holds the editor's library session, so it can resolve
-    // `design_search` (the artwork-station gather step) client-side.
-    library: true,
-    // GRIDA-SEC-006 — hosted "included" AI: the grida provider calls this
-    // origin (same editor base the perimeter already trusts); the renderer
-    // pushes the short-lived session token over /auth/gg/set.
-    gg_base_url: runtimeEditorBaseUrl,
-    // Native provider path: Grida owns the agent loop; the user's ChatGPT
-    // subscription supplies only model capacity. This is deliberately
-    // separate from the disabled external ACP execution path above.
-    chatgpt: CHATGPT_SUBSCRIPTION_CONFIG,
+    editor_base_url: runtimeEditorBaseUrl,
+    agent:
+      agentMode === "disabled"
+        ? false
+        : {
+            // The enabled-mode argv guard above requires this host authority.
+            scratch_base: requiredScratchBase!,
+            skills_root: skillsRoot,
+            sandbox_enforced: sandboxEnforced,
+            shell_executor: sandboxEnforced ? network.shellExecutor : undefined,
+          },
     // issue #974 — provider traffic follows Electron/Chromium's system network
     // route while the sidecar and its raw children remain under the SRT wrap.
     provider_http: network.providerHttp,

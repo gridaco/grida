@@ -30,21 +30,12 @@ import {
   type ShellExecutor,
 } from "@grida/daemon/server";
 import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
-import { registerSecretsRoutes } from "./http/routes/secrets";
 import { registerProvidersRoutes } from "./http/routes/providers";
-import { registerImagesRoutes } from "./http/routes/images";
-import { registerVideoRoutes } from "./http/routes/video";
-import { registerThreeDRoutes } from "./http/routes/three-d";
-import { registerMusicRoutes } from "./http/routes/music";
-import { registerSoundEffectsRoutes } from "./http/routes/sound-effects";
-import { registerTextToSpeechRoutes } from "./http/routes/text-to-speech";
 import { registerAgentRoutes } from "./http/routes/agent";
 import { registerDirectoryScopesRoutes } from "./http/routes/directory-scopes";
 import { registerSessionsRoutes } from "./http/routes/sessions";
-import { registerGridaAuthRoutes } from "./http/routes/gg-auth";
 import { registerChatGptAuthRoutes } from "./http/routes/chatgpt-auth";
 import { EndpointProvidersStore } from "./providers/endpoints";
-import { GridaGatewaySessionStore } from "./providers/gg-session";
 import { ChatGptCredentialManager } from "./providers/chatgpt-credentials";
 import {
   ChatGptProvider,
@@ -57,9 +48,8 @@ import { AgentRuntime } from "./runtime";
 import { StreamRegistry } from "./runtime/stream-registry";
 import { defaultScratchBase, sweepScratch } from "./session/scratch";
 import { DirectoryScopeRegistry } from "./session/directory-scopes";
-import { ProviderHttp, type ProviderHttpTransport } from "./providers/http";
-import { ModelCatalogStore } from "./providers/model-catalog";
-import { models } from "@grida/ai-models";
+import type { ProviderHttpTransport } from "./providers/http";
+import { MediaHost } from "./media-host";
 
 export {
   DirectoryScopeRegistry,
@@ -69,7 +59,7 @@ export {
   type DirectoryScopeRegistryOptions,
 } from "./session/directory-scopes";
 export type { ProviderHttpTransport } from "./providers/http";
-export { CHATGPT_AUTH_ROUTE_PATHS } from "./http/routes/chatgpt-auth";
+export { CHATGPT_AUTH_ROUTE_PATHS } from "./protocol/chatgpt";
 export type {
   ChatGptAuthStart,
   ChatGptOAuthConfig,
@@ -282,42 +272,22 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
   return {
     sse_query_token_paths: sseQueryTokenPaths,
     register: (app: Hono, services: DaemonServices) => {
-      const providerHttp = new ProviderHttp(opts.provider_http);
       // Endpoint provider configs (issue #806): plain config beside the
       // secrets store, persisted at ${userData}/endpoints.json.
       const endpointsStore = new EndpointProvidersStore(
         services.user_data_path
       );
-      // Grida Cloud session (GRIDA-SEC-006): in-memory only, per launch.
-      // The whole hosted-provider surface keys off the host passing a
-      // base URL — without it, no routes, no resolution, fully dormant.
-      const gridaGatewayBaseUrl =
-        typeof opts.gg_base_url === "string" && opts.gg_base_url.length > 0
-          ? opts.gg_base_url
-          : undefined;
-      const gridaSession = new GridaGatewaySessionStore();
-      // Provider configuration routes are registered before the runtime is
-      // constructed. Their callback closes over this late-bound trusted edge;
-      // requests cannot arrive until tenant registration returns.
+      // The private media owner provides the same HTTP, GG and catalogue
+      // instances to every route and to the optional chat runtime.
       let onProviderReady: (() => void) | undefined;
       const signalProviderReady = () => onProviderReady?.();
-      // The catalogue this tenant resolves against: the bundled one as a
-      // seed, the published one as the authority. A refresh can make a
-      // previously unresolvable model resolvable, which is exactly the
-      // condition `on_provider_ready` exists to retry — a session parked
-      // as `provider_down` on an unknown model un-parks here.
-      const modelCatalog = new ModelCatalogStore({
-        snapshot: pinnedCatalog(),
-        base_url: gridaGatewayBaseUrl,
-        fetch: providerHttp.request,
-        on_change: signalProviderReady,
+      const media = new MediaHost(services, opts, {
+        endpoints: endpointsStore,
+        on_provider_ready: signalProviderReady,
       });
-      if (gridaGatewayBaseUrl) {
-        registerGridaAuthRoutes(app, {
-          store: gridaSession,
-          on_provider_ready: signalProviderReady,
-        });
-      }
+      const { providerHttp, gridaSession, gridaGatewayBaseUrl, modelCatalog } =
+        media;
+      media.register(app);
       let chatgpt: ChatGptProviderRuntime | undefined;
       if (!caps.providers && opts.chatgpt) {
         console.warn(
@@ -336,6 +306,23 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           credentials,
           on_provider_ready: signalProviderReady,
         });
+      }
+      if (caps.providers) {
+        registerProvidersRoutes(app, {
+          endpoints: endpointsStore,
+          secrets: services.secrets,
+          provider_http: providerHttp,
+          on_provider_ready: signalProviderReady,
+        });
+      }
+      // Route flags now also bound chat allocation. The legacy server entry
+      // still imports chat modules; import media-server for module isolation.
+      if (!caps.agent && !caps.sessions) {
+        media.start();
+        return {
+          capabilities: { ...caps, gg: gridaGatewayBaseUrl !== undefined },
+          cleanup: () => media.dispose(),
+        };
       }
       // Chat sessions: SQLite at ${userData}/sessions.db — agent-tenant
       // domain data (#927). Opened once per launch and closed via the
@@ -364,70 +351,6 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       // routes created.
       const streams = new StreamRegistry();
 
-      if (caps.secrets) {
-        registerSecretsRoutes(app, {
-          store: services.secrets,
-          endpoints: endpointsStore,
-          on_provider_ready: signalProviderReady,
-        });
-      }
-      if (caps.providers) {
-        registerProvidersRoutes(app, {
-          endpoints: endpointsStore,
-          secrets: services.secrets,
-          provider_http: providerHttp,
-          on_provider_ready: signalProviderReady,
-        });
-      }
-      if (caps.images) {
-        registerImagesRoutes(app, {
-          secrets: services.secrets,
-          media: services.media,
-          gg: gridaSession,
-          gg_base_url: gridaGatewayBaseUrl,
-          provider_http: providerHttp,
-          catalog: modelCatalog,
-        });
-      }
-      if (caps.video) {
-        registerVideoRoutes(app, {
-          secrets: services.secrets,
-          media: services.media,
-          gg: gridaSession,
-          gg_base_url: gridaGatewayBaseUrl,
-          provider_http: providerHttp,
-          catalog: modelCatalog,
-        });
-      }
-      if (caps.three_d) {
-        registerThreeDRoutes(app, {
-          secrets: services.secrets,
-          media: services.media,
-          provider_http: providerHttp,
-        });
-      }
-      if (caps.music) {
-        registerMusicRoutes(app, {
-          media: services.media,
-          gg: gridaSession,
-          gg_base_url: gridaGatewayBaseUrl,
-          provider_http: providerHttp,
-        });
-      }
-      if (caps.sound_effects) {
-        registerSoundEffectsRoutes(app, {
-          secrets: services.secrets,
-          media: services.media,
-          provider_http: providerHttp,
-        });
-      }
-      if (caps.text_to_speech) {
-        registerTextToSpeechRoutes(app, {
-          secrets: services.secrets,
-          media: services.media,
-          provider_http: providerHttp,
-        });
-      }
       // GRIDA-SEC-004 — a finite command is a host capability, not a boolean
       // attestation about the daemon's broad process tree. Standalone/CLI hosts
       // retain raw execution only through the explicit unsandboxed switch.
@@ -544,7 +467,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
 
       // After registration: the boot fetch is non-blocking, but a refresh
       // signals provider-ready, and that callback must already be wired.
-      modelCatalog.start();
+      media.start();
 
       return {
         // `gg` reflects the feature actually being ON (base URL
@@ -557,7 +480,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         cleanup: () => {
           runtime.dispose();
           directoryScopes.dispose();
-          modelCatalog.dispose();
+          media.dispose();
           sessionsStore.close();
         },
       };
@@ -652,21 +575,4 @@ export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
       createAgentTenant(agentTenantOptionsFromDaemon(opts, capabilities)),
     ],
   });
-}
-
-/** `GRIDA_AGENT_DISABLE_MODELS_FETCH` — never fetch; stay on the seed. */
-const MODELS_FETCH_DISABLED_ENV = "GRIDA_AGENT_DISABLE_MODELS_FETCH";
-
-/**
- * The catalogue an operator pinned this daemon to, if any.
- *
- * A snapshot freezes the store, so handing it the bundled seed is exactly
- * "never fetch". The one hatch for an air-gapped or version-pinned
- * deployment; absent, the store seeds from the bundle and refreshes from
- * the published catalogue as usual.
- */
-function pinnedCatalog(): models.snapshot.Snapshot | undefined {
-  return process.env[MODELS_FETCH_DISABLED_ENV] === "1"
-    ? models.snapshot.seed()
-    : undefined;
 }

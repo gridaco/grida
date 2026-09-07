@@ -1,4 +1,4 @@
-// GRIDA-SEC-008 — tenant startup shares one serialized credential store.
+// GRIDA-SEC-004 / GRIDA-SEC-008 — startup bounds chat allocation and shares credential custody.
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -237,5 +237,11 @@ describe("agent tenant startup", () => {
     expect(response.status).toBe(200);
     expect(recover).not.toHaveBeenCalled();
     expect(retry).not.toHaveBeenCalled();
+    await expect(
+      fs.stat(path.join(baseDir, "sessions.db"))
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(fs.stat(scratchBase)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 });
