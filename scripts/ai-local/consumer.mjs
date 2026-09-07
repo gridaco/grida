@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { proveVideo } from "./video-consumer.mjs";
 import { proveMusic } from "./music-consumer.mjs";
 import { proveSoundEffects } from "./sound-effect-consumer.mjs";
+import { proveTextToSpeech } from "./text-to-speech-consumer.mjs";
 
 const require = createRequire(import.meta.url);
 const format = process.argv[2];
@@ -288,6 +289,7 @@ await check(
 const video = await proveVideo({ load, require, check });
 const music = await proveMusic({ load, require, check });
 const sound_effects = await proveSoundEffects({ load, require, check });
+const text_to_speech = await proveTextToSpeech({ load, require, check });
 await check(
   "no ambient network, credential discovery or filesystem state",
   async () => {
@@ -309,6 +311,7 @@ process.stdout.write(
     video,
     music,
     sound_effects,
+    text_to_speech,
     guard: proof.counts,
     loaded_modules: proof.loaded.size,
   })

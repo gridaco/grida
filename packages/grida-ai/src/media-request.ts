@@ -142,7 +142,10 @@ export class MediaRequest {
 
   #bounded(response: Response, maximum: number): Response {
     const declared = Number(response.headers.get("content-length"));
-    if (Number.isFinite(declared) && declared > maximum) {
+    // Successful bodies retain eager rejection (including shared hosted JSON
+    // parsing). Non-success headers must reach the operation's status policy:
+    // an oversized error body must not hide a provider's access-denied status.
+    if (response.ok && Number.isFinite(declared) && declared > maximum) {
       void response.body?.cancel().catch(() => undefined);
       throw new MediaRequest.Failure("invalid_response");
     }
@@ -174,6 +177,9 @@ export class MediaRequest {
           if (reads++ > 0 && reads % 64 === 0)
             await new Promise<void>((resolve) => setTimeout(resolve, 0));
           this.check();
+          // Non-success bodies are also bounded before their first source read.
+          if (Number.isFinite(declared) && declared > maximum)
+            throw new MediaRequest.Failure("invalid_response");
           const item = await this.wait(reader.read());
           if (closed) return;
           if (item.done) {

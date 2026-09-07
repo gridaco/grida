@@ -3,7 +3,7 @@
 Private, experimental SDK for shared model-driven operations. Catalogue-backed
 image and video generation use BYOK OpenRouter, Vercel, fal, or scoped Grida
 Gateway credentials. Music generation uses the existing GG-only Lyria route;
-sound effects use the existing ElevenLabs BYOK operation.
+sound effects and speech use their existing ElevenLabs BYOK operations.
 
 ## Ownership
 
@@ -254,6 +254,67 @@ failures without upstream bodies or GG error remapping. Token/key presence does
 not establish provider readiness or affordability. Cancellation cannot undo an
 accepted paid request.
 
+## Text-to-speech and voice discovery
+
+```ts
+import { TextToSpeechClient } from "@grida/ai";
+
+const speech = new TextToSpeechClient({ keys, http });
+const voices = await speech.listVoices({ provider: "elevenlabs", signal });
+// voices: readonly { voice_id: string; name: string }[]
+const operation = await speech.resolve({
+  model_id: "eleven_v3",
+  provider: "elevenlabs",
+  voice_id: selectedVoiceId,
+});
+const result = await operation.generate({
+  text: "[whispers] Hello there.",
+  signal,
+});
+// result.audio: { data: Uint8Array; media_type: "audio/mpeg" }
+```
+
+Speech admits the existing staged `eleven_v3` model and an explicit voice; listing
+voices is optional. The frozen descriptor includes the trimmed `voice_id`.
+Voice IDs are limited to 256 Unicode code points, must be URI-encodable, and cannot
+be the literal navigation segments `.` or `..`. An opaque ID is encoded as one
+path segment under the fixed ElevenLabs speech endpoint.
+
+Original text, whitespace, and audio tags are preserved. Blank text is rejected;
+the bundled 5,000-character limit uses Grida's existing Unicode code point
+counting, including whitespace. That counting policy does not claim a provider
+Unicode specification. Generation accepts only text and signal: no voice settings,
+seed, format selector, or application defaults. One POST with `eleven_v3` requests
+`mp3_44100_128`; nonempty `audio/mpeg` output is limited to 16 MiB. The host owns
+`speech.mp3`, base64 encoding, and persistence receipts.
+
+Voice discovery reads `/v2/voices` at the fixed provider origin with `page_size=100`.
+The first page may include more than 100 default voices. The invocation reads at
+most ten pages, each bounded to 2 MiB, and retains at most 2,000 unique voices.
+Only trimmed IDs/names of up to 256 code points are returned. The first duplicate
+ID wins; ordering is deterministic by name, then ID. This is a bounded picker aid,
+not a complete account inventory, and caps do not grant a raw pagination API.
+
+The existing local cursor policy trims a nonblank token, bounds it to 1,024 code
+points, and encodes it with `URLSearchParams`; it assumes no token alphabet and
+never follows a returned URL. Missing, malformed, or repeated required cursors
+fail the invocation, including on a capped page. Invalid JSON/pages and later-page
+provider denial do not return a misleading partial success.
+
+The narrow key capability reads only `elevenlabs`. Resolution's key check,
+voice listing, and generation have separately bounded invocations. Each listing
+keeps one private key snapshot through its pages; each new invocation reads the
+current key. The shared five-minute lifecycle covers key lookup, requests, and
+body reads. There are no retries, GG authority, custom origins, result downloads,
+raw voice metadata, or credential outputs. Cancellation cannot undo accepted speech.
+
+`TextToSpeechClient.Failure` codes are `invalid_input`, `model_unavailable`,
+`provider_key_required`, `provider_access_denied`, `aborted`, `timeout`,
+`invalid_response`, and `generation_failed`. Both listing and speech preserve
+provider HTTP 401/403 as access-denied failures; other failures have safe code-only
+messages without provider bodies. Presence of a key does not establish voice
+access, account readiness, or affordability.
+
 ## Authority and construction foundations
 
 <!-- GRIDA-SEC-004 / GRIDA-SEC-006: explicit host transport and scoped memory custody. -->
@@ -323,7 +384,7 @@ ship an unresolved `workspace:*` dependency and expect npm to supply it.
 
 Producer tests exercise synthetic authorized transports, each supported media route,
 reference/option preservation, selected-provider stability, safe failures,
-no retry of failed submissions, bounded video/music lifecycle/results, and scoped-token expiry. Promoted helper tests
+no retry of failed submissions, bounded invocation/results, and scoped-token expiry. Promoted helper tests
 cover catalogue refresh and bounded downloads. No test calls a real provider,
 opens a real credential store, or starts a Grida host. Packaging and host consumers
 must use public exports; source aliases are not a substitute for that proof.

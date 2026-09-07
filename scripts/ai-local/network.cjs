@@ -73,7 +73,8 @@ if (process.env.GRIDA_AI_PROOF_CONSUMER === "1") {
         relative === "consumer.mjs" ||
         relative === "video-consumer.mjs" ||
         relative === "music-consumer.mjs" ||
-        relative === "sound-effect-consumer.mjs")
+        relative === "sound-effect-consumer.mjs" ||
+        relative === "text-to-speech-consumer.mjs")
     );
   };
   const modulePath = (value) => {

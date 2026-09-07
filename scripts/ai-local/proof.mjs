@@ -414,6 +414,10 @@ async function main() {
       fileURLToPath(new URL("./sound-effect-consumer.mjs", import.meta.url)),
       path.join(runtime, "sound-effect-consumer.mjs")
     );
+    await cp(
+      fileURLToPath(new URL("./text-to-speech-consumer.mjs", import.meta.url)),
+      path.join(runtime, "text-to-speech-consumer.mjs")
+    );
     for (const format of ["esm", "cjs"]) {
       report.phase = `public ${format} consumer`;
       const { stdout, stderr } = await run(
@@ -432,7 +436,7 @@ async function main() {
       await writeFile(
         path.join(runtime, `consumer.${extension}`),
         `
-import { ImageClient, VideoClient, MusicClient, SoundEffectClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
+import { ImageClient, VideoClient, MusicClient, SoundEffectClient, TextToSpeechClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
 import { byokProvidersFor } from "@grida/ai/providers";
 import { models } from "@grida/ai-models";
 declare const http: ProviderHttp;
@@ -466,7 +470,16 @@ async function soundEffect(): Promise<Uint8Array> {
   const mediaType: "audio/mpeg" = result.audio.media_type;
   return result.audio.data;
 }
-void [client, image, video, music, soundEffect, providers, models];
+async function speech(): Promise<Uint8Array> {
+  const client = new TextToSpeechClient({ http, keys: { get: provider => null } });
+  const voices: readonly TextToSpeechClient.Voice[] = await client.listVoices({ provider: "elevenlabs", signal: new AbortController().signal });
+  const operation = await client.resolve({ model_id: "eleven_v3", provider: "elevenlabs", voice_id: "synthetic-voice" });
+  const voice: string = operation.voice_id;
+  const result = await operation.generate({ text: "Synthetic type probe", signal: new AbortController().signal });
+  const mediaType: "audio/mpeg" = result.audio.media_type;
+  return result.audio.data;
+}
+void [client, image, video, music, soundEffect, speech, providers, models];
 `,
         { mode: 0o600 }
       );

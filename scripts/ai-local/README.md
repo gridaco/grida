@@ -39,6 +39,12 @@ Sound effects exercise the existing ElevenLabs BYOK model, exact option forwardi
 and omission, key rotation/removal, safe failures, bounded MP3 responses, and
 cancellation during key lookup and submission. The provider key never enters a
 download lane or result; synthetic signature bytes carry no recording.
+Text-to-speech exercises existing ElevenLabs v3 speech without prior discovery,
+verbatim text and encoded voice IDs, bounded voice pagination with one key
+snapshot, projected and sorted voices, and default-voice pages larger than the
+requested page size. Key removal, safe provider denial, malformed responses and
+cancellation cannot leak credentials or cause a retry. Its MP3 prefix bytes are
+synthetic, and neither speech nor voice discovery grants a download destination.
 
 Separate `.mts` and `.cts` consumers compile through the packed public exports
 with NodeNext resolution, `types: []`, and `skipLibCheck: false`. Source and emitted

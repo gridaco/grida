@@ -12,6 +12,11 @@ import type {
   SoundEffectGenerateRequest,
   SoundEffectGenerateResult,
 } from "./protocol/sound-effects";
+import type {
+  TextToSpeechGenerateRequest,
+  TextToSpeechGenerateResult,
+  TextToSpeechListVoicesResult,
+} from "./protocol/text-to-speech";
 
 describe("AgentTransport media generation routes", () => {
   it("preserves the video request and receipt wire through the fixed route", async () => {
@@ -120,6 +125,58 @@ describe("AgentTransport media generation routes", () => {
       },
     });
     expect(await client.audio.soundEffects.generate(request)).toEqual(result);
+  });
+
+  it("preserves voice-list and speech wire contracts with text tags and a root receipt", async () => {
+    const request: TextToSpeechGenerateRequest = {
+      model_id: "eleven_v3",
+      voice_id: " voice-a ",
+      text: "\n [whispers] Hello there. \t",
+    };
+    const voices: TextToSpeechListVoicesResult = {
+      provider_id: "elevenlabs",
+      voices: [{ voice_id: "voice-a", name: "Alice" }],
+    };
+    const result: TextToSpeechGenerateResult = {
+      model_id: request.model_id,
+      provider_id: "elevenlabs",
+      voice_id: "voice-a",
+      audio: {
+        base64: "SUQz",
+        media_type: "audio/mpeg",
+        file_name: "speech.mp3",
+      },
+      stored_media: {
+        id: "cbb1523d-e740-45fd-bbac-17610609d062",
+        file_name: "speech.mp3",
+        media_type: "audio/mpeg",
+        byte_size: 3,
+        created_at: 2,
+      },
+    };
+    const seen: Array<{ path: string; method?: string; body: unknown }> = [];
+    const client = new AgentTransport.Client({
+      fetcher: async (path, init) => {
+        seen.push({
+          path,
+          method: init?.method,
+          body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        });
+        if (path === "/audio/text-to-speech/voices") {
+          return Response.json(voices);
+        }
+        return Response.json(result);
+      },
+    });
+    expect(await client.audio.textToSpeech.listVoices()).toEqual(voices);
+    expect(await client.audio.textToSpeech.generate(request)).toEqual(result);
+    expect(seen.map(({ path }) => path)).toEqual([
+      "/audio/text-to-speech/voices",
+      "/audio/text-to-speech/generate",
+    ]);
+    expect(seen[0].body).toBeUndefined();
+    expect(seen[1].method).toBe("POST");
+    expect(seen[1].body).toEqual(request);
   });
 
   it("owns the 3D, music, sound-effect, and text-to-speech paths", async () => {

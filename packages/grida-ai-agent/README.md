@@ -90,8 +90,14 @@ text/duration/loop/influence validation and bounded MP3 execution. The route own
 base64 output, `sound-effect.mp3`, optional root-level receipts and missing-key
 recovery status. It supplies no GG authority and performs no result download.
 
-Other media operations retain their existing implementations until promoted
-with their callers. Media routes still mount with the agent tenant; independent
+The text-to-speech routes use `TextToSpeechClient` for generation and voice
+discovery. The SDK owns text/voice validation, bounded pagination and projected
+voice IDs/names, while the host owns picker choices, missing-key/access-denied
+status, `speech.mp3`, wire encoding and optional root-level receipts. Speech
+text is preserved verbatim; the SDK descriptor supplies the normalized voice ID.
+
+3D generation retains its existing implementation until promoted with its caller.
+Media routes still mount with the agent tenant; independent
 Desktop media startup is a separate host change.
 
 ## Provider HTTP
