@@ -81,8 +81,9 @@ offer another installation path; distribution and process lifetime are
 separate choices.
 
 Local tools use local inputs. Hosted operations make explicit service requests.
-Account reads and hosted AI generation need a connection; help and bundled
-docs work offline. Unavailable services produce honest errors.
+Account reads and hosted AI generation need a connection. Installed help works
+offline; `docs` prints links to the canonical documentation home, which requires
+a connection to read. Unavailable services produce honest errors.
 
 Introduce a persistent service only for operations needing shared or
 long-lived state. `grida account view` must not start an agent, launch Desktop,

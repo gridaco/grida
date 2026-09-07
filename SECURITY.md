@@ -1744,6 +1744,19 @@ credential through reuse of an existing browser or daemon bridge.
     There is no automatic replay, remint or weaker credential fallback. The
     server independently verifies the live OAuth bearer and explicit current-user
     membership before the shared GG mint policy signs a token.
+11. **Thin CLI host.** The private `grida` preview accepts only an explicit bounded,
+    owner-controlled local public-client file and separate `GRIDA_HOME`; it does
+    not discover repository configuration, hosted registration, Desktop cookies
+    or provider keys. It refuses the process home and ordinary Grida home,
+    including existing filesystem aliases, before opening native custody. Browser
+    launch uses a fixed OS executable with a constructed environment and one
+    validated authorization URL argument, without a shell or `BROWSER` override.
+    Explicit manual login writes that URL only to stderr. Noninteractive reads
+    never start login. The fixed command grammar delegates to public auth/account
+    owners; JSON and terminal output contain safe DTOs or classified failures,
+    never arbitrary exception objects. Help, version and docs do not open custody
+    or network. Cancellation closes pending login but waits for noncancellable
+    custody work, reporting that a write may have completed.
 
 **Limits and adoption gates.** Producer tests are not deployment certification.
 The real local Auth 2.196.0 consumer proof has passed login/denial/consent reuse,
@@ -1868,6 +1881,29 @@ membership separately, without a snapshot guarantee across page requests.
 - The [local consumer proof](editor/e2e/auth-oauth.spec.mts) and
   [copied-package probe](scripts/auth-local/native-probe.mjs) also obey the
   separate local provisioning boundary, GRIDA-SEC-011.
+- [CLI registration/host](packages/grida-cli/src/host.ts) and
+  [host tests](packages/grida-cli/src/host.test.ts),
+  [command lifecycle](packages/grida-cli/src/run.ts) and
+  [lifecycle tests](packages/grida-cli/src/run.test.ts),
+  [process entry](packages/grida-cli/src/bin.ts),
+  [grammar](packages/grida-cli/src/cli.ts) and
+  [grammar tests](packages/grida-cli/src/cli.test.ts),
+  [output](packages/grida-cli/src/output.ts) and
+  [output tests](packages/grida-cli/src/output.test.ts) — fixed operations,
+  independent custody, explicit browser launch, and safe presentation.
+- [CLI build](packages/grida-cli/tsdown.config.mts) and
+  [package contract](packages/grida-cli/README.md) retain optional native loading
+  and document the unprovisioned hosted-registration gate. The
+  [installed CLI proof](scripts/cli-local/proof.mjs),
+  [transport guard](scripts/cli-local/network.cjs),
+  [guard tests](scripts/cli-local/network.test.mjs), and
+  [proof contract](scripts/cli-local/README.md) exercise production file custody
+  across real local login, restart, concurrency, refresh, reads and logout;
+  fixture isolation is also GRIDA-SEC-011.
+- [Offline Linux CLI smoke](scripts/cli-local/linux-smoke.mjs) exercises the
+  installed binary and production file custody as an unprivileged container
+  user, without an issuer or keyring; the caller owns network-disabled container
+  isolation and cleanup.
 
 ---
 
@@ -1916,14 +1952,28 @@ defaults would cross those boundaries.
    fixture signing authority is separately governed by GRIDA-SEC-006. Offline configs
    skip env loading. CI verifies the downloaded CLI checksum, supplies no hosted
    credentials, cleans up only its fixture, and uploads no credential artifacts.
+   The installed CLI proof packs current artifacts and installs offline into a
+   private tree with optional keytar omitted. It uses production file custody,
+   captures manual authorization URLs only in memory, restricts CLI traffic to
+   the exact fixture API/editor ports and callback listeners, and refuses
+   external module resolution. The macOS custody owner's exact read-only ACL
+   command remains real. Reports contain hashes and safe phase metadata only;
+   owned browser/profile/process cleanup precedes report writing. One bounded
+   application-clock injection exercises real near-expiry refresh without
+   modifying issuer time, tokens or credential files.
 
 **Limits.** This is local provisioning, not hosted deployment certification.
 The executable, repository, dependencies, Docker engine, and same-user process
-environment are trusted. Node guards are not an OS network sandbox: they allow
-other loopback ports and Unix sockets. The harness checks executable versions;
+environment are trusted. Node guards are not an OS network sandbox. The original
+auth-local guard allows other loopback ports and Unix sockets; the installed CLI
+guard permits only its listed TCP ports and fixed read-only OS ACL command.
+The harness checks executable versions;
 checksum verification belongs to release acquisition and CI. Public container
-image downloads remain necessary. Disposable file custody proves no product
-storage, hostile-local-user protection, or cross-process coordination contract.
+image downloads remain necessary. The original injected-custody probe does not
+prove durable product storage. The separately installed CLI proof exercises the
+production file backend and cross-process lock on its recorded platform; it does
+not certify an OS sandbox, hostile-local-user protection, hosted registration,
+the system browser launcher, or OS keyring availability.
 
 **Files bound by this id.**
 
@@ -1942,6 +1992,15 @@ storage, hostile-local-user protection, or cross-process coordination contract.
   [offline Vitest config](editor/vitest.oauth.config.ts),
   [CI workflow](.github/workflows/auth-local.yml), and
   [harness contract](scripts/auth-local/README.md) — execution and adoption.
+- [Installed CLI proof](scripts/cli-local/proof.mjs),
+  [CLI transport guard](scripts/cli-local/network.cjs),
+  [guard tests](scripts/cli-local/network.test.mjs), and
+  [proof contract](scripts/cli-local/README.md) — separate real CLI processes and
+  production file custody using this fixture's registered client.
+- [Offline Linux CLI smoke](scripts/cli-local/linux-smoke.mjs) accepts only a
+  packed artifact, creates private temporary state and uses a synthetic public
+  registration. Its documented caller supplies a disposable unprivileged
+  network-disabled container; it makes no real OAuth or keyring claim.
 
 ---
 

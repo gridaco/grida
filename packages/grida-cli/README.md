@@ -1,0 +1,60 @@
+# Grida CLI
+
+> **GRIDA-SEC-010** — independent native account custody and safe command output;
+> see [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md).
+
+The `grida` command composes Grida's account services and tools for people and
+their own harnesses. It runs independently of Desktop.
+
+**Private development preview.** This package is not published. The legacy npm
+release does not provide these commands. Current commands cover auth, credential
+storage, identity, organization membership, cached credits, help/version and docs.
+AI commands follow the shared media capabilities; agent, render and MCP are deferred.
+
+Documentation has one canonical home: the
+[CLI contract](https://grida.co/docs/wg/cli/v1) and
+[doctrine](https://grida.co/docs/wg/cli/index).
+Installed help describes implemented syntax; `grida docs [command...]` prints a
+canonical URL without fetching it or opening a browser. No guide tree is bundled.
+
+## Ownership
+
+This is the branded executable and host adapter. Parsing, terminal output,
+trusted registration, system-browser launch and process lifetime belong here.
+Auth/custody belong to `@grida/auth`; account selection and reads belong to
+`@grida/account`. Future media commands consume `@grida/ai`. A command does not
+move its product's implementation into this package.
+
+Do not import agent, daemon, Electron, Next.js or browser application state.
+Do not add generic authenticated fetch, token getters, duplicated domain policy,
+implicit login, silent provider fallback, or a plugin framework for hypothetical
+commands. Validate syntax before initializing a host. SDK reads are separate
+observations, not an atomic identity/membership snapshot.
+
+## Local development
+
+Build the auth/account workspace dependencies, then `pnpm --filter grida build`.
+Use `node packages/grida-cli/dist/bin.mjs --help` from the repository root.
+The build bundles private workspace dependencies; the optional native
+`@github/keytar` binding stays external and declared in the packed manifest.
+
+Authenticated preview commands require an explicit local fixture registration
+and isolated `GRIDA_HOME`. There is no hosted default or repository configuration
+discovery. Set `GRIDA_CLI_LOCAL_CONFIG` to the fixture's absolute public-client
+JSON path and `GRIDA_HOME` to a separate absolute private directory outside your
+ordinary Grida home. The
+[installed-CLI proof](https://github.com/gridaco/grida/tree/main/scripts/cli-local)
+owns the setup and checks. Hosted registration, cross-platform CI and npm release
+automation are release prerequisites.
+
+Node.js 24 or later is required. Durable auth currently supports macOS and Linux;
+Windows auth fails closed. An unavailable keyring never selects file storage
+implicitly. See the
+[credential custody contract](https://grida.co/docs/wg/cli/credential-custody).
+
+`--json` emits a safe public result or `{ "error": { "code", "message" } }` to
+stdout; diagnostics use stderr. Exit codes are 0 (success), 1 (operation failure)
+and 2 (usage). `--no-input` prevents terminal questions; OS keyring access may
+still ask for permission. Interactive login rejects `--json` and `--no-input`.
+`auth login --no-browser` prints a sign-in URL for manual opening on the same
+machine. Signals cancel login; an in-flight credential write is allowed to settle.
