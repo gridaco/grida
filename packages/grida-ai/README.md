@@ -521,6 +521,75 @@ work; server expiry and entitlement policy remain authoritative.
 
 ## Shared provider implementation entry
 
+### First-party provider credential admission
+
+`ProviderCredentials` owns reusable, application-independent BYOK input policy.
+It is experimental, like this package, and keeps no credential store or history.
+
+```ts
+import { ProviderHttp } from "@grida/ai";
+import { ProviderCredentials } from "@grida/ai/providers";
+
+const key = ProviderCredentials.normalize("openrouter", enteredKey);
+// key is still a secret: only the host's authorized custody should receive it.
+const credentials = new ProviderCredentials({
+  http: new ProviderHttp({
+    request: authorizedRequest,
+    download: authorizedDownload,
+  }),
+});
+const result = await credentials.check({ provider: "openrouter", key, signal });
+// result: { status: "accepted" } or { status: "not_supported" }
+```
+
+Construction and `normalize` are synchronous and perform no I/O. Normalization
+bounds the original UTF-8 input to 4 KiB, trims outer whitespace, requires a
+nonempty ASCII token (0x21–0x7e), and rejects case-insensitive
+`PASTE_*_KEY_HERE` templates. Those framing limits are Grida policy. The returned
+string is explicitly the normalized secret; it is not safe display metadata.
+
+The following provider rules and read-only checks were reviewed against official
+documentation on 2026-09-08. No suffix lengths or alphabets are inferred from
+example keys.
+
+| Provider          | Static admission                                                                                                                                                                                                                        | Explicit check and acceptance                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| OpenRouter        | Documented `sk-or-` prefix with a nonempty suffix.                                                                                                                                                                                      | `GET https://openrouter.ai/api/v1/key`, Bearer authorization; HTTP 200 and boolean `data.is_management_key: false`. Management keys are rejected. [Key prefix](https://openrouter.ai/blog/tutorials/any-coding-agent/), [current-key API](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key), [required SDK field](https://github.com/OpenRouterTeam/typescript-sdk/blob/main/src/models/operations/getcurrentkey.ts).                                 |
+| Vercel AI Gateway | Current `vck_` keys require a nonempty suffix. Opaque legacy keys remain admissible: the new-format announcement does not retire them or specify a legacy grammar. Static acceptance cannot establish provider identity for those keys. | `GET https://ai-gateway.vercel.sh/v1/credits`, Bearer authorization; HTTP 200 and finite decimal numeric strings `balance` and `total_used`. Zero or negative balance does not deny authentication. [New formats](https://vercel.com/changelog/new-token-formats-and-secret-scanning), [key documentation](https://vercel.com/docs/ai-gateway/authentication-and-byok/api-keys), [REST API](https://vercel.com/docs/ai-gateway/sdks-and-apis/rest-api#check-credit-balance).   |
+| fal               | Full `key_id:key_secret` with exactly one separator and two nonempty components.                                                                                                                                                        | `GET https://api.fal.ai/v1/models/pricing?endpoint_id=fal-ai/flux/dev`, `Key` authorization; HTTP 200 and a `prices` entry for that endpoint with finite numeric `unit_price` and nonblank string `unit`/`currency`. Ordinary API scope suffices. [Key contract](https://fal.ai/docs/platform-apis/v1/keys/create), [pricing API](https://fal.ai/docs/platform-apis/v1/models/pricing), [scope documentation](https://fal.ai/docs/api-reference/platform-apis/authentication). |
+| ElevenLabs        | Opaque token; no inferred prefix.                                                                                                                                                                                                       | `not_supported`, with no request. `/v1/user` requires extra User Read permission, while `/v1/models` allows unauthenticated access. Neither proves acceptance without imposing an unrelated permission. [Authentication](https://elevenlabs.io/docs/api-reference/authentication), [official setup skill](https://github.com/elevenlabs/skills/blob/main/setup-api-key/SKILL.md), [models API](https://elevenlabs.io/docs/api-reference/models/list).                          |
+
+`check` reuses normalization and makes at most one request. It requires an explicit
+host `ProviderHttp`, sends only the fixed GET and provider authorization header,
+omits cookies, refuses redirects, disables caching, and uses a ten-second deadline
+covering transport and body reads. JSON is limited to 64 KiB and must decode as
+valid UTF-8. A late response is cancelled; cancellation is never awaited at the
+expense of completion. Repeated ready stream chunks yield to deadline timers.
+There is no ambient fetch in this owner, retry, generation, pagination, automatic
+refresh, or preflight added to existing generation/listing operations.
+
+Only frozen status metadata is returned. Provider account, key, balance, pricing,
+and response metadata are discarded. An accepted read is transient evidence for
+that read, not future model access, credit availability, or generation readiness.
+The checks submit no inference; the cited references do not establish a separate
+universal billing guarantee for metadata reads. Hosts choose whether and when to
+check and own persistence; this package never records verification state.
+
+`ProviderCredentials.Failure` has code-only messages: `invalid_input`,
+`credential_rejected` (401 or an OpenRouter management key), `access_denied`
+(403, which may be scope or account policy), `unavailable` (other HTTP/transport
+failures), `invalid_response`, `aborted`, or `timeout`. Raw upstream errors and
+caller-supplied abort reasons never become messages or causes.
+
+These rules identify first-party provider connections. A future custom `base_url`
+must bind its own validation and check to that connection; an OpenAI-compatible
+wire protocol cannot grant first-party prefixes or endpoints. There is no custom
+endpoint or configurable probe API. The host still authorizes DNS, resolved
+addresses, routes and transport behavior; a fetch-shaped capability cannot make
+those decisions on the host's behalf.
+
+### Trusted implementation helpers
+
 `@grida/ai/providers` supplies trusted provider implementations with
 the promoted catalogue gates, provider identity/precedence, scoped GG request and
 error helpers, and fal queue/URL/error-prefix helpers. These are trusted provider
