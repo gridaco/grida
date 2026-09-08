@@ -86,6 +86,33 @@ TOML escaping, literal strings, comments, and table ordering. A maintained TOML
 parser owns syntax; schema validation owns authority. The synthetic compatibility
 fixtures live in [fixtures/providers-v1](fixtures/providers-v1/README.md).
 
+## Manual configuration
+
+On macOS or Linux, you can create or edit `<home>/providers/credentials.toml`
+offline. Close Desktop and stop other Grida clients or commands using that home
+before editing: ordinary editors do not acquire the credential lock. Automation
+that can run concurrently must use the public store API or implement the lock
+and atomic-publication protocol below.
+
+For a new file, use the schema example above, replace the example provider ID and
+key, and leave `migration.state = "unstarted"` and `removed = []`. Create the
+`providers` directory with mode 0700 and the file with mode 0600, both owned by
+your user. Existing safe ancestor directories can remain 0755. Use regular files
+and directories without symlinks, hard links, or additional macOS ACL grants.
+Save as UTF-8 without a BOM, with correct TOML escaping. Keep keys on one line.
+
+For an existing file, preserve its version, migration metadata, deletion
+tombstones, and other provider entries. Change only the intended key. Use
+`grida providers remove <provider>` for deletion and `grida providers configure
+<provider>` to restore an ID listed in `migration.removed`; these commands retain
+the migration guarantees. If migration is `pending`, let updated Desktop finish
+its cleanup before editing. Do not change the state to bypass it.
+
+Keep the editor's saves private and avoid credential backup or swap files. Save a
+complete document before restarting clients. Never delete the whole credential
+file or `profile.lock.sqlite` to reset or repair the store. Windows clients must
+use their explicit environment or stdin key input instead of this file adapter.
+
 ## Read and mutation rules
 
 Every operation acquires exclusive authority, discards valid unpublished orphan

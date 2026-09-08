@@ -67,8 +67,9 @@ machine. Signals cancel login; an in-flight credential write is allowed to settl
 The [media contract](https://grida.co/docs/wg/cli/media) owns examples, schemas,
 variants, availability and result rules. Installed help stays minimal.
 
-BYOK uses the shared `providers/credentials.toml` under Grida home, without
-Grida login. `providers configure <provider>` stores a key using hidden input
+BYOK saves keys to `~/.grida/providers/credentials.toml`, or
+`$GRIDA_HOME/providers/credentials.toml` when `GRIDA_HOME` is an absolute path,
+without Grida login. `providers configure <provider>` stores a key using hidden input
 or `--key-stdin`; `providers remove <provider>` removes the shared stored key.
 `providers list` shows presence, source and plaintext storage mode, not verified
 access. The same native owner serves Desktop, independently of its lifetime.
@@ -78,6 +79,13 @@ Stored BYOK currently supports macOS/Linux only; Windows CLI users can supply
 explicit environment/stdin keys. Account OAuth and ChatGPT stores remain separate. GG needs the local native registration
 above, login and an organization. The auth owner hands a scoped grant into
 one invocation's memory store; account tokens never enter provider execution.
+
+For manual file configuration, follow the
+[provider file format and editing instructions](https://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md).
+Stop Desktop and other Grida processes using this home before editing; keep
+the `providers` directory at `0700`, the file at `0600`, and preserve version
+and migration metadata. `grida providers --help` also prints the location and
+format link without opening the credential store.
 
 `generate` validates JSON and probes a fresh output directory before authority
 or paid submission. It saves artifacts and a safe receipt with local paths and

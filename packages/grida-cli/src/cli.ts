@@ -412,6 +412,9 @@ export namespace Cli {
   export function helpText(topic: Topic): string {
     return (
       help[topic] +
+      (topic.startsWith("providers")
+        ? "\n\nCredential file: ~/.grida/providers/credentials.toml\nWith an absolute GRIDA_HOME: $GRIDA_HOME/providers/credentials.toml\nPlaintext on macOS/Linux: providers directory 0700, file 0600.\nManual edits: stop Desktop and other Grida processes using this home;\npreserve version and migration metadata. Use providers remove for deletion.\nFile format and manual configuration:\nhttps://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md"
+        : "") +
       "\n\n--no-input suppresses terminal interaction; the OS keyring may still request access.\nDocumentation: " +
       docsUrl(topic) +
       "\n"

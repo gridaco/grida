@@ -118,7 +118,10 @@ and header identify sensitive content. TOML is still plaintext: its syntax
 provides no additional confidentiality over JSON or INI.
 
 The [versioned storage protocol](https://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md)
-owns the exact schema, locking and migration rules. A minimal record looks like:
+owns the exact schema, locking, migration rules and manual configuration instructions.
+Provider help prints the default and overridden file locations without opening
+storage. Manual editors must stop other clients using the same home, retain
+private permissions, and preserve version and migration metadata. A minimal record looks like:
 
 ```toml
 # Grida provider credentials.
