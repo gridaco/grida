@@ -40,6 +40,16 @@ describe("GET /api/v1/ai/models", () => {
     expect((await GET(request("junk"))).status).toBe(401);
   });
 
+  it("excludes FAL-only GPT Image 2.5 variants from hosted availability", async () => {
+    const { token } = await signGgToken("user-1", 7);
+    const res = await GET(request(token));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Entry[] };
+    const ids = body.data.map((entry) => entry.id);
+    expect(ids).not.toContain("openai/gpt-image-2.5-flare");
+    expect(ids).not.toContain("openai/gpt-image-2.5-sunburst");
+  });
+
   it("lists text+image+video with tiers, deprecation flags, and no pricing", async () => {
     const { token } = await signGgToken("user-1", 7);
     const res = await GET(request(token));

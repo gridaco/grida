@@ -29,8 +29,9 @@ import {
   usePromptInputController,
   type PromptInputMessage,
 } from "@app/ui/ai-elements/prompt-input";
-import { images, type MediaItem } from "@/lib/desktop/bridge";
+import { images, useDesktopBridge, type MediaItem } from "@/lib/desktop/bridge";
 import { ImageModelPicker } from "./image-model-picker";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 
 /** Named prompt templates — pick one from the composer menu to fill the input.
  *  Design-tool flavored starters; original to Grida. */
@@ -77,7 +78,9 @@ const PROMPT_TEMPLATES: { name: string; prompt: string }[] = [
   },
 ];
 
-const DEFAULT_MODEL_ID = models.image.listed_models()[0]?.id ?? "";
+const DEFAULT_MODEL_ID = models.image.models["openai/gpt-image-2"]?.listed
+  ? "openai/gpt-image-2"
+  : (models.image.listed_models()[0]?.id ?? "");
 
 /** Always render at least this many cells so the gallery grid is visible even
  *  when empty. Extra slots beyond the images are blank placeholders. */
@@ -105,11 +108,14 @@ function sizeOptionsFor(
   return opts;
 }
 
-/** Quality tiers only apply to per-image-tiered models (e.g. GPT Image). */
-function supportsQuality(
+/** Explicit quality options can also belong to token-billed image models. */
+function qualityOptionsFor(
   card: models.image.ImageModelCard | undefined
-): boolean {
-  return card?.pricing.type === "per_image_tiered";
+): readonly string[] {
+  return (
+    card?.quality?.options ??
+    (card?.pricing.type === "per_image_tiered" ? QUALITY_OPTIONS : [])
+  );
 }
 
 /** File extension for a download, from the returned media type. */
@@ -155,6 +161,7 @@ export function DesktopImagePlayground({
   onGenerationBusyChange?: (busy: boolean) => void;
   onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
+  const bridge = useDesktopBridge();
   const [modelId, setModelId] = useState(
     initialModelId && models.image.models[initialModelId]?.listed
       ? initialModelId
@@ -163,9 +170,14 @@ export function DesktopImagePlayground({
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [size, setSize] = useState<SizeOption>(AUTO_SIZE);
-  const [quality, setQuality] = useState<string>("auto");
-
   const card = models.image.models[modelId];
+  const requiresUpdate = MediaModelAvailability.requiresImageUpdate(
+    card,
+    bridge?.app.version
+  );
+  const [quality, setQuality] = useState<string>(
+    () => card?.quality?.default ?? "auto"
+  );
   const active = tiles.find((t) => t.id === activeId && t.status === "done");
 
   const remove = (id: string) =>
@@ -176,6 +188,7 @@ export function DesktopImagePlayground({
   };
 
   const runGenerate = async (rawPrompt: string) => {
+    if (requiresUpdate) return;
     const prompt = rawPrompt.trim();
     if (!prompt) return;
     // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh so a
@@ -196,7 +209,7 @@ export function DesktopImagePlayground({
         ...(size.width && size.height
           ? { width: size.width, height: size.height }
           : {}),
-        ...(quality !== "auto" ? { quality } : {}),
+        ...(card?.quality || quality !== "auto" ? { quality } : {}),
       });
       for (let index = res.images.length - 1; index >= 0; index -= 1) {
         const stored = res.images[index]?.stored_media;
@@ -233,6 +246,11 @@ export function DesktopImagePlayground({
       {/* Header */}
       <header className="flex shrink-0 items-center justify-between px-6 py-4">
         <h1 className="text-2xl font-bold tracking-tight">Images</h1>
+        {requiresUpdate && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {MediaModelAvailability.imageUpdateMessage}
+          </p>
+        )}
       </header>
 
       {/* Gallery — a real hairline grid, visible even when empty. Cells are
@@ -290,16 +308,19 @@ export function DesktopImagePlayground({
                 />
                 <ImageModelPicker
                   value={modelId}
+                  desktopVersion={bridge?.app.version}
                   onValueChange={(next) => {
                     // Reset model-scoped options — a size/quality the new model
                     // doesn't expose would otherwise be sent and rejected.
                     setModelId(next);
                     setSize(AUTO_SIZE);
-                    setQuality("auto");
+                    setQuality(
+                      models.image.models[next]?.quality?.default ?? "auto"
+                    );
                   }}
                 />
               </PromptInputTools>
-              <PromptInputSubmit />
+              <PromptInputSubmit disabled={requiresUpdate} />
             </PromptInputFooter>
           </PromptInput>
         </PromptInputProvider>
@@ -380,7 +401,7 @@ function SettingsMenu({
   onQuality: (q: string) => void;
 }) {
   const sizeOptions = sizeOptionsFor(card);
-  const showQuality = supportsQuality(card);
+  const qualityOptions = qualityOptionsFor(card);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -404,17 +425,17 @@ function SettingsMenu({
             {opt.label === size.label && <Check className="size-4" />}
           </DropdownMenuItem>
         ))}
-        {showQuality && (
+        {qualityOptions.length > 0 && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Quality</DropdownMenuLabel>
-            {QUALITY_OPTIONS.map((q) => (
+            {qualityOptions.map((q) => (
               <DropdownMenuItem
                 key={q}
                 onSelect={() => onQuality(q)}
                 className="justify-between capitalize"
               >
-                {q}
+                {q === "xhigh" ? "Extra high" : q === "max" ? "Maximum" : q}
                 {q === quality && <Check className="size-4" />}
               </DropdownMenuItem>
             ))}

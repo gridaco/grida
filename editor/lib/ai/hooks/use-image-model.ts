@@ -92,7 +92,10 @@ export function useImageModelConfig(defaultModel: ai.image.ImageModelId) {
     width: config.width,
     height: config.height,
     aspect_ratio: config.aspect_ratio,
-    models: Object.values(ai.image.models) as ai.image.ImageModelCard[],
+    models: Object.values(ai.image.models).filter(
+      (model): model is NonNullable<typeof model> =>
+        !!model && !!ai.image.binding(model, "vercel")
+    ),
     select,
     setSize,
   };

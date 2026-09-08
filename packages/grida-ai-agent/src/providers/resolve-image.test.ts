@@ -6,6 +6,7 @@ import {
   resolveImageModel,
 } from "./resolve-image";
 import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
+import { GridaGatewaySessionStore } from "./gg-session";
 
 /** Fake SecretsStore exposing only the `_getKey` the resolver uses. */
 function fakeSecrets(keys: Record<string, string>): SecretsStore {
@@ -18,6 +19,10 @@ function fakeSecrets(keys: Record<string, string>): SecretsStore {
 const LISTED = "openai/gpt-image-2";
 // A kept-but-unlisted card (bfl/flux-kontext-max — not on OpenRouter).
 const UNLISTED = "bfl/flux-kontext-max";
+const FAL_ONLY = [
+  "openai/gpt-image-2.5-flare",
+  "openai/gpt-image-2.5-sunburst",
+];
 
 describe("defaultImageModelId", () => {
   it("is the explicit tracked pin (gpt-image-2), not catalog order", () => {
@@ -86,6 +91,66 @@ describe("resolveImageModel", () => {
         "nobody/nope"
       )
     ).rejects.toBeInstanceOf(ImageModelUnavailableError);
+  });
+
+  describe.each(FAL_ONLY)("FAL-only launch: %s", (id) => {
+    it("resolves FAL even when every other provider is connected", async () => {
+      const r = await resolveImageModel(
+        {
+          secrets: fakeSecrets({
+            fal: "sk-fal",
+            openrouter: "sk-or",
+            vercel: "sk-v",
+          }),
+        },
+        id
+      );
+      expect(r.provider_id).toBe("fal");
+      expect(r.binding_id).toBe(`${id.replace("2.5-", "2.5/")}/text-to-image`);
+    });
+
+    it("resolves the distinct edit route and reference cap", async () => {
+      const r = await resolveImageModel(
+        { secrets: fakeSecrets({ fal: "sk-fal" }) },
+        id,
+        { references: true }
+      );
+      expect(r.provider_id).toBe("fal");
+      expect(r.binding_id).toBe(`${id.replace("2.5-", "2.5/")}/edit`);
+      expect(r.references_max).toBe(16);
+    });
+
+    it.each([undefined, "gg", "vercel", "openrouter"] as const)(
+      "refuses unavailable provider %s even with a live GG session",
+      async (explicit) => {
+        const gg = new GridaGatewaySessionStore();
+        gg.set({
+          access_token: "test-token",
+          expires_at: Date.now() + 900_000,
+        });
+        await expect(
+          resolveImageModel(
+            {
+              secrets: fakeSecrets({ vercel: "sk-v", openrouter: "sk-or" }),
+              gg,
+              gg_base_url: "https://grida.test",
+            },
+            id,
+            { explicit }
+          )
+        ).rejects.toBeInstanceOf(ImageModelUnavailableError);
+      }
+    );
+
+    it("names FAL as the connection required for editing", async () => {
+      await expect(
+        resolveImageModel(
+          { secrets: fakeSecrets({ openrouter: "sk-or" }) },
+          id,
+          { references: true }
+        )
+      ).rejects.toThrow(/reference images.*connect a key for: fal/is);
+    });
   });
 
   describe("image-to-image (references)", () => {

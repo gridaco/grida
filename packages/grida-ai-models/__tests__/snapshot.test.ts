@@ -525,6 +525,20 @@ describe("models.snapshot media — image validation", () => {
       },
     ],
     ["no provider bindings", { providers: {} }],
+    ["an unknown primary provider", { provider: "futureprovider" }],
+    ["empty quality options", { quality: { options: [], default: "high" } }],
+    [
+      "a non-string quality option",
+      { quality: { options: ["high", 1], default: "high" } },
+    ],
+    [
+      "a quality default outside its choices",
+      { quality: { options: ["high"], default: "auto" } },
+    ],
+    [
+      "a negative text output price",
+      { pricing: { type: "per_token", input: 5, output: 30, text_output: -1 } },
+    ],
   ])("rejects %s", (_label, over) => {
     const parsed = snapshot.parse(mutateCard("openai/gpt-image-2", over));
     // The text catalogue survives; only the media section is dropped.
@@ -532,9 +546,9 @@ describe("models.snapshot media — image validation", () => {
     expect(parsed!.image).toBeUndefined();
   });
 
-  it("rejects a listed card missing a binding — the one-key promise", () => {
-    // A curated card is servable by EVERY provider, so one connected key
-    // serves the whole list. resolve-image.ts relies on it.
+  it("accepts a listed card with partial provider coverage", () => {
+    // Listings need a verified route, not every provider. The runtime must
+    // select a binding the user has credentials for (or fail closed).
     const image = seedImage();
     const card = image["openai/gpt-image-2"] as Record<string, unknown>;
     const providers = { ...(card.providers as object) } as Record<
@@ -543,8 +557,22 @@ describe("models.snapshot media — image validation", () => {
     >;
     delete providers.fal;
     image["openai/gpt-image-2"] = { ...card, providers } as never;
-    expect(snapshot.parse(withMedia({ image }))!.image).toBeUndefined();
+    expect(snapshot.parse(withMedia({ image }))!.image).toBeDefined();
   });
+
+  it.each(["flare", "sunburst"] as const)(
+    "round-trips the FAL-only %s card with quality, edit route and split rates",
+    (variant) => {
+      const id = `openai/gpt-image-2.5-${variant}`;
+      const parsed = snapshot.parse(withMedia({ image: seedImage() }))!;
+      const card = parsed.image!.models[id]!;
+      expect(card).toEqual(models.image.models[id]);
+      expect(card.provider).toBe("fal");
+      expect(card.quality?.default).toBe("high");
+      expect(card.providers.fal?.references?.max).toBe(16);
+      expect(card.providers.fal?.pricing).toMatchObject({ text_output: 10 });
+    }
+  );
 
   it("allows an UNLISTED card to be missing bindings", () => {
     const image = seedImage();

@@ -11,10 +11,9 @@
  *
  * Precedence mirrors `resolveProvider`: `BYOK_PROVIDER_METADATA` order,
  * intersected with (a) providers this card binds and (b) providers with a
- * stored key. Because the curated list is **universal** (every `listed` card
- * binds every provider — enforced by a catalog invariant test), one connected
- * key serves the whole list. Non-`listed` cards are not part of the v1 BYOK
- * surface and are rejected.
+ * stored key. A listed card may initially bind only one provider, so the
+ * connection must match that card's verified bindings. Non-`listed` cards
+ * are not part of the BYOK surface and are rejected.
  */
 
 import { models } from "@grida/ai-models";
@@ -82,9 +81,8 @@ export class ImageModelUnavailableError extends Error {
 
 /**
  * The providers whose binding serves the image-to-image (references) route for
- * `card` — the set a user could connect a key for to unlock i2i. Today only
- * OpenRouter carries `references` bindings (verified live 2026-07-01), but this
- * reads the catalog so the error message stays honest as bindings are added.
+ * `card` — the set a user could connect a key for to unlock i2i. Reads the
+ * catalog so the error message stays honest as provider edit bindings change.
  */
 function referenceCapableProviders(
   card: models.image.ImageModelCard,
@@ -127,8 +125,8 @@ export type ResolveImageOptions = {
  * The default image model for a caller that doesn't pick one (e.g. a bare
  * `generate_image({prompt})`). An EXPLICIT, tracked pin — {@link
  * DEFAULT_IMAGE_MODEL_ID} (see `./preferences`) — not "whatever the catalog
- * lists first". Because the curated list is universal (every `listed` card binds
- * every provider), one connected key serves it.
+ * lists first". The default pin binds every image provider; newer listed cards
+ * may require a specific provider connection.
  *
  * Fallback to the first curated `listed` card guards catalog drift only: if the
  * pin were ever dropped/unlisted, a connected key can still serve *some* default
@@ -156,8 +154,8 @@ export async function hasUsableImageProvider(
     if (!isImageProvider(p.id)) continue;
     if (await deps.secrets._getKey(p.id)) return true;
   }
-  // Grida hosted (GRIDA-SEC-006): a live session serves the curated list
-  // too — a signed-in keyless user gets in-chat image generation.
+  // Grida hosted (GRIDA-SEC-006): a live session serves cards with a Vercel
+  // binding too — a signed-in keyless user gets in-chat image generation.
   return liveGgMediaDeps(deps) !== null;
 }
 
@@ -203,8 +201,7 @@ export async function resolveImageModel(
     (v) => !v.image.cardById(modelId)
   );
   const card = view.image.cardById(modelId);
-  // Unknown id, or a non-curated card (legacy / not universal) — not part of
-  // the v1 BYOK image surface.
+  // Unknown id, or a non-curated card — not part of the BYOK image surface.
   if (!card || !card.listed) {
     throw new ImageModelUnavailableError(modelId, options.explicit);
   }

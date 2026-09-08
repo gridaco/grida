@@ -177,6 +177,20 @@ describe("POST /api/v1/ai/images/generations", () => {
     expect(mockedGetEntitlement).not.toHaveBeenCalled();
   });
 
+  it.each(["openai/gpt-image-2.5-flare", "openai/gpt-image-2.5-sunburst"])(
+    "rejects FAL-only %s before hosted billing or inference",
+    async (modelId) => {
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request({ model_id: modelId, prompt: "x" }, token)
+      );
+      expect(res.status).toBe(404);
+      expect(h.imageCalls).toBe(0);
+      expect(mockedGetEntitlement).not.toHaveBeenCalled();
+      expect(mockedIngest).not.toHaveBeenCalled();
+    }
+  );
+
   it("402 for blocked orgs, before the provider call", async () => {
     mockedGetEntitlement.mockResolvedValue({
       allowed: false,

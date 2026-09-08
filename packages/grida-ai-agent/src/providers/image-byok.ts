@@ -176,7 +176,12 @@ const FAL_QUEUE_BASE = "https://queue.fal.run";
 const FAL_HOSTS = ["*.fal.run", "fal.run", "fal.media", "*.fal.media"] as const;
 /** Total poll budget. fal image jobs are typically seconds; cap to stay bounded. */
 const FAL_POLL_TIMEOUT_MS = 120_000;
+/** GPT Image 2.5 includes the slower Sunburst renderer. Give this family the
+ * same bounded queue budget as fal's longer-running media jobs. */
+const FAL_GPT_IMAGE_2_5_POLL_TIMEOUT_MS = 600_000;
 const FAL_POLL_INTERVAL_MS = 1_000;
+const FAL_GPT_IMAGE_2_5_ROUTE =
+  /^openai\/gpt-image-2\.5\/(?:flare|sunburst)\/(?:text-to-image|edit)$/;
 
 type FalSubmitResponse = {
   request_id: string;
@@ -220,19 +225,33 @@ export class FalImageModel implements ImageModelV3 {
     const { prompt, n, size, aspectRatio, seed, providerOptions, abortSignal } =
       options;
 
-    // fal accepts `image_size` either as an enum or `{ width, height }`.
-    const image_size = size ? whFromSize(size) : undefined;
-    const falExtra =
-      (providerOptions?.fal as Record<string, unknown> | undefined) ?? {};
+    const isGptImage25 = FAL_GPT_IMAGE_2_5_ROUTE.test(this.modelId);
+    // An omitted SDK size means Auto in the UI. GPT Image 2.5's t2i default
+    // is landscape_4_3, so send auto explicitly instead of accepting that default.
+    const image_size =
+      (size ? whFromSize(size) : undefined) ??
+      (isGptImage25 ? "auto" : undefined);
+    // Curated, capped references from the internal namespace are authoritative.
+    // A passthrough image_urls field must not inject or replace those inputs.
+    // Keep sync_mode at its false default: this adapter consumes CDN results.
+    const {
+      image_urls: _ignoredRefs,
+      sync_mode: _ignoredSync,
+      ...falExtra
+    } = (providerOptions?.fal as Record<string, unknown> | undefined) ?? {};
+    const acceptsReferences = isGptImage25 && this.modelId.endsWith("/edit");
+    const refs = gridaReferences(providerOptions);
 
-    // Image-to-image is NOT wired on the fal route: the catalog ships no fal
-    // `references` binding, so resolveImageModel never routes an i2i call here.
-    // Guard that coupling — if references ever arrive (e.g. a fal edit binding is
-    // added without mapping them into fal's field), fail loudly rather than
-    // silently degrading to a t2i generation the caller didn't ask for.
-    if (gridaReferences(providerOptions)) {
+    // Only these researched edit schemas consume image_urls. Keep other routes
+    // closed so adding a catalog binding cannot silently degrade i2i to t2i.
+    if (refs && !acceptsReferences) {
       throw new Error(
-        "[fal] image-to-image references are not supported on the fal route yet"
+        "[fal] image-to-image references are not supported on this fal route"
+      );
+    }
+    if (acceptsReferences && (!refs || refs.length > 16)) {
+      throw new Error(
+        "[fal] GPT Image 2.5 edits require 1–16 reference images"
       );
     }
 
@@ -250,6 +269,7 @@ export class FalImageModel implements ImageModelV3 {
           ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
           ...(seed !== undefined ? { seed } : {}),
           ...falExtra,
+          ...(refs ? { image_urls: refs } : {}),
         }),
       }
     );
@@ -271,7 +291,9 @@ export class FalImageModel implements ImageModelV3 {
       submit.status_url,
       {
         headers: this.headers(),
-        timeoutMs: FAL_POLL_TIMEOUT_MS,
+        timeoutMs: isGptImage25
+          ? FAL_GPT_IMAGE_2_5_POLL_TIMEOUT_MS
+          : FAL_POLL_TIMEOUT_MS,
         intervalMs: FAL_POLL_INTERVAL_MS,
         label: "[fal]",
         classify: falQueueOutcome,
@@ -330,9 +352,9 @@ export class FalImageModel implements ImageModelV3 {
  * Pull image-to-image reference URLs off our INTERNAL `grida` provider-options
  * namespace. The host (`createImageGenerator`) puts the curated board's
  * references here as https or base64 data URLs; adapters map them to each
- * provider's own field (OpenRouter `input_references`). This namespace is never
- * forwarded raw to a provider. Returns `undefined` when there are no usable
- * references.
+ * provider's own field (OpenRouter `input_references`, fal `image_urls`). This
+ * namespace is never forwarded raw to a provider. Returns `undefined` when
+ * there are no usable references.
  */
 function gridaReferences(
   providerOptions: ImageModelV3CallOptions["providerOptions"]

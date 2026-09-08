@@ -84,7 +84,7 @@ describe("models.image.findImageModelCard", () => {
   });
 
   it("returns null when the bare name matches no card", () => {
-    // "gpt-image" is a prefix of three OpenAI ids but is not the
+    // "gpt-image" is a prefix of several OpenAI ids but is not the
     // bare name of any of them — must refuse rather than guess.
     expect(models.image.findImageModelCard("gpt-image")).toBeNull();
   });
@@ -147,16 +147,50 @@ describe("models.image provider-binding invariants", () => {
     }
   });
 
-  it("listed cards are universal (served by every supported provider)", () => {
-    // The one-key promise: a single connected provider serves every listed
-    // card. If a listed card loses a binding, this fails loudly.
-    const ALL: models.image.ImageProvider[] = ["vercel", "fal", "openrouter"];
-    for (const card of models.image.listed_models()) {
-      for (const p of ALL) {
-        expect(models.image.binding(card, p)).not.toBeNull();
-      }
+  it.each(["flare", "sunburst"] as const)(
+    "lists GPT Image 2.5 %s only on its verified FAL routes",
+    (variant) => {
+      const card = models.image.models[`openai/gpt-image-2.5-${variant}`]!;
+      expect(card).toMatchObject({
+        listed: true,
+        deprecated: false,
+        provider: "fal",
+        release: { date: "2026-09-08", basis: "model" },
+        quality: {
+          options: ["auto", "low", "medium", "high", "xhigh", "max"],
+          default: "high",
+        },
+        constraints: {
+          step: 16,
+          max_edge: 3840,
+          min_pixels: 655360,
+          max_pixels: 8294400,
+          aspect_ratio: { max: 3 },
+        },
+      });
+      expect(Object.keys(card.providers)).toEqual(["fal"]);
+      expect(models.image.binding(card, "vercel")).toBeNull();
+      expect(models.image.binding(card, "openrouter")).toBeNull();
+      expect(models.image.binding(card, "fal")).toMatchObject({
+        id: `openai/gpt-image-2.5/${variant}/text-to-image`,
+        references: {
+          id: `openai/gpt-image-2.5/${variant}/edit`,
+          max: 16,
+        },
+        // All six rates are published by FAL for both generation and edits,
+        // in USD per million tokens (not OpenAI's old per-image tiers).
+        pricing: {
+          type: "per_token",
+          input: 5,
+          cached_input: 1.25,
+          image_input: 8,
+          cached_image_input: 2,
+          text_output: 10,
+          output: 30,
+        },
+      });
     }
-  });
+  );
 
   it("binding() resolves a present provider and nulls an absent one", () => {
     const kontext = models.image.models["bfl/flux-kontext-max"]!;

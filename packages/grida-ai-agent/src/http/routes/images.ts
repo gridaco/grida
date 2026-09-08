@@ -102,10 +102,9 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
     // The OpenRouter/fal adapters spread their provider-option bag into the
     // upstream request body, so `{ quality }` reaches the provider that supports
     // it; others ignore it. NB: keyed by provider, never `grida` (no billing).
-    const providerOptions =
-      quality && quality !== "auto"
-        ? { [resolved.provider_id]: { quality } }
-        : undefined;
+    const providerOptions = quality
+      ? { [resolved.provider_id]: { quality } }
+      : undefined;
 
     let generation;
     try {

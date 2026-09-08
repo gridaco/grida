@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
+import { generateImage } from "ai";
 import type { MediaItem } from "@grida/daemon";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import { registerImagesRoutes } from "./images";
@@ -14,10 +15,13 @@ const generation = vi.hoisted(() => ({
   images: [] as Array<{ base64: string; mediaType: string }>,
 }));
 vi.mock("ai", () => ({
-  generateImage: async () => generation,
+  generateImage: vi.fn<() => Promise<typeof generation>>(
+    async () => generation
+  ),
 }));
 
 beforeEach(() => {
+  vi.mocked(generateImage).mockClear();
   generation.images = [{ base64: "AAAA", mediaType: "image/png" }];
 });
 
@@ -88,6 +92,26 @@ describe("POST /images/generate", () => {
       "vercel"
     );
   });
+
+  it.each(["auto", "xhigh", "max"])(
+    "forwards GPT Image 2.5 quality %s to FAL",
+    async (quality) => {
+      const res = await post(appWith({ fal: "sk-fal" }), {
+        model_id: "openai/gpt-image-2.5-sunburst",
+        prompt: "a detailed landscape",
+        quality,
+        width: 1536,
+        height: 1024,
+      });
+      expect(res.status).toBe(200);
+      expect(vi.mocked(generateImage)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          size: "1536x1024",
+          providerOptions: { fal: { quality } },
+        })
+      );
+    }
+  );
 
   it("never returns the api key in the response", async () => {
     const res = await post(appWith({ fal: "sk-secret-123" }), {
