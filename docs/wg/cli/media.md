@@ -172,6 +172,15 @@ input parsing and execution for both Desktop and CLI. Account custody and
 scoped GG access retain their separate authorities. No agent runtime, server
 framework or Desktop process is needed to execute these operations.
 
+## Planned: shared provider credentials
+
+The accepted [provider custody design](./credential-custody.md#provider-credentials)
+uses a shared, private plaintext `credentials.toml` for Desktop and CLI BYOK.
+Environment/stdin remain invocation-only overrides. Configuration/removal,
+Desktop migration and the language-neutral storage contract must be implemented
+before the CLI reads this file. Optional keyring storage is deferred.
+The current preview continues to use explicit environment/stdin credentials.
+
 ## Planned: provider-native endpoints
 
 After exporting existing Desktop operations, extend the same command to an
@@ -241,8 +250,6 @@ Grida Desktop or a local agent loop.
   an exported Grida contract. Validation failure must never switch contracts.
 - For the planned provider-native extension, allow explicit raw JSON when
   schema-based validation is unavailable or insufficient.
-- Add persistent CLI provider configuration only after its custody and removal
-  contract is defined; current BYOK uses explicit environment or stdin inputs.
 
 ## What the other CLIs establish
 

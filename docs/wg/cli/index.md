@@ -42,8 +42,11 @@ commands, Canvas integration, subscription billing, and MCP are deferred.
 Account work starts with login, organization membership and the credit check
 needed before generation.
 
-The [credential custody study](./credential-custody.md) compares established
-CLIs and defines durable login storage and refresh coordination.
+The [credential custody study](./credential-custody.md) defines Grida account
+storage and refresh coordination. Its accepted
+[provider credential design](./credential-custody.md#provider-credentials)
+uses a shared, private TOML file for Desktop and CLI BYOK; implementation and
+migration are pending.
 
 ## One name, independent products
 
