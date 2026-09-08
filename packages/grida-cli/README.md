@@ -71,6 +71,14 @@ BYOK saves keys to `~/.grida/providers/credentials.toml`, or
 `$GRIDA_HOME/providers/credentials.toml` when `GRIDA_HOME` is an absolute path,
 without Grida login. `providers configure <provider>` stores a key using hidden input
 or `--key-stdin`; `providers remove <provider>` removes the shared stored key.
+All selected keys (file, environment or stdin) pass cheap static validation through
+[the shared provider policy](https://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md).
+`configure` additionally checks OpenRouter, Vercel and fal once before saving;
+rejection, denial or an unavailable check leaves the old key unchanged. ElevenLabs
+has no suitable permission-neutral check and saves with `verification.status` set
+to `not_supported`. Successful supported checks report `accepted`, which proves
+only that read was accepted now. Verification is never stored or repeated by
+listing, availability, voice discovery or generation.
 `providers list` shows presence, source and plaintext storage mode, not verified
 access. The same native owner serves Desktop, independently of its lifetime.
 Environment keys or `--key-stdin` override storage without opening it or persisting

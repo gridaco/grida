@@ -1,6 +1,9 @@
 // GRIDA-SEC-013 / GRIDA-SEC-014 — invocation overrides before shared provider custody.
 import { ProviderCredentialStore } from "@grida/auth/providers";
-import type { ByokProviderId } from "@grida/ai/providers";
+import {
+  ProviderCredentials as ProviderCredentialPolicy,
+  type ByokProviderId,
+} from "@grida/ai/providers";
 
 /** One command's trusted key reader. Only status() is suitable for CLI output. */
 export class ProviderCredentials {
@@ -41,14 +44,12 @@ export class ProviderCredentials {
         const name = environment[id];
         const value = Object.hasOwn(env, name) ? env[name] : undefined;
         if (value === undefined) continue;
-        const key = normalize(value, true);
-        if (key !== null) {
-          owner.#values.set(id, key);
-          owner.#sources.set(id, "environment");
-        }
+        const key = normalize(id, value);
+        owner.#values.set(id, key);
+        owner.#sources.set(id, "environment");
       }
       if (isProvider(provider) && input) {
-        const key = await readKey(input, signal);
+        const key = await readKey(provider, input, signal);
         owner.#values.set(provider, key);
         owner.#sources.set(provider, "stdin");
       }
@@ -64,7 +65,7 @@ export class ProviderCredentials {
             throw new ProviderCredentials.Failure("cancelled");
           const value = await store.read(id);
           if (value === null) continue;
-          owner.#values.set(id, normalize(value, true)!);
+          owner.#values.set(id, normalize(id, value));
           owner.#sources.set(id, "file");
         }
       }
@@ -132,7 +133,7 @@ export namespace ProviderCredentials {
     ) {
       super(
         code === "invalid_credentials"
-          ? "Provider credentials must be a nonblank key of at most 4 KiB."
+          ? "Provider key has an invalid format or is a placeholder. Check the provider key format in grida providers --help."
           : code === "cancelled"
             ? "Provider credential input was cancelled."
             : "Provider credential input could not be read."
@@ -158,22 +159,13 @@ function invalid(): ProviderCredentials.Failure {
   return new ProviderCredentials.Failure("invalid_credentials");
 }
 
-function normalize(value: unknown, required: boolean): string | null {
-  if (
-    typeof value !== "string" ||
-    value.length > maxBytes ||
-    Buffer.byteLength(value, "utf8") > maxBytes
-  )
+function normalize(provider: ByokProviderId, value: unknown): string {
+  try {
+    // All CLI sources share first-party policy; custody itself stays opaque.
+    return ProviderCredentialPolicy.normalize(provider, value);
+  } catch {
     throw invalid();
-  const key = value.trim();
-  if (!key) {
-    if (required) throw invalid();
-    return null;
   }
-  // Provider keys are opaque header values. Refuse embedded whitespace,
-  // controls and non-ASCII text instead of guessing or forwarding a bad key.
-  if (!/^[\x21-\x7e]+$/.test(key)) throw invalid();
-  return key;
 }
 
 function safeFailure(error: unknown): ProviderCredentials.Failure {
@@ -194,6 +186,7 @@ function safeFailure(error: unknown): ProviderCredentials.Failure {
 }
 
 async function readKey(
+  provider: ByokProviderId,
   input: AsyncIterable<Uint8Array>,
   signal: AbortSignal | undefined
 ): Promise<string> {
@@ -250,7 +243,7 @@ async function readKey(
       const chunk = await wait(iterator.next());
       if (chunk.done) {
         completed = true;
-        return normalize(bytes.toString("utf8", 0, length), true)!;
+        return normalize(provider, bytes.toString("utf8", 0, length));
       }
       const value = chunk.value;
       if (

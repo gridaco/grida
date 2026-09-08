@@ -359,7 +359,7 @@ describe("MediaCommands preflight and BYOK", () => {
 
   it("keeps a missing selected BYOK key separate from Grida login and cleans its reservation", async () => {
     const root = await temporary();
-    const test = fixture({ OPENROUTER_API_KEY: KEY });
+    const test = fixture({ OPENROUTER_API_KEY: "sk-or-" + KEY });
     expect(
       await test.invoke(generateArgs(path.join(root, "result")), {
         prompt: PROMPT,
@@ -662,7 +662,7 @@ describe("MediaCommands failure and signal lifetime", () => {
 
   it("retains a partial result and safe saved paths after an output collision without retrying generation", async () => {
     const out = path.join(await temporary(), "result");
-    const test = fixture({ OPENROUTER_API_KEY: KEY });
+    const test = fixture({ OPENROUTER_API_KEY: "sk-or-" + KEY });
     test.request.mockImplementation(async () => {
       await writeFile(
         path.join(out, "output-2.png"),

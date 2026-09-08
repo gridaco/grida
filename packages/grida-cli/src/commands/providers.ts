@@ -1,11 +1,14 @@
-// GRIDA-SEC-014 — explicit shared provider mutation, never account login or key echo.
+// GRIDA-SEC-013 / GRIDA-SEC-014 — check before shared custody; no account login or key echo.
 import { ProviderCredentialStore } from "@grida/auth/providers";
+import { ProviderHttp, type ProviderHttpTransport } from "@grida/ai";
+import { ProviderCredentials as ProviderCredentialPolicy } from "@grida/ai/providers";
 import { Readable } from "node:stream";
 import { Cli } from "../cli";
 import { Output } from "../output";
 import { ProviderCredentials } from "../provider-credentials";
 import { ProviderPrompt } from "../provider-prompt";
 import { ProviderStore } from "../provider-store";
+import { MediaHttp } from "../media-http";
 
 export namespace ProviderCommands {
   export type Host = {
@@ -13,6 +16,7 @@ export namespace ProviderCommands {
     stdin: Readable;
     openStore: typeof ProviderStore.open;
     prompt: (signal: AbortSignal) => Promise<Uint8Array>;
+    transport: () => ProviderHttpTransport;
   };
 
   export async function run(
@@ -24,12 +28,14 @@ export namespace ProviderCommands {
       openStore: ProviderStore.open,
       prompt: (signal) =>
         ProviderPrompt.read(process.stdin, process.stderr, signal),
+      transport: () => new MediaHttp().transport,
     }
   ): Promise<number> {
     const controller = new AbortController();
     const interrupt = () => controller.abort();
     let credentials: ProviderCredentials | undefined;
     let prompted: Uint8Array | undefined;
+    let verification: ProviderCredentialPolicy.CheckResult | undefined;
     process.on("SIGINT", interrupt);
     process.on("SIGTERM", interrupt);
     try {
@@ -50,6 +56,15 @@ export namespace ProviderCommands {
               ? host.stdin
               : Readable.from([prompted!]),
           },
+          signal: controller.signal,
+        });
+        // Only explicit registration probes. Reads and generation use static
+        // admission alone; verification is transient and never stored in TOML.
+        verification = await new ProviderCredentialPolicy({
+          http: new ProviderHttp(host.transport()),
+        }).check({
+          provider: invocation.provider,
+          key: credentials.get(invocation.provider)!,
           signal: controller.signal,
         });
       }
@@ -73,17 +88,27 @@ export namespace ProviderCommands {
           storage: "plaintext_file",
           shared: true,
           environment_checked: false,
+          ...(verification ? { verification } : {}),
         },
         [
           configured
             ? `${invocation.provider}: saved to shared plaintext credentials.toml with private permissions.`
             : `${invocation.provider}: removed from shared credentials.toml. The provider key has not been revoked.`,
           "Desktop and CLI share stored keys. Environment overrides remain effective; Grida login is separate.",
+          ...(verification
+            ? [
+                verification.status === "accepted"
+                  ? "Provider accepted the key check. Model access and available credits remain unverified."
+                  : "No suitable provider key check is available; saved with static validation only.",
+              ]
+            : []),
         ]
       );
       return 0;
     } catch (error) {
-      if (error instanceof ProviderCredentialStore.Failure)
+      if (error instanceof ProviderCredentialPolicy.Failure)
+        output.failure({ code: error.code, message: checkMessage(error.code) });
+      else if (error instanceof ProviderCredentialStore.Failure)
         output.failure({
           code: error.code,
           message: ProviderStore.message(error.code),
@@ -108,5 +133,22 @@ export namespace ProviderCommands {
       process.removeListener("SIGINT", interrupt);
       process.removeListener("SIGTERM", interrupt);
     }
+  }
+}
+
+function checkMessage(code: ProviderCredentialPolicy.FailureCode): string {
+  switch (code) {
+    case "invalid_input":
+      return "The provider key has an invalid format. Stored credentials were not changed.";
+    case "credential_rejected":
+      return "The provider rejected this key for inference use. Stored credentials were not changed.";
+    case "access_denied":
+      return "The provider denied the key check. Check key permissions or account restrictions; stored credentials were not changed.";
+    case "aborted":
+      return "Provider configuration cancelled before saving.";
+    case "timeout":
+      return "The provider key check timed out. Stored credentials were not changed; retry configuration when ready.";
+    default:
+      return "The provider key check could not be completed. Stored credentials were not changed; retry configuration when ready.";
   }
 }

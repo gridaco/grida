@@ -5,7 +5,7 @@ import { inspect } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProviderCredentials } from "./provider-credentials";
 
-const secret = "synthetic-provider-key";
+const secret = "synthetic:provider-key";
 const bytes = (value: string) => Buffer.from(value);
 const stream = (...values: string[]) => Readable.from(values.map(bytes));
 const openStdin = (input: AsyncIterable<Uint8Array>, signal?: AbortSignal) =>
@@ -23,9 +23,9 @@ afterEach(() => {
 describe("ProviderCredentials environment", () => {
   it("reads only the four exact supported environment names", async () => {
     const env = {
-      OPENROUTER_API_KEY: " openrouter-synthetic \n",
-      AI_GATEWAY_API_KEY: "gateway-synthetic",
-      FAL_KEY: "fal-synthetic",
+      OPENROUTER_API_KEY: " sk-or-openrouter-synthetic \n",
+      AI_GATEWAY_API_KEY: "vck_gateway-synthetic",
+      FAL_KEY: "fal:synthetic",
       ELEVENLABS_API_KEY: "elevenlabs-synthetic",
       BYOK_OPENROUTER_API_KEY: "legacy-ignored",
       GRIDA_BYOK_KEY: "legacy-ignored",
@@ -63,9 +63,9 @@ describe("ProviderCredentials environment", () => {
         source: "environment",
       },
     ]);
-    expect(owner.get("openrouter")).toBe("openrouter-synthetic");
-    expect(owner.get("vercel")).toBe("gateway-synthetic");
-    expect(owner.get("fal")).toBe("fal-synthetic");
+    expect(owner.get("openrouter")).toBe("sk-or-openrouter-synthetic");
+    expect(owner.get("vercel")).toBe("vck_gateway-synthetic");
+    expect(owner.get("fal")).toBe("fal:synthetic");
     expect(owner.get("elevenlabs")).toBe("elevenlabs-synthetic");
   });
 
@@ -138,7 +138,7 @@ describe("ProviderCredentials environment", () => {
 
   it("accepts an exact 4 KiB ASCII key", async () => {
     const owner = await ProviderCredentials.open({
-      env: { FAL_KEY: "k".repeat(4096) },
+      env: { FAL_KEY: "id:" + "k".repeat(4093) },
     });
     expect(owner.get("fal")).toHaveLength(4096);
   });
@@ -194,12 +194,12 @@ describe("ProviderCredentials explicit stdin", () => {
         get FAL_KEY(): string {
           throw new Error("overridden slot must not be read");
         },
-        OPENROUTER_API_KEY: "separate-key",
+        OPENROUTER_API_KEY: "sk-or-separate-key",
       },
       stdin: { provider: "fal", input: stream("  ", secret, "\n") },
     });
     expect(owner.get("fal")).toBe(secret);
-    expect(owner.get("openrouter")).toBe("separate-key");
+    expect(owner.get("openrouter")).toBe("sk-or-separate-key");
     expect(
       owner.status().find((value) => value.provider === "fal")?.source
     ).toBe("stdin");

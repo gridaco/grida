@@ -157,6 +157,28 @@ Precedence is `--key-stdin`, the selected provider's environment variable, then
 the shared file. A blank or malformed explicit key fails; unset the environment
 variable to use storage. Overrides never persist or open the selected stored key.
 
+### Key validation
+
+Every selected CLI key, whether loaded from TOML, environment or stdin, passes
+cheap static validation. Obvious template values are rejected. Provider-specific
+rules require official evidence; Grida's input size/header-safety limits are not
+claims about a provider's key length. The
+[shared provider policy](https://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md)
+owns the exact rules, upstream references and authenticated check endpoints.
+
+`providers configure` checks a newly entered OpenRouter, Vercel or fal key once
+before saving, including when input comes from `--key-stdin`. A rejected,
+permission-denied, timed-out or inconclusive check does not replace the old key.
+ElevenLabs has no suitable permission-neutral check; its key is saved with static
+validation only. Output distinguishes `verification.status: accepted` from
+`not_supported`. Neither promises model entitlement, credits or future access.
+
+File edits, invocation overrides, listing, availability and generation never
+trigger registration checks. Verification is not persisted or cached as authority.
+A future custom base URL requires its own credential and endpoint policy; protocol
+compatibility alone must never select first-party key formats or probe destinations.
+Custom base URL configuration remains deferred.
+
 ### Protection and lifecycle
 
 - Use one canonical provider file per Grida home, separate from project

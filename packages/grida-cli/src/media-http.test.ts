@@ -180,6 +180,21 @@ describe("MediaHttp provider authority", () => {
 
   it.each([
     [
+      "https://openrouter.ai/api/v1/key",
+      "GET",
+      { authorization: "Bearer sk-or-synthetic" },
+    ],
+    [
+      "https://ai-gateway.vercel.sh/v1/credits",
+      "GET",
+      { authorization: "Bearer vck_synthetic" },
+    ],
+    [
+      "https://api.fal.ai/v1/models/pricing?endpoint_id=fal-ai/flux/dev",
+      "GET",
+      { authorization: "Key synthetic:fal" },
+    ],
+    [
       "https://queue.fal.run/fal-ai/fixture",
       "POST",
       {
@@ -251,6 +266,70 @@ describe("MediaHttp provider authority", () => {
       expect(sockets).toHaveLength(1);
     }
   );
+
+  it.each([
+    [
+      "https://openrouter.ai/api/v1/key?leak=value",
+      "GET",
+      "Bearer sk-or-synthetic",
+    ],
+    [
+      "https://ai-gateway.vercel.sh/v1/credits?team=other",
+      "GET",
+      "Bearer vck_synthetic",
+    ],
+    ["https://api.fal.ai/v1/models/pricing", "GET", "Key synthetic:fal"],
+    [
+      "https://api.fal.ai/v1/models/pricing?endpoint_id=other",
+      "GET",
+      "Key synthetic:fal",
+    ],
+    [
+      "https://api.fal.ai/v1/models/pricing?endpoint_id=fal-ai/flux/dev&extra=value",
+      "GET",
+      "Key synthetic:fal",
+    ],
+    [
+      "https://api.fal.ai/v1/models/pricing?endpoint_id=fal-ai/flux/dev&endpoint_id=fal-ai/flux/dev",
+      "GET",
+      "Key synthetic:fal",
+    ],
+    ["https://api.fal.ai/v1/models", "GET", "Key synthetic:fal"],
+    ["https://api.elevenlabs.io/v1/user", "GET", "Bearer synthetic"],
+    ["https://openrouter.ai/api/v1/key", "POST", "Bearer sk-or-synthetic"],
+    ["https://ai-gateway.vercel.sh/v1/credits", "POST", "Bearer vck_synthetic"],
+    [
+      "https://api.fal.ai/v1/models/pricing?endpoint_id=fal-ai/flux/dev",
+      "POST",
+      "Key synthetic:fal",
+    ],
+    ["https://openrouter.ai/api/v1/key", "GET", "Key synthetic:fal"],
+    ["https://ai-gateway.vercel.sh/v1/credits", "GET", "Key synthetic:fal"],
+    [
+      "https://api.fal.ai/v1/models/pricing?endpoint_id=fal-ai/flux/dev",
+      "GET",
+      "Bearer synthetic",
+    ],
+  ])(
+    "refuses unsupported registration authority before DNS: %s %s",
+    async (url, method, authorization) => {
+      await refused(url, { method, headers: { authorization } });
+      expect(lookup).not.toHaveBeenCalled();
+      expect(sockets).toHaveLength(0);
+    }
+  );
+
+  it("does not replay a registration credential on a redirect", async () => {
+    fixtures.push({
+      status: 302,
+      headers: { location: "https://openrouter.ai/api/v1/key" },
+    });
+    await refused("https://openrouter.ai/api/v1/key", {
+      headers: { authorization: "Bearer sk-or-synthetic" },
+    });
+    expect(sockets).toHaveLength(1);
+    expect(lookup).toHaveBeenCalledOnce();
+  });
 
   it.each([
     "https://openrouter.ai.evil.invalid/api/v1/images",

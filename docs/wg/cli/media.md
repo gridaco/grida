@@ -102,13 +102,16 @@ native CLI login and organization.
 | `fal`        | `FAL_KEY`                 |
 | `elevenlabs` | `ELEVENLABS_API_KEY`      |
 
-`providers list` reports key presence and source, never contents. It does not
-verify keys. Precedence is stdin, environment, then the shared file. An explicit
-key bypasses file access and never persists; a blank or malformed override fails.
+`providers list` reports key presence and source after cheap static validation,
+never contents. It does not verify provider access. Precedence is stdin, environment,
+then the shared file. An explicit key bypasses file access and never persists;
+a blank or malformed override fails.
 `--key-stdin` cannot share stdin with `--input -`. Keys are never literal command
 arguments. `providers remove <provider>` removes the shared stored key for both
 clients; environment overrides remain effective. Grida logout leaves provider
-keys intact.
+keys intact. `configure` performs the custody contract's supported registration
+check once before saving; ordinary reads and generation never add a key-check
+request. Provider formats and probes have one owner in the shared AI layer.
 
 Speech needs a provider voice in addition to its model:
 

@@ -127,7 +127,8 @@ function route(
       (method === "POST" &&
         ["/api/v1/images", "/api/v1/videos"].includes(path)) ||
       (method === "GET" &&
-        /^\/api\/v1\/videos\/[^/]+(?:\/content)?$/.test(path))
+        (/^\/api\/v1\/videos\/[^/]+(?:\/content)?$/.test(path) ||
+          (path === "/api/v1/key" && !target.search)))
     )
       return "openrouter";
   }
@@ -136,10 +137,19 @@ function route(
     return "openrouter";
   if (
     target.hostname === "ai-gateway.vercel.sh" &&
-    method === "POST" &&
-    /^\/v3\/ai\/(?:image|video)-model$/.test(path)
+    ((method === "POST" && /^\/v3\/ai\/(?:image|video)-model$/.test(path)) ||
+      (method === "GET" && path === "/v1/credits" && !target.search))
   )
     return "vercel";
+  // Registration-only read. Do not grant the wider platform/management API.
+  if (
+    target.hostname === "api.fal.ai" &&
+    method === "GET" &&
+    path === "/v1/models/pricing" &&
+    target.searchParams.size === 1 &&
+    target.searchParams.get("endpoint_id") === "fal-ai/flux/dev"
+  )
+    return "fal";
   if (
     target.hostname === "queue.fal.run" &&
     ["GET", "POST"].includes(method) &&

@@ -23,13 +23,25 @@ and omits the optional keyring binding. No Docker or hosted service is needed.
 
 The proof checks offline discovery and schemas, explicit provider presence and
 stdin keys, shared TOML configuration/removal across restarts and concurrent
-processes, overrides that bypass corrupt storage, stored-key generation, image/video/music/SFX/speech/3D artifacts and receipts, paginated voice
+processes, overrides that bypass corrupt storage, stored-key generation,
+image/video/music/SFX/speech/3D artifacts and receipts, paginated voice
 projection, every existing 3D input contract, invalid-input/output preflight,
 access-denied errors and cancellation without retry. The GG fixture checks the
 account token on account/mint routes and a distinct scoped token on media routes.
 Independent music processes remint; GG credentials are absent from durable
 profile files. Tiny signature bytes prove byte transport and persistence, not
 media codec validity.
+
+Provider configuration uses distinct synthetic keys and the real SDK credential
+policy. OpenRouter, Vercel and fal each make exactly one authenticated registration
+read against their fixed synthetic key/credits/pricing response. ElevenLabs makes
+no registration request and reports `not_supported`. Accepted checks report only
+safe verification metadata; they do not establish remaining credits or future
+generation access. Rejected, denied, rate-limited and malformed responses preserve
+the existing credential file byte for byte. Invalid formats and placeholders from
+stdin, environment and manually edited owned TOML fail before DNS. Provider lists,
+availability reads and removal make no verification request; generation fixtures
+permit only the media operation's own requests.
 
 Provider DNS and HTTPS sockets are synthetic. The preload asserts the actual
 CLI transport's destination, credential lane, pinned lookup and TLS options,

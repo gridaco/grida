@@ -2229,8 +2229,11 @@ generation receipts without a fixed projection.
    Stdin replaces the matching environment slot; successful explicit inputs bypass
    constructing or opening the stored-key owner for that provider. Missing inputs
    use the shared file; blank/malformed explicit input fails without fallback.
-   Stored keys retain the same CLI header validation. Keys are bounded to 4 KiB,
-   normalized and header-safe; stdin has a cancellable 30-second bound. Only the
+   All selected file/environment/stdin keys use the shared AI provider admission
+   policy: bounded to 4 KiB, normalized, header-safe, free of known template values,
+   and checked against documented first-party formats without guessed suffix lengths.
+   Vercel legacy keys remain opaque where upstream specifies no retirement contract.
+   Stdin has a cancellable 30-second bound. Only the
    trusted SDK key reader receives secret strings. Status projects presence and
    source and plaintext storage mode; disposal drops private references. Explicit
    configure/remove commands mutate shared custody without opening account auth.
@@ -2270,6 +2273,18 @@ generation receipts without a fixed projection.
    metadata have terminal controls escaped. Credentials and GG memory are cleared
    in the invocation's `finally`; the binary uses exit codes without forcing exit
    through a pending custody or file write.
+6. **Explicit credential checks before registration.** CLI `providers configure`
+   validates the entered key through the shared AI owner, then invokes that owner's
+   single authenticated GET before opening custody. The host permits only OpenRouter's
+   `/api/v1/key`, Vercel's `/v1/credits`, and fal's `/v1/models/pricing` with exactly
+   one fixed `endpoint_id=fal-ai/flux/dev`. This does not grant other platform APIs.
+   The shared owner rejects redirects, bounds the request/body lifecycle to ten seconds
+   and 64 KiB of UTF-8 JSON, and discards account/key/pricing metadata. Rejected,
+   denied, malformed, cancelled or unavailable checks never replace the stored key.
+   ElevenLabs has no suitable permission-neutral check and reports `not_supported`
+   without a request. Acceptance is transient metadata; it is neither stored nor
+   consulted as future authorization. Ordinary reads and generation never invoke
+   checks. Future custom endpoints require their own credential/destination policy.
 
 **Limits and verification.** The executable, SDK dependencies, runtime, OS trust
 store, process environment and same-user code are trusted. This is not an OS
@@ -2293,6 +2308,12 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
 - [Provider credential owner](packages/grida-cli/src/provider-credentials.ts) and
   [tests](packages/grida-cli/src/provider-credentials.test.ts) — scoped process
   inputs, safe presence metadata and invocation cleanup.
+- [Provider registration](packages/grida-cli/src/commands/providers.ts) and
+  [storage adoption tests](packages/grida-cli/src/provider-storage.test.ts) —
+  one explicit supported check before custody, with no overwrite on failure.
+  The [shared provider policy](packages/grida-ai/src/provider-credentials.ts) and
+  [producer tests](packages/grida-ai/src/provider-credentials.test.ts) retain
+  GRIDA-SEC-004; shared custody retains GRIDA-SEC-014.
 - [Media composition](packages/grida-cli/src/media-run.ts) and
   [tests](packages/grida-cli/src/media-run.test.ts) — public SDK parsing,
   preflight, authority selection and safe completion; also GRIDA-SEC-006.
@@ -2380,9 +2401,11 @@ durable or discard unrelated OAuth records.
    project file. Environment/stdin override selection happens before storage is
    constructed; GG supplies no store capability. Configure/remove await durable
    mutations through signals. Status and failures project only fixed safe metadata;
-   no key, prefix, parser excerpt or native error is printed. No account setup or
-   provider network probe is required. Provider removal leaves account sessions and
-   environment variables untouched.
+   no key, prefix, parser excerpt or native error is printed. No account setup is
+   required. CLI configuration performs GRIDA-SEC-013's supported provider check
+   before opening custody; ordinary stored-key consumption uses static validation
+   only. The TOML owner itself stays provider-opaque and never performs network I/O.
+   Provider removal leaves account sessions and environment variables untouched.
 
 7. **Provider files cannot become tool grants.** The daemon supplies the provider
    directory as a fixed protected native root. `ProtectedRoots` rejects ancestor,
@@ -2448,6 +2471,10 @@ platform evidence, not Windows or cross-platform release certification.
   [hidden-input tests](packages/grida-cli/src/provider-prompt.test.ts), and
   [shared-store adoption tests](packages/grida-cli/src/provider-storage.test.ts).
   Grammar, dispatch, media composition and installed proof retain GRIDA-SEC-013.
+  [Shared static/probe policy](packages/grida-ai/src/provider-credentials.ts),
+  [producer tests](packages/grida-ai/src/provider-credentials.test.ts), and the
+  [provider entry](packages/grida-ai/src/providers.ts) remain owned by the AI package
+  under GRIDA-SEC-004; they add no provider awareness to the TOML storage protocol.
 - Desktop [supervisor](desktop/src/main/agent-sidecar-supervisor.ts),
   [sidecar](desktop/src/agent-sidecar.ts),
   [composition](desktop/src/sidecar/daemon.ts),

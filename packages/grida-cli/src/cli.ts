@@ -34,11 +34,11 @@ export namespace Cli {
     providers:
       "Usage: grida providers <command>\n\nCommands:\n  list                    Show key presence and effective source\n  configure <provider>    Save a shared provider API key\n  remove <provider>       Remove a shared provider API key",
     "providers configure":
-      "Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]\n\nSave an API key in shared plaintext credentials.toml with private permissions.\nDesktop and CLI use the same stored keys. No Grida login or provider probe.\nWithout --key-stdin, enter the key at a hidden terminal prompt.\nAutomation requires --key-stdin; keys are never accepted as arguments.",
+      "Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]\n\nSave an API key in shared plaintext credentials.toml with private permissions.\nDesktop and CLI use the same stored keys. No Grida login required.\nValidate format, then check OpenRouter/Vercel/fal once before saving.\nA failed check leaves stored keys unchanged. ElevenLabs saves unverified.\nWithout --key-stdin, enter the key at a hidden terminal prompt.\nAutomation requires --key-stdin; keys are never accepted as arguments.",
     "providers remove":
       "Usage: grida providers remove <provider> [--json] [--no-input]\n\nRemove the stored key for Desktop and CLI. Environment keys remain effective.\nThis does not revoke the key at its provider or sign out of Grida.",
     "providers list":
-      "Usage: grida providers list [--json]\n\nShow key presence and source, never key contents. No login or probes.\nStored keys use shared plaintext credentials.toml with private permissions.\nOPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY.\nGG uses a separate Grida login and organization; no provider key.",
+      "Usage: grida providers list [--json]\n\nShow key presence and source after static validation, never key contents.\nNo login or probes; configured does not mean provider-verified.\nStored keys use shared plaintext credentials.toml with private permissions.\nOPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY.\nGG uses a separate Grida login and organization; no provider key.",
     generate:
       "Usage: grida generate --provider <provider> --model <id> --input @file|- --out <new-directory> [--kind <kind>] [--variant text|references|image] [--key-stdin] [--org <slug> | --org-id <id>] [--json]\n\nProviders: openrouter, vercel, fal, elevenlabs, gg.\nInspect the model first for its JSON input schema. No raw provider passthrough.\n--input reads one JSON object from an explicit file or stdin (16 MiB max).\n--key-stdin reads a BYOK key instead of its environment slot; cannot share\nstdin with JSON input. Precedence: stdin, environment, shared credentials.toml.\nExplicit keys bypass the stored key. BYOK needs no Grida login. GG requires login.\n--out must name a new directory under an existing parent. Artifacts and\nreceipt.json are written locally without overwriting files.\nNo automatic generation retry. Interrupted requests may still be charged.",
     voices:
@@ -413,7 +413,7 @@ export namespace Cli {
     return (
       help[topic] +
       (topic.startsWith("providers")
-        ? "\n\nCredential file: ~/.grida/providers/credentials.toml\nWith an absolute GRIDA_HOME: $GRIDA_HOME/providers/credentials.toml\nPlaintext on macOS/Linux: providers directory 0700, file 0600.\nManual edits: stop Desktop and other Grida processes using this home;\npreserve version and migration metadata. Use providers remove for deletion.\nFile format and manual configuration:\nhttps://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md"
+        ? "\n\nCredential file: ~/.grida/providers/credentials.toml\nWith an absolute GRIDA_HOME: $GRIDA_HOME/providers/credentials.toml\nPlaintext on macOS/Linux: providers directory 0700, file 0600.\nManual edits: stop Desktop and other Grida processes using this home;\npreserve version and migration metadata. Use providers remove for deletion.\nFile format and manual configuration:\nhttps://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md\nKey validation policy:\nhttps://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md"
         : "") +
       "\n\n--no-input suppresses terminal interaction; the OS keyring may still request access.\nDocumentation: " +
       docsUrl(topic) +

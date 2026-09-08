@@ -11,7 +11,7 @@ import { Output } from "./output";
 import { ProviderCredentials } from "./provider-credentials";
 import { ProviderStore } from "./provider-store";
 
-const KEY = "synthetic-private-stored-key";
+const KEY = "synthetic:private-stored-key";
 const roots: string[] = [];
 async function fixture() {
   const root = await realpath(
@@ -32,8 +32,26 @@ async function fixture() {
     (text) => stdout.push(text),
     (text) => stderr.push(text)
   );
+  const request = vi.fn<typeof fetch>(async () =>
+    Response.json({
+      prices: [
+        {
+          endpoint_id: "fal-ai/flux/dev",
+          unit_price: 0.025,
+          unit: "image",
+          currency: "USD",
+        },
+      ],
+    })
+  );
   const host: ProviderCommands.Host = {
     env,
+    transport: () => ({
+      request,
+      download: async () => {
+        throw new Error("No download allowed");
+      },
+    }),
     stdin: Readable.from([Buffer.from(KEY)]),
     openStore: vi.fn<typeof ProviderStore.open>(ProviderStore.open),
     prompt: vi.fn<ProviderCommands.Host["prompt"]>(async () =>
@@ -42,6 +60,7 @@ async function fixture() {
   };
   return {
     root,
+    request,
     store,
     env,
     stdout,
@@ -58,9 +77,7 @@ async function fixture() {
       return ProviderCommands.run(invocation, output, host);
     },
     safe() {
-      expect(stdout.join("") + stderr.join("")).not.toContain(
-        "synthetic-private"
-      );
+      expect(stdout.join("") + stderr.join("")).not.toContain(KEY);
       expect(fetch).not.toHaveBeenCalled();
     },
   };
@@ -83,6 +100,158 @@ afterEach(async () => {
 });
 
 describe("shared CLI provider credentials", () => {
+  it("checks the entered key once before opening custody, ignoring stored and environment keys", async () => {
+    const f = await fixture();
+    await f.store.set("fal", "previous:stored-key");
+    f.host.env.FAL_KEY = "environment:ignored-key";
+    const respond = f.request.getMockImplementation()!;
+    f.request.mockImplementation(async (input, init) => {
+      expect(f.host.openStore).not.toHaveBeenCalled();
+      expect(new Headers(init?.headers).get("authorization")).toBe(
+        `Key ${KEY}`
+      );
+      return respond(input, init);
+    });
+    expect(
+      await f.invoke(["providers", "configure", "fal", "--key-stdin", "--json"])
+    ).toBe(0);
+    expect(f.request).toHaveBeenCalledOnce();
+    expect(f.result().verification).toEqual({ status: "accepted" });
+    expect(await f.store.read("fal")).toBe(KEY);
+    f.safe();
+  });
+
+  it("saves opaque ElevenLabs keys with an explicit unsupported check and no network", async () => {
+    const f = await fixture();
+    expect(
+      await f.invoke([
+        "providers",
+        "configure",
+        "elevenlabs",
+        "--key-stdin",
+        "--json",
+      ])
+    ).toBe(0);
+    expect(f.request).not.toHaveBeenCalled();
+    expect(f.result().verification).toEqual({ status: "not_supported" });
+    expect(await f.store.read("elevenlabs")).toBe(KEY);
+    f.safe();
+  });
+
+  it.each([
+    [401, "credential_rejected"],
+    [403, "access_denied"],
+    [429, "unavailable"],
+    [500, "unavailable"],
+    [302, "invalid_response"],
+    [200, "invalid_response"],
+  ] as const)(
+    "failed probe %i preserves the old file and exposes only a safe code",
+    async (status, code) => {
+      const f = await fixture();
+      await f.store.set("fal", "previous:stored-key");
+      const file = path.join(f.root, "providers", "credentials.toml");
+      const before = await readFile(file);
+      f.request.mockResolvedValueOnce(new Response(KEY, { status }));
+      expect(
+        await f.invoke([
+          "providers",
+          "configure",
+          "fal",
+          "--key-stdin",
+          "--json",
+        ])
+      ).toBe(1);
+      expect(f.result().error.code).toBe(code);
+      expect(f.request).toHaveBeenCalledOnce();
+      expect(f.host.openStore).not.toHaveBeenCalled();
+      expect(await readFile(file)).toEqual(before);
+      f.safe();
+    }
+  );
+
+  it.each(["file", "environment", "stdin"] as const)(
+    "rejects a %s placeholder before any provider request",
+    async (source) => {
+      const f = await fixture();
+      const placeholder = "PASTE_FAL_KEY_HERE";
+      if (source === "file") await f.store.set("fal", placeholder);
+      const open = vi.fn<() => ProviderCredentialStore>(() => f.store);
+      await expect(
+        ProviderCredentials.open({
+          provider: "fal",
+          env: source === "environment" ? { FAL_KEY: placeholder } : {},
+          store: open,
+          ...(source === "stdin"
+            ? {
+                stdin: {
+                  provider: "fal" as const,
+                  input: Readable.from([Buffer.from(placeholder)]),
+                },
+              }
+            : {}),
+        })
+      ).rejects.toMatchObject({ code: "invalid_credentials" });
+      expect(open).toHaveBeenCalledTimes(source === "file" ? 1 : 0);
+      expect(f.request).not.toHaveBeenCalled();
+      f.safe();
+    }
+  );
+
+  it("rejects an invalid configure key before custody and network", async () => {
+    const f = await fixture();
+    f.host.stdin = Readable.from([Buffer.from("PASTE_FAL_KEY_HERE")]);
+    expect(
+      await f.invoke(["providers", "configure", "fal", "--key-stdin", "--json"])
+    ).toBe(1);
+    expect(f.result().error.code).toBe("invalid_credentials");
+    expect(f.host.openStore).not.toHaveBeenCalled();
+    expect(f.request).not.toHaveBeenCalled();
+    f.safe();
+  });
+
+  it("cancels after an accepted check without opening custody", async () => {
+    const f = await fixture();
+    const prior = new Set(process.listeners("SIGINT"));
+    const respond = f.request.getMockImplementation()!;
+    f.request.mockImplementation(async (input, init) => {
+      const result = await respond(input, init);
+      process.listeners("SIGINT").find((handler) => !prior.has(handler))!(
+        "SIGINT"
+      );
+      return result;
+    });
+    expect(
+      await f.invoke(["providers", "configure", "fal", "--key-stdin", "--json"])
+    ).toBe(1);
+    expect(f.result().error.code).toBe("aborted");
+    expect(f.host.openStore).not.toHaveBeenCalled();
+    f.safe();
+  });
+
+  it("settles a durable write already started when a signal arrives", async () => {
+    const f = await fixture();
+    const prior = new Set(process.listeners("SIGINT"));
+    const set = f.store.set.bind(f.store);
+    f.host.openStore = vi.fn<ProviderCommands.Host["openStore"]>(
+      async () => f.store
+    );
+    const mutate = vi
+      .spyOn(f.store, "set")
+      .mockImplementation(async (provider, key) => {
+        process.listeners("SIGINT").find((handler) => !prior.has(handler))!(
+          "SIGINT"
+        );
+        await set(provider, key);
+      });
+    expect(
+      await f.invoke(["providers", "configure", "fal", "--key-stdin", "--json"])
+    ).toBe(0);
+    expect(mutate).toHaveBeenCalledOnce();
+    expect(await f.store.read("fal")).toBe(KEY);
+    f.safe();
+  });
+
   it("configures without account setup and survives a new reader; removal is shared", async () => {
     const f = await fixture();
     expect(

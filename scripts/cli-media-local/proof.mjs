@@ -27,7 +27,14 @@ const repository = fileURLToPath(new URL("../../", import.meta.url));
 const reportPath = path.join(repository, ".cache/cli-media-local/result.json");
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const prompt = "A synthetic media fixture";
-const key = "synthetic-provider-key-no-authority";
+const keys = {
+  openrouter: "sk-or-synthetic-openrouter-key-no-authority",
+  vercel:
+    "vck_syntheticVercelKeyNoAuthority0123456789abcdefghijklmnopqrstuvwxyz",
+  fal: "synthetic-fal-id:synthetic-fal-secret-no-authority",
+  elevenlabs: "synthetic-elevenlabs-key-no-authority",
+};
+const rejectedKey = "sk-or-synthetic-rejected-key-no-authority";
 const accountToken = "synthetic-account-access";
 const refreshToken = "synthetic-account-refresh";
 const ggToken = "synthetic.gg.token";
@@ -52,6 +59,58 @@ function fixture(requests = [], dns = {}) {
   for (const request of requests)
     dns[request.hostname] ??= [{ address: "93.184.216.34", family: 4 }];
   return { requests, dns };
+}
+function registrationFixture(provider, key = keys[provider], response) {
+  switch (provider) {
+    case "openrouter":
+      return fixture([
+        {
+          hostname: "openrouter.ai",
+          path: "/api/v1/key",
+          method: "GET",
+          headers: { authorization: `Bearer ${key}` },
+          response:
+            response ?? jsonBody({ data: { is_management_key: false } }),
+        },
+      ]);
+    case "vercel":
+      return fixture([
+        {
+          hostname: "ai-gateway.vercel.sh",
+          path: "/v1/credits",
+          method: "GET",
+          headers: { authorization: `Bearer ${key}` },
+          response: response ?? jsonBody({ balance: "0", total_used: "0" }),
+        },
+      ]);
+    case "fal":
+      return fixture([
+        {
+          hostname: "api.fal.ai",
+          path: "/v1/models/pricing?endpoint_id=fal-ai/flux/dev",
+          method: "GET",
+          headers: { authorization: `Key ${key}` },
+          response:
+            response ??
+            jsonBody({
+              prices: [
+                {
+                  endpoint_id: "fal-ai/flux/dev",
+                  unit_price: 0.025,
+                  unit: "image",
+                  currency: "USD",
+                },
+              ],
+              next_cursor: null,
+              has_more: false,
+            }),
+        },
+      ]);
+    case "elevenlabs":
+      return fixture();
+    default:
+      throw new Error("Unknown synthetic registration provider");
+  }
 }
 async function files(root) {
   const result = [];
@@ -247,7 +306,18 @@ async function main() {
             0,
             "Synthetic assertions must never be hidden by safe CLI errors"
           );
-          for (const secret of [key, accountToken, refreshToken, ggToken])
+          assert.equal(
+            stats.requests.length,
+            wire.requests.length,
+            "Every configured provider request must occur exactly once"
+          );
+          for (const secret of [
+            ...Object.values(keys),
+            rejectedKey,
+            accountToken,
+            refreshToken,
+            ggToken,
+          ])
             assert(
               !(stdout + stderr).includes(secret),
               "Credential entered command output"
@@ -488,7 +558,7 @@ async function main() {
       "provider presence has no network or credential output",
       async () => {
         const result = await json(["providers", "list"], {
-          extraEnv: { FAL_KEY: key },
+          extraEnv: { FAL_KEY: keys.fal },
         });
         assert(Array.isArray(result.value.providers));
         assert.equal(
@@ -501,32 +571,148 @@ async function main() {
       }
     );
     await check(
-      "shared BYOK survives restart, concurrent configuration and overrides",
+      "registration checks once before shared BYOK survives restart",
       async () => {
-        const saved = await json(
-          ["providers", "configure", "openrouter", "--key-stdin"],
-          { input: key }
-        );
-        assert.equal(saved.value.storage, "plaintext_file");
-        assert.equal(saved.value.shared, true);
-        await Promise.all(
-          ["fal", "elevenlabs"].map((provider) =>
-            json(["providers", "configure", provider, "--key-stdin"], {
-              input: key,
-            })
-          )
-        );
+        const configure = async (provider) => {
+          const saved = await json(
+            ["providers", "configure", provider, "--key-stdin"],
+            { input: keys[provider], wire: registrationFixture(provider) }
+          );
+          assert.equal(saved.value.storage, "plaintext_file");
+          assert.equal(saved.value.shared, true);
+          assert.deepEqual(saved.value.verification, {
+            status: provider === "elevenlabs" ? "not_supported" : "accepted",
+          });
+          assert.equal(
+            saved.stats.requests.length,
+            provider === "elevenlabs" ? 0 : 1
+          );
+          if (provider === "elevenlabs") assert.deepEqual(saved.stats.dns, []);
+        };
+        await configure("openrouter");
+        await Promise.all(["vercel", "fal", "elevenlabs"].map(configure));
         const listed = await json(["providers", "list"]);
-        for (const provider of ["openrouter", "fal", "elevenlabs"])
+        assert.deepEqual(listed.stats.dns, []);
+        for (const provider of Object.keys(keys)) {
           assert.equal(
             listed.value.providers.find((row) => row.provider === provider)
               .source,
             "file"
           );
+          const available = await json([
+            "models",
+            "list",
+            "--provider",
+            provider,
+            "--available",
+          ]);
+          assert.equal(available.value.access.source, "file");
+          assert.deepEqual(available.stats.dns, []);
+        }
+      }
+    );
+    await check(
+      "rejected registration never changes the saved key",
+      async () => {
+        const credentials = path.join(profile, "providers", "credentials.toml");
+        const previous = await readFile(credentials);
+        for (const [response, code] of [
+          [
+            { status: 401, ...jsonBody({ detail: rejectedKey }) },
+            "credential_rejected",
+          ],
+          [
+            { status: 403, ...jsonBody({ detail: rejectedKey }) },
+            "access_denied",
+          ],
+          [
+            { status: 429, ...jsonBody({ detail: rejectedKey }) },
+            "unavailable",
+          ],
+          [
+            jsonBody({ data: { is_management_key: "false" } }),
+            "invalid_response",
+          ],
+        ]) {
+          const result = await json(
+            ["providers", "configure", "openrouter", "--key-stdin"],
+            {
+              input: rejectedKey,
+              wire: registrationFixture("openrouter", rejectedKey, response),
+            },
+            1
+          );
+          assert.equal(result.value.error.code, code);
+          assert.equal(result.stats.requests.length, 1);
+          assert.deepEqual(await readFile(credentials), previous);
+        }
+      }
+    );
+    await check(
+      "static credential rejection precedes every source's DNS",
+      async () => {
+        const credentials = path.join(profile, "providers", "credentials.toml");
+        const previous = await readFile(credentials, "utf8");
+        for (const [provider, environment, value] of [
+          [
+            "openrouter",
+            "OPENROUTER_API_KEY",
+            "synthetic-without-required-prefix",
+          ],
+          ["fal", "FAL_KEY", "synthetic-without-key-id-separator"],
+          ["vercel", "AI_GATEWAY_API_KEY", "PASTE_VERCEL_AI_GATEWAY_KEY_HERE"],
+          ["elevenlabs", "ELEVENLABS_API_KEY", "PASTE_ELEVENLABS_KEY_HERE"],
+        ]) {
+          const configured = await json(
+            ["providers", "configure", provider, "--key-stdin"],
+            { input: value },
+            1
+          );
+          assert.equal(configured.value.error.code, "invalid_credentials");
+          assert.deepEqual(configured.stats.dns, []);
+          assert.equal(await readFile(credentials, "utf8"), previous);
+          const args = [
+            "models",
+            "list",
+            "--provider",
+            provider,
+            "--available",
+          ];
+          const fromEnvironment = await json(
+            args,
+            { extraEnv: { [environment]: value } },
+            1
+          );
+          assert.equal(fromEnvironment.value.error.code, "invalid_credentials");
+          assert.deepEqual(fromEnvironment.stats.dns, []);
+          try {
+            assert(
+              previous.includes(keys[provider]),
+              "Owned stored key must exist"
+            );
+            await writeFile(
+              credentials,
+              previous.replace(keys[provider], value),
+              { mode: 0o600 }
+            );
+            const fromFile = await json(args, undefined, 1);
+            assert.equal(fromFile.value.error.code, "invalid_credentials");
+            assert.deepEqual(fromFile.stats.dns, []);
+          } finally {
+            await writeFile(credentials, previous, { mode: 0o600 });
+          }
+        }
+      }
+    );
+    await check(
+      "shared provider removal and explicit overrides never probe",
+      async () => {
         await Promise.all(
-          ["fal", "elevenlabs"].map((provider) =>
-            json(["providers", "remove", provider])
-          )
+          ["vercel", "fal", "elevenlabs"].map(async (provider) => {
+            const removed = await json(["providers", "remove", provider]);
+            assert(!Object.hasOwn(removed.value, "verification"));
+            assert.deepEqual(removed.stats.dns, []);
+          })
         );
         const credentials = path.join(profile, "providers", "credentials.toml");
         const previous = await readFile(credentials);
@@ -534,7 +720,7 @@ async function main() {
           await writeFile(credentials, "invalid TOML [", { mode: 0o600 });
           const override = await json(
             ["models", "list", "--provider", "fal", "--available"],
-            { extraEnv: { FAL_KEY: key } }
+            { extraEnv: { FAL_KEY: keys.fal } }
           );
           assert.equal(override.value.access.source, "environment");
           assert.equal(await readFile(credentials, "utf8"), "invalid TOML [");
@@ -558,7 +744,7 @@ async function main() {
               hostname: "openrouter.ai",
               path: "/api/v1/images",
               method: "POST",
-              headers: { authorization: `Bearer ${key}` },
+              headers: { authorization: `Bearer ${keys.openrouter}` },
               json: { model: "openai/gpt-image-2", prompt, n: 1 },
               response: jsonBody({
                 data: [{ b64_json: png.toString("base64") }],
@@ -583,14 +769,14 @@ async function main() {
         model: "openai/gpt-image-2",
         provider: "vercel",
         value: { prompt },
-        extraEnv: { AI_GATEWAY_API_KEY: key },
+        extraEnv: { AI_GATEWAY_API_KEY: keys.vercel },
         wire: fixture([
           {
             hostname: "ai-gateway.vercel.sh",
             path: "/v3/ai/image-model",
             method: "POST",
             headers: {
-              authorization: `Bearer ${key}`,
+              authorization: `Bearer ${keys.vercel}`,
               "ai-model-id": "openai/gpt-image-2",
               "ai-image-model-specification-version": "3",
             },
@@ -616,13 +802,13 @@ async function main() {
           loop: false,
           prompt_influence: 0,
         },
-        input: key + "\n",
+        input: keys.elevenlabs + "\n",
         wire: fixture([
           {
             hostname: "api.elevenlabs.io",
             path: "/v1/sound-generation?output_format=mp3_44100_128",
             method: "POST",
-            headers: { "xi-api-key": key },
+            headers: { "xi-api-key": keys.elevenlabs },
             json: {
               text: prompt,
               model_id: "eleven_text_to_sound_v2",
@@ -645,13 +831,13 @@ async function main() {
           model: "eleven_v3",
           provider: "elevenlabs",
           value: { text: "  Synthetic speech  ", voice_id: "voice/one" },
-          extraEnv: { ELEVENLABS_API_KEY: key },
+          extraEnv: { ELEVENLABS_API_KEY: keys.elevenlabs },
           wire: fixture([
             {
               hostname: "api.elevenlabs.io",
               path: "/v1/text-to-speech/voice%2Fone?output_format=mp3_44100_128",
               method: "POST",
-              headers: { "xi-api-key": key },
+              headers: { "xi-api-key": keys.elevenlabs },
               json: { text: "  Synthetic speech  ", model_id: "eleven_v3" },
               response: binary(mp3, "audio/mpeg"),
             },
@@ -667,13 +853,13 @@ async function main() {
         const result = await json(
           ["voices", "list", "--provider", "elevenlabs"],
           {
-            extraEnv: { ELEVENLABS_API_KEY: key },
+            extraEnv: { ELEVENLABS_API_KEY: keys.elevenlabs },
             wire: fixture([
               {
                 hostname: "api.elevenlabs.io",
                 path: "/v2/voices?page_size=100",
                 method: "GET",
-                headers: { "xi-api-key": key },
+                headers: { "xi-api-key": keys.elevenlabs },
                 response: jsonBody({
                   voices: [
                     {
@@ -690,7 +876,7 @@ async function main() {
                 hostname: "api.elevenlabs.io",
                 path: "/v2/voices?page_size=100&next_page_token=cursor%2Fone%2B",
                 method: "GET",
-                headers: { "xi-api-key": key },
+                headers: { "xi-api-key": keys.elevenlabs },
                 response: jsonBody({
                   voices: [
                     { voice_id: "a", name: "Alpha" },
@@ -720,13 +906,13 @@ async function main() {
           model: "google/veo-3.1",
           provider: "openrouter",
           value: { prompt },
-          extraEnv: { OPENROUTER_API_KEY: key },
+          extraEnv: { OPENROUTER_API_KEY: keys.openrouter },
           wire: fixture([
             {
               hostname: "openrouter.ai",
               path: "/api/v1/videos",
               method: "POST",
-              headers: { authorization: `Bearer ${key}` },
+              headers: { authorization: `Bearer ${keys.openrouter}` },
               json: { model: "google/veo-3.1", prompt },
               response: jsonBody({ id: "synthetic-job" }),
             },
@@ -734,14 +920,14 @@ async function main() {
               hostname: "openrouter.ai",
               path: "/api/v1/videos/synthetic-job",
               method: "GET",
-              headers: { authorization: `Bearer ${key}` },
+              headers: { authorization: `Bearer ${keys.openrouter}` },
               response: jsonBody({ status: "completed" }),
             },
             {
               hostname: "openrouter.ai",
               path: "/api/v1/videos/synthetic-job/content?index=0",
               method: "GET",
-              headers: { authorization: `Bearer ${key}` },
+              headers: { authorization: `Bearer ${keys.openrouter}` },
               response: binary(mp4, "video/mp4"),
             },
           ]),
@@ -758,13 +944,13 @@ async function main() {
           model: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
           provider: "fal",
           value: { prompt },
-          extraEnv: { FAL_KEY: key },
+          extraEnv: { FAL_KEY: keys.fal },
           wire: fixture([
             {
               hostname: "queue.fal.run",
               path: "/fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
               method: "POST",
-              headers: { authorization: `Key ${key}` },
+              headers: { authorization: `Key ${keys.fal}` },
               json: { prompt },
               response: jsonBody({
                 status_url: "https://queue.fal.run/job/status",
@@ -775,14 +961,14 @@ async function main() {
               hostname: "queue.fal.run",
               path: "/job/status",
               method: "GET",
-              headers: { authorization: `Key ${key}` },
+              headers: { authorization: `Key ${keys.fal}` },
               response: jsonBody({ status: "COMPLETED" }),
             },
             {
               hostname: "queue.fal.run",
               path: "/job/result",
               method: "GET",
-              headers: { authorization: `Key ${key}` },
+              headers: { authorization: `Key ${keys.fal}` },
               response: jsonBody({
                 model_glb: { url: "https://v3.fal.media/model.glb" },
               }),
@@ -815,13 +1001,13 @@ async function main() {
           value: {
             image: { data: png.toString("base64"), media_type: "image/png" },
           },
-          extraEnv: { FAL_KEY: key },
+          extraEnv: { FAL_KEY: keys.fal },
           wire: fixture([
             {
               hostname: "queue.fal.run",
               path: `/${model}`,
               method: "POST",
-              headers: { authorization: `Key ${key}` },
+              headers: { authorization: `Key ${keys.fal}` },
               json: {
                 [field]: `data:image/png;base64,${png.toString("base64")}`,
               },
@@ -834,14 +1020,14 @@ async function main() {
               hostname: "queue.fal.run",
               path: "/job/status",
               method: "GET",
-              headers: { authorization: `Key ${key}` },
+              headers: { authorization: `Key ${keys.fal}` },
               response: jsonBody({ status: "COMPLETED" }),
             },
             {
               hostname: "queue.fal.run",
               path: "/job/result",
               method: "GET",
-              headers: { authorization: `Key ${key}` },
+              headers: { authorization: `Key ${keys.fal}` },
               response: jsonBody({
                 model_glb: { url: "https://v3.fal.media/model.glb" },
               }),
@@ -884,7 +1070,7 @@ async function main() {
         ];
         let result = await json(
           args,
-          { extraEnv: { OPENROUTER_API_KEY: key } },
+          { extraEnv: { OPENROUTER_API_KEY: keys.openrouter } },
           1
         );
         assert.equal(result.value.error.code, "invalid_input");
@@ -899,7 +1085,11 @@ async function main() {
         await assert.rejects(lstat(out), { code: "ENOENT" });
         await mkdir(out);
         await writeFile(path.join(out, "sentinel"), "preserve");
-        result = await json(args, { extraEnv: { OPENROUTER_API_KEY: key } }, 1);
+        result = await json(
+          args,
+          { extraEnv: { OPENROUTER_API_KEY: keys.openrouter } },
+          1
+        );
         assert.equal(result.value.error.code, "output_unavailable");
         assert.deepEqual(result.stats.requests, []);
         assert.deepEqual(result.stats.dns, []);
@@ -931,13 +1121,13 @@ async function main() {
             out,
           ],
           {
-            extraEnv: { ELEVENLABS_API_KEY: key },
+            extraEnv: { ELEVENLABS_API_KEY: keys.elevenlabs },
             wire: fixture([
               {
                 hostname: "api.elevenlabs.io",
                 path: "/v1/text-to-speech/voice?output_format=mp3_44100_128",
                 method: "POST",
-                headers: { "xi-api-key": key },
+                headers: { "xi-api-key": keys.elevenlabs },
                 json: { text: "synthetic", model_id: "eleven_v3" },
                 response: {
                   status: 403,
@@ -974,13 +1164,13 @@ async function main() {
             "--no-input",
           ],
           {
-            extraEnv: { OPENROUTER_API_KEY: key },
+            extraEnv: { OPENROUTER_API_KEY: keys.openrouter },
             wire: fixture([
               {
                 hostname: "openrouter.ai",
                 path: "/api/v1/images",
                 method: "POST",
-                headers: { authorization: `Bearer ${key}` },
+                headers: { authorization: `Bearer ${keys.openrouter}` },
                 json: { model: "openai/gpt-image-2", prompt, n: 1 },
                 pending: true,
               },
