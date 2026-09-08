@@ -7,6 +7,8 @@ Ownership map after the engine split (the Rust engine lives in
 
 - `test-fig/`, `test-figma/` — Figma import fixtures (LFS: `*.fig`, `*.deck`)
 - `test-canvas/`, `test-markdown/` — dotcanvas / markdown fixtures
+- `test-cli/` — human-authored workflow prompts for exercising the Grida CLI
+  with an external harness; inputs are fixed, generated outputs are not
 
 ## FROZEN SNAPSHOTS — canon lives in the engine repo
 
