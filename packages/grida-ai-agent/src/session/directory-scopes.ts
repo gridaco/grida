@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-004 — session-scoped, read-only directory grants.
+ * GRIDA-SEC-004 / GRIDA-SEC-014 — session-scoped, read-only directory grants.
  *
  * A trusted host gesture supplies a raw directory path once. This registry
  * canonicalizes it, rejects the daemon's secret tree, and returns an opaque
@@ -17,7 +17,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { containsPath } from "@grida/daemon/server";
+import { ProtectedRoots } from "@grida/daemon/server";
 import {
   DIRECTORY_SCOPE_MOUNT_ROOT,
   type DirectoryScopeDescriptor,
@@ -74,16 +74,16 @@ export class DirectoryScopeRegistry {
   private readonly claimed = new Map<string, ClaimedScope>();
   private readonly sessions = new Map<string, Set<string>>();
   private pending_reservations = 0;
-  private readonly protected_roots: readonly string[];
+  private readonly protected_roots: ProtectedRoots;
   private readonly pending_ttl_ms: number;
   private readonly max_pending: number;
   private readonly now: () => number;
 
   constructor(opts: DirectoryScopeRegistryOptions = {}) {
-    this.protected_roots = [
+    this.protected_roots = new ProtectedRoots([
       ...(opts.secrets_root ? [opts.secrets_root] : []),
       ...(opts.protected_roots ?? []),
-    ];
+    ]);
     this.pending_ttl_ms = positiveInteger(
       opts.pending_ttl_ms,
       DEFAULT_PENDING_TTL_MS
@@ -137,27 +137,7 @@ export class DirectoryScopeRegistry {
         );
       }
 
-      for (const protectedPath of this.protected_roots) {
-        // Deliberately resolve on every attachment gesture. A protected path
-        // may be created or retargeted as a symlink while this registry lives;
-        // caching its first identity would make the deny stale.
-        const protectedRoot = await fs
-          .realpath(protectedPath)
-          .catch(() => path.resolve(protectedPath));
-        // Reject BOTH directions. Selecting a protected root (or a child) is an
-        // obvious secret read; selecting an ancestor would expose the same tree
-        // through descendant traversal. This in-process check keeps the deny true
-        // even where the outer OS sandbox is unavailable.
-        if (
-          containsPath(protectedRoot, root) ||
-          containsPath(root, protectedRoot)
-        ) {
-          throw new DirectoryScopeError(
-            "directory-scope-protected-root",
-            "selected directory overlaps a protected host directory"
-          );
-        }
-      }
+      this.assertAllowed(root);
 
       const id = `dir_${crypto.randomUUID()}`;
       const descriptor: DirectoryScopeDescriptor = {
@@ -212,6 +192,7 @@ export class DirectoryScopeRegistry {
             "directory reference belongs to another session"
           );
         }
+        this.assertAllowed(owned.root);
         this.assertDescriptor(descriptor, owned);
         resolved.push(owned);
         continue;
@@ -223,6 +204,7 @@ export class DirectoryScopeRegistry {
           "directory reference is unavailable or expired"
         );
       }
+      this.assertAllowed(candidate.root);
       this.assertDescriptor(descriptor, candidate);
       resolved.push(candidate);
     }
@@ -261,7 +243,7 @@ export class DirectoryScopeRegistry {
     const out: DirectoryScopeGrant[] = [];
     for (const id of ids) {
       const scope = this.claimed.get(id);
-      if (scope) out.push(toGrant(scope));
+      if (scope && this.allowed(scope.root)) out.push(toGrant(scope));
     }
     return out;
   }
@@ -279,6 +261,22 @@ export class DirectoryScopeRegistry {
     this.pending.clear();
     this.claimed.clear();
     this.sessions.clear();
+  }
+
+  private allowed(root: string): boolean {
+    try {
+      return !this.protected_roots.overlaps(root);
+    } catch {
+      return false;
+    }
+  }
+
+  private assertAllowed(root: string): void {
+    if (!this.allowed(root))
+      throw new DirectoryScopeError(
+        "directory-scope-protected-root",
+        "selected directory overlaps a protected host directory"
+      );
   }
 
   private pruneExpired(): void {

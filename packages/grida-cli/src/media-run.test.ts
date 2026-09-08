@@ -3,6 +3,7 @@
 // GRIDA-GG: token — synthetic tokens only; no services, auth custody or provider calls.
 import { MediaOperations } from "@grida/ai";
 import { AuthClient } from "@grida/auth";
+import { ProviderCredentialStore } from "@grida/auth/providers";
 import {
   mkdtemp,
   mkdir,
@@ -65,10 +66,16 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
     (text) => stdout.push(text),
     (text) => stderr.push(text)
   );
+  let storeHome: Promise<string> | undefined;
+  const openStore = vi.fn<MediaCommands.Host["openStore"]>(
+    async () =>
+      new ProviderCredentialStore({ home: await (storeHome ??= temporary()) })
+  );
   const host: MediaCommands.Host = {
     env,
     stdin: Readable.from([]),
     openAuth,
+    openStore,
     transport,
   };
   return {
@@ -79,6 +86,7 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
     request,
     download,
     openAuth,
+    openStore,
     transport,
     async invoke(args: string[], input?: unknown) {
       if (input !== undefined)

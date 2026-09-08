@@ -58,7 +58,7 @@ public subpath; workspace bindings use it in-process.
 ## Shared media operations
 
 The image HTTP route and `generate_image` tool use `@grida/ai`'s `ImageClient`.
-This package adapts its secret store and provider transport, chooses the agent's
+This package adapts shared native provider custody and provider transport, chooses the agent's
 default model, and explicitly selects the existing automatic provider policy.
 The SDK resolves compatibility and executes the selected provider. The host
 reads reference files and persists returned bytes to media storage or session
@@ -107,8 +107,9 @@ by this route. Future 3D workflows need their own reviewed host wire adaptations
 ## Independent media startup
 
 Hosts can import `createMediaDaemon` from `@grida/agent/media-server` to run the
-existing media routes without importing the chat runtime, SQLite, skill
-discovery or ACP. It uses the same daemon perimeter and host-owned credentials,
+existing media routes without importing the chat runtime, opening a chat
+SQLite database, discovering skills or starting ACP. Shared provider custody
+lazily uses SQLite only for its private cross-process lock after startup. It uses the same daemon perimeter and host-owned credentials,
 provider transport and media store. Media and BYOK settings default on; GG
 routes require `gg_base_url`. Chat, sessions, endpoint-provider settings,
 native ChatGPT auth and shell remain absent. `createMediaTenant` supplies the
@@ -120,6 +121,7 @@ import { createMediaDaemon } from "@grida/agent/media-server";
 const daemon = createMediaDaemon({
   password,
   user_data_path,
+  provider_home, // Explicit shared Grida home; omit for an isolated embedded host.
   media_root,
   http_access,
   provider_http,
@@ -147,6 +149,15 @@ from `@grida/agent/sandbox`, and `CHATGPT_AUTH_ROUTE_PATHS` and the
 `ChatGptAuthStart` wire type from the neutral root. Their existing `server`
 exports remain compatible. Route names and wire types grant no native auth
 authority; the host still owns that ceremony.
+
+The daemon's `SecretsStore` now delegates BYOK persistence to the shared
+native TOML owner (GRIDA-SEC-014). The native host supplies `provider_home`;
+media and agent code continue to receive only a key reader. The standalone
+`grida-agent` host uses the canonical Grida home by default; its explicit
+`GRIDA_AGENT_USER_DATA` override also isolates provider custody under that
+path. ChatGPT OAuth remains in the daemon's separate `auth.json` and GG stays
+in memory. Directory references and finite-command scopes protect both the
+agent state root and the shared provider directory.
 
 ## Provider HTTP
 
@@ -329,3 +340,11 @@ pnpm --filter @grida/agent test    # vitest
 
 `smoke:sessions:live` exercises the sessions store against a real SQLite
 file — a manual smoke check, not part of `test`.
+
+The native host excludes the provider credential tree from workspace, scratch and
+attached-directory grants before structured filesystem hydration. The same
+`ProtectedRoots` owner from `@grida/daemon/server` rechecks those roots before
+backend I/O and revalidates pending or cached directory grants. An ancestor such
+as the entire Grida home is refused too; ordinary workspace symlinks continue to
+use the daemon filesystem's containment checks. These are application authority
+checks, not protection against a hostile local process racing path mutations.

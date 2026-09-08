@@ -11,7 +11,9 @@ import type { Cli } from "./cli";
 export async function run(
   invocation: Exclude<
     Cli.Invocation,
-    Cli.MediaInvocation | { command: "help" | "version" | "docs" }
+    | Cli.MediaInvocation
+    | Cli.ProviderInvocation
+    | { command: "help" | "version" | "docs" }
   >,
   output: Output
 ): Promise<number> {

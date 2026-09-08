@@ -22,7 +22,8 @@ stop or adopt another service. npm installation is offline, ignores lifecycle sc
 and omits the optional keyring binding. No Docker or hosted service is needed.
 
 The proof checks offline discovery and schemas, explicit provider presence and
-stdin keys, image/video/music/SFX/speech/3D artifacts and receipts, paginated voice
+stdin keys, shared TOML configuration/removal across restarts and concurrent
+processes, overrides that bypass corrupt storage, stored-key generation, image/video/music/SFX/speech/3D artifacts and receipts, paginated voice
 projection, every existing 3D input contract, invalid-input/output preflight,
 access-denied errors and cancellation without retry. The GG fixture checks the
 account token on account/mint routes and a distinct scoped token on media routes.

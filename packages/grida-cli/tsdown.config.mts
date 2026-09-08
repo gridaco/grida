@@ -10,6 +10,7 @@ export default defineConfig({
   deps: {
     alwaysBundle: [
       "@grida/auth",
+      "@grida/home",
       "@grida/account",
       "@grida/ai",
       "@grida/ai-models",

@@ -45,8 +45,8 @@ needed before generation.
 The [credential custody study](./credential-custody.md) defines Grida account
 storage and refresh coordination. Its accepted
 [provider credential design](./credential-custody.md#provider-credentials)
-uses a shared, private TOML file for Desktop and CLI BYOK; implementation and
-migration are pending.
+uses a shared, private TOML file for Desktop and CLI BYOK, with explicit
+configuration/removal and one-time legacy Desktop migration in the preview.
 
 ## One name, independent products
 

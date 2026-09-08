@@ -34,7 +34,7 @@ Electron main/preload (desktop)
   -> loads editor /desktop/*
 
 Desktop sidecar composition
-  -> @grida/daemon owns the perimeter, credential persistence and local resources
+  -> @grida/daemon owns the perimeter, shared-provider adapter and local resources
   -> @grida/agent/media-server serves media through @grida/ai without chat startup
   -> full @grida/agent/server also enables sessions and desktop agent execution
   -> serves authenticated daemon HTTP only on main-transferred sockets
@@ -64,11 +64,22 @@ Electron's `userData` directory and are owned exclusively by main. The hosted
 renderer receives purpose-specific actions, never a generic preferences
 key/value bridge. `DesktopPreferences` uses a small versioned JSON document
 with owner-only atomic writes. Account cookies remain in Chromium's HttpOnly
-session, while provider credentials and API keys remain in the sidecar's secret
-store. On the first upgrade from Desktop 0.0.13, main consumes the former
+session, while BYOK API keys use the shared native `providers/credentials.toml` under
+Grida home through the sidecar's secret adapter. ChatGPT OAuth stays in the
+agent's `auth.json`. On the first upgrade from Desktop 0.0.13, main consumes the former
 renderer onboarding-completion flag through one fixed hidden same-origin probe
 and records the migration before selecting an authenticated role. That legacy
 flag is never consulted again.
+
+Shared BYOK custody (GRIDA-SEC-014) is private plaintext on macOS/Linux.
+Desktop and CLI see the same provider changes without either requiring the
+other to run. The supervisor resolves Grida home once and forwards that exact
+path to the sidecar and its sandbox policy. An explicit
+`GRIDA_AGENT_USER_DATA` override isolates both agent state and provider custody.
+Migration preserves ChatGPT OAuth, retires old API entries and resumes pending
+cleanup without reimporting keys. Older mixed-file writers must not run
+concurrently. Windows BYOK storage is currently unsupported; existing ChatGPT
+OAuth behavior is unchanged. No renderer capability returns stored keys.
 
 On macOS and Linux, the sidecar runs under `srt` with no direct external
 destinations and `allow_local_binding: false`; Electron main supplies the two

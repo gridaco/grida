@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-SEC-004 — media startup behind the existing daemon perimeter.
 // GRIDA-SEC-006 / GRIDA-GG: provider — per-launch shared GG custody, cleared at stop.
 /**
@@ -57,6 +58,8 @@ export function createMediaTenant(opts: MediaTenantOptions = {}): DaemonTenant {
 export type MediaDaemonOptions = Omit<MediaTenantOptions, "capabilities"> & {
   password: string;
   user_data_path: string;
+  /** Shared native provider home; omission keeps this host's credentials isolated. */
+  provider_home?: string;
   projects_root?: string;
   media_root?: string;
   http_access: DaemonHttpAccess;
@@ -77,6 +80,7 @@ export function createMediaDaemon(opts: MediaDaemonOptions): DaemonServer {
   return new DaemonServer({
     password: opts.password,
     user_data_path: opts.user_data_path,
+    provider_home: opts.provider_home,
     projects_root: opts.projects_root,
     media_root: opts.media_root,
     http_access: opts.http_access,

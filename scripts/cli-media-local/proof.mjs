@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — shared provider custody retains explicit host authority.
 // GRIDA-SEC-013 — installed CLI media, synthetic provider sockets and owned GG HTTP.
 // GRIDA-SEC-006 — distinct account/mint and scoped GG media routes; no durable GG token.
 // GRIDA-GG: token — only synthetic grants enter this installed consumer proof.
@@ -499,29 +500,83 @@ async function main() {
         assert.deepEqual(result.stats.dns, []);
       }
     );
-    await check("OpenRouter image writes bytes and a receipt", async () => {
-      await generate({
-        name: "image",
-        model: "openai/gpt-image-2",
-        provider: "openrouter",
-        value: { prompt },
-        extraEnv: { OPENROUTER_API_KEY: key },
-        wire: fixture([
-          {
-            hostname: "openrouter.ai",
-            path: "/api/v1/images",
-            method: "POST",
-            headers: { authorization: `Bearer ${key}` },
-            json: { model: "openai/gpt-image-2", prompt, n: 1 },
-            response: jsonBody({
-              data: [{ b64_json: png.toString("base64") }],
-            }),
-          },
-        ]),
-        data: png,
-        type: "image/png",
-      });
-    });
+    await check(
+      "shared BYOK survives restart, concurrent configuration and overrides",
+      async () => {
+        const saved = await json(
+          ["providers", "configure", "openrouter", "--key-stdin"],
+          { input: key }
+        );
+        assert.equal(saved.value.storage, "plaintext_file");
+        assert.equal(saved.value.shared, true);
+        await Promise.all(
+          ["fal", "elevenlabs"].map((provider) =>
+            json(["providers", "configure", provider, "--key-stdin"], {
+              input: key,
+            })
+          )
+        );
+        const listed = await json(["providers", "list"]);
+        for (const provider of ["openrouter", "fal", "elevenlabs"])
+          assert.equal(
+            listed.value.providers.find((row) => row.provider === provider)
+              .source,
+            "file"
+          );
+        await Promise.all(
+          ["fal", "elevenlabs"].map((provider) =>
+            json(["providers", "remove", provider])
+          )
+        );
+        const credentials = path.join(profile, "providers", "credentials.toml");
+        const previous = await readFile(credentials);
+        try {
+          await writeFile(credentials, "invalid TOML [", { mode: 0o600 });
+          const override = await json(
+            ["models", "list", "--provider", "fal", "--available"],
+            { extraEnv: { FAL_KEY: key } }
+          );
+          assert.equal(override.value.access.source, "environment");
+          assert.equal(await readFile(credentials, "utf8"), "invalid TOML [");
+          const failed = await json(["providers", "list"], undefined, 1);
+          assert.equal(failed.value.error.code, "invalid_store");
+        } finally {
+          await writeFile(credentials, previous, { mode: 0o600 });
+        }
+      }
+    );
+    await check(
+      "OpenRouter image uses stored BYOK and writes bytes and a receipt",
+      async () => {
+        await generate({
+          name: "image",
+          model: "openai/gpt-image-2",
+          provider: "openrouter",
+          value: { prompt },
+          wire: fixture([
+            {
+              hostname: "openrouter.ai",
+              path: "/api/v1/images",
+              method: "POST",
+              headers: { authorization: `Bearer ${key}` },
+              json: { model: "openai/gpt-image-2", prompt, n: 1 },
+              response: jsonBody({
+                data: [{ b64_json: png.toString("base64") }],
+              }),
+            },
+          ]),
+          data: png,
+          type: "image/png",
+        });
+        await json(["providers", "remove", "openrouter"]);
+        const removed = await json(["providers", "list"]);
+        assert.equal(
+          removed.value.providers.find((row) => row.provider === "openrouter")
+            .configured,
+          false
+        );
+      }
+    );
     await check("Vercel image uses the pinned SDK protocol", async () => {
       await generate({
         name: "vercel-image",

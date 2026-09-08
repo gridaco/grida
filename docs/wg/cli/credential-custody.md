@@ -106,8 +106,9 @@ still require login. Recovery must report that outcome honestly.
 
 ## Provider credentials
 
-**Accepted design, implementation pending:** Desktop and CLI share a local
-`credentials.toml` for BYOK API keys under the user's Grida home. Plaintext
+**Implemented in the development preview:** Desktop and CLI share
+`providers/credentials.toml` for BYOK API keys under the user's Grida home
+(`~/.grida` by default, or the explicit `GRIDA_HOME`). Plaintext
 with user-only permissions is the default. Both clients use the same credential
 owner; neither requires the other to run. A language rewrite must preserve this
 contract without requiring the previous runtime or a credential daemon.
@@ -116,13 +117,17 @@ TOML provides readable sections, comments, and explicit types. The filename
 and header identify sensitive content. TOML is still plaintext: its syntax
 provides no additional confidentiality over JSON or INI.
 
-Illustrative record shape; exact serialization and compatibility rules must
-be specified before either client adopts it:
+The [versioned storage protocol](https://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md)
+owns the exact schema, locking and migration rules. A minimal record looks like:
 
 ```toml
 # Grida provider credentials.
 # Contains secrets. Do not commit or share.
 version = 1
+
+[migration]
+state = "unstarted"
+removed = []
 
 [providers.fal]
 api_key = "..."
@@ -131,6 +136,24 @@ api_key = "..."
 api_key = "..."
 ```
 
+Configure a connection once, then use it from either client:
+
+```sh
+grida providers configure fal
+grida providers list
+grida providers remove fal
+```
+
+`configure` uses hidden terminal input. Automation supplies `--key-stdin`;
+there is no literal key argument. `list` reports presence and effective source,
+never key contents or verified access. Stored credentials currently require
+macOS/Linux and Node 24+ on the main thread. Windows stored BYOK is unsupported;
+explicit CLI environment/stdin keys remain available.
+
+Precedence is `--key-stdin`, the selected provider's environment variable, then
+the shared file. A blank or malformed explicit key fails; unset the environment
+variable to use storage. Overrides never persist or open the selected stored key.
+
 ### Protection and lifecycle
 
 - Use one canonical provider file per Grida home, separate from project
@@ -138,8 +161,8 @@ api_key = "..."
   Grida login. Explicit environment/stdin inputs override stored keys for that
   invocation without reading or modifying the provider file.
 - Create private files and directories before writing secrets: owner-only
-  permissions on POSIX and an equivalent owner-controlled Windows ACL policy.
-  Validate ownership and unsafe filesystem aliases; publish complete updates
+  permissions on supported POSIX hosts; Windows requires an equivalent ACL
+  implementation before support. Validate ownership and unsafe filesystem aliases; publish complete updates
   atomically and coordinate all mutations across processes.
 - Accept keys through masked input or stdin. Ordinary status, errors, logs and
   receipts disclose no secret values; status identifies the source and
@@ -180,10 +203,17 @@ OpenCode documents provider API keys in a local
 These observations support the portability tradeoff; they do not define
 Grida's format or protection requirements.
 
-This decision does not convert the current CLI's environment/stdin inputs or
-Desktop's provider store automatically. It does not change Grida account
-OAuth's keyring default, export ChatGPT subscription credentials, or persist
-GG grants. Provider OAuth refresh/sharing remains a separate future lifecycle
+The updated Desktop imports legacy API keys on first provider access. Existing
+shared keys and explicit removals win; only API-key records are retired from the
+old file, preserving ChatGPT OAuth. An interrupted retirement leaves migration
+pending and blocks stored-key operations until updated Desktop retries cleanup.
+Environment/stdin overrides remain usable. After completion the old file is
+never a BYOK source again. Do not run older clients that still write the old
+provider store, delete the whole TOML file, or edit its migration metadata to
+remove a connection; use the command or Desktop connection settings.
+
+Account OAuth retains its keyring default. This does not export ChatGPT
+subscription credentials or persist GG grants. Provider OAuth refresh/sharing remains a separate future lifecycle
 contract; BYOK file access alone cannot coordinate rotating tokens.
 
 ## Security ownership
@@ -191,6 +221,9 @@ contract; BYOK file access alone cannot coordinate rotating tokens.
 **GRIDA-SEC-010** owns registered native OAuth account authority, including
 consent, callback, token use, durable custody, and session-local revocation.
 The registry records the implemented controls and their platform limits.
+
+**GRIDA-SEC-014** owns shared native BYOK custody and one-time legacy retirement.
+The CLI input/egress boundary remains **GRIDA-SEC-013**.
 
 **GRIDA-SEC-011** owns the separate local Supabase OAuth provisioning boundary:
 disposable fixture authority, environment isolation, administrative registration,

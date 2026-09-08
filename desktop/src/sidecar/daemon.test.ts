@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit provider-root forwarding and host isolation.
 // GRIDA-SEC-004 / GRIDA-SEC-006 / GRIDA-SEC-008 — host authority forwarding.
 // GRIDA-GG: desktop — scoped custody receives the same host origin and transport.
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -27,6 +28,7 @@ const transport = {
 const common = {
   password: "synthetic-daemon-password",
   user_data_path: "/synthetic/state",
+  provider_home: "/synthetic/shared-home",
   media_root: "/synthetic/media",
   projects_root: "/synthetic/projects",
   editor_base_url: "https://editor.invalid",
@@ -50,6 +52,7 @@ describe("Desktop daemon composition", () => {
     expect(mocks.media).toHaveBeenCalledWith({
       password: common.password,
       user_data_path: common.user_data_path,
+      provider_home: common.provider_home,
       media_root: common.media_root,
       projects_root: common.projects_root,
       gg_base_url: common.editor_base_url,

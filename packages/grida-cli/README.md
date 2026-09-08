@@ -1,6 +1,6 @@
 # Grida CLI
 
-> **GRIDA-SEC-010 / GRIDA-SEC-013** — independent account custody and CLI media authority;
+> **GRIDA-SEC-010 / GRIDA-SEC-013 / GRIDA-SEC-014** — independent account custody and CLI media authority;
 > see [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md).
 
 The `grida` command composes Grida's account services and tools for people and
@@ -67,9 +67,15 @@ machine. Signals cancel login; an in-flight credential write is allowed to settl
 The [media contract](https://grida.co/docs/wg/cli/media) owns examples, schemas,
 variants, availability and result rules. Installed help stays minimal.
 
-BYOK uses explicit environment slots or `--key-stdin`, without Grida login; no
-provider credential is persisted or discovered from Desktop. `providers list`
-shows presence, not verified access. GG needs the local native registration
+BYOK uses the shared `providers/credentials.toml` under Grida home, without
+Grida login. `providers configure <provider>` stores a key using hidden input
+or `--key-stdin`; `providers remove <provider>` removes the shared stored key.
+`providers list` shows presence, source and plaintext storage mode, not verified
+access. The same native owner serves Desktop, independently of its lifetime.
+Environment keys or `--key-stdin` override storage without opening it or persisting
+input. Blank/malformed explicit keys fail; unset a variable to select storage.
+Stored BYOK currently supports macOS/Linux only; Windows CLI users can supply
+explicit environment/stdin keys. Account OAuth and ChatGPT stores remain separate. GG needs the local native registration
 above, login and an organization. The auth owner hands a scoped grant into
 one invocation's memory store; account tokens never enter provider execution.
 

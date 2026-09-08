@@ -1,10 +1,14 @@
-// GRIDA-SEC-013 — explicit CLI BYOK inputs; no Desktop or account custody discovery.
+// GRIDA-SEC-013 / GRIDA-SEC-014 — invocation overrides before shared provider custody.
+import { ProviderCredentialStore } from "@grida/auth/providers";
 import type { ByokProviderId } from "@grida/ai/providers";
 
 /** One command's trusted key reader. Only status() is suitable for CLI output. */
 export class ProviderCredentials {
   #values = new Map<ProviderCredentials.Provider, string>();
-  #sources = new Map<ProviderCredentials.Provider, "environment" | "stdin">();
+  #sources = new Map<
+    ProviderCredentials.Provider,
+    "environment" | "stdin" | "file"
+  >();
 
   private constructor() {}
 
@@ -37,7 +41,7 @@ export class ProviderCredentials {
         const name = environment[id];
         const value = Object.hasOwn(env, name) ? env[name] : undefined;
         if (value === undefined) continue;
-        const key = normalize(value, false);
+        const key = normalize(value, true);
         if (key !== null) {
           owner.#values.set(id, key);
           owner.#sources.set(id, "environment");
@@ -48,10 +52,27 @@ export class ProviderCredentials {
         owner.#values.set(provider, key);
         owner.#sources.set(provider, "stdin");
       }
+      // Construct/open custody only after the chosen overrides have succeeded.
+      // GG and pure input consumers omit this capability entirely.
+      const missing = (selected === undefined ? providers : [selected]).filter(
+        (id) => !owner.#values.has(id)
+      );
+      if (missing.length && options.store) {
+        const store = await options.store();
+        for (const id of missing) {
+          if (signal?.aborted)
+            throw new ProviderCredentials.Failure("cancelled");
+          const value = await store.read(id);
+          if (value === null) continue;
+          owner.#values.set(id, normalize(value, true)!);
+          owner.#sources.set(id, "file");
+        }
+      }
       if (signal?.aborted) throw new ProviderCredentials.Failure("cancelled");
       return owner;
     } catch (error) {
       owner.dispose();
+      if (error instanceof ProviderCredentialStore.Failure) throw error;
       throw safeFailure(error);
     }
   }
@@ -92,12 +113,14 @@ export namespace ProviderCredentials {
     /** Explicitly allocated stdin; it cannot simultaneously carry command JSON. */
     stdin?: { provider: Provider; input: AsyncIterable<Uint8Array> };
     signal?: AbortSignal;
+    /** Lazy native owner supplied by the CLI host; never an ambient home lookup. */
+    store?: () => ProviderCredentialStore | Promise<ProviderCredentialStore>;
   };
   export type Status = {
     readonly provider: Provider;
     readonly environment: string;
     readonly configured: boolean;
-    readonly source: "environment" | "stdin" | null;
+    readonly source: "environment" | "stdin" | "file" | null;
   };
   export class Failure extends Error {
     readonly name = "ProviderCredentials.Failure";

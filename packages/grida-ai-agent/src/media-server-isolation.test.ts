@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — custody may use only private lock databases after media startup.
 // GRIDA-SEC-004 / GRIDA-SEC-006 / GRIDA-SEC-008 — built media startup and lightweight host exports.
 // GRIDA-GG: provider — synthetic transport proves scoped custody without agent startup.
 import { execFile } from "node:child_process";
@@ -124,7 +125,11 @@ describe("built media-only entry", () => {
       );
       const { stdout, stderr } = await execute(
         process.execPath,
-        [path.join(stage, "probe.mjs"), format],
+        [
+          "--disable-warning=ExperimentalWarning",
+          path.join(stage, "probe.mjs"),
+          format,
+        ],
         {
           cwd: stage,
           timeout: 20_000,
@@ -164,16 +169,42 @@ import net from "node:net";
 import dns from "node:dns";
 const format = process.argv[2];
 const require = createRequire(import.meta.url);
+const sqlite = require("node:sqlite");
+const NativeDatabase = sqlite.DatabaseSync;
+const executeFile = child.execFile;
+let custodyEnabled = false;
 const base = path.join(process.cwd(), "run-" + format);
 await fsp.mkdir(base, { recursive: true });
 const forbidden = { module: 0, process: 0, network: 0, state: 0 };
 function deny(kind) { forbidden[kind]++; throw new Error("Forbidden " + kind + " authority"); }
+sqlite.DatabaseSync = class extends NativeDatabase {
+  constructor(filename, options) {
+    const state = fs.realpathSync(path.join(base, "state"));
+    if (!custodyEnabled || ![
+      path.join(state, ".auth-lock", "profile.lock.sqlite"),
+      path.join(state, "providers", "profile.lock.sqlite"),
+    ].includes(filename)) deny("module");
+    super(filename, options);
+  }
+  exec(sql) {
+    if (!["PRAGMA busy_timeout = 0", "BEGIN IMMEDIATE", "ROLLBACK"].includes(sql)) deny("module");
+    return super.exec(sql);
+  }
+};
 registerHooks({ resolve(specifier, context, next) {
-  if (/^(?:node:sqlite|sqlite|drizzle-orm|@agentclientprotocol\/sdk)(?:\/|$)/.test(specifier)) deny("module");
+  if (/^(?:drizzle-orm|@agentclientprotocol\/sdk)(?:\/|$)/.test(specifier) ||
+    (/^(?:node:)?sqlite$/.test(specifier) && !custodyEnabled)) deny("module");
   return next(specifier, context);
 } });
 for (const name of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"])
   child[name] = () => deny("process");
+child.execFile = (file, args, options, callback) => {
+  const root = fs.realpathSync(base), target = args?.[1];
+  const owned = typeof target === "string" && (target === root || target.startsWith(root + path.sep) || root.startsWith(target.endsWith(path.sep) ? target : target + path.sep));
+  if (!custodyEnabled || file !== "/bin/ls" || args?.length !== 2 || args[0] !== "-lde" || !owned ||
+    options?.env?.LC_ALL !== "C" || options?.env?.LANG !== "C" || Object.keys(options.env).length !== 2) deny("process");
+  return executeFile(file, args, options, callback);
+};
 globalThis.fetch = async () => deny("network");
 for (const module of [http, https]) for (const name of ["request", "get"]) module[name] = () => deny("network");
 net.Socket.prototype.connect = () => deny("network");
@@ -245,6 +276,7 @@ try {
   assert.equal(handshake.capabilities.sound_effects, true);
   assert.equal(handshake.capabilities.music, true);
   assert.equal((await call(daemon, "/agent/run")).status, 404);
+  custodyEnabled = true;
   assert.equal((await call(daemon, "/secrets/set", { provider_id: "elevenlabs", key })).status, 200);
   const sound = await call(daemon, "/audio/sound-effects/generate", { model_id: "eleven_text_to_sound_v2", prompt: "clock ticking" });
   assert.equal(sound.status, 200);

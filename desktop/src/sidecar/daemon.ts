@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-SEC-004 — Desktop selects composition before importing chat machinery.
 // GRIDA-SEC-006 / GRIDA-GG: desktop — one scoped GG authority per launch.
 import type { DaemonServer, ShellExecutor } from "@grida/daemon/server";
@@ -12,6 +13,7 @@ export namespace DesktopDaemon {
   export type Options = {
     password: string;
     user_data_path: string;
+    provider_home?: string;
     media_root: string;
     projects_root?: string;
     editor_base_url: string;
@@ -30,6 +32,7 @@ export namespace DesktopDaemon {
     const shared: MediaDaemonOptions = {
       password: opts.password,
       user_data_path: opts.user_data_path,
+      provider_home: opts.provider_home,
       media_root: opts.media_root,
       projects_root: opts.projects_root,
       http_access: {

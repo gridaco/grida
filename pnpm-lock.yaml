@@ -1471,6 +1471,9 @@ importers:
       '@grida/auth':
         specifier: workspace:*
         version: link:../grida-auth
+      '@grida/home':
+        specifier: workspace:*
+        version: link:../grida-home
       '@types/node':
         specifier: ^24
         version: 24.12.2
@@ -1492,6 +1495,9 @@ importers:
 
   packages/grida-daemon:
     dependencies:
+      '@grida/auth':
+        specifier: workspace:*
+        version: link:../grida-auth
       '@hono/node-server':
         specifier: 1.19.9
         version: 1.19.9(hono@4.11.8)

@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-GG: desktop — pass the GG host into the sandbox policy (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — AgentSidecar supervisor.
@@ -101,7 +102,11 @@ export class AgentSidecarSupervisor {
   // construction, before Electron is ready. This secret-state path stays
   // separate from Electron's app.getPath("userData") browser profile; the
   // app-managed media root below is resolved and sandboxed independently.
-  private readonly user_data_path = home.join("agent");
+  private readonly user_data_path =
+    process.env.GRIDA_AGENT_USER_DATA ?? home.join("agent");
+  // GRIDA-SEC-014 — one path fact for custody, sidecar argv and command denies.
+  private readonly provider_home =
+    process.env.GRIDA_AGENT_USER_DATA ?? home.dir();
   private readonly media_root = DesktopMediaRoot.current;
 
   // Durable sidecar log (~/.grida/agent/logs/sidecar.log) — the on-disk
@@ -289,6 +294,7 @@ export class AgentSidecarSupervisor {
     }
     const policy = DesktopAgentSandboxPolicy.build({
       userData: this.user_data_path,
+      providerRoot: path.join(this.provider_home, "providers"),
       mediaRoot: this.media_root,
       home: app.getPath("home"),
       ggHost: new URL(EDITOR_BASE_URL).hostname,
@@ -310,6 +316,7 @@ export class AgentSidecarSupervisor {
       this.commandHost = new AgentCommandHost({
         scratchBase: this.scratchBase,
         userData: this.user_data_path,
+        providerRoot: path.join(this.provider_home, "providers"),
         mediaRoot: this.media_root,
         home: app.getPath("home"),
         filesystemPolicy: policy.filesystem,
@@ -375,6 +382,7 @@ export class AgentSidecarSupervisor {
     const args = [
       scriptPath,
       `--user-data=${this.user_data_path}`,
+      `--provider-home=${this.provider_home}`,
       `--media-root=${this.media_root}`,
       `--agent=${agentEnabled ? "enabled" : "disabled"}`,
       ...(this.scratchBase ? [`--scratch-base=${this.scratchBase}`] : []),

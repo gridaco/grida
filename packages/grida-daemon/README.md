@@ -29,8 +29,8 @@ It owns:
   [daemon.md](../../docs/wg/ai/agent/daemon.md), #798): registration
   record, persistent credential, authenticated probe, connect-or-spawn.
 - **Host primitives tenants build on.** The shell runner (structural
-  GRIDA-SEC-004 gates), `SecretsStore`/`AuthStore` (presence/set/delete;
-  raw reads stay server-side), `MediaPersistence` (path-free binary-media
+  GRIDA-SEC-004 gates), `SecretsStore` (shared native BYOK adapter) and
+  `AuthStore` (tenant OAuth custody; raw reads stay server-side), `MediaPersistence` (path-free binary-media
   publication backed by a separately injected host store), path containment,
   request validation, and the sandbox policy frame.
 
@@ -53,6 +53,34 @@ local path.
 AI-specific — no `ai`, no model catalogs, no provider SDKs. Enforced by
 `src/__boundary__.test.ts`; if that test is in your way, the change
 belongs in a tenant.
+
+## Provider credentials
+
+> GRIDA-SEC-014 — one shared native BYOK authority; existing HTTP perimeter and
+> ChatGPT OAuth remain GRIDA-SEC-004 and GRIDA-SEC-008.
+
+`provider_home` is an explicit host option. Desktop passes the canonical Grida
+home, so Desktop and CLI use the same `providers/credentials.toml` through
+[`@grida/auth/providers`](https://github.com/gridaco/grida/blob/main/packages/grida-auth/README.md).
+Omitting this option keeps direct/embedded daemons isolated under their supplied
+`user_data_path`; the daemon never discovers a real user home or project config.
+`SecretsStore` keeps its presence/set/delete interface and trusted `_getKey`
+reader. It does not return keys through HTTP or cache them across operations.
+
+First use migrates API-key entries from `user_data_path/auth.json`. Canonical
+values and earlier removals win. A durable pending fence precedes source
+retirement; retry finishes cleanup without importing again. Completed migration
+never reads the legacy file again. OAuth records stay in `auth.json`; updated
+macOS/Linux OAuth writers and migration use the same private `.auth-lock`
+process lock. Only the exact old private temporary-file pattern is retired.
+Do not run an older application that writes the mixed file concurrently:
+it does not participate in this protocol. `GRIDA_AUTH_CONTENT` is never a
+migration source, and new `AuthStore` API-key writes are refused.
+
+Shared BYOK custody currently supports macOS/Linux native main-thread hosts.
+Windows BYOK operations fail explicitly before opening storage; construction
+and the existing ChatGPT OAuth path remain available with their previous
+platform limits. Account logout and memory-only GG grants do not change this file.
 
 ## Exports
 
@@ -96,3 +124,13 @@ pnpm --filter @grida/daemon test:browser   # perimeter system harness (Chromium)
 The browser suite boots two real daemons (with a stub tenant) and proves
 the CORS / Referer / query-token rules from a real browser context —
 things a forged-header Node test cannot prove.
+
+`@grida/daemon/server` exports the Node-only `ProtectedRoots` topology gate. It
+accepts fixed absolute protected roots and checks an absolute candidate with
+`overlaps(path)`, resolving existing ancestors even before the protected subtree
+exists. Unresolvable aliases fail closed. `WorkspaceRegistry` accepts these roots
+as its third constructor argument and `FileRegistry` as its first; both recheck
+saved grants before returning file authority. The daemon supplies its provider
+credential directory to both registries. This prevents opening that directory, a
+child or an ancestor as an ordinary file/workspace grant; it is not an OS sandbox
+or protection against a hostile process racing filesystem mutations.

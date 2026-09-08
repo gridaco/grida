@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — real shared-file custody with isolated native migration locks.
 // GRIDA-SEC-004 / GRIDA-SEC-006 — real sidecar startup, private channels and synthetic custody.
 // GRIDA-GG: provider — fake scoped grants only; no issuer or provider is contacted.
 import { spawn, type ChildProcess } from "node:child_process";
@@ -146,6 +147,11 @@ describe("built Desktop media startup", () => {
         (await active.post("/secrets/get", { provider_id: "elevenlabs" }))
           .status
       ).toBe(404);
+      // Only after a successful media-only handshake may shared custody import
+      // SQLite's lock-only adapter. Chat startup remains forbidden throughout.
+      await fs.writeFile(path.join(root, "allow-custody"), "enabled", {
+        mode: 0o600,
+      });
       expect(
         (await active.post("/secrets/set", { provider_id: "elevenlabs", key }))
           .status
@@ -209,10 +215,16 @@ describe("built Desktop media startup", () => {
       await active.stop();
       active = undefined;
 
-      expect(await fs.readdir(userData)).toEqual(["auth.json"]);
+      expect((await fs.readdir(userData)).sort()).toEqual([
+        ".auth-lock",
+        "providers",
+      ]);
       expect(await fs.readdir(temporary)).toEqual([]);
       expect(await fs.readdir(home)).toEqual([]);
-      const state = await fs.readFile(path.join(userData, "auth.json"), "utf8");
+      const state = await fs.readFile(
+        path.join(userData, "providers", "credentials.toml"),
+        "utf8"
+      );
       expect(state).toContain(key);
       expect(state).not.toContain(ggToken);
       active = await Sidecar.start({
@@ -224,6 +236,10 @@ describe("built Desktop media startup", () => {
         runtime,
         fetchProvider,
         generation: 2,
+      });
+      expect((await active.post("/handshake")).status).toBe(200);
+      await fs.writeFile(path.join(root, "allow-custody"), "enabled", {
+        mode: 0o600,
       });
       expect(
         await (
@@ -249,6 +265,7 @@ describe("built Desktop media startup", () => {
           await fs.readFile(path.join(root, `guard-${generation}.json`), "utf8")
         );
         expect(report.counts).toEqual({ imports: 0, network: 0, processes: 0 });
+        expect(report.custody.locks).toBeGreaterThan(0);
         expect(Number(report.node.split(".")[0])).toBeGreaterThanOrEqual(24);
         expect(Boolean(report.electron)).toBe(runtime.electron);
       }
@@ -307,6 +324,7 @@ class Sidecar {
     this.sockets = new AgentDaemonSocketHost(child, fatal);
   }
   static async start(options: StartOptions): Promise<Sidecar> {
+    await fs.rm(path.join(options.root, "allow-custody"), { force: true });
     const child = spawn(
       options.runtime.executable,
       [
@@ -324,6 +342,8 @@ class Sidecar {
           ...options.env,
           ELECTRON_RUN_AS_NODE: "1",
           GRIDA_AGENT_DISABLE_MODELS_FETCH: "1",
+          GRIDA_MEDIA_STARTUP_ROOT: options.root,
+          GRIDA_MEDIA_STARTUP_STATE: options.userData,
           GRIDA_MEDIA_STARTUP_REPORT: path.join(
             options.root,
             `guard-${options.generation}.json`

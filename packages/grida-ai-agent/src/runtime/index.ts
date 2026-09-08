@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-GG: provider — thread the `gg` session deps into resolution (docs/wg/platform/hosted-ai.md)
 // GRIDA-SEC-008 — persist and reuse the exact session provider/model identity.
 /**
@@ -217,6 +218,8 @@ export type AgentRuntimeDeps = ResolveDeps & {
    * secret-arg reads (test/standalone).
    */
   secrets_root?: string;
+  /** Additional native credential roots outside the agent state directory. */
+  protected_read_roots?: readonly string[];
   /**
    * GRIDA-SEC-004 — host-owned finite-command capability. Omission is
    * FAIL-CLOSED: no `run_command` tool. A Desktop host injects an OS-confined
@@ -1680,6 +1683,7 @@ export class AgentRuntime {
     const {
       workspace_registry: workspaceRegistry,
       secrets_root: secretsRoot,
+      protected_read_roots: protectedReadRoots,
       shell_executor: shellExecutor,
       scratch_base: scratchBase,
     } = this.deps;
@@ -1702,6 +1706,7 @@ export class AgentRuntime {
     const runDeps = {
       workspace_registry: workspaceRegistry,
       secrets_root: secretsRoot,
+      protected_read_roots: protectedReadRoots,
       shell_executor: shellExecutor,
       track_command_execution: (task: Promise<unknown>) => {
         // The command task ends only after the host's terminal abort ACK, which

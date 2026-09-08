@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — shared provider custody retains explicit host authority.
 // GRIDA-SEC-013 — explicit CLI BYOK custody and safe presence-only output.
 import { Readable } from "node:stream";
 import { inspect } from "node:util";
@@ -76,12 +77,10 @@ describe("ProviderCredentials environment", () => {
     expect(owner.status().every((value) => !value.configured)).toBe(true);
   });
 
-  it("treats missing and blank environment keys as absent", async () => {
-    const owner = await ProviderCredentials.open({
-      env: { FAL_KEY: "\t \r\n" },
-    });
-    expect(owner.get("fal")).toBeNull();
-    expect(owner.status().every((value) => value.source === null)).toBe(true);
+  it("refuses a blank explicit environment key rather than selecting a stored key", async () => {
+    await expect(
+      ProviderCredentials.open({ env: { FAL_KEY: "\t \r\n" } })
+    ).rejects.toMatchObject({ code: "invalid_credentials" });
   });
 
   it("snapshots each selected environment getter once", async () => {

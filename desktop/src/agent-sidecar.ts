@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-GG: desktop — pass the GG base URL to the daemon (docs/wg/platform/hosted-ai.md)
 // GRIDA-SEC-006 — the selected composition receives the scoped GG custody owner.
 // GRIDA-SEC-008 — construct the native provider inside Grida's agent tenant.
@@ -105,6 +106,8 @@ if (!userDataPath) {
   process.exit(1);
 }
 const requiredUserDataPath = userDataPath;
+// GRIDA-SEC-014 — explicit host authority; direct test/embedded hosts stay isolated.
+const providerHome = getCliArg("provider-home") ?? requiredUserDataPath;
 const mediaRoot = getCliArg("media-root");
 if (!mediaRoot) {
   console.error("[agent-sidecar] fatal: missing --media-root");
@@ -183,6 +186,7 @@ async function main() {
   const host = await DesktopDaemon.create({
     password,
     user_data_path: requiredUserDataPath,
+    provider_home: providerHome,
     media_root: requiredMediaRoot,
     projects_root: projectsRoot,
     editor_base_url: runtimeEditorBaseUrl,

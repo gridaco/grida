@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-GG: provider — construct + wire the GG session store and routes (docs/wg/platform/hosted-ai.md)
 // GRIDA-SEC-008 — construct the native provider with the shared AuthStore.
 /**
@@ -344,7 +345,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       }).filesystem.deny_read;
       const directoryScopes = new DirectoryScopeRegistry({
         secrets_root: services.user_data_path,
-        protected_roots: sensitiveReadRoots,
+        protected_roots: [...sensitiveReadRoots, services.secrets.directory],
       });
       // In-flight run registry — shared with the daemon shutdown via the
       // tenant handle's `drain` so stop() reaches the same entries the
@@ -397,6 +398,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         // workspaces.json, recent.json). Threaded into exact command scope so a
         // confined executor can deny it while the daemon itself retains access.
         secrets_root: services.user_data_path,
+        protected_read_roots: [services.secrets.directory],
         scratch_base: scratchBase,
         shell_executor: shellExecutor,
         // GRIDA-SEC-004 — the sandboxed ACP disposition consumes this host
@@ -499,6 +501,8 @@ export type AgentDaemonOptions = AgentTenantOptions & {
   capabilities?: Partial<DaemonCapabilities>;
   /** Host-provided data directory for daemon + tenant persistent state. */
   user_data_path: string;
+  /** Shared native provider home; omission isolates custody under user_data_path. */
+  provider_home?: string;
   /** GRIDA-SEC-004 — host-injected managed root for `/workspaces/create`. */
   projects_root?: string;
   /** Daemon-frame field: host-injected root for durable generated media. */
@@ -536,6 +540,7 @@ export function agentTenantOptionsFromDaemon(
     password: _password,
     capabilities: _daemonCapabilities,
     user_data_path: _userDataPath,
+    provider_home: _providerHome,
     projects_root: _projectsRoot,
     media_root: _mediaRoot,
     http_access: _httpAccess,
@@ -557,6 +562,7 @@ export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
   return new DaemonServer({
     password: opts.password,
     user_data_path: opts.user_data_path,
+    provider_home: opts.provider_home,
     projects_root: opts.projects_root,
     media_root: opts.media_root,
     http_access: opts.http_access,

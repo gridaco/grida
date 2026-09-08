@@ -315,7 +315,8 @@ perimeter through the typed `DaemonTenant` seam. Both currently ship in
 [`packages/grida-ai-agent`](packages/grida-ai-agent). Its separate
 `@grida/agent/media-server` entry starts the existing media routes, BYOK
 configuration and scoped GG custody without importing the chat runtime,
-SQLite, skills or ACP. The full `createAgentDaemon` composition uses the same
+chat SQLite state, skills or ACP. Provider access lazily opens only the shared
+credential owner's SQLite exclusion lock (GRIDA-SEC-014). The full `createAgentDaemon` composition uses the same
 media/provider owner and adds agent/session behavior. This is runtime startup
 isolation; the media entry still belongs to the agent package and does not
 promise independent package installation.
@@ -326,8 +327,10 @@ executor or enable native ChatGPT OAuth. It retains the same main-owned
 listener, authenticated perimeter, provider transport and media root. The
 choice is explicit host configuration, never an automatic fallback after
 agent initialization fails. No second daemon or credential store is created:
-the existing state location and daemon-owned `AuthStore` write chain remain
-shared, with one memory-only GG session and one catalogue per composition.
+the daemon-owned OAuth `AuthStore` remains separate from the shared provider
+TOML owner, with one memory-only GG session and one catalogue per composition.
+The first provider access retires legacy API entries through GRIDA-SEC-014;
+subsequent reads never use that retired source.
 
 Shared image, video, audio and 3D operations and provider HTTP belong to
 [`@grida/ai`](packages/grida-ai/README.md). The tenant supplies narrow key/token
@@ -650,7 +653,8 @@ the sidecar sends one bounded `command.request` over its inherited private
 channel, and Electron main independently canonicalizes the exact workspace,
 session scratch, cwd, and host-owned scratch base. Main then asks `srt` for a
 fresh kernel profile for that finite command. The profile denies the entire
-shared scratch base and the daemon's secret `userData`, re-allows only this
+shared scratch base, the daemon's secret `userData` and the shared provider
+credential directory, re-allows only this
 session's scratch, and grants writes only to the exact workspace, exact
 scratch, and a private per-command temp directory. It also denies SRT's shared
 compatibility temp/log write defaults and gives the command no direct network
@@ -695,12 +699,15 @@ merely by argv inspection.
   logs a warning. A boolean claim alone can never cause raw execution.
 
 - **Secret-dir containment (per command).** The daemon's own secret dir —
-  its `userData`, where BYOK `auth.json`, `workspaces.json`, `recent.json`,
-  and the sessions db live — is deliberately **not** in the `srt`
-  **outer** policy, because the sidecar itself must read `auth.json` for
-  provider calls. Electron main does not need that authority to execute a
+  its `userData`, where OAuth `auth.json`, `workspaces.json`, `recent.json`,
+  and the sessions db live — and the separate shared provider directory are
+  deliberately not denied in the `srt` **outer** policy, because the sidecar
+  itself needs credential custody for provider calls. Electron main does not need that authority to execute a
   command, so every finite-command profile adds a kernel `deny_read` and
-  `deny_write` for `userData`. `validateShellRequest` still rejects an explicit
+  `deny_write` for `userData` and the canonical provider subtree. The supervisor
+  supplies the same provider-root fact to sidecar custody and command protection;
+  overlapping workspace/scratch/media grants fail closed. `validateShellRequest`
+  still rejects an explicit
   arg resolving there as defense in depth, but computed interpreter paths are
   covered as well. HOME secrets (`~/.ssh`, `~/.aws`, shell rc files) remain
   denied in both outer and command profiles. The fs-edit tools (`read_file`)
@@ -929,6 +936,15 @@ Today:
 - [editor/scaffolds/desktop/workbench/terminal-pane.tsx](editor/scaffolds/desktop/workbench/terminal-pane.tsx) — xterm.js view over the `terminal` bridge namespace; renderer side of the human terminal.
 - `desktop/src/main.ts` — Electron main entry; acquires the single-instance lock (deferred to `ready` so a secondary instance can forward a macOS `open-file` path via `additionalData` before quitting — before any sidecar/window/IPC is created, preserving the one-sidecar invariant); routes `open-file`/`open-url`/`second-instance` opens.
 - [desktop/src/main/open-handoff.ts](desktop/src/main/open-handoff.ts) — pure codec for the secondary→primary "open" forward; tolerant `decode` so a foreign or legacy `second-instance` payload is never mistaken for an open.
+
+The shared provider-file extension also binds
+[ProtectedRoots](packages/grida-daemon/src/protected-roots.ts), its
+[alias tests](packages/grida-daemon/src/protected-roots.test.ts),
+[file/workspace grant tests](packages/grida-daemon/src/provider-root-grants.test.ts),
+and [structured agent grant tests](packages/grida-ai-agent/src/runtime/provider-root-grants.test.ts).
+The existing file/workspace registries and directory-scope owner consume this
+common native gate; GRIDA-SEC-014 records custody and the exact protected-root
+wiring. No file grant or cached handle may admit the shared provider subtree.
 
 **What does NOT belong here.** A `secrets.get` method on the bridge.
 A bridge installed unconditionally (without `pathname` scoping). A
@@ -1493,8 +1509,13 @@ trusted merely because it is “local.”
    closed.
 3. **Secret custody and race-safe persistence.** The sidecar alone owns code
    exchange, access/refresh lifecycle, account metadata, and request-time
-   credential injection. One daemon `AuthStore` instance serializes BYOK and
-   OAuth writes into owner-readable `auth.json` (`0600`, atomic replacement).
+   credential injection. OAuth remains in daemon `AuthStore`
+   (`auth.json`, `0600`, atomic replacement). Updated macOS/Linux writers share
+   a cross-process lock with API-key retirement under GRIDA-SEC-014, rereading
+   before mutation and preserving unrelated records. BYOK moves to the separate
+   shared TOML owner; new API-key writes through `AuthStore` are refused.
+   Windows retains its existing OAuth in-process queue and does not support
+   shared BYOK.
    Refresh is single-flight and rotating refresh tokens are persisted before
    use. Compare-and-replace/remove guards prevent a late refresh or cancelled
    exchange from overwriting/removing a newer account. Exact attempt
@@ -1787,8 +1808,8 @@ credential through reuse of an existing browser or daemon bridge.
     never arbitrary exception objects. Help, version and docs do not open custody
     or network. Cancellation closes pending login but waits for noncancellable
     custody work, reporting that a write may have completed.
-    Media commands' explicit BYOK environment/stdin input is separate under
-    GRIDA-SEC-013 and is never consulted by account custody. Native GG generation
+    Media commands' BYOK inputs and shared provider store are separate under
+    GRIDA-SEC-013/014 and are never consulted by account custody. Native GG generation
     consumes the fixed scoped handoff in rule 10, not an account-token getter.
 
 **Limits and adoption gates.** Producer tests are not deployment certification.
@@ -2191,15 +2212,21 @@ generation receipts without a fixed projection.
    Ordinary listing/inspection needs no credential or network. An availability
    filter reports key presence or cached organization eligibility explicitly;
    neither establishes provider access or generation success.
-2. **Invocation-owned credentials.** `ProviderCredentials` reads only the four
+2. **Invocation-owned credentials.** `ProviderCredentials` reads the four
    named process environment slots (`OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY`,
-   `FAL_KEY`, `ELEVENLABS_API_KEY`) or an explicitly allocated stdin key. Execution
+   `FAL_KEY`, `ELEVENLABS_API_KEY`), an explicitly allocated stdin key, or the
+   shared provider owner under GRIDA-SEC-014. Execution
    inspects only its selected provider; provider status may inspect all four.
-   There is no dotenv, repository, Desktop store, account store or alias lookup.
-   Stdin replaces only the matching provider slot. Keys are bounded to 4 KiB,
+   There is no dotenv, repository, legacy Desktop file or account-store lookup.
+   Stdin replaces the matching environment slot; successful explicit inputs bypass
+   constructing or opening the stored-key owner for that provider. Missing inputs
+   use the shared file; blank/malformed explicit input fails without fallback.
+   Stored keys retain the same CLI header validation. Keys are bounded to 4 KiB,
    normalized and header-safe; stdin has a cancellable 30-second bound. Only the
    trusted SDK key reader receives secret strings. Status projects presence and
-   source; disposal drops private references. GG obtains an org-bound grant through
+   source and plaintext storage mode; disposal drops private references. Explicit
+   configure/remove commands mutate shared custody without opening account auth.
+   GG obtains an org-bound grant through
    the auth owner's fixed exchange into one invocation's memory store and supplies
    an empty BYOK reader. The media transport never receives the account JWT.
 3. **Destination-bound egress.** `MediaHttp` admits credential-bearing requests
@@ -2330,6 +2357,35 @@ durable or discard unrelated OAuth records.
    Retirement must preserve unrelated source records and complete durably; its
    failures remain pending. There is no dual-write mode or fallback to the source.
 
+5. **Independent native adoption.** Desktop supplies its canonical provider home
+   explicitly, and standalone daemon hosts default to their own isolated data
+   path. `SecretsStore` delegates to the public owner and runs one-time migration
+   through the legacy writer lock. Its routes still expose only presence/set/delete.
+   Every updated macOS/Linux OAuth mutation shares the legacy lock and rereads
+   disk before changing a record. Strict legacy reads bypass test environment
+   content; retirement removes API entries only and cleans validated old temporaries.
+   ChatGPT refresh and Grida account login are not migrated into this store.
+6. **Explicit CLI inputs and writes.** The CLI grammar never accepts literal key
+   arguments. Configure reads hidden terminal input or explicitly allocated stdin;
+   input is bounded and validated before custody opens. The terminal is restored
+   on success, failure, timeout or cancellation. Native home resolution reads no
+   project file. Environment/stdin override selection happens before storage is
+   constructed; GG supplies no store capability. Configure/remove await durable
+   mutations through signals. Status and failures project only fixed safe metadata;
+   no key, prefix, parser excerpt or native error is printed. No account setup or
+   provider network probe is required. Provider removal leaves account sessions and
+   environment variables untouched.
+
+7. **Provider files cannot become tool grants.** The daemon supplies the provider
+   directory as a fixed protected native root. `ProtectedRoots` rejects ancestor,
+   descendant and alias overlap, including an absent subtree; unresolved/dangling
+   aliases fail closed. File/workspace registries recheck stored handles and roots,
+   so earlier registration cannot retain newly forbidden authority. Agent structured
+   filesystem and directory-reference admission use the same topology rule before
+   granting reads. Desktop's finite-command policy denies this exact directory
+   while its long-lived credential host retains custody access. No renderer can
+   configure or remove these protections.
+
 **Limits and verification.** This is plaintext user-level custody, not encryption,
 secure erasure, provider revocation, protection from same-user code, or backup
 protection. A supported filesystem, OS, runtime and dependencies are trusted.
@@ -2364,6 +2420,53 @@ platform evidence, not Windows or cross-platform release certification.
   [build](packages/grida-auth/tsdown.config.mts),
   [language-neutral protocol](packages/grida-auth/PROVIDER-CREDENTIALS-V1.md), and
   [conformance fixtures](packages/grida-auth/fixtures/providers-v1/README.md).
+- [Daemon credential facade](packages/grida-daemon/src/secrets.ts),
+  [legacy OAuth owner/migration](packages/grida-daemon/src/auth/file.ts),
+  [migration tests](packages/grida-daemon/src/secrets.test.ts),
+  [protected-root owner](packages/grida-daemon/src/protected-roots.ts),
+  [alias tests](packages/grida-daemon/src/protected-roots.test.ts),
+  [file/workspace grant tests](packages/grida-daemon/src/provider-root-grants.test.ts),
+  [file registry](packages/grida-daemon/src/files/registry.ts),
+  [workspace registry](packages/grida-daemon/src/workspaces.ts),
+  [daemon composition](packages/grida-daemon/src/daemon-server.ts),
+  [services seam](packages/grida-daemon/src/http/server.ts),
+  [Node exports](packages/grida-daemon/src/server.ts),
+  [package contract](packages/grida-daemon/README.md), and
+  [daemon contract](packages/grida-daemon/docs/daemon-server.md).
+- [CLI provider commands](packages/grida-cli/src/commands/providers.ts),
+  [native home adapter](packages/grida-cli/src/provider-store.ts),
+  [invocation owner](packages/grida-cli/src/provider-credentials.ts),
+  [hidden input](packages/grida-cli/src/provider-prompt.ts),
+  [hidden-input tests](packages/grida-cli/src/provider-prompt.test.ts), and
+  [shared-store adoption tests](packages/grida-cli/src/provider-storage.test.ts).
+  Grammar, dispatch, media composition and installed proof retain GRIDA-SEC-013.
+- Desktop [supervisor](desktop/src/main/agent-sidecar-supervisor.ts),
+  [sidecar](desktop/src/agent-sidecar.ts),
+  [composition](desktop/src/sidecar/daemon.ts),
+  [outer policy](desktop/src/main/agent-sandbox-policy.ts), and
+  [finite command host](desktop/src/main/agent-command-host.ts), with
+  [supervisor tests](desktop/src/main/agent-sidecar-supervisor.test.ts),
+  [composition tests](desktop/src/sidecar/daemon.test.ts),
+  [outer-policy tests](desktop/src/main/agent-sandbox-policy.test.ts), and
+  [command-host tests](desktop/src/main/agent-command-host.test.ts).
+  The [built startup proof](desktop/src/sidecar/media-startup.test.ts) and
+  [its guard](desktop/src/sidecar/testing/media-startup-guard.cjs) distinguish
+  custody-only SQLite access from forbidden chat startup. These retain
+  GRIDA-SEC-004's channel, sandbox and renderer guarantees. The
+  [Desktop contract](desktop/README.md) and
+  [agent authority contract](desktop/docs/agent-authority.md) document host custody.
+- Agent [CLI](packages/grida-ai-agent/src/cli.ts),
+  [full server](packages/grida-ai-agent/src/server.ts),
+  [media server](packages/grida-ai-agent/src/media-server.ts),
+  [runtime](packages/grida-ai-agent/src/runtime/index.ts), and
+  [workspace bindings](packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts),
+  [directory scope owner](packages/grida-ai-agent/src/session/directory-scopes.ts),
+  and [structured-file grant tests](packages/grida-ai-agent/src/runtime/provider-root-grants.test.ts)
+  carry native custody/protected-root facts, never renderer-selected key paths.
+  [Built media isolation tests](packages/grida-ai-agent/src/media-server-isolation.test.ts),
+  the [agent contract](packages/grida-ai-agent/README.md), and the
+  [ChatGPT custody contract](packages/grida-ai-agent/docs/chatgpt-subscription-provider.md)
+  bind startup isolation and the separate OAuth lifecycle.
 
 ---
 

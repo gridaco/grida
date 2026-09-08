@@ -1,51 +1,21 @@
 /**
- * GRIDA-SEC-004 / GRIDA-SEC-008 — serialized credential persistence.
+ * GRIDA-SEC-004 / GRIDA-SEC-008 / GRIDA-SEC-014 — native OAuth custody and
+ * bounded retirement of the former mixed API-key/OAuth file.
  *
- * Lives at `${userDataPath}/auth.json`, chmod 0o600, owned exclusively
- * by the agent host. V1 stores BYOK API key records keyed by provider id.
- * The filename intentionally stays `auth.json`: it is local credential
- * infrastructure, not a hosted OAuth route layer.
- *
- * Schema is intentionally tiny so it can be hand-edited in a pinch and
- * so format drift is obvious:
- *
- *   ```json
- *   {
- *     "openrouter": { "type": "api", "key": "sk-or-..." },
- *     "vercel":     { "type": "api", "key": "..." }
- *   }
- *   ```
- *
- * **Permission discipline.** The file MUST be mode 0o600 (owner-only
- * read/write). On write we set the mode at open time so the FD is
- * never world-readable, even briefly. On read we `fs.stat` first and
- * refuse if any bits in `0o077` (group/world) are set — even reading
- * a too-permissive auth.json could be misinterpreted as "permissions
- * are fine"; better to fail loudly so the user knows their secrets
- * are exposed.
- *
- * **Atomic writes.** Same pattern as `files/io.ts`: write to a
- * sibling `.tmp` file in the same directory, then `rename` into place.
- * `rename` is atomic on POSIX within the same filesystem.
- *
- * **No in-memory cache.** Reads are cheap (small JSON, almost always
- * page-cached), and the agent host is the sole writer so we don't worry
- * about cross-process races on writes. Skipping the cache means we
- * cannot serve stale keys after, e.g., a side-channel where the user
- * `rm`'d auth.json.
- *
- * **Env override.** `GRIDA_AUTH_CONTENT` short-circuits disk I/O when
- * set — lets tests inject a fixed auth state without touching the
- * filesystem. The override is read-only:
- * `writeAll()` still hits disk, but `readAll()` short-circuits before
- * the stat/permission check.
- *
- * **Never log the contents of this file.** Logging the path is fine,
- * logging "wrote auth entry for provider=X user=Y" is fine, logging
- * the API key is a security violation.
+ * OAuth remains in user_data_path/auth.json. New API-key writes are refused.
+ * Updated macOS/Linux writers and migration share a crash-released lock in
+ * .auth-lock; lock order is legacy file then canonical provider store. Old
+ * application versions do not participate and must not write concurrently.
+ * Windows retains the previous OAuth queue; shared BYOK is unsupported there.
  */
 
 import fs from "node:fs/promises";
+import { constants, type Stats } from "node:fs";
+import { execFile } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { promisify } from "node:util";
+import { CredentialLock } from "@grida/auth/node";
+import type { ProviderCredentialStore } from "@grida/auth/providers";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { atomicWrite } from "../storage/atomic-write";
@@ -111,12 +81,26 @@ export class AuthStore {
    */
   private write_chain: Promise<unknown> = Promise.resolve();
 
+  readonly userDataPath: string;
+
   constructor(userDataPath: string) {
-    this.file_path = path.join(userDataPath, FILE_NAME);
+    this.userDataPath = path.resolve(userDataPath);
+    this.file_path = path.join(this.userDataPath, FILE_NAME);
   }
 
   private enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
-    const next = this.write_chain.catch(() => undefined).then(task);
+    const next = this.write_chain
+      .catch(() => undefined)
+      .then(async () => {
+        if (process.platform === "win32") return task();
+        // A legacy agent directory may already be 0755. The lock gets its own
+        // private subtree; no existing directory permissions are repaired.
+        await fs.mkdir(this.userDataPath, { recursive: true, mode: 0o700 });
+        const directory = await fs.realpath(this.userDataPath);
+        return new CredentialLock({
+          directory: path.join(directory, ".auth-lock"),
+        }).run(task);
+      });
     this.write_chain = next.catch(() => undefined);
     return next;
   }
@@ -127,8 +111,8 @@ export class AuthStore {
    *
    * **Permission check.** If the file exists, we stat it and refuse to
    * read if the mode has any group/world bits set. The mode is the
-   * primary defense for at-rest secrets in V1 (V2.1 wraps with the OS
-   * keychain), so silently reading a too-permissive file would mask
+   * at-rest protection for this OAuth file; silently reading a
+   * too-permissive file would mask
    * the problem.
    */
   async readAll(): Promise<AuthFile> {
@@ -173,7 +157,159 @@ export class AuthStore {
    * half-written or orphaned tmp is never world-readable.
    */
   async writeAll(file: AuthFile): Promise<void> {
-    await atomicWrite(this.file_path, JSON.stringify(file));
+    if (Object.values(file).some((entry) => entry.type === "api")) {
+      throw new Error("API keys require the shared provider credential store");
+    }
+    return this.enqueueWrite(() => this.persist(file));
+  }
+
+  /**
+   * Fixed migration seam: the source lock covers producer publication and
+   * retirement. Completed canonical migration never reads this source again.
+   * GRIDA_AUTH_CONTENT is intentionally not a migration source.
+   */
+  async migrateProviderKeys(store: ProviderCredentialStore): Promise<void> {
+    await this.enqueueWrite(async () => {
+      await store.migrate({
+        read: async () => {
+          const all = await this.readDisk();
+          return Object.entries(all).flatMap(([provider, entry]) => {
+            if (entry?.type !== "api") return [];
+            if (typeof entry.key !== "string")
+              throw new Error("Invalid legacy provider credential");
+            return entry.key.trim().length === 0
+              ? []
+              : [{ provider, apiKey: entry.key }];
+          });
+        },
+        retire: async () => {
+          const all = await this.readDisk();
+          const remaining = Object.fromEntries(
+            Object.entries(all).filter(([, entry]) => entry?.type !== "api")
+          );
+          if (Object.keys(remaining).length !== Object.keys(all).length) {
+            await this.persist(remaining);
+          }
+          await this.cleanup();
+        },
+      });
+    });
+  }
+
+  private async readForMutation(): Promise<AuthFile> {
+    return process.platform === "win32" ? this.readAll() : this.readDisk();
+  }
+
+  private async readDisk(): Promise<AuthFile> {
+    let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+    try {
+      const stat = await fs.lstat(this.file_path);
+      this.checkFile(stat);
+      await this.checkAcl(this.file_path);
+      handle = await fs.open(
+        this.file_path,
+        constants.O_RDONLY | constants.O_NOFOLLOW
+      );
+      const opened = await handle.stat();
+      this.checkFile(opened);
+      if (
+        opened.dev !== stat.dev ||
+        opened.ino !== stat.ino ||
+        opened.size > 1_048_576
+      ) {
+        throw new Error();
+      }
+      const bytes = await handle.readFile();
+      if (bytes.byteLength > 1_048_576) throw new Error();
+      const raw = new TextDecoder("utf-8", {
+        fatal: true,
+        ignoreBOM: true,
+      }).decode(bytes);
+      const value: unknown = JSON.parse(raw);
+      if (!value || typeof value !== "object" || Array.isArray(value))
+        throw new Error();
+      return value as AuthFile;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === "ENOENT" && !handle)
+        return {};
+      throw new Error("Legacy credential storage is invalid or unavailable");
+    } finally {
+      await handle?.close();
+    }
+  }
+
+  private checkFile(stat: Stats): void {
+    if (
+      !stat.isFile() ||
+      stat.nlink !== 1 ||
+      (stat.mode & 0o7777) !== 0o600 ||
+      (process.geteuid && stat.uid !== process.geteuid())
+    ) {
+      throw new Error("Legacy credential storage is invalid or unavailable");
+    }
+  }
+
+  private async checkAcl(filename: string): Promise<void> {
+    if (process.platform !== "darwin") return;
+    const { stdout } = await promisify(execFile)(
+      "/bin/ls",
+      ["-lde", filename],
+      {
+        env: { LC_ALL: "C", LANG: "C" },
+        timeout: 2000,
+        maxBuffer: 65_536,
+      }
+    );
+    if (/^\s*\d+:.*\ballow\b/m.test(stdout)) throw new Error();
+  }
+
+  private async cleanup(): Promise<void> {
+    for (const filename of await fs.readdir(this.userDataPath)) {
+      if (!/^\.auth\.json\.[0-9a-f]{16}\.tmp$/.test(filename)) continue;
+      const full = path.join(this.userDataPath, filename);
+      this.checkFile(await fs.lstat(full));
+      await this.checkAcl(full);
+      await fs.unlink(full);
+    }
+    await this.syncDirectory();
+  }
+
+  private async syncDirectory(): Promise<void> {
+    if (process.platform === "win32") return;
+    const handle = await fs.open(this.userDataPath, constants.O_RDONLY);
+    try {
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  }
+
+  private async persist(file: AuthFile): Promise<void> {
+    if (process.platform === "win32") {
+      await atomicWrite(this.file_path, JSON.stringify(file));
+      return;
+    }
+    const temporary = path.join(
+      this.userDataPath,
+      `.auth.json.${randomBytes(8).toString("hex")}.tmp`
+    );
+    let staged = false;
+    try {
+      const handle = await fs.open(temporary, "wx", 0o600);
+      staged = true;
+      try {
+        await handle.writeFile(JSON.stringify(file), "utf8");
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      await fs.rename(temporary, this.file_path);
+      staged = false;
+      // A post-rename failure never rolls back a newly committed OAuth token.
+      await this.syncDirectory();
+    } finally {
+      if (staged) await fs.unlink(temporary).catch(() => undefined);
+    }
   }
 
   async get(providerId: string): Promise<AuthInfo | undefined> {
@@ -182,19 +318,21 @@ export class AuthStore {
   }
 
   async set(providerId: string, info: AuthInfo): Promise<void> {
+    if (info.type === "api")
+      throw new Error("API keys require the shared provider credential store");
     return this.enqueueWrite(async () => {
-      const all = await this.readAll();
+      const all = await this.readForMutation();
       all[providerId] = info;
-      await this.writeAll(all);
+      await this.persist(all);
     });
   }
 
   async remove(providerId: string): Promise<void> {
     return this.enqueueWrite(async () => {
-      const all = await this.readAll();
+      const all = await this.readForMutation();
       if (!(providerId in all)) return;
       delete all[providerId];
-      await this.writeAll(all);
+      await this.persist(all);
     });
   }
 
@@ -210,10 +348,10 @@ export class AuthStore {
     expected: AuthInfo
   ): Promise<boolean> {
     return this.enqueueWrite(async () => {
-      const all = await this.readAll();
+      const all = await this.readForMutation();
       if (!isDeepStrictEqual(all[providerId], expected)) return false;
       delete all[providerId];
-      await this.writeAll(all);
+      await this.persist(all);
       return true;
     });
   }
@@ -230,11 +368,13 @@ export class AuthStore {
     expected: AuthInfo,
     next: AuthInfo
   ): Promise<boolean> {
+    if (next.type === "api")
+      throw new Error("API keys require the shared provider credential store");
     return this.enqueueWrite(async () => {
-      const all = await this.readAll();
+      const all = await this.readForMutation();
       if (!isDeepStrictEqual(all[providerId], expected)) return false;
       all[providerId] = next;
-      await this.writeAll(all);
+      await this.persist(all);
       return true;
     });
   }

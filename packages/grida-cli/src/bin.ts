@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// GRIDA-SEC-014 — shared provider custody retains explicit host authority.
 // GRIDA-SEC-010 / GRIDA-SEC-013 — safe process output and explicit account/media dispatch.
 import { Cli } from "./cli";
 import { Output } from "./output";
@@ -36,6 +37,12 @@ try {
     case "voices list": {
       const { MediaCommands } = await import("./media-run");
       process.exitCode = await MediaCommands.run(invocation, output);
+      break;
+    }
+    case "providers configure":
+    case "providers remove": {
+      const { ProviderCommands } = await import("./commands/providers");
+      process.exitCode = await ProviderCommands.run(invocation, output);
       break;
     }
     default: {

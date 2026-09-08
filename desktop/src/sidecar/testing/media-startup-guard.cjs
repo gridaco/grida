@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — only fixture-owned credential lock databases and ACL metadata.
 // GRIDA-SEC-004 — test tripwires, not an OS sandbox or a packaged-app proof.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -9,9 +10,36 @@ const https = require("node:https");
 const http2 = require("node:http2");
 const dns = require("node:dns");
 const childProcess = require("node:child_process");
+const path = require("node:path");
+// Loaded by the proof itself before observation, never by the sidecar startup.
+const sqlite = require("node:sqlite");
+const NativeDatabase = sqlite.DatabaseSync;
+const executeFile = childProcess.execFile;
 
 const reportPath = process.env.GRIDA_MEDIA_STARTUP_REPORT;
 assert.ok(reportPath);
+const root = fs.realpathSync(process.env.GRIDA_MEDIA_STARTUP_ROOT);
+const state = fs.realpathSync(process.env.GRIDA_MEDIA_STARTUP_STATE);
+const custody = { locks: 0, acl: 0 };
+const enabled = () => fs.existsSync(path.join(root, "allow-custody"));
+const lockFiles = new Set([
+  path.join(state, ".auth-lock", "profile.lock.sqlite"),
+  path.join(state, "providers", "profile.lock.sqlite"),
+]);
+sqlite.DatabaseSync = class extends NativeDatabase {
+  constructor(filename, options) {
+    if (!enabled() || !lockFiles.has(filename)) forbidden("imports");
+    super(filename, options);
+    custody.locks++;
+  }
+  exec(sql) {
+    if (
+      !["PRAGMA busy_timeout = 0", "BEGIN IMMEDIATE", "ROLLBACK"].includes(sql)
+    )
+      forbidden("imports");
+    return super.exec(sql);
+  }
+};
 const counts = { imports: 0, network: 0, processes: 0 };
 function forbidden(kind) {
   counts[kind] += 1;
@@ -19,7 +47,7 @@ function forbidden(kind) {
 }
 moduleApi.registerHooks({
   resolve(specifier, context, next) {
-    if (/^(?:node:)?sqlite$/.test(specifier)) {
+    if (/^(?:node:)?sqlite$/.test(specifier) && !enabled()) {
       counts.imports += 1;
       throw new Error(
         `media startup attempted forbidden imports: ${specifier} from ${context.parentURL}`
@@ -42,6 +70,32 @@ for (const name of [
 ]) {
   childProcess[name] = () => forbidden("processes");
 }
+// Owner checks use a fixed macOS executable to inspect ACL metadata. This is
+// the sole process allowance; it cannot execute model-selected commands.
+childProcess.execFile = (file, args, options, callback) => {
+  const filename = args?.[1];
+  const owned =
+    typeof filename === "string" &&
+    (filename === root ||
+      filename.startsWith(root + path.sep) ||
+      root.startsWith(
+        filename.endsWith(path.sep) ? filename : filename + path.sep
+      ));
+  if (
+    !enabled() ||
+    file !== "/bin/ls" ||
+    args?.length !== 2 ||
+    args[0] !== "-lde" ||
+    !owned ||
+    options?.env?.LC_ALL !== "C" ||
+    options?.env?.LANG !== "C" ||
+    Object.keys(options.env).length !== 2
+  ) {
+    return forbidden("processes");
+  }
+  custody.acl++;
+  return executeFile(file, args, options, callback);
+};
 net.connect = net.createConnection = denyNetwork;
 net.Socket.prototype.connect = denyNetwork;
 net.Server.prototype.listen = denyNetwork;
@@ -77,6 +131,7 @@ process.on("exit", () => {
       node: process.versions.node,
       electron: process.versions.electron ?? null,
       counts,
+      custody,
     }),
     { mode: 0o600 }
   );

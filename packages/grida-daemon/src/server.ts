@@ -1,4 +1,6 @@
 /**
+ * GRIDA-SEC-014 — native protected roots and shared provider custody.
+ *
  * `@grida/daemon/server` — the GRIDA-SEC-004 Node surface for hosts and
  * tenants.
  *
@@ -41,6 +43,7 @@ export { Daemon } from "./daemon";
 // ── Tenant toolkit ──────────────────────────────────────────────────
 // The daemon-owned primitives a tenant builds on. Kept explicit (no
 // star) so the seam surface stays reviewable.
+export { ProtectedRoots } from "./protected-roots";
 export { WorkspaceRegistry, type Workspace } from "./workspaces";
 export { workspaceFs } from "./workspaces/fs";
 export {

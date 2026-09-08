@@ -64,6 +64,8 @@ function setup(json = true) {
       invocation.command === "models list" ||
       invocation.command === "models inspect" ||
       invocation.command === "providers list" ||
+      invocation.command === "providers configure" ||
+      invocation.command === "providers remove" ||
       invocation.command === "generate" ||
       invocation.command === "voices list"
     )

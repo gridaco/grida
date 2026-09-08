@@ -88,10 +88,12 @@ result is a local file receipt, not JSON pretending to contain native bytes.
 
 ## Immediate: supply access explicitly
 
-BYOK uses the selected provider's environment slot or `--key-stdin` and needs
-no Grida login. GG requires a separate native CLI login and organization.
-There is no Desktop credential discovery or persistent provider configuration
-in this preview.
+BYOK needs no Grida login. Configure a shared key with
+`grida providers configure fal`, or supply an invocation-only environment key
+or `--key-stdin`. Desktop and CLI share `providers/credentials.toml` under Grida
+home; the [custody contract](./credential-custody.md#provider-credentials) owns
+configuration, removal, platform support and migration. GG requires a separate
+native CLI login and organization.
 
 | Provider     | Explicit environment slot |
 | ------------ | ------------------------- |
@@ -101,10 +103,12 @@ in this preview.
 | `elevenlabs` | `ELEVENLABS_API_KEY`      |
 
 `providers list` reports key presence and source, never contents. It does not
-verify keys. `--key-stdin` replaces the selected environment slot for one
-invocation; it cannot share stdin with `--input -`. Keys are never literal
-command arguments. Grida logout affects its own OAuth session; provider keys
-remain controlled by the caller's environment or secret manager.
+verify keys. Precedence is stdin, environment, then the shared file. An explicit
+key bypasses file access and never persists; a blank or malformed override fails.
+`--key-stdin` cannot share stdin with `--input -`. Keys are never literal command
+arguments. `providers remove <provider>` removes the shared stored key for both
+clients; environment overrides remain effective. Grida logout leaves provider
+keys intact.
 
 Speech needs a provider voice in addition to its model:
 
@@ -171,15 +175,6 @@ process interaction and local files. The shared AI owner supplies descriptors,
 input parsing and execution for both Desktop and CLI. Account custody and
 scoped GG access retain their separate authorities. No agent runtime, server
 framework or Desktop process is needed to execute these operations.
-
-## Planned: shared provider credentials
-
-The accepted [provider custody design](./credential-custody.md#provider-credentials)
-uses a shared, private plaintext `credentials.toml` for Desktop and CLI BYOK.
-Environment/stdin remain invocation-only overrides. Configuration/removal,
-Desktop migration and the language-neutral storage contract must be implemented
-before the CLI reads this file. Optional keyring storage is deferred.
-The current preview continues to use explicit environment/stdin credentials.
 
 ## Planned: provider-native endpoints
 

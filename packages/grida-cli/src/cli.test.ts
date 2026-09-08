@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — shared provider custody retains explicit host authority.
 // GRIDA-SEC-010 / GRIDA-SEC-013 — command grammar and explicit authority regression checks.
 import { describe, expect, it } from "vitest";
 import { Cli } from "./cli";
@@ -88,6 +89,39 @@ describe("CLI grammar", () => {
 });
 
 describe("media command grammar", () => {
+  it("keeps provider persistence explicit and keys off argv", () => {
+    expect(
+      Cli.parse(["providers", "configure", "fal", "--help"])
+    ).toMatchObject({
+      command: "help",
+      topic: "providers configure",
+    });
+    expect(
+      Cli.parse(["providers", "configure", "fal", "--key-stdin", "--json"])
+    ).toMatchObject({
+      command: "providers configure",
+      provider: "fal",
+      keyStdin: true,
+    });
+    expect(
+      Cli.parse(["providers", "remove", "fal", "--no-input"])
+    ).toMatchObject({
+      command: "providers remove",
+      provider: "fal",
+    });
+    expect(() =>
+      Cli.parse(["providers", "configure", "fal", "--json"])
+    ).toThrow(expect.objectContaining({ code: "interaction_required" }));
+    for (const args of [
+      ["configure", "gg", "--key-stdin"],
+      ["configure", "fal", "synthetic-secret"],
+      ["configure", "fal", "--key", "synthetic-secret"],
+      ["remove", "fal", "--key-stdin"],
+    ])
+      expect(() => Cli.parse(["providers", ...args])).toThrow(
+        expect.objectContaining({ code: "invalid_usage" })
+      );
+  });
   it("keeps discovery credential-free and provider selection explicit", () => {
     expect(Cli.parse(["models", "list"])).toMatchObject({
       command: "models list",

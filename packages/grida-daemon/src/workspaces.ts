@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-004 — workspace registry.
+ * GRIDA-SEC-004 / GRIDA-SEC-014 — workspace registry.
  *
  * A workspace is an opened directory. Single-root in V1.x (multi-root
  * is V2). Persisted at `${userData}/workspaces.json` with the same
@@ -30,6 +30,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { atomicWrite } from "./storage/atomic-write";
+import { ProtectedRoots } from "./protected-roots";
 import { containsPath } from "./path-contains";
 
 export type Workspace = {
@@ -76,7 +77,14 @@ export class WorkspaceRegistry {
   private default_root?: string;
   private default_ensured = false;
 
-  constructor(userDataPath: string, projectsRoot?: string) {
+  private readonly protectedRoots: ProtectedRoots;
+
+  constructor(
+    userDataPath: string,
+    projectsRoot?: string,
+    protectedRoots: readonly string[] = []
+  ) {
+    this.protectedRoots = new ProtectedRoots(protectedRoots);
     this.file_path = path.join(userDataPath, FILE_NAME);
     this.projects_root = projectsRoot;
   }
@@ -123,6 +131,7 @@ export class WorkspaceRegistry {
    */
   async open(rootPath: string): Promise<Workspace> {
     const real = await fs.realpath(rootPath);
+    this.assertAllowed(real);
     const stat = await fs.stat(real);
     if (!stat.isDirectory()) {
       throw new Error(`workspace path is not a directory: ${rootPath}`);
@@ -185,6 +194,7 @@ export class WorkspaceRegistry {
     if (!this.projects_root) {
       throw new Error("projects-root-not-configured");
     }
+    this.assertAllowed(this.projects_root);
     await fs.mkdir(this.projects_root, { recursive: true });
     const realRoot = await fs.realpath(this.projects_root);
 
@@ -264,6 +274,7 @@ export class WorkspaceRegistry {
     if (!this.projects_root) return null;
     if (!this.default_ensured) {
       try {
+        this.assertAllowed(this.projects_root);
         await fs.mkdir(this.projects_root, { recursive: true });
         // `open` realpaths + registers + persists (single-sourced id/name rules).
         const ws = await this.open(this.projects_root);
@@ -276,7 +287,7 @@ export class WorkspaceRegistry {
       }
     }
     const ws = this.entries.find((e) => e.root === this.default_root);
-    return ws ? { ...ws, is_default: true } : null;
+    return ws && this.allowed(ws.root) ? { ...ws, is_default: true } : null;
   }
 
   /**
@@ -287,10 +298,12 @@ export class WorkspaceRegistry {
   async list(): Promise<Workspace[]> {
     await this.ensureDefault();
     await this.ensureLoaded();
-    return this.entries.map((e) => ({
-      ...e,
-      is_default: this.default_root != null && e.root === this.default_root,
-    }));
+    return this.entries
+      .filter((e) => this.allowed(e.root))
+      .map((e) => ({
+        ...e,
+        is_default: this.default_root != null && e.root === this.default_root,
+      }));
   }
 
   /**
@@ -299,7 +312,9 @@ export class WorkspaceRegistry {
    */
   async findById(id: string): Promise<Workspace | null> {
     await this.ensureLoaded();
-    return this.entries.find((e) => e.id === id) ?? null;
+    return (
+      this.entries.find((e) => e.id === id && this.allowed(e.root)) ?? null
+    );
   }
 
   /**
@@ -308,7 +323,9 @@ export class WorkspaceRegistry {
    */
   async findByRoot(root: string): Promise<Workspace | null> {
     await this.ensureLoaded();
-    return this.entries.find((e) => e.root === root) ?? null;
+    return (
+      this.entries.find((e) => e.root === root && this.allowed(e.root)) ?? null
+    );
   }
 
   async pin(id: string, pinned: boolean): Promise<void> {
@@ -337,6 +354,7 @@ export class WorkspaceRegistry {
     // Caller guarantees loaded — this is a sync check used in routes
     // where the list has already been touched on this request.
     for (const w of this.entries) {
+      if (!this.allowed(w.root)) continue;
       // Use `path.sep`-terminated prefix match to avoid false positives
       // like `/Users/x/docs2` matching workspace `/Users/x/docs`.
       const prefix = w.root.endsWith(path.sep) ? w.root : w.root + path.sep;
@@ -349,13 +367,26 @@ export class WorkspaceRegistry {
 
   /** Snapshot of currently-registered workspace roots. */
   rootsSnapshot(): readonly string[] {
-    return this.entries.map((e) => e.root);
+    return this.entries.filter((e) => this.allowed(e.root)).map((e) => e.root);
   }
 
   /**
    * Cap to MAX_ENTRIES. Pinned entries are never evicted; among
    * un-pinned, most-recently-opened wins.
    */
+  private allowed(root: string): boolean {
+    try {
+      return !this.protectedRoots.overlaps(root);
+    } catch {
+      return false;
+    }
+  }
+
+  private assertAllowed(root: string): void {
+    if (!this.allowed(root))
+      throw new Error("workspace-overlaps-protected-root");
+  }
+
   private trim(): void {
     if (this.entries.length <= MAX_ENTRIES) return;
     const pinned = this.entries.filter((e) => e.pinned);

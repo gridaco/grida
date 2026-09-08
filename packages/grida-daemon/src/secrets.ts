@@ -1,75 +1,71 @@
 /**
- * GRIDA-SEC-004 — BYOK secret store.
- *
- * Thin façade over `AuthStore` for the `ApiKeyEntry`-shaped records
- * (`openrouter`, `vercel`). The agent host's `/secrets/*` HTTP routes
- * call this; the BYOK provider path in `runtime.ts`
- * calls this internally to pull the key when constructing the
- * @ai-sdk client.
- *
- * **The client never reads secrets back.** There is no `get()`
- * method on the bridge (and none should be added). The agent host uses the
- * key internally; the client can only `has()` / `set()` / `delete()`.
- * This closes the XSS exfil path even if a host bridge's path-scoping
- * defense is somehow bypassed.
- *
- * **Whitespace-only keys are treated as absent.** Matches
- * `editor/lib/ai/models.ts` `resolveByokProvider` —
- * `process.env.BYOK_*_API_KEY?.trim()` — so a user pasting in just
- * whitespace is treated as no configured provider rather than getting
- * a confusing upstream "empty key" error.
- *
- * **Allowed provider ids.** The route layer validates this set;
- * the store doesn't (it would be tempting to centralize the check
- * here, but the route's 400-with-clear-message is much friendlier
- * than a silent ignore here, and the route knows the HTTP shape).
+ * GRIDA-SEC-004 / GRIDA-SEC-014 — shared BYOK custody behind presence/set/delete.
+ * Raw keys stay in the native host. No renderer or HTTP secret-read operation.
+ * Account logout and ChatGPT OAuth remain separate from this provider file.
  */
+import fs from "node:fs/promises";
+import path from "node:path";
+import { ProviderCredentialStore } from "@grida/auth/providers";
+import type { AuthStore } from "./auth/file";
 
-import type { AuthStore, ApiKeyEntry } from "./auth/file";
-
+/** Compatibility façade over the canonical native provider credential owner. */
 export class SecretsStore {
-  constructor(private readonly auth: AuthStore) {}
+  readonly directory: string;
+  private readonly home: string;
+  private ready: Promise<ProviderCredentialStore> | undefined;
 
-  async has(providerId: string): Promise<boolean> {
-    const entry = await this.auth.get(providerId);
-    if (!entry || entry.type !== "api") return false;
-    return entry.key.trim().length > 0;
+  constructor(
+    private readonly auth: AuthStore,
+    providerHome = auth.userDataPath
+  ) {
+    this.home = path.resolve(providerHome);
+    this.directory = path.join(this.home, "providers");
   }
 
-  /**
-   * Caller is responsible for rejecting whitespace-only keys with a
-   * 400 — see `http/routes/secrets.ts`. We don't reject here
-   * because this is a low-level store; the input validation is at
-   * the route layer.
-   */
+  private store(): Promise<ProviderCredentialStore> {
+    this.ready ??= this.initialize().catch((error) => {
+      this.ready = undefined;
+      throw error instanceof ProviderCredentialStore.Failure
+        ? error
+        : new ProviderCredentialStore.Failure("storage_failed");
+    });
+    return this.ready;
+  }
+
+  private async initialize(): Promise<ProviderCredentialStore> {
+    if (!["darwin", "linux"].includes(process.platform)) {
+      throw new ProviderCredentialStore.Failure("unsupported_platform");
+    }
+    // Only the explicit host path is canonicalized. This accommodates native
+    // temporary-directory aliases without reading another application's home.
+    await fs.mkdir(this.home, { recursive: true, mode: 0o700 });
+    const store = new ProviderCredentialStore({
+      home: await fs.realpath(this.home),
+    });
+    await this.auth.migrateProviderKeys(store);
+    return store;
+  }
+
+  async has(providerId: string): Promise<boolean> {
+    return (await this._getKey(providerId)) !== null;
+  }
+
   async set(
     providerId: string,
     key: string,
-    metadata?: Record<string, string>
+    _metadata?: Record<string, string>
   ): Promise<void> {
-    const entry: ApiKeyEntry = {
-      type: "api",
-      key,
-      ...(metadata ? { metadata } : {}),
-    };
-    await this.auth.set(providerId, entry);
+    if (!key.trim()) throw new ProviderCredentialStore.Failure("invalid_input");
+    await (await this.store()).set(providerId, key);
   }
 
   async delete(providerId: string): Promise<void> {
-    await this.auth.remove(providerId);
+    await (await this.store()).remove(providerId);
   }
 
-  /**
-   * Internal-only — read back the secret key for daemon-side use
-   * (constructing the @ai-sdk client in `runtime.ts`).
-   * NEVER exposed through the HTTP surface; if you find yourself
-   * wanting a `/secrets/` route that returns this, stop and re-read
-   * the threat model.
-   */
+  /** Trusted SDK injection only. Never expose through the daemon transport. */
   async _getKey(providerId: string): Promise<string | null> {
-    const entry = await this.auth.get(providerId);
-    if (!entry || entry.type !== "api") return null;
-    const trimmed = entry.key.trim();
-    return trimmed.length > 0 ? entry.key : null;
+    const key = await (await this.store()).read(providerId);
+    return key?.trim() ? key : null;
   }
 }

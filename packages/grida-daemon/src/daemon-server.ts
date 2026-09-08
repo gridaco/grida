@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 /**
  * DaemonServer — the daemon lifecycle owner.
  * GRIDA-SEC-004 — the authenticated perimeter is identical in listening and
@@ -50,6 +51,8 @@ export type DaemonServerOptions = {
   capabilities?: Partial<DaemonCapabilities>;
   /** Host-provided data directory for daemon persistent state. */
   user_data_path: string;
+  /** Explicit shared provider home. Omission isolates custody under user_data_path. */
+  provider_home?: string;
   /**
    * GRIDA-SEC-004 — host-injected managed root for the auto-create flow
    * (`POST /workspaces/create`). The desktop supervisor passes `~/Documents/Grida Projects`;

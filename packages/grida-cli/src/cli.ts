@@ -1,10 +1,11 @@
+// GRIDA-SEC-014 — shared provider custody retains explicit host authority.
 // GRIDA-SEC-010 / GRIDA-SEC-013 — explicit commands cannot select arbitrary credential transport.
 import { parseArgs } from "node:util";
 
 /** Static command grammar. Parsing never opens storage, browsers or connections. */
 export namespace Cli {
   const help = {
-    "": "Grida — account access and tools\n\nUsage: grida <command>\n\nCommands:\n  auth       Sign in and manage this CLI's session\n  account    Read your identity, organizations and credits\n  models     Discover executable models and input schemas\n  providers  Inspect explicit provider credentials\n  generate   Generate media into a new local directory\n  voices     List available speech voices\n  docs       Print canonical documentation URLs\n\nOptions: --help, --version\nUse grida <command> --help for details.",
+    "": "Grida — account access and tools\n\nUsage: grida <command>\n\nCommands:\n  auth       Sign in and manage this CLI's session\n  account    Read your identity, organizations and credits\n  models     Discover executable models and input schemas\n  providers  Manage shared provider API keys\n  generate   Generate media into a new local directory\n  voices     List available speech voices\n  docs       Print canonical documentation URLs\n\nOptions: --help, --version\nUse grida <command> --help for details.",
     auth: "Usage: grida auth <command>\n\nCommands:\n  login      Sign in using the system browser\n  status     Inspect the local session (no server verification)\n  logout     Clear local credentials and request session revocation\n  storage    Inspect or explicitly migrate credential storage",
     "auth login":
       "Usage: grida auth login [--storage keyring|file] [--no-browser]\n\nSign in using the system browser. New profiles use the OS keyring.\nFile storage is an explicit alternative; the choice is saved per profile.\nUse auth storage migrate to change an existing profile's backend.\n--no-browser prints the sign-in URL for you to open on this machine.\nRequires interaction; --json and --no-input cannot start login.",
@@ -30,15 +31,20 @@ export namespace Cli {
       "Usage: grida models list [--provider <provider>] [--modality image|video|audio|3d] [--kind <kind>] [--available] [--org <slug> | --org-id <id>] [--json]\n\nLists executable operations, including staged models. No provider probes.\n--available requires --provider: BYOK checks key presence; GG checks cached\norganization eligibility online. Neither guarantees model access or generation.",
     "models inspect":
       "Usage: grida models inspect --provider <provider> --model <id> [--kind <kind>] [--variant text|references|image] [--json]\n\nPrint the effective JSON input schema and native output description.\nKinds: image, video, music, sound-effect, text-to-speech, three-d.\nThe kind is inferred when unambiguous; image/video default to text input.",
-    providers: "Usage: grida providers list [--json]",
+    providers:
+      "Usage: grida providers <command>\n\nCommands:\n  list                    Show key presence and effective source\n  configure <provider>    Save a shared provider API key\n  remove <provider>       Remove a shared provider API key",
+    "providers configure":
+      "Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]\n\nSave an API key in shared plaintext credentials.toml with private permissions.\nDesktop and CLI use the same stored keys. No Grida login or provider probe.\nWithout --key-stdin, enter the key at a hidden terminal prompt.\nAutomation requires --key-stdin; keys are never accepted as arguments.",
+    "providers remove":
+      "Usage: grida providers remove <provider> [--json] [--no-input]\n\nRemove the stored key for Desktop and CLI. Environment keys remain effective.\nThis does not revoke the key at its provider or sign out of Grida.",
     "providers list":
-      "Usage: grida providers list [--json]\n\nShow explicit environment key presence, never key contents. No login or probes.\nOPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY.\nGG uses a separate Grida login and organization; no provider key.",
+      "Usage: grida providers list [--json]\n\nShow key presence and source, never key contents. No login or probes.\nStored keys use shared plaintext credentials.toml with private permissions.\nOPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY.\nGG uses a separate Grida login and organization; no provider key.",
     generate:
-      "Usage: grida generate --provider <provider> --model <id> --input @file|- --out <new-directory> [--kind <kind>] [--variant text|references|image] [--key-stdin] [--org <slug> | --org-id <id>] [--json]\n\nProviders: openrouter, vercel, fal, elevenlabs, gg.\nInspect the model first for its JSON input schema. No raw provider passthrough.\n--input reads one JSON object from an explicit file or stdin (16 MiB max).\n--key-stdin reads a BYOK key instead of its environment slot; cannot share\nstdin with JSON input. BYOK needs no Grida login. GG requires login.\n--out must name a new directory under an existing parent. Artifacts and\nreceipt.json are written locally without overwriting files.\nNo automatic generation retry. Interrupted requests may still be charged.",
+      "Usage: grida generate --provider <provider> --model <id> --input @file|- --out <new-directory> [--kind <kind>] [--variant text|references|image] [--key-stdin] [--org <slug> | --org-id <id>] [--json]\n\nProviders: openrouter, vercel, fal, elevenlabs, gg.\nInspect the model first for its JSON input schema. No raw provider passthrough.\n--input reads one JSON object from an explicit file or stdin (16 MiB max).\n--key-stdin reads a BYOK key instead of its environment slot; cannot share\nstdin with JSON input. Precedence: stdin, environment, shared credentials.toml.\nExplicit keys bypass the stored key. BYOK needs no Grida login. GG requires login.\n--out must name a new directory under an existing parent. Artifacts and\nreceipt.json are written locally without overwriting files.\nNo automatic generation retry. Interrupted requests may still be charged.",
     voices:
       "Usage: grida voices list --provider elevenlabs [--key-stdin] [--json]",
     "voices list":
-      "Usage: grida voices list --provider elevenlabs [--key-stdin] [--json]\n\nList speech voices using the explicit ElevenLabs credential. No Grida login.",
+      "Usage: grida voices list --provider elevenlabs [--key-stdin] [--json]\n\nList speech voices using the ElevenLabs credential. No Grida login.",
     docs: "Usage: grida docs [command...]\n\nPrint the canonical documentation URL. Does not open a browser or fetch it.\nExamples: grida docs, grida docs account credits, grida docs auth storage",
   } as const;
   export type Topic = keyof typeof help;
@@ -53,6 +59,15 @@ export namespace Cli {
     | "three-d";
   export type Variant = "text" | "references" | "image";
   export type Selector = { id: number } | { name: string };
+  export type ProviderInvocation = Options &
+    (
+      | {
+          command: "providers configure";
+          provider: Exclude<Provider, "gg">;
+          keyStdin: boolean;
+        }
+      | { command: "providers remove"; provider: Exclude<Provider, "gg"> }
+    );
   export type MediaInvocation = Options &
     (
       | {
@@ -85,6 +100,7 @@ export namespace Cli {
       | { command: "voices list"; provider: "elevenlabs"; keyStdin: boolean }
     );
   export type Invocation =
+    | ProviderInvocation
     | MediaInvocation
     | (Options &
         (
@@ -227,6 +243,35 @@ export namespace Cli {
     if (topic === "providers list") {
       allowed(...common);
       return { ...options, command: topic };
+    }
+    if (
+      positionals[0] === "providers" &&
+      (positionals[1] === "configure" || positionals[1] === "remove")
+    ) {
+      const configure = positionals[1] === "configure";
+      allowed(...common, ...(configure ? ["key-stdin"] : []));
+      const provider = choice(positionals[2], [
+        "openrouter",
+        "vercel",
+        "fal",
+        "elevenlabs",
+      ] as const);
+      if (positionals.length !== 3 || !provider) throw usage();
+      if (configure) {
+        const keyStdin = values["key-stdin"] === true;
+        if (!keyStdin && (options.json || options.noInput))
+          throw new Failure(
+            "interaction_required",
+            "Use --key-stdin to configure a provider without terminal interaction."
+          );
+        return {
+          ...options,
+          command: "providers configure",
+          provider,
+          keyStdin,
+        };
+      }
+      return { ...options, command: "providers remove", provider };
     }
     if (topic === "models list") {
       allowed(
@@ -376,7 +421,7 @@ export namespace Cli {
   export function docsUrl(topic: Topic): string {
     return (
       "https://grida.co/docs/wg/cli/" +
-      (topic.startsWith("auth storage")
+      (topic.startsWith("auth storage") || topic.startsWith("providers")
         ? "credential-custody"
         : /^(models|providers|generate|voices)/.test(topic)
           ? "media"
@@ -423,6 +468,11 @@ export namespace Cli {
     return { id: Number(id) };
   }
   function known(value: string): Topic {
+    const providerHelp =
+      /^(providers (?:configure|remove)) (?:openrouter|vercel|fal|elevenlabs)$/.exec(
+        value
+      );
+    if (providerHelp) value = providerHelp[1]!;
     if (!Object.hasOwn(help, value)) throw usage();
     return value as Topic;
   }

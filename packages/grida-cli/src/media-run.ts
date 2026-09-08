@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — shared provider custody retains explicit host authority.
 // GRIDA-SEC-013 — explicit CLI media authority, preflight and safe result presentation.
 // GRIDA-SEC-006 — the native account owner hands off only a scoped in-memory GG grant.
 // GRIDA-GG: token — one invocation, no persistence, remint or provider fallback.
@@ -15,6 +16,7 @@ import {
 } from "@grida/ai";
 import { AccountClient } from "@grida/account";
 import { AuthClient } from "@grida/auth";
+import { ProviderCredentialStore } from "@grida/auth/providers";
 import type { Readable } from "node:stream";
 import { Cli } from "./cli";
 import { CliHost } from "./host";
@@ -22,6 +24,7 @@ import { MediaFiles } from "./media-files";
 import { MediaHttp } from "./media-http";
 import { Output } from "./output";
 import { ProviderCredentials } from "./provider-credentials";
+import { ProviderStore } from "./provider-store";
 
 /** CLI composition only. Operation selection, parsing and execution belong to the SDK. */
 export namespace MediaCommands {
@@ -30,6 +33,7 @@ export namespace MediaCommands {
     env: NodeJS.ProcessEnv;
     stdin: Readable;
     openAuth: typeof CliHost.open;
+    openStore: typeof ProviderStore.open;
     transport: (ggOrigin?: string) => ProviderHttpTransport;
   };
 
@@ -40,6 +44,7 @@ export namespace MediaCommands {
       env: process.env,
       stdin: process.stdin,
       openAuth: CliHost.open,
+      openStore: ProviderStore.open,
       transport: (ggOrigin) => new MediaHttp({ ggOrigin }).transport,
     }
   ): Promise<number> {
@@ -95,6 +100,7 @@ export namespace MediaCommands {
           } else {
             credentials = await ProviderCredentials.open({
               env: host.env,
+              store: () => host.openStore(host.env),
               provider: invocation.provider,
               signal,
             });
@@ -129,15 +135,24 @@ export namespace MediaCommands {
         return 0;
       }
       if (invocation.command === "providers list") {
-        credentials = await ProviderCredentials.open({ env: host.env, signal });
+        credentials = await ProviderCredentials.open({
+          env: host.env,
+          signal,
+          store: () => host.openStore(host.env),
+        });
         const providers = credentials.status();
         output.result(
-          { providers, gg: { authentication: "grida_login", checked: false } },
+          {
+            providers,
+            storage: "shared_plaintext_file",
+            gg: { authentication: "grida_login", checked: false },
+          },
           [
             ...providers.map(
               (row) =>
-                `${row.provider}: ${row.configured ? "configured" : "missing"} (${row.environment})`
+                `${row.provider}: ${row.configured ? "configured" : "missing"} (${row.source ?? "no key"}; ${row.environment})`
             ),
+            "Stored keys use shared plaintext credentials.toml with private permissions.",
             "gg: Grida login and organization required; access not checked.",
           ]
         );
@@ -195,6 +210,7 @@ export namespace MediaCommands {
       } else {
         credentials = await ProviderCredentials.open({
           env: host.env,
+          store: () => host.openStore(host.env),
           provider: invocation.provider,
           signal,
           ...(invocation.keyStdin
@@ -375,6 +391,11 @@ function failure(error: unknown, output: Output) {
     error instanceof ProviderCredentials.Failure
   ) {
     output.failure({ code: error.code, message: error.message });
+  } else if (error instanceof ProviderCredentialStore.Failure) {
+    output.failure({
+      code: error.code,
+      message: ProviderStore.message(error.code),
+    });
   } else if (error instanceof MediaFiles.Failure) {
     const messages = {
       input_unavailable:
@@ -429,7 +450,7 @@ function failure(error: unknown, output: Output) {
       code: error.code,
       message:
         error.code === "provider_key_required"
-          ? "Supply the selected provider's environment key or --key-stdin."
+          ? "Configure the selected provider with grida providers configure, or supply its environment key or --key-stdin."
           : error.code === "insufficient_credits"
             ? "Grida credits are insufficient for this operation."
             : "Media operation failed. An accepted request may still be charged; no automatic retry was made.",

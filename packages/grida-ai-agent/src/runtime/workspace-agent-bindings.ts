@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-GG: provider — thread the `gg` session deps into image gen (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — workspace-bound agent bindings.
@@ -12,7 +13,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, realpathSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { AgentFs } from "../fs";
-import { containsPath } from "@grida/daemon/server";
+import { containsPath, ProtectedRoots } from "@grida/daemon/server";
 import { isProtectedWrite } from "../fs/scope";
 import { isReadOnlyCommand } from "@grida/daemon/server";
 import { AgentTodos } from "../todos";
@@ -117,6 +118,8 @@ export async function createWorkspaceAgentBindings(
      * runtime; absent on the no-bindings path. See `shell/runner.ts`.
      */
     secrets_root?: string;
+    /** GRIDA-SEC-014 — shared provider custody is separate from chat state. */
+    protected_read_roots?: readonly string[];
     /**
      * GRIDA-SEC-004 — host-owned finite-command capability. When absent,
      * `run_command` is withheld. A Desktop host supplies an OS-confined
@@ -221,7 +224,8 @@ export async function createWorkspaceAgentBindings(
     new WorkspaceAgentFsBackend(
       workspace,
       scratchDir ? [{ id: "scratch", root: scratchDir }] : [],
-      directoryScopes
+      directoryScopes,
+      deps.protected_read_roots
     ),
     {
       write_guard: (pathname) => {
@@ -248,7 +252,10 @@ export async function createWorkspaceAgentBindings(
             workspace_root: workspace.root,
             scratch_root: scratchDir,
             scratch_base: scratchBase,
-            protected_read_roots: deps.secrets_root ? [deps.secrets_root] : [],
+            protected_read_roots: [
+              ...(deps.secrets_root ? [deps.secrets_root] : []),
+              ...(deps.protected_read_roots ?? []),
+            ],
             executor: deps.shell_executor,
             // Flush the agent fs's pending writes before a command runs, so a
             // script the agent just wrote via write_file is on disk when the
@@ -278,7 +285,7 @@ export async function createWorkspaceAgentBindings(
   // modality, a scratch sink exists (produced bytes land there — S3), and the
   // user actually holds a provider key. The last check mirrors vision's
   // `bytesReadable` gate — never advertise a producer that would refuse every
-  // call. The async key probe is cheap (a file read of auth.json).
+  // call. The key probe reads the shared native provider store.
   let image_gen: AgentGen.ImageGenerator | undefined;
   if (workspace && deps.image_gen_enabled && deps.secrets && scratchDir) {
     const secrets = deps.secrets;
@@ -706,6 +713,7 @@ type ResolvedAgentScope =
 
 export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   private readonly directoryScopes: ReadonlyMap<string, DirectoryScopeBinding>;
+  private readonly protectedRoots: ProtectedRoots;
 
   constructor(
     private readonly workspace: Workspace | null,
@@ -724,14 +732,30 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
      * so it never needed this; `read_file` reads the hydrated map, so it did.
      */
     private readonly additionalRoots: ReadonlyArray<workspaceFs.Scope> = [],
-    directoryScopes: readonly DirectoryScopeBinding[] = []
+    directoryScopes: readonly DirectoryScopeBinding[] = [],
+    protectedRoots: readonly string[] = []
   ) {
+    this.protectedRoots = new ProtectedRoots(protectedRoots);
     this.directoryScopes = new Map(
       normalizeDirectoryScopes(directoryScopes).map((scope) => [
         scope.id,
         scope,
       ])
     );
+    // Before AgentFs hydration: no reachable root can contain native credentials.
+    this.assertRootsAllowed();
+  }
+
+  private assertRootsAllowed(): void {
+    const roots = [
+      ...(this.workspace ? [this.workspace.root] : []),
+      ...this.additionalRoots.map((scope) => scope.root),
+      ...[...this.directoryScopes.values()].map((scope) => scope.root),
+    ];
+    for (const root of roots) {
+      if (this.protectedRoots.overlaps(root))
+        throw new Error("agent-fs-overlaps-protected-root");
+    }
   }
 
   /**
@@ -744,6 +768,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
    * Promise.all" failure this guards against.
    */
   async list(): Promise<string[]> {
+    this.assertRootsAllowed();
     const out: string[] = [];
     // The workspace tree — emitted in the fs tools' logical "/"-rooted form.
     let truncated = this.workspace
@@ -774,6 +799,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   }
 
   async list_directory(pathname: string): Promise<AgentFs.ListEntries> {
+    this.assertRootsAllowed();
     try {
       if (pathname === DIRECTORY_REFERENCE_ROOT) {
         return {
@@ -864,6 +890,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
    * AgentFs's in-memory grep and are deliberately not walked again here.
    */
   async grep(args: AgentFs.GrepArgs): Promise<AgentFs.BackendGrepResult> {
+    this.assertRootsAllowed();
     if (args.pattern.length === 0 || this.directoryScopes.size === 0) {
       return { matches: [], paths_scanned: [] };
     }
@@ -1138,6 +1165,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
    * space). `workspaceFs`'s own realpath containment still rejects escapes.
    */
   private scopeFor(p: string): ResolvedAgentScope {
+    this.assertRootsAllowed();
     if (!p.startsWith("/")) {
       throw new Error(`agent-fs path must start with "/": ${p}`);
     }
@@ -1288,6 +1316,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     depth: number,
     out: string[]
   ): Promise<boolean> {
+    this.assertRootsAllowed();
     if (depth > SCAN_MAX_DEPTH) return true;
     let entries: workspaceFs.Entry[];
     try {
