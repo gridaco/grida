@@ -1,0 +1,6 @@
+# GRIDA-SEC-014 — unsupported version must fail closed.
+version = 2
+[migration]
+state = "complete"
+removed = []
+[providers]

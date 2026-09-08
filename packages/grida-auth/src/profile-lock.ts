@@ -1,4 +1,5 @@
 // GRIDA-SEC-010 — crash-released exclusion; SQLite never stores credentials.
+// GRIDA-SEC-014 — provider and native credential writers reuse this lock protocol.
 import path from "node:path";
 import { lstat } from "node:fs/promises";
 import type { DatabaseSync } from "node:sqlite";

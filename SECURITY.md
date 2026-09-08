@@ -1699,9 +1699,11 @@ credential through reuse of an existing browser or daemon bridge.
    timeout, and completion close the listener. Code and refresh grants use
    the fixed OAuth token endpoint; credential-bearing requests never follow
    redirects or acquire browser cookies.
-4. **Independent native custody.** `@grida/auth` returns safe metadata; only
-   the injected custody/transport capabilities receive account tokens. The package
-   reads no Desktop, browser, provider, or daemon credential store. Its
+4. **Independent native custody.** `AuthClient` returns safe metadata; only
+   the injected custody/transport capabilities receive account tokens. This account
+   lifecycle reads no Desktop, browser, provider, or daemon credential store.
+   The separate `@grida/auth/providers` entry owns API keys under GRIDA-SEC-014;
+   sharing private-file and lock primitives does not share account authority. Its
    single-writer lifecycle serializes mutations, rejects overlapping login
    and refresh, and invalidates stale work on logout/cancellation. Accepted
    refresh rotations survive a later identity-check failure; the access token
@@ -2282,9 +2284,92 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
 
 ---
 
+### `GRIDA-SEC-014` — Shared native provider credential boundary
+
+**What it protects.** Independent native applications share BYOK API keys in one
+private plaintext TOML authority per Grida home. Account OAuth (GRIDA-SEC-010),
+ChatGPT subscription OAuth (GRIDA-SEC-008) and memory-only GG grants
+(GRIDA-SEC-006) remain separate. A provider key does not establish Grida identity.
+
+**Vulnerable scenario (prevented).** Independent writers lose one another's keys,
+unsafe file aliases expose credentials, corrupt storage silently selects a stale
+copy, or a deleted key reappears when an old mixed credential file is imported.
+A partial migration could retire its source before the canonical replacement is
+durable or discard unrelated OAuth records.
+
+**How the code prevents it.**
+
+1. **One explicit authority.** `ProviderCredentialStore` requires a normalized
+   absolute native home and uses only `providers/credentials.toml` beneath it.
+   It has no account, project, environment, network, keyring or alternative-file
+   discovery. The separate Node entry leaves the neutral account export unchanged.
+   Its versioned language-neutral protocol defines strict TOML types, UTF-8,
+   provider/key/file bounds, no unknown fields and fixed safe failure codes.
+   Missing files alone mean absence; malformed or unsupported files are errors.
+   Listing reveals IDs only; secret reads are for trusted native SDK injection.
+2. **Private publication.** The existing private-file owner validates every path
+   component, file ownership/mode/link count, opened inode and macOS ACL grants.
+   Existing safe 0755 ancestors are permitted; the provider directory is 0700
+   and its files 0600. No existing permission repair or unsafe alias is accepted.
+   Writes create an exclusive private temporary, fsync, rename and sync the parent.
+   Post-rename failure never restores old credentials. Cleanup under lock removes
+   only validated owned temporary names and never adopts them as credentials.
+3. **Cross-process exclusion.** All operations use the same private SQLite
+   rollback lock, including readers and removal of absent keys. A process-wide
+   queue coordinates separately loaded copies before opening/closing its inode.
+   OS locks release on crash; bounded acquisition never steals a live lock.
+   The lock stores no secrets and never rolls back a completed file publication.
+   `CredentialLock` exposes that same coordination for another native credential
+   writer without exposing SQLite handles or changing its file protection policy.
+4. **Irreversible migration.** A source writer lock precedes the canonical lock.
+   The one-time source callback returns API-key entries only. Existing canonical
+   keys win; absent-key removal leaves a durable tombstone before first import.
+   The merged canonical document and pending fence become durable before source
+   retirement. Pending blocks ordinary stored operations and retries retirement
+   without rereading or importing keys. Complete calls neither source callback.
+   Retirement must preserve unrelated source records and complete durably; its
+   failures remain pending. There is no dual-write mode or fallback to the source.
+
+**Limits and verification.** This is plaintext user-level custody, not encryption,
+secure erasure, provider revocation, protection from same-user code, or backup
+protection. A supported filesystem, OS, runtime and dependencies are trusted.
+The native implementation supports main-thread Node 24+ on macOS/Linux; Windows
+and worker threads fail before file access. Compatibility with older applications
+that ignore the shared locks or keep using the old API-key file is unsupported.
+Deleting the whole TOML file or manually changing migration metadata can erase
+its fences. A failure after rename may already have committed a complete change.
+The source owner is responsible for its format, safe atomic retirement and all
+updated legacy writers using the same source lock. `CredentialLock` preserves a
+callback's domain error; its host must project that error safely.
+
+Synthetic private-home tests cover schema/encoding/permissions/aliases, malformed
+and unsupported stores, canonical precedence and deletion fencing, interrupted
+retirement and uncertain publication. A copied built package verifies independent
+processes, mixed ESM/CommonJS copies, restart and SIGKILL recovery. This is local
+platform evidence, not Windows or cross-platform release certification.
+
+**Files bound by this id.**
+
+- [Provider entry](packages/grida-auth/src/providers.ts),
+  [store](packages/grida-auth/src/provider-credential-store.ts),
+  [store tests](packages/grida-auth/src/provider-credential-store.test.ts), and
+  [process tests](packages/grida-auth/src/provider-process.test.ts).
+- [Native entry](packages/grida-auth/src/node.ts),
+  [credential lock](packages/grida-auth/src/credential-lock.ts), and
+  [lock tests](packages/grida-auth/src/credential-lock.test.ts).
+- [Private-file owner](packages/grida-auth/src/private-files.ts) and
+  [profile lock](packages/grida-auth/src/profile-lock.ts), shared with
+  GRIDA-SEC-010; existing account guarantees remain enforced.
+- [Package contract](packages/grida-auth/README.md),
+  [build](packages/grida-auth/tsdown.config.mts),
+  [language-neutral protocol](packages/grida-auth/PROVIDER-CREDENTIALS-V1.md), and
+  [conformance fixtures](packages/grida-auth/fixtures/providers-v1/README.md).
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-014` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-015` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

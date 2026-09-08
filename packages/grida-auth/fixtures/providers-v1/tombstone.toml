@@ -1,0 +1,6 @@
+# GRIDA-SEC-014 — deletion precedes a future import.
+version = 1
+[migration]
+state = "unstarted"
+removed = ["example"]
+[providers]

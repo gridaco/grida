@@ -1192,6 +1192,9 @@ importers:
       '@grida/home':
         specifier: workspace:*
         version: link:../grida-home
+      smol-toml:
+        specifier: 1.8.0
+        version: 1.8.0
     devDependencies:
       tsdown:
         specifier: ^0.22.1
@@ -13939,6 +13942,10 @@ packages:
   slash@4.0.0:
     resolution: {integrity: sha512-3dOsAHXXUkQTpOYcoAxLIorMTp4gIQr5IW3iVb7A7lFIp0VHhnynm9izx6TssdrIcVIESAlVjtnO2K8bg+Coew==}
     engines: {node: '>=12'}
+
+  smol-toml@1.8.0:
+    resolution: {integrity: sha512-kCZr2V3ch9i00x8zXRhjUNVcjG9ijES5dDudkXvUVCT5QlJNQWElSJdZqyPemffHoLNUYwOcou0Fy+ojN0uHSQ==}
+    engines: {node: '>= 18'}
 
   snake-case@3.0.4:
     resolution: {integrity: sha512-LAOh4z89bGQvl9pFfNF8V146i7o7/CqFPbqzYgP+yYzDIDeS9HaNFtXABamRW+AQzEVODcvE79ljJ+8a9YSdMg==}
@@ -29922,6 +29929,8 @@ snapshots:
   slash@3.0.0: {}
 
   slash@4.0.0: {}
+
+  smol-toml@1.8.0: {}
 
   snake-case@3.0.4:
     dependencies:
