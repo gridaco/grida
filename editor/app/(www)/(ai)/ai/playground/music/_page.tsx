@@ -84,8 +84,9 @@ function Workspace() {
   const credits = useAiCredits();
   const [loading, startGenerate] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [modelId, setModelId] =
-    useState<ai.audio.music.ModelId>("google/lyria-3");
+  const [modelId, setModelId] = useState<ai.audio.music.ModelId>(
+    () => ai.audio.music.default_id ?? ai.audio.music.listed_models()[0]!.id
+  );
   const [results, setResults] = useState<ResultItem[]>([]);
   const card = useMemo(() => ai.audio.music.models[modelId], [modelId]);
 

@@ -5,10 +5,9 @@ import * as gridaGateway from "@/lib/desktop/gg-session";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
-import { Dialog, DialogContent, DialogTitle } from "@app/ui/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +31,7 @@ import {
 } from "@app/ui/ai-elements/prompt-input";
 import { images, useDesktopBridge, type MediaItem } from "@/lib/desktop/bridge";
 import { ImageModelPicker } from "./image-model-picker";
+import { GeneratedImagePreview } from "./generated-image-preview";
 import { MediaModelAvailability } from "../shared/media-model-availability";
 import { Transparency } from "@/grida-canvas-react/components/transparency";
 
@@ -79,10 +79,6 @@ const PROMPT_TEMPLATES: { name: string; prompt: string }[] = [
       "A sheet of glossy die-cut stickers with white borders, vibrant cartoon style, drop shadows",
   },
 ];
-
-const DEFAULT_MODEL_ID = models.image.models["openai/gpt-image-2"]?.listed
-  ? "openai/gpt-image-2"
-  : (models.image.listed_models()[0]?.id ?? "");
 
 /** Always render at least this many cells so the gallery grid is visible even
  *  when empty. Extra slots beyond the images are blank placeholders. */
@@ -179,9 +175,12 @@ export function DesktopImagePlayground({
   );
   useEffect(() => providerStore.connect(), [providerStore]);
   const [modelId, setModelId] = useState(
-    initialModelId && models.image.models[initialModelId]?.listed
-      ? initialModelId
-      : DEFAULT_MODEL_ID
+    () =>
+      MediaModelAvailability.select(
+        models.image.listed_models(),
+        initialModelId,
+        models.image.default_id
+      )?.id ?? ""
   );
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -351,31 +350,13 @@ export function DesktopImagePlayground({
       </div>
 
       {/* Fullscreen viewer */}
-      <Dialog
+      <GeneratedImagePreview
+        key={active?.id}
         open={active != null}
         onOpenChange={(o) => !o && setActiveId(null)}
-      >
-        <DialogContent className="max-w-[90vw] overflow-hidden p-0 sm:max-w-3xl">
-          <DialogTitle className="sr-only">
-            {active?.prompt ?? "Generated image"}
-          </DialogTitle>
-          {active?.src && (
-            <Transparency>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={active.src}
-                alt={active.prompt}
-                className="max-h-[85vh] w-full object-contain"
-              />
-            </Transparency>
-          )}
-          {active && (
-            <p className="px-4 pb-4 text-sm text-muted-foreground">
-              {active.prompt}
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
+        src={active?.src}
+        prompt={active?.prompt ?? ""}
+      />
     </div>
   );
 }

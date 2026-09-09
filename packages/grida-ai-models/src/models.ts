@@ -1,44 +1,10 @@
 /**
- * Central model catalogue.
- *
- * The `models` namespace is the only export, also re-exported as the
- * package default (`import models from "@grida/ai-models"`). Surface:
- *
- * - `models.text.*`        — text-model spec table, tier→spec map, lookup
- * - `models.image.*`       — image-generation catalogue
- * - `models.audio.music.*` / `.sound_effects.*` / `.text_to_speech.*`
- *   — exact audio-output catalogues
- * - `models.three_d.*`     — 3D-generation catalogue
- * - `models.video.*`       — video-generation catalogue
- * - `models.image_tools.*` — non-generator image tools (background removal, upscale)
- * - `models.Provider`, `models.Vendor` — shared discriminator labels
- *
- * Tier vocabulary lives in `./tiers.ts`; that module type-uses
- * `models.text.CatalogId` from this one so the tier→id table is
- * constrained to real catalogue entries at compile time.
- *
- * Everything sits in one file because tsdown's `.d.ts` bundler does
- * not preserve `export import` namespace aliases across internal
- * modules — keeping the full `namespace models` declaration in a
- * single source file is the workaround.
- *
- * Routing labels on the cards — `Provider` (text/image), the literal provider
- * bindings on music, sound-effect, text-to-speech, and 3D cards, and video's per-binding
- * `video.VideoProvider` — are data labels only; see the README for the full
- * contract.
- *
- * @module
- */
-
-import { TIER_MODEL_IDS, type ModelTier } from "./tiers";
-
-/**
  * The id-matching rules, over an arbitrary spec table.
  *
  * Private to this file and parameterized rather than closed over
  * `catalogSpecs` so that `models.text.modelSpecById` (the bundled
- * catalogue) and a `models.snapshot` view (a published catalogue) match
- * ids identically. Two copies of these rules would drift the day a
+ * catalogue) and consumer-supplied factual subsets match ids identically.
+ * Two copies of these rules would drift the day a
  * provider changes its id convention.
  *
  * Accepts an exact namespaced id, a bare id, or a date-suffixed id —
@@ -69,8 +35,7 @@ function specByIdOver(
 /**
  * Open-registry resolution over an arbitrary spec table ∪ `custom`.
  * The table wins on a collision; custom ids match exactly. Shared by
- * `models.text.registry.resolve` and `models.snapshot` views so the
- * precedence is stated once.
+ * built-in and caller-supplied registries, so precedence is stated once.
  */
 function resolveOver(
   specs: readonly models.text.ModelSpec[],
@@ -84,9 +49,7 @@ function resolveOver(
 }
 
 /**
- * Card lookup over an arbitrary media table. Shared by
- * `models.image.findImageModelCard` and the `models.snapshot` media views so
- * the bundled catalogue and a published one answer identically.
+ * Card lookup over an arbitrary media table for image-model lookups.
  *
  * Accepts an exact namespaced id or a bare post-slash name. Unlike
  * {@link specByIdOver} there is no date-suffix tolerance — media providers
@@ -104,19 +67,6 @@ function cardByIdOver<Card extends { id: string }>(
     if (slash >= 0 && card.id.slice(slash + 1) === modelId) return card;
   }
   return undefined;
-}
-
-/**
- * The curated user-facing subset of a media table, frozen so callers can
- * hold it without risking mutation of the shared catalogue. Callers memoize;
- * this states the filter once.
- */
-function listedOver<Card extends { listed: boolean }>(
-  cards: Record<string, Card | undefined>
-): readonly Card[] {
-  return Object.freeze(
-    Object.values(cards).filter((card): card is Card => !!card && card.listed)
-  );
 }
 
 export namespace models {
@@ -147,16 +97,6 @@ export namespace models {
     | "xai"
     | "alibaba"
     | "meta";
-
-  /**
-   * Catalogue lifecycle for newly grounded media surfaces.
-   *
-   * - `listed` — integrated and safe to show in the normal user-facing list.
-   * - `staged` — the provider contract is grounded and may be callable only
-   *   from a dedicated compatibility playground; it is not yet part of normal
-   *   integrated model selection. Staged never means callable by itself.
-   */
-  export type CatalogueStatus = "listed" | "staged";
 
   /** Calendar date serialized as `YYYY-MM-DD`. Runtime snapshot parsing also
    * validates that the value is a real Gregorian calendar date. */
@@ -261,11 +201,6 @@ export namespace models {
       outputLimit: number;
       /** Cost per 1M tokens in USD. */
       cost: ModelCostPerMillion;
-      /**
-       * Grida catalogue lifecycle marker. The model is still callable, but
-       * Grida considers it superseded; UIs may hide or mark it.
-       */
-      deprecated?: boolean;
     }
 
     /** A bundled text-model spec. Unlike the snapshot-compatible base shape,
@@ -331,7 +266,6 @@ export namespace models {
           cacheRead: 0.5,
           longContext: OPENAI_LONG_CONTEXT_PRICING,
         },
-        deprecated: true,
       },
       "openai/gpt-5.5-pro": {
         id: "openai/gpt-5.5-pro",
@@ -486,9 +420,7 @@ export namespace models {
         outputLimit: 128_000,
         cost: { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
       },
-      // Superseded by Claude Fable 5.1, which is never more expensive, but
-      // still the only Fable that accepts forced tool choice — so it is
-      // deprecated, not removed.
+      // Unlike Fable 5.1, this version accepts forced tool choice.
       "anthropic/claude-fable-5": {
         id: "anthropic/claude-fable-5",
         label: "Claude Fable 5",
@@ -505,7 +437,6 @@ export namespace models {
         contextWindow: 1_000_000,
         outputLimit: 128_000,
         cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
-        deprecated: true,
       },
       // Drop-in successor to Opus 4.8 at the same rate card.
       "anthropic/claude-opus-5": {
@@ -541,7 +472,6 @@ export namespace models {
         contextWindow: 1_000_000,
         outputLimit: 128_000,
         cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
-        deprecated: true,
       },
       // Google's cache model is read + hourly storage (no one-time write
       // premium that matches `cacheWrite` semantics), so the field is omitted.
@@ -572,8 +502,7 @@ export namespace models {
       },
       // 3.8 improves accuracy and reliability at the same rate, but Google
       // still recommends 3.7 when compute efficiency matters because 3.8 can
-      // consume more tokens. Keep it callable as a deprecated choice rather
-      // than deleting a model that remains better on a real axis.
+      // consume more tokens.
       // https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/guides/gemini-3-8-flash
       "google/gemini-3.7-flash": {
         id: "google/gemini-3.7-flash",
@@ -589,7 +518,6 @@ export namespace models {
         contextWindow: 1_048_576,
         outputLimit: 65_536,
         cost: { input: 1.5, output: 7.5, cacheRead: 0.15 },
-        deprecated: true,
       },
       "google/gemini-3.1-pro-preview": {
         id: "google/gemini-3.1-pro-preview",
@@ -633,21 +561,6 @@ export namespace models {
     > = catalogSpecs;
 
     /**
-     * Text-model spec for each tier. Derived from `TIER_MODEL_IDS` +
-     * `catalog`; the compiler enforces that every tier's id resolves to
-     * a real catalog entry.
-     */
-    export const byTier: Record<
-      ModelTier,
-      ModelSpec & { release: ModelRelease }
-    > = {
-      nano: catalog[TIER_MODEL_IDS.nano],
-      mini: catalog[TIER_MODEL_IDS.mini],
-      pro: catalog[TIER_MODEL_IDS.pro],
-      max: catalog[TIER_MODEL_IDS.max],
-    };
-
-    /**
      * Look up a model spec by id.
      *
      * Accepts:
@@ -656,8 +569,11 @@ export namespace models {
      * - Date-suffixed id: `"gpt-5.6-luna-2026-07-30"` (providers often
      *   append a snapshot date in their API responses)
      */
-    export function modelSpecById(modelId: string): ModelSpec | undefined {
-      return specByIdOver(Object.values(catalogSpecs), modelId);
+    export function modelSpecById(
+      modelId: string,
+      specs: readonly ModelSpec[] = Object.values(catalogSpecs)
+    ): ModelSpec | undefined {
+      return specByIdOver(specs, modelId);
     }
 
     /**
@@ -757,7 +673,12 @@ export namespace models {
           contextWindow:
             spec.contextWindow ?? CUSTOM_MODEL_DEFAULTS.contextWindow,
           outputLimit: spec.outputLimit ?? CUSTOM_MODEL_DEFAULTS.outputLimit,
-          cost: spec.cost,
+          cost: spec.cost && {
+            ...spec.cost,
+            ...(spec.cost.longContext
+              ? { longContext: { ...spec.cost.longContext } }
+              : {}),
+          },
           custom: true,
         };
       }
@@ -770,9 +691,10 @@ export namespace models {
        */
       export function resolve(
         modelId: string,
-        custom?: readonly CustomModelSpec[]
+        custom?: readonly CustomModelSpec[],
+        specs: readonly ModelSpec[] = Object.values(catalogSpecs)
       ): ResolvedModelSpec | undefined {
-        return resolveOver(Object.values(catalogSpecs), modelId, custom);
+        return resolveOver(specs, modelId, custom);
       }
     }
   }
@@ -781,8 +703,7 @@ export namespace models {
 
   export namespace image {
     /**
-     * @deprecated Use `ImageModelId` directly — every card carries
-     * a `provider` field on its own.
+     * @deprecated Use `ImageModelId` directly and inspect explicit bindings.
      */
     export type ProviderModel = {
       provider: "vercel";
@@ -1040,42 +961,13 @@ export namespace models {
       };
     };
 
-    // ── Card types ──────────────────────────────────────────────────
-
-    export type ImageModelCardCompact = {
-      id: ImageModelId;
-      label: string;
-      deprecated: boolean;
-      short_description: string;
-      release?: ModelRelease;
-      speed_label: SpeedLabel;
-      /** Real provider pricing data. */
-      pricing: ImageModelPricing;
-    };
-
     export type ImageModelCard = {
       id: ImageModelId;
       label: string;
-      deprecated: boolean;
       short_description: string;
       /** Optional only for backwards-compatible snapshot parsing. */
       release?: ModelRelease;
       vendor: Vendor;
-      /**
-       * Primary/default provider for single-provider readers. Equals one of
-       * the keys in {@link providers}. Hosted consumers must still verify a
-       * Vercel binding; a listed card can be BYOK-only.
-       */
-      provider: ImageProvider;
-      /**
-       * Whether this model is surfaced in the curated, user-facing list.
-       * Listed models need at least one verified, integrated provider route.
-       * Provider coverage may differ; consumers must resolve a bound provider
-       * the user can access rather than assuming any connected key works.
-       */
-      listed: boolean;
-      /** Why a card is `listed: false` (legacy, superseded, or not universal). */
-      listed_reason?: string;
       /**
        * Providers that serve this model, keyed by provider. **No implied
        * preference** — default-provider selection is deferred to the runtime
@@ -1110,11 +1002,6 @@ export namespace models {
        * for per-token models it is a rough estimate. Not for display.
        */
       avg_cost_usd: number;
-      default: {
-        width: number;
-        height: number;
-        aspect_ratio: AspectRatioString;
-      };
     };
 
     type CatalogCard = ImageModelCard & {
@@ -1154,18 +1041,6 @@ export namespace models {
       output: 30,
     };
 
-    export const toCompact = (card: ImageModelCard): ImageModelCardCompact => {
-      return {
-        id: card.id,
-        label: card.label,
-        deprecated: card.deprecated,
-        short_description: card.short_description,
-        release: card.release,
-        speed_label: card.speed_label,
-        pricing: card.pricing,
-      };
-    };
-
     export const models: Partial<Record<ImageModelId, CatalogCard>> = {
       // -----------------------------------------------------------------
       // OpenAI
@@ -1180,12 +1055,9 @@ export namespace models {
           source_url:
             "https://developers.openai.com/api/docs/models/gpt-image-2",
         },
-        deprecated: true,
         short_description:
           "Previous-generation image model. Superseded by GPT Image 2.5.",
         vendor: "openai",
-        provider: "vercel",
-        listed: true,
         // Native transparency added 2026-08-20; provider exposure differs.
         // https://developers.openai.com/api/docs/changelog
         transparent_background: true,
@@ -1266,12 +1138,7 @@ export namespace models {
             output: 30.0,
           },
         },
-        avg_cost_usd: 0.053, // medium/1024x1024
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
+        avg_cost_usd: 0.053,
       },
       // Released as two distinct models. All three providers now list both
       // variants; fal separates generation and edit endpoint ids, while
@@ -1285,12 +1152,9 @@ export namespace models {
           source_url:
             "https://openai.com/index/introducing-chatgpt-images-2-5/",
         },
-        deprecated: false,
         short_description:
           "Fast image generation and reference-guided editing.",
         vendor: "openai",
-        provider: "vercel",
-        listed: true,
         // Both fal generation and edit schemas expose background=transparent.
         // https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api
         // https://fal.ai/models/openai/gpt-image-2.5/flare/edit/api
@@ -1351,7 +1215,6 @@ export namespace models {
         // Not a fixed per-image price: actual cost depends on all billed tokens.
         // https://developers.openai.com/api/docs/guides/image-generation
         avg_cost_usd: 0.055,
-        default: { width: 1024, height: 1024, aspect_ratio: "1:1" },
       },
       "openai/gpt-image-2.5-sunburst": {
         id: "openai/gpt-image-2.5-sunburst",
@@ -1362,12 +1225,9 @@ export namespace models {
           source_url:
             "https://openai.com/index/introducing-chatgpt-images-2-5/",
         },
-        deprecated: false,
         short_description:
           "Detailed image generation and precise editing with longer generation times.",
         vendor: "openai",
-        provider: "vercel",
-        listed: true,
         // Both fal generation and edit schemas expose background=transparent.
         // https://fal.ai/models/openai/gpt-image-2.5/sunburst/text-to-image/api
         // https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api
@@ -1423,7 +1283,6 @@ export namespace models {
         },
         pricing: GPT_IMAGE_2_5_VERCEL_PRICING,
         avg_cost_usd: 0.055,
-        default: { width: 1024, height: 1024, aspect_ratio: "1:1" },
       },
       // https://developers.openai.com/api/docs/models/gpt-image-1.5
       "openai/gpt-image-1.5": {
@@ -1434,13 +1293,9 @@ export namespace models {
           basis: "model",
           source_url: "https://openai.com/index/new-chatgpt-images-is-here/",
         },
-        deprecated: true,
         short_description:
           "Previous-generation image model. Superseded by GPT Image 2.",
         vendor: "openai",
-        provider: "vercel",
-        listed: false,
-        listed_reason: "Previous-generation model, superseded by GPT Image 2.",
         providers: {
           vercel: {
             provider: "vercel",
@@ -1481,12 +1336,7 @@ export namespace models {
             output: 32.0,
           },
         },
-        avg_cost_usd: 0.034, // medium/1024x1024
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
+        avg_cost_usd: 0.034,
       },
       // https://developers.openai.com/api/docs/models/gpt-image-1-mini
       "openai/gpt-image-1-mini": {
@@ -1497,13 +1347,8 @@ export namespace models {
           basis: "model",
           source_url: "https://openai.com/devday/",
         },
-        deprecated: false,
         short_description: "Cost-efficient image generation model",
         vendor: "openai",
-        provider: "vercel",
-        listed: false,
-        listed_reason:
-          "Cost-tier model, not part of the curated flagship/SOTA list.",
         providers: {
           vercel: {
             provider: "vercel",
@@ -1544,12 +1389,7 @@ export namespace models {
             output: 8.0,
           },
         },
-        avg_cost_usd: 0.011, // medium/1024x1024
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
+        avg_cost_usd: 0.011,
       },
       // -----------------------------------------------------------------
       // Google (multimodal LLMs with native image output)
@@ -1564,12 +1404,9 @@ export namespace models {
           basis: "model",
           source_url: "https://ai.google.dev/gemini-api/docs/changelog",
         },
-        deprecated: false,
         short_description:
           "Fast, efficient multimodal model with native image generation",
         vendor: "google",
-        provider: "vercel",
-        listed: true,
         // "Nano Banana 2"; ids/prices verified 2026-06-29, see issues/908
         providers: {
           // The gateway serves the graduated `google/gemini-3.1-flash-image`
@@ -1608,12 +1445,7 @@ export namespace models {
         sizes: null,
         constraints: { max_edge: 1536 },
         pricing: { type: "per_token", input: 0.5, output: 3.0 },
-        avg_cost_usd: 0.004, // conservative per-image estimate for budget
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
+        avg_cost_usd: 0.004,
       },
       // python .tools/model_info.py --image gemini-3-pro-image
       // Vercel gateway pricing: $2.00/MTok input, $12.00/MTok output
@@ -1626,12 +1458,9 @@ export namespace models {
           source_url:
             "https://blog.google/innovation-and-ai/products/nano-banana-pro/",
         },
-        deprecated: false,
         short_description:
           "High-quality multimodal model with native image generation",
         vendor: "google",
-        provider: "vercel",
-        listed: true,
         // "Nano Banana Pro"; ids/prices verified 2026-06-29, see issues/908
         providers: {
           vercel: {
@@ -1663,12 +1492,7 @@ export namespace models {
         sizes: null,
         constraints: { max_edge: 1536 },
         pricing: { type: "per_token", input: 2.0, output: 12.0 },
-        avg_cost_usd: 0.015, // conservative per-image estimate for budget
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
+        avg_cost_usd: 0.015,
       },
       // "Nano Banana 2 Lite" — GA 2026-06-30. The cost/speed tier of the 3.1
       // Flash family: ~half of Nano Banana 2's meter, and 1K-only output
@@ -1685,14 +1509,9 @@ export namespace models {
           basis: "model",
           source_url: "https://ai.google.dev/gemini-api/docs/changelog",
         },
-        deprecated: false,
         short_description:
           "Fastest, most cost-efficient Gemini image model; 1K output only.",
         vendor: "google",
-        provider: "vercel",
-        listed: false,
-        listed_reason:
-          "Cost-tier model, not part of the curated flagship/SOTA list.",
         providers: {
           vercel: {
             provider: "vercel",
@@ -1718,11 +1537,6 @@ export namespace models {
         // × $30/1M image-output (Google/Vercel changelog, 2026-07-01). The
         // budget meter charges this per image, so it must be the real cost.
         avg_cost_usd: 0.034,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
       // -----------------------------------------------------------------
       // Black Forest Labs (via Vercel AI Gateway)
@@ -1737,12 +1551,9 @@ export namespace models {
           basis: "model",
           source_url: "https://bfl.ai/blog/flux-2",
         },
-        deprecated: false,
         short_description:
           "Latest Flux model with best-in-class image quality and prompt adherence",
         vendor: "black-forest-labs",
-        provider: "vercel",
-        listed: true,
         // All three providers meter $0.03 per megapixel (Vercel model page,
         // OpenRouter endpoint `cost_usd`/megapixel, fal "first megapixel");
         // represented as flat at the 1MP baseline. The Vercel binding shipped
@@ -1780,11 +1591,6 @@ export namespace models {
         constraints: { min_edge: 256, max_edge: 1440 },
         pricing: { type: "per_image_flat", usd: 0.03 },
         avg_cost_usd: 0.03,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
       // -----------------------------------------------------------------
       // Black Forest Labs — Flux 2 Max
@@ -1801,12 +1607,9 @@ export namespace models {
           basis: "model",
           source_url: "https://playground.bfl.ai/changelog",
         },
-        deprecated: false,
         short_description:
           "Black Forest Labs' highest-fidelity Flux 2 — maximum prompt adherence and detail.",
         vendor: "black-forest-labs",
-        provider: "vercel",
-        listed: true,
         providers: {
           vercel: {
             provider: "vercel",
@@ -1840,11 +1643,6 @@ export namespace models {
         constraints: { min_edge: 256, max_edge: 1440 },
         pricing: { type: "per_image_flat", usd: 0.07 },
         avg_cost_usd: 0.07,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
       "bfl/flux-kontext-max": {
         id: "bfl/flux-kontext-max",
@@ -1854,14 +1652,9 @@ export namespace models {
           basis: "model",
           source_url: "https://bfl.ai/blog/flux-1-kontext",
         },
-        deprecated: false,
         short_description:
           "Highest quality Flux model for context-aware image generation and editing",
         vendor: "black-forest-labs",
-        provider: "vercel",
-        listed: false,
-        listed_reason:
-          "Image-editing model; not on OpenRouter, so not universal (one-key) coverage.",
         providers: {
           vercel: {
             provider: "vercel",
@@ -1884,11 +1677,6 @@ export namespace models {
         constraints: { max_edge: 1820 },
         pricing: { type: "per_image_flat", usd: 0.08 },
         avg_cost_usd: 0.08,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
       "bfl/flux-kontext-pro": {
         id: "bfl/flux-kontext-pro",
@@ -1898,16 +1686,9 @@ export namespace models {
           basis: "model",
           source_url: "https://bfl.ai/blog/flux-1-kontext",
         },
-        deprecated: false,
         short_description: "Fast context-aware image generation and editing",
         vendor: "black-forest-labs",
-        provider: "vercel",
-        listed: false,
-        listed_reason:
-          "Image-editing model; superseded by Flux 2 and not on OpenRouter, so not universal.",
-        // $0.04 on both providers. The card shipped at $0.05 — and because the
-        // hosted route gates on a vercel binding, not on `listed`, that was a
-        // live 25% over-deduction. Gateway feed `pricing.image` + fal's model
+        // $0.04 on both providers: gateway feed `pricing.image` + fal's model
         // page ("Fixed $0.04 cost per image edit"), verified 2026-09-02.
         providers: {
           vercel: {
@@ -1931,11 +1712,6 @@ export namespace models {
         constraints: { max_edge: 1820 },
         pricing: { type: "per_image_flat", usd: 0.04 },
         avg_cost_usd: 0.04,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
       "bfl/flux-pro-1.1": {
         id: "bfl/flux-pro-1.1",
@@ -1945,13 +1721,9 @@ export namespace models {
           basis: "model",
           source_url: "https://bfl.ai/blog/24-10-02-flux",
         },
-        deprecated: false,
         short_description:
           "Faster, better FLUX Pro. Text-to-image model with excellent image quality and output diversity.",
         vendor: "black-forest-labs",
-        provider: "vercel",
-        listed: false,
-        listed_reason: "Superseded by Flux 2 Pro; not universal.",
         providers: {
           vercel: {
             provider: "vercel",
@@ -1967,11 +1739,6 @@ export namespace models {
         constraints: { min_edge: 256, max_edge: 1440 },
         pricing: { type: "per_image_flat", usd: 0.04 },
         avg_cost_usd: 0.04,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
       // -----------------------------------------------------------------
       // ByteDance — Seedream 5.0 Pro
@@ -1990,12 +1757,9 @@ export namespace models {
           source_url:
             "https://seed.bytedance.com/en/blog/beyond-generation-it-understands-design-introducing-seedream-5-0-pro",
         },
-        deprecated: false,
         short_description:
           "ByteDance's flagship image model — dense layouts, infographics and text-heavy compositions at 1K–2K.",
         vendor: "bytedance",
-        provider: "vercel",
-        listed: true,
         providers: {
           vercel: {
             provider: "vercel",
@@ -2035,11 +1799,6 @@ export namespace models {
         },
         pricing: { type: "per_image_flat", usd: 0.035 },
         avg_cost_usd: 0.035,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
       // -----------------------------------------------------------------
       // ByteDance — Seedream 5.0 Lite
@@ -2056,12 +1815,9 @@ export namespace models {
           source_url:
             "https://seed.bytedance.com/en/blog/deeper-thinking-more-accurate-generation-introducing-seedream-5-0-lite",
         },
-        deprecated: false,
         short_description:
           "ByteDance's fast 2K–4K image model — Seedream 5.0 quality at the 4.5 price point.",
         vendor: "bytedance",
-        provider: "vercel",
-        listed: true,
         providers: {
           vercel: {
             provider: "vercel",
@@ -2097,19 +1853,11 @@ export namespace models {
         constraints: { min_pixels: 3_686_400, max_pixels: 16_777_216 },
         pricing: { type: "per_image_flat", usd: 0.035 },
         avg_cost_usd: 0.035,
-        default: {
-          width: 2048,
-          height: 2048,
-          aspect_ratio: "1:1",
-        },
       },
       // -----------------------------------------------------------------
       // ByteDance — Seedream 4.5
       // -----------------------------------------------------------------
-      // $0.04/img on all three providers (re-verified 2026-09-02). Superseded
-      // by Seedream 5.0 Lite — cheaper on every provider, newer generation —
-      // so deprecated and unlisted; kept as a real choice for its editing
-      // route until 5.0's i2i is verified on the same providers.
+      // $0.04/img on all three providers (re-verified 2026-09-02).
       "bytedance/seedream-4.5": {
         id: "bytedance/seedream-4.5",
         label: "Seedream 4.5",
@@ -2119,13 +1867,9 @@ export namespace models {
           source_url:
             "https://blog.fal.ai/seedream-4-5-is-now-available-on-fal/",
         },
-        deprecated: true,
         short_description:
           "ByteDance's unified image generation and editing model.",
         vendor: "bytedance",
-        provider: "vercel",
-        listed: false,
-        listed_reason: "Previous-generation model, superseded by Seedream 5.0.",
         providers: {
           vercel: {
             provider: "vercel",
@@ -2159,11 +1903,6 @@ export namespace models {
         constraints: { max_edge: 4096 },
         pricing: { type: "per_image_flat", usd: 0.04 },
         avg_cost_usd: 0.04,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
       // -----------------------------------------------------------------
       // SpaceXAI — Grok Imagine Image 2.0
@@ -2181,12 +1920,9 @@ export namespace models {
           basis: "model",
           source_url: "https://x.ai/news/grok-imagine-image-2",
         },
-        deprecated: false,
         short_description:
           "SpaceXAI's image model — fast 1K/2K generation with a low-cost quality tier.",
         vendor: "xai",
-        provider: "vercel",
-        listed: true,
         providers: {
           vercel: {
             provider: "vercel",
@@ -2250,19 +1986,14 @@ export namespace models {
             "medium/2048x2048": 0.08,
           },
         },
-        avg_cost_usd: 0.06, // medium 1K
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
+        avg_cost_usd: 0.06,
       },
       // -----------------------------------------------------------------
       // Meta — Muse Image 1.0
       // -----------------------------------------------------------------
       // Meta's agentic image model (2026-08-26): $0.01/img on Vercel (feed
       // `pricing.image`) and fal (page payload). OpenRouter lists it but
-      // exposes no serving endpoint, so it is not universal → unlisted.
+      // exposes no serving endpoint.
       // fal exposes aspect ratio only (no size control). Verified 2026-09-02.
       "meta/muse-image-1.0": {
         id: "meta/muse-image-1.0",
@@ -2273,14 +2004,9 @@ export namespace models {
           source_url:
             "https://about.fb.com/news/2026/07/introducing-muse-image-meta-ai/",
         },
-        deprecated: false,
         short_description:
           "Meta's agentic image model — reasons before it renders; generates and edits from text and references.",
         vendor: "meta",
-        provider: "vercel",
-        listed: false,
-        listed_reason:
-          "OpenRouter lists it without a serving endpoint, so not universal (one-key) coverage.",
         providers: {
           vercel: {
             provider: "vercel",
@@ -2305,11 +2031,6 @@ export namespace models {
         constraints: null,
         pricing: { type: "per_image_flat", usd: 0.01 },
         avg_cost_usd: 0.01,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
       // -----------------------------------------------------------------
       // Recraft — V4.1
@@ -2329,12 +2050,9 @@ export namespace models {
           source_url:
             "https://www.recraft.ai/blog/recraft-v4-1-more-beautiful-by-nature",
         },
-        deprecated: false,
         short_description:
           "Design-first image model — sharper prompt control and production-ready raster for brand and editorial work.",
         vendor: "recraft-ai",
-        provider: "vercel",
-        listed: true,
         providers: {
           vercel: {
             provider: "vercel",
@@ -2367,20 +2085,12 @@ export namespace models {
         constraints: { max_edge: 2048 },
         pricing: { type: "per_image_flat", usd: 0.035 },
         avg_cost_usd: 0.035,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
       // -----------------------------------------------------------------
       // Recraft — V3
       // -----------------------------------------------------------------
       // $0.04/img raster on every provider (re-verified 2026-09-02; Recraft's
-      // own pricing table agrees). Superseded by V4.1, which is cheaper on
-      // every provider and equal on vector — deprecated, not removed, only
-      // because V3's positioned-text rendering is an axis V4.1 has not been
-      // shown to match. Remove once that is checked.
+      // own pricing table agrees).
       "recraft/recraft-v3": {
         id: "recraft/recraft-v3",
         label: "Recraft V3",
@@ -2390,13 +2100,9 @@ export namespace models {
           source_url:
             "https://www.recraft.ai/blog/recraft-introduces-a-revolutionary-ai-model-that-thinks-in-design-language",
         },
-        deprecated: true,
         short_description:
           "Design-grade image model with strong text rendering and vector styles.",
         vendor: "recraft-ai",
-        provider: "vercel",
-        listed: false,
-        listed_reason: "Previous-generation model, superseded by Recraft V4.1.",
         providers: {
           vercel: {
             provider: "vercel",
@@ -2426,11 +2132,6 @@ export namespace models {
         constraints: { max_edge: 2048 },
         pricing: { type: "per_image_flat", usd: 0.04 },
         avg_cost_usd: 0.04,
-        default: {
-          width: 1024,
-          height: 1024,
-          aspect_ratio: "1:1",
-        },
       },
     } as const;
 
@@ -2483,13 +2184,6 @@ export namespace models {
         (support === undefined ? card.transparent_background : support) === true
       );
     }
-
-    let _listed: readonly ImageModelCard[] | null = null;
-    /** Cards in the curated user-facing list (`listed: true`). Computed once and
-     *  frozen — the catalog is static, so callers can call freely without
-     *  risking mutation of the shared view. */
-    export const listed_models = (): readonly ImageModelCard[] =>
-      (_listed ??= listedOver(models));
   }
 
   // ── models.audio ──────────────────────────────────────────────────
@@ -2534,11 +2228,9 @@ export namespace models {
         id: ModelId;
         label: string;
         release: ModelRelease;
-        deprecated: boolean;
         short_description: string;
         vendor: "google";
         provider: "replicate";
-        status: CatalogueStatus;
         input: Input;
         output: Output;
         duration_label: string;
@@ -2561,12 +2253,10 @@ export namespace models {
             basis: "model",
             source_url: "https://deepmind.google/models/model-cards/lyria-3/",
           },
-          deprecated: false,
           short_description:
             "Generate 30-second 48kHz stereo music clips from text or images.",
           vendor: "google",
           provider: "replicate",
-          status: "listed",
           input: { modalities: ["text", "image"], max_images: 10 },
           output: {
             default_format: "mp3",
@@ -2594,12 +2284,10 @@ export namespace models {
             source_url:
               "https://blog.google/innovation-and-ai/technology/developers-tools/lyria-3-developers/",
           },
-          deprecated: false,
           short_description:
             "Generate full-length tracks up to ~3 minutes from text or images.",
           vendor: "google",
           provider: "replicate",
-          status: "listed",
           input: { modalities: ["text", "image"], max_images: 10 },
           output: {
             default_format: "mp3",
@@ -2625,12 +2313,6 @@ export namespace models {
       export function is_model_id(id: string): id is ModelId {
         return (model_ids as readonly string[]).includes(id);
       }
-
-      let _listed: readonly ModelCard[] | null = null;
-      export const listed_models = (): readonly ModelCard[] =>
-        (_listed ??= Object.freeze(
-          Object.values(models).filter((card) => card.status === "listed")
-        ));
     }
 
     /** ElevenLabs Text to Sound Effects. */
@@ -2665,11 +2347,9 @@ export namespace models {
         id: ModelId;
         label: string;
         release: ModelRelease;
-        deprecated: boolean;
         short_description: string;
         vendor: "elevenlabs";
         provider: "elevenlabs";
-        status: CatalogueStatus;
         input: Input;
         output: Output;
         duration_label: string;
@@ -2691,12 +2371,10 @@ export namespace models {
             source_url:
               "https://www.linkedin.com/posts/elevenlabsio_introducing-v2-of-our-sfx-model-generate-activity-7368680062662909953-aeBg",
           },
-          deprecated: false,
           short_description:
             "Generate loopable sound effects up to 30 seconds from text.",
           vendor: "elevenlabs",
           provider: "elevenlabs",
-          status: "staged",
           input: { type: "text" },
           output: {
             default_format: "mp3",
@@ -2723,12 +2401,6 @@ export namespace models {
       } as const satisfies Record<ModelId, ModelCard>;
 
       export const model_ids = Object.freeze(Object.keys(models) as ModelId[]);
-
-      let _staged: readonly ModelCard[] | null = null;
-      export const staged_models = (): readonly ModelCard[] =>
-        (_staged ??= Object.freeze(
-          Object.values(models).filter((card) => card.status === "staged")
-        ));
     }
 
     /** ElevenLabs expressive text-to-speech generation. */
@@ -2760,11 +2432,9 @@ export namespace models {
         id: ModelId;
         label: string;
         release: ModelRelease;
-        deprecated: boolean;
         short_description: string;
         vendor: "elevenlabs";
         provider: "elevenlabs";
-        status: CatalogueStatus;
         input: Input;
         output: Output;
         output_format: "mp3";
@@ -2782,12 +2452,10 @@ export namespace models {
             basis: "model",
             source_url: "https://elevenlabs.io/blog/eleven-v3",
           },
-          deprecated: false,
           short_description:
             "Generate expressive speech with bracketed audio and emotion tags.",
           vendor: "elevenlabs",
           provider: "elevenlabs",
-          status: "staged",
           input: {
             type: "text",
             max_characters: 5_000,
@@ -2808,12 +2476,6 @@ export namespace models {
       } as const satisfies Record<ModelId, ModelCard>;
 
       export const model_ids = Object.freeze(Object.keys(models) as ModelId[]);
-
-      let _staged: readonly ModelCard[] | null = null;
-      export const staged_models = (): readonly ModelCard[] =>
-        (_staged ??= Object.freeze(
-          Object.values(models).filter((card) => card.status === "staged")
-        ));
     }
   }
 
@@ -2822,10 +2484,8 @@ export namespace models {
   /**
    * 3D-generation endpoint catalogue.
    *
-   * These entries are deliberately `staged`: ids, IO contracts, meters, and a
-   * playground execution seam are grounded, while workspace integration remains
-   * deferred. The catalogue itself is not an execution seam. All currently
-   * selected endpoints are served by fal.
+   * Exact ids, IO contracts, and provider meters. Application integration and
+   * lifecycle are independent of these facts. These endpoints are served by fal.
    */
   export namespace three_d {
     export type TextToThreeDModelId = "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d";
@@ -2887,13 +2547,11 @@ export namespace models {
       id: ThreeDModelId;
       label: string;
       release: ModelRelease;
-      deprecated: boolean;
       short_description: string;
       vendor: Vendor;
       /** Every currently catalogued endpoint is the exact fal route in `id`. */
       provider: "fal";
       category: ThreeDModelCategory;
-      status: CatalogueStatus;
       input: ThreeDInput;
       output: ThreeDOutput;
       pricing: ThreeDModelPricing;
@@ -2917,12 +2575,10 @@ export namespace models {
           basis: "model",
           source_url: "https://cloud.tencent.com/document/product/1804/120694",
         },
-        deprecated: false,
         short_description: "Generate a textured 3D asset from a text prompt.",
         vendor: "tencent",
         provider: "fal",
         category: "3d/text-to-3d",
-        status: "staged",
         input: { type: "text", max_utf8_characters: 1024 },
         output: HUNYUAN_OUTPUT,
         pricing: {
@@ -2941,13 +2597,11 @@ export namespace models {
           basis: "model",
           source_url: "https://cloud.tencent.com/document/product/1804/120694",
         },
-        deprecated: false,
         short_description:
           "Generate a textured 3D asset from one image or up to eight views.",
         vendor: "tencent",
         provider: "fal",
         category: "3d/image-to-3d",
-        status: "staged",
         input: { type: "image", min_images: 1, max_images: 8 },
         output: HUNYUAN_OUTPUT,
         pricing: {
@@ -2970,13 +2624,11 @@ export namespace models {
           basis: "model",
           source_url: "https://huggingface.co/microsoft/TRELLIS.2-4B",
         },
-        deprecated: false,
         short_description:
           "Generate a textured GLB asset from a single reference image.",
         vendor: "microsoft",
         provider: "fal",
         category: "3d/image-to-3d",
-        status: "staged",
         input: { type: "image", min_images: 1, max_images: 1 },
         output: { primary: "glb", optional: [] },
         pricing: {
@@ -2988,8 +2640,6 @@ export namespace models {
         url: "https://fal.ai/models/fal-ai/trellis-2",
       },
     } as const satisfies Record<ThreeDModelId, ThreeDModelCard>;
-
-    const all_cards: readonly ThreeDModelCard[] = Object.values(models);
 
     export const three_d_model_ids = Object.freeze(
       Object.keys(models) as ThreeDModelId[]
@@ -3016,18 +2666,6 @@ export namespace models {
     ): id is ImageToThreeDModelId {
       return (image_to_three_d_model_ids as readonly string[]).includes(id);
     }
-
-    let _listed: readonly ThreeDModelCard[] | null = null;
-    export const listed_models = (): readonly ThreeDModelCard[] =>
-      (_listed ??= Object.freeze(
-        all_cards.filter((card) => card.status === "listed")
-      ));
-
-    let _staged: readonly ThreeDModelCard[] | null = null;
-    export const staged_models = (): readonly ThreeDModelCard[] =>
-      (_staged ??= Object.freeze(
-        all_cards.filter((card) => card.status === "staged")
-      ));
   }
 
   // ── models.video ──────────────────────────────────────────────────
@@ -3183,15 +2821,8 @@ export namespace models {
       label: string;
       /** Optional only for backwards-compatible snapshot parsing. */
       release?: ModelRelease;
-      deprecated: boolean;
       short_description: string;
       vendor: Vendor;
-      /**
-       * Video cards exist only for models enabled in Grida selection. Kept as
-       * an explicit marker for runtime guards and cross-modality consumers;
-       * unsupported or compatibility-only models do not get catalogue cards.
-       */
-      listed: true;
       /** Supported aspect ratios. */
       aspect_ratios: image.AspectRatioString[];
       /** Inclusive output-duration bounds, in seconds. */
@@ -3200,13 +2831,6 @@ export namespace models {
       /** Whether the model can produce synchronized audio (capability; per-mode pricing lives on each binding). */
       audio: boolean;
       speed_label: image.SpeedLabel;
-      /** Default generation request. Every binding must price `(resolution, audio)`. */
-      default: {
-        resolution: ResolutionLabel;
-        aspect_ratio: image.AspectRatioString;
-        duration: number;
-        audio: boolean;
-      };
       /** Original vendor's model card page (not a serving gateway). */
       url: string;
       /**
@@ -3236,22 +2860,14 @@ export namespace models {
           basis: "model",
           source_url: "https://ai.google.dev/gemini-api/docs/changelog",
         },
-        deprecated: false,
         short_description:
           "Google's flagship video model — strong prompt adherence with native, synchronized audio.",
         vendor: "google",
-        listed: true,
         aspect_ratios: ["16:9", "9:16"],
         min_duration: 4,
         max_duration: 8,
         audio: true,
         speed_label: "slow",
-        default: {
-          resolution: "1080p",
-          aspect_ratio: "16:9",
-          duration: 8,
-          audio: true,
-        },
         url: "https://deepmind.google/models/veo/",
         providers: {
           // Vercel AI Gateway — gateway.video(id), image-to-video. The
@@ -3337,22 +2953,14 @@ export namespace models {
           basis: "model",
           source_url: "https://ai.google.dev/gemini-api/docs/changelog",
         },
-        deprecated: false,
         short_description:
           "Faster, cheaper Veo 3.1 — the same envelope and native audio at a fraction of the price.",
         vendor: "google",
-        listed: true,
         aspect_ratios: ["16:9", "9:16"],
         min_duration: 4,
         max_duration: 8,
         audio: true,
         speed_label: "medium",
-        default: {
-          resolution: "1080p",
-          aspect_ratio: "16:9",
-          duration: 8,
-          audio: true,
-        },
         url: "https://deepmind.google/models/veo/",
         providers: {
           // https://vercel.com/ai-gateway/models/veo-3.1-fast-generate-001
@@ -3405,22 +3013,14 @@ export namespace models {
           source_url:
             "https://blog.google/innovation-and-ai/technology/ai/veo-3-1-lite/",
         },
-        deprecated: false,
         short_description:
           "Budget Veo 3.1 — 720p/1080p clips with native audio for a few cents a second.",
         vendor: "google",
-        listed: true,
         aspect_ratios: ["16:9", "9:16"],
         min_duration: 4,
         max_duration: 8,
         audio: true,
         speed_label: "fast",
-        default: {
-          resolution: "1080p",
-          aspect_ratio: "16:9",
-          duration: 8,
-          audio: true,
-        },
         url: "https://deepmind.google/models/veo/",
         providers: {
           // https://vercel.com/ai-gateway/models/veo-3.1-lite-generate-001
@@ -3470,22 +3070,14 @@ export namespace models {
           source_url:
             "https://www.alibabacloud.com/help/en/model-studio/newly-released-models",
         },
-        deprecated: false,
         short_description:
           "Alibaba's flagship video model — long clips (up to 30s) with bundled audio at the lowest per-second rates in the catalogue.",
         vendor: "alibaba",
-        listed: true,
         aspect_ratios: ["16:9", "4:3", "1:1", "3:4", "9:16"],
         min_duration: 2,
         max_duration: 30,
         audio: true,
         speed_label: "medium",
-        default: {
-          resolution: "1080p",
-          aspect_ratio: "16:9",
-          duration: 5,
-          audio: true,
-        },
         url: "https://wan.video/",
         providers: {
           // https://vercel.com/ai-gateway/models/wan-v3.0-video
@@ -3533,22 +3125,14 @@ export namespace models {
           source_url:
             "https://seed.bytedance.com/en/blog/seedance-2-0-%E6%AD%A3%E5%BC%8F%E5%8F%91%E5%B8%83",
         },
-        deprecated: false,
         short_description:
           "ByteDance's video model — image-to-video with reference modes, up to 4K, at roughly two-thirds the price of Seedance 2.5.",
         vendor: "bytedance",
-        listed: true,
         aspect_ratios: ["16:9", "9:16", "1:1"],
         min_duration: 5,
         max_duration: 15,
         audio: true,
         speed_label: "slow",
-        default: {
-          resolution: "720p",
-          aspect_ratio: "16:9",
-          duration: 5,
-          audio: true,
-        },
         url: "https://seed.bytedance.com/en/seedance2_0",
         // NO Vercel binding, deliberately. The gateway serves
         // `bytedance/seedance-2.0` but meters it PER TOKEN
@@ -3608,10 +3192,8 @@ export namespace models {
       // per token on the gateway ($10.70/MTok at 480p/720p, $11.70 at 1080p
       // vs 2.0's $7.00/$7.70), ~56–71% more per second on fal, and no 4K.
       // It buys 4–30s clips, video-editing and extend-video. 2.0 is cheaper
-      // and serves 4K, so it stays listed and undeprecated — the catalogue
-      // rule keeps a card that is still a real choice. Same metering story:
-      // the gateway bills tokens, so no Vercel binding until post-flight
-      // metering exists. fal states per-second prices, audio bundled.
+      // and serves 4K. The gateway bills tokens, so there is no comparable
+      // per-second Vercel meter here. fal states per-second prices, audio bundled.
       "bytedance/seedance-2.5": {
         id: "bytedance/seedance-2.5",
         label: "Seedance 2.5",
@@ -3621,22 +3203,14 @@ export namespace models {
           source_url:
             "https://seed.bytedance.com/en/blog/one-take-creation-flexible-referencing-introducing-seedance-2-5",
         },
-        deprecated: false,
         short_description:
           "ByteDance's latest video model — up to 30-second clips with native audio, reference and editing modes.",
         vendor: "bytedance",
-        listed: true,
         aspect_ratios: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"],
         min_duration: 4,
         max_duration: 30,
         audio: true,
         speed_label: "slow",
-        default: {
-          resolution: "720p",
-          aspect_ratio: "16:9",
-          duration: 5,
-          audio: true,
-        },
         url: "https://seed.bytedance.com/en/seedance",
         providers: {
           // fal's stated rates: $0.2205/s @480p, $0.4730/s @720p, $1.164/s
@@ -3675,22 +3249,14 @@ export namespace models {
           basis: "model",
           source_url: "https://x.ai/news/grok-imagine-1-5",
         },
-        deprecated: false,
         short_description:
           "SpaceXAI's image-to-video model — animates a still into cinematic video with native, lip-synced audio.",
         vendor: "xai",
-        listed: true,
         aspect_ratios: ["16:9", "9:16"],
         min_duration: 1,
         max_duration: 15,
         audio: true,
         speed_label: "fast",
-        default: {
-          resolution: "720p",
-          aspect_ratio: "16:9",
-          duration: 5,
-          audio: true,
-        },
         url: "https://docs.x.ai/developers/models/grok-imagine-video-1.5",
         providers: {
           // Vercel AI Gateway — image-to-video; mirrors SpaceXAI's list price (no markup).
@@ -3777,13 +3343,6 @@ export namespace models {
       const bundled = models[card.id]?.providers[provider];
       return bundled?.id === current.id ? bundled.input : null;
     }
-
-    let _listed: readonly VideoModelCard[] | null = null;
-    /** Cards enabled in Grida model selection. Computed once and frozen — the
-     *  catalog is static, so callers can call freely without risking mutation
-     *  of the shared view. */
-    export const listed_models = (): readonly VideoModelCard[] =>
-      (_listed ??= listedOver(models));
   }
 
   // ── models.image_tools ────────────────────────────────────────────
@@ -3984,956 +3543,16 @@ export namespace models {
       "google/gemini-embedding-2";
     export const LIBRARY_EMBEDDING_DIMENSIONS = 1536;
   }
-
-  // ── models.snapshot ───────────────────────────────────────────────
-  //
-  // Catalogue distribution — see docs/wg/platform/hosted-ai.md.
-  //
-  // The bundled catalogue is a SEED, not the authority. A host may fetch
-  // a published snapshot and resolve against that instead, so a model
-  // added on the server reaches an already-installed binary without a
-  // release. This namespace is pure data + pure resolution: fetching,
-  // caching, and scheduling belong to the host (`ModelCatalogStore` in
-  // `@grida/agent`).
-
-  export namespace snapshot {
-    /**
-     * Wire schema major. {@link parse} rejects anything else.
-     *
-     * Additive evolution does NOT bump this — v1 parsers ignore fields
-     * they do not know, so publishing a new optional field is safe. A
-     * breaking shape change publishes at a NEW route path and bumps this,
-     * leaving old clients on the old path (or rejecting the body and
-     * falling back to the seed — fail-safe either way).
-     */
-    export const SCHEMA = 1;
-
-    /** Text catalogue + tier map. Replaces the seed's wholesale. */
-    export interface TextSection {
-      /**
-       * Full replacement for `models.text.catalog`. Each key equals its
-       * entry's `id`. Deliberately NOT merged with the seed: removing a
-       * model from the catalogue is the kill switch, and a merge would
-       * defeat it on every installed client.
-       */
-      catalog: Record<string, text.ModelSpec>;
-      /** Full replacement for `TIER_MODEL_IDS`. Every id is a `catalog` key. */
-      tier_model_ids: Record<ModelTier, string>;
-    }
-
-    /**
-     * A published catalogue.
-     *
-     * Sections are independent: a media section that fails validation is
-     * dropped on its own and the rest of the snapshot still applies. Only
-     * `text` is load-bearing enough to reject the whole payload, because a
-     * host with no text catalogue cannot run a turn at all.
-     */
-    export interface Snapshot {
-      /** Always {@link SCHEMA} on a parsed value. */
-      schema: number;
-      /** Opaque publisher version (a deploy sha; `"seed"` for the bundle). */
-      version: string;
-      /** Informational only; never drives resolution. */
-      generated_at?: string;
-      text: TextSection;
-      /** Absent ⇒ the consumer keeps its bundled image catalogue. */
-      image?: ImageSection;
-      /** Absent ⇒ the consumer keeps its bundled video catalogue. */
-      video?: VideoSection;
-    }
-
-    /** Image catalogue. Replaces `models.image.models` wholesale. */
-    export interface ImageSection {
-      models: Record<string, image.ImageModelCard>;
-    }
-
-    /** Video catalogue. Replaces `models.video.models` wholesale. */
-    export interface VideoSection {
-      models: Record<string, video.VideoModelCard>;
-    }
-
-    /**
-     * The read surface for one media catalogue. Mirrors the lookups the
-     * corresponding namespace exports, so a call site reads the same
-     * whether it is on the bundled catalogue or a published one.
-     */
-    export interface MediaView<Card, Provider extends string, Binding> {
-      readonly models: Readonly<Record<string, Card>>;
-      /** Cards in the curated user-facing list (`listed: true`). */
-      listed(): readonly Card[];
-      /** Exact namespaced id, or a bare post-slash name. No date tolerance. */
-      cardById(modelId: string): Card | undefined;
-      /** That provider's binding, or `null` if it does not serve the model. */
-      binding(card: Card, provider: Provider): Binding | null;
-    }
-
-    export type ImageView = MediaView<
-      image.ImageModelCard,
-      image.ImageProvider,
-      image.ImageProviderBinding
-    >;
-
-    export type VideoView = MediaView<
-      video.VideoModelCard,
-      video.VideoProvider,
-      video.VideoProviderBinding
-    >;
-
-    /**
-     * Resolution surface over one snapshot — the read API a host swaps
-     * atomically on refresh. Mirrors the `models.text.*` shape so a call
-     * site reads the same either way.
-     *
-     * Build only from {@link seed} or a {@link parse} result: `by_tier`
-     * assumes tier ids resolve, which is exactly what `parse` validates.
-     */
-    export interface View {
-      readonly catalog: Readonly<Record<string, text.ModelSpec>>;
-      readonly tier_model_ids: Readonly<Record<ModelTier, string>>;
-      readonly by_tier: Readonly<Record<ModelTier, text.ModelSpec>>;
-      /**
-       * Exact catalogue membership — `catalog[modelId] !== undefined`.
-       *
-       * This, NOT {@link modelSpecById}, is what a gate asks. The two
-       * differ on purpose: `modelSpecById` also matches a bare name and a
-       * date suffix, which is right when you want a model's LIMITS or
-       * RATES (a near-miss id is still that model), and wrong when you
-       * are deciding what id to forward to a provider — a provider is
-       * given the id the caller sent, and only an exact catalogue id is
-       * one it will recognize.
-       */
-      has(modelId: string): boolean;
-      /** Same matching rules as {@link models.text.modelSpecById}. */
-      modelSpecById(modelId: string): text.ModelSpec | undefined;
-      /** Same precedence as {@link models.text.registry.resolve}. */
-      resolve(
-        modelId: string,
-        custom?: readonly text.registry.CustomModelSpec[]
-      ): text.registry.ResolvedModelSpec | undefined;
-      readonly image: ImageView;
-      readonly video: VideoView;
-    }
-
-    const TIERS: readonly ModelTier[] = ["nano", "mini", "pro", "max"];
-
-    /** Bounds on untrusted input. Generous — the real catalogue is ~15. */
-    const MAX_CATALOG_ENTRIES = 256;
-
-    /**
-     * Plausible model-id shape. Also the reason a catalogue key can never
-     * be `__proto__`: assigning that key to an object literal would
-     * mutate its prototype instead of adding an entry.
-     */
-    const MODEL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
-
-    function isRecord(v: unknown): v is Record<string, unknown> {
-      return typeof v === "object" && v !== null && !Array.isArray(v);
-    }
-
-    function isText(v: unknown): v is string {
-      return typeof v === "string" && v.length > 0;
-    }
-
-    function isISODate(v: unknown): v is ISODate {
-      if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-        return false;
-      }
-      const parsed = new Date(`${v}T00:00:00.000Z`);
-      return (
-        !Number.isNaN(parsed.valueOf()) &&
-        parsed.toISOString().slice(0, 10) === v
-      );
-    }
-
-    function isHttpsUrl(v: unknown): v is string {
-      return isText(v) && /^https:\/\/[^\s]+$/.test(v);
-    }
-
-    /**
-     * `undefined` means the additive field is absent on an older snapshot;
-     * `null` means it was present but malformed and the containing record must
-     * be rejected.
-     */
-    function parseRelease(v: unknown): ModelRelease | null | undefined {
-      if (v === undefined) return undefined;
-      if (!isRecord(v) || !isHttpsUrl(v.source_url)) return null;
-      if (v.basis !== "model" && v.basis !== "provider_endpoint") return null;
-      if (v.date === null) {
-        return v.basis === "provider_endpoint"
-          ? { date: null, basis: v.basis, source_url: v.source_url }
-          : null;
-      }
-      if (!isISODate(v.date)) return null;
-      return { date: v.date, basis: v.basis, source_url: v.source_url };
-    }
-
-    /** A token count: positive and exactly representable. */
-    function isCount(v: unknown): v is number {
-      return typeof v === "number" && Number.isSafeInteger(v) && v > 0;
-    }
-
-    /** A price or multiplier: finite and non-negative (free is legal). */
-    function isRate(v: unknown): v is number {
-      return typeof v === "number" && Number.isFinite(v) && v >= 0;
-    }
-
-    function parseCost(v: unknown): text.ModelCostPerMillion | undefined {
-      if (!isRecord(v) || !isRate(v.input) || !isRate(v.output)) {
-        return undefined;
-      }
-      const cost: text.ModelCostPerMillion = {
-        input: v.input,
-        output: v.output,
-      };
-      if (v.cacheRead !== undefined) {
-        if (!isRate(v.cacheRead)) return undefined;
-        cost.cacheRead = v.cacheRead;
-      }
-      if (v.cacheWrite !== undefined) {
-        if (!isRate(v.cacheWrite)) return undefined;
-        cost.cacheWrite = v.cacheWrite;
-      }
-      if (v.longContext !== undefined) {
-        const lc = v.longContext;
-        if (
-          !isRecord(lc) ||
-          !isCount(lc.inputTokensAbove) ||
-          !isRate(lc.inputMultiplier) ||
-          !isRate(lc.outputMultiplier)
-        ) {
-          return undefined;
-        }
-        cost.longContext = {
-          inputTokensAbove: lc.inputTokensAbove,
-          inputMultiplier: lc.inputMultiplier,
-          outputMultiplier: lc.outputMultiplier,
-        };
-      }
-      return cost;
-    }
-
-    function parseSpec(key: string, v: unknown): text.ModelSpec | undefined {
-      if (!MODEL_ID_PATTERN.test(key)) return undefined;
-      if (!isRecord(v) || v.id !== key) return undefined;
-      if (!isText(v.label)) return undefined;
-      if (typeof v.multimodal !== "boolean") return undefined;
-      if (typeof v.tool_call !== "boolean") return undefined;
-      if (!isCount(v.contextWindow) || !isCount(v.outputLimit))
-        return undefined;
-      if (!Array.isArray(v.imageInputMimes)) return undefined;
-      const imageInputMimes: text.ImageInputMime[] = [];
-      for (const mime of v.imageInputMimes) {
-        if (typeof mime !== "string" || !mime.startsWith("image/")) {
-          return undefined;
-        }
-        imageInputMimes.push(mime as text.ImageInputMime);
-      }
-      const cost = parseCost(v.cost);
-      if (!cost) return undefined;
-      const release = parseRelease(v.release);
-      if (release === null) return undefined;
-
-      const spec: text.ModelSpec = {
-        id: key,
-        label: v.label,
-        multimodal: v.multimodal,
-        imageInputMimes,
-        tool_call: v.tool_call,
-        contextWindow: v.contextWindow,
-        outputLimit: v.outputLimit,
-        cost,
-      };
-      if (release) spec.release = release;
-      if (v.short_label !== undefined) {
-        if (!isText(v.short_label)) return undefined;
-        spec.short_label = v.short_label;
-      }
-      if (v.deprecated !== undefined) {
-        if (typeof v.deprecated !== "boolean") return undefined;
-        spec.deprecated = v.deprecated;
-      }
-      return spec;
-    }
-
-    // ── media validation ──────────────────────────────────────────────
-
-    /** Bounds on the free-form key maps inside media pricing. */
-    const MAX_PRICE_KEYS = 64;
-
-    /**
-     * Keys that mutate an object instead of adding an entry.
-     *
-     * Media pricing carries FREE-FORM key maps — image `tiers`
-     * (`"medium/1024x1024"`) and video `usd_per_second` (`"720p"`) — which
-     * {@link MODEL_ID_PATTERN} does not cover. Copying a JSON-parsed
-     * `__proto__` key onto a plain object replaces that object's prototype
-     * rather than adding a key, and a later lookup then resolves through
-     * the prototype chain: `tiers["anything"]` would return an
-     * attacker-chosen number while `Object.keys(tiers)` still looks clean.
-     * That reads as a real price to a `!== undefined` billing guard.
-     */
-    const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-
-    /** A bounded map of free-form keys to validated values, or undefined. */
-    function parseKeyedMap<T>(
-      v: unknown,
-      parseValue: (value: unknown) => T | undefined
-    ): Record<string, T> | undefined {
-      if (!isRecord(v)) return undefined;
-      const entries = Object.entries(v);
-      if (entries.length === 0 || entries.length > MAX_PRICE_KEYS) {
-        return undefined;
-      }
-      const out: Record<string, T> = {};
-      for (const [key, value] of entries) {
-        if (!isText(key) || UNSAFE_KEYS.has(key)) return undefined;
-        const parsed = parseValue(value);
-        if (parsed === undefined) return undefined;
-        out[key] = parsed;
-      }
-      return out;
-    }
-
-    function parseRate(v: unknown): number | undefined {
-      return isRate(v) ? v : undefined;
-    }
-
-    /** Copy `key` from `src` onto `dst` only when present and valid. */
-    function optional<T extends object>(
-      dst: T,
-      src: Record<string, unknown>,
-      key: string & keyof T,
-      ok: (v: unknown) => boolean
-    ): boolean {
-      const value = src[key];
-      if (value === undefined) return true;
-      if (!ok(value)) return false;
-      // Conditional assign, never `{ k: src[k] }` — an own key holding
-      // `undefined` is dropped by JSON.stringify and breaks round-trip.
-      (dst as Record<string, unknown>)[key] = value;
-      return true;
-    }
-
-    function parsePerTokenRates(
-      v: Record<string, unknown>,
-      into: Record<string, unknown>
-    ): boolean {
-      if (!isRate(v.input) || !isRate(v.output)) return false;
-      into.input = v.input;
-      into.output = v.output;
-      for (const key of [
-        "cached_input",
-        "image_input",
-        "cached_image_input",
-        "text_output",
-      ]) {
-        if (v[key] === undefined) continue;
-        if (!isRate(v[key])) return false;
-        into[key] = v[key];
-      }
-      return true;
-    }
-
-    function parseImagePricing(
-      v: unknown
-    ): image.ImageModelPricing | undefined {
-      if (!isRecord(v)) return undefined;
-      if (v.type === "per_image_flat") {
-        // Free is legal — `image-cost.ts` distinguishes an absent tier
-        // from a $0 one.
-        return isRate(v.usd)
-          ? { type: "per_image_flat", usd: v.usd }
-          : undefined;
-      }
-      if (v.type === "per_token") {
-        const out: Record<string, unknown> = { type: "per_token" };
-        return parsePerTokenRates(v, out)
-          ? (out as image.PerTokenPricing)
-          : undefined;
-      }
-      if (v.type === "per_image_tiered") {
-        const tiers = parseKeyedMap(v.tiers, parseRate);
-        if (!tiers) return undefined;
-        const out: image.PerImageTieredPricing = {
-          type: "per_image_tiered",
-          tiers,
-        };
-        if (v.tokens !== undefined) {
-          if (!isRecord(v.tokens)) return undefined;
-          const tokens: Record<string, unknown> = {};
-          if (!parsePerTokenRates(v.tokens, tokens)) return undefined;
-          out.tokens = tokens as image.PerTokenRates;
-        }
-        return out;
-      }
-      // An arm this client cannot price. `image-cost.ts` switches on the
-      // three known ones and would fall through to `undefined`.
-      return undefined;
-    }
-
-    function parseVideoPricing(v: unknown): video.PerSecondPricing | undefined {
-      if (!isRecord(v) || v.type !== "per_second") return undefined;
-      const usd_per_second = parseKeyedMap(v.usd_per_second, (modes) => {
-        if (!isRecord(modes)) return undefined;
-        const out: Partial<Record<video.AudioMode, number>> = {};
-        for (const mode of ["audio", "silent"] as const) {
-          if (modes[mode] === undefined) continue;
-          if (!isRate(modes[mode])) return undefined;
-          out[mode] = modes[mode];
-        }
-        // Absence IS the capability statement, but an empty entry states
-        // nothing and would make a resolution label unpriceable.
-        return Object.keys(out).length > 0 ? out : undefined;
-      });
-      if (!usd_per_second) return undefined;
-      const pricing: video.PerSecondPricing = {
-        type: "per_second",
-        usd_per_second,
-      };
-      if (!optional(pricing, v, "usd_per_input_image", isRate))
-        return undefined;
-      return pricing;
-    }
-
-    /**
-     * Provider bindings, keyed by provider.
-     *
-     * UNKNOWN PROVIDER KEYS ARE DROPPED rather than rejecting the card.
-     * A provider this client has no adapter for is not an error — it is a
-     * route it cannot take — and rejecting would make adding a provider a
-     * breaking publish. (The AI SDK gateway learned this the hard way: it
-     * validated its model-kind field as a hard enum, so the day a new kind
-     * shipped the whole listing failed to parse; it now accepts loosely
-     * and filters unknown rows.)
-     */
-    function parseBindings<P extends string, B>(
-      v: unknown,
-      known: readonly P[],
-      parseBinding: (provider: P, value: unknown) => B | undefined
-    ): Partial<Record<P, B>> | undefined {
-      if (!isRecord(v)) return undefined;
-      const out: Partial<Record<P, B>> = {};
-      for (const provider of known) {
-        const value = v[provider];
-        if (value === undefined) continue;
-        const binding = parseBinding(provider, value);
-        if (!binding) return undefined;
-        out[provider] = binding;
-      }
-      // Every card must be servable by something.
-      return Object.keys(out).length > 0 ? out : undefined;
-    }
-
-    /**
-     * The half of a binding both media modalities share: the routing id, the
-     * meter, and the two optional labels. Stated once so `url`, `deprecated`,
-     * and `avg_cost_usd` cannot end up validated two different ways.
-     */
-    type MediaBinding<P extends string, Pricing> = {
-      provider: P;
-      id: string;
-      pricing: Pricing;
-      avg_cost_usd: number;
-      deprecated?: boolean;
-      url?: string;
-    };
-
-    function parseMediaBinding<P extends string, Pricing>(
-      provider: P,
-      v: unknown,
-      parsePricing: (value: unknown) => Pricing | undefined
-    ): MediaBinding<P, Pricing> | undefined {
-      if (!isRecord(v)) return undefined;
-      // The `provider` field is redundant with its key by design; validate
-      // the redundancy rather than normalising it away.
-      if (v.provider !== provider) return undefined;
-      if (!isText(v.id) || !isRate(v.avg_cost_usd)) return undefined;
-      const pricing = parsePricing(v.pricing);
-      if (!pricing) return undefined;
-      const out: MediaBinding<P, Pricing> = {
-        provider,
-        id: v.id,
-        pricing,
-        avg_cost_usd: v.avg_cost_usd,
-      };
-      if (!optional(out, v, "deprecated", (x) => typeof x === "boolean")) {
-        return undefined;
-      }
-      if (!optional(out, v, "url", isText)) return undefined;
-      return out;
-    }
-
-    function parseImageBinding(
-      provider: image.ImageProvider,
-      v: unknown
-    ): image.ImageProviderBinding | undefined {
-      const out = parseMediaBinding(provider, v, parseImagePricing);
-      if (!out) return undefined;
-      const card: image.ImageProviderBinding = out;
-      if (
-        !optional(
-          card,
-          v as Record<string, unknown>,
-          "transparent_background",
-          (value) => value === null || typeof value === "boolean"
-        )
-      ) {
-        return undefined;
-      }
-      const refs = (v as Record<string, unknown>).references;
-      if (refs !== undefined) {
-        // Dropping this silently disables image-to-image routing.
-        if (!isRecord(refs) || !isText(refs.id) || !isCount(refs.max)) {
-          return undefined;
-        }
-        card.references = { id: refs.id, max: refs.max };
-      }
-      return card;
-    }
-
-    function parseVideoBinding(
-      provider: video.VideoProvider,
-      v: unknown
-    ): video.VideoProviderBinding | undefined {
-      const out = parseMediaBinding(provider, v, parseVideoPricing);
-      if (!out) return undefined;
-      const card: video.VideoProviderBinding = out;
-      if (Object.prototype.hasOwnProperty.call(v, "input")) {
-        const input = (v as Record<string, unknown>).input;
-        // Preserve an unusable fact as unknown, rather than dropping this
-        // whole section and allowing view() to restore the bundled catalogue.
-        card.input =
-          input === "text" || input === "image" || input === "text-or-image"
-            ? input
-            : null;
-      }
-      return card;
-    }
-
-    /** `T | null` — null is meaningful here, a missing key is not. */
-    function nullable<T>(
-      v: unknown,
-      parseValue: (value: unknown) => T | undefined
-    ): T | null | undefined {
-      if (v === null) return null;
-      return parseValue(v);
-    }
-
-    function parseSizes(v: unknown): image.SizeSpec[] | undefined {
-      if (!Array.isArray(v)) return undefined;
-      const out: image.SizeSpec[] = [];
-      for (const size of v) {
-        if (
-          !Array.isArray(size) ||
-          size.length !== 3 ||
-          !isCount(size[0]) ||
-          !isCount(size[1]) ||
-          typeof size[2] !== "string" ||
-          !/^\d+:\d+$/.test(size[2])
-        ) {
-          return undefined;
-        }
-        out.push([size[0], size[1], size[2] as image.AspectRatioString]);
-      }
-      return out;
-    }
-
-    function parseConstraints(
-      v: unknown
-    ): image.ImageSizeConstraints | undefined {
-      if (!isRecord(v)) return undefined;
-      const out: image.ImageSizeConstraints = {};
-      for (const key of [
-        "step",
-        "min_edge",
-        "max_edge",
-        "min_pixels",
-        "max_pixels",
-      ] as const) {
-        if (v[key] === undefined) continue;
-        if (!isCount(v[key])) return undefined;
-        out[key] = v[key];
-      }
-      if (v.aspect_ratio !== undefined) {
-        const ar = v.aspect_ratio;
-        if (!isRecord(ar)) return undefined;
-        const bounds: { min?: number; max?: number } = {};
-        for (const key of ["min", "max"] as const) {
-          if (ar[key] === undefined) continue;
-          if (!isRate(ar[key])) return undefined;
-          bounds[key] = ar[key];
-        }
-        out.aspect_ratio = bounds;
-      }
-      return out;
-    }
-
-    function isAspectRatio(v: unknown): v is image.AspectRatioString {
-      return typeof v === "string" && /^\d+:\d+$/.test(v);
-    }
-
-    function parseImageCard(
-      key: string,
-      v: unknown
-    ): image.ImageModelCard | undefined {
-      if (!MODEL_ID_PATTERN.test(key)) return undefined;
-      if (!isRecord(v) || v.id !== key) return undefined;
-      if (!isText(v.label) || !isText(v.short_description)) return undefined;
-      // `vendor` and `speed_label` are closed unions in TypeScript but are
-      // validated as text on the wire: a model from a new vendor must not
-      // require a client release, which is the whole point of publishing.
-      if (!isText(v.vendor) || !isText(v.speed_label)) return undefined;
-      if (!isText(v.speed_max)) return undefined;
-      if (typeof v.deprecated !== "boolean") return undefined;
-      if (typeof v.listed !== "boolean") return undefined;
-      if (!isRate(v.avg_cost_usd)) return undefined;
-      const release = parseRelease(v.release);
-      if (release === null) return undefined;
-
-      const pricing = parseImagePricing(v.pricing);
-      if (!pricing) return undefined;
-
-      const styles = nullable(v.styles, (x) =>
-        Array.isArray(x) && x.every(isText) ? (x as string[]) : undefined
-      );
-      if (styles === undefined) return undefined;
-      const sizes = nullable(v.sizes, parseSizes);
-      if (sizes === undefined) return undefined;
-      const constraints = nullable(v.constraints, parseConstraints);
-      if (constraints === undefined) return undefined;
-
-      if (!isRecord(v.default)) return undefined;
-      if (!isCount(v.default.width) || !isCount(v.default.height)) {
-        return undefined;
-      }
-      if (!isAspectRatio(v.default.aspect_ratio)) return undefined;
-
-      const providers = parseBindings(
-        v.providers,
-        image.providers,
-        parseImageBinding
-      );
-      if (!providers) return undefined;
-      // A listed model can launch on one provider first. Its primary route
-      // must be known and bound; runtime selection intersects the available
-      // bindings with connected keys, and hosted calls still require Vercel.
-      if (!image.providers.includes(v.provider as image.ImageProvider)) {
-        return undefined;
-      }
-      const primary = v.provider as image.ImageProvider;
-      if (!providers[primary]) {
-        return undefined;
-      }
-
-      const card: image.ImageModelCard = {
-        id: key,
-        label: v.label,
-        deprecated: v.deprecated,
-        short_description: v.short_description,
-        vendor: v.vendor as Vendor,
-        provider: primary,
-        listed: v.listed,
-        providers,
-        styles,
-        speed_label: v.speed_label as image.SpeedLabel,
-        speed_max: v.speed_max,
-        sizes,
-        constraints,
-        pricing,
-        avg_cost_usd: v.avg_cost_usd,
-        default: {
-          width: v.default.width,
-          height: v.default.height,
-          aspect_ratio: v.default.aspect_ratio,
-        },
-      };
-      if (
-        !optional(
-          card,
-          v,
-          "transparent_background",
-          (value) => typeof value === "boolean"
-        )
-      ) {
-        return undefined;
-      }
-      if (v.quality !== undefined) {
-        const quality = v.quality;
-        if (
-          !isRecord(quality) ||
-          !Array.isArray(quality.options) ||
-          quality.options.length === 0 ||
-          !quality.options.every(isText) ||
-          !isText(quality.default) ||
-          !quality.options.includes(quality.default)
-        ) {
-          return undefined;
-        }
-        card.quality = {
-          options: [...quality.options],
-          default: quality.default,
-        };
-      }
-      if (release) card.release = release;
-      if (!optional(card, v, "listed_reason", isText)) return undefined;
-      return card;
-    }
-
-    function parseVideoCard(
-      key: string,
-      v: unknown
-    ): video.VideoModelCard | undefined {
-      if (!MODEL_ID_PATTERN.test(key)) return undefined;
-      if (!isRecord(v) || v.id !== key) return undefined;
-      if (!isText(v.label) || !isText(v.short_description)) return undefined;
-      if (!isText(v.vendor) || !isText(v.speed_label) || !isText(v.url)) {
-        return undefined;
-      }
-      if (typeof v.deprecated !== "boolean") return undefined;
-      // Not `typeof === "boolean"`: a video card exists ONLY for a model in
-      // Grida selection, so the type pins `listed: true`. A payload saying
-      // otherwise is malformed, not a hidden card.
-      if (v.listed !== true) return undefined;
-      if (typeof v.audio !== "boolean") return undefined;
-      const release = parseRelease(v.release);
-      if (release === null) return undefined;
-      if (!isCount(v.min_duration) || !isCount(v.max_duration))
-        return undefined;
-      if (v.min_duration > v.max_duration) return undefined;
-      if (
-        !Array.isArray(v.aspect_ratios) ||
-        !v.aspect_ratios.every(isAspectRatio)
-      ) {
-        return undefined;
-      }
-
-      if (!isRecord(v.default)) return undefined;
-      const dflt = v.default;
-      if (!isText(dflt.resolution) || !isAspectRatio(dflt.aspect_ratio)) {
-        return undefined;
-      }
-      if (!isCount(dflt.duration) || typeof dflt.audio !== "boolean") {
-        return undefined;
-      }
-      if (dflt.duration < v.min_duration || dflt.duration > v.max_duration) {
-        return undefined;
-      }
-
-      const providers = parseBindings(
-        v.providers,
-        video.providers,
-        parseVideoBinding
-      );
-      if (!providers) return undefined;
-      // Provider selection is deferred to the runtime, so the contract is
-      // route-agnostic: whichever provider it later picks must be able to
-      // serve the model's DEFAULT config. Deliberately NOT the image
-      // one-key rule — the video ecosystem is fragmented and no model is
-      // on every provider.
-      const mode: video.AudioMode = dflt.audio ? "audio" : "silent";
-      for (const binding of Object.values(providers)) {
-        const rate = binding.pricing.usd_per_second[dflt.resolution]?.[mode];
-        if (!(typeof rate === "number" && rate > 0)) return undefined;
-      }
-
-      const card: video.VideoModelCard = {
-        id: key,
-        label: v.label,
-        deprecated: v.deprecated,
-        short_description: v.short_description,
-        vendor: v.vendor as Vendor,
-        listed: true,
-        aspect_ratios: v.aspect_ratios as image.AspectRatioString[],
-        min_duration: v.min_duration,
-        max_duration: v.max_duration,
-        audio: v.audio,
-        speed_label: v.speed_label as image.SpeedLabel,
-        default: {
-          resolution: dflt.resolution,
-          aspect_ratio: dflt.aspect_ratio,
-          duration: dflt.duration,
-          audio: dflt.audio,
-        },
-        url: v.url,
-        providers,
-      };
-      if (release) card.release = release;
-      return card;
-    }
-
-    /**
-     * A media section, or `undefined` when absent or unusable.
-     *
-     * Unusable is not fatal: the caller drops just this section and keeps
-     * the rest of the snapshot, so a bad image catalogue can never take
-     * the text catalogue — or the whole daemon — down with it.
-     */
-    function parseMediaSection<Card>(
-      v: unknown,
-      parseCard: (key: string, value: unknown) => Card | undefined
-    ): { models: Record<string, Card> } | undefined {
-      if (!isRecord(v) || !isRecord(v.models)) return undefined;
-      const entries = Object.entries(v.models);
-      if (entries.length === 0 || entries.length > MAX_CATALOG_ENTRIES) {
-        return undefined;
-      }
-      const out: Record<string, Card> = {};
-      for (const [key, value] of entries) {
-        const card = parseCard(key, value);
-        if (!card) return undefined;
-        out[key] = card;
-      }
-      return { models: out };
-    }
-
-    /**
-     * The bundled catalogue expressed as a snapshot — the seed a host
-     * starts from and falls back to. Also what the publishing endpoint
-     * serves, which is why `parse(JSON.parse(JSON.stringify(seed())))`
-     * round-trips exactly (pinned in `__tests__/snapshot.test.ts`).
-     */
-    export function seed(opts?: { version?: string }): Snapshot {
-      return {
-        schema: SCHEMA,
-        version: opts?.version ?? "seed",
-        text: {
-          catalog: { ...text.catalog },
-          tier_model_ids: { ...TIER_MODEL_IDS },
-        },
-        image: {
-          models: { ...(image.models as Record<string, image.ImageModelCard>) },
-        },
-        video: {
-          models: { ...(video.models as Record<string, video.VideoModelCard>) },
-        },
-      };
-    }
-
-    /**
-     * Validate an untrusted published catalogue. Returns `null` rather
-     * than throwing — a host must be able to keep serving on a bad
-     * payload, and whole-or-reject is what keeps a half-applied
-     * catalogue from ever existing.
-     *
-     * Strict on shape and on the invariants resolution depends on;
-     * lenient on unknown fields, so a newer publisher stays readable.
-     */
-    export function parse(data: unknown): Snapshot | null {
-      if (!isRecord(data) || data.schema !== SCHEMA) return null;
-      if (!isText(data.version)) return null;
-      if (!isRecord(data.text) || !isRecord(data.text.catalog)) return null;
-
-      const entries = Object.entries(data.text.catalog);
-      if (entries.length === 0 || entries.length > MAX_CATALOG_ENTRIES) {
-        return null;
-      }
-      const catalog: Record<string, text.ModelSpec> = {};
-      for (const [key, value] of entries) {
-        const spec = parseSpec(key, value);
-        if (!spec) return null;
-        catalog[key] = spec;
-      }
-
-      const rawTiers = data.text.tier_model_ids;
-      if (!isRecord(rawTiers)) return null;
-      const tier_model_ids = {} as Record<ModelTier, string>;
-      for (const tier of TIERS) {
-        const id = rawTiers[tier];
-        // A tier pointing outside the catalogue would leave `by_tier`
-        // dangling, which every compaction limit reads.
-        if (!isText(id) || !Object.hasOwn(catalog, id)) return null;
-        tier_model_ids[tier] = id;
-      }
-
-      const parsed: Snapshot = {
-        schema: SCHEMA,
-        version: data.version,
-        text: { catalog, tier_model_ids },
-      };
-      if (data.generated_at !== undefined) {
-        if (!isText(data.generated_at)) return null;
-        parsed.generated_at = data.generated_at;
-      }
-
-      // Media sections are optional and independently fallible. An absent
-      // one leaves the consumer on its bundled media catalogue; an invalid
-      // one is dropped the same way, because a broken image catalogue must
-      // not cost a host its text catalogue too.
-      if (data.image !== undefined) {
-        const section = parseMediaSection(data.image, parseImageCard);
-        if (section) parsed.image = section;
-      }
-      if (data.video !== undefined) {
-        const section = parseMediaSection(data.video, parseVideoCard);
-        if (section) parsed.video = section;
-      }
-      return parsed;
-    }
-
-    /**
-     * A media read surface over one card table.
-     *
-     * The `listed` memo lives HERE, on the view, not on the catalogue —
-     * `models.image.listed_models()` memoizes over the bundled dict and
-     * can never observe a published one, so a swappable catalogue has to
-     * own its own lazily-computed list.
-     */
-    function buildMediaView<
-      Card extends { id: string; listed: boolean; providers: object },
-      Provider extends string,
-      Binding,
-    >(models: Record<string, Card>): MediaView<Card, Provider, Binding> {
-      let listed: readonly Card[] | undefined;
-      return {
-        models,
-        listed: () => (listed ??= listedOver(models)),
-        cardById: (modelId) => cardByIdOver(models, modelId),
-        binding: (card, provider) =>
-          (card.providers as Record<string, Binding>)[provider] ?? null,
-      };
-    }
-
-    function build(s: Snapshot): View {
-      const catalog = s.text.catalog;
-      const specs = Object.values(catalog);
-      const tier_model_ids = s.text.tier_model_ids;
-      return {
-        catalog,
-        tier_model_ids,
-        by_tier: {
-          nano: catalog[tier_model_ids.nano],
-          mini: catalog[tier_model_ids.mini],
-          pro: catalog[tier_model_ids.pro],
-          max: catalog[tier_model_ids.max],
-        },
-        has: (modelId) => Object.hasOwn(catalog, modelId),
-        modelSpecById: (modelId) => specByIdOver(specs, modelId),
-        resolve: (modelId, custom) => resolveOver(specs, modelId, custom),
-        // A snapshot without a media section falls back to the bundled
-        // catalogue for that modality only.
-        image: buildMediaView(
-          s.image?.models ??
-            (image.models as Record<string, image.ImageModelCard>)
-        ),
-        video: buildMediaView(
-          s.video?.models ??
-            (video.models as Record<string, video.VideoModelCard>)
-        ),
-      };
-    }
-
-    let seedView: View | undefined;
-
-    /**
-     * A resolution surface. With no argument, the bundled catalogue's —
-     * built once, so a host that never fetches pays nothing.
-     */
-    export function view(s?: Snapshot): View {
-      if (s) return build(s);
-      return (seedView ??= build(seed()));
-    }
-  }
 }
+
+// Bundled values are shared across importers. Freeze every nested fact.
+function freeze<T>(value: T): T {
+  if (value && typeof value === "object") {
+    for (const child of Object.values(value)) freeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+freeze(models);
 
 export default models;

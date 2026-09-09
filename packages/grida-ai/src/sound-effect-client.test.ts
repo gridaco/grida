@@ -1,6 +1,6 @@
+import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 — public SFX provider authority, live keys, bounded audio, safe failures.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
 import { SoundEffectClient, ProviderHttp } from "./index";
 
 const ID = "eleven_text_to_sound_v2";
@@ -19,6 +19,7 @@ function setup(overrides: Partial<SoundEffectClient.Options> = {}) {
   });
   const get = vi.fn<SoundEffectClient.Keys["get"]>(() => KEY);
   const client = new SoundEffectClient({
+    catalog: CatalogFixture.store(),
     keys: { get },
     http: new ProviderHttp({ request, download }),
     ...overrides,
@@ -51,7 +52,9 @@ afterEach(() => {
 describe("SoundEffectClient public contract", () => {
   it("admits the existing staged model, freezes selection, and exposes no credentials or SDK model", async () => {
     const { client, request, download } = setup();
-    expect(models.audio.sound_effects.models[ID].status).toBe("staged");
+    expect(CatalogFixture.view().lifecycle.sound_effects[ID].status).toBe(
+      "staged"
+    );
     const operation = await client.resolve({
       model_id: ID,
       provider: "elevenlabs",
@@ -405,6 +408,7 @@ describe("SoundEffectClient public contract", () => {
     expect(
       () =>
         new SoundEffectClient({
+          catalog: CatalogFixture.store(),
           http,
           keys: { get: () => KEY },
           gg: {},
@@ -413,6 +417,7 @@ describe("SoundEffectClient public contract", () => {
     expect(
       () =>
         new SoundEffectClient({
+          catalog: CatalogFixture.store(),
           http,
           keys: { get: () => KEY },
           base_url: "https://custom.example",

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ImagePlus } from "lucide-react";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import {
   PromptInput,
   PromptInputAttachment,
@@ -27,7 +27,7 @@ import { MediaModelAvailability } from "../shared/media-model-availability";
 import { generatedMediaFile } from "../shared/generated-media-file";
 import { ThreeDReferenceImage } from "./three-d-reference-image";
 
-const THREE_D_MODELS = models.three_d.staged_models();
+const THREE_D_MODELS = models.three_d.ordered_models();
 
 export type ThreeDGeneratedPreview = Readonly<{
   file: File;

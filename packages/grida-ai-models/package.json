@@ -2,7 +2,7 @@
   "name": "@grida/ai-models",
   "version": "0.0.0",
   "private": true,
-  "description": "Typed AI model catalogue: tier vocabulary, text-model specs, and media-generation catalogues (image, audio, image-tools). Catalogue data only — not a provider registry, not a billing package.",
+  "description": "Canonical AI model identities, provenance, provider bindings, capabilities, IO limits, and published prices. Product membership and preferences live in @app/ai-catalog.",
   "license": "MIT",
   "author": "Grida",
   "repository": "https://github.com/gridaco/grida",

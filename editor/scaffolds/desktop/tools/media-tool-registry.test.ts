@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import { DesktopMediaTool } from "./media-tool-registry";
 
 describe("DesktopMediaTool", () => {
@@ -21,6 +21,18 @@ describe("DesktopMediaTool", () => {
       "create",
       "inspect",
     ]);
+  });
+
+  it("keeps both staged and listed family members available in dedicated tools", () => {
+    for (const [tool, cards] of [
+      ["3d-generator", models.three_d.ordered_models()],
+      ["text-to-sound-effects", models.audio.sound_effects.ordered_models()],
+      ["text-to-speech", models.audio.text_to_speech.ordered_models()],
+    ] as const) {
+      expect(DesktopMediaTool.resolve(tool).modelIds).toEqual(
+        cards.map((card) => card.id)
+      );
+    }
   });
 
   it("fails missing and unknown tool ids closed to the default", () => {
@@ -75,6 +87,39 @@ describe("DesktopMediaTool", () => {
     expect(selection.initialModelId).toBe(
       models.audio.sound_effects.model_ids[0]
     );
+  });
+
+  it("opens image generation on the shared Flare default when no model was chosen", () => {
+    expect(
+      DesktopMediaTool.resolveSelection("image-generator", null).initialModelId
+    ).toBe("openai/gpt-image-2.5-flare");
+    expect(
+      DesktopMediaTool.resolveSelection("image-generator", "unknown-model")
+        .initialModelId
+    ).toBe("openai/gpt-image-2.5-flare");
+  });
+
+  it("preserves an explicit legacy image model instead of applying the new default", () => {
+    expect(
+      DesktopMediaTool.resolveSelection("image-generator", "openai/gpt-image-2")
+        .initialModelId
+    ).toBe("openai/gpt-image-2");
+    expect(
+      DesktopMediaTool.resolveSelection(null, "openai/gpt-image-2")
+        .initialModelId
+    ).toBe("openai/gpt-image-2");
+  });
+
+  it("preserves existing non-image generation defaults independently of list sorting", () => {
+    expect(
+      DesktopMediaTool.resolveSelection("video-generator", null).initialModelId
+    ).toBe("google/veo-3.1");
+    expect(
+      DesktopMediaTool.resolveSelection("3d-generator", null).initialModelId
+    ).toBe("fal-ai/hunyuan-3d/v3.1/pro/text-to-3d");
+    expect(
+      DesktopMediaTool.resolveSelection("text-to-music", null).initialModelId
+    ).toBe("google/lyria-3");
   });
 
   it("keeps viewer selections generation-free", () => {

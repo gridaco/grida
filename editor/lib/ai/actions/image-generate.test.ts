@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import { generateAiImage } from "./image-generate";
 
 const mocks = vi.hoisted(() => ({

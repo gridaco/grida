@@ -37,10 +37,8 @@ import type {
   ImageModel,
 } from "ai";
 import { embed, experimental_generateVideo, wrapProvider } from "ai";
-import {
-  models as ai_models,
-  type GridaCallProviderOptions,
-} from "@grida/ai-models";
+import { catalog as ai_models } from "@app/ai-catalog";
+import type { GridaCallProviderOptions } from "@grida/ai-models";
 import type { VideoGenerateRequest, VideoGenerateResult } from "@grida/agent";
 import Replicate from "replicate";
 import OpenAI from "openai";

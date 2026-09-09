@@ -40,7 +40,7 @@ import {
   PromptInputTools,
   type PromptInputMessage,
 } from "@app/ui/ai-elements/prompt-input";
-import models, { type ModelTier } from "@grida/ai-models";
+import models, { type ModelTier } from "@app/ai-catalog";
 import { cn } from "@app/ui/lib/utils";
 import { resolveAiError } from "@/lib/ai/error";
 import { AiCredits, useAiCredits } from "@/lib/ai/credits";
@@ -68,13 +68,13 @@ const markdown = {
 
 // ---------------------------------------------------------------------------
 // Model picker — only the four tiered models (nano / mini / pro / max),
-// derived from the `@grida/ai-models` catalogue (`models.text.byTier`) so
+// derived from the `@app/ai-catalog` catalogue (`models.text.byTier`) so
 // ids, labels, and pricing stay in lockstep with the source of truth.
 // Non-tiered catalog entries (e.g. gpt-5.5, gpt-5.5-pro) are intentionally
 // hidden — they're either too expensive for blanket exposure or reserved
 // for specific call sites.
 //
-// `@grida/ai-models` is a pure data package; `@/lib/ai/models` is NOT
+// `@app/ai-catalog` is a pure data package; `@/lib/ai/models` is NOT
 // imported here because it carries the server-only gateway/BYOK seam.
 // ---------------------------------------------------------------------------
 type ModelOption = {

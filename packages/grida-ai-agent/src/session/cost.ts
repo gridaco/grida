@@ -1,4 +1,4 @@
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import type { ChatModel, MessageUsage } from "./rows";
 
 export function usageTokenTotal(usage: MessageUsage): number {

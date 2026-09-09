@@ -1,3 +1,4 @@
+import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 — public speech authority, safe voice paths/text, bounded audio and failures.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { models } from "@grida/ai-models";
@@ -17,6 +18,7 @@ function setup(overrides: Partial<TextToSpeechClient.Options> = {}) {
   });
   const get = vi.fn<TextToSpeechClient.Keys["get"]>(() => KEY);
   const client = new TextToSpeechClient({
+    catalog: CatalogFixture.store(),
     keys: { get },
     http: new ProviderHttp({ request, download }),
     ...overrides,
@@ -49,7 +51,9 @@ afterEach(() => {
 describe("TextToSpeechClient speech operation", () => {
   it("admits staged v3, normalizes the explicit voice, and exposes no credential or SDK model", async () => {
     const { client, request, download } = setup();
-    expect(models.audio.text_to_speech.models[ID].status).toBe("staged");
+    expect(CatalogFixture.view().lifecycle.text_to_speech[ID].status).toBe(
+      "staged"
+    );
     const operation = await client.resolve({
       model_id: ID,
       provider: "elevenlabs",

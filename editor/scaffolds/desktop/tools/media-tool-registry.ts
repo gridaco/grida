@@ -1,4 +1,4 @@
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 
 export type DesktopMediaToolId =
   | "image-generator"
@@ -21,6 +21,8 @@ export type DesktopMediaToolSpec = Readonly<{
   description: string;
   /** Exact model ids accepted by this tool. Empty for viewer-only tools. */
   modelIds: readonly string[];
+  /** Service recommendation, independent of the presentation order. */
+  defaultModelId?: string;
 }>;
 
 export type DesktopMediaToolSelection = Readonly<{
@@ -35,6 +37,7 @@ const TOOL_SPECS = Object.freeze([
     label: "Images",
     description: "Create images from a written prompt.",
     modelIds: models.image.listed_models().map((card) => card.id),
+    defaultModelId: models.image.default_id,
   },
   {
     id: "video-generator",
@@ -42,34 +45,40 @@ const TOOL_SPECS = Object.freeze([
     label: "Video",
     description: "Create a video from a written prompt.",
     modelIds: models.video.listed_models().map((card) => card.id),
+    defaultModelId: models.video.default_id,
   },
   {
     id: "3d-generator",
     group: "create",
     label: "3D model",
     description: "Create a 3D model from text or a reference image.",
-    modelIds: models.three_d.three_d_model_ids,
+    modelIds: models.three_d.ordered_models().map((card) => card.id),
   },
   {
     id: "text-to-music",
     group: "create",
     label: "Music",
     description: "Create a music track from genre, mood, and arrangement.",
-    modelIds: models.audio.music.model_ids,
+    modelIds: models.audio.music.listed_models().map((card) => card.id),
+    defaultModelId: models.audio.music.default_id,
   },
   {
     id: "text-to-sound-effects",
     group: "create",
     label: "SFX",
     description: "Create a short sound effect from a written cue.",
-    modelIds: models.audio.sound_effects.model_ids,
+    modelIds: models.audio.sound_effects
+      .ordered_models()
+      .map((card) => card.id),
   },
   {
     id: "text-to-speech",
     group: "create",
     label: "Voice",
     description: "Turn dialogue with expression cues into spoken audio.",
-    modelIds: models.audio.text_to_speech.model_ids,
+    modelIds: models.audio.text_to_speech
+      .ordered_models()
+      .map((card) => card.id),
   },
   {
     id: "image-viewer",
@@ -182,26 +191,16 @@ export namespace DesktopMediaTool {
     if (models.video.models[modelId]?.listed) {
       return resolve("video-generator");
     }
-    if (
-      (models.three_d.three_d_model_ids as readonly string[]).includes(modelId)
-    ) {
+    if (resolve("3d-generator").modelIds.includes(modelId)) {
       return resolve("3d-generator");
     }
-    if ((models.audio.music.model_ids as readonly string[]).includes(modelId)) {
+    if (resolve("text-to-music").modelIds.includes(modelId)) {
       return resolve("text-to-music");
     }
-    if (
-      (models.audio.sound_effects.model_ids as readonly string[]).includes(
-        modelId
-      )
-    ) {
+    if (resolve("text-to-sound-effects").modelIds.includes(modelId)) {
       return resolve("text-to-sound-effects");
     }
-    if (
-      (models.audio.text_to_speech.model_ids as readonly string[]).includes(
-        modelId
-      )
-    ) {
+    if (resolve("text-to-speech").modelIds.includes(modelId)) {
       return resolve("text-to-speech");
     }
     return null;
@@ -222,9 +221,14 @@ export namespace DesktopMediaTool {
       tool.id === "3d-generator" &&
       (toolValue === "text-to-3d" || toolValue === "image-to-3d")
     ) {
-      return toolValue === "text-to-3d"
-        ? models.three_d.text_to_three_d_model_ids[0]!
-        : models.three_d.image_to_three_d_model_ids[0]!;
+      const input = toolValue === "text-to-3d" ? "text" : "image";
+      const model = models.three_d
+        .ordered_models()
+        .find((card) => card.input.type === input);
+      if (model) return model.id;
+    }
+    if (tool.defaultModelId && tool.modelIds.includes(tool.defaultModelId)) {
+      return tool.defaultModelId;
     }
     return tool.modelIds[0]!;
   }

@@ -28,7 +28,7 @@ import {
   SidebarProvider,
 } from "@app/ui/components/sidebar";
 import { cn } from "@app/ui/lib/utils";
-import type { models } from "@grida/ai-models";
+import type { catalog as models } from "@app/ai-catalog";
 import { mediaLibrary, type MediaItem } from "@/lib/desktop/bridge";
 import { ThreeDPlayground } from "../3d-gen/three-d-playground";
 import { MusicPlayground } from "../audio-gen/music-playground";

@@ -39,7 +39,11 @@ verifies actual guide examples, built routes and installed documentation links.
 This is the branded executable and host adapter. Parsing, terminal output,
 trusted registration, system-browser launch and process lifetime belong here.
 Auth/custody belong to `@grida/auth`; account selection and reads belong to
-`@grida/account`. Media commands consume `@grida/ai` through its public exports. A command does not
+`@grida/account`. Media commands consume `@grida/ai` through its public exports.
+The CLI supplies Grida's bundled service catalogue from `@app/ai-catalog` for
+discovery and execution; the shared SDK owns no product membership or defaults.
+This pinned catalogue does not refresh or choose a model/provider implicitly.
+A command does not
 move its product's implementation into this package.
 
 Do not import agent, daemon, Electron, Next.js or browser application state.

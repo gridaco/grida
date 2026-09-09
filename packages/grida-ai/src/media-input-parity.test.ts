@@ -1,3 +1,4 @@
+import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — JSON and native pre-submission validation have one owner.
 // GRIDA-GG: token — synthetic authority only; discovery itself receives none.
 import { describe, expect, it, vi } from "vitest";
@@ -12,7 +13,7 @@ import {
   ProviderHttp,
 } from "./index";
 
-const operations = new MediaOperations();
+const operations = new MediaOperations({ catalog: CatalogFixture.view() });
 const image = operations
   .list({ kind: "image", provider: "openrouter" })
   .find((item) => item.variant === "references")!;
@@ -170,21 +171,26 @@ describe("MediaOperations and native operation validation", () => {
       switch (prepared.kind) {
         case "image":
           generate = (
-            await new ImageClient({ keys: { get }, http }).resolve(
-              prepared.selection
-            )
+            await new ImageClient({
+              catalog: CatalogFixture.store(),
+              keys: { get },
+              http,
+            }).resolve(prepared.selection)
           ).generate;
           break;
         case "video":
           generate = (
-            await new VideoClient({ keys: { get }, http }).resolve(
-              prepared.selection
-            )
+            await new VideoClient({
+              catalog: CatalogFixture.store(),
+              keys: { get },
+              http,
+            }).resolve(prepared.selection)
           ).generate;
           break;
         case "music":
           generate = (
             await new MusicClient({
+              catalog: CatalogFixture.store(),
               gg: { getAccessToken: () => "synthetic-scoped-token" },
               gg_base_url: "https://fixture.example",
               http,
@@ -193,23 +199,29 @@ describe("MediaOperations and native operation validation", () => {
           break;
         case "sound-effect":
           generate = (
-            await new SoundEffectClient({ keys: { get }, http }).resolve(
-              prepared.selection
-            )
+            await new SoundEffectClient({
+              catalog: CatalogFixture.store(),
+              keys: { get },
+              http,
+            }).resolve(prepared.selection)
           ).generate;
           break;
         case "text-to-speech":
           generate = (
-            await new TextToSpeechClient({ keys: { get }, http }).resolve(
-              prepared.selection
-            )
+            await new TextToSpeechClient({
+              catalog: CatalogFixture.store(),
+              keys: { get },
+              http,
+            }).resolve(prepared.selection)
           ).generate;
           break;
         case "three-d":
           generate = (
-            await new ThreeDClient({ keys: { get }, http }).resolve(
-              prepared.selection
-            )
+            await new ThreeDClient({
+              catalog: CatalogFixture.store(),
+              keys: { get },
+              http,
+            }).resolve(prepared.selection)
           ).generate;
           break;
       }
@@ -246,7 +258,11 @@ describe("MediaOperations and native operation validation", () => {
     });
     const http = new ProviderHttp({ request, download: request });
     const keys = { get: () => "synthetic-key" };
-    const selected = await new ImageClient({ keys, http }).resolve({
+    const selected = await new ImageClient({
+      catalog: CatalogFixture.store(),
+      keys,
+      http,
+    }).resolve({
       model_id: image.model_id,
       provider: "openrouter",
     });
@@ -257,7 +273,11 @@ describe("MediaOperations and native operation validation", () => {
         signal: AbortSignal.abort(),
       })
     ).rejects.toMatchObject({ code: "aborted" });
-    const video = await new VideoClient({ keys, http }).resolve({
+    const video = await new VideoClient({
+      catalog: CatalogFixture.store(),
+      keys,
+      http,
+    }).resolve({
       model_id: "google/veo-3.1",
       provider: "vercel",
     });

@@ -7,6 +7,7 @@ import {
   GridaGatewaySessionStore,
   ImageClient,
   MediaOperations,
+  ModelCatalogStore,
   MusicClient,
   ProviderHttp,
   SoundEffectClient,
@@ -15,6 +16,7 @@ import {
   VideoClient,
   type ProviderHttpTransport,
 } from "@grida/ai";
+import { catalog } from "@app/ai-catalog";
 import { AccountClient } from "@grida/account";
 import { AuthClient } from "@grida/auth";
 import { ProviderCredentialStore } from "@grida/auth/providers";
@@ -59,7 +61,10 @@ export namespace MediaCommands {
     let credentials: ProviderCredentials | undefined;
     let directory: MediaFiles.Directory | undefined;
     const gg = new GridaGatewaySessionStore();
-    const operations = new MediaOperations();
+    const modelCatalog = new ModelCatalogStore({
+      seed: catalog.snapshot.view(),
+    });
+    const operations = new MediaOperations({ catalog: modelCatalog.view() });
     process.on("SIGINT", interrupt);
     process.on("SIGTERM", interrupt);
     try {
@@ -231,6 +236,7 @@ export namespace MediaCommands {
       const http = new ProviderHttp(host.transport(ggOrigin));
       if (invocation.command === "voices list") {
         const voices = await new TextToSpeechClient({
+          catalog: modelCatalog,
           keys: credentials,
           http,
         }).listVoices({ provider: "elevenlabs", signal });
@@ -243,7 +249,7 @@ export namespace MediaCommands {
       }
       const artifacts = await generate(
         parsed!,
-        { http, keys: credentials, gg, ggOrigin },
+        { catalog: modelCatalog, http, keys: credentials, gg, ggOrigin },
         signal
       );
       // Bytes may already have cost money. Once returned, finish saving even if
@@ -258,6 +264,7 @@ export namespace MediaCommands {
       failure(error, output);
       return error instanceof Cli.Failure ? 2 : 1;
     } finally {
+      modelCatalog.dispose();
       credentials?.dispose();
       gg.clear();
       await directory?.abandon();
@@ -284,6 +291,7 @@ function modality(
 async function generate(
   parsed: MediaOperations.Parsed,
   host: {
+    catalog: ModelCatalogStore;
     http: ProviderHttp;
     keys: ProviderCredentials;
     gg: GridaGatewaySessionStore;
@@ -297,6 +305,7 @@ async function generate(
   switch (parsed.kind) {
     case "image": {
       const operation = await new ImageClient({
+        catalog: host.catalog,
         keys: host.keys,
         http: host.http,
         gg: host.gg,
@@ -307,6 +316,7 @@ async function generate(
     }
     case "video": {
       const operation = await new VideoClient({
+        catalog: host.catalog,
         keys: host.keys,
         http: host.http,
         gg: host.gg,
@@ -318,6 +328,7 @@ async function generate(
     case "music": {
       if (!host.ggOrigin) throw new MusicClient.Failure("gg_token_expired");
       const operation = await new MusicClient({
+        catalog: host.catalog,
         http: host.http,
         gg: host.gg,
         gg_base_url: host.ggOrigin,
@@ -327,6 +338,7 @@ async function generate(
     }
     case "sound-effect": {
       const operation = await new SoundEffectClient({
+        catalog: host.catalog,
         keys: host.keys,
         http: host.http,
       }).resolve(parsed.selection);
@@ -335,6 +347,7 @@ async function generate(
     }
     case "text-to-speech": {
       const operation = await new TextToSpeechClient({
+        catalog: host.catalog,
         keys: host.keys,
         http: host.http,
       }).resolve(parsed.selection);
@@ -342,7 +355,11 @@ async function generate(
       return [(await operation.generate({ ...parsed.input, signal })).audio];
     }
     case "three-d": {
-      const client = new ThreeDClient({ keys: host.keys, http: host.http });
+      const client = new ThreeDClient({
+        catalog: host.catalog,
+        keys: host.keys,
+        http: host.http,
+      });
       // Exact endpoint contracts keep future 3D capabilities from inheriting an
       // accidental universal shape. Each new contract earns an explicit branch.
       switch (parsed.model_id) {

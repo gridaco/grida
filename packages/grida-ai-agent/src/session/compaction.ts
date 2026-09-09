@@ -16,7 +16,7 @@
  *   recovery   → transient retry → tool-output prune → chunk → drop-middle
  */
 
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import type { ModelFactory } from "../agent";
 import type { ChatModel, ChatMessageWithParts } from "./rows";
 import type { SessionsStore } from "./store";

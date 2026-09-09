@@ -3,6 +3,7 @@ import { models } from "@grida/ai-models";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
+import type { ModelCatalogStore } from "./model-catalog";
 import { ProviderHttp } from "./http";
 import { MediaRequest } from "./media-request";
 
@@ -14,14 +15,17 @@ const MAX_BYTES = MediaInputs.limits.sound_effect;
 /** Existing ElevenLabs sound effects. Hosts own provider-key custody and authorized egress. */
 export class SoundEffectClient {
   readonly #http: ProviderHttp;
+  readonly #catalog: ModelCatalogStore;
   readonly #getKey: SoundEffectClient.Keys["get"];
 
   constructor(options: SoundEffectClient.Options) {
     try {
-      exactKeys(options, ["keys", "http"]);
-      const { keys, http } = options;
+      exactKeys(options, ["keys", "http", "catalog"]);
+      const { keys, http, catalog } = options;
       const get = keys.get;
       if (!(http instanceof ProviderHttp) || typeof get !== "function") throw 0;
+      if (!catalog || typeof catalog.view !== "function") throw 0;
+      this.#catalog = catalog;
       this.#http = http;
       this.#getKey = get.bind(keys);
     } catch {
@@ -35,7 +39,7 @@ export class SoundEffectClient {
     let request: MediaRequest | undefined;
     try {
       const id = selection(input);
-      if (!MediaRoutes.soundEffect(id))
+      if (!MediaRoutes.soundEffect(id, this.#catalog.view()))
         throw new SoundEffectClient.Failure("model_unavailable");
       request = new MediaRequest(this.#http);
       await this.#key(request);
@@ -136,7 +140,11 @@ export namespace SoundEffectClient {
   export type Keys = {
     get(provider: "elevenlabs"): string | null | Promise<string | null>;
   };
-  export type Options = { keys: Keys; http: ProviderHttp };
+  export type Options = {
+    keys: Keys;
+    http: ProviderHttp;
+    catalog: ModelCatalogStore;
+  };
   export type Selection = { model_id: string; provider: "elevenlabs" };
   export type Descriptor = Readonly<{
     model_id: ModelId;

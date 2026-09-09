@@ -1,4 +1,4 @@
-import models, { TIER_MODEL_IDS } from "..";
+import { catalog as models, TIER_MODEL_IDS } from "../src";
 
 describe("models.text.modelSpecById", () => {
   it.each([

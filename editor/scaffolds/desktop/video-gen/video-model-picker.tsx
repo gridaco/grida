@@ -1,6 +1,6 @@
 "use client";
 
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import {
   Select,
   SelectContent,
@@ -33,6 +33,9 @@ export function VideoModelPicker({
         {listed.map((card) => (
           <SelectItem key={card.id} value={card.id}>
             {card.label}
+            {card.deprecated && (
+              <span className="text-muted-foreground"> · Legacy</span>
+            )}
           </SelectItem>
         ))}
       </SelectContent>

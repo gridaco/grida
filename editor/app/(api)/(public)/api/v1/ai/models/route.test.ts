@@ -68,6 +68,18 @@ describe("GET /api/v1/ai/models", () => {
     }
   });
 
+  it("lists the preferred image model first and keeps the legacy model selectable last", async () => {
+    const { token } = await signGgToken("user-1", 7);
+    const res = await GET(request(token));
+    const body = (await res.json()) as { data: Entry[] };
+    const images = body.data.filter(
+      (entry) => entry.grida.modality === "image"
+    );
+    expect(images[0]?.id).toBe("openai/gpt-image-2.5-flare");
+    expect(images.at(-1)?.id).toBe("openai/gpt-image-2");
+    expect(images.at(-1)?.grida.deprecated).toBe(true);
+  });
+
   it("lists text+image+video with tiers, deprecation flags, and no pricing", async () => {
     const { token } = await signGgToken("user-1", 7);
     const res = await GET(request(token));

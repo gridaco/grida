@@ -1,12 +1,11 @@
+import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — public video authority, whole-operation bounds, safe results.
 // GRIDA-GG: token — synthetic scoped credentials only; no services or provider calls.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
 import {
   VideoClient,
   ProviderHttp,
   GridaGatewaySessionStore,
-  ModelCatalogStore,
   MediaOperations,
 } from "./index";
 
@@ -30,6 +29,7 @@ function setup(overrides: Partial<VideoClient.Options> = {}) {
   const download = vi.fn<typeof fetch>(async () => new Response(DATA));
   const get = vi.fn<VideoClient.Keys["get"]>(() => KEY);
   const client = new VideoClient({
+    catalog: CatalogFixture.store(),
     keys: { get },
     http: new ProviderHttp({ request, download }),
     ...overrides,
@@ -101,7 +101,7 @@ describe("VideoClient bounded image input", () => {
     Uint8Array.from(atob(png), (character) => character.charCodeAt(0));
 
   it("declares one bounded byte image or HTTPS frame only for the exact verified operation", () => {
-    const operations = new MediaOperations();
+    const operations = new MediaOperations({ catalog: CatalogFixture.view() });
     const schema = operations.inspect(selector).input_schema;
     expect(schema).toMatchObject({
       oneOf: [{ required: ["image"] }, { required: ["image_url"] }],
@@ -141,10 +141,12 @@ describe("VideoClient bounded image input", () => {
       )
     ).toEqual([operations.inspect(selector)]);
     expect(Object.isFrozen(schema.oneOf)).toBe(true);
-    const snapshot = structuredClone(models.snapshot.seed());
+    const snapshot = structuredClone(CatalogFixture.data());
     snapshot.video!.models[selection.model_id]!.providers.fal!.id =
       "unverified/image-to-video";
-    const replaced = new MediaOperations({ snapshot });
+    const replaced = new MediaOperations({
+      catalog: CatalogFixture.view(snapshot),
+    });
     expect(
       replaced.inspect(selector).input_schema.properties
     ).not.toHaveProperty("image");
@@ -161,7 +163,9 @@ describe("VideoClient bounded image input", () => {
     async (media_type) => {
       const { client, request, download } = setup();
       falMock(request);
-      const parsed = new MediaOperations().parseInput(selector, {
+      const parsed = new MediaOperations({
+        catalog: CatalogFixture.view(),
+      }).parseInput(selector, {
         prompt: PROMPT,
         image: { data: png, media_type },
         duration: 4,
@@ -197,7 +201,9 @@ describe("VideoClient bounded image input", () => {
     async (generate_audio) => {
       const { client, request } = setup();
       falMock(request);
-      const parsed = new MediaOperations().parseInput(selector, {
+      const parsed = new MediaOperations({
+        catalog: CatalogFixture.view(),
+      }).parseInput(selector, {
         prompt: PROMPT,
         image_url: FRAME,
         generate_audio,
@@ -216,7 +222,7 @@ describe("VideoClient bounded image input", () => {
   );
 
   it("rejects audio controls on unadvertised operations before reading a generation key", async () => {
-    const operations = new MediaOperations();
+    const operations = new MediaOperations({ catalog: CatalogFixture.view() });
     const { client, get, request } = setup();
     const unsupported = {
       model_id: "google/veo-3.1",
@@ -313,7 +319,7 @@ describe("VideoClient bounded image input", () => {
   });
 
   it("shares native and JSON exclusions before a generation key read or submission", async () => {
-    const operations = new MediaOperations();
+    const operations = new MediaOperations({ catalog: CatalogFixture.view() });
     const { client, request, get } = setup();
     const operation = await client.resolve(selection);
     get.mockClear();
@@ -366,7 +372,7 @@ describe("VideoClient bounded image input", () => {
     const { client, request, get } = setup();
     const operation = await client.resolve(selection);
     get.mockClear();
-    const operations = new MediaOperations();
+    const operations = new MediaOperations({ catalog: CatalogFixture.view() });
     const decode = vi.spyOn(globalThis, "atob");
     const maximumEncoded = Math.ceil(limit / 3) * 4;
     // The same encoded length can decode beyond the byte ceiling when padding is removed.
@@ -615,21 +621,21 @@ describe("VideoClient public operation", () => {
   });
 
   it("keeps exact legacy binding facts but refuses unknown/replaced capability routes", async () => {
-    const snapshot = models.snapshot.seed();
+    const snapshot = CatalogFixture.data();
     const legacy = JSON.parse(JSON.stringify(snapshot));
     // Published snapshots store video cards by canonical id.
     const section = legacy.video;
     const cards = section.models;
     delete cards[ID].providers.vercel.input;
     const first = setup({
-      catalog: new ModelCatalogStore({ snapshot: legacy }),
+      catalog: CatalogFixture.store(legacy),
     });
     expect(
       (await first.client.resolve({ model_id: ID, provider: "vercel" })).input
     ).toBe("text-or-image");
     cards[ID].providers.vercel.id = "new/unverified-binding";
     const second = setup({
-      catalog: new ModelCatalogStore({ snapshot: legacy }),
+      catalog: CatalogFixture.store(legacy),
     });
     await failure(
       second.client.resolve({ model_id: ID, provider: "vercel" }),

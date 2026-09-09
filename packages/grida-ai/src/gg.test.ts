@@ -1,3 +1,4 @@
+import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — GG URL admission before scoped credential access.
 // GRIDA-GG: token — synthetic transport only; no live credentials or services.
 import { describe, expect, it, vi } from "vitest";
@@ -44,6 +45,7 @@ function authority() {
     read,
     get,
     options: {
+      catalog: CatalogFixture.store(),
       http: new ProviderHttp({ request, download }),
       gg: { getAccessToken: read },
       keys: { get },
@@ -55,7 +57,10 @@ const clients = [
   [
     "image",
     (options: ImageClient.Options) => new ImageClient(options),
-    new MediaOperations().list({ kind: "image", provider: "gg" })[0].model_id,
+    new MediaOperations({ catalog: CatalogFixture.view() }).list({
+      kind: "image",
+      provider: "gg",
+    })[0].model_id,
     { images: [{ base64: "iVBORw0KGgo=" }] },
     "images",
   ],
@@ -70,6 +75,7 @@ const clients = [
     "music",
     (options: ImageClient.Options & { gg_base_url: string }) =>
       new MusicClient({
+        catalog: CatalogFixture.store(),
         http: options.http,
         gg: options.gg!,
         gg_base_url: options.gg_base_url,

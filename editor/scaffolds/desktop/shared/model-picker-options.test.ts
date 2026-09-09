@@ -3,7 +3,7 @@ import {
   CHATGPT_SUBSCRIPTION_MODEL_IDS,
   GG_PROVIDER_ID,
 } from "@grida/agent";
-import _models from "@grida/ai-models";
+import _models from "@app/ai-catalog";
 import { describe, expect, it } from "vitest";
 import {
   model_picker_options,
@@ -67,14 +67,36 @@ describe("model_picker_options", () => {
     const catalogIds = Object.keys(_models.text.catalog);
 
     expect(grida.label).toBe("Grida");
-    expect(grida.options.map((option) => option.selection.model_id)).toEqual(
-      catalogIds
-    );
+    expect(
+      new Set(grida.options.map((option) => option.selection.model_id))
+    ).toEqual(new Set(catalogIds));
     expect(
       grida.options.every(
         (option) => option.selection.provider_id === GG_PROVIDER_ID
       )
     ).toBe(true);
+  });
+
+  it("places every legacy model after active choices without removing its provider tuple", () => {
+    for (const group of [
+      model_picker_options.grida(),
+      ...model_picker_options.byok(["openrouter", "vercel"]),
+    ]) {
+      const firstLegacy = group.options.findIndex(
+        (option) => option.deprecated
+      );
+      expect(firstLegacy).toBeGreaterThan(0);
+      expect(
+        group.options.slice(firstLegacy).every((option) => option.deprecated)
+      ).toBe(true);
+      expect(
+        group.options.some(
+          (option) =>
+            option.selection.model_id === "anthropic/claude-opus-4.8" &&
+            option.selection.provider_id === group.id
+        )
+      ).toBe(true);
+    }
   });
 
   it("shows only ready subscription and configured non-Grida providers", () => {

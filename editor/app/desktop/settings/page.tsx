@@ -33,7 +33,7 @@ import {
   CardTitle,
 } from "@app/ui/components/card";
 import { Skeleton } from "@app/ui/components/skeleton";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import {
   AlibabaCloudLogo,
   BlackForestLabsLogo,
@@ -944,13 +944,13 @@ function MediaModelsSection() {
   const voiceSupported = audio.textToSpeech.isSupported();
   const imageModels = imageSupported ? models.image.listed_models() : [];
   const videoModels = videoSupported ? models.video.listed_models() : [];
-  const threeDModels = threeDSupported ? models.three_d.staged_models() : [];
+  const threeDModels = threeDSupported ? models.three_d.ordered_models() : [];
   const musicModels = musicSupported ? models.audio.music.listed_models() : [];
   const soundEffectModels = soundEffectSupported
-    ? models.audio.sound_effects.staged_models()
+    ? models.audio.sound_effects.ordered_models()
     : [];
   const voiceModels = voiceSupported
-    ? models.audio.text_to_speech.staged_models()
+    ? models.audio.text_to_speech.ordered_models()
     : [];
 
   useEffect(() => {
@@ -1102,6 +1102,7 @@ type MediaModelCard = {
   vendor: models.Vendor;
   provider?: string;
   providers?: object;
+  deprecated?: boolean;
 };
 
 function MediaModelGroup({
@@ -1154,6 +1155,9 @@ function MediaModelRow({
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-2">
           <span className="font-medium">{card.label}</span>
+          {card.deprecated && (
+            <span className="text-xs text-muted-foreground">Legacy</span>
+          )}
           <MediaProviderLogos card={card} />
           <span
             className={

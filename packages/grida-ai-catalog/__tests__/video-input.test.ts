@@ -1,4 +1,4 @@
-import models from "..";
+import { catalog as models } from "../src";
 
 const video = models.video;
 type Card = models.video.VideoModelCard;
@@ -9,6 +9,7 @@ function copy(id = "google/veo-3.1"): Card {
 
 function published(card: Card): models.snapshot.View {
   const seed = models.snapshot.seed();
+  if (seed.preferences) delete seed.preferences.video;
   seed.video = { models: { [card.id]: card } };
   return models.snapshot.view(models.snapshot.parse(seed)!);
 }

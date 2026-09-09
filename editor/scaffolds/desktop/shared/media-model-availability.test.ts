@@ -1,12 +1,45 @@
 import { describe, expect, it, vi } from "vitest";
 import { MediaModelAvailability } from "./media-model-availability";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import type { DesktopBridge } from "@/lib/desktop/bridge";
 
 const catalogue = Object.freeze([
   { id: "alpha", label: "Alpha" },
   { id: "beta", label: "Beta" },
 ]);
+
+describe("MediaModelAvailability.select", () => {
+  const legacy = { id: "legacy", deprecated: true };
+  const active = { id: "active" };
+  const recommended = { id: "recommended" };
+  const choices = [legacy, active, recommended];
+
+  it("uses the service recommendation regardless of incidental input order", () => {
+    expect(
+      MediaModelAvailability.select(choices, undefined, "recommended")
+    ).toBe(recommended);
+  });
+
+  it("preserves an explicit legacy choice over an active recommendation", () => {
+    expect(
+      MediaModelAvailability.select(choices, "legacy", "recommended")
+    ).toBe(legacy);
+  });
+
+  it("cannot choose a recommendation outside the caller's allowed models", () => {
+    expect(
+      MediaModelAvailability.select([active], "legacy", "recommended")
+    ).toBe(active);
+    expect(
+      MediaModelAvailability.select([], "legacy", "recommended")
+    ).toBeUndefined();
+  });
+
+  it("prefers an active fallback while keeping a legacy-only route usable", () => {
+    expect(MediaModelAvailability.select(choices)).toBe(active);
+    expect(MediaModelAvailability.select([legacy])).toBe(legacy);
+  });
+});
 
 describe("MediaModelAvailability.filter", () => {
   it("uses the full catalogue only when no restriction was provided", () => {

@@ -5,7 +5,7 @@ import * as gridaGateway from "@/lib/desktop/gg-session";
 
 import { useState } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@app/ui/components/dialog";
@@ -31,6 +31,7 @@ import {
 } from "@app/ui/ai-elements/prompt-input";
 import { video, type MediaItem } from "@/lib/desktop/bridge";
 import { VideoModelPicker } from "./video-model-picker";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 
 /** Named prompt templates — motion-flavored starters, original to Grida. */
 const PROMPT_TEMPLATES: { name: string; prompt: string }[] = [
@@ -65,8 +66,6 @@ const PROMPT_TEMPLATES: { name: string; prompt: string }[] = [
       "Seamless looping shot of tall grass swaying gently in the breeze, warm sunlight, calm and serene",
   },
 ];
-
-const DEFAULT_MODEL_ID = models.video.listed_models()[0]?.id ?? "";
 
 /** Always render at least this many cells so the gallery grid is visible. */
 const MIN_CELLS = 12;
@@ -136,9 +135,12 @@ export function DesktopVideoPlayground({
   onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
   const [modelId, setModelId] = useState(
-    initialModelId && models.video.models[initialModelId]?.listed
-      ? initialModelId
-      : DEFAULT_MODEL_ID
+    () =>
+      MediaModelAvailability.select(
+        models.video.listed_models(),
+        initialModelId,
+        models.video.default_id
+      )?.id ?? ""
   );
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);

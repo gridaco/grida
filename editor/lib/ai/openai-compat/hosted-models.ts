@@ -4,13 +4,12 @@
 /**
  * Hosted-model allowlist — the single availability source for the
  * `/api/v1/ai/*` endpoints, composed from the ONE catalog
- * (`@grida/ai-models`) so nothing drifts:
+ * (`@app/ai-catalog`) so nothing drifts:
  *
- * - text: every catalog entry (a catalog entry IS hosted-servable by
- *   construction — the seam's cost math resolves from it). Deprecated
- *   entries stay CALLABLE (a pinned client id must not break the day a
- *   sibling supersedes it; removal from the catalog is the kill
- *   switch) and are flagged on `/models`.
+ * - text: exact listed service members. Staged members remain reference
+ *   data and cannot run through the hosted gateway. Listed legacy entries
+ *   stay callable and are flagged on `/models`; removing a model from the
+ *   listed set withdraws its hosted availability.
  * - image/video: listed cards carrying a `vercel` binding (what the
  *   seam can serve through the gateway).
  *
@@ -18,9 +17,16 @@
  * concern; exposing per-token USD here invites client-side cost math
  * that drifts from Metronome.
  */
-import { models, TIER_MODEL_IDS, type ModelTier } from "@grida/ai-models";
+import {
+  catalog as models,
+  TIER_MODEL_IDS,
+  type ModelTier,
+} from "@app/ai-catalog";
 
-const catalog = models.text.catalog;
+const HOSTED_TEXT_MODELS = models.text.listed_models();
+const HOSTED_TEXT_MODEL_IDS = new Set(
+  HOSTED_TEXT_MODELS.map((model) => model.id)
+);
 
 export type HostedModelEntry = {
   id: string;
@@ -36,7 +42,7 @@ export type HostedModelEntry = {
 };
 
 export function isHostedTextModel(modelId: string): boolean {
-  return Object.prototype.hasOwnProperty.call(catalog, modelId);
+  return HOSTED_TEXT_MODEL_IDS.has(modelId);
 }
 
 /** Ascending capability order — lowest tier first. */
@@ -84,7 +90,7 @@ export function hostedModelList(): readonly HostedModelEntry[] {
 function buildHostedModelList(): HostedModelEntry[] {
   const entries: HostedModelEntry[] = [];
 
-  for (const spec of Object.values(catalog)) {
+  for (const spec of HOSTED_TEXT_MODELS) {
     entries.push({
       id: spec.id,
       object: "model",
@@ -126,7 +132,7 @@ function buildHostedModelList(): HostedModelEntry[] {
         modality: "video",
         tier: null,
         label: card.label,
-        deprecated: false,
+        deprecated: card.deprecated,
       },
     });
   }

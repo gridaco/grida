@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@app/ai-catalog": "workspace:*",
     "@grida/account": "workspace:*",
     "@grida/ai": "workspace:*",
     "@grida/auth": "workspace:*",

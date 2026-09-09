@@ -1,3 +1,4 @@
+import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 — public 3D credential snapshots, bounded async lifecycle and safe failures.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProviderHttp, ThreeDClient } from "./index";
@@ -39,6 +40,7 @@ function setup() {
   );
   const download = vi.fn<typeof fetch>(async () => response("download"));
   const client = new ThreeDClient({
+    catalog: CatalogFixture.store(),
     keys: { get },
     http: new ProviderHttp({ request, download }),
   });

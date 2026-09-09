@@ -11,7 +11,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import _models from "@grida/ai-models";
+import _models from "@app/ai-catalog";
 import {
   byokProvidersFor,
   resolveEndpointModels,

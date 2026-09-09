@@ -164,6 +164,19 @@ describe("agent tenant generated-media wiring", () => {
       expect(music.gg).toBe(runtime.gg);
       expect(runtime.catalog).toBe(image.catalog);
       expect(video.catalog).toBe(runtime.catalog);
+      expect(music.catalog).toBe(runtime.catalog);
+      expect(registrations.soundEffects.mock.calls[0][1].catalog).toBe(
+        runtime.catalog
+      );
+      expect(registrations.textToSpeech.mock.calls[0][1].catalog).toBe(
+        runtime.catalog
+      );
+      expect(registrations.threeD.mock.calls[0][1].catalog).toBe(
+        runtime.catalog
+      );
+      expect(runtime.catalog?.view().image.default_id).toBe(
+        "openai/gpt-image-2.5-flare"
+      );
       expect(runtime.provider_http).toBe(image.provider_http);
       expect(video.provider_http).toBe(runtime.provider_http);
       expect(music.provider_http).toBe(runtime.provider_http);

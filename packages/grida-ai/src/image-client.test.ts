@@ -1,10 +1,10 @@
+import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — public image authority, output, and no-retry contracts.
 // GRIDA-GG: token — synthetic scoped credentials only; no services or provider calls.
 import { describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
 import { ImageClient, ProviderHttp, GridaGatewaySessionStore } from "./index";
 
-const view = models.snapshot.view();
+const view = CatalogFixture.view();
 const card = view.image
   .listed()
   .find((entry) => view.image.binding(entry, "openrouter")?.references)!;
@@ -21,6 +21,7 @@ function setup(overrides: Partial<ImageClient.Options> = {}) {
   const download = vi.fn<typeof fetch>(async () => new Response(PNG));
   const get = vi.fn<ImageClient.Keys["get"]>(() => KEY);
   const client = new ImageClient({
+    catalog: CatalogFixture.store(),
     keys: { get },
     http: new ProviderHttp({ request, download }),
     ...overrides,

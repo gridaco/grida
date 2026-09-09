@@ -18,6 +18,7 @@ on:
       - "packages/grida-daemon/**"
       - "packages/grida-auth/**"
       - "packages/grida-ai-models/**"
+      - "packages/grida-ai-catalog/**"
       - "packages/grida-desktop-bridge/**"
       - "packages/grida-home/**"
       - ".github/workflows/verify-desktop-package.yml"
@@ -50,11 +51,11 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify linked package command coverage
-        run: pnpm exec vitest run scripts/linked-packages.test.ts
+      - name: Verify linked package and archive guards
+        run: pnpm exec vitest run scripts/linked-packages.test.ts vite.guards.test.ts forge.config.test.ts
 
       - name: Build linked workspace packages
-        # The desktop bundles several @grida/* workspace packages whose dist/ is
+        # The desktop bundles linked workspace packages whose dist/ is
         # gitignored; build their closure from the repo root so the Vite build
         # can resolve them. `shell: bash` so the `\` continuations work on the
         # Windows runner (default shell is PowerShell). Mirrors the publish
@@ -68,6 +69,7 @@ jobs:
             --filter=@grida/agent \
             --filter=@grida/daemon \
             --filter=@grida/ai-models \
+            --filter=@app/ai-catalog \
             --filter=@grida/home
 
       - name: Package (runs the GRIDA-DESKTOP-BUILD-GUARD oracle)

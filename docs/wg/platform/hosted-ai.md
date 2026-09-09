@@ -255,6 +255,23 @@ The catalogue is therefore **published, not shipped**: authored in-repo
 (it is a curated product decision, not a scrape) and served at
 `GET /api/v1/models/catalog`.
 
+**Facts and service choices have different owners.** A factual model catalog
+describes identities, capabilities, verified provider bindings, and published
+rates independently of Grida. The service catalog selects offerings from those
+facts and owns listing, legacy status, request presets, tiers, and presentation
+preferences. A legacy offering remains a valid explicit choice; legacy is not
+a claim that an upstream provider has retired it. Removing service membership
+does not erase factual identity.
+
+**Recommendation is not authorization.** A service family may configure a
+default independently from a partial manual order. A default must be listed
+and nonlegacy. Presentation places that default first, other active offerings
+before legacy offerings, then applies explicit rank and a deterministic label
+and identifier tie-break. Unranked members remain present. Explicit user
+selections and surface-specific tier choices take precedence over the general
+recommendation. Provider availability and implemented adapter capabilities are
+checked separately at execution.
+
 - **The published snapshot IS the deployed gate.** That endpoint's body
   and the server's own model allowlist are the same static import in the
   same deploy artifact, so they cannot disagree. This is why the published
@@ -265,10 +282,11 @@ The catalogue is therefore **published, not shipped**: authored in-repo
   bundled catalogue immediately and forever if the network never comes
   back. A bad snapshot can make a host mis-list; it can never leave one
   with no catalogue at all.
-- **Whole-or-reject, and wholesale.** A snapshot that fails validation is
-  discarded entirely — a half-applied catalogue must not exist. A valid one
-  REPLACES the catalogue rather than merging: removing a model is the kill
-  switch, and a merge would defeat it on every installed client.
+- **Wholesale replacement within each accepted section.** An invalid required
+  text section rejects the snapshot. Optional media sections retain the
+  independently fallible behavior described below. Each valid section REPLACES
+  its catalogue rather than merging: removing a model is the kill switch, and
+  a merge would defeat it on every installed client.
 - **Credential-free, and outside the token-gated glob.** A desktop
   sidecar fetches this at boot, long before a renderer can push a
   signed-in session token, so the route must accept no credential — while
@@ -322,6 +340,15 @@ the consumer falls back to its bundled catalogue for that modality only.
 Only `text` is load-bearing enough to reject the whole payload, because a
 host with no text catalogue cannot run a turn at all. A broken image
 catalogue must never cost a host its ability to answer.
+
+**Schema-1 recommendations are additive.** Older clients ignore optional
+default and order fields; their existing membership and lifecycle fields must
+retain their meanings. Newer readers resolve recommendations against the same
+effective section as its model bindings. When a media section is dropped, its
+remote recommendations are dropped with it. The schema does not distinguish
+independent GG and BYOK service membership; server-side provider and request
+gates remain authoritative. Catalog data cannot add adapter code to an
+installed client.
 
 **Not every modality is published yet.** `text`, `image`, and `video` are.
 Music, sound effects, and 3D are still gated against the host's BUNDLED

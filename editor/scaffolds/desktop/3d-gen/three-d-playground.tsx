@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { Box, FileUp, FolderSearch, X } from "lucide-react";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import { Button } from "@app/ui/components/button";
 import {
   Empty,
@@ -45,7 +45,7 @@ export function ThreeDPlayground({
   onRevealStoredMedia?: (item: MediaItem) => void;
 }) {
   const availableModels = MediaModelAvailability.filter(
-    models.three_d.staged_models(),
+    models.three_d.ordered_models(),
     modelIds
   );
   const resolvedInitialModel =

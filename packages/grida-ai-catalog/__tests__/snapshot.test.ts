@@ -1,4 +1,4 @@
-import models, { TIER_MODEL_IDS } from "..";
+import { catalog as models, TIER_MODEL_IDS } from "../src";
 
 const snapshot = models.snapshot;
 
@@ -340,7 +340,7 @@ describe("models.snapshot.view", () => {
       "gpt-5.6-luna",
       "gpt-5.6-luna-2026-07-30",
     ]) {
-      expect(view.modelSpecById(id)).toBe(models.text.modelSpecById(id));
+      expect(view.modelSpecById(id)).toEqual(models.text.modelSpecById(id));
     }
     expect(view.modelSpecById("acme/nope")).toBeUndefined();
   });
@@ -440,6 +440,8 @@ function withMedia(over: {
   video?: Record<string, unknown>;
 }): unknown {
   const base = wire(snapshot.seed()) as Record<string, unknown>;
+  // These legacy protocol cases replace membership without recommendations.
+  delete base.preferences;
   if (over.image) base.image = { models: over.image };
   if (over.video) base.video = { models: over.video };
   return base;

@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — discovery grants no provider or GG authority.
 // GRIDA-GG: provider — executable route facts do not establish scoped access or credits.
 import { models } from "@grida/ai-models";
+import type { ModelCatalogView } from "./model-catalog";
 import { InputSchema, type InputJsonSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
@@ -14,25 +15,21 @@ import type { ThreeDClient } from "./three-d-client";
 /** Immutable bundled/pinned operation facts and the explicit JSON input contract. */
 export class MediaOperations {
   readonly #descriptors: readonly MediaOperations.Descriptor[];
-  constructor(options: { snapshot?: models.snapshot.Snapshot } = {}) {
+  constructor(options: { catalog: ModelCatalogView }) {
     try {
-      InputSchema.exact(options, ["snapshot"]);
-      let snapshot: models.snapshot.Snapshot | undefined;
-      if (options.snapshot !== undefined) {
-        // Own the pinned data. Invalid supplied sections must never restore the seed.
-        const raw = JSON.parse(JSON.stringify(options.snapshot));
-        const parsed = models.snapshot.parse(raw);
+      InputSchema.exact(options, ["catalog"]);
+      for (const section of [options.catalog.image, options.catalog.video]) {
         if (
-          !parsed ||
-          (raw.image !== undefined && !parsed.image) ||
-          (raw.video !== undefined && !parsed.video)
+          !section ||
+          typeof section.models !== "object" ||
+          !section.models ||
+          Array.isArray(section.models)
         )
           throw 0;
-        snapshot = parsed;
       }
-      this.#descriptors = InputSchema.freeze(
-        descriptors(models.snapshot.view(snapshot))
-      );
+      // The host validates its wire schema before supplying this trusted view.
+      // Own the resulting descriptors; later host mutation cannot alter discovery.
+      this.#descriptors = InputSchema.freeze(descriptors(options.catalog));
     } catch {
       throw new MediaOperations.Failure("invalid_input");
     }
@@ -313,7 +310,7 @@ function imageRule(
     provider_id: descriptor.provider_id as ImageClient.Provider,
   });
 }
-function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
+function descriptors(view: ModelCatalogView): MediaOperations.Descriptor[] {
   const result: MediaOperations.Descriptor[] = [];
   function add(
     kind: MediaOperations.Kind,
@@ -387,46 +384,59 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
     }
   }
   for (const card of Object.values(models.audio.music.models)) {
-    if (MediaRoutes.music(card.id))
+    if (MediaRoutes.music(card.id, view))
       add(
         "music",
-        { model_id: card.id, binding_id: card.id, provider_id: "gg" },
+        {
+          model_id: card.id,
+          binding_id: card.id,
+          provider_id: "gg",
+          ...(view.lifecycle.music[card.id].deprecated
+            ? { deprecated: true as const }
+            : {}),
+        },
         "text",
-        card.status,
+        view.lifecycle.music[card.id].status,
         MediaInputs.music
       );
   }
-  if (MediaRoutes.soundEffect(MediaRoutes.soundEffectId))
+  if (MediaRoutes.soundEffect(MediaRoutes.soundEffectId, view))
     add(
       "sound-effect",
       {
         model_id: MediaRoutes.soundEffectId,
         binding_id: MediaRoutes.soundEffectId,
         provider_id: "elevenlabs",
+        ...(view.lifecycle.sound_effects[MediaRoutes.soundEffectId].deprecated
+          ? { deprecated: true as const }
+          : {}),
       },
       "text",
-      models.audio.sound_effects.models[MediaRoutes.soundEffectId].status,
+      view.lifecycle.sound_effects[MediaRoutes.soundEffectId].status,
       MediaInputs.soundEffect
     );
-  if (MediaRoutes.speech(MediaRoutes.speechId))
+  if (MediaRoutes.speech(MediaRoutes.speechId, view))
     add(
       "text-to-speech",
       {
         model_id: MediaRoutes.speechId,
         binding_id: MediaRoutes.speechId,
         provider_id: "elevenlabs",
+        ...(view.lifecycle.text_to_speech[MediaRoutes.speechId].deprecated
+          ? { deprecated: true as const }
+          : {}),
       },
       "text",
-      models.audio.text_to_speech.models[MediaRoutes.speechId].status,
+      view.lifecycle.text_to_speech[MediaRoutes.speechId].status,
       MediaInputs.speechJson
     );
   for (const id of MediaRoutes.threeDIds) {
-    if (MediaRoutes.threeD(id))
+    if (MediaRoutes.threeD(id, view))
       add(
         "three-d",
         { model_id: id, binding_id: id, provider_id: "fal" },
         MediaRoutes.threeDInput(id),
-        models.three_d.models[id].status,
+        view.lifecycle.three_d[id].status,
         MediaInputs.threeD(id)
       );
   }

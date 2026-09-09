@@ -9,6 +9,7 @@ import { proveMusic } from "./music-consumer.mjs";
 import { proveSoundEffects } from "./sound-effect-consumer.mjs";
 import { proveTextToSpeech } from "./text-to-speech-consumer.mjs";
 import { proveThreeD } from "./three-d-consumer.mjs";
+import { proofCatalog } from "./catalog.mjs";
 
 const require = createRequire(import.meta.url);
 const format = process.argv[2];
@@ -39,9 +40,11 @@ const {
   ProviderHttp,
   GridaGatewaySessionStore,
   ModelCatalogStore,
+  MediaOperations,
 } = await load("@grida/ai");
 const providers = await load("@grida/ai/providers");
 const { models } = await load("@grida/ai-models");
+const catalog = new ModelCatalogStore({ seed: proofCatalog(models) });
 const cases = [];
 async function check(name, run) {
   try {
@@ -126,6 +129,7 @@ gg.set({
   organization: { id: 7, name: "synthetic" },
 });
 const client = new ImageClient({
+  catalog,
   keys: { get: () => key },
   http,
   gg,
@@ -158,6 +162,7 @@ const safeFailure = (error) => {
 
 await check("host packages and private SDK adapters unavailable", async () => {
   for (const name of [
+    "@app/ai-catalog",
     "@grida/agent",
     "@grida/daemon",
     "@grida/auth",
@@ -177,7 +182,17 @@ await check("host packages and private SDK adapters unavailable", async () => {
       .byokProvidersFor("image")
       .some((provider) => provider.id === "fal")
   );
-  assert.equal(typeof new ModelCatalogStore().view, "function");
+  assert.equal(catalog.refreshable, false);
+  assert.equal(catalog.view().image.listed().length, 1);
+  const operations = new MediaOperations({ catalog: catalog.view() });
+  assert.deepEqual(
+    [
+      ...new Set(
+        operations.list({ kind: "image" }).map((entry) => entry.model_id)
+      ),
+    ],
+    [model]
+  );
   assert.equal(requests.length, 0);
 });
 for (const provider of ["openrouter", "vercel", "fal", "gg"]) {
@@ -221,7 +236,13 @@ await check("unsupported model and missing key refuse before I/O", async () => {
     client.resolve({ model_id: "synthetic-missing-model", provider: "fal" }),
     safeFailure
   );
-  const empty = new ImageClient({ http, keys: { get: () => null } });
+  // A known factual model outside this host's membership is not implicitly admitted.
+  assert(models.image.models["openai/gpt-image-2.5-flare"]);
+  await assert.rejects(
+    client.resolve({ model_id: "openai/gpt-image-2.5-flare", provider: "fal" }),
+    safeFailure
+  );
+  const empty = new ImageClient({ catalog, http, keys: { get: () => null } });
   await assert.rejects(
     empty.resolve({ model_id: model, provider: "vercel" }),
     safeFailure
@@ -231,6 +252,7 @@ await check("unsupported model and missing key refuse before I/O", async () => {
 await check("selected key loss cannot silently switch provider", async () => {
   let available = true;
   const selected = new ImageClient({
+    catalog,
     http,
     keys: {
       get: (provider) => (provider === "vercel" && !available ? null : key),
@@ -288,11 +310,21 @@ await check(
     assert.equal(gg.status().active, false);
   }
 );
-const video = await proveVideo({ load, require, check });
-const music = await proveMusic({ load, require, check });
-const sound_effects = await proveSoundEffects({ load, require, check });
-const text_to_speech = await proveTextToSpeech({ load, require, check });
-const three_d = await proveThreeD({ load, require, check });
+const video = await proveVideo({ load, require, check, catalog });
+const music = await proveMusic({ load, require, check, catalog });
+const sound_effects = await proveSoundEffects({
+  load,
+  require,
+  check,
+  catalog,
+});
+const text_to_speech = await proveTextToSpeech({
+  load,
+  require,
+  check,
+  catalog,
+});
+const three_d = await proveThreeD({ load, require, check, catalog });
 await check(
   "no ambient network, credential discovery or filesystem state",
   async () => {

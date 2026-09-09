@@ -41,4 +41,5 @@ overrides:
   "@grida/daemon": "link:../packages/grida-daemon"
   "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge"
   "@grida/ai-models": "link:../packages/grida-ai-models"
+  "@app/ai-catalog": "link:../packages/grida-ai-catalog"
   "@grida/home": "link:../packages/grida-home"

@@ -25,9 +25,11 @@ import { CliRelease } from "../cli-release/prepare.mjs";
 
 const repository = fileURLToPath(new URL("../../", import.meta.url));
 // Resolve the SDK's public package export in its actual consumer's dependency scope.
-const { MediaOperations } = createRequire(
+const requireCli = createRequire(
   new URL("../../packages/grida-cli/package.json", import.meta.url)
-)("@grida/ai");
+);
+const { MediaOperations } = requireCli("@grida/ai");
+const { catalog } = requireCli("@app/ai-catalog");
 const execute = promisify(execFile);
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const route = (value) => value.replace(/\/$/, "");
@@ -386,7 +388,9 @@ export const CliDocs = {
         "Every public CLI page needs a command owner"
       );
 
-      const operations = new MediaOperations();
+      const operations = new MediaOperations({
+        catalog: catalog.snapshot.view(),
+      });
       const asset = await readFile(
         path.join(repository, "fixtures/images/checker.png")
       );

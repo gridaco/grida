@@ -8,7 +8,7 @@
  * point. `model-catalog.test.ts` covers the store's own failure modes.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import { ModelCatalogStore } from "./model-catalog";
 import { resolveProvider, type ResolveDeps } from "./index";
 import {
@@ -469,22 +469,23 @@ describe("an image model published after this binary shipped", () => {
     // falls to this default.
     const seeded = models.snapshot.seed();
     const image = { ...seeded.image!.models };
-    // Unlist the pinned default; the fallback must come from the PUBLISHED
-    // list, not the bundled one.
-    image["openai/gpt-image-2"] = {
-      ...image["openai/gpt-image-2"]!,
+    // Withdraw the bundled recommendation and publish its replacement in the
+    // same snapshot. The host must not retain a private hard-coded default.
+    const bundledDefault = models.image.default_id!;
+    image[bundledDefault] = {
+      ...image[bundledDefault]!,
       listed: false,
     };
+    seeded.preferences!.image = { default_id: "openai/gpt-image-2.5-sunburst" };
     const store = new ModelCatalogStore({
       base_url: BASE_URL,
       fetch: serve(() => ({ ...seeded, image: { models: image } })),
     });
-    await store.refresh("boot");
+    expect(await store.refresh("boot")).toBe(true);
 
-    expect(defaultImageModelId()).toBe("openai/gpt-image-2");
+    expect(defaultImageModelId()).toBe(bundledDefault);
     const moved = defaultImageModelId(store.view());
-    expect(moved).not.toBe("openai/gpt-image-2");
-    expect(moved).toBeDefined();
+    expect(moved).toBe("openai/gpt-image-2.5-sunburst");
     store.dispose();
   });
 });

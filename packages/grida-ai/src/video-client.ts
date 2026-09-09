@@ -21,7 +21,7 @@ import { MediaRequest } from "./media-request";
 export class VideoClient {
   readonly #getKey: VideoClient.Keys["get"];
   readonly #http: ProviderHttp;
-  readonly #catalog?: ModelCatalogStore;
+  readonly #catalog: ModelCatalogStore;
   readonly #gg?: GgTokenSource;
   readonly #ggBaseUrl?: string;
 
@@ -32,6 +32,7 @@ export class VideoClient {
       if (!(http instanceof ProviderHttp) || typeof get !== "function") throw 0;
       this.#getKey = get.bind(keys);
       this.#http = http;
+      if (!catalog || typeof catalog.view !== "function") throw 0;
       this.#catalog = catalog;
       if (gg !== undefined)
         this.#gg = { getAccessToken: gg.getAccessToken.bind(gg) };
@@ -220,7 +221,7 @@ export namespace VideoClient {
   export type Options = {
     keys: Keys;
     http: ProviderHttp;
-    catalog?: ModelCatalogStore;
+    catalog: ModelCatalogStore;
     gg?: GgTokenSource;
     gg_base_url?: string;
   };

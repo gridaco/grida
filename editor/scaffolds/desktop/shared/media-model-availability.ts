@@ -1,11 +1,25 @@
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import { byokProvidersFor } from "@grida/agent";
 import type { DesktopBridge } from "@/lib/desktop/bridge";
 
-type MediaModelCard = Readonly<{ id: string }>;
+type MediaModelCard = Readonly<{ id: string; deprecated?: boolean }>;
 
 /** Catalogue selection and native-client compatibility for media models. */
 export namespace MediaModelAvailability {
+  /** Preserve a requested available model, then apply the service preference. */
+  export function select<T extends MediaModelCard>(
+    catalogue: readonly T[],
+    requestedId?: string | null,
+    defaultId?: string
+  ): T | undefined {
+    return (
+      catalogue.find((model) => model.id === requestedId) ??
+      catalogue.find((model) => model.id === defaultId && !model.deprecated) ??
+      catalogue.find((model) => !model.deprecated) ??
+      catalogue[0]
+    );
+  }
+
   export type ImageProviderState = Readonly<{
     loaded: boolean;
     images: boolean;

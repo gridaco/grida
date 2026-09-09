@@ -1,9 +1,9 @@
 // Client-safe: editor-only AI helpers + re-aggregation of the shared
-// catalogue from `@grida/ai-models`. Anything seam-dependent lives in
+// catalogue from `@app/ai-catalog`. Anything seam-dependent lives in
 // `./methods.ts` (server-only) so client bundles that import cost-card
 // data don't drag in `next/headers` via the billing transitive chain.
 
-import _catalog from "@grida/ai-models";
+import _catalog from "@app/ai-catalog";
 
 export namespace ai {
   // GRIDA-EE: billing — usage denomination for prepaid organization credit.
@@ -18,7 +18,7 @@ export namespace ai {
     return Math.ceil(cost_usd * 1000);
   }
 
-  // Re-aggregate the media catalogues from `@grida/ai-models` under the
+  // Re-aggregate the media catalogues from `@app/ai-catalog` under the
   // editor-side `ai.*` path. Audio remains an organizational parent with
   // exact `music`, `sound_effects`, and `text_to_speech` children.
   export import image = _catalog.image;
@@ -67,7 +67,7 @@ export namespace ai {
       };
 
       // Background-remover model id constants. `satisfies` pins each to a
-      // real catalogue entry so a rename in `@grida/ai-models` fails the
+      // real catalogue entry so a rename in `@app/ai-catalog` fails the
       // build here instead of silently drifting.
       export const MODEL_ID_BRIA_REMOVE_BACKGROUND =
         "bria/remove-background" satisfies image_tools.ImageToolModelId;

@@ -7,11 +7,11 @@
  * constants from here.
  *
  * The tier set and the tier→model id table live in
- * [@grida/ai-models](../../grida-ai-models). This file only adds the
+ * [@app/ai-catalog](../../grida-ai-catalog). This file only adds the
  * agent's own defaults on top.
  */
 
-import type { ModelTier } from "@grida/ai-models";
+import type { ModelTier } from "@app/ai-catalog";
 
 export type { ModelTier };
 

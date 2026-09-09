@@ -1,3 +1,4 @@
+import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 — public exact 3D contracts, input/authority bounds and GLB projection.
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { ProviderHttp, ThreeDClient } from "./index";
@@ -21,6 +22,7 @@ function setup() {
   });
   const download = vi.fn<typeof fetch>(async () => new Response(GLB));
   const client = new ThreeDClient({
+    catalog: CatalogFixture.store(),
     keys: { get },
     http: new ProviderHttp({ request, download }),
   });

@@ -193,6 +193,7 @@ async function sourceHashes() {
     "grida-cli",
     "grida-ai",
     "grida-ai-models",
+    "grida-ai-catalog",
     "grida-auth",
     "grida-account",
     "grida-home",
@@ -687,6 +688,18 @@ async function main() {
       const listed = await json(["models", "list"]);
       assert(Array.isArray(listed.value.operations));
       assert(listed.value.operations.length > 0);
+      for (const [model, status, deprecated] of [
+        ["openai/gpt-image-2", "listed", true],
+        ["openai/gpt-image-2.5-flare", "listed", false],
+        ["fal-ai/trellis-2", "staged", false],
+      ]) {
+        const operation = listed.value.operations.find(
+          (entry) => entry.model_id === model
+        );
+        assert(operation);
+        assert.equal(operation.status, status);
+        assert.equal(operation.deprecated === true, deprecated);
+      }
       assert.deepEqual(listed.stats.requests, []);
       assert.deepEqual(listed.stats.dns, []);
       const local = await json([

@@ -11,6 +11,7 @@ on:
       - "packages/grida-cli/**"
       - "packages/grida-ai/**"
       - "packages/grida-ai-models/**"
+      - "packages/grida-ai-catalog/**"
       - "packages/grida-auth/**"
       - "packages/grida-account/**"
       - "packages/grida-home/**"

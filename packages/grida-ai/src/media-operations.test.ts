@@ -1,3 +1,4 @@
+import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — credential-free executable descriptions and shared input rules.
 // GRIDA-GG: provider — discovery describes routes, never scoped access or credit eligibility.
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -39,8 +40,7 @@ const trellis = {
   model_id: "fal-ai/trellis-2",
   provider: "fal",
 } as const;
-const imageCard = models.snapshot
-  .view()
+const imageCard = CatalogFixture.view()
   .image.listed()
   .find((card) => models.image.binding(card, "openrouter")?.references)!;
 const image = {
@@ -80,7 +80,7 @@ describe("MediaOperations discovery", () => {
     const network = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("Discovery must not fetch");
     });
-    const operations = new MediaOperations();
+    const operations = new MediaOperations({ catalog: CatalogFixture.view() });
     const descriptors = operations.list();
     expect(new Set(descriptors.map((entry) => entry.kind))).toEqual(
       new Set([
@@ -110,7 +110,7 @@ describe("MediaOperations discovery", () => {
   });
 
   it("returns deeply immutable schemas and honest native byte output descriptions", () => {
-    const operations = new MediaOperations();
+    const operations = new MediaOperations({ catalog: CatalogFixture.view() });
     const descriptors = operations.list();
     expect(Object.isFrozen(descriptors)).toBe(true);
     for (const descriptor of descriptors) {
@@ -166,7 +166,7 @@ describe("MediaOperations discovery", () => {
   });
 
   it("keeps staged executable bindings visible without promoting catalogue status", () => {
-    const operations = new MediaOperations();
+    const operations = new MediaOperations({ catalog: CatalogFixture.view() });
     expect(operations.inspect(sound).status).toBe("staged");
     expect(operations.inspect(speech).status).toBe("staged");
     expect(
@@ -190,7 +190,7 @@ describe("MediaOperations discovery", () => {
   });
 
   it("separates concrete image reference and video start-frame variants", () => {
-    const operations = new MediaOperations();
+    const operations = new MediaOperations({ catalog: CatalogFixture.view() });
     const text = operations.inspect(image);
     const references = operations.inspect({ ...image, variant: "references" });
     const binding = models.image.binding(imageCard, "openrouter")!;
@@ -227,7 +227,7 @@ describe("MediaOperations discovery", () => {
 
   it("distinguishes invalid selectors from absent routes", () => {
     expect.hasAssertions();
-    const operations = new MediaOperations();
+    const operations = new MediaOperations({ catalog: CatalogFixture.view() });
     rejects(
       () => operations.inspect({ ...music, model_id: "unknown/model" }),
       "operation_unavailable"
@@ -247,19 +247,21 @@ describe("MediaOperations discovery", () => {
     );
     rejects(
       () =>
-        new MediaOperations({ keys: {} } as ConstructorParameters<
+        new MediaOperations({ keys: {} } as unknown as ConstructorParameters<
           typeof MediaOperations
         >[0])
     );
   });
 
   it("owns a pinned snapshot and never restores a removed image or video binding", () => {
-    const snapshot = JSON.parse(JSON.stringify(models.snapshot.seed()));
+    const snapshot = JSON.parse(JSON.stringify(CatalogFixture.data()));
     delete snapshot.image.models[image.model_id];
     delete snapshot.video.models[video.model_id].providers.vercel;
-    const operations = new MediaOperations({ snapshot });
-    snapshot.image = models.snapshot.seed().image;
-    snapshot.video = models.snapshot.seed().video;
+    const operations = new MediaOperations({
+      catalog: CatalogFixture.view(snapshot),
+    });
+    snapshot.image = CatalogFixture.data().image;
+    snapshot.video = CatalogFixture.data().video;
     expect(
       operations.list({ kind: "image", model_id: image.model_id })
     ).toEqual([]);
@@ -274,43 +276,55 @@ describe("MediaOperations discovery", () => {
   });
 
   it("inherits only exact legacy video facts and refuses changed or explicitly unknown bindings", () => {
-    const snapshot = JSON.parse(JSON.stringify(models.snapshot.seed()));
+    const snapshot = JSON.parse(JSON.stringify(CatalogFixture.data()));
     const binding = snapshot.video.models[video.model_id].providers.vercel;
     delete binding.input;
-    expect(new MediaOperations({ snapshot }).inspect(video).variant).toBe(
-      "text"
-    );
+    expect(
+      new MediaOperations({ catalog: CatalogFixture.view(snapshot) }).inspect(
+        video
+      ).variant
+    ).toBe("text");
     binding.id = "new/unverified-binding";
     rejects(
-      () => new MediaOperations({ snapshot }).inspect(video),
+      () =>
+        new MediaOperations({ catalog: CatalogFixture.view(snapshot) }).inspect(
+          video
+        ),
       "operation_unavailable"
     );
     binding.id = models.video.binding(
-      models.snapshot.view().video.models[video.model_id]!,
+      CatalogFixture.view().video.models[video.model_id]!,
       "vercel"
     )!.id;
     binding.input = null;
     rejects(
-      () => new MediaOperations({ snapshot }).inspect(video),
+      () =>
+        new MediaOperations({ catalog: CatalogFixture.view(snapshot) }).inspect(
+          video
+        ),
       "operation_unavailable"
     );
     rejects(
       () =>
-        new MediaOperations({ snapshot }).inspect({ ...video, provider: "gg" }),
+        new MediaOperations({ catalog: CatalogFixture.view(snapshot) }).inspect(
+          { ...video, provider: "gg" }
+        ),
       "operation_unavailable"
     );
   });
 
   it("rejects an invalid supplied section instead of falling back to bundled media", () => {
     expect.hasAssertions();
-    const snapshot = JSON.parse(JSON.stringify(models.snapshot.seed()));
+    const snapshot = JSON.parse(JSON.stringify(CatalogFixture.data()));
     snapshot.image = { models: "malformed" };
-    rejects(() => new MediaOperations({ snapshot }));
+    rejects(
+      () => new MediaOperations({ catalog: CatalogFixture.view(snapshot) })
+    );
   });
 });
 
 describe("MediaOperations JSON input", () => {
-  const operations = new MediaOperations();
+  const operations = new MediaOperations({ catalog: CatalogFixture.view() });
 
   it("preserves image text/options, supplies the count default and describes numeric constraints", () => {
     const result = operations.parseInput(image, {
@@ -622,8 +636,49 @@ describe("MediaOperations JSON input", () => {
   });
 });
 
+describe("host lifecycle ownership", () => {
+  it("withholds removed audio and 3D entries without changing factual bindings", () => {
+    const view = CatalogFixture.view();
+    const catalog = {
+      ...view,
+      lifecycle: {
+        music: {},
+        sound_effects: {},
+        text_to_speech: {},
+        three_d: {},
+      },
+    };
+    const operations = new MediaOperations({ catalog });
+    for (const kind of [
+      "music",
+      "sound-effect",
+      "text-to-speech",
+      "three-d",
+    ] as const)
+      expect(operations.list({ kind })).toEqual([]);
+    expect(operations.list({ kind: "image" }).length).toBeGreaterThan(0);
+  });
+  it("projects supplied legacy metadata without making retained audio uncallable", () => {
+    const view = CatalogFixture.view();
+    const lifecycle = Object.fromEntries(
+      Object.entries(view.lifecycle).map(([kind, entries]) => [
+        kind,
+        Object.fromEntries(
+          Object.entries(entries).map(([id, entry]) => [
+            id,
+            { ...entry, deprecated: true },
+          ])
+        ),
+      ])
+    ) as typeof view.lifecycle;
+    const operations = new MediaOperations({ catalog: { ...view, lifecycle } });
+    for (const selector of [music, sound, speech])
+      expect(operations.inspect(selector).deprecated).toBe(true);
+  });
+});
+
 describe("image discovery after catalogue evolution", () => {
-  const operations = new MediaOperations();
+  const operations = new MediaOperations({ catalog: CatalogFixture.view() });
   const model_id = "openai/gpt-image-2.5-flare";
   it("keeps deprecated models callable and identifies their status", () => {
     const old = operations.list({

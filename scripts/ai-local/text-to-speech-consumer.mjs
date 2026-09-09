@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 — standalone speech/voice discovery with synthetic ElevenLabs authority.
 import assert from "node:assert/strict";
 
-export async function proveTextToSpeech({ load, require, check }) {
+export async function proveTextToSpeech({ load, require, check, catalog }) {
   const { TextToSpeechClient, ProviderHttp } = await load("@grida/ai");
   const selection = {
     model_id: "eleven_v3",
@@ -140,7 +140,7 @@ export async function proveTextToSpeech({ load, require, check }) {
       );
     },
   });
-  const client = new TextToSpeechClient({ keys, http });
+  const client = new TextToSpeechClient({ catalog, keys, http });
   const list = (signal) =>
     client.listVoices({ provider: "elevenlabs", signal });
   const failure = (code) => (error) => {
@@ -158,7 +158,7 @@ export async function proveTextToSpeech({ load, require, check }) {
       assert.throws(() => require.resolve("@grida/ai/text-to-speech-client"));
       assert.deepEqual(Object.keys(client), []);
       assert.throws(
-        () => new TextToSpeechClient({ keys, http, gg: {} }),
+        () => new TextToSpeechClient({ catalog, keys, http, gg: {} }),
         failure("invalid_input")
       );
     }

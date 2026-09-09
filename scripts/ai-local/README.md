@@ -31,6 +31,9 @@ platform remain absent.
 The public consumer runs once using ESM imports and once using CJS `require`.
 Both root and `/providers` exports must work; private media implementations and Grida
 agent, daemon, auth, account, CLI, Desktop and framework packages are unavailable.
+The proof host supplies its own small, immutable catalogue over public model facts,
+including explicit lifecycle metadata. `@app/ai-catalog` is unavailable: the SDK
+cannot silently inherit Grida's service membership, defaults or ordering.
 Synthetic transports exercise OpenRouter, Vercel, fal and scoped GG image
 generation and video submit/poll/result chains, input capability discovery, credential-free result downloads,
 explicit provider selection, missing credentials, single submission on failure,

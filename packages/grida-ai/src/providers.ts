@@ -4,7 +4,6 @@ export { ProviderCredentials } from "./provider-credentials";
 export {
   catalogView,
   catalogViewOnMiss,
-  CATALOG_PATH,
   type RefreshReason,
 } from "./model-catalog";
 export { liveGgMediaDeps } from "./gg-session";

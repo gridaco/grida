@@ -3,6 +3,7 @@
 // GRIDA-SEC-006 — only the public native scoped sink supplies GG to the real media SDK.
 // GRIDA-GG: token — synthetic tokens only; no services, auth custody or provider calls.
 import { MediaOperations } from "@grida/ai";
+import { catalog } from "@app/ai-catalog";
 import { AuthClient } from "@grida/auth";
 import { ProviderCredentialStore } from "@grida/auth/providers";
 import {
@@ -31,7 +32,7 @@ const PROMPT = "synthetic-private-prompt";
 const PNG = Buffer.from("iVBORw0KGgo=", "base64");
 const MP3 = Uint8Array.of(0x49, 0x44, 0x33);
 const organization = { id: 7, name: "studio", display_name: "Studio" };
-const discovery = new MediaOperations();
+const discovery = new MediaOperations({ catalog: catalog.snapshot.view() });
 const image = discovery
   .list({ kind: "image", provider: "openrouter" })
   .find((entry) => entry.variant === "text")!;
@@ -223,6 +224,30 @@ afterEach(async () => {
 });
 
 describe("MediaCommands offline discovery and access observations", () => {
+  it("uses the service catalogue without hiding explicit legacy or staged operations", async () => {
+    const { env, read } = forbiddenEnv();
+    const test = fixture(env);
+    expect(await test.invoke(["models", "list"])).toBe(0);
+    const operations = test.result().operations;
+    for (const [model_id, status, deprecated] of [
+      ["openai/gpt-image-2", "listed", true],
+      ["openai/gpt-image-2.5-flare", "listed", undefined],
+      ["fal-ai/trellis-2", "staged", undefined],
+    ]) {
+      const operation = operations.find(
+        (entry: { model_id: string }) => entry.model_id === model_id
+      );
+      expect(operation).toBeDefined();
+      expect(operation.status).toBe(status);
+      expect(operation.deprecated === true).toBe(deprecated === true);
+    }
+    expect(read).not.toHaveBeenCalled();
+    expect(test.openStore).not.toHaveBeenCalled();
+    expect(test.openAuth).not.toHaveBeenCalled();
+    expect(test.transport).not.toHaveBeenCalled();
+    test.assertSafe();
+  });
+
   it.each([
     "missing-file",
     "malformed-image",

@@ -26,7 +26,7 @@
  * precedence.
  */
 
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@app/ai-catalog";
 import { catalogView, type ModelCatalogStore } from "./model-catalog";
 import type { TierModelIds } from "./byok";
 import type { ModelFactory } from "../agent";

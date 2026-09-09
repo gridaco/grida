@@ -8,13 +8,13 @@ import type { Plugin } from "vite";
  * `require("@grida/desktop-bridge")` that resolved to nothing at runtime,
  * so the app crashed on launch with "Cannot find module".
  *
- * The desktop `link:`s `@grida/*` workspace packages whose `dist/` is
+ * The desktop `link:`s `@grida/*` and `@app/*` workspace packages whose `dist/` is
  * gitignored. If those aren't built (the isolated ./desktop release CI
  * never built them), Rollup can't resolve the import and silently
  * downgrades it to an external `require(...)`. This is uniquely dangerous
  * because EVERY check stays green — the symlink resolves, types exist,
  * and local dev has `dist/` built — so it only breaks in a clean
- * packaging run. `@grida/*` packages are always meant to be bundled;
+ * packaging run. These workspace packages are always meant to be bundled;
  * finding one external means the bundle is broken.
  *
  * Why a PLUGIN that exits, not `onwarn`/`this.error`: Rollup does emit
@@ -28,7 +28,7 @@ import type { Plugin } from "vite";
  * Wire it into every desktop Vite entry (main, preload, agent-sidecar).
  */
 
-const WORKSPACE_SCOPE = "@grida/";
+const WORKSPACE_SCOPES = ["@grida/", "@app/"] as const;
 
 /** Workspace imports the bundle left external — i.e. unbuilt link deps. */
 export function externalizedWorkspaceImports(
@@ -37,8 +37,10 @@ export function externalizedWorkspaceImports(
   const offenders = new Set<string>();
   for (const id of imports) {
     // Internal emitted chunks and node/npm externals never carry the
-    // workspace scope, so this prefix is the whole test.
-    if (id.startsWith(WORKSPACE_SCOPE)) offenders.add(id);
+    // workspace scopes, so these prefixes are the whole test.
+    if (WORKSPACE_SCOPES.some((scope) => id.startsWith(scope))) {
+      offenders.add(id);
+    }
   }
   return [...offenders];
 }
@@ -65,7 +67,7 @@ export function gridaBundleGuard(): Plugin {
       const list = offenders.map((o) => `  - ${o}`).join("\n");
       console.error(
         `\nGRIDA-DESKTOP-BUILD-GUARD: refusing to ship a broken bundle.\n` +
-          `These ${WORKSPACE_SCOPE}* workspace packages were left external ` +
+          `These workspace packages were left external ` +
           `instead of bundled, so the binary will crash on launch with ` +
           `"Cannot find module":\n${list}\n` +
           `Their dist/ is gitignored — build them before packaging:\n` +

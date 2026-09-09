@@ -3,6 +3,7 @@ import { models } from "@grida/ai-models";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
+import type { ModelCatalogStore } from "./model-catalog";
 import { ProviderHttp } from "./http";
 import { MediaRequest } from "./media-request";
 
@@ -15,14 +16,17 @@ const MAX_PAGE_BYTES = 2 * 1024 * 1024;
 /** Bounded ElevenLabs voice discovery and the existing v3 speech operation. */
 export class TextToSpeechClient {
   readonly #http: ProviderHttp;
+  readonly #catalog: ModelCatalogStore;
   readonly #getKey: TextToSpeechClient.Keys["get"];
 
   constructor(options: TextToSpeechClient.Options) {
     try {
-      exactKeys(options, ["keys", "http"]);
-      const { keys, http } = options;
+      exactKeys(options, ["keys", "http", "catalog"]);
+      const { keys, http, catalog } = options;
       const get = keys.get;
       if (!(http instanceof ProviderHttp) || typeof get !== "function") throw 0;
+      if (!catalog || typeof catalog.view !== "function") throw 0;
+      this.#catalog = catalog;
       this.#http = http;
       this.#getKey = get.bind(keys);
     } catch {
@@ -95,7 +99,7 @@ export class TextToSpeechClient {
     let request: MediaRequest | undefined;
     try {
       const { model_id, voice_id } = selection(input);
-      if (!MediaRoutes.speech(model_id))
+      if (!MediaRoutes.speech(model_id, this.#catalog.view()))
         throw new TextToSpeechClient.Failure("model_unavailable");
       request = new MediaRequest(this.#http);
       await this.#key(request);
@@ -182,7 +186,11 @@ export namespace TextToSpeechClient {
   export type Keys = {
     get(provider: "elevenlabs"): string | null | Promise<string | null>;
   };
-  export type Options = { keys: Keys; http: ProviderHttp };
+  export type Options = {
+    keys: Keys;
+    http: ProviderHttp;
+    catalog: ModelCatalogStore;
+  };
   export type VoiceSelection = { provider: "elevenlabs"; signal?: AbortSignal };
   export type Voice = Readonly<{ voice_id: string; name: string }>;
   export type Selection = {

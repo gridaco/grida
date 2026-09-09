@@ -9,6 +9,7 @@ export default defineConfig({
   fixedExtension: true,
   deps: {
     alwaysBundle: [
+      "@app/ai-catalog",
       "@grida/auth",
       "@grida/home",
       "@grida/account",

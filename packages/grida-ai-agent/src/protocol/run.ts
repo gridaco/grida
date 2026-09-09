@@ -3,7 +3,8 @@
  * run, plus the canonical agent-bucket id. Client-safe.
  */
 
-import type { models, ModelTier } from "@grida/ai-models";
+import type { models } from "@grida/ai-models";
+import type { ModelTier } from "@app/ai-catalog";
 import type { ProviderId } from "./provider-ids";
 import type { AgentMode } from "./mode";
 

@@ -18,7 +18,7 @@ import {
   type ByokProviderId,
   type EndpointProviderConfig,
 } from "@grida/agent";
-import _models from "@grida/ai-models";
+import _models from "@app/ai-catalog";
 
 export type ModelPickerSelection = Readonly<{
   model_id: string;
@@ -38,7 +38,7 @@ export type ModelPickerGroup = Readonly<{
 }>;
 
 const textCatalog = _models.text.catalog;
-const modelOptions = Object.values(textCatalog);
+const modelOptions = _models.text.listed_models();
 
 export namespace model_picker_options {
   /** The exact closed ChatGPT projection, never every `openai/*` model. */
