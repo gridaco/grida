@@ -226,7 +226,12 @@ function TokenRates({ rates }: { rates: AITypes.image.PerTokenRates }) {
     rows.push(["Image input", rates.image_input]);
   if (rates.cached_image_input !== undefined)
     rows.push(["Image input (cached)", rates.cached_image_input]);
-  rows.push(["Output", rates.output]);
+  if (rates.text_output !== undefined)
+    rows.push(["Text output", rates.text_output]);
+  rows.push([
+    rates.text_output !== undefined ? "Image output" : "Output",
+    rates.output,
+  ]);
   return (
     <div className="space-y-0.5 text-xs">
       <p className="text-muted-foreground mb-1">Per 1M tokens</p>
@@ -309,12 +314,12 @@ function PricingDetail({
               ${pricing.output.toFixed(2)}
             </span>
             <span className="text-sm text-muted-foreground">
-              per 1M output tokens
+              {pricing.text_output !== undefined
+                ? "per 1M image output tokens"
+                : "per 1M output tokens"}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Input: ${pricing.input.toFixed(2)} / 1M tokens
-          </p>
+          <TokenRates rates={pricing} />
         </div>
       );
   }
@@ -365,6 +370,36 @@ function ConstraintsDetail({
 
 // ── Card ─────────────────────────────────────────────────────────────────────
 
+function ImageProviderRequirement({
+  model,
+}: {
+  model: AITypes.image.ImageModelCard;
+}) {
+  if (
+    !ai.image.binding(model, "fal") ||
+    ai.image.binding(model, "vercel") ||
+    ai.image.binding(model, "openrouter")
+  )
+    return null;
+  return (
+    <p className="text-xs text-muted-foreground">
+      Requires a fal key in Grida Desktop
+    </p>
+  );
+}
+
+function ImageTransparency({ model }: { model: AITypes.image.ImageModelCard }) {
+  const providers = ai.image.providers.filter((provider) =>
+    ai.image.supportsTransparentBackground(model, provider)
+  );
+  if (!providers.length) return null;
+  return (
+    <p className="text-xs text-muted-foreground">
+      Transparent background via {providers.join(", ")}
+    </p>
+  );
+}
+
 function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
   return (
     <Card className="flex flex-col bg-card/50 border-muted overflow-hidden">
@@ -377,7 +412,8 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
             variant="outline"
             className="shrink-0 capitalize text-xs font-normal"
           >
-            {model.speed_label} &middot; ~{model.speed_max}
+            {model.speed_label} &middot;{" "}
+            {model.speed_max === "varies" ? "Varies" : `~${model.speed_max}`}
           </Badge>
         </div>
         <CardDescription className="text-sm line-clamp-2 overflow-hidden text-ellipsis">
@@ -388,6 +424,8 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
       <CardContent className="flex-1 flex flex-col gap-4 pt-4">
         {/* Pricing */}
         <PricingDetail pricing={model.pricing} />
+        <ImageProviderRequirement model={model} />
+        <ImageTransparency model={model} />
 
         {/* Constraints */}
         {model.constraints && (
@@ -693,6 +731,8 @@ export default function AIModelsCatalogPage() {
                           <code className="text-xs text-muted-foreground">
                             {model.id}
                           </code>
+                          <ImageProviderRequirement model={model} />
+                          <ImageTransparency model={model} />
                           <ReleaseDate
                             release={model.release}
                             prefix
@@ -712,7 +752,9 @@ export default function AIModelsCatalogPage() {
                         {model.speed_label}
                       </Badge>
                       <span className="text-xs text-muted-foreground ml-2">
-                        ~{model.speed_max}
+                        {model.speed_max === "varies"
+                          ? "Varies"
+                          : `~${model.speed_max}`}
                       </span>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">

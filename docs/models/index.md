@@ -1,7 +1,16 @@
 ---
 title: Models & Pricing
 description: Compare Grida AI model tiers, context windows, and text, image, and music generation costs.
-keywords: [AI models, AI pricing, GPT-5.6, Claude Fable 5.1, Lyria, Grida AI]
+keywords:
+  [
+    AI models,
+    AI pricing,
+    GPT-5.6,
+    GPT Image 2.5,
+    Claude Fable 5.1,
+    Lyria,
+    Grida AI,
+  ]
 slug: pricing
 format: md
 ---
@@ -10,11 +19,11 @@ format: md
 
 Grida uses AI models across the editor for text, image, music, and media-processing workflows. This page documents the models that are integrated and available to use, their capabilities, and pricing.
 
-Text and image models use Grida's hosted model routes. Media models that require a specialist provider identify that provider explicitly; a catalogued compatibility contract is not the same as an integrated model.
+Models are available through Grida-hosted routes or a connected provider key. Models that require a specialist provider identify that provider explicitly; check provider availability before choosing a model.
 
 ## Billing
 
-Grida-hosted AI usage is deducted from prepaid credit purchased separately for your organization. Pricing plans do not include recurring AI credit. The rates below show how each operation is charged against that credit balance.
+Grida-hosted AI usage is deducted from prepaid credit purchased separately for your organization. Pricing plans do not include recurring AI credit. When you use your own provider key, the provider charges your account directly. The rates below describe the provider's pricing for each operation.
 
 ## Agent Models
 
@@ -109,11 +118,32 @@ retirement.
 
 ## Image Generation Models
 
-Image models power the image generation features in the editor. Pricing varies by provider — some charge per image (flat or tiered by quality/size), others charge per token.
+Image models power the image generation features in the editor. Pricing varies by provider — some charge per image (flat or tiered by quality/size), others charge per token. The model list shows available providers; a listed model needs at least one supported provider, and a single key may not cover every model.
 
 ### OpenAI
 
-OpenAI image models are billed per output token. The tables below show the published per-image equivalents for popular sizes; arbitrary in-envelope sizes are billed by the underlying token rates.
+OpenAI image models are billed by token usage, including text and image inputs. Image output cost depends on the model, quality, and dimensions.
+
+**GPT Image 2.5 Flare** (`openai/gpt-image-2.5-flare`) and **GPT Image 2.5 Sunburst** (`openai/gpt-image-2.5-sunburst`)
+
+[Released September 8, 2026](https://openai.com/index/introducing-chatgpt-images-2-5/), Flare is the faster everyday option; Sunburst prioritizes precise edits and intricate detail, with longer generation times. Both are available through Grida-hosted credit and connected **fal**, **OpenRouter**, or **Vercel AI Gateway** keys. Desktop requires version 0.0.22 or later, including when the hosted model catalog has already refreshed.
+
+Both variants support generation and, through fal or OpenRouter, editing with up to 16 reference images. Grida accepts 1–4 outputs per request. Quality options are `auto`, `low`, `medium`, `high`, `xhigh`, and `max`; Grida selects `high` initially. Dimensions must be multiples of 16, neither edge may exceed 3840 px, the aspect ratio must be at most 3:1, and total area must be 655,360–8,294,400 pixels. Transparent backgrounds require PNG or WebP output. See the [Flare API](https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api) and [Sunburst editing API](https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api).
+
+The Desktop image playground generates from text. This update does not add a
+reference-image editing control there; the editing bindings are available to
+agent hosts that explicitly select one of these variants.
+
+Both variants have the same [fal token rates](https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image), in USD per 1M tokens:
+
+| Token type | Input | Cached input | Output |
+| ---------- | ----- | ------------ | ------ |
+| Text       | $5.00 | $1.25        | $10.00 |
+| Image      | $8.00 | $2.00        | $30.00 |
+
+For a 1024x1024 image, OpenAI's [output-token calculator](https://developers.openai.com/api/docs/guides/image-generation) estimates $0.01317 at `medium` and $0.05268 at `high`. These are output-only estimates, not fixed per-image prices; input tokens add to the bill. fal rounds the total charge up to the nearest $0.0001.
+
+[Vercel AI Gateway](https://vercel.com/ai-gateway/models/gpt-image-2.5-flare) publishes $5/M input tokens, $1.25/M cached input tokens, and $30/M output tokens. [OpenRouter](https://openrouter.ai/api/v1/images/models/openai/gpt-image-2.5-flare/endpoints) publishes $5/M text input, $8/M image input, and $30/M image output tokens. Grida keeps each provider's published meter separately. Hosted image billing uses Gateway's reported response cost when available. Without that receipt, it falls back to the catalog's coarse per-image estimate ($0.055 for these variants), which can differ from actual token cost across quality levels and dimensions.
 
 **GPT Image 2** (`openai/gpt-image-2`)
 
@@ -126,6 +156,30 @@ Per 1M tokens: `text input $5.00 · text cached $1.25 · image input $8.00 · im
 | High    | $0.211    | $0.165    | $0.165    |
 
 GPT Image 2 also accepts arbitrary resolutions (multiples of 16, edges ≤ 3840 px, aspect ratio ≤ 3:1, total pixels in 655,360 – 8,294,400). Cost for non-standard sizes is computed from output token count.
+
+GPT Image 2 remains available through Vercel AI Gateway, fal, and OpenRouter, including Grida's hosted route.
+
+**Transparent backgrounds**
+
+In Grida Desktop 0.0.22 or later, GPT Image 2 offers native transparent
+backgrounds with a connected fal key. Both GPT Image 2.5 variants additionally
+support transparency through Vercel AI Gateway, including Grida-hosted credit.
+Select
+**Transparent background** in the image playground settings; Grida requests
+PNG output and preserves the original image bytes when saving or downloading.
+This does not run a background-removal model afterward.
+
+Provider support is checked separately from the model's native capability.
+OpenAI added GPT Image 2 transparency in its [August 20 update](https://developers.openai.com/api/docs/changelog),
+and fal exposes it. OpenRouter's [GPT Image 2 endpoint](https://openrouter.ai/api/v1/images/models/openai/gpt-image-2/endpoints)
+and current GPT Image 2.5 endpoints still accept only `auto` or `opaque`.
+Vercel transparency for GPT Image 2 remains unverified, although its
+[Flare](https://vercel.com/ai-gateway/models/gpt-image-2.5-flare) and
+[Sunburst](https://vercel.com/ai-gateway/models/gpt-image-2.5-sunburst) pages
+explicitly support it. Grida only offers transparency on verified routes.
+If a required provider is disconnected, generation is blocked rather than
+silently producing an opaque image. Older Desktop versions do not send the
+new background setting.
 
 **GPT Image Mini** (`openai/gpt-image-1-mini`)
 
@@ -196,8 +250,8 @@ Tiered by quality and size.
 | -------------------------------------- | ----------- |
 | Muse Image 1.0 (`meta/muse-image-1.0`) | $0.010      |
 
-`Muse Image 1.0` is catalogued but not offered in the default picker: OpenRouter
-lists it without a serving endpoint, so it is not available on every provider.
+`Muse Image 1.0` remains outside the default picker. Its OpenRouter listing has
+no serving endpoint.
 
 ### Recraft
 
@@ -213,25 +267,26 @@ which is cheaper on every provider; this is not an upstream Recraft retirement.
 
 ### Image Sizes
 
-| Model                  | Min Size  | Max Size                         | Aspect Ratios |
-| ---------------------- | --------- | -------------------------------- | ------------- |
-| GPT Image 2            | —         | edges ≤ 3840 px, ≤ 8.3M px total | up to 3:1     |
-| GPT Image 1.5          | 1024x1024 | 1536x1536                        | 1:1, 2:3, 3:2 |
-| GPT Image Mini         | 1024x1024 | 1536x1536                        | 1:1, 2:3, 3:2 |
-| Gemini Flash Image     | —         | 1536x1536                        | Flexible      |
-| Gemini Flash Lite      | —         | 1024x1024 (1K only)              | Flexible      |
-| Gemini Pro Image       | —         | 1536x1536                        | Flexible      |
-| Flux 2 Max             | 256x256   | 1440x1440                        | Flexible      |
-| Flux 2 Pro             | 256x256   | 1440x1440                        | Flexible      |
-| Flux Kontext Max       | —         | 1820x1820                        | Flexible      |
-| Flux Kontext Pro       | —         | 1820x1820                        | Flexible      |
-| Flux Pro 1.1           | 256x256   | 1440x1440                        | Flexible      |
-| Recraft V4.1           | —         | 2048x2048                        | Flexible      |
-| Recraft V3             | —         | 2048x2048                        | Flexible      |
-| Seedream 5.0 Pro       | 1.0 MP    | 4.2 MP (1024² to 2048² total px) | up to 16:1    |
-| Seedream 5.0 Lite      | 3.7 MP    | 16.8 MP (2560x1440 to 4096²)     | Flexible      |
-| Grok Imagine Image 2.0 | —         | 2048x2048 (1K or 2K)             | Flexible      |
-| Muse Image 1.0         | —         | chosen by the model              | 21:9 to 9:21  |
+| Model                          | Min Size         | Max Size                         | Aspect Ratios |
+| ------------------------------ | ---------------- | -------------------------------- | ------------- |
+| GPT Image 2.5 Flare / Sunburst | 655,360 total px | edges ≤ 3840 px, ≤ 8.3M px total | up to 3:1     |
+| GPT Image 2                    | —                | edges ≤ 3840 px, ≤ 8.3M px total | up to 3:1     |
+| GPT Image 1.5                  | 1024x1024        | 1536x1536                        | 1:1, 2:3, 3:2 |
+| GPT Image Mini                 | 1024x1024        | 1536x1536                        | 1:1, 2:3, 3:2 |
+| Gemini Flash Image             | —                | 1536x1536                        | Flexible      |
+| Gemini Flash Lite              | —                | 1024x1024 (1K only)              | Flexible      |
+| Gemini Pro Image               | —                | 1536x1536                        | Flexible      |
+| Flux 2 Max                     | 256x256          | 1440x1440                        | Flexible      |
+| Flux 2 Pro                     | 256x256          | 1440x1440                        | Flexible      |
+| Flux Kontext Max               | —                | 1820x1820                        | Flexible      |
+| Flux Kontext Pro               | —                | 1820x1820                        | Flexible      |
+| Flux Pro 1.1                   | 256x256          | 1440x1440                        | Flexible      |
+| Recraft V4.1                   | —                | 2048x2048                        | Flexible      |
+| Recraft V3                     | —                | 2048x2048                        | Flexible      |
+| Seedream 5.0 Pro               | 1.0 MP           | 4.2 MP (1024² to 2048² total px) | up to 16:1    |
+| Seedream 5.0 Lite              | 3.7 MP           | 16.8 MP (2560x1440 to 4096²)     | Flexible      |
+| Grok Imagine Image 2.0         | —                | 2048x2048 (1K or 2K)             | Flexible      |
+| Muse Image 1.0                 | —                | chosen by the model              | 21:9 to 9:21  |
 
 ## Video Generation Models
 

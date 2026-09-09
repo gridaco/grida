@@ -10,9 +10,9 @@
  * protocol carries no reference images; the sidecar resolver routes
  * i2i to BYOK providers).
  *
- * Auth: scoped AI token only (GRIDA-SEC-006). Billing: pre-priced via
- * the shared `computeImageCostMills` and threaded through the seam's
- * image middleware (`providerOptions.grida.costMills`). NO library
+ * Auth: scoped AI token only (GRIDA-SEC-006). Billing: Gateway response
+ * receipt when available, otherwise the shared `computeImageCostMills`
+ * fallback (`providerOptions.grida.costMills`). NO library
  * upload — the daemon owns persistence.
  */
 import { generateImage } from "ai";
@@ -24,13 +24,16 @@ import { computeImageCostMills } from "@/lib/ai/image-cost";
 import { methods, gridaProviderOptions } from "@/lib/ai/server";
 import {
   fromUnknownError,
+  invalidRequest,
   modelNotFound,
   parseJsonRequest,
   rateLimited,
 } from "@/lib/ai/openai-compat/errors";
 import { allowAiRequest } from "@/lib/ai/openai-compat/limits";
 
-export const maxDuration = 120;
+// Complex image requests can take two minutes before auth/billing overhead.
+// Keep headroom within Vercel Fluid Compute's all-plan 300-second limit.
+export const maxDuration = 300;
 
 const NO_STORE = { "cache-control": "no-store" } as const;
 
@@ -48,6 +51,7 @@ const requestSchema = z.looseObject({
   n: z.number().int().min(1).max(4).nullish(),
   seed: z.number().int().nullish(),
   quality: z.string().nullish(),
+  background: z.enum(["auto", "opaque", "transparent"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -65,7 +69,24 @@ export async function POST(request: Request) {
     // Hosted serving goes through the gateway — a card without a
     // vercel binding is not servable here (the sidecar's BYOK
     // adapters cover the rest).
-    if (!ai.image.binding(card, "vercel")) return modelNotFound(req.model_id);
+    const binding = ai.image.binding(card, "vercel");
+    if (!binding) return modelNotFound(req.model_id);
+    if (
+      req.quality &&
+      card.quality &&
+      !card.quality.options.includes(req.quality)
+    ) {
+      return invalidRequest("Unsupported quality for this model.");
+    }
+
+    // An explicit mode must never become an opaque, billed success when the
+    // gateway has not exposed the native control. Auto is the legacy default.
+    const background = req.background === "auto" ? undefined : req.background;
+    if (background && !ai.image.supportsTransparentBackground(card, "vercel")) {
+      return invalidRequest(
+        "This model does not have verified background control through Grida Gateway. Use a supported provider key or omit background."
+      );
+    }
 
     const resolved = methods.getSDKImageModel(card.id);
     if (!resolved) return modelNotFound(req.model_id);
@@ -89,10 +110,14 @@ export async function POST(request: Request) {
     // charges "high" while the provider renders its default. The Vercel
     // AI Gateway keys providerOptions by origin provider (`openai` for
     // `openai/gpt-image-2`).
-    const slash = card.id.indexOf("/");
-    const originProvider = slash > 0 ? card.id.slice(0, slash) : undefined;
-    const quality =
-      req.quality && req.quality !== "auto" ? req.quality : undefined;
+    const slash = binding.id.indexOf("/");
+    const originProvider = slash > 0 ? binding.id.slice(0, slash) : undefined;
+    const quality = req.quality || undefined;
+    const imageOptions = {
+      ...(quality ? { quality } : {}),
+      ...(background ? { background } : {}),
+      ...(background === "transparent" ? { output_format: "png" } : {}),
+    };
 
     const generation = await generateImage({
       model: resolved.model,
@@ -107,7 +132,9 @@ export async function POST(request: Request) {
           feature: "v1/ai/images",
           costMills,
         }),
-        ...(originProvider && quality ? { [originProvider]: { quality } } : {}),
+        ...(originProvider && Object.keys(imageOptions).length
+          ? { [originProvider]: imageOptions }
+          : {}),
       },
     });
 

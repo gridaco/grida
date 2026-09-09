@@ -119,6 +119,7 @@ function CanvasConsumer() {
           width: model.width,
           height: model.height,
           aspect_ratio: model.aspect_ratio,
+          ...(model.quality ? { quality: model.quality } : {}),
           prompt: value.text,
         });
         const data = credits.consume(env, { next: "/playground/image" });
@@ -319,12 +320,34 @@ function Chat({
               <SelectItem key={m.id} value={m.id}>
                 <div className="w-full flex items-center justify-between gap-2">
                   {m.label}
-                  <Badge variant="outline">~{m.speed_max}</Badge>
+                  <Badge variant="outline">
+                    {m.speed_max === "varies" ? "Varies" : `~${m.speed_max}`}
+                  </Badge>
                 </div>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {model.card?.quality && (
+          <Select value={model.quality} onValueChange={model.setQuality}>
+            <SelectTrigger
+              aria-label="Image quality"
+              className="w-min border-none"
+            >
+              <SelectValue placeholder="Quality" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Quality</SelectLabel>
+                {model.card.quality.options.map((quality) => (
+                  <SelectItem key={quality} value={quality}>
+                    {quality.charAt(0).toUpperCase() + quality.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        )}
       </div>
       <ChatBox disabled={loading} onValueCommit={onCommit}>
         <ChatBoxTextArea />

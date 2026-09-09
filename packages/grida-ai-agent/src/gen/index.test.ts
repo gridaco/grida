@@ -45,6 +45,47 @@ describe("AgentGen.toModelOutput", () => {
 });
 
 describe("AgentGen.resolveToolCall", () => {
+  it.each(["auto", "opaque", "transparent"] as const)(
+    "forwards %s background intent to the injected generator",
+    async (background) => {
+      let received: AgentGen.ImageGenInput | undefined;
+      await AgentGen.resolveToolCall(
+        {
+          generate: async (input) => {
+            received = input;
+            return OK;
+          },
+        },
+        {
+          tool_name: "generate_image",
+          input: { prompt: "a sticker", background },
+        }
+      );
+      expect(received).toEqual({ prompt: "a sticker", background });
+    }
+  );
+
+  it.each(["checkerboard", "", null, true])(
+    "rejects invalid background %s without invoking the generator",
+    async (background) => {
+      let calls = 0;
+      const output = await AgentGen.resolveToolCall(
+        {
+          generate: async () => {
+            calls++;
+            return OK;
+          },
+        },
+        {
+          tool_name: "generate_image",
+          input: { prompt: "a sticker", background },
+        }
+      );
+      expect(output).toMatchObject({ ok: false, reason: "invalid_input" });
+      expect(calls).toBe(0);
+    }
+  );
+
   const okGen: AgentGen.ImageGenerator = {
     async generate() {
       return OK;

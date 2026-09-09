@@ -54,6 +54,29 @@ function stubFetch(): () => Record<string, unknown> | undefined {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("GridaGatewayImageModel.doGenerate", () => {
+  it.each(["opaque", "transparent"] as const)(
+    "forwards immutable resolved %s background for independent hosted validation",
+    async (background) => {
+      const readBody = stubFetch();
+      const model = new GridaGatewayImageModel(
+        liveStore(),
+        "https://grida.test",
+        "openai/gpt-image-2",
+        undefined,
+        background
+      );
+      await model.doGenerate(
+        callOptions({
+          providerOptions: {
+            gg: { background: "auto", output_format: "jpeg", quality: "high" },
+          },
+        })
+      );
+      expect(readBody()).toMatchObject({ background, quality: "high" });
+      expect(readBody()).not.toHaveProperty("output_format");
+    }
+  );
+
   it("forwards providerOptions.gg.quality into the hosted request body", async () => {
     const readBody = stubFetch();
     const model = new GridaGatewayImageModel(

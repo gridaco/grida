@@ -433,20 +433,39 @@ const languageModelMiddleware: LanguageModelMiddleware = {
 const imageModelMiddleware: ImageModelMiddleware = {
   specificationVersion: "v3",
 
-  // Image gen doesn't expose token usage; the caller passes computed
-  // cost via providerOptions.grida.costMills. Without it the seam logs
-  // and charges 0 — loud enough to surface in review without breaking
-  // an already-billed provider call.
+  // Prefer Gateway's response receipt (USD), which accounts for actual quality,
+  // dimensions and cache use. Caller pricing remains a fallback for responses
+  // without a receipt; aggregate image token counts cannot price mixed inputs.
+  // https://vercel.com/academy/ai-gateway/ai-gateway-pricing
   wrapGenerate: async ({ doGenerate, params, model }) => {
     const ctx = extractContext(model.modelId, params.providerOptions);
     if (typeof ctx.costMills !== "number") {
       console.warn(
-        `[ai-seam] image call missing providerOptions.grida.costMills (model=${ctx.model_id}, feature=${ctx.feature}); charging 0`
+        `[ai-seam] image call missing providerOptions.grida.costMills (model=${ctx.model_id}, feature=${ctx.feature}); no fallback estimate`
       );
     }
-    const costMills = ctx.costMills ?? 0;
     return withTransaction(ctx, async () => {
       const result = await doGenerate();
+      const gatewayMetadata = result.providerMetadata?.gateway;
+      const rawCost =
+        gatewayMetadata &&
+        typeof gatewayMetadata === "object" &&
+        "cost" in gatewayMetadata
+          ? gatewayMetadata.cost
+          : undefined;
+      const reportedUsd =
+        typeof rawCost === "number"
+          ? rawCost
+          : typeof rawCost === "string" && rawCost.trim() !== ""
+            ? Number(rawCost)
+            : NaN;
+      const reportedMills = reportedUsd * 1000;
+      // A legitimate zero receipt is not missing. Never turn malformed data
+      // into free usage, or multiply a per-call receipt by the image count.
+      const costMills =
+        Number.isFinite(reportedMills) && reportedMills >= 0
+          ? reportedMills
+          : (ctx.costMills ?? 0);
       return { result, costMills };
     });
   },

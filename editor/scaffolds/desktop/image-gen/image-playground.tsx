@@ -3,7 +3,7 @@
 
 import * as gridaGateway from "@/lib/desktop/gg-session";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
 import { models } from "@grida/ai-models";
 import { Skeleton } from "@app/ui/components/skeleton";
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogTitle } from "@app/ui/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -29,8 +30,10 @@ import {
   usePromptInputController,
   type PromptInputMessage,
 } from "@app/ui/ai-elements/prompt-input";
-import { images, type MediaItem } from "@/lib/desktop/bridge";
+import { images, useDesktopBridge, type MediaItem } from "@/lib/desktop/bridge";
 import { ImageModelPicker } from "./image-model-picker";
+import { MediaModelAvailability } from "../shared/media-model-availability";
+import { Transparency } from "@/grida-canvas-react/components/transparency";
 
 /** Named prompt templates — pick one from the composer menu to fill the input.
  *  Design-tool flavored starters; original to Grida. */
@@ -77,7 +80,9 @@ const PROMPT_TEMPLATES: { name: string; prompt: string }[] = [
   },
 ];
 
-const DEFAULT_MODEL_ID = models.image.listed_models()[0]?.id ?? "";
+const DEFAULT_MODEL_ID = models.image.models["openai/gpt-image-2"]?.listed
+  ? "openai/gpt-image-2"
+  : (models.image.listed_models()[0]?.id ?? "");
 
 /** Always render at least this many cells so the gallery grid is visible even
  *  when empty. Extra slots beyond the images are blank placeholders. */
@@ -105,11 +110,14 @@ function sizeOptionsFor(
   return opts;
 }
 
-/** Quality tiers only apply to per-image-tiered models (e.g. GPT Image). */
-function supportsQuality(
+/** Explicit quality options can also belong to token-billed image models. */
+function qualityOptionsFor(
   card: models.image.ImageModelCard | undefined
-): boolean {
-  return card?.pricing.type === "per_image_tiered";
+): readonly string[] {
+  return (
+    card?.quality?.options ??
+    (card?.pricing.type === "per_image_tiered" ? QUALITY_OPTIONS : [])
+  );
 }
 
 /** File extension for a download, from the returned media type. */
@@ -155,6 +163,21 @@ export function DesktopImagePlayground({
   onGenerationBusyChange?: (busy: boolean) => void;
   onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
+  const bridge = useDesktopBridge();
+  const providerStore = useMemo(
+    () =>
+      new MediaModelAvailability.ImageProviders(
+        bridge,
+        async () => (await gridaGateway.ensureFresh()).kind === "active"
+      ),
+    [bridge]
+  );
+  const providers = useSyncExternalStore(
+    providerStore.subscribe,
+    providerStore.getSnapshot,
+    providerStore.getSnapshot
+  );
+  useEffect(() => providerStore.connect(), [providerStore]);
   const [modelId, setModelId] = useState(
     initialModelId && models.image.models[initialModelId]?.listed
       ? initialModelId
@@ -163,9 +186,17 @@ export function DesktopImagePlayground({
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [size, setSize] = useState<SizeOption>(AUTO_SIZE);
-  const [quality, setQuality] = useState<string>("auto");
-
   const card = models.image.models[modelId];
+  const [transparent, setTransparent] = useState(false);
+  const access = MediaModelAvailability.image(card, providers, transparent);
+  const transparencyAccess = MediaModelAvailability.image(
+    card,
+    providers,
+    true
+  );
+  const [quality, setQuality] = useState<string>(
+    () => card?.quality?.default ?? "auto"
+  );
   const active = tiles.find((t) => t.id === activeId && t.status === "done");
 
   const remove = (id: string) =>
@@ -178,9 +209,11 @@ export function DesktopImagePlayground({
   const runGenerate = async (rawPrompt: string) => {
     const prompt = rawPrompt.trim();
     if (!prompt) return;
-    // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh so a
-    // signed-in keyless user generates through the included provider.
-    // Never throws; BYOK runs are unaffected when it degrades.
+    // GRIDA-SEC-006 — refresh hosted-session readiness and key presence before
+    // submission. A removed key never silently turns transparent intent opaque.
+    const refreshed = await providerStore.refresh(card, transparent);
+    if (!MediaModelAvailability.image(card, refreshed, transparent).available)
+      return;
     const id = crypto.randomUUID();
     const model_id = modelId;
     setTiles((prev) => [
@@ -189,14 +222,14 @@ export function DesktopImagePlayground({
     ]);
     onGenerationBusyChange?.(true);
     try {
-      await gridaGateway.ensureFresh();
       const res = await images.generate({
         model_id,
         prompt,
         ...(size.width && size.height
           ? { width: size.width, height: size.height }
           : {}),
-        ...(quality !== "auto" ? { quality } : {}),
+        ...(card?.quality || quality !== "auto" ? { quality } : {}),
+        ...(transparent ? { background: "transparent" as const } : {}),
       });
       for (let index = res.images.length - 1; index >= 0; index -= 1) {
         const stored = res.images[index]?.stored_media;
@@ -233,6 +266,11 @@ export function DesktopImagePlayground({
       {/* Header */}
       <header className="flex shrink-0 items-center justify-between px-6 py-4">
         <h1 className="text-2xl font-bold tracking-tight">Images</h1>
+        {!access.available && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {access.reason}
+          </p>
+        )}
       </header>
 
       {/* Gallery — a real hairline grid, visible even when empty. Cells are
@@ -287,19 +325,26 @@ export function DesktopImagePlayground({
                   onSize={setSize}
                   quality={quality}
                   onQuality={setQuality}
+                  transparent={transparent}
+                  onTransparent={setTransparent}
+                  transparencyAvailable={transparencyAccess.available}
                 />
                 <ImageModelPicker
                   value={modelId}
+                  providers={providers}
                   onValueChange={(next) => {
                     // Reset model-scoped options — a size/quality the new model
                     // doesn't expose would otherwise be sent and rejected.
                     setModelId(next);
                     setSize(AUTO_SIZE);
-                    setQuality("auto");
+                    setTransparent(false);
+                    setQuality(
+                      models.image.models[next]?.quality?.default ?? "auto"
+                    );
                   }}
                 />
               </PromptInputTools>
-              <PromptInputSubmit />
+              <PromptInputSubmit disabled={!access.available} />
             </PromptInputFooter>
           </PromptInput>
         </PromptInputProvider>
@@ -315,12 +360,14 @@ export function DesktopImagePlayground({
             {active?.prompt ?? "Generated image"}
           </DialogTitle>
           {active?.src && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={active.src}
-              alt={active.prompt}
-              className="max-h-[85vh] w-full object-contain"
-            />
+            <Transparency>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={active.src}
+                alt={active.prompt}
+                className="max-h-[85vh] w-full object-contain"
+              />
+            </Transparency>
           )}
           {active && (
             <p className="px-4 pb-4 text-sm text-muted-foreground">
@@ -372,15 +419,21 @@ function SettingsMenu({
   onSize,
   quality,
   onQuality,
+  transparent,
+  onTransparent,
+  transparencyAvailable,
 }: {
   card: models.image.ImageModelCard | undefined;
   size: SizeOption;
   onSize: (s: SizeOption) => void;
   quality: string;
   onQuality: (q: string) => void;
+  transparent: boolean;
+  onTransparent: (value: boolean) => void;
+  transparencyAvailable: boolean;
 }) {
   const sizeOptions = sizeOptionsFor(card);
-  const showQuality = supportsQuality(card);
+  const qualityOptions = qualityOptionsFor(card);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -404,20 +457,32 @@ function SettingsMenu({
             {opt.label === size.label && <Check className="size-4" />}
           </DropdownMenuItem>
         ))}
-        {showQuality && (
+        {qualityOptions.length > 0 && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Quality</DropdownMenuLabel>
-            {QUALITY_OPTIONS.map((q) => (
+            {qualityOptions.map((q) => (
               <DropdownMenuItem
                 key={q}
                 onSelect={() => onQuality(q)}
                 className="justify-between capitalize"
               >
-                {q}
+                {q === "xhigh" ? "Extra high" : q === "max" ? "Maximum" : q}
                 {q === quality && <Check className="size-4" />}
               </DropdownMenuItem>
             ))}
+          </>
+        )}
+        {/* Preserve checked intent after disconnect (see test/desktop-media-transparent-background.md). */}
+        {(transparencyAvailable || transparent) && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={transparent}
+              onCheckedChange={onTransparent}
+            >
+              Transparent background
+            </DropdownMenuCheckboxItem>
           </>
         )}
       </DropdownMenuContent>
@@ -478,7 +543,7 @@ function GalleryCell({
   }
 
   return (
-    <div className={`group overflow-hidden ${CELL}`}>
+    <Transparency className={`group overflow-hidden ${CELL}`}>
       <button
         type="button"
         onClick={onOpen}
@@ -523,6 +588,6 @@ function GalleryCell({
           <X className="size-3.5" />
         </button>
       </div>
-    </div>
+    </Transparency>
   );
 }

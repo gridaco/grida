@@ -22,12 +22,18 @@ export type ImageGenerateRequest = {
   n?: number;
   seed?: number;
   /**
-   * Quality tier (`high` | `medium` | `low`). Only meaningful for models that
-   * expose quality tiers (per-image-tiered pricing, e.g. GPT Image). Forwarded
-   * to the provider as a provider-option; ignored by models that don't support
-   * it. Omit (or `auto`) to use the provider default.
+   * Model-specific quality tier, including `xhigh` and `max` for GPT Image 2.5.
+   * Forwarded as a provider-option; consult the card's quality choices for the
+   * accepted values. Omit to use the provider default; `auto` is forwarded as
+   * an explicit provider choice.
    */
   quality?: string;
+  /**
+   * Native background intent. Omitted/auto preserves provider defaults.
+   * Explicit opaque/transparent requires a verified provider route; unsupported
+   * requests fail before generation. Transparent output is requested as PNG.
+   */
+  background?: "auto" | "opaque" | "transparent";
 };
 
 export type ImageGeneratedImage = {

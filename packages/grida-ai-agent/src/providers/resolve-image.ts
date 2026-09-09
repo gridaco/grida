@@ -11,10 +11,9 @@
  *
  * Precedence mirrors `resolveProvider`: `BYOK_PROVIDER_METADATA` order,
  * intersected with (a) providers this card binds and (b) providers with a
- * stored key. Because the curated list is **universal** (every `listed` card
- * binds every provider — enforced by a catalog invariant test), one connected
- * key serves the whole list. Non-`listed` cards are not part of the v1 BYOK
- * surface and are rejected.
+ * stored key. A listed card may initially bind only one provider, so the
+ * connection must match that card's verified bindings. Non-`listed` cards
+ * are not part of the BYOK surface and are rejected.
  */
 
 import { models } from "@grida/ai-models";
@@ -27,6 +26,7 @@ import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
 import type { ProviderHttp } from "./http";
 import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
+import type { ImageGenerateRequest } from "../protocol/images";
 
 type ImageProvider = models.image.ImageProvider;
 
@@ -64,17 +64,22 @@ export class ImageModelUnavailableError extends Error {
      *  agent-visible message then names WHY (needs a reference-capable route)
      *  and, when known, which providers serve it — so the agent can tell the
      *  user which key to connect instead of a bare "unavailable". */
-    references?: { capable_providers: readonly string[] }
+    references?: { capable_providers: readonly string[] },
+    public readonly background?: "opaque" | "transparent"
   ) {
     super(
-      references
-        ? `[agent-host-images] no connected provider can generate ${model_id} with reference images (image-to-image)` +
+      background
+        ? `[agent-host-images] no connected provider can generate ${model_id} with a ${background} background` +
+            (references ? " and reference images" : "") +
+            (provider_id ? ` using ${provider_id}` : "")
+        : references
+          ? `[agent-host-images] no connected provider can generate ${model_id} with reference images (image-to-image)` +
             (references.capable_providers.length > 0
               ? ` — connect a key for: ${references.capable_providers.join(", ")}`
               : "")
-        : provider_id
-          ? `[agent-host-images] explicit provider not available: ${provider_id} for ${model_id}`
-          : `[agent-host-images] no provider available for ${model_id}`
+          : provider_id
+            ? `[agent-host-images] explicit provider not available: ${provider_id} for ${model_id}`
+            : `[agent-host-images] no provider available for ${model_id}`
     );
     this.name = "ImageModelUnavailableError";
   }
@@ -82,9 +87,8 @@ export class ImageModelUnavailableError extends Error {
 
 /**
  * The providers whose binding serves the image-to-image (references) route for
- * `card` — the set a user could connect a key for to unlock i2i. Today only
- * OpenRouter carries `references` bindings (verified live 2026-07-01), but this
- * reads the catalog so the error message stays honest as bindings are added.
+ * `card` — the set a user could connect a key for to unlock i2i. Reads the
+ * catalog so the error message stays honest as provider edit bindings change.
  */
 function referenceCapableProviders(
   card: models.image.ImageModelCard,
@@ -121,14 +125,16 @@ export type ResolveImageOptions = {
    * never lands on a text-to-image-only route.
    */
   references?: boolean;
+  /** Explicit non-auto modes require a verified native-background route. */
+  background?: ImageGenerateRequest["background"];
 };
 
 /**
  * The default image model for a caller that doesn't pick one (e.g. a bare
  * `generate_image({prompt})`). An EXPLICIT, tracked pin — {@link
  * DEFAULT_IMAGE_MODEL_ID} (see `./preferences`) — not "whatever the catalog
- * lists first". Because the curated list is universal (every `listed` card binds
- * every provider), one connected key serves it.
+ * lists first". The default pin binds every image provider; newer listed cards
+ * may require a specific provider connection.
  *
  * Fallback to the first curated `listed` card guards catalog drift only: if the
  * pin were ever dropped/unlisted, a connected key can still serve *some* default
@@ -156,8 +162,8 @@ export async function hasUsableImageProvider(
     if (!isImageProvider(p.id)) continue;
     if (await deps.secrets._getKey(p.id)) return true;
   }
-  // Grida hosted (GRIDA-SEC-006): a live session serves the curated list
-  // too — a signed-in keyless user gets in-chat image generation.
+  // Grida hosted (GRIDA-SEC-006): a live session serves cards with a Vercel
+  // binding too — a signed-in keyless user gets in-chat image generation.
   return liveGgMediaDeps(deps) !== null;
 }
 
@@ -169,7 +175,8 @@ function resolvedGgImage(
   modelId: string,
   card: models.image.ImageModelCard,
   hosted: { session: GridaGatewaySessionStore; base_url: string },
-  providerHttp?: ProviderHttp
+  providerHttp?: ProviderHttp,
+  background?: "opaque" | "transparent"
 ): ResolvedImageModel {
   return {
     provider_id: GG_PROVIDER_ID,
@@ -179,7 +186,8 @@ function resolvedGgImage(
       hosted.session,
       hosted.base_url,
       card.id,
-      providerHttp
+      providerHttp,
+      background
     ),
   };
 }
@@ -203,10 +211,16 @@ export async function resolveImageModel(
     (v) => !v.image.cardById(modelId)
   );
   const card = view.image.cardById(modelId);
-  // Unknown id, or a non-curated card (legacy / not universal) — not part of
-  // the v1 BYOK image surface.
+  const background =
+    options.background === "auto" ? undefined : options.background;
+  // Unknown id, or a non-curated card — not part of the BYOK image surface.
   if (!card || !card.listed) {
-    throw new ImageModelUnavailableError(modelId, options.explicit);
+    throw new ImageModelUnavailableError(
+      modelId,
+      options.explicit,
+      undefined,
+      background
+    );
   }
 
   // Explicit hosted pick — only grida is checked (mirrors the BYOK
@@ -214,10 +228,26 @@ export async function resolveImageModel(
   // has no references field, so i2i must ride a BYOK route.
   if (options.explicit === GG_PROVIDER_ID) {
     const hosted = !options.references && liveGgMediaDeps(deps);
-    if (!hosted || !view.image.binding(card, "vercel")) {
-      throw new ImageModelUnavailableError(modelId, GG_PROVIDER_ID);
+    if (
+      !hosted ||
+      !view.image.binding(card, "vercel") ||
+      (background &&
+        !models.image.supportsTransparentBackground(card, "vercel"))
+    ) {
+      throw new ImageModelUnavailableError(
+        modelId,
+        GG_PROVIDER_ID,
+        undefined,
+        background
+      );
     }
-    return resolvedGgImage(modelId, card, hosted, deps.provider_http);
+    return resolvedGgImage(
+      modelId,
+      card,
+      hosted,
+      deps.provider_http,
+      background
+    );
   }
 
   const order: ImageProvider[] = options.explicit
@@ -229,6 +259,13 @@ export async function resolveImageModel(
   for (const provider of order) {
     const binding = view.image.binding(card, provider);
     if (!binding) continue;
+    // Native alpha support is the conservative admission gate for both explicit
+    // modes. Unknown controls are not inferred from a model's vendor or name.
+    if (
+      background &&
+      !models.image.supportsTransparentBackground(card, provider)
+    )
+      continue;
     // For an image-to-image resolution, the provider must serve the edit route.
     // Skip t2i-only bindings so references never land where they're ignored.
     if (options.references && !binding.references) continue;
@@ -243,7 +280,8 @@ export async function resolveImageModel(
         provider,
         key.trim(),
         binding_id,
-        deps.provider_http
+        deps.provider_http,
+        background
       ),
       ...(options.references
         ? { references_max: binding.references!.max }
@@ -255,8 +293,19 @@ export async function resolveImageModel(
   // any card the hosted gateway can (a vercel binding), t2i only.
   if (!options.explicit && !options.references) {
     const hosted = liveGgMediaDeps(deps);
-    if (hosted && view.image.binding(card, "vercel")) {
-      return resolvedGgImage(modelId, card, hosted, deps.provider_http);
+    if (
+      hosted &&
+      view.image.binding(card, "vercel") &&
+      (!background ||
+        models.image.supportsTransparentBackground(card, "vercel"))
+    ) {
+      return resolvedGgImage(
+        modelId,
+        card,
+        hosted,
+        deps.provider_http,
+        background
+      );
     }
   }
 
@@ -269,6 +318,7 @@ export async function resolveImageModel(
     options.explicit,
     options.references
       ? { capable_providers: referenceCapableProviders(card, view) }
-      : undefined
+      : undefined,
+    background
   );
 }
