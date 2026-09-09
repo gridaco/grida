@@ -1162,33 +1162,21 @@ GRANT EXECUTE ON FUNCTION public.fn_billing_stamp_ai_credit_processed(text, text
 
 
 ---------------------------------------------------------------------
--- Metronome RPC privileges.
--- Their definitions and account/event extensions are described by
--- 20260508130000_grida_billing_metronome.sql; this reference remains partial.
--- Permission inventory covers every public billing entry point, including
--- those definitions, and is verified by billing_rpc_grants_test.sql.
+-- Metronome RPC permission reference (definitions not yet mirrored here).
+-- Definitions and account/event extensions live in
+-- ../migrations/20260508130000_grida_billing_metronome.sql.
+-- ../migrations/20260909090825_billing_rpc_grants.sql applies their grants:
+-- service_role has EXECUTE; PUBLIC, anon and authenticated have none.
+-- Keep this inventory as comments until the definitions are mirrored, so
+-- declarative schema tooling does not execute grants on absent functions.
+-- ../tests/billing_rpc_grants_test.sql verifies the migrated permissions.
 ---------------------------------------------------------------------
-
-REVOKE ALL ON FUNCTION
-  public.fn_billing_apply_metronome_event(text, text, jsonb),
-  public.fn_billing_get_metronome_account(bigint),
-  public.fn_billing_set_metronome_ids(bigint, text, text),
-  public.fn_billing_set_balance_cache(bigint, bigint, boolean),
-  public.fn_billing_set_auto_reload(bigint, boolean, integer, integer),
-  public.fn_billing_resolve_org_by_metronome_customer(text),
-  public.fn_billing_list_provisioned_orgs(),
-  public.fn_billing_list_metronome_events(bigint, integer),
-  public.fn_billing_debit_balance_cache(bigint, bigint, bigint)
-FROM PUBLIC, anon, authenticated;
-
-GRANT EXECUTE ON FUNCTION
-  public.fn_billing_apply_metronome_event(text, text, jsonb),
-  public.fn_billing_get_metronome_account(bigint),
-  public.fn_billing_set_metronome_ids(bigint, text, text),
-  public.fn_billing_set_balance_cache(bigint, bigint, boolean),
-  public.fn_billing_set_auto_reload(bigint, boolean, integer, integer),
-  public.fn_billing_resolve_org_by_metronome_customer(text),
-  public.fn_billing_list_provisioned_orgs(),
-  public.fn_billing_list_metronome_events(bigint, integer),
-  public.fn_billing_debit_balance_cache(bigint, bigint, bigint)
-TO service_role;
+-- public.fn_billing_apply_metronome_event(text, text, jsonb)
+-- public.fn_billing_get_metronome_account(bigint)
+-- public.fn_billing_set_metronome_ids(bigint, text, text)
+-- public.fn_billing_set_balance_cache(bigint, bigint, boolean)
+-- public.fn_billing_set_auto_reload(bigint, boolean, integer, integer)
+-- public.fn_billing_resolve_org_by_metronome_customer(text)
+-- public.fn_billing_list_provisioned_orgs()
+-- public.fn_billing_list_metronome_events(bigint, integer)
+-- public.fn_billing_debit_balance_cache(bigint, bigint, bigint)
