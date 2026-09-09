@@ -287,9 +287,11 @@ export namespace InputSchema {
           if ((value.length / 4) * 3 - padding > maximum) throw 0;
           const decoded = atob(value);
           if (!decoded.length || decoded.length > maximum) throw 0;
-          return Uint8Array.from(decoded, (character) =>
-            character.charCodeAt(0)
-          );
+          // Avoid expanding a multi-megabyte string through the iterable path.
+          const bytes = new Uint8Array(decoded.length);
+          for (let i = 0; i < decoded.length; i++)
+            bytes[i] = decoded.charCodeAt(i);
+          return bytes;
         }
         if (
           !(value instanceof Uint8Array) ||

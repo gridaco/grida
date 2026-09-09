@@ -540,16 +540,32 @@ describe("MediaOperations JSON input", () => {
   });
 
   it("enforces the encoded and decoded 8 MiB image input bounds", () => {
-    const data = btoa("x".repeat(8 * 1024 * 1024));
+    const maximum = 8 * 1024 * 1024;
+    const pattern = String.fromCharCode(
+      ...Array.from({ length: 256 }, (_, byte) => byte)
+    );
+    const data = btoa(pattern.repeat(maximum / pattern.length));
     const result = operations.parseInput(trellis, {
       image: { data, media_type: "image/webp" },
     });
     if (result.kind !== "three-d" || result.model_id !== trellis.model_id)
       throw new Error("Expected TRELLIS input");
-    expect(result.input.image.data).toHaveLength(8 * 1024 * 1024);
+    expect(result.input.image.data).toHaveLength(maximum);
+    expect(
+      result.input.image.data.every((byte, index) => byte === index % 256)
+    ).toBe(true);
+    const decode = vi.spyOn(globalThis, "atob");
+    // 8 MiB ends with two bytes, so a third byte fits in the same base64 length.
+    const decodedOverflow = data.slice(0, -4) + btoa(pattern.slice(-2) + "\0");
+    expect(decodedOverflow).toHaveLength(data.length);
     rejects(() =>
       operations.parseInput(trellis, {
-        image: { data: data + "AAAA", media_type: "image/webp" },
+        image: { data: decodedOverflow, media_type: "image/webp" },
+      })
+    );
+    rejects(() =>
+      operations.parseInput(trellis, {
+        image: { data: decodedOverflow + "AAAA", media_type: "image/webp" },
       })
     );
     for (const invalid of ["", "AQ", "!!!!", "AAAA==="])
@@ -558,6 +574,7 @@ describe("MediaOperations JSON input", () => {
           image: { data: invalid, media_type: "image/webp" },
         })
       );
+    expect(decode).not.toHaveBeenCalled();
   });
 
   it("rejects JSON controls, unknown fields and undefined optional fields", () => {
