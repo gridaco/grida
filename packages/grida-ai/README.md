@@ -111,7 +111,7 @@ or value advertised by a provider's model card.
 
 `parseInput` returns a `kind`-discriminated native `{ selection, input }` pair.
 Speech JSON includes `voice_id` and `text`; the normalized voice ID moves into the
-selection. Exact image-input 3D JSON uses
+selection. Image-input 3D JSON and the exact inline-capable video route use
 `{ "image": { "data": "AQID", "media_type": "image/png" } }`, with base64 data
 decoded to `Uint8Array`. Local paths are not inputs to this package. `AbortSignal`
 is a separate native execution control and is never accepted from JSON.
@@ -218,15 +218,49 @@ const result = await operation.generate({
 Selection is explicit, with the same opt-in `auto` precedence as images.
 The frozen descriptor includes `input: "text" | "image" | "text-or-image"` from
 the selected catalogue binding. `image: true` selects a start-frame operation;
-its generation requires an authorized HTTPS `image_url`. A text selection rejects
-an image URL. Capability facts are owned by `@grida/ai-models`; absent facts in old
+its generation requires an authorized HTTPS `image_url`, or bounded image bytes
+where that exact operation's input schema declares `image`. A text selection rejects
+image inputs. Capability facts are owned by `@grida/ai-models`; absent facts in old
 snapshots use only exact canonical/provider/binding matches to bundled facts.
 Changed, removed, or explicitly unknown bindings do not inherit capabilities.
 GG remains text-only and requires a text-eligible Vercel binding. The current fal
 bindings and Vercel Grok require a start frame. OpenRouter uses `frame_images` with
 `first_frame`; the exact fal Wan binding uses `start_image_url`.
 
-Generation accepts `aspect_ratio` as positive integer `W:H`, `resolution` as
+The exact fal `fal-ai/veo3.1/lite/image-to-video` binding (bundled as
+`google/veo-3.1-lite`) also accepts `image: { data: Uint8Array, media_type }`.
+Its JSON equivalent is `{ "image": { "data": "AQID", "media_type": "image/png" } }`.
+Supply exactly one of `image` or `image_url`; `image_url` remains HTTPS-only.
+The same exact route accepts optional boolean `generate_audio`; explicit `false`
+requests silent video and is forwarded unchanged. Omission leaves the serving
+route's default (`true`) in effect. Native callers and JSON use the same schema;
+other bindings do not inherit this field. See the
+[serving contract](https://fal.ai/models/fal-ai/veo3.1/lite/image-to-video/api).
+The SDK admits nonempty PNG, JPEG, or WebP bytes up to **8,000,000 bytes** and
+copies them before awaiting credentials. Base64 JSON is bounded before decoding;
+native bytes become a bounded data URL on the existing authenticated fal request.
+The [fal API documents inline file inputs and an 8 MB image limit](https://fal.ai/models/fal-ai/veo3.1/lite/image-to-video/api),
+and the [model input form lists the admitted formats](https://fal.ai/models/fal-ai/veo3.1/lite/image-to-video).
+The SDK uses this conservative format subset and decimal byte ceiling; it does
+not decode image pixels, resize frames, or promise upstream content acceptance.
+Other video bindings remain HTTPS-only, including OpenRouter and Vercel.
+
+`MediaOperations.inspect(...).input_schema.properties.image` is present only
+when bytes are supported. Its nested `data` schema states the base64 and decoded
+byte bounds, and `media_type.enum` lists accepted MIME types. Root `oneOf` states
+the exclusive input choice. Hosts can inspect these facts before authorizing or
+loading an image; filenames, paths, uploads, and storage remain host concerns.
+
+For this exact fal Lite binding, numeric `duration` is limited to `4`, `6`, or `8`
+and maps to `"4s"`, `"6s"`, or `"8s"`. Resolution stays in the SDK's `WxH` shape:
+`1280x720` / `720x1280` map to `"720p"`, and `1920x1080` / `1080x1920` to
+`"1080p"`, with the matching `16:9` / `9:16` aspect ratio. A conflicting explicit
+aspect ratio fails; omitted options retain provider defaults. Unsupported
+dimensions, durations, aspect ratios, and `fps` fail before the generation key
+lookup. These route-specific constraints are part of the inspected schema and
+the same native/JSON parser that owns serialization eligibility.
+
+Other routes accept `aspect_ratio` as positive integer `W:H`, `resolution` as
 positive integer `WxH` (not a catalogue price label such as `720p`), positive finite
 `duration`/`fps`, and a safe-integer `seed`. The pinned Vercel adapter silently omits
 zero upstream, so direct Vercel `seed: 0` is rejected as `invalid_input` before key

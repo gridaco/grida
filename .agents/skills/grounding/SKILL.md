@@ -47,8 +47,9 @@ Disagreement → decide which wins _and why_ (`git log -1` recency, what
 the running entrypoint imports, what tests assert); don't average;
 surface a material conflict to the user. **Never authoritative even when
 they match:** `docs/_history/`,
-`docs/@designto-code/` (synced — truth is upstream), `docs/cli/`
-(deprecated), `.ref/`.
+`docs/@designto-code/` (synced — truth is upstream), `.ref/`.
+`docs/cli/` is the replacement CLI's maintained user guide; only its explicitly
+retired legacy pages are historical. Follow `docs/AGENTS.md` for that boundary.
 
 ## Dead-tree traps
 

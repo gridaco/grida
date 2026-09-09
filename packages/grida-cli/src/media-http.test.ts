@@ -6,6 +6,7 @@ import https from "node:https";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MediaHttp } from "./media-http";
+import { oauthClientRegistration } from "./oauth-client-registration";
 
 vi.mock("node:dns/promises", () => ({ lookup: vi.fn<typeof lookup>() }));
 vi.mock("node:http", async (original) => {
@@ -442,7 +443,88 @@ describe("MediaHttp provider authority", () => {
     expect(sockets[0]!.body).toEqual(Buffer.from("{}"));
   });
 
-  it("admits GG only at the explicit trusted fixture origin and fixed media routes", async () => {
+  it.each(["images", "videos", "music"])(
+    "routes hosted GG %s through public DNS and verified TLS, never loopback",
+    async (kind) => {
+      const ggOrigin = oauthClientRegistration.apiOrigin;
+      const endpoint = `${ggOrigin}/api/v1/ai/${kind}/generations`;
+      await refused(endpoint, json);
+      expect(lookup).not.toHaveBeenCalled();
+      host = new MediaHttp({ ggOrigin });
+      expect(await (await host.transport.request(endpoint, json)).text()).toBe(
+        "ok"
+      );
+      const authority = new URL(ggOrigin).hostname;
+      expect(lookup).toHaveBeenCalledExactlyOnceWith(authority, {
+        all: true,
+        verbatim: true,
+      });
+      expect(http.request).not.toHaveBeenCalled();
+      expect(https.request).toHaveBeenCalledOnce();
+      const options = sockets[0]!.options;
+      expect(options).toMatchObject({
+        protocol: "https:",
+        hostname: authority,
+        servername: authority,
+        rejectUnauthorized: true,
+        port: 443,
+        agent: false,
+        headers: { authorization: "Bearer synthetic-key" },
+      });
+      const pinned = vi.fn<(...args: unknown[]) => void>();
+      options.lookup!(authority, { family: 4 }, pinned);
+      expect(pinned).toHaveBeenCalledWith(null, "93.184.216.34", 4);
+    }
+  );
+
+  it("keeps hosted GG credentials within the fixed media POST routes", async () => {
+    const ggOrigin = oauthClientRegistration.apiOrigin;
+    host = new MediaHttp({ ggOrigin });
+    for (const path of [
+      "/api/v1/auth/me",
+      "/api/v1/ai/token",
+      "/api/v1/ai/images/generations?other=1",
+    ]) {
+      await refused(`${ggOrigin}${path}`, json);
+    }
+    await refused(`${ggOrigin}/api/v1/ai/images/generations`, {
+      ...json,
+      method: "GET",
+      body: undefined,
+    });
+    await refused("http://127.0.0.1:3041/api/v1/ai/images/generations", json);
+    await refused(`${ggOrigin}/api/v1/ai/images/generations`, json, true);
+    expect(lookup).not.toHaveBeenCalled();
+    expect(sockets).toHaveLength(0);
+  });
+
+  it("rejects private hosted GG DNS and redirects before credential replay", async () => {
+    const ggOrigin = oauthClientRegistration.apiOrigin;
+    host = new MediaHttp({ ggOrigin });
+    const endpoint = `${ggOrigin}/api/v1/ai/images/generations`;
+    vi.mocked(lookup).mockResolvedValueOnce([
+      { address: "93.184.216.34", family: 4 },
+      { address: "127.0.0.1", family: 4 },
+    ] as never);
+    await refused(endpoint, json);
+    expect(sockets).toHaveLength(0);
+    fixtures.push({ status: 307, headers: { location: endpoint } });
+    await refused(endpoint, json);
+    expect(sockets).toHaveLength(1);
+    expect(sockets[0]!.destroy).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    "https://other.invalid",
+    "http://grida.co",
+    "https://grida.co/",
+    "https://grida.co:444",
+    "https://user@grida.co",
+  ])("refuses an unregistered GG origin %s", (ggOrigin) => {
+    expect(() => new MediaHttp({ ggOrigin })).toThrow("media_transport_failed");
+  });
+
+  it("admits local GG only at the explicit trusted fixture origin and fixed media routes", async () => {
     await refused("http://127.0.0.1:3041/api/v1/ai/music/generations", json);
     expect(() => new MediaHttp({ ggOrigin: "http://localhost:3041" })).toThrow(
       "media_transport_failed"
@@ -460,6 +542,10 @@ describe("MediaHttp provider authority", () => {
     }
     await refused("http://127.0.0.1:3041/api/v1/auth/me", json);
     await refused("http://127.0.0.1:3042/api/v1/ai/music/generations", json);
+    await refused(
+      `${oauthClientRegistration.apiOrigin}/api/v1/ai/images/generations`,
+      json
+    );
     expect(lookup).not.toHaveBeenCalled();
     expect(http.request).toHaveBeenCalledTimes(3);
   });

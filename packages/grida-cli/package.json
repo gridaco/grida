@@ -9,7 +9,8 @@
     "grida": "./dist/bin.mjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "THIRD-PARTY-NOTICES.txt"
   ],
   "type": "module",
   "scripts": {

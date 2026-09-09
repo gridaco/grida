@@ -44,7 +44,26 @@ const docs_site_docs_root = path.join(__dirname, "../../docs");
  *  - intro.md
  */
 function handle_translations() {
+  clearGeneratedDocsTranslations(docs_site_root);
   handle_dir(docs_site_docs_root);
+}
+
+// Only this subtree is generated from root docs translations. Preserve locale
+// messages, theme configuration, blog content and any versioned documentation.
+function clearGeneratedDocsTranslations(siteRoot) {
+  const localeRoot = path.join(siteRoot, "i18n");
+  if (!fse.existsSync(localeRoot)) return;
+  for (const entry of fse.readdirSync(localeRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    fse.removeSync(
+      path.join(
+        localeRoot,
+        entry.name,
+        "docusaurus-plugin-content-docs",
+        "current"
+      )
+    );
+  }
 }
 
 function is_valid_translations_dir(dir_path) {
@@ -286,6 +305,7 @@ function main() {
 }
 
 module.exports = main;
+module.exports.clearGeneratedDocsTranslations = clearGeneratedDocsTranslations;
 
 // for dev
 if (require.main === module) {

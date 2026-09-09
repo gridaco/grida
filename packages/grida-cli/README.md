@@ -13,11 +13,14 @@ Media commands discover models/schemas, inspect provider key presence, list spee
 voices and generate image, video, music, sound effects, speech and supported 3D.
 Agent, render and MCP are deferred.
 
-Documentation has one canonical home: the
+User documentation has one canonical home: the
+[Grida CLI guide](https://grida.co/docs/cli). Contributor design lives in the
 [CLI contract](https://grida.co/docs/wg/cli/v1) and
 [doctrine](https://grida.co/docs/wg/cli/index).
 Installed help describes implemented syntax; `grida docs [command...]` prints a
 canonical URL without fetching it or opening a browser. No guide tree is bundled.
+The [docs check](https://github.com/gridaco/grida/tree/main/scripts/cli-docs)
+verifies actual guide examples, built routes and installed documentation links.
 
 ## Ownership
 
@@ -33,6 +36,21 @@ implicit login, silent provider fallback, or a plugin framework for hypothetical
 commands. Validate syntax before initializing a host. SDK reads are separate
 observations, not an atomic identity/membership snapshot.
 
+## OAuth client registration
+
+The production client ID, issuer, API origin and callback URLs live in
+[`src/oauth-client-registration.ts`](https://github.com/gridaco/grida/blob/main/packages/grida-cli/src/oauth-client-registration.ts).
+These public values are intentionally versioned in Git and bundled with the CLI.
+The CLI host consumes them; the shared auth SDK remains registration-agnostic.
+Changes must stay aligned with the Supabase OAuth app and Grida server allowlist.
+Issuer/client/API changes also affect existing credential profile identity.
+
+Account commands use this hosted public registration:
+Grida's HTTPS issuer/API and the two registered loopback callbacks. Public client
+metadata is not a secret or proof of binary identity. No environment variable or
+repository file can override the hosted issuer, API origin or client ID.
+Hosted consent/API deployment and own-account acceptance remain release gates.
+
 ## Local development
 
 Build the auth/account/AI workspace dependencies, then `pnpm --filter grida build`.
@@ -40,14 +58,22 @@ Use `node packages/grida-cli/dist/bin.mjs --help` from the repository root.
 The build bundles private workspace dependencies; the optional native
 `@github/keytar` binding stays external and declared in the packed manifest.
 
-Authenticated preview commands require an explicit local fixture registration
-and isolated `GRIDA_HOME`. There is no hosted default or repository configuration
-discovery. Set `GRIDA_CLI_LOCAL_CONFIG` to the fixture's absolute public-client
-JSON path and `GRIDA_HOME` to a separate absolute private directory outside your
-ordinary Grida home. The
+Hosted custody uses `~/.grida/auth`, or the `auth` directory beneath an explicit
+absolute `GRIDA_HOME`; it remains separate from Desktop sessions and provider
+keys. Empty/relative auth home overrides fail instead of selecting another store.
+For local development, set `GRIDA_CLI_LOCAL_CONFIG` to the fixture's absolute
+public-client JSON path and `GRIDA_HOME` to a separate absolute private directory
+outside your ordinary Grida home. This explicit override accepts only the fixed
+local fixture issuer/API. Invalid local configuration never falls back to hosted
+authentication. There is no repository or dotenv discovery. The
 [installed-CLI proof](https://github.com/gridaco/grida/tree/main/scripts/cli-local)
-owns the setup and checks. Hosted registration, cross-platform CI and npm release
-automation are release prerequisites.
+owns the fixture setup and checks. Cross-platform CI, deployed account access and
+npm release approval are release prerequisites.
+
+The [release preparation](https://github.com/gridaco/grida/tree/main/scripts/cli-release)
+owns candidate packing, independent CI publication and recovery. The package
+ships third-party notices for its bundled dependencies; review that inventory
+when changing the bundle.
 
 Node.js 24 or later is required. Durable auth currently supports macOS and Linux;
 Windows auth fails closed. An unavailable keyring never selects file storage
@@ -64,6 +90,9 @@ machine. Signals cancel login; an in-flight credential write is allowed to settl
 ## Media access and files
 
 `grida models list` and `models inspect` are offline and credential-free.
+Listing shows accepted local-image flags; `models list --local-image` keeps only
+operations accepting `--reference FILE` or `--image FILE`. The column, JSON
+`local_image_flags`, filter and inspection guidance derive from the SDK schema.
 The [media contract](https://grida.co/docs/wg/cli/media) owns examples, schemas,
 variants, availability and result rules. Installed help stays minimal.
 
@@ -84,8 +113,9 @@ access. The same native owner serves Desktop, independently of its lifetime.
 Environment keys or `--key-stdin` override storage without opening it or persisting
 input. Blank/malformed explicit keys fail; unset a variable to select storage.
 Stored BYOK currently supports macOS/Linux only; Windows CLI users can supply
-explicit environment/stdin keys. Account OAuth and ChatGPT stores remain separate. GG needs the local native registration
-above, login and an organization. The auth owner hands a scoped grant into
+explicit environment/stdin keys. Account OAuth and ChatGPT stores remain separate.
+GG needs account login and an organization through the selected registration
+above. The auth owner hands a scoped grant into
 one invocation's memory store; account tokens never enter provider execution.
 
 For manual file configuration, follow the
@@ -95,7 +125,25 @@ the `providers` directory at `0700`, the file at `0600`, and preserve version
 and migration metadata. `grida providers --help` also prints the location and
 format link without opening the credential store.
 
-`generate` validates JSON and probes a fresh output directory before authority
+`generate` accepts `--prompt`/`--prompt-file`, `--text`/`--text-file` with `--voice`
+for speech, ordered `--reference` inputs and a single `--image`. `--param FIELD=VALUE`
+sets advertised scalar fields; complex requests retain the exclusive `--input @file|-`
+mode. Both lower to the same SDK input parser. Media flags select a compatible
+variant; they never switch provider, model or billing route. Human `models inspect`
+shows inputs and an example; `--json` keeps the full descriptor.
+The fal Veo 3.1 Lite route accepts `--param generate_audio=false` for silent video;
+omission retains the provider's audio-enabled default. Unadvertised routes refuse it.
+
+Explicit file paths resolve from the working directory. Text uses UTF-8; local
+PNG/JPEG/static WebP images use content-based header admission, without pixel
+decoding or transcoding. Files are read once with bounded bytes and lifetime.
+Local images are capped at 8 MiB each, aggregate image reads at 16 MiB, and the
+assembled JSON at 16 MiB including base64 expansion. SDK limits can be lower.
+No arbitrary JSON string is a file grant; no input URL is fetched by this host.
+Inline input support belongs to the selected operation's public schema. See the
+[media contract](https://grida.co/docs/wg/cli/media) for current route coverage.
+
+`generate` validates input and probes a fresh output directory before authority
 or paid submission. It saves artifacts and a safe receipt with local paths and
 hashes. Existing files are never replaced. A failed save reports already
 published files; no paid operation is automatically replayed. Signals abort
@@ -106,5 +154,5 @@ The CLI owns a Node HTTP adapter with fixed provider routes, DNS-address
 validation and pinning, and credential-free result downloads. It is independent
 of the Desktop transport and sandbox. The
 [installed synthetic media proof](https://github.com/gridaco/grida/tree/main/scripts/cli-media-local)
-checks the packed executable without real provider calls. Hosted registration,
-actual provider compatibility and cross-platform release checks remain release gates.
+checks the packed executable without real provider calls. Deployed account/GG
+access, actual provider compatibility and cross-platform release checks remain release gates.

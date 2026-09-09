@@ -18,11 +18,9 @@ describe("CLI grammar", () => {
     const docs = Cli.parse(["docs", "auth", "storage"]);
     expect(docs).toMatchObject({ command: "docs", topic: "auth storage" });
     expect(Cli.docsUrl("account credits")).toBe(
-      "https://grida.co/docs/wg/cli/v1"
+      "https://grida.co/docs/cli/account"
     );
-    expect(Cli.docsUrl("auth storage")).toBe(
-      "https://grida.co/docs/wg/cli/credential-custody"
-    );
+    expect(Cli.docsUrl("auth storage")).toBe("https://grida.co/docs/cli/auth");
   });
 
   it("keeps numeric slugs distinct from organization IDs", () => {
@@ -89,6 +87,70 @@ describe("CLI grammar", () => {
 });
 
 describe("media command grammar", () => {
+  const friendly = [
+    "generate",
+    "--provider",
+    "openrouter",
+    "--model",
+    "openai/gpt-image-2",
+    "--out",
+    "./result",
+  ];
+  it("accepts ordered references and parameters without requiring JSON", () => {
+    expect(
+      Cli.parse([
+        ...friendly,
+        "--prompt",
+        "  a=b\n",
+        "--reference",
+        "./first.png",
+        "--reference",
+        "./second.png",
+        "--param",
+        "quality=high",
+        "--param",
+        "seed=0",
+      ])
+    ).toMatchObject({
+      command: "generate",
+      request: {
+        prompt: "  a=b\n",
+        references: ["./first.png", "./second.png"],
+        parameters: [
+          { field: "quality", value: "high" },
+          { field: "seed", value: "0" },
+        ],
+      },
+    });
+  });
+  it.each([
+    ["--prompt", "a", "--prompt", "b"],
+    ["--prompt", "a", "--prompt-file", "./b.txt"],
+    ["--text", "a", "--text-file", "./b.txt"],
+    ["--prompt", "a", "--text", "b"],
+    ["--reference", "a.png", "--image", "b.png"],
+    ["--image", "-"],
+    ["--reference", "-"],
+    ["--prompt", "a", "--input", "@request.json"],
+    ["--prompt-file", "-", "--key-stdin"],
+    ["--text-file", "-", "--key-stdin"],
+    ["--param", "seed=1", "--param", "seed=2"],
+    ["--param", "seed"],
+    ["--param", "__proto__=bad"],
+  ])("rejects ambiguous request construction %j", (...flags) => {
+    expect(() => Cli.parse([...friendly, ...flags])).toThrow(Cli.Failure);
+  });
+  it("allocates stdin to text or a key, never both", () => {
+    expect(Cli.parse([...friendly, "--prompt-file", "-"])).toMatchObject({
+      request: { promptFile: "-" },
+    });
+    expect(
+      Cli.parse([...friendly, "--prompt-file", "./prompt.txt", "--key-stdin"])
+    ).toMatchObject({
+      request: { promptFile: "./prompt.txt" },
+      keyStdin: true,
+    });
+  });
   it("keeps provider persistence explicit and keys off argv", () => {
     expect(
       Cli.parse(["providers", "configure", "fal", "--help"])
@@ -126,6 +188,11 @@ describe("media command grammar", () => {
     expect(Cli.parse(["models", "list"])).toMatchObject({
       command: "models list",
       available: false,
+      localImage: false,
+    });
+    expect(Cli.parse(["models", "list", "--local-image"])).toMatchObject({
+      command: "models list",
+      localImage: true,
     });
     expect(
       Cli.parse([
@@ -153,7 +220,7 @@ describe("media command grammar", () => {
       ])
     ).toMatchObject({ command: "models inspect", model: "fal-ai/trellis-2" });
     expect(Cli.docsUrl("models inspect")).toBe(
-      "https://grida.co/docs/wg/cli/media"
+      "https://grida.co/docs/cli/models"
     );
   });
   it("accepts explicit file input and a separately owned stdin key", () => {
@@ -182,6 +249,7 @@ describe("media command grammar", () => {
   });
   it.each([
     ["models", "list", "--available"],
+    ["providers", "list", "--local-image"],
     ["models", "list", "--provider", "fal", "--org", "studio"],
     ["models", "inspect", "--model", "x"],
     ["models", "inspect", "--provider", "auto", "--model", "x"],

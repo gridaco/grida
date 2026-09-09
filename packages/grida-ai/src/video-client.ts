@@ -135,7 +135,7 @@ export class VideoClient {
   ): Promise<VideoClient.Result> {
     let request: MediaRequest | undefined;
     try {
-      const args = generationInput(input, image, descriptor.provider_id);
+      const args = generationInput(input, image, descriptor);
       request = new MediaRequest(this.#http, args.signal);
       request.check();
       let raw: videoModels.Video[];
@@ -249,11 +249,19 @@ export namespace VideoClient {
     resolution?: `${number}x${number}`;
     duration?: number;
     fps?: number;
+    /** Explicit audio control only where the selected route's schema advertises it. */
+    generate_audio?: boolean;
     /** Safe integer. The pinned Vercel adapter cannot honor zero and rejects it. */
     seed?: number;
-    /** An already authorized HTTPS start frame; local files and inline data are not read. */
+    /** An already authorized HTTPS start frame. Mutually exclusive with image. */
     image_url?: string;
+    /** Bounded host-resolved bytes; admitted only by exact routes whose input schema declares image. */
+    image?: Image;
     signal?: AbortSignal;
+  };
+  export type Image = {
+    data: Uint8Array;
+    media_type: "image/png" | "image/jpeg" | "image/webp";
   };
   export type Result = { videos: { data: Uint8Array; media_type: string }[] };
   export type FailureCode =
@@ -302,13 +310,16 @@ function selection(value: VideoClient.Selection): VideoClient.Selection {
 function generationInput(
   value: VideoClient.Input,
   image: boolean,
-  provider: VideoClient.Provider
+  descriptor: VideoClient.Descriptor
 ): VideoClient.Input {
   try {
+    const rule = MediaInputs.video(image, descriptor);
     return InputSchema.native(
-      MediaInputs.video(image, provider),
+      rule,
       value,
-      image ? [] : ["image_url"]
+      ["image_url", "image", "fps"].filter(
+        (field) => !Object.hasOwn(rule.schema.properties as object, field)
+      )
     );
   } catch {
     throw new VideoClient.Failure("invalid_input");

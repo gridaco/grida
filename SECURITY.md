@@ -881,7 +881,7 @@ Today:
   permission limits and the separate authority required for future custom endpoints.
 - [Shared image operation](packages/grida-ai/src/image-client.ts), [provider HTTP](packages/grida-ai/src/http.ts), [BYOK image adapters](packages/grida-ai/src/image-byok.ts), [GG request helpers](packages/grida-ai/src/gg.ts), [GG image adapter](packages/grida-ai/src/image-gg.ts), and [provider entry](packages/grida-ai/src/providers.ts) — caller-selected provider authority, live credential reads, distinct request/download lanes, and safe image outcomes. The operation never retries a failed paid batch; requested multiple images may require multiple provider-sized batches. Existing agent imports delegate to these owners. The [SDK contract](packages/grida-ai/README.md) defines host responsibilities. [Image operation tests](packages/grida-ai/src/image-client.test.ts) and [download tests](packages/grida-ai/src/http.test.ts) pin credential isolation, safe failures and bounded asset reads. The [queue and URL helpers](packages/grida-ai/src/fetch-helpers.ts), [their tests](packages/grida-ai/src/fetch-helpers.test.ts), and [BYOK adapter tests](packages/grida-ai/src/image-byok.test.ts) preserve provider-owned polling and credential-free result downloads.
 - [HTTP image adapter tests](packages/grida-ai-agent/src/http/routes/images.test.ts) and [workspace image adapter tests](packages/grida-ai-agent/src/runtime/image-generation.test.ts) — existing admission and host persistence around the shared operation, reference capability before file reads, safe host failures, and no paid retry.
-- [Shared video operation](packages/grida-ai/src/video-client.ts), [provider adapters](packages/grida-ai/src/video-models.ts), and [bounded invocation](packages/grida-ai/src/media-request.ts) — video resolution and execution without host types. One submission uses the selected provider and a private invocation credential; a changed key cannot retarget an accepted job. Submission, polling and result reads share a deadline and cancellation. Provider-owned URL restrictions and separate request/download lanes remain enforced; all result representations are bounded before bytes reach the host. HTTP admission, base64 wire responses and media persistence remain in the [video route](packages/grida-ai-agent/src/http/routes/video.ts), with a thin [resolver adapter](packages/grida-ai-agent/src/providers/resolve-video.ts). This replaces the former agent `video-byok.ts` owner. [Operation tests](packages/grida-ai/src/video-client.test.ts) pin provider wires, credentials, cancellation, deadlines, hostile results and safe failures; [route tests](packages/grida-ai-agent/src/http/routes/video.test.ts) pin the host contract.
+- [Shared video operation](packages/grida-ai/src/video-client.ts), [provider adapters](packages/grida-ai/src/video-models.ts), and [bounded invocation](packages/grida-ai/src/media-request.ts) — video resolution and execution without host types. One submission uses the selected provider and a private invocation credential; a changed key cannot retarget an accepted job. The exact fal `fal-ai/veo3.1/lite/image-to-video` binding admits one HTTPS frame or PNG/JPEG/WebP bytes up to 8,000,000 bytes. Shared native/JSON rules expose that exact capability, bound base64 before decoding, snapshot bytes before credential lookup, and reject unsupported representations/options before generation authority. Its private adapter creates a bounded inline data URL and maps accepted numeric duration/dimensions to the documented fal wire. Other bindings retain HTTPS-only frame inputs; no filesystem read, upload route or new host grant is added. Submission, polling and result reads share a deadline and cancellation. Provider-owned URL restrictions and separate request/download lanes remain enforced; all result representations are bounded before bytes reach the host. HTTP admission, base64 wire responses and media persistence remain in the [video route](packages/grida-ai-agent/src/http/routes/video.ts), with a thin [resolver adapter](packages/grida-ai-agent/src/providers/resolve-video.ts). This replaces the former agent `video-byok.ts` owner. [Operation tests](packages/grida-ai/src/video-client.test.ts) pin provider wires, image input bounds/snapshots, credentials, cancellation, deadlines, hostile results and safe failures; [route tests](packages/grida-ai-agent/src/http/routes/video.test.ts) pin the host contract.
 - [Shared music operation](packages/grida-ai/src/music-client.ts) and [its tests](packages/grida-ai/src/music-client.test.ts) — GG-only text-to-music with no BYOK credential capability or direct Replicate access. The existing scoped token and host-authorized request lane carry one submission. The shared [media invocation](packages/grida-ai/src/media-request.ts) bounds its lifetime and response reads; only bounded MP3 bytes and MIME type leave the operation. The [music route](packages/grida-ai-agent/src/http/routes/music.ts) retains HTTP admission, canonical filenames and optional root-level storage receipts, pinned by [route tests](packages/grida-ai-agent/src/http/routes/music.test.ts). This replaces the former agent `gg-media.ts` music adapter.
 - [Shared sound-effect operation](packages/grida-ai/src/sound-effect-client.ts) and [its tests](packages/grida-ai/src/sound-effect-client.test.ts) — the existing ElevenLabs BYOK model uses one fixed provider endpoint and a live key from the host's narrow reader. No GG credential or download destination is available. The shared [media invocation](packages/grida-ai/src/media-request.ts) bounds credential lookup, response reads and cancellation; only nonempty MP3 bytes within 16 MiB and a MIME type leave the operation. The [sound-effects route](packages/grida-ai-agent/src/http/routes/sound-effects.ts) and [its tests](packages/grida-ai-agent/src/http/routes/sound-effects.test.ts) retain admission, missing-key status, wire encoding, filenames and optional root-level receipts. Safe failures omit credential and upstream details. This replaces the former agent `elevenlabs-sound-effects.ts` adapter.
 - [Standalone package proof](scripts/ai-local/proof.mjs), [runtime guard](scripts/ai-local/network.cjs), [image consumer](scripts/ai-local/consumer.mjs), [video consumer](scripts/ai-local/video-consumer.mjs), [music consumer](scripts/ai-local/music-consumer.mjs), [sound-effect consumer](scripts/ai-local/sound-effect-consumer.mjs), [speech and voice consumer](scripts/ai-local/text-to-speech-consumer.mjs), [3D consumer](scripts/ai-local/three-d-consumer.mjs), and [guide](scripts/ai-local/README.md) — packed public exports with only declared production dependencies, synthetic transports, and guarded ambient network/credential/state access. No Grida host is installed or started.
@@ -1808,12 +1808,17 @@ credential through reuse of an existing browser or daemon bridge.
     There is no automatic replay, remint or weaker credential fallback. The
     server independently verifies the live OAuth bearer and explicit current-user
     membership before the shared GG mint policy signs a token.
-11. **Thin CLI account host.** Account commands in the private `grida` preview
-    accept only an explicit bounded, owner-controlled local public-client file
-    and separate `GRIDA_HOME`; the account host does
-    not discover repository configuration, hosted registration, Desktop cookies
-    or provider keys. It refuses the process home and ordinary Grida home,
-    including existing filesystem aliases, before opening native custody. Browser
+11. **Thin CLI account host.** Account commands select the public hosted
+    registration pinned in the executable: fixed HTTPS issuer/API, client ID and
+    registered loopback callbacks. No environment or repository configuration
+    changes hosted destination authority. Custody uses the canonical Grida home
+    or an explicit absolute `GRIDA_HOME`, with issuer/client/API profile binding.
+    Empty/relative overrides and filesystem-root/user-home targets fail before
+    custody. The explicit local fixture file remains bounded and owner-controlled,
+    accepts only the fixed local issuer/API and registered callbacks, and requires
+    a separate home outside ordinary Grida home, including filesystem aliases.
+    Invalid local configuration never falls back to hosted authority. The host
+    discovers no dotenv/repository configuration, Desktop cookies or provider keys. Browser
     launch uses a fixed OS executable with a constructed environment and one
     validated authorization URL argument, without a shell or `BROWSER` override.
     Explicit manual login writes that URL only to stderr. Noninteractive reads
@@ -1949,7 +1954,8 @@ membership separately, without a snapshot guarantee across page requests.
 - The [local consumer proof](editor/e2e/auth-oauth.spec.mts) and
   [copied-package probe](scripts/auth-local/native-probe.mjs) also obey the
   separate local provisioning boundary, GRIDA-SEC-011.
-- [CLI registration/host](packages/grida-cli/src/host.ts) and
+- [CLI OAuth client registration](packages/grida-cli/src/oauth-client-registration.ts),
+  [CLI host](packages/grida-cli/src/host.ts) and
   [host tests](packages/grida-cli/src/host.test.ts),
   [command lifecycle](packages/grida-cli/src/run.ts) and
   [lifecycle tests](packages/grida-cli/src/run.test.ts),
@@ -1959,9 +1965,13 @@ membership separately, without a snapshot guarantee across page requests.
   [output](packages/grida-cli/src/output.ts) and
   [output tests](packages/grida-cli/src/output.test.ts) — fixed operations,
   independent custody, explicit browser launch, and safe presentation.
+- The [installed CLI proof](scripts/cli-media-local/proof.mjs) checks the shipped
+  hosted registration, ordinary-home file custody, manual URL and cancellation
+  with external network denied. Its [contract](scripts/cli-media-local/README.md)
+  distinguishes offline composition from hosted OAuth enforcement.
 - [CLI build](packages/grida-cli/tsdown.config.mts) and
   [package contract](packages/grida-cli/README.md) retain optional native loading
-  and document the unprovisioned hosted-registration gate. The
+  and document the hosted deployment/acceptance gates. The
   [installed CLI proof](scripts/cli-local/proof.mjs),
   [transport guard](scripts/cli-local/network.cjs),
   [guard tests](scripts/cli-local/network.test.mjs), and
@@ -2226,9 +2236,13 @@ generation receipts without a fixed projection.
 **How the code prevents it.**
 
 1. **Explicit inputs and shared operation rules.** The fixed grammar requires a
-   provider/model and explicit JSON source/output directory for generation. It
+   provider/model and explicit input/output directory for generation. JSON input
+   and friendly request-building flags are exclusive; duplicate fields and competing
+   stdin readers are rejected. Media flags select only a compatible advertised
+   variant and never discard media or change provider/model. Scalar parameters
+   use the published field type, then the same normative SDK parser as JSON. It
    accepts no literal key argument, custom provider origin or raw provider-option
-   passthrough. `--key-stdin` cannot share stdin with JSON or select GG. Bundled
+   passthrough. `--key-stdin` cannot share stdin with JSON/text or select GG. Bundled
    `MediaOperations` descriptors and the SDK's normative parser establish the
    exact executable route and validate JSON before credential custody is opened.
    Ordinary listing/inspection needs no credential or network. An availability
@@ -2256,19 +2270,26 @@ generation receipts without a fixed projection.
    an empty BYOK reader. The media transport never receives the account JWT.
 3. **Destination-bound egress.** `MediaHttp` admits credential-bearing requests
    only on its reviewed provider host/path/method allowlist, with provider-specific
-   header families. GG currently permits only the explicit local API origin and
-   fixed image/video/music POST paths. Provider redirects are rejected without
+   header families. GG permits only the invocation's selected origin: the shipped
+   public registration's HTTPS API origin or the fixed local fixture, with only
+   image/video/music POST paths and no query parameters. Provider redirects are rejected without
    replay. The download lane is HTTPS GET/HEAD with no credential, cookie, body or
    caller-selected Host header. Each connection and download redirect resolves
    fresh DNS, rejects the entire answer if any address is non-public, and pins one
    validated address in Node's lookup callback while retaining the original TLS
-   hostname and certificate verification. The configured GG loopback is the sole
+   hostname and certificate verification, including hosted GG. The explicitly selected local GG fixture is the sole
    private-address exception. Direct requests use no ambient fetch, proxy agent,
    cookie jar or pooled connection. Header/body sizes, DNS/connect time, total
    request lifetime and streamed responses are bounded; SDK-specific limits may
    be lower. No failed paid request is automatically resubmitted.
-4. **Output preflight and publication.** Explicit UTF-8 JSON file/stdin input is
-   bounded to 16 MiB; no URL is fetched as input. A new private output directory
+4. **Input and output preflight; publication.** Explicit UTF-8 JSON/text file/stdin
+   input is bounded to 16 MiB. Selected local images have an 8 MiB per-file bound,
+   a 16 MiB aggregate read bound, and structural PNG/JPEG/static WebP header checks.
+   The assembled JSON is capped at 16 MiB including base64. Input reads snapshot a
+   regular file once and have a 30-second lifetime including open/stat; late opens
+   are closed after cancellation. No path is expanded from JSON/text, no image is
+   transcoded, and no URL is fetched as input. HTTPS inputs pass through only under
+   the SDK's declared input contract; local files are encoded inline. A new private output directory
    must have an existing parent. Before opening keys or account custody, a probe
    exercises the same exclusive write/fsync/hard-link publication used for results.
    Saving checks the reserved directory's identity, writes private temporary
@@ -2334,9 +2355,15 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
 - [Media transport](packages/grida-cli/src/media-http.ts) and
   [tests](packages/grida-cli/src/media-http.test.ts) — fixed credential routes,
   DNS pinning, TLS authority, credential-free redirects and bounded streams.
+  Hosted GG authority reuses the public [CLI registration](packages/grida-cli/src/oauth-client-registration.ts),
+  whose metadata remains governed by GRIDA-SEC-010.
 - [Input/artifact owner](packages/grida-cli/src/media-files.ts) and
   [tests](packages/grida-cli/src/media-files.test.ts) — explicit input, publication
   preflight, no overwrite and partial-save reporting.
+- [Request input assembly](packages/grida-cli/src/media-input.ts) and
+  [tests](packages/grida-cli/src/media-input.test.ts) — explicit file flags,
+  schema-typed scalar input, bounded encoding, advertised variant selection,
+  human inspection and the shared SDK validation boundary.
 - [Output projection](packages/grida-cli/src/output.ts) and
   [tests](packages/grida-cli/src/output.test.ts),
   [build](packages/grida-cli/tsdown.config.mts), and

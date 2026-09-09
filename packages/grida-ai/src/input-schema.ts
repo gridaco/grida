@@ -172,14 +172,18 @@ export namespace InputSchema {
       return value;
     },
   };
-  export function enumeration<const T extends readonly string[]>(
+  export function enumeration<const T extends readonly (string | number)[]>(
     values: T
   ): Rule<T[number]> {
     return {
-      schema: freeze({ type: "string", enum: [...values] }),
+      schema: freeze({ type: typeof values[0], enum: [...values] }),
       parse(value) {
-        if (typeof value !== "string" || !values.includes(value)) throw 0;
-        return value;
+        if (
+          (typeof value !== "string" && typeof value !== "number") ||
+          !values.includes(value)
+        )
+          throw 0;
+        return value as T[number];
       },
     };
   }

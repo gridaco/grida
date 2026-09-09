@@ -28,9 +28,9 @@ export namespace Cli {
     models:
       "Usage: grida models <list|inspect>\n\nDiscover bundled executable operations without credentials or network access.",
     "models list":
-      "Usage: grida models list [--provider <provider>] [--modality image|video|audio|3d] [--kind <kind>] [--available] [--org <slug> | --org-id <id>] [--json]\n\nLists executable operations, including staged models. No provider probes.\n--available requires --provider: BYOK checks key presence; GG checks cached\norganization eligibility online. Neither guarantees model access or generation.",
+      "Usage: grida models list [--provider <provider>] [--modality image|video|audio|3d] [--kind <kind>] [--local-image] [--available] [--org <slug> | --org-id <id>] [--json]\n\nLists executable operations, including staged models, with accepted local-image flags.\n--local-image filters to operations accepting --reference FILE or --image FILE.\nNo provider probes. --available requires --provider: BYOK checks key presence;\nGG checks cached organization eligibility online. Neither guarantees model access\nor generation.",
     "models inspect":
-      "Usage: grida models inspect --provider <provider> --model <id> [--kind <kind>] [--variant text|references|image] [--json]\n\nPrint the effective JSON input schema and native output description.\nKinds: image, video, music, sound-effect, text-to-speech, three-d.\nThe kind is inferred when unambiguous; image/video default to text input.",
+      "Usage: grida models inspect --provider <provider> --model <id> [--kind <kind>] [--variant text|references|image] [--json]\n\nShow accepted inputs and a command example; --json prints the full schema.\nKinds: image, video, music, sound-effect, text-to-speech, three-d.\nThe kind is inferred when unambiguous; image/video default to text input.",
     providers:
       "Usage: grida providers <command>\n\nCommands:\n  list                    Show key presence and effective source\n  configure <provider>    Save a shared provider API key\n  remove <provider>       Remove a shared provider API key",
     "providers configure":
@@ -40,7 +40,7 @@ export namespace Cli {
     "providers list":
       "Usage: grida providers list [--json]\n\nShow key presence and source after static validation, never key contents.\nNo login or probes; configured does not mean provider-verified.\nStored keys use shared plaintext credentials.toml with private permissions.\nOPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY.\nGG uses a separate Grida login and organization; no provider key.",
     generate:
-      "Usage: grida generate --provider <provider> --model <id> --input @file|- --out <new-directory> [--kind <kind>] [--variant text|references|image] [--key-stdin] [--org <slug> | --org-id <id>] [--json]\n\nProviders: openrouter, vercel, fal, elevenlabs, gg.\nInspect the model first for its JSON input schema. No raw provider passthrough.\n--input reads one JSON object from an explicit file or stdin (16 MiB max).\n--key-stdin reads a BYOK key instead of its environment slot; cannot share\nstdin with JSON input. Precedence: stdin, environment, shared credentials.toml.\nExplicit keys bypass the stored key. BYOK needs no Grida login. GG requires login.\n--out must name a new directory under an existing parent. Artifacts and\nreceipt.json are written locally without overwriting files.\nNo automatic generation retry. Interrupted requests may still be charged.",
+      "Usage: grida generate --provider <provider> --model <id> --out <new-directory> [inputs] [--kind <kind>] [--variant text|references|image] [--key-stdin] [--org <slug> | --org-id <id>] [--json]\n\nInputs:\n  --prompt TEXT | --prompt-file FILE|-    Generation instructions\n  --text TEXT | --text-file FILE|-        Speech text (with --voice ID)\n  --reference FILE|HTTPS-URL              Image reference; repeat for more\n  --image FILE|HTTPS-URL                  Image input where supported\n  --param FIELD=VALUE                     Advertised scalar option; repeat\n  --input @file|-                         Full JSON instead of the flags above\n\nExample:\n  grida generate --provider openrouter --model openai/gpt-image-2 --prompt 'Restyle this image' --reference ./photo.png --out ./result\n\nFile flags read explicit paths relative to the working directory. PNG/JPEG/static WebP\nimages are limited to 8 MiB each; the assembled JSON input is limited to 16 MiB.\nSelected files are sent inline to the selected provider; no Grida upload storage.\nRun grida models inspect for supported inputs. No raw provider passthrough.\nJSON mode never expands paths and cannot mix with request-building flags.\nMedia flags select a compatible variant; a conflicting --variant is refused.\nProviders: openrouter, vercel, fal, elevenlabs, gg.\n--key-stdin cannot share stdin with JSON or text input. Key precedence: stdin,\nenvironment, shared credentials.toml. BYOK needs no Grida login. GG requires login.\n--out must name a new directory under an existing parent. Artifacts and\nreceipt.json are written locally without overwriting files.\nNo automatic generation retry. Interrupted requests may still be charged.",
     voices:
       "Usage: grida voices list --provider elevenlabs [--key-stdin] [--json]",
     "voices list":
@@ -48,6 +48,10 @@ export namespace Cli {
     docs: "Usage: grida docs [command...]\n\nPrint the canonical documentation URL. Does not open a browser or fetch it.\nExamples: grida docs, grida docs account credits, grida docs auth storage",
   } as const;
   export type Topic = keyof typeof help;
+  /** The actual offline help inventory, also used by documentation coverage checks. */
+  export const topics: readonly Topic[] = Object.freeze(
+    Object.keys(help) as Topic[]
+  );
   type Options = { json: boolean; noInput: boolean };
   export type Provider = "openrouter" | "vercel" | "fal" | "elevenlabs" | "gg";
   export type Kind =
@@ -59,6 +63,17 @@ export namespace Cli {
     | "three-d";
   export type Variant = "text" | "references" | "image";
   export type Selector = { id: number } | { name: string };
+  /** Request construction is local syntax, never a second model contract. */
+  export type Request = {
+    prompt?: string;
+    promptFile?: string;
+    text?: string;
+    textFile?: string;
+    references?: readonly string[];
+    image?: string;
+    voice?: string;
+    parameters: readonly { field: string; value: string }[];
+  };
   export type ProviderInvocation = Options &
     (
       | {
@@ -76,6 +91,7 @@ export namespace Cli {
           modality?: "image" | "video" | "audio" | "3d";
           kind?: Kind;
           available: boolean;
+          localImage: boolean;
           selector?: Selector;
         }
       | {
@@ -86,17 +102,19 @@ export namespace Cli {
           variant?: Variant;
         }
       | { command: "providers list" }
-      | {
+      | ({
           command: "generate";
           provider: Provider;
           model: string;
           kind?: Kind;
           variant?: Variant;
-          input: string;
           out: string;
           keyStdin: boolean;
           selector?: Selector;
-        }
+        } & (
+          | { input: string; request?: never }
+          | { input?: never; request: Request }
+        ))
       | { command: "voices list"; provider: "elevenlabs"; keyStdin: boolean }
     );
   export type Invocation =
@@ -158,8 +176,17 @@ export namespace Cli {
           modality: { type: "string" },
           variant: { type: "string" },
           input: { type: "string" },
+          prompt: { type: "string" },
+          "prompt-file": { type: "string" },
+          text: { type: "string" },
+          "text-file": { type: "string" },
+          reference: { type: "string", multiple: true },
+          image: { type: "string" },
+          voice: { type: "string" },
+          param: { type: "string", multiple: true },
           out: { type: "string" },
           available: { type: "boolean" },
+          "local-image": { type: "boolean" },
           "key-stdin": { type: "boolean" },
         },
       });
@@ -169,7 +196,8 @@ export namespace Cli {
     const seen = new Set<string>();
     for (const token of parsed.tokens ?? []) {
       if (token.kind !== "option") continue;
-      if (seen.has(token.name)) throw usage();
+      if (seen.has(token.name) && !["reference", "param"].includes(token.name))
+        throw usage();
       seen.add(token.name);
     }
     const { values, positionals } = parsed;
@@ -280,6 +308,7 @@ export namespace Cli {
         "modality",
         "kind",
         "available",
+        "local-image",
         "org",
         "org-id"
       );
@@ -311,6 +340,7 @@ export namespace Cli {
         kind,
         modality,
         available,
+        localImage: values["local-image"] === true,
         selector,
       };
     }
@@ -332,7 +362,7 @@ export namespace Cli {
         "kind",
         "variant",
         ...(topic === "generate"
-          ? ["input", "out", "key-stdin", "org", "org-id"]
+          ? ["input", "out", "key-stdin", "org", "org-id", ...requestFlags]
           : [])
       );
       const provider = choice(values.provider, [
@@ -363,17 +393,34 @@ export namespace Cli {
       const out = values.out;
       const keyStdin = values["key-stdin"] === true;
       const selector = organization(values);
+      const hasRequest = requestFlags.some((name) => seen.has(name));
       if (
-        typeof input !== "string" ||
-        !(input === "-" || (input.startsWith("@") && input.length > 1)) ||
+        (input !== undefined &&
+          (typeof input !== "string" ||
+            !(input === "-" || (input.startsWith("@") && input.length > 1)) ||
+            input.includes("\0"))) ||
+        (input === undefined && !hasRequest) ||
+        (input !== undefined && hasRequest) ||
         typeof out !== "string" ||
         !out ||
-        input.includes("\0") ||
         out.includes("\0") ||
         (keyStdin && (input === "-" || provider === "gg")) ||
         (selector && provider !== "gg")
       )
         throw usage();
+      const request = input === undefined ? requestValues(values) : undefined;
+      if (
+        [
+          keyStdin,
+          input === "-",
+          request?.promptFile === "-",
+          request?.textFile === "-",
+        ].filter(Boolean).length > 1
+      )
+        throw new Failure(
+          "invalid_usage",
+          "Only one input can read stdin; use a file for the other input."
+        );
       return {
         ...options,
         command: topic,
@@ -381,7 +428,7 @@ export namespace Cli {
         model,
         kind,
         variant,
-        input,
+        ...(request ? { request } : { input: input as string }),
         out,
         keyStdin,
         selector,
@@ -409,6 +456,84 @@ export namespace Cli {
     throw usage();
   }
 
+  const requestFlags = [
+    "prompt",
+    "prompt-file",
+    "text",
+    "text-file",
+    "reference",
+    "image",
+    "voice",
+    "param",
+  ];
+  function requestValues(
+    values: ReturnType<typeof parseArgs>["values"]
+  ): Request {
+    const scalar = (name: string) => {
+      const value = values[name];
+      if (value === undefined) return undefined;
+      if (typeof value !== "string") throw usage();
+      return value;
+    };
+    const source = (name: string) => {
+      const value = scalar(name);
+      if (value !== undefined && (!value || value.includes("\0")))
+        throw usage();
+      return value;
+    };
+    const repeated = (name: string): string[] | undefined => {
+      const value = values[name];
+      if (value === undefined) return undefined;
+      if (
+        !Array.isArray(value) ||
+        value.some((item) => typeof item !== "string")
+      )
+        throw usage();
+      return value as string[];
+    };
+    const prompt = scalar("prompt"),
+      promptFile = source("prompt-file");
+    const text = scalar("text"),
+      textFile = source("text-file");
+    const references = repeated("reference"),
+      image = source("image");
+    if (
+      (prompt !== undefined && promptFile !== undefined) ||
+      (text !== undefined && textFile !== undefined) ||
+      ((prompt !== undefined || promptFile !== undefined) &&
+        (text !== undefined || textFile !== undefined)) ||
+      (references !== undefined && image !== undefined) ||
+      image === "-" ||
+      references?.some(
+        (value) => !value || value === "-" || value.includes("\0")
+      )
+    )
+      throw usage();
+    const fields = new Set<string>();
+    const parameters = (repeated("param") ?? []).map((entry) => {
+      const equals = entry.indexOf("=");
+      const field = entry.slice(0, equals),
+        value = entry.slice(equals + 1);
+      if (equals < 1 || !/^[a-z][a-z0-9_]*$/.test(field) || fields.has(field))
+        throw new Failure(
+          "invalid_usage",
+          "Use --param FIELD=VALUE once per advertised scalar field."
+        );
+      fields.add(field);
+      return { field, value };
+    });
+    return {
+      prompt,
+      promptFile,
+      text,
+      textFile,
+      references,
+      image,
+      voice: scalar("voice"),
+      parameters,
+    };
+  }
+
   export function helpText(topic: Topic): string {
     return (
       help[topic] +
@@ -422,15 +547,34 @@ export namespace Cli {
   }
 
   export function docsUrl(topic: Topic): string {
-    return (
-      "https://grida.co/docs/wg/cli/" +
-      (topic.startsWith("auth storage") || topic.startsWith("providers")
-        ? "credential-custody"
-        : /^(models|providers|generate|voices)/.test(topic)
-          ? "media"
-          : "v1")
-    );
+    return "https://grida.co/docs/cli" + docsPages[topic];
   }
+
+  // Exhaustive by help topic: adding a command requires choosing its guide owner.
+  const docsPages: Record<Topic, string> = {
+    "": "",
+    auth: "/auth",
+    "auth login": "/auth",
+    "auth status": "/auth",
+    "auth logout": "/auth",
+    "auth storage": "/auth",
+    "auth storage show": "/auth",
+    "auth storage migrate": "/auth",
+    account: "/account",
+    "account view": "/account",
+    "account credits": "/account",
+    models: "/models",
+    "models list": "/models",
+    "models inspect": "/models",
+    providers: "/providers",
+    "providers configure": "/providers",
+    "providers remove": "/providers",
+    "providers list": "/providers",
+    generate: "/generate",
+    voices: "/models",
+    "voices list": "/models",
+    docs: "",
+  };
 
   const kinds = [
     "image",

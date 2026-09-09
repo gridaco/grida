@@ -7,8 +7,10 @@ import { homedir } from "node:os";
 import path from "node:path";
 import type { AuthClient } from "@grida/auth";
 import type { createPersistentNativeAuth } from "@grida/auth/node";
+import { home as gridaHome } from "@grida/home";
+import { oauthClientRegistration } from "./oauth-client-registration";
 
-/** Trusted CLI composition. Hosted registration is intentionally not provisioned. */
+/** Trusted CLI composition; registration is shipped with the executable. */
 export namespace CliHost {
   export type Runtime = Awaited<ReturnType<typeof createPersistentNativeAuth>>;
   export type Options = {
@@ -21,15 +23,11 @@ export namespace CliHost {
 
   export class Failure extends Error {
     readonly name = "CliHost.Failure";
-    constructor(
-      readonly code: "not_configured" | "invalid_config" | "browser_failed"
-    ) {
+    constructor(readonly code: "invalid_config" | "browser_failed") {
       super(
-        code === "not_configured"
-          ? "Local CLI authentication is not configured."
-          : code === "invalid_config"
-            ? "The local CLI configuration is invalid."
-            : "The authorization browser could not be opened."
+        code === "invalid_config"
+          ? "The CLI authentication configuration is invalid. Use an absolute GRIDA_HOME; local fixture configuration also requires an isolated home."
+          : "The authorization browser could not be opened."
       );
     }
   }
@@ -40,15 +38,14 @@ export namespace CliHost {
     env: NodeJS.ProcessEnv = process.env
   ): Promise<Runtime> {
     const configPath = env.GRIDA_CLI_LOCAL_CONFIG;
-    const home = env.GRIDA_HOME;
+    const configuredHome = env.GRIDA_HOME;
     const storage = options.storage;
     const noBrowser = options.noBrowser;
     const output = options.onAuthorizationUrl;
-    if (configPath === undefined || configPath === "")
-      throw new Failure("not_configured");
     if (
-      !absolute(configPath) ||
-      !absolute(home) ||
+      (configPath !== undefined && !absolute(configPath)) ||
+      (configuredHome !== undefined && !absolute(configuredHome)) ||
+      (configPath !== undefined && configuredHome === undefined) ||
       (storage !== undefined && storage !== "file" && storage !== "keyring") ||
       (noBrowser !== undefined && typeof noBrowser !== "boolean") ||
       (noBrowser === true ? typeof output !== "function" : output !== undefined)
@@ -58,8 +55,17 @@ export namespace CliHost {
     // Snapshot the small browser environment before any await. Credentials,
     // BROWSER, loader hooks, proxy variables and shell options are never copied.
     const browserEnv = systemBrowserEnvironment(env);
-    await validateHome(home);
-    const config = await registration(configPath);
+    const home = await validateHome(
+      configuredHome ?? gridaHome.dir({ env: {}, home: homedir() }),
+      configPath !== undefined
+    );
+    // An explicit local override must validate in full; failure never selects
+    // hosted authority. Issuer/API/client overrides and repository discovery do
+    // not exist. Neither profile imports Desktop or provider credentials.
+    const config =
+      configPath === undefined
+        ? oauthClientRegistration
+        : await localRegistration(configPath);
     // Keep help/version independent of native credential modules and their I/O.
     const { createPersistentNativeAuth } = await import("@grida/auth/node");
     return createPersistentNativeAuth(config, {
@@ -82,12 +88,8 @@ export namespace CliHost {
   }
 }
 
-const issuer = "http://127.0.0.1:55431/auth/v1";
-const apiOrigin = "http://127.0.0.1:3041";
-const callbacks = new Set([
-  "http://127.0.0.1:55435/callback",
-  "http://127.0.0.1:55436/callback",
-]);
+const localIssuer = "http://127.0.0.1:55431/auth/v1";
+const localApiOrigin = "http://127.0.0.1:3041";
 
 function absolute(value: unknown): value is string {
   return (
@@ -95,8 +97,9 @@ function absolute(value: unknown): value is string {
   );
 }
 
-async function validateHome(value: string): Promise<void> {
+async function validateHome(value: string, local: boolean): Promise<string> {
   try {
+    if (!absolute(value)) throw new Error();
     const userHome = homedir();
     const paths = await Promise.all([
       canonicalPath(value),
@@ -111,10 +114,12 @@ async function validateHome(value: string): Promise<void> {
     if (
       directory === path.parse(directory).root ||
       directory === canonicalUserHome ||
-      directory === ordinaryHome ||
-      directory.startsWith(ordinaryHome + path.sep)
+      (local &&
+        (directory === ordinaryHome ||
+          directory.startsWith(ordinaryHome + path.sep)))
     )
       throw new Error();
+    return paths[0]!;
   } catch {
     throw new CliHost.Failure("invalid_config");
   }
@@ -142,7 +147,9 @@ async function canonicalPath(value: string): Promise<string> {
   }
 }
 
-async function registration(configPath: string): Promise<AuthClient.Config> {
+async function localRegistration(
+  configPath: string
+): Promise<AuthClient.Config> {
   // A public registration file carries destination authority. Read one bounded
   // regular file, refusing a symlink, device, shared writer or oversized input.
   let file: Awaited<ReturnType<typeof open>> | undefined;
@@ -179,19 +186,21 @@ async function registration(configPath: string): Promise<AuthClient.Config> {
     if (
       typeof config.clientId !== "string" ||
       !/^[A-Za-z0-9_-]{1,256}$/.test(config.clientId) ||
-      config.issuer !== issuer ||
-      config.apiOrigin !== apiOrigin ||
+      config.issuer !== localIssuer ||
+      config.apiOrigin !== localApiOrigin ||
       !Array.isArray(config.redirectUris) ||
       config.redirectUris.length < 1 ||
       config.redirectUris.length > 2 ||
-      config.redirectUris.some((uri) => !callbacks.has(uri)) ||
+      config.redirectUris.some(
+        (uri) => !oauthClientRegistration.redirectUris.includes(uri)
+      ) ||
       new Set(config.redirectUris).size !== config.redirectUris.length
     )
       throw new CliHost.Failure("invalid_config");
     return Object.freeze({
       clientId: config.clientId,
-      issuer,
-      apiOrigin,
+      issuer: localIssuer,
+      apiOrigin: localApiOrigin,
       redirectUris: Object.freeze([
         ...config.redirectUris,
       ]) as readonly string[],

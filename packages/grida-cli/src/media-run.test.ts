@@ -223,7 +223,49 @@ afterEach(async () => {
 
 describe("MediaCommands offline discovery and access observations", () => {
   it.each([
+    "missing-file",
+    "malformed-image",
+    "field-collision",
+    "existing-output",
+    "invalid-model-option",
+  ])(
+    "refuses friendly %s before credentials or any transport",
+    async (mode) => {
+      const root = await temporary();
+      const out = path.join(root, "result");
+      const local = path.join(root, "private-image.png");
+      if (mode === "malformed-image")
+        await writeFile(local, "synthetic-private-not-an-image");
+      if (mode === "existing-output") await mkdir(out);
+      const { env, read } = forbiddenEnv();
+      const test = fixture(env);
+      const args = [
+        "generate",
+        "--provider",
+        "openrouter",
+        "--model",
+        "openai/gpt-image-2",
+        "--prompt",
+        PROMPT,
+        "--out",
+        out,
+      ];
+      if (mode === "missing-file" || mode === "malformed-image")
+        args.push("--reference", local);
+      if (mode === "field-collision")
+        args.push("--param", "prompt=synthetic-private-collision");
+      if (mode === "invalid-model-option") args.push("--param", "n=17");
+      expect(await test.invoke(args)).not.toBe(0);
+      expect(read).not.toHaveBeenCalled();
+      expect(test.openAuth).not.toHaveBeenCalled();
+      expect(test.openStore).not.toHaveBeenCalled();
+      expect(test.transport).not.toHaveBeenCalled();
+      test.assertSafe();
+    }
+  );
+  it.each([
     { args: ["models", "list"] },
+    { args: ["models", "list", "--local-image"] },
     {
       args: [
         "models",
@@ -248,6 +290,61 @@ describe("MediaCommands offline discovery and access observations", () => {
       test.assertSafe();
     }
   );
+
+  it("filters and reports local-image support from schemas without authority", async () => {
+    const { env, read } = forbiddenEnv();
+    const test = fixture(env);
+    expect(
+      await test.invoke([
+        "models",
+        "list",
+        "--modality",
+        "video",
+        "--local-image",
+      ])
+    ).toBe(0);
+    expect(test.result().operations).toEqual([
+      expect.objectContaining({
+        provider_id: "fal",
+        model_id: "google/veo-3.1-lite",
+        variant: "image",
+        local_image_flags: ["--image"],
+      }),
+    ]);
+    expect(
+      await test.invoke([
+        "models",
+        "list",
+        "--modality",
+        "video",
+        "--provider",
+        "openrouter",
+        "--local-image",
+      ])
+    ).toBe(0);
+    expect(test.result().operations).toEqual([]);
+    expect(
+      await test.invoke([
+        "models",
+        "list",
+        "--provider",
+        "openrouter",
+        "--kind",
+        "image",
+        "--local-image",
+      ])
+    ).toBe(0);
+    expect(test.result().operations.length).toBeGreaterThan(0);
+    for (const row of test.result().operations) {
+      expect(row.local_image_flags).toEqual(["--reference"]);
+      expect(row).not.toHaveProperty("input_schema");
+    }
+    expect(read).not.toHaveBeenCalled();
+    expect(test.openStore).not.toHaveBeenCalled();
+    expect(test.openAuth).not.toHaveBeenCalled();
+    expect(test.transport).not.toHaveBeenCalled();
+    test.assertSafe();
+  });
 
   it.each([false, true])(
     "reports BYOK presence=%s without claiming upstream access",

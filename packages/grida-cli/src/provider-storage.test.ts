@@ -1,6 +1,13 @@
 // GRIDA-SEC-014 / GRIDA-SEC-013 — real owner, private synthetic homes, no network.
 import { ProviderCredentialStore } from "@grida/auth/providers";
-import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -100,6 +107,13 @@ afterEach(async () => {
 });
 
 describe("shared CLI provider credentials", () => {
+  it("preserves invalid native-home configuration as input failure", async () => {
+    await expect(ProviderStore.open({ GRIDA_HOME: "/" })).rejects.toMatchObject(
+      {
+        code: "invalid_input",
+      }
+    );
+  });
   it("checks the entered key once before opening custody, ignoring stored and environment keys", async () => {
     const f = await fixture();
     await f.store.set("fal", "previous:stored-key");
@@ -369,6 +383,9 @@ describe("shared CLI provider credentials", () => {
     await writeFile(file, `invalid synthetic-private-key = [`, { mode: 0o600 });
     expect(await f.invoke(["providers", "remove", "fal", "--json"])).toBe(1);
     expect(f.result().error.code).toBe("invalid_store");
+    expect(f.result().error.message).toContain(
+      "TOML syntax and required fields"
+    );
     expect(await readFile(file, "utf8")).toBe(
       "invalid synthetic-private-key = ["
     );
@@ -381,6 +398,43 @@ describe("shared CLI provider credentials", () => {
     ).rejects.toMatchObject({ code: "invalid_store" });
     f.safe();
   });
+
+  it("reports inaccessible private custody without suggesting malformed TOML or changing it", async () => {
+    const f = await fixture();
+    await f.store.set("fal", KEY);
+    const file = path.join(f.root, "providers", "credentials.toml");
+    const before = await readFile(file);
+    await chmod(file, 0o644);
+    expect(await f.invoke(["providers", "remove", "fal", "--json"])).toBe(1);
+    expect(f.result().error.code).toBe("storage_failed");
+    expect(f.result().error.message).toMatch(
+      /access or lock.*filesystem or sandbox access/
+    );
+    expect(f.result().error.message).not.toMatch(/TOML syntax|format version/);
+    expect(await readFile(file)).toEqual(before);
+    expect(f.result().error.message).not.toContain(f.root);
+    f.safe();
+  });
+
+  it.each([
+    ["store_busy", /busy in another process/],
+    ["unsupported_version", /unsupported format version.*Update Grida/],
+    ["storage_failed", /filesystem or sandbox access/],
+  ] as const)(
+    "preserves safe %s guidance from the credential owner",
+    async (code, guidance) => {
+      const f = await fixture();
+      f.host.openStore = async () => {
+        throw new ProviderCredentialStore.Failure(code);
+      };
+      expect(await f.invoke(["providers", "remove", "fal", "--json"])).toBe(1);
+      expect(f.result().error).toMatchObject({
+        code,
+        message: expect.stringMatching(guidance),
+      });
+      f.safe();
+    }
+  );
 
   it("sanitizes arbitrary host failures and does not leak input contents", async () => {
     const f = await fixture();

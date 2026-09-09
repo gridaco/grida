@@ -7,6 +7,7 @@ import {
   ProviderHttp,
   GridaGatewaySessionStore,
   ModelCatalogStore,
+  MediaOperations,
 } from "./index";
 
 const ID = "google/veo-3.1";
@@ -78,6 +79,351 @@ function falMock(
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+describe("VideoClient bounded image input", () => {
+  const selection = {
+    model_id: "google/veo-3.1-lite",
+    provider: "fal",
+    image: true,
+  } as const;
+  const selector = {
+    kind: "video",
+    model_id: selection.model_id,
+    provider: "fal",
+    variant: "image",
+  } as const;
+  const limit = 8_000_000;
+  // A real PNG byte sequence, kept inline because the contract owns bytes, not a filesystem.
+  const png =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jHFAAAAAASUVORK5CYII=";
+  const bytes = () =>
+    Uint8Array.from(atob(png), (character) => character.charCodeAt(0));
+
+  it("declares one bounded byte image or HTTPS frame only for the exact verified operation", () => {
+    const operations = new MediaOperations();
+    const schema = operations.inspect(selector).input_schema;
+    expect(schema).toMatchObject({
+      oneOf: [{ required: ["image"] }, { required: ["image_url"] }],
+      properties: {
+        image: {
+          type: "object",
+          additionalProperties: false,
+          required: ["data", "media_type"],
+          properties: {
+            data: {
+              contentEncoding: "base64",
+              maxLength: Math.ceil(limit / 3) * 4,
+              "x-grida-decoded-max-bytes": limit,
+            },
+            media_type: { enum: ["image/png", "image/jpeg", "image/webp"] },
+          },
+        },
+        image_url: {
+          "x-grida-url": {
+            schemes: ["https"],
+            userinfo: false,
+            fragments: false,
+          },
+        },
+        duration: { enum: [4, 6, 8] },
+        generate_audio: { type: "boolean" },
+        resolution: {
+          enum: ["1280x720", "720x1280", "1920x1080", "1080x1920"],
+        },
+      },
+    });
+    expect(schema.properties).not.toHaveProperty("fps");
+    const routes = operations.list({ kind: "video" });
+    expect(
+      routes.filter((route) =>
+        Object.hasOwn(route.input_schema.properties as object, "image")
+      )
+    ).toEqual([operations.inspect(selector)]);
+    expect(Object.isFrozen(schema.oneOf)).toBe(true);
+    const snapshot = structuredClone(models.snapshot.seed());
+    snapshot.video!.models[selection.model_id]!.providers.fal!.id =
+      "unverified/image-to-video";
+    const replaced = new MediaOperations({ snapshot });
+    expect(
+      replaced.inspect(selector).input_schema.properties
+    ).not.toHaveProperty("image");
+    expect(() =>
+      replaced.parseInput(selector, {
+        prompt: PROMPT,
+        image: { data: png, media_type: "image/png" },
+      })
+    ).toThrow(MediaOperations.Failure);
+  });
+
+  it.each(["image/png", "image/jpeg", "image/webp"] as const)(
+    "serializes bounded %s bytes once on the selected request lane",
+    async (media_type) => {
+      const { client, request, download } = setup();
+      falMock(request);
+      const parsed = new MediaOperations().parseInput(selector, {
+        prompt: PROMPT,
+        image: { data: png, media_type },
+        duration: 4,
+        seed: 0,
+      });
+      if (parsed.kind !== "video") throw new Error("Expected video input");
+      expect(parsed.input.image?.data).toEqual(bytes());
+      const operation = await client.resolve(parsed.selection);
+      expect(await operation.generate(parsed.input)).toEqual({
+        videos: [{ data: DATA, media_type: "video/mp4" }],
+      });
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
+      expect(request.mock.calls[0][0]).toBe(
+        "https://queue.fal.run/fal-ai/veo3.1/lite/image-to-video"
+      );
+      expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
+        prompt: PROMPT,
+        image_url: `data:${media_type};base64,${png}`,
+        duration: "4s",
+        seed: 0,
+      });
+      expect(download).toHaveBeenCalledOnce();
+      expect(
+        new Headers(download.mock.calls[0][1]?.headers).has("authorization")
+      ).toBe(false);
+    }
+  );
+
+  it.each([false, true])(
+    "preserves explicit audio=%s through JSON, native execution and the fal wire",
+    async (generate_audio) => {
+      const { client, request } = setup();
+      falMock(request);
+      const parsed = new MediaOperations().parseInput(selector, {
+        prompt: PROMPT,
+        image_url: FRAME,
+        generate_audio,
+      });
+      if (parsed.kind !== "video") throw new Error("Expected video input");
+      expect(parsed.input.generate_audio).toBe(generate_audio);
+      const operation = await client.resolve(parsed.selection);
+      await operation.generate(parsed.input);
+      expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toMatchObject({
+        generate_audio,
+      });
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
+    }
+  );
+
+  it("rejects audio controls on unadvertised operations before reading a generation key", async () => {
+    const operations = new MediaOperations();
+    const { client, get, request } = setup();
+    const unsupported = {
+      model_id: "google/veo-3.1",
+      provider: "openrouter",
+      image: true,
+    } as const;
+    const operation = await client.resolve(unsupported);
+    get.mockClear();
+    await expect(
+      operation.generate({
+        prompt: PROMPT,
+        image_url: FRAME,
+        generate_audio: false,
+      })
+    ).rejects.toMatchObject({ code: "invalid_input" });
+    for (const route of operations.list({ kind: "video" })) {
+      if (
+        route.provider_id === "fal" &&
+        route.binding_id === "fal-ai/veo3.1/lite/image-to-video"
+      )
+        continue;
+      expect(route.input_schema.properties).not.toHaveProperty(
+        "generate_audio"
+      );
+      expect(() =>
+        operations.parseInput(
+          {
+            kind: route.kind,
+            provider: route.provider_id,
+            model_id: route.model_id,
+            variant: route.variant,
+          },
+          { prompt: PROMPT, image_url: FRAME, generate_audio: false }
+        )
+      ).toThrow(MediaOperations.Failure);
+    }
+    expect(get).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["1280x720", "720p", "16:9", 4],
+    ["720x1280", "720p", "9:16", 6],
+    ["1920x1080", "1080p", "16:9", 8],
+    ["1080x1920", "1080p", "9:16", 4],
+  ] as const)(
+    "preserves HTTPS frames and maps %s dimensions and numeric seconds to the documented wire",
+    async (resolution, wireResolution, aspect_ratio, duration) => {
+      const { client, request } = setup();
+      falMock(request);
+      const operation = await client.resolve(selection);
+      await operation.generate({
+        prompt: PROMPT,
+        image_url: FRAME,
+        resolution,
+        duration,
+      });
+      expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
+        prompt: PROMPT,
+        image_url: FRAME,
+        resolution: wireResolution,
+        aspect_ratio,
+        duration: `${duration}s`,
+      });
+    }
+  );
+
+  it("snapshots image bytes and options before awaiting the invocation credential", async () => {
+    const { client, request, get } = setup();
+    falMock(request);
+    const operation = await client.resolve(selection);
+    const pending = deferred<string>();
+    get.mockReturnValue(pending.promise);
+    const input: VideoClient.Input = {
+      prompt: PROMPT,
+      image: { data: bytes(), media_type: "image/png" },
+      duration: 4,
+      resolution: "1280x720",
+    };
+    const generated = operation.generate(input);
+    input.image!.data.fill(0);
+    input.image!.media_type = "image/webp";
+    input.duration = 8;
+    input.resolution = "1080x1920";
+    pending.resolve(KEY);
+    await generated;
+    expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
+      prompt: PROMPT,
+      image_url: `data:image/png;base64,${png}`,
+      duration: "4s",
+      resolution: "720p",
+      aspect_ratio: "16:9",
+    });
+  });
+
+  it("shares native and JSON exclusions before a generation key read or submission", async () => {
+    const operations = new MediaOperations();
+    const { client, request, get } = setup();
+    const operation = await client.resolve(selection);
+    get.mockClear();
+    const inputs = [
+      {},
+      { image_url: FRAME, image: { data: png, media_type: "image/png" } },
+      { image_url: `data:image/png;base64,${png}` },
+      { image_url: "file:///private/frame.png" },
+      { image: { data: "", media_type: "image/png" } },
+      { image: { data: "A QID", media_type: "image/png" } },
+      { image: { data: png, media_type: "image/gif" } },
+      {
+        image: {
+          data: png,
+          media_type: "image/png",
+          path: "/private/frame.png",
+        },
+      },
+      { image: null },
+      ...[2, 4.5, 10].map((duration) => ({ image_url: FRAME, duration })),
+      { image_url: FRAME, resolution: "720p" },
+      { image_url: FRAME, resolution: "640x480" },
+      { image_url: FRAME, resolution: "1280x720", aspect_ratio: "9:16" },
+      { image_url: FRAME, aspect_ratio: "1:1" },
+      { image_url: FRAME, fps: 24 },
+      { image_url: FRAME, generate_audio: "false" },
+      { image_url: FRAME, generate_audio: 0 },
+      { image_url: FRAME, generate_audio: null },
+    ];
+    for (const fields of inputs) {
+      const input = { prompt: PROMPT, ...fields };
+      expect(() => operations.parseInput(selector, input)).toThrow(
+        MediaOperations.Failure
+      );
+      const native = structuredClone(input) as Record<string, unknown>;
+      if (native.image && typeof native.image === "object") {
+        const image = native.image as Record<string, unknown>;
+        if (image.data === png) image.data = bytes();
+      }
+      await failure(
+        operation.generate(native as VideoClient.Input),
+        "invalid_input"
+      );
+    }
+    expect(get).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("bounds encoded input before decoding and native bytes before copying or acquiring credentials", async () => {
+    const { client, request, get } = setup();
+    const operation = await client.resolve(selection);
+    get.mockClear();
+    const operations = new MediaOperations();
+    const decode = vi.spyOn(globalThis, "atob");
+    const maximumEncoded = Math.ceil(limit / 3) * 4;
+    // The same encoded length can decode beyond the byte ceiling when padding is removed.
+    for (const data of [
+      "A".repeat(maximumEncoded + 4),
+      "A".repeat(maximumEncoded),
+    ]) {
+      expect(() =>
+        operations.parseInput(selector, {
+          prompt: PROMPT,
+          image: { data, media_type: "image/png" },
+        })
+      ).toThrow(MediaOperations.Failure);
+    }
+    expect(decode).not.toHaveBeenCalled();
+    await failure(
+      operation.generate({
+        prompt: PROMPT,
+        image: { data: new Uint8Array(limit + 1), media_type: "image/png" },
+      }),
+      "invalid_input"
+    );
+    expect(get).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+    falMock(request);
+    await operation.generate({
+      prompt: PROMPT,
+      image: { data: new Uint8Array(limit), media_type: "image/png" },
+    });
+    const body = JSON.parse(String(request.mock.calls[0][1]?.body));
+    expect(body.image_url.length).toBe(
+      "data:image/png;base64,".length + maximumEncoded
+    );
+  });
+
+  it.each([
+    { model_id: "google/veo-3.1", provider: "fal", image: true },
+    { model_id: "google/veo-3.1-lite", provider: "vercel", image: true },
+    { model_id: "google/veo-3.1", provider: "openrouter", image: true },
+    { model_id: "google/veo-3.1-lite", provider: "vercel" },
+  ] as const)(
+    "refuses bytes on routes that do not declare them: $provider/$model_id",
+    async (selected) => {
+      const { client, request, get } = setup();
+      const operation = await client.resolve(selected);
+      get.mockClear();
+      await failure(
+        operation.generate({
+          prompt: PROMPT,
+          image: { data: bytes(), media_type: "image/png" },
+        }),
+        "invalid_input"
+      );
+      expect(get).not.toHaveBeenCalled();
+      expect(request).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe("VideoClient public operation", () => {

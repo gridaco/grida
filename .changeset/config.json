@@ -7,7 +7,7 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["editor", "docs", "blog", "viewer", "backgrounds"],
+  "ignore": ["editor", "docs", "blog", "viewer", "backgrounds", "grida"],
   "privatePackages": {
     "version": true,
     "tag": true

@@ -4,6 +4,9 @@ import { lookup } from "node:dns/promises";
 import http, { type IncomingMessage } from "node:http";
 import https from "node:https";
 import { BlockList, isIP } from "node:net";
+import { oauthClientRegistration } from "./oauth-client-registration";
+
+const localGgOrigin = "http://127.0.0.1:3041";
 
 /** CLI-owned media egress. No environment, proxy, cookie or credential discovery. */
 export class MediaHttp {
@@ -11,7 +14,12 @@ export class MediaHttp {
 
   constructor(options: { ggOrigin?: string } = {}) {
     const ggOrigin = options.ggOrigin;
-    if (ggOrigin !== undefined && ggOrigin !== "http://127.0.0.1:3041") fail();
+    if (
+      ggOrigin !== undefined &&
+      ggOrigin !== oauthClientRegistration.apiOrigin &&
+      ggOrigin !== localGgOrigin
+    )
+      fail();
     this.transport = Object.freeze({
       request: (input, init) => execute("provider", input, init, ggOrigin),
       download: (input, init) => execute("download", input, init),
@@ -116,6 +124,7 @@ function route(
   if (target.origin === ggOrigin) {
     if (
       method !== "POST" ||
+      target.search ||
       !/^\/api\/v1\/ai\/(?:images|videos|music)\/generations$/.test(path)
     )
       fail();
@@ -262,7 +271,10 @@ async function resolve(
   ggOrigin?: string
 ): Promise<Address> {
   check(signal);
-  if (target.origin === ggOrigin) return { address: "127.0.0.1", family: 4 };
+  // Hosted GG keeps the same public DNS/TLS boundary as every other provider.
+  // Selecting GG grants its fixed routes, not a private-address exception.
+  if (ggOrigin === localGgOrigin && target.origin === localGgOrigin)
+    return { address: "127.0.0.1", family: 4 };
   const hostname = target.hostname.replace(/^\[|\]$/g, "");
   if (isIP(hostname)) return publicAddress(hostname);
   const deadline = performance.now() + 5_000;

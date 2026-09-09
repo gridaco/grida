@@ -23,16 +23,15 @@ not need to run, and no Grida agent or Canvas is involved.
 ```sh
 grida models list --modality image
 grida models list --modality audio
+grida models list --modality video --local-image
 grida models inspect --provider gg --model openai/gpt-image-2 --json
 
 grida generate --provider gg --model openai/gpt-image-2 \
-  --org studio --input @image.json --out ./images
+  --org studio --prompt "A blue ceramic teapot" --out ./images
 ```
 
-`image.json` contains the selected operation's arguments, for example
-`{"prompt":"A blue ceramic teapot"}`. `--out` names a **new directory** under an
-existing parent. Inspect before writing inputs; a catalogue card does not
-promise an executable operation.
+`--out` names a **new directory** under an existing parent. Inspect before
+choosing inputs; a catalogue card does not promise an executable operation.
 
 | Kind             | Current boundary                                                         |
 | ---------------- | ------------------------------------------------------------------------ |
@@ -48,6 +47,12 @@ promise an executable operation.
 Staged models remain marked `staged`. Listing and inspection use no credentials,
 network, account storage or provider probes.
 
+Listing shows each operation's accepted local-image flags; JSON rows include
+`local_image_flags` (`--reference`, `--image`, or an empty list). `--local-image`
+filters to operations accepting a local image in either form and combines with
+the other filters. This is derived from the selected input schema, not provider
+or model names; it establishes supported input, not provider access.
+
 Choose `--provider` and the returned **`model_id`**. For curated image/video,
 this is the canonical Grida model ID; `binding_id` reports its provider route.
 They are not interchangeable. The staged 3D contracts use exact endpoint IDs.
@@ -56,8 +61,9 @@ No command substitutes a provider, model or billing route after failure.
 ## Immediate: inspect the input contract
 
 An operation is identified by provider, model, kind and input variant. The kind
-is inferred when unambiguous. Image/video default to `text`; select another
-advertised variant explicitly:
+is inferred when unambiguous. Image/video default to `text`; JSON requests
+select another advertised variant explicitly. Media flags select their compatible
+variant automatically and reject a conflicting explicit `--variant`:
 
 ```sh
 grida models inspect --provider fal --model google/veo-3.1 \
@@ -66,9 +72,11 @@ grida generate --provider fal --model google/veo-3.1 \
   --variant image --input @video.json --out ./video
 ```
 
-Inspection returns the effective JSON input schema, model/provider binding,
-status, variant and native output description. Validation and schema publication
+Human inspection shows accepted fields, required inputs, declared limits and an
+example command. `--json` returns the effective input schema, model/provider
+binding, status, variant and native output description. Validation and schema publication
 share the execution owner's definitions. Unknown arguments fail before submission.
+Local-file guidance appears only where the inspected operation accepts it.
 The schema uses JSON Schema 2020-12, with `x-grida` annotations for normalization
 and constraints such as UTF-16 length that ordinary schema keywords cannot express.
 The operation parser is authoritative; a generic JSON Schema check is not a
@@ -85,6 +93,67 @@ accepted image MIME type. It becomes bytes for the native operation. Each 3D
 endpoint retains its own schema; new capabilities do not inherit a universal
 3D signature. Native outputs are described as bytes and media types; the CLI's
 result is a local file receipt, not JSON pretending to contain native bytes.
+
+## Immediate: text and local media inputs
+
+Simple requests need no JSON file:
+
+```sh
+grida generate --provider openrouter --model openai/gpt-image-2 \
+  --prompt "Restyle the header while preserving the supplied mark" \
+  --reference ./header.png --reference ./mark.png \
+  --param quality=high --out ./header
+
+grida generate --provider fal --model fal-ai/trellis-2 \
+  --image ./object.png --out ./object-3d
+
+grida generate --provider fal --model google/veo-3.1-lite \
+  --prompt "A gentle camera move" --image ./scene.png \
+  --param duration=4 --param resolution=1280x720 \
+  --param generate_audio=false --out ./clip
+
+grida generate --provider elevenlabs --model eleven_v3 \
+  --text-file ./narration.txt --voice YOUR_VOICE_ID --out ./speech
+```
+
+`--prompt` supplies generation instructions; `--text` supplies speech text.
+Their `--prompt-file` and `--text-file` alternatives read UTF-8 without trimming;
+`-` explicitly reads stdin. Paths are relative to the current working directory.
+Literal text is never interpreted as a filename, even if it starts with `@`.
+
+`--reference` accepts an image file or HTTPS URL and can repeat; order is preserved.
+`--image` selects a single video or 3D image input. The selected operation must
+support the supplied representation. Inspect the selected reference variant or
+filter with `--local-image` to discover local image support. Local video frames
+currently work on fal's Veo 3.1 Lite binding; other video bindings retain their
+HTTPS-only input. The existing
+image-to-3D contracts accept local files. Unsupported modes fail locally without
+changing model/provider or dropping an image.
+
+The fal Veo 3.1 Lite operation exposes the boolean `generate_audio` option.
+`--param generate_audio=false` requests silent video; omission keeps the serving
+route's audio-enabled default. Other operations reject this field unless their
+own schema advertises it. Audio controls are model inputs, not another command.
+
+Local images must be PNG, JPEG or static WebP, at most 8 MiB each; individual
+operations can impose lower limits. The CLI identifies the format from structural
+headers, not the filename; it does not fully decode pixels. Aggregate image reads
+are bounded to 16 MiB, and assembled input is bounded to 16 MiB **including base64
+expansion**. Text files and JSON input are also bounded to 16 MiB. File reads have
+a 30-second limit and snapshot a regular file once. No image is resized or transcoded.
+
+The CLI sends selected files inline to the selected provider. It neither creates
+Grida storage objects nor downloads arbitrary input URLs. HTTPS inputs pass to
+the provider where supported. File selection and all local validation finish
+before credentials are opened or generation is submitted.
+
+`--param FIELD=VALUE` supplies an advertised top-level scalar field, for example
+`--param seed=0` or `--param loop=false`. Its schema determines whether the value
+is a string, number or boolean; a numeric-looking string stays a string. It does
+not admit undeclared provider options. Complex values use `--input @file|-`.
+JSON mode cannot mix with request-building flags. Duplicate fields and competing
+stdin readers fail; nothing silently overrides another input. Both modes use the
+same normative operation parser.
 
 ## Immediate: supply access explicitly
 
@@ -106,7 +175,8 @@ native CLI login and organization.
 never contents. It does not verify provider access. Precedence is stdin, environment,
 then the shared file. An explicit key bypasses file access and never persists;
 a blank or malformed override fails.
-`--key-stdin` cannot share stdin with `--input -`. Keys are never literal command
+`--key-stdin` cannot share stdin with `--input -`, `--prompt-file -` or
+`--text-file -`. Keys are never literal command
 arguments. `providers remove <provider>` removes the shared stored key for both
 clients; environment overrides remain effective. Grida logout leaves provider
 keys intact. `configure` performs the custody contract's supported registration

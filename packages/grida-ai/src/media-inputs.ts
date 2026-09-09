@@ -15,6 +15,7 @@ export namespace MediaInputs {
     image_items: 16,
     video: 64 * 1024 * 1024,
     video_items: 16,
+    video_image: 8_000_000,
     music: 32 * 1024 * 1024,
     sound_effect: 16 * 1024 * 1024,
     speech: 16 * 1024 * 1024,
@@ -76,24 +77,102 @@ export namespace MediaInputs {
       }
     >;
   }
+  // Exact serving contract, not a provider-wide capability or catalogue price label.
+  // https://fal.ai/models/fal-ai/veo3.1/lite/image-to-video/api
+  export const falVeoLite = S.freeze({
+    binding_id: "fal-ai/veo3.1/lite/image-to-video",
+    resolutions: {
+      "1280x720": { resolution: "720p", aspect_ratio: "16:9" },
+      "720x1280": { resolution: "720p", aspect_ratio: "9:16" },
+      "1920x1080": { resolution: "1080p", aspect_ratio: "16:9" },
+      "1080x1920": { resolution: "1080p", aspect_ratio: "9:16" },
+    },
+  } as const);
   export function video(
     image: boolean,
-    provider: VideoClient.Provider
+    descriptor: Pick<VideoClient.Descriptor, "provider_id" | "binding_id">
   ): S.Rule<VideoClient.Input> {
-    return S.object({
+    const lite =
+      descriptor.provider_id === "fal" &&
+      descriptor.binding_id === falVeoLite.binding_id;
+    const rule = S.object({
       prompt: S.string({ nonblank: true }),
-      aspect_ratio: S.optional(S.pair(":")),
-      resolution: S.optional(S.pair("x")),
-      duration: S.optional(S.number({ exclusiveMin: 0 })),
-      fps: S.optional(S.number({ exclusiveMin: 0 })),
+      aspect_ratio: S.optional(
+        lite ? S.enumeration(["16:9", "9:16"]) : S.pair(":")
+      ),
+      resolution: S.optional(
+        lite ? S.enumeration(Object.keys(falVeoLite.resolutions)) : S.pair("x")
+      ),
+      duration: S.optional(
+        lite ? S.enumeration([4, 6, 8]) : S.number({ exclusiveMin: 0 })
+      ),
+      ...(lite ? {} : { fps: S.optional(S.number({ exclusiveMin: 0 })) }),
+      // The serving route defaults to audio; absence still delegates to that default.
+      ...(lite ? { generate_audio: S.optional(S.boolean) } : {}),
       seed: S.optional(
         S.number({
           integer: true,
-          ...(provider === "vercel" ? { exclude: 0 } : {}),
+          ...(descriptor.provider_id === "vercel" ? { exclude: 0 } : {}),
         })
       ),
-      ...(image ? { image_url: S.url() } : {}),
+      ...(lite && image
+        ? {
+            image_url: S.optional(S.url()),
+            image: S.optional(
+              S.object({
+                data: S.bytes(limits.video_image),
+                media_type: S.enumeration([
+                  "image/png",
+                  "image/jpeg",
+                  "image/webp",
+                ]),
+              })
+            ),
+          }
+        : image
+          ? { image_url: S.url() }
+          : {}),
     }) as S.Rule<VideoClient.Input>;
+    if (!lite) return rule;
+    return {
+      schema: S.freeze({
+        ...rule.schema,
+        ...(image
+          ? { oneOf: [{ required: ["image"] }, { required: ["image_url"] }] }
+          : {}),
+        allOf: Object.entries(falVeoLite.resolutions).map(
+          ([resolution, wire]) => ({
+            if: {
+              properties: { resolution: { const: resolution } },
+              required: ["resolution"],
+            },
+            // eslint-disable-next-line unicorn/no-thenable -- JSON Schema keyword, never a callable promise member.
+            then: {
+              properties: { aspect_ratio: { const: wire.aspect_ratio } },
+            },
+          })
+        ),
+      }),
+      parse(value, json) {
+        const input = rule.parse(value, json);
+        if (
+          image &&
+          (input.image === undefined) === (input.image_url === undefined)
+        )
+          throw 0;
+        if (
+          input.resolution !== undefined &&
+          input.aspect_ratio !== undefined
+        ) {
+          const mapped =
+            falVeoLite.resolutions[
+              input.resolution as keyof typeof falVeoLite.resolutions
+            ];
+          if (input.aspect_ratio !== mapped.aspect_ratio) throw 0;
+        }
+        return input;
+      },
+    };
   }
   export const music = S.object({
     prompt: S.string({ trim: true, nonblank: true, max: 4096, unit: "utf16" }),

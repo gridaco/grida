@@ -13,9 +13,12 @@ import {
 import path from "node:path";
 import type { Readable } from "node:stream";
 
-/** Local JSON input and generation artifacts. Provider filenames/URLs have no path authority. */
+/** Explicit local inputs and generation artifacts. Provider filenames/URLs have no path authority. */
 export namespace MediaFiles {
-  const inputLimit = 16 * 1024 * 1024;
+  export const inputLimits = Object.freeze({
+    text: 16 * 1024 * 1024,
+    image: 8 * 1024 * 1024,
+  });
   export type Artifact = { data: Uint8Array; media_type: string };
   export type Metadata = {
     kind: string;
@@ -59,38 +62,135 @@ export namespace MediaFiles {
     signal: AbortSignal,
     stdin: Readable = process.stdin
   ): Promise<unknown> {
-    let file: Awaited<ReturnType<typeof open>> | undefined;
-    let stream: Readable;
+    if (signal.aborted) throw new Failure("cancelled");
+    if (source !== "-" && (!source.startsWith("@") || source.length === 1))
+      throw new Failure("invalid_input");
+    const bytes = await readBytes(
+      source === "-" ? source : source.slice(1),
+      signal,
+      inputLimits.text,
+      source === "-" ? stdin : undefined
+    );
     try {
-      if (signal.aborted) throw new Failure("cancelled");
-      if (source === "-") stream = stdin;
-      else if (source.startsWith("@") && source.length > 1) {
+      const value: unknown = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+      );
+      if (!value || typeof value !== "object" || Array.isArray(value)) throw 0;
+      return value;
+    } catch {
+      throw new Failure("invalid_input");
+    }
+  }
+
+  /** Preserve text exactly; '-' explicitly allocates stdin. File paths are literal. */
+  export async function readText(
+    source: string,
+    signal: AbortSignal,
+    stdin: Readable = process.stdin
+  ): Promise<string> {
+    checkFileSource(source);
+    const bytes = await readBytes(
+      source,
+      signal,
+      inputLimits.text,
+      source === "-" ? stdin : undefined
+    );
+    try {
+      return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+        bytes
+      );
+    } catch {
+      throw new Failure("invalid_input");
+    }
+  }
+
+  /** Snapshot one regular file. MIME comes from bounded headers, never its name. */
+  export async function readImage(
+    source: string,
+    signal: AbortSignal,
+    maximumBytes: number = inputLimits.image
+  ): Promise<Artifact> {
+    if (!Number.isSafeInteger(maximumBytes) || maximumBytes <= 0)
+      throw new Failure("invalid_input");
+    if (source === "-") throw new Failure("invalid_input");
+    checkFileSource(source);
+    const data = await readBytes(
+      source,
+      signal,
+      Math.min(maximumBytes, inputLimits.image)
+    );
+    const media_type = imageType(data);
+    if (!media_type) throw new Failure("invalid_input");
+    return { data, media_type };
+  }
+
+  function checkFileSource(source: string): void {
+    if (!source || /^(?:[a-z][a-z\d+.-]*:\/\/|data:|file:)/i.test(source))
+      throw new Failure("invalid_input");
+  }
+
+  async function readBytes(
+    source: string,
+    signal: AbortSignal,
+    limit: number,
+    stdin?: Readable
+  ): Promise<Buffer> {
+    if (signal.aborted) throw new Failure("cancelled");
+    const lifetime = new AbortController();
+    const abort = () => lifetime.abort(new Failure("cancelled"));
+    const timer = setTimeout(
+      () => lifetime.abort(new Failure("input_unavailable")),
+      30_000
+    );
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+    try {
+      // Opening/statting a remote-mounted file can stall too. The caller's
+      // deadline includes those operations; late completion only closes its fd.
+      return await new Promise<Buffer>((resolve, reject) => {
+        const stopped = () => reject(lifetime.signal.reason);
+        lifetime.signal.addEventListener("abort", stopped, { once: true });
+        void readSource(source, lifetime.signal, limit, stdin)
+          .then(resolve, reject)
+          .finally(() => lifetime.signal.removeEventListener("abort", stopped));
+        if (lifetime.signal.aborted) stopped();
+      });
+    } catch (error) {
+      if (error instanceof Failure) throw error;
+      throw new Failure(signal.aborted ? "cancelled" : "input_unavailable");
+    } finally {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", abort);
+    }
+  }
+
+  async function readSource(
+    source: string,
+    signal: AbortSignal,
+    limit: number,
+    stdin?: Readable
+  ): Promise<Buffer> {
+    let file: Awaited<ReturnType<typeof open>> | undefined;
+    try {
+      signal.throwIfAborted();
+      let stream: Readable;
+      if (stdin) stream = stdin;
+      else {
         file = await open(
-          path.resolve(source.slice(1)),
+          path.resolve(source),
           constants.O_RDONLY | constants.O_NONBLOCK
         );
+        signal.throwIfAborted();
         const info = await file.stat();
-        if (!info.isFile() || info.size > inputLimit)
+        signal.throwIfAborted();
+        if (!info.isFile() || info.size > limit)
           throw new Failure("input_unavailable");
         stream = file.createReadStream({
           autoClose: false,
           highWaterMark: 64 * 1024,
         });
-      } else throw new Failure("invalid_input");
-      const bytes = await readBounded(stream, signal, file !== undefined);
-      try {
-        const value: unknown = JSON.parse(
-          new TextDecoder("utf-8", { fatal: true }).decode(bytes)
-        );
-        if (!value || typeof value !== "object" || Array.isArray(value))
-          throw 0;
-        return value;
-      } catch {
-        throw new Failure("invalid_input");
       }
-    } catch (error) {
-      if (error instanceof Failure) throw error;
-      throw new Failure(signal.aborted ? "cancelled" : "input_unavailable");
+      return await readBounded(stream, signal, file !== undefined, limit);
     } finally {
       await file?.close().catch(() => undefined);
     }
@@ -99,7 +199,8 @@ export namespace MediaFiles {
   function readBounded(
     stream: Readable,
     signal: AbortSignal,
-    owned: boolean
+    owned: boolean,
+    limit: number
   ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
@@ -111,7 +212,6 @@ export namespace MediaFiles {
         stream.removeListener("data", data);
         stream.removeListener("end", end);
         signal.removeEventListener("abort", abort);
-        clearTimeout(timer);
         stream.pause();
         // A pending read may fail while an owned file stream is closing. Observe
         // that error too; it must never escape as a raw Node diagnostic.
@@ -126,7 +226,7 @@ export namespace MediaFiles {
           return;
         }
         size += chunk.byteLength;
-        if (size > inputLimit) {
+        if (size > limit) {
           finish(new Failure("invalid_input"));
           return;
         }
@@ -134,17 +234,121 @@ export namespace MediaFiles {
       };
       const end = () => finish();
       const failed = () => finish(new Failure("input_unavailable"));
-      const abort = () => finish(new Failure("cancelled"));
-      const timer = setTimeout(
-        () => finish(new Failure("input_unavailable")),
-        30_000
-      );
+      const abort = () => finish(signal.reason as Failure);
       stream.on("data", data);
       stream.once("end", end);
       stream.once("error", failed);
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted) abort();
     });
+  }
+
+  /** Container/header admission only: compressed pixels remain provider input. */
+  function imageType(bytes: Buffer): string | undefined {
+    if (
+      bytes.length >= 33 &&
+      bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex")) &&
+      bytes.readUInt32BE(8) === 13 &&
+      bytes.toString("latin1", 12, 16) === "IHDR" &&
+      bytes.readUInt32BE(16) > 0 &&
+      bytes.readUInt32BE(16) <= 0x7fffffff &&
+      bytes.readUInt32BE(20) > 0 &&
+      bytes.readUInt32BE(20) <= 0x7fffffff &&
+      bytes[26] === 0 &&
+      bytes[27] === 0 &&
+      bytes[28]! <= 1
+    ) {
+      const depth = bytes[24]!;
+      const color = bytes[25]!;
+      if (
+        (color === 0 && [1, 2, 4, 8, 16].includes(depth)) ||
+        ([2, 4, 6].includes(color) && [8, 16].includes(depth)) ||
+        (color === 3 && [1, 2, 4, 8].includes(depth))
+      )
+        return "image/png";
+    }
+    if (bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+      let offset = 2;
+      let frame = false;
+      while (offset < bytes.length) {
+        if (bytes[offset++] !== 0xff) return;
+        while (bytes[offset] === 0xff) offset++;
+        const marker = bytes[offset++];
+        if (marker === undefined || offset + 2 > bytes.length) return;
+        const length = bytes.readUInt16BE(offset);
+        if (length < 2 || offset + length > bytes.length) return;
+        if (
+          marker >= 0xc0 &&
+          marker <= 0xcf &&
+          ![0xc4, 0xc8, 0xcc].includes(marker)
+        ) {
+          if (
+            length < 8 ||
+            bytes[offset + 2]! < 2 ||
+            bytes[offset + 2]! > 16 ||
+            !bytes.readUInt16BE(offset + 3) ||
+            !bytes.readUInt16BE(offset + 5) ||
+            !bytes[offset + 7] ||
+            length !== 8 + 3 * bytes[offset + 7]!
+          )
+            return;
+          frame = true;
+        }
+        if (marker === 0xda) {
+          if (
+            frame &&
+            length >= 6 &&
+            bytes[offset + 2]! > 0 &&
+            length === 6 + 2 * bytes[offset + 2]! &&
+            offset + length < bytes.length - 2 &&
+            bytes[bytes.length - 2] === 0xff &&
+            bytes[bytes.length - 1] === 0xd9
+          )
+            return "image/jpeg";
+          return;
+        }
+        offset += length;
+      }
+    }
+    if (
+      bytes.length >= 20 &&
+      bytes.toString("latin1", 0, 4) === "RIFF" &&
+      bytes.readUInt32LE(4) === bytes.length - 8 &&
+      bytes.toString("latin1", 8, 12) === "WEBP"
+    ) {
+      let offset = 12;
+      let image = false;
+      while (offset + 8 <= bytes.length) {
+        const kind = bytes.toString("latin1", offset, offset + 4);
+        const length = bytes.readUInt32LE(offset + 4);
+        const start = offset + 8;
+        if (length > bytes.length - start) return;
+        if (kind === "VP8 ") {
+          if (
+            length < 10 ||
+            bytes[start]! & 1 ||
+            bytes.toString("hex", start + 3, start + 6) !== "9d012a" ||
+            !(bytes.readUInt16LE(start + 6) & 0x3fff) ||
+            !(bytes.readUInt16LE(start + 8) & 0x3fff)
+          )
+            return;
+          image = true;
+        } else if (kind === "VP8L") {
+          if (length < 5 || bytes[start] !== 0x2f || bytes[start + 4]! >> 5)
+            return;
+          image = true;
+        } else if (kind === "VP8X") {
+          if (
+            length !== 10 ||
+            bytes[start]! & 0xc1 ||
+            bytes.readUIntBE(start + 1, 3) !== 0
+          )
+            return;
+        }
+        offset = start + length + (length & 1);
+      }
+      if (image && offset === bytes.length) return "image/webp";
+    }
   }
 
   /** Reserve a fresh directory before submission; never reuse or overwrite one. */

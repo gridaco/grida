@@ -21,6 +21,7 @@ import type { Readable } from "node:stream";
 import { Cli } from "./cli";
 import { CliHost } from "./host";
 import { MediaFiles } from "./media-files";
+import { MediaInput } from "./media-input";
 import { MediaHttp } from "./media-http";
 import { Output } from "./output";
 import { ProviderCredentials } from "./provider-credentials";
@@ -62,11 +63,8 @@ export namespace MediaCommands {
     process.on("SIGTERM", interrupt);
     try {
       if (invocation.command === "models inspect") {
-        const descriptor = inspect(operations, invocation);
-        output.result(
-          descriptor,
-          JSON.stringify(descriptor, null, 2).split("\n")
-        );
+        const descriptor = MediaInput.inspect(operations, invocation);
+        output.result(descriptor, MediaInput.describe(descriptor));
         return 0;
       }
       if (invocation.command === "models list") {
@@ -77,8 +75,10 @@ export namespace MediaCommands {
           })
           .filter(
             (entry) =>
-              !invocation.modality ||
-              modality(entry.kind) === invocation.modality
+              (!invocation.modality ||
+                modality(entry.kind) === invocation.modality) &&
+              (!invocation.localImage ||
+                MediaInput.localImageFlags(entry).length > 0)
           );
         let access: unknown = { checked: false };
         if (invocation.available) {
@@ -117,15 +117,23 @@ export namespace MediaCommands {
           }
         }
         const rows = descriptors.map(
-          ({ input_schema: _, output: result, ...entry }) => ({
+          ({ input_schema, output: result, ...entry }) => ({
             ...entry,
+            local_image_flags: MediaInput.localImageFlags({
+              ...entry,
+              input_schema,
+              output: result,
+            }),
             output: result,
           })
         );
         output.result({ operations: rows, access }, [
+          ...(rows.length
+            ? ["KIND  PROVIDER  MODEL  VARIANT  STATUS  LOCAL IMAGE"]
+            : []),
           ...rows.map(
             (row) =>
-              `${row.kind}  ${row.provider_id}  ${row.model_id}  ${row.variant}  ${row.status}`
+              `${row.kind}  ${row.provider_id}  ${row.model_id}  ${row.variant}  ${row.status}  ${row.local_image_flags.join(", ") || "none"}`
           ),
           ...(rows.length ? [] : ["No matching operations."]),
           invocation.available
@@ -162,7 +170,7 @@ export namespace MediaCommands {
       // Resolve the contract and validate all JSON before opening keys/account custody.
       const descriptor =
         invocation.command === "generate"
-          ? inspect(operations, invocation)
+          ? MediaInput.inspect(operations, invocation)
           : undefined;
       const parsed =
         invocation.command === "generate"
@@ -173,7 +181,7 @@ export namespace MediaCommands {
                 provider: descriptor!.provider_id,
                 variant: descriptor!.variant,
               },
-              await MediaFiles.readInput(invocation.input, signal, host.stdin)
+              await MediaInput.read(descriptor!, invocation, signal, host.stdin)
             )
           : undefined;
       check();
@@ -258,33 +266,6 @@ export namespace MediaCommands {
   }
 }
 
-function inspect(
-  operations: MediaOperations,
-  invocation: Extract<
-    Cli.MediaInvocation,
-    { command: "models inspect" | "generate" }
-  >
-) {
-  const candidates = operations.list({
-    model_id: invocation.model,
-    provider: invocation.provider,
-    kind: invocation.kind,
-  });
-  const kinds = new Set(candidates.map((entry) => entry.kind));
-  if (kinds.size === 0)
-    throw new MediaOperations.Failure("operation_unavailable");
-  if (kinds.size !== 1)
-    throw new Cli.Failure(
-      "invalid_usage",
-      "Choose the operation with --kind; run grida models list."
-    );
-  return operations.inspect({
-    kind: candidates[0]!.kind,
-    model_id: invocation.model,
-    provider: invocation.provider,
-    variant: invocation.variant,
-  });
-}
 function modality(
   kind: MediaOperations.Kind
 ): "image" | "video" | "audio" | "3d" {

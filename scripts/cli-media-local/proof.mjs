@@ -1,4 +1,5 @@
 // GRIDA-SEC-014 — shared provider custody retains explicit host authority.
+// GRIDA-SEC-010 — hosted registration is inspected offline with disposable custody.
 // GRIDA-SEC-013 — installed CLI media, synthetic provider sockets and owned GG HTTP.
 // GRIDA-SEC-006 — distinct account/mint and scoped GG media routes; no durable GG token.
 // GRIDA-GG: token — only synthetic grants enter this installed consumer proof.
@@ -20,7 +21,8 @@ import http from "node:http";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { parseArgs, promisify } from "node:util";
+import { CliRelease } from "../cli-release/prepare.mjs";
 
 const execute = promisify(execFile);
 const repository = fileURLToPath(new URL("../../", import.meta.url));
@@ -39,6 +41,17 @@ const accountToken = "synthetic-account-access";
 const refreshToken = "synthetic-account-refresh";
 const ggToken = "synthetic.gg.token";
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+// Full local input container, unlike output signature stubs used for transport.
+const localPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
+  "base64"
+);
+const localImageUrl = `data:image/png;base64,${localPng.toString("base64")}`;
+const referenceUrl =
+  "https://public.example/reference.png?synthetic-input=private";
+const speechText =
+  "  안녕하세요, synthetic speech 🎨\r\nKeep these spaces.  \n";
+const invalidImageText = "synthetic private input: this is not an image";
 const mp3 = Buffer.from([73, 68, 51, 4, 0, 0]);
 const mp4 = Buffer.from([0, 0, 0, 24]);
 const glb = Buffer.from([103, 108, 84, 70, 2, 0, 0, 0, 12, 0, 0, 0]);
@@ -55,10 +68,59 @@ const binary = (value, type) => ({
   headers: { "content-type": type },
   base64: value.toString("base64"),
 });
+function assertInputAbsent(text) {
+  for (const value of [
+    prompt,
+    speechText,
+    referenceUrl,
+    localPng.toString("base64"),
+    invalidImageText,
+  ])
+    assert(
+      !text.includes(value) &&
+        !text.includes(JSON.stringify(value).slice(1, -1)),
+      "Private input entered command output or receipt"
+    );
+}
 function fixture(requests = [], dns = {}) {
   for (const request of requests)
     dns[request.hostname] ??= [{ address: "93.184.216.34", family: 4 }];
   return { requests, dns };
+}
+function queuedFalFixture(binding, input, result, bytes, type) {
+  return fixture([
+    {
+      hostname: "queue.fal.run",
+      path: `/${binding}`,
+      method: "POST",
+      headers: { authorization: `Key ${keys.fal}` },
+      json: input,
+      response: jsonBody({
+        status_url: "https://queue.fal.run/job/status",
+        response_url: "https://queue.fal.run/job/result",
+      }),
+    },
+    {
+      hostname: "queue.fal.run",
+      path: "/job/status",
+      method: "GET",
+      headers: { authorization: `Key ${keys.fal}` },
+      response: jsonBody({ status: "COMPLETED" }),
+    },
+    {
+      hostname: "queue.fal.run",
+      path: "/job/result",
+      method: "GET",
+      headers: { authorization: `Key ${keys.fal}` },
+      response: jsonBody(result),
+    },
+    {
+      hostname: "v3.fal.media",
+      path: "/friendly-result",
+      method: "GET",
+      response: binary(bytes, type),
+    },
+  ]);
 }
 function registrationFixture(provider, key = keys[provider], response) {
   switch (provider) {
@@ -138,6 +200,12 @@ async function sourceHashes() {
     const root = path.join(repository, "packages", name);
     for (const filename of [
       path.join(root, "package.json"),
+      ...(name === "grida-cli"
+        ? [
+            path.join(root, "README.md"),
+            path.join(root, "THIRD-PARTY-NOTICES.txt"),
+          ]
+        : []),
       ...(await readdir(root))
         .filter((name) => /^tsdown\.config\.[cm]?ts$/.test(name))
         .map((name) => path.join(root, name)),
@@ -153,6 +221,7 @@ async function sourceHashes() {
     ...(await files(path.join(repository, "scripts/cli-media-local"))),
     path.join(repository, "scripts/cli-local/network.cjs"),
     path.join(repository, "scripts/cli-local/network.test.mjs"),
+    ...(await files(path.join(repository, "scripts/cli-release"))),
   ])
     result[path.relative(repository, filename)] = sha256(
       await readFile(filename)
@@ -161,6 +230,17 @@ async function sourceHashes() {
 }
 async function main() {
   assert(Number(process.versions.node.split(".")[0]) >= 24, "Node24+ required");
+  const { values } = parseArgs({ options: { archive: { type: "string" } } });
+  let candidate;
+  if (values.archive !== undefined) {
+    assert(path.isAbsolute(values.archive), "Archive must be an absolute path");
+    const stat = await lstat(values.archive);
+    assert(
+      stat.isFile() && stat.size > 0 && stat.size <= 16 * 1024 * 1024,
+      "Expected a bounded regular tarball"
+    );
+    candidate = await readFile(values.archive);
+  }
   const owned = await realpath(
     await mkdtemp(path.join(tmpdir(), "grida-cli-media-"))
   );
@@ -215,7 +295,7 @@ async function main() {
   }
   async function startCommand(
     args,
-    { wire = fixture(), extraEnv = {}, input } = {}
+    { wire = fixture(), extraEnv = {}, input, hosted = false } = {}
   ) {
     const id = sequence++;
     const fixturePath = path.join(owned, `fixture-${id}.json`);
@@ -229,8 +309,10 @@ async function main() {
         cwd: runtime,
         env: {
           ...env,
-          GRIDA_HOME: profile,
-          GRIDA_CLI_LOCAL_CONFIG: path.join(owned, "public-client.json"),
+          GRIDA_HOME: hosted ? undefined : profile,
+          GRIDA_CLI_LOCAL_CONFIG: hosted
+            ? undefined
+            : path.join(owned, "public-client.json"),
           GRIDA_CLI_PROOF_ROOT: owned,
           GRIDA_CLI_PROOF_REPORT: baseReport,
           GRIDA_MEDIA_PROOF_FIXTURE: fixturePath,
@@ -273,7 +355,9 @@ async function main() {
             const url = new URL(text);
             assert.equal(
               url.origin + url.pathname,
-              "http://127.0.0.1:55431/auth/v1/oauth/authorize"
+              hosted
+                ? "https://mozagqllybnbytfcmvdh.supabase.co/auth/v1/oauth/authorize"
+                : "http://127.0.0.1:55431/auth/v1/oauth/authorize"
             );
             assert(!url.username && !url.password && !url.hash);
             resolveUrl(url);
@@ -322,7 +406,8 @@ async function main() {
               !(stdout + stderr).includes(secret),
               "Credential entered command output"
             );
-          resolve({ code, stdout, stderr, stats });
+          assertInputAbsent(stdout + stderr);
+          resolve({ code, stdout, stderr, stats, base });
         } catch {
           reject(
             new Error("Installed CLI result or authority assertion failed")
@@ -378,9 +463,19 @@ async function main() {
     type,
     extraEnv = {},
     input,
+    inputArgs,
   }) {
-    const inputFile = path.join(owned, `input-${sequence}.json`);
-    await writeFile(inputFile, JSON.stringify(value), { mode: 0o600 });
+    let requestArgs = inputArgs;
+    if (requestArgs === undefined) {
+      const inputFile = path.join(owned, `input-${sequence}.json`);
+      await writeFile(inputFile, JSON.stringify(value), { mode: 0o600 });
+      requestArgs = ["--input", `@${inputFile}`];
+    } else
+      assert.equal(
+        value,
+        undefined,
+        "Friendly and JSON inputs must remain exclusive"
+      );
     const out = path.join(owned, `output-${name}`);
     const args = [
       "generate",
@@ -388,8 +483,7 @@ async function main() {
       model,
       "--provider",
       provider,
-      "--input",
-      `@${inputFile}`,
+      ...requestArgs,
       "--out",
       out,
       ...(kind ? ["--kind", kind] : []),
@@ -413,6 +507,7 @@ async function main() {
     assert.equal(saved.length, 2, "One artifact and one receipt only");
     const receiptFile = saved.find((value) => value.endsWith(".json"));
     assert.deepEqual(JSON.parse(await readFile(receiptFile, "utf8")), receipt);
+    assertInputAbsent(JSON.stringify(receipt));
     assert.equal(result.stats.requests.length, wire?.requests.length ?? 0);
     return { out, args, result };
   }
@@ -453,43 +548,22 @@ async function main() {
     );
     report.sources = await sourceHashes();
     await check("offline packed installation", async () => {
-      const source = path.join(repository, "packages/grida-cli");
-      const packed = path.join(owned, "package");
-      await mkdir(packed, { mode: 0o700 });
-      await cp(path.join(source, "dist"), path.join(packed, "dist"), {
-        recursive: true,
-      });
-      await cp(
-        path.join(source, "package.json"),
-        path.join(packed, "package.json")
-      );
-      const npm = path.resolve(
-        path.dirname(process.execPath),
-        "../lib/node_modules/npm/bin/npm-cli.js"
-      );
+      const npm = await CliRelease.npm();
       const options = {
         cwd: owned,
         env,
         timeout: 60_000,
         maxBuffer: 512 * 1024,
       };
-      const packedResult = await execute(
-        process.execPath,
-        [
-          npm,
-          "pack",
-          packed,
-          "--pack-destination",
-          path.join(owned, "archives"),
-          "--json",
-          "--offline",
-          "--ignore-scripts",
-        ],
-        options
-      );
-      const record = JSON.parse(packedResult.stdout)[0];
-      assert.equal(record.name, "grida");
-      const archive = path.join(owned, "archives", record.filename);
+      let archive;
+      if (candidate) {
+        archive = path.join(owned, "archives", "candidate.tgz");
+        await writeFile(archive, candidate, { mode: 0o600 });
+      } else {
+        const directory = path.join(owned, "archives", "candidate");
+        const record = await CliRelease.prepare(directory);
+        archive = path.join(directory, record.archive);
+      }
       report.archive_sha256 = sha256(await readFile(archive));
       await execute(
         process.execPath,
@@ -525,12 +599,120 @@ async function main() {
 
     // Cases are deliberately expressed in CLI syntax and provider wire fixtures,
     // with no import from a source file or test-only SDK/custody implementation.
+    await check(
+      "hosted registration and ordinary-home custody stay offline",
+      async () => {
+        const options = { hosted: true };
+        const before = await json(["auth", "storage", "show"], options);
+        assert.equal(before.value.backend, "keyring");
+        assert.equal(before.value.initialized, false);
+        await json(["auth", "storage", "migrate", "file"], options);
+        const status = await json(["auth", "status"], options, 1);
+        assert.deepEqual(status.value, { state: "signed-out" });
+        const login = await startCommand(
+          ["auth", "login", "--no-browser"],
+          options
+        );
+        const authorization = await login.authorization;
+        assert.equal(
+          authorization.searchParams.get("client_id"),
+          "ab2b3b01-a0a1-4d40-969c-b8fc177a2557"
+        );
+        assert.equal(authorization.searchParams.get("scope"), "email profile");
+        assert.equal(
+          authorization.searchParams.get("code_challenge_method"),
+          "S256"
+        );
+        assert.match(
+          authorization.searchParams.get("state"),
+          /^[A-Za-z0-9_-]{43}$/
+        );
+        assert.match(
+          authorization.searchParams.get("code_challenge"),
+          /^[A-Za-z0-9_-]{43}$/
+        );
+        assert(
+          [
+            "http://127.0.0.1:55435/callback",
+            "http://127.0.0.1:55436/callback",
+          ].includes(authorization.searchParams.get("redirect_uri"))
+        );
+        // Do not navigate to this URL or send a code. No hosted request is allowed.
+        login.child.kill("SIGTERM");
+        const cancelled = await login.done;
+        assert.equal(cancelled.code, 1);
+        assert.match(cancelled.stderr, /Command interrupted/);
+        const after = await json(["auth", "storage", "show"], options);
+        assert.equal(after.value.profile, before.value.profile);
+        assert.equal(after.value.backend, "file");
+        const loggedOut = await json(["auth", "logout"], options);
+        assert.deepEqual(loggedOut.value, {
+          state: "signed-out",
+          revocation: "not-needed",
+        });
+        for (const result of [before, status, cancelled, after, loggedOut]) {
+          assert.deepEqual(result.base.requests, []);
+          assert.deepEqual(result.stats.requests, []);
+          assert.deepEqual(result.stats.dns, []);
+          assert.equal(result.stats.token_exchanges, 0);
+        }
+        const credentials = JSON.parse(
+          await readFile(
+            path.join(
+              home,
+              ".grida",
+              "auth",
+              after.value.profile,
+              "credentials.json"
+            ),
+            "utf8"
+          )
+        );
+        assert.equal(credentials.binding.home, path.join(home, ".grida"));
+        assert.equal(
+          credentials.binding.issuer,
+          "https://mozagqllybnbytfcmvdh.supabase.co/auth/v1"
+        );
+        assert.equal(
+          credentials.binding.clientId,
+          "ab2b3b01-a0a1-4d40-969c-b8fc177a2557"
+        );
+        assert.equal(credentials.binding.apiOrigin, "https://grida.co");
+        assert.equal(credentials.envelope.session, null);
+      }
+    );
+
     await check("offline model discovery and schemas", async () => {
       const listed = await json(["models", "list"]);
       assert(Array.isArray(listed.value.operations));
       assert(listed.value.operations.length > 0);
       assert.deepEqual(listed.stats.requests, []);
       assert.deepEqual(listed.stats.dns, []);
+      const local = await json([
+        "models",
+        "list",
+        "--modality",
+        "video",
+        "--local-image",
+      ]);
+      assert.deepEqual(
+        local.value.operations.map(
+          ({ provider_id, model_id, local_image_flags }) => ({
+            provider_id,
+            model_id,
+            local_image_flags,
+          })
+        ),
+        [
+          {
+            provider_id: "fal",
+            model_id: "google/veo-3.1-lite",
+            local_image_flags: ["--image"],
+          },
+        ]
+      );
+      assert.deepEqual(local.stats.requests, []);
+      assert.deepEqual(local.stats.dns, []);
       for (const [model, provider] of [
         ["openai/gpt-image-2", "openrouter"],
         ["eleven_text_to_sound_v2", "elevenlabs"],
@@ -554,6 +736,63 @@ async function main() {
         assert.deepEqual(inspected.stats.dns, []);
       }
     });
+    await check(
+      "local input support is discoverable from installed schemas",
+      async () => {
+        for (const [model, provider, variant, field] of [
+          ["openai/gpt-image-2", "openrouter", "references", "references"],
+          ["fal-ai/trellis-2", "fal", "image", "image"],
+          ["google/veo-3.1-lite", "fal", "image", "image"],
+        ]) {
+          const inspected = await json([
+            "models",
+            "inspect",
+            "--model",
+            model,
+            "--provider",
+            provider,
+            "--variant",
+            variant,
+          ]);
+          assert.equal(inspected.value.variant, variant);
+          const schema = inspected.value.input_schema;
+          if (field === "references") {
+            assert.equal(schema.properties.references.type, "array");
+            assert.equal(
+              schema.properties.references.maxItems,
+              inspected.value.references_max
+            );
+            assert(schema.properties.references.maxItems >= 3);
+          } else {
+            assert.deepEqual(
+              schema.properties.image.properties.media_type.enum,
+              ["image/png", "image/jpeg", "image/webp"]
+            );
+            assert.equal(
+              schema.properties.image.properties.data[
+                "x-grida-decoded-max-bytes"
+              ],
+              model === "google/veo-3.1-lite" ? 8_000_000 : 8 * 1024 * 1024
+            );
+          }
+          if (model === "google/veo-3.1-lite") {
+            assert.equal(
+              inspected.value.binding_id,
+              "fal-ai/veo3.1/lite/image-to-video"
+            );
+            assert.deepEqual(schema.oneOf, [
+              { required: ["image"] },
+              { required: ["image_url"] },
+            ]);
+            assert.deepEqual(schema.properties.duration.enum, [4, 6, 8]);
+            assert.equal(schema.properties.generate_audio.type, "boolean");
+            assert(schema.properties.resolution.enum.includes("1280x720"));
+          }
+          assert.deepEqual(inspected.stats.requests, []);
+          assert.deepEqual(inspected.stats.dns, []);
+        }
+      }
+    );
     await check(
       "provider presence has no network or credential output",
       async () => {
@@ -1044,6 +1283,289 @@ async function main() {
         });
       });
     }
+
+    const localImageFile = path.join(runtime, "reference-input.jpg");
+    const textFile = path.join(runtime, "speech-input.txt");
+    await writeFile(localImageFile, localPng, { mode: 0o600 });
+    await writeFile(textFile, speechText, { mode: 0o600 });
+    await check(
+      "friendly references preserve local and HTTPS order and match JSON",
+      async () => {
+        const references = [localImageUrl, referenceUrl, localImageUrl];
+        for (const [name, request] of [
+          [
+            "references-flags",
+            {
+              inputArgs: [
+                "--prompt",
+                prompt,
+                "--reference",
+                "./reference-input.jpg",
+                "--reference",
+                referenceUrl,
+                "--reference",
+                "./reference-input.jpg",
+              ],
+            },
+          ],
+          [
+            "references-json",
+            { value: { prompt, references }, variant: "references" },
+          ],
+        ]) {
+          const generated = await generate({
+            name,
+            model: "openai/gpt-image-2",
+            provider: "openrouter",
+            ...request,
+            extraEnv: { OPENROUTER_API_KEY: keys.openrouter },
+            wire: fixture([
+              {
+                hostname: "openrouter.ai",
+                path: "/api/v1/images",
+                method: "POST",
+                headers: { authorization: `Bearer ${keys.openrouter}` },
+                json: {
+                  model: "openai/gpt-image-2",
+                  prompt,
+                  n: 1,
+                  input_references: references.map((url) => ({
+                    type: "image_url",
+                    image_url: { url },
+                  })),
+                },
+                response: jsonBody({
+                  data: [{ b64_json: png.toString("base64") }],
+                }),
+              },
+            ]),
+            data: png,
+            type: "image/png",
+          });
+          assert.equal(generated.result.value.variant, "references");
+          assert.deepEqual(generated.result.stats.dns, ["openrouter.ai"]);
+        }
+      }
+    );
+    await check(
+      "friendly local image reaches TRELLIS bytes without JSON",
+      async () => {
+        const generated = await generate({
+          name: "trellis-local",
+          model: "fal-ai/trellis-2",
+          provider: "fal",
+          inputArgs: ["--image", "./reference-input.jpg"],
+          extraEnv: { FAL_KEY: keys.fal },
+          wire: queuedFalFixture(
+            "fal-ai/trellis-2",
+            { image_url: localImageUrl },
+            { model_glb: { url: "https://v3.fal.media/friendly-result" } },
+            glb,
+            "model/gltf-binary"
+          ),
+          data: glb,
+          type: "model/gltf-binary",
+        });
+        assert.equal(generated.result.value.variant, "image");
+      }
+    );
+    await check(
+      "friendly SFX scalar flags preserve false and zero",
+      async () => {
+        await generate({
+          name: "sfx-flags",
+          model: "eleven_text_to_sound_v2",
+          provider: "elevenlabs",
+          inputArgs: [
+            "--prompt",
+            prompt,
+            "--param",
+            "duration_seconds=1",
+            "--param",
+            "loop=false",
+            "--param",
+            "prompt_influence=0",
+          ],
+          extraEnv: { ELEVENLABS_API_KEY: keys.elevenlabs },
+          wire: fixture([
+            {
+              hostname: "api.elevenlabs.io",
+              path: "/v1/sound-generation?output_format=mp3_44100_128",
+              method: "POST",
+              headers: { "xi-api-key": keys.elevenlabs },
+              json: {
+                text: prompt,
+                model_id: "eleven_text_to_sound_v2",
+                duration_seconds: 1,
+                loop: false,
+                prompt_influence: 0,
+              },
+              response: binary(mp3, "audio/mpeg"),
+            },
+          ]),
+          data: mp3,
+          type: "audio/mpeg",
+        });
+      }
+    );
+    await check(
+      "friendly speech reads exact UTF-8 text and encodes its voice",
+      async () => {
+        await generate({
+          name: "speech-file",
+          model: "eleven_v3",
+          provider: "elevenlabs",
+          inputArgs: [
+            "--text-file",
+            "./speech-input.txt",
+            "--voice",
+            "voice/one",
+          ],
+          extraEnv: { ELEVENLABS_API_KEY: keys.elevenlabs },
+          wire: fixture([
+            {
+              hostname: "api.elevenlabs.io",
+              path: "/v1/text-to-speech/voice%2Fone?output_format=mp3_44100_128",
+              method: "POST",
+              headers: { "xi-api-key": keys.elevenlabs },
+              json: { text: speechText, model_id: "eleven_v3" },
+              response: binary(mp3, "audio/mpeg"),
+            },
+          ]),
+          data: mp3,
+          type: "audio/mpeg",
+        });
+      }
+    );
+    await check(
+      "fal Veo Lite local image uses exact inline and scalar wire values",
+      async () => {
+        const generated = await generate({
+          name: "veo-lite-local",
+          model: "google/veo-3.1-lite",
+          provider: "fal",
+          inputArgs: [
+            "--prompt",
+            prompt,
+            "--image",
+            "./reference-input.jpg",
+            "--param",
+            "duration=4",
+            "--param",
+            "resolution=1280x720",
+            "--param",
+            "generate_audio=false",
+          ],
+          extraEnv: { FAL_KEY: keys.fal },
+          wire: queuedFalFixture(
+            "fal-ai/veo3.1/lite/image-to-video",
+            {
+              prompt,
+              image_url: localImageUrl,
+              duration: "4s",
+              resolution: "720p",
+              aspect_ratio: "16:9",
+              generate_audio: false,
+            },
+            { video: { url: "https://v3.fal.media/friendly-result" } },
+            mp4,
+            "video/mp4"
+          ),
+          data: mp4,
+          type: "video/mp4",
+        });
+        assert.equal(generated.result.value.variant, "image");
+        assert.equal(
+          generated.result.value.binding_id,
+          "fal-ai/veo3.1/lite/image-to-video"
+        );
+      }
+    );
+    await check(
+      "local input and flag failures precede DNS and output creation",
+      async () => {
+        const malformed = path.join(runtime, "malformed-private.png");
+        const oversized = path.join(runtime, "oversized-private.png");
+        await writeFile(malformed, invalidImageText, { mode: 0o600 });
+        const bytes = Buffer.alloc(8 * 1024 * 1024 + 1);
+        localPng.copy(bytes);
+        await writeFile(oversized, bytes, { mode: 0o600 });
+        for (const [name, model, inputArgs] of [
+          [
+            "URL-only-video",
+            "google/veo-3.1",
+            ["--prompt", prompt, "--image", "./reference-input.jpg"],
+          ],
+          [
+            "missing-file",
+            "openai/gpt-image-2",
+            ["--prompt", prompt, "--reference", "./missing-private.png"],
+          ],
+          [
+            "malformed-image",
+            "openai/gpt-image-2",
+            ["--prompt", prompt, "--reference", "./malformed-private.png"],
+          ],
+          [
+            "oversized-image",
+            "openai/gpt-image-2",
+            ["--prompt", prompt, "--reference", "./oversized-private.png"],
+          ],
+          [
+            "duplicate-flags",
+            "openai/gpt-image-2",
+            ["--prompt", prompt, "--prompt", prompt],
+          ],
+        ]) {
+          const out = path.join(owned, `never-${name}`);
+          const result = await json(
+            [
+              "generate",
+              "--provider",
+              "openrouter",
+              "--model",
+              model,
+              ...inputArgs,
+              "--out",
+              out,
+            ],
+            { extraEnv: { OPENROUTER_API_KEY: keys.openrouter } },
+            2
+          );
+          assert.equal(result.value.error.code, "invalid_usage");
+          assert.deepEqual(result.stats.requests, []);
+          assert.deepEqual(result.stats.dns, []);
+          await assert.rejects(lstat(out), { code: "ENOENT" });
+        }
+        const out = path.join(owned, "occupied-friendly-output");
+        await mkdir(out, { mode: 0o700 });
+        await writeFile(path.join(out, "sentinel"), "preserve");
+        const result = await json(
+          [
+            "generate",
+            "--provider",
+            "openrouter",
+            "--model",
+            "openai/gpt-image-2",
+            "--prompt",
+            prompt,
+            "--reference",
+            "./reference-input.jpg",
+            "--out",
+            out,
+          ],
+          { extraEnv: { OPENROUTER_API_KEY: keys.openrouter } },
+          1
+        );
+        assert.equal(result.value.error.code, "output_unavailable");
+        assert.deepEqual(result.stats.requests, []);
+        assert.deepEqual(result.stats.dns, []);
+        assert.equal(
+          await readFile(path.join(out, "sentinel"), "utf8"),
+          "preserve"
+        );
+      }
+    );
 
     await check(
       "invalid inputs and occupied outputs fail before authority",

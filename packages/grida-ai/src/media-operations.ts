@@ -123,10 +123,10 @@ export class MediaOperations {
               provider: provider_id as VideoClient.Provider,
               image: variant === "image",
             },
-            input: MediaInputs.video(
-              variant === "image",
-              provider_id as VideoClient.Provider
-            ).parse(value, true),
+            input: MediaInputs.video(variant === "image", {
+              ...descriptor,
+              provider_id: provider_id as VideoClient.Provider,
+            }).parse(value, true),
           };
         case "music":
           return {
@@ -381,7 +381,7 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
             },
             image ? "image" : "text",
             "listed",
-            MediaInputs.video(image, provider)
+            MediaInputs.video(image, route)
           );
       }
     }

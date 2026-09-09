@@ -10,10 +10,14 @@ format: md
 
 # Grida CLI
 
-> **Status: accepted doctrine.** Examples describe the
-> replacement CLI; they are not available in the legacy npm release.
+> **Status: accepted doctrine; implementation is a private preview.** Examples
+> describe the replacement CLI, not the legacy npm release.
 > See the [v1 spec](./v1.md) for the immediate scope and
 > [account infrastructure](./account-infrastructure.md) for its foundation.
+
+The [documentation contract](./documentation.md) defines the public CLI guide's
+home, retirement of legacy instructions, and checks that keep examples and
+documentation links aligned with released commands.
 
 Sign in, inspect your account, use a Grida tool, and keep the result in your
 own workflow. Type the commands yourself, put them in a script, or give them

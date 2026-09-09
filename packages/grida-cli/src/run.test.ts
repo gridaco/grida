@@ -176,12 +176,13 @@ describe("run results and failures", () => {
 
   it("reports known host configuration failures before starting auth", async () => {
     const { open, client, stdout, invoke } = setup();
-    open.mockRejectedValueOnce(new CliHost.Failure("not_configured"));
+    open.mockRejectedValueOnce(new CliHost.Failure("invalid_config"));
     expect(await invoke(["auth", "status", "--json"])).toBe(1);
     expect(JSON.parse(stdout[0]!)).toEqual({
       error: {
-        code: "not_configured",
-        message: "Local CLI authentication is not configured.",
+        code: "invalid_config",
+        message:
+          "The CLI authentication configuration is invalid. Use an absolute GRIDA_HOME; local fixture configuration also requires an isolated home.",
       },
     });
     expect(client.status).not.toHaveBeenCalled();

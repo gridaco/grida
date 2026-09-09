@@ -6,6 +6,7 @@ import { postHosted } from "./gg";
 import type { GgTokenSource } from "./gg-session";
 import { MediaRequest } from "./media-request";
 import { MediaInputs } from "./media-inputs";
+import type { VideoClient } from "./video-client";
 
 /** Internal adapters. No raw model, credentials, provider metadata, or queue handles are public. */
 export namespace videoModels {
@@ -20,8 +21,10 @@ export namespace videoModels {
     resolution?: `${number}x${number}`;
     duration?: number;
     fps?: number;
+    generate_audio?: boolean;
     seed?: number;
     image_url?: string;
+    image?: VideoClient.Image;
   };
   export type Video =
     | { type: "url"; url: string; mediaType: string }
@@ -109,6 +112,16 @@ export namespace videoModels {
     // https://fal.ai/models/alibaba/wan-3.0/image-to-video/api
     const frame =
       id === "alibaba/wan-3.0/image-to-video" ? "start_image_url" : "image_url";
+    const body = wire(input);
+    const lite = id === MediaInputs.falVeoLite.binding_id;
+    const resolution =
+      lite && input.resolution
+        ? MediaInputs.falVeoLite.resolutions[
+            input.resolution as keyof typeof MediaInputs.falVeoLite.resolutions
+          ]
+        : undefined;
+    const imageUrl = input.image ? imageDataUrl(input.image) : input.image_url;
+    request.check();
     const submit = await request.json<{
       status_url: string;
       response_url: string;
@@ -116,8 +129,15 @@ export namespace videoModels {
       method: "POST",
       headers,
       body: JSON.stringify({
-        ...wire(input),
-        ...(input.image_url ? { [frame]: input.image_url } : {}),
+        ...body,
+        ...(lite && input.duration !== undefined
+          ? { duration: `${input.duration}s` }
+          : {}),
+        ...resolution,
+        ...(lite && input.generate_audio !== undefined
+          ? { generate_audio: input.generate_audio }
+          : {}),
+        ...(imageUrl ? { [frame]: imageUrl } : {}),
       }),
     });
     allowed(submit.status_url, falHosts);
@@ -239,6 +259,15 @@ export namespace videoModels {
       ...(input.fps !== undefined ? { fps: input.fps } : {}),
       ...(input.seed !== undefined ? { seed: input.seed } : {}),
     };
+  }
+
+  function imageDataUrl(image: VideoClient.Image): string {
+    let binary = "";
+    for (let offset = 0; offset < image.data.length; offset += 8192)
+      binary += String.fromCharCode(
+        ...image.data.subarray(offset, offset + 8192)
+      );
+    return `data:${image.media_type};base64,${btoa(binary)}`;
   }
 
   function allowed(value: string, hosts: string[]) {

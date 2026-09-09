@@ -1,0 +1,85 @@
+name: CLI documentation
+
+on:
+  pull_request:
+    paths:
+      - "docs/cli/**"
+      - "docs/index.md"
+      - "docs/translations/**/index.md"
+      - "docs/AGENTS.md"
+      - "apps/docs/**"
+      - "packages/grida-cli/**"
+      - "packages/grida-ai/**"
+      - "packages/grida-ai-models/**"
+      - "packages/grida-auth/**"
+      - "packages/grida-account/**"
+      - "packages/grida-home/**"
+      - "scripts/cli-docs/**"
+      - "scripts/cli-release/**"
+      - "scripts/cli-local/network.cjs"
+      - "fixtures/images/checker.png"
+      - "editor/next.config.ts"
+      - ".github/workflows/cli-docs.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".nvmrc"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      archive_artifact:
+        description: Candidate artifact from CLI verification, containing candidate.json and its tarball.
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-docs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          lfs: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build current command and schema contracts
+        run: pnpm --filter grida... build
+      - name: Build documentation
+        run: pnpm --filter docs build
+      - name: Check example parsing and translation cleanup
+        run: |
+          node --import tsx --test scripts/cli-docs/check.test.mjs
+          node --test apps/docs/scripts/docs-site-gen/copy-translations.test.cjs
+      - name: Download release candidate
+        if: inputs.archive_artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.archive_artifact }}
+          path: .cache/cli-docs-candidate
+      - name: Check the release candidate against its documentation
+        if: inputs.archive_artifact != ''
+        run: |
+          node --import tsx --input-type=module <<'NODE'
+          import path from 'node:path';
+          import { CliRelease } from './scripts/cli-release/prepare.mjs';
+          import { CliDocs } from './scripts/cli-docs/check.mjs';
+          const root = path.resolve('.cache/cli-docs-candidate');
+          const candidate = await CliRelease.verify(root);
+          console.log(JSON.stringify(await CliDocs.run({ archive: path.join(root, candidate.archive) }), null, 2));
+          NODE
+      - name: Check the current preview against its documentation
+        if: inputs.archive_artifact == ''
+        run: node --import tsx scripts/cli-docs/check.mjs

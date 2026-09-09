@@ -1,6 +1,7 @@
 # Installed CLI media proof
 
 > **GRIDA-SEC-013 / GRIDA-SEC-006** — synthetic provider authority and an owned GG HTTP fixture.
+> **GRIDA-SEC-010** — offline hosted registration and disposable ordinary-home custody.
 > **GRIDA-GG: token** — fresh synthetic scoped grants stay in invocation memory.
 > See [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md).
 
@@ -15,13 +16,25 @@ node scripts/cli-media-local/proof.mjs
 node --test scripts/cli-media-local/network.test.mjs scripts/cli-local/network.test.mjs
 ```
 
+An optional `--archive /absolute/path/grida-version.tgz` tests an existing
+candidate instead of packing a new one. It snapshots that bounded regular file
+into its owned fixture and records its hash. The release and docs jobs use this
+path to verify the exact package that will be published. Default packing uses
+the shared [release preparation](../cli-release/README.md) file boundary.
+
 Node 24+, its bundled npm, and permission to bind the owned loopback API port
 `3041` plus at least one registered callback port (`55435` or `55436`) are required.
 An occupied API port or both occupied callback ports fail the proof; it does not
 stop or adopt another service. npm installation is offline, ignores lifecycle scripts,
 and omits the optional keyring binding. No Docker or hosted service is needed.
 
-The proof checks offline discovery and schemas, explicit provider presence and
+The proof checks the shipped hosted registration without visiting its issuer:
+ordinary-home storage metadata, explicit file selection, restart/status, the
+manual authorization URL's client/callback/PKCE fields, cancellation and empty
+logout. Its home is disposable; external network and OS keyring access remain
+blocked. This does not prove hosted login or deployment readiness.
+
+It also checks offline discovery and schemas, explicit provider presence and
 stdin keys, shared TOML configuration/removal across restarts and concurrent
 processes, overrides that bypass corrupt storage, stored-key generation,
 image/video/music/SFX/speech/3D artifacts and receipts, paginated voice
@@ -31,6 +44,19 @@ account token on account/mint routes and a distinct scoped token on media routes
 Independent music processes remint; GG credentials are absent from durable
 profile files. Tiny signature bytes prove byte transport and persistence, not
 media codec validity.
+
+Local-input cases use a complete PNG container and the installed CLI's public
+schemas. They check ordered local and HTTPS references, equivalent JSON inputs,
+local TRELLIS image bytes, SFX `false`/`0` scalars, exact UTF-8 speech files and
+voice IDs, and the exact fal Veo Lite image-to-video binding. The Veo case asserts
+an inline PNG with provider duration `4s`, resolution `720p` and aspect ratio
+`16:9`, and explicit `generate_audio: false`. Discovery checks that `--local-image`
+finds the supported video route without DNS or provider requests. Missing,
+malformed and oversized files, duplicate flags, local input on a
+URL-only video binding, and occupied outputs fail before DNS or submission.
+Inputs remain absent from process output, receipts and the safe report. These
+cases verify file admission and wire serialization; provider codec acceptance
+remains a separate check.
 
 Provider configuration uses distinct synthetic keys and the real SDK credential
 policy. OpenRouter, Vercel and fal each make exactly one authenticated registration

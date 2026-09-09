@@ -25,7 +25,8 @@ export namespace ProviderStore {
           parent = next;
         }
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof ProviderCredentialStore.Failure) throw error;
       throw new ProviderCredentialStore.Failure("storage_failed");
     }
   }
@@ -40,8 +41,14 @@ export namespace ProviderStore {
         return "Desktop provider-key migration needs cleanup. Open the updated Desktop and retry a provider connection, or use an explicit environment key or --key-stdin.";
       case "store_busy":
         return "Provider credentials are busy in another process. Retry after it finishes.";
+      case "invalid_store":
+        return "credentials.toml is not a valid Grida provider credential file. Check its TOML syntax and required fields; run grida providers --help for the format. No alternate stored key was selected.";
+      case "unsupported_version":
+        return "credentials.toml uses an unsupported format version. Update Grida to a compatible version; do not change the version field to bypass this check.";
+      case "invalid_input":
+        return "Invalid provider credential input or storage location. Check the provider name and use an absolute GRIDA_HOME if set.";
       default:
-        return "Cannot use shared provider credentials. Check credentials.toml format, version and private permissions; no alternate stored key was selected.";
+        return "Cannot access or lock provider credential storage. Check filesystem or sandbox access, ownership and private permissions for the Grida home; run grida providers --help for its location. No alternate stored key was selected.";
     }
   }
 }

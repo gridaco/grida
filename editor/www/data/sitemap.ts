@@ -46,7 +46,6 @@ export namespace sitemap {
     thebundle: "/bundle",
     playground: "/playground",
     playground_forms: "/playground/forms",
-    figma_ci: "/figma/ci",
     figma_assistant: "/figma/assistant",
     figma_vscode: "/figma/vscode",
     book15: "https://cal.com/universe-from-grida/15min",
@@ -152,11 +151,6 @@ export namespace sitemap {
       title: "WEST (beta)",
       href: links.west,
       description: "Welcome to West of referral marketing",
-    } satisfies Item,
-    figma_ci: {
-      title: "Figma CI",
-      href: links.figma_ci,
-      description: "CI for Figma Designs",
     } satisfies Item,
     figma_assistant: {
       title: "Figma Assistant",

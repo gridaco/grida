@@ -1,4 +1,4 @@
-// GRIDA-SEC-010 / GRIDA-SEC-006 — local registration, custody and scoped handoff.
+// GRIDA-SEC-010 / GRIDA-SEC-006 — trusted registration, custody and scoped handoff.
 // GRIDA-GG: token — only an explicit construction-time sink receives the grant.
 import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
@@ -6,6 +6,7 @@ import {
   chmod,
   mkdtemp,
   mkdir,
+  realpath,
   rm,
   symlink,
   writeFile,
@@ -34,6 +35,12 @@ const config = {
     "http://127.0.0.1:55436/callback",
   ],
 };
+const hostedConfig = {
+  clientId: "ab2b3b01-a0a1-4d40-969c-b8fc177a2557",
+  issuer: "https://mozagqllybnbytfcmvdh.supabase.co/auth/v1",
+  apiOrigin: "https://grida.co",
+  redirectUris: config.redirectUris,
+};
 const nativeFactory = vi.mocked(createPersistentNativeAuth);
 const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
 let root: string;
@@ -41,7 +48,7 @@ let env: NodeJS.ProcessEnv;
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  root = await mkdtemp(path.join(tmpdir(), "grida-cli-host-"));
+  root = await realpath(await mkdtemp(path.join(tmpdir(), "grida-cli-host-")));
   const userHome = path.join(root, "user");
   await mkdir(userHome);
   vi.mocked(homedir).mockReturnValue(userHome);
@@ -74,12 +81,12 @@ function browser() {
   return options.openBrowser;
 }
 
-function authorizationUrl() {
-  const url = new URL(`${config.issuer}/oauth/authorize`);
+function authorizationUrl(registration = config) {
+  const url = new URL(`${registration.issuer}/oauth/authorize`);
   url.search = new URLSearchParams({
-    client_id: config.clientId,
+    client_id: registration.clientId,
     response_type: "code",
-    redirect_uri: config.redirectUris[0]!,
+    redirect_uri: registration.redirectUris[0]!,
     scope: "email profile",
     state: "s".repeat(43),
     code_challenge: "c".repeat(43),
@@ -89,12 +96,83 @@ function authorizationUrl() {
 }
 
 describe("CliHost.open", () => {
-  it("requires explicit registration before constructing custody", async () => {
-    await expect(CliHost.open({}, {})).rejects.toMatchObject({
-      code: "not_configured",
+  it("uses frozen hosted registration and the ordinary Grida home by default", async () => {
+    await CliHost.open({}, {});
+    const [actual, options] = nativeFactory.mock.calls[0]!;
+    expect(actual).toEqual(hostedConfig);
+    expect(Object.isFrozen(actual)).toBe(true);
+    expect(Object.isFrozen(actual.redirectUris)).toBe(true);
+    expect(options).toEqual({
+      home: path.join(homedir(), ".grida"),
+      openBrowser: expect.any(Function),
     });
-    expect(createPersistentNativeAuth).not.toHaveBeenCalled();
     expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it("lets GRIDA_HOME choose hosted custody without changing destination authority", async () => {
+    await CliHost.open(
+      { storage: "file" },
+      {
+        GRIDA_HOME: env.GRIDA_HOME,
+        GRIDA_OAUTH_CLIENT_IDS: "untrusted-client",
+        GRIDA_OAUTH_ORIGIN: "https://untrusted.example",
+        GRIDA_API_ORIGIN: "https://untrusted.example",
+        NEXT_PUBLIC_SUPABASE_URL: "https://untrusted.example",
+      }
+    );
+    expect(nativeFactory).toHaveBeenCalledExactlyOnceWith(hostedConfig, {
+      home: env.GRIDA_HOME,
+      storage: "file",
+      openBrowser: expect.any(Function),
+    });
+  });
+
+  it.each([
+    () => "",
+    () => "relative-home",
+    () => "/invalid\0home",
+    () => path.parse(homedir()).root,
+    () => homedir(),
+  ])(
+    "rejects invalid explicit hosted homes instead of selecting another store",
+    async (home) => {
+      await expect(
+        CliHost.open({}, { GRIDA_HOME: home() })
+      ).rejects.toMatchObject({ code: "invalid_config" });
+      expect(nativeFactory).not.toHaveBeenCalled();
+    }
+  );
+
+  it("canonicalizes a hosted home alias before passing it to custody", async () => {
+    const alias = path.join(root, "home-alias");
+    await symlink(homedir(), alias);
+    await CliHost.open({}, { GRIDA_HOME: path.join(alias, ".grida") });
+    expect(nativeFactory.mock.calls[0]![1].home).toBe(
+      path.join(homedir(), ".grida")
+    );
+  });
+
+  it("refuses a relative OS home instead of creating cwd account storage", async () => {
+    vi.mocked(homedir).mockReturnValue("relative-user-home");
+    await expect(CliHost.open({}, {})).rejects.toMatchObject({
+      code: "invalid_config",
+    });
+    expect(nativeFactory).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to hosted authority when the local override is empty", async () => {
+    await expect(
+      CliHost.open({}, { ...env, GRIDA_CLI_LOCAL_CONFIG: "" })
+    ).rejects.toMatchObject({ code: "invalid_config" });
+    expect(nativeFactory).not.toHaveBeenCalled();
+  });
+
+  it("does not accept hosted registration through the local fixture file", async () => {
+    await writeConfig(hostedConfig);
+    await expect(CliHost.open({}, env)).rejects.toMatchObject({
+      code: "invalid_config",
+    });
+    expect(nativeFactory).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -196,7 +274,9 @@ describe("CliHost.open", () => {
     await writeConfig({ ...config, ...change });
     await expect(CliHost.open({}, env)).rejects.toMatchObject({
       code: "invalid_config",
-      message: "The local CLI configuration is invalid.",
+      message: expect.stringContaining(
+        "CLI authentication configuration is invalid"
+      ),
     });
     expect(createPersistentNativeAuth).not.toHaveBeenCalled();
     expect(spawn).not.toHaveBeenCalled();
@@ -213,7 +293,9 @@ describe("CliHost.open", () => {
     async (value) => {
       await writeConfig(value);
       await expect(CliHost.open({}, env)).rejects.toMatchObject({
-        message: "The local CLI configuration is invalid.",
+        message: expect.stringContaining(
+          "CLI authentication configuration is invalid"
+        ),
       });
       expect(createPersistentNativeAuth).not.toHaveBeenCalled();
     }
@@ -246,7 +328,7 @@ describe("CliHost.open", () => {
     expect(createPersistentNativeAuth).not.toHaveBeenCalled();
   });
 
-  it("never falls back to a cwd registration or dotenv file", async () => {
+  it("ignores cwd registration and dotenv when selecting the hosted profile", async () => {
     const repo = path.join(root, "repository");
     await mkdir(repo);
     await writeFile(path.join(repo, ".env"), "GRIDA_HOME=must-not-load");
@@ -254,14 +336,28 @@ describe("CliHost.open", () => {
       path.join(repo, "public-client.json"),
       JSON.stringify(config)
     );
-    await expect(CliHost.open({}, { PWD: repo })).rejects.toMatchObject({
-      code: "not_configured",
-    });
-    expect(createPersistentNativeAuth).not.toHaveBeenCalled();
+    await CliHost.open({}, { PWD: repo });
+    expect(nativeFactory.mock.calls[0]![0]).toEqual(hostedConfig);
+    expect(nativeFactory.mock.calls[0]![1].home).toBe(
+      path.join(homedir(), ".grida")
+    );
   });
 });
 
 describe("CliHost browser capability", () => {
+  it("accepts only the hosted issuer in hosted mode, without a local fallback", async () => {
+    const output = vi.fn<(url: string) => void>();
+    await CliHost.open({ noBrowser: true, onAuthorizationUrl: output }, {});
+    await expect(browser()(authorizationUrl().href)).rejects.toMatchObject({
+      code: "browser_failed",
+    });
+    expect(output).not.toHaveBeenCalled();
+    const url = authorizationUrl(hostedConfig).href;
+    await browser()(url);
+    expect(output).toHaveBeenCalledExactlyOnceWith(url);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it("requires explicit manual mode and output together before custody", async () => {
     await expect(CliHost.open({ noBrowser: true }, env)).rejects.toMatchObject({
       code: "invalid_config",
