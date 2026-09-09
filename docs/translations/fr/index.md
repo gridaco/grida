@@ -25,7 +25,7 @@ Ce site est le point d'entrée principal de la documentation produit. Si vous d�
 - Utilisez [With Figma](./with-figma/index.md) si vous importez depuis Figma, utilisez Assistant ou configurez un workflow lié à Figma.
 - Utilisez [Forms](./forms/respondent-email-notifications.md) si vous travaillez sur des flux de formulaire, des notifications ou le traitement des réponses.
 - Utilisez [Platform](./platform/index.md) si vous travaillez avec l'infrastructure produit, les clients, les tags ou les fonctionnalités de plateforme.
-- Utilisez [CLI](./cli/index.md) pour accéder au compte et aux outils multimédias depuis le terminal. Cette interface est actuellement en préversion de développement.
+- Utilisez [CLI](https://grida.co/docs/cli) pour accéder au compte et aux outils multimédias depuis le terminal. Cette interface est actuellement en préversion de développement.
 - Utilisez [Canvas SDK](./canvas/sdk/index.md) si vous intégrez ou embarquez les capacités canvas de Grida.
 
 ## Domaines produit

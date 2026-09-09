@@ -23,6 +23,8 @@ The check verifies:
   public pages have unique emitted routes and matching canonical URLs.
 - Relative guide links and anchors resolve in built docs. Repository links
   point to existing files. External sites are not contacted.
+- Root and translated landing articles emit links to the canonical CLI guide;
+  a working sidebar cannot mask a stale `.md` link in the article.
 - The candidate's help and docs URLs match current source, with an empty home,
   scrubbed environment, and the existing installed-CLI offline network guard.
 - Every ordinary `sh` fence parses with the real CLI grammar. Generation and

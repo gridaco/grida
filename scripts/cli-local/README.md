@@ -3,7 +3,8 @@
 > **GRIDA-SEC-010 / GRIDA-SEC-011** — real native account custody in an owned
 > local OAuth fixture. See [SECURITY.md](../../SECURITY.md).
 
-This proof packs the current `grida` build, installs its tarball with npm into a
+This proof prepares the current `grida` build through the shared
+[candidate preparer](../cli-release/README.md), installs its tarball with npm into a
 private temporary directory, and runs the installed executable in separate
 processes. It uses the production `createPersistentNativeAuth` file backend.
 There is no copied test custody, token injection, Desktop, daemon, or agent.
@@ -19,8 +20,15 @@ With Node.js 24 and the repository's Playwright Chromium installed:
 
 ```sh
 node scripts/cli-local/proof.mjs --state /absolute/fixture/fixture.json
+node scripts/cli-local/proof.mjs --state /absolute/fixture/fixture.json --archive /absolute/candidate.tgz
 node --test scripts/cli-local/network.test.mjs
 ```
+
+`--archive` snapshots an existing bounded regular tarball into the owned fixture
+instead of packing again, so local OAuth can test the same candidate as CI. The
+installed manifest, file boundary and executable must match the current checkout.
+The report records the archive hash. This real-issuer proof remains a separate,
+fixture-owned acceptance command; normal CLI CI uses the synthetic media proof.
 
 The runner uses only the validated fixture's public registration and seeded
 local test credentials. CLI children receive the public registration path,

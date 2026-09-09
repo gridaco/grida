@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import {
-  cp,
   lstat,
   mkdir,
   mkdtemp,
@@ -18,9 +17,10 @@ import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { parseArgs, promisify } from "node:util";
 import { readState } from "../auth-local/stack.mjs";
 import { fixture } from "../auth-local/guards.mjs";
+import { CliRelease } from "../cli-release/prepare.mjs";
 
 const execute = promisify(execFile);
 const repository = fileURLToPath(new URL("../../", import.meta.url));
@@ -87,12 +87,27 @@ async function main() {
     Number(process.versions.node.split(".")[0]) >= 24,
     "Node 24+ is required"
   );
-  const args = process.argv.slice(2);
+  const { values } = parseArgs({
+    options: {
+      state: { type: "string" },
+      archive: { type: "string" },
+    },
+  });
   assert(
-    args.length === 2 && args[0] === "--state",
-    "Usage: node scripts/cli-local/proof.mjs --state /absolute/fixture.json"
+    values.state,
+    "Usage: node scripts/cli-local/proof.mjs --state /absolute/fixture.json [--archive /absolute/candidate.tgz]"
   );
-  const state = await readState(args[1]);
+  let candidate;
+  if (values.archive !== undefined) {
+    assert(path.isAbsolute(values.archive), "Archive must be an absolute path");
+    const stat = await lstat(values.archive);
+    assert(
+      stat.isFile() && stat.size > 0 && stat.size <= 16 * 1024 * 1024,
+      "Expected a bounded regular tarball"
+    );
+    candidate = await readFile(values.archive);
+  }
+  const state = await readState(values.state);
   assert.equal(state.phase, "bootstrapped");
   const setup = JSON.parse(await readFile(state.setupPath, "utf8"));
   assert.equal(setup.apiUrl, fixture.apiUrl);
@@ -389,42 +404,23 @@ async function main() {
     report.sources = await sourceHashes();
     await phase("offline package installation", async () => {
       const source = path.join(repository, "packages/grida-cli");
-      const packed = path.join(owned, "package");
-      await mkdir(packed, { mode: 0o700 });
-      await cp(path.join(source, "dist"), path.join(packed, "dist"), {
-        recursive: true,
-      });
-      await cp(
-        path.join(source, "package.json"),
-        path.join(packed, "package.json")
-      );
-      const npm = path.resolve(
-        path.dirname(process.execPath),
-        "../lib/node_modules/npm/bin/npm-cli.js"
-      );
+      const npm = await CliRelease.npm();
       const options = {
         cwd: owned,
         env: childEnv,
         timeout: 60_000,
         maxBuffer: 512 * 1024,
       };
-      const packedResult = await execute(
-        process.execPath,
-        [
-          npm,
-          "pack",
-          packed,
-          "--pack-destination",
-          path.join(owned, "archives"),
-          "--json",
-          "--offline",
-          "--ignore-scripts",
-        ],
-        options
-      );
-      const record = JSON.parse(packedResult.stdout)[0];
-      assert.equal(record.name, "grida");
-      const archive = path.join(owned, "archives", record.filename);
+      let archive;
+      if (candidate) {
+        archive = path.join(owned, "archives", "candidate.tgz");
+        await writeFile(archive, candidate, { mode: 0o600 });
+      } else {
+        const out = path.join(owned, "archives", "candidate");
+        const record = await CliRelease.prepare(out);
+        await CliRelease.verify(out);
+        archive = path.join(out, record.archive);
+      }
       report.archive_sha256 = hash(await readFile(archive));
       await execute(
         process.execPath,
@@ -447,10 +443,17 @@ async function main() {
       const manifest = JSON.parse(
         await readFile(path.join(installed, "package.json"), "utf8")
       );
-      assert.equal(manifest.name, "grida");
-      assert.deepEqual(manifest.dependencies ?? {}, {});
-      assert.equal(manifest.optionalDependencies["@github/keytar"], "7.10.6");
-      await files(installed); // No package-internal symlink to workspace source/dependencies.
+      CliRelease.manifest(manifest);
+      assert.deepEqual(
+        manifest,
+        JSON.parse(await readFile(path.join(source, "package.json"), "utf8"))
+      );
+      const installedFiles = await files(installed); // No package-internal symlink to workspace source/dependencies.
+      CliRelease.files(
+        installedFiles.map((filename) => ({
+          path: path.relative(installed, filename),
+        }))
+      );
       bin = await realpath(path.join(runtime, "node_modules/.bin/grida"));
       assert.equal(bin, path.resolve(installed, manifest.bin.grida));
       assert.equal(

@@ -38,6 +38,7 @@
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
+    "test:package": "node --test ../../scripts/ai-local/proof.test.mjs ../../scripts/npm.test.mjs && node ../../scripts/ai-local/proof.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json"
   },
   "dependencies": {

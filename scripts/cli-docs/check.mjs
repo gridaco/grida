@@ -33,6 +33,30 @@ const digest = (value) => createHash("sha256").update(value).digest("hex");
 const route = (value) => value.replace(/\/$/, "");
 
 export const CliDocs = {
+  /** Check the emitted article links, not a sidebar that can mask a stale index link. */
+  landingLinks(html, page) {
+    const article = /<article\b[^>]*>([\s\S]*?)<\/article>/.exec(html)?.[1];
+    assert(article, `Missing documentation article: ${page}`);
+    const links = [
+      ...article.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>CLI<\/a>/g),
+    ];
+    assert(links.length, `Missing CLI guide link: ${page}`);
+    for (const [, href] of links) {
+      const target = new URL(href, `https://grida.co${page}`);
+      assert.equal(
+        target.origin,
+        "https://grida.co",
+        `Wrong CLI guide origin: ${page}`
+      );
+      assert.equal(
+        route(target.pathname),
+        "/docs/cli",
+        `Wrong CLI guide route: ${page} → ${href}`
+      );
+    }
+    return links.length;
+  },
+
   /** A deliberately small literal-command grammar. This never evaluates a shell. */
   words(text) {
     const words = [];
@@ -211,6 +235,27 @@ export const CliDocs = {
         sources.push({ source, text, meta, html });
       }
       assert.equal(active.size, 6, "The public CLI guide has six owning pages");
+
+      // Root and translated entry pages link to the one canonical English guide.
+      // Check actual emitted hrefs: localized Markdown can leave a literal .md URL
+      // even while Docusaurus successfully emits a fallback guide and sidebar.
+      const translations = await readdir(path.join(docsRoot, "translations"), {
+        withFileTypes: true,
+      });
+      const landingPages = ["/docs/"];
+      for (const entry of translations) {
+        if (!entry.isDirectory()) continue;
+        try {
+          await stat(
+            path.join(docsRoot, "translations", entry.name, "index.md")
+          );
+          landingPages.push(`/docs/${entry.name}/`);
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+        }
+      }
+      for (const page of landingPages)
+        report.links += CliDocs.landingLinks(await htmlFor(page), page);
 
       for (const { source, text } of sources) {
         for (const [, target] of text.matchAll(/\]\(([^\s)]+)\)/g)) {

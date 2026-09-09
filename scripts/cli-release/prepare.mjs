@@ -8,7 +8,6 @@ import {
   mkdtemp,
   readFile,
   readdir,
-  realpath,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -16,25 +15,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
+import { npmCli } from "../npm.mjs";
 
 const execute = promisify(execFile);
 const repository = fileURLToPath(new URL("../../", import.meta.url));
 
 /** Package policy shared by candidate preparation and the explicit release guard. */
 export const CliRelease = {
-  async npm() {
-    // Resolve the companion executable rather than assuming nvm's lib layout:
-    // Homebrew keeps npm under libexec. Never select an ambient PATH executable.
-    const filename = await realpath(
-      path.join(path.dirname(process.execPath), "npm")
-    );
-    assert.equal(
-      path.basename(filename),
-      "npm-cli.js",
-      "Expected the Node installation's npm CLI"
-    );
-    return filename;
-  },
+  npm: npmCli,
   manifest(value) {
     assert.equal(value.name, "grida", "Unexpected package name");
     assert.equal(value.type, "module", "The CLI must remain an ESM executable");

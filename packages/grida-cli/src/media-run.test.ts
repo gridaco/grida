@@ -507,7 +507,10 @@ describe("MediaCommands preflight and BYOK", () => {
     expect(
       JSON.parse(await readFile(path.join(out, "receipt.json"), "utf8"))
     ).toEqual(receipt);
-    expect(await readdir(out)).toEqual(["output-1.mp3", "receipt.json"]);
+    expect((await readdir(out)).sort()).toEqual([
+      "output-1.mp3",
+      "receipt.json",
+    ]);
     test.assertSafe();
   });
 
@@ -751,7 +754,10 @@ describe("MediaCommands failure and signal lifetime", () => {
     expect(await readFile(test.result().artifacts[0].path)).toEqual(
       Buffer.from(MP3)
     );
-    expect(await readdir(out)).toEqual(["output-1.mp3", "receipt.json"]);
+    expect((await readdir(out)).sort()).toEqual([
+      "output-1.mp3",
+      "receipt.json",
+    ]);
     expect(test.request).toHaveBeenCalledOnce();
     expect(process.listeners("SIGINT")).toEqual(before);
     test.assertSafe();
@@ -793,7 +799,10 @@ describe("MediaCommands failure and signal lifetime", () => {
     expect(await readFile(path.join(out, "output-2.png"), "utf8")).toBe(
       "preserve-owned-collision"
     );
-    expect(await readdir(out)).toEqual(["output-1.png", "output-2.png"]);
+    expect((await readdir(out)).sort()).toEqual([
+      "output-1.png",
+      "output-2.png",
+    ]);
     expect(test.request).toHaveBeenCalledOnce();
     test.assertSafe();
   });

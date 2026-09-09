@@ -16,6 +16,7 @@ on:
       - "packages/grida-home/**"
       - "scripts/cli-docs/**"
       - "scripts/cli-release/**"
+      - "scripts/npm.mjs"
       - "scripts/cli-local/network.cjs"
       - "fixtures/images/checker.png"
       - "editor/next.config.ts"

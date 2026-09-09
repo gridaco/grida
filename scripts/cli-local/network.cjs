@@ -56,15 +56,11 @@ globalThis.fetch = function (input, init) {
     url.username ||
     url.password ||
     url.hash ||
-    !allowed(url.hostname, url.port)
+    !allowed(url.hostname, url.port) ||
+    init?.redirect !== "manual"
   )
     return Promise.resolve().then(deny);
   stats.requests.push({ method: init?.method ?? "GET", path: url.pathname });
-  assert.equal(
-    init?.redirect,
-    "manual",
-    "The installed producer must reject redirects itself"
-  );
   return fetch(input, init);
 };
 for (const [name, methods] of [

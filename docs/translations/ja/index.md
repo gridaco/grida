@@ -25,7 +25,7 @@ Grida はオープンソースのキャンバスエディタ兼レンダリン�
 - Figma からのインポート、Assistant の利用、Figma 関連の設定を行う場合は [With Figma](./with-figma/index.md) を参照してください。
 - フォームフロー、通知、回答処理を扱う場合は [Forms](./forms/respondent-email-notifications.md) を参照してください。
 - 顧客、タグ、プラットフォーム機能などのプロダクト基盤を扱う場合は [Platform](./platform/index.md) を参照してください。
-- ターミナルからアカウントやメディアツールを使う場合は [CLI](./cli/index.md) を参照してください。現在は開発プレビューです。
+- ターミナルからアカウントやメディアツールを使う場合は [CLI](https://grida.co/docs/cli) を参照してください。現在は開発プレビューです。
 - Grida キャンバスを埋め込んだり統合したりする場合は [Canvas SDK](./canvas/sdk/index.md) を参照してください。
 
 ## 製品ドキュメント領域

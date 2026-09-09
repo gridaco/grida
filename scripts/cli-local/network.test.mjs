@@ -38,6 +38,11 @@ test("CLI proof blocks remote, unexpected loopback, socket, subprocess and offli
       assert.throws(() => dns.resolveTxt('example.invalid'));
       await assert.rejects(dnsPromises.reverse('192.0.2.1'));
       assert.throws(() => new dns.Resolver());
+      for (const redirect of [undefined, 'follow', 'error']) {
+        const rejected = fetch('http://127.0.0.1:3041/api/v1/auth/me', { redirect });
+        assert(rejected instanceof Promise, 'Policy refusal retains fetch promise semantics');
+        await assert.rejects(rejected, /CLI fixture rejected/);
+      }
       process.env.GRIDA_CLI_PROOF_OFFLINE='1';
       await assert.rejects(fetch('http://127.0.0.1:3041/api/v1/auth/me'));
     `,
@@ -49,7 +54,7 @@ test("CLI proof blocks remote, unexpected loopback, socket, subprocess and offli
       }
     );
     assert.deepEqual(JSON.parse(await readFile(report, "utf8")), {
-      denied: 11,
+      denied: 14,
       requests: [],
     });
   } finally {

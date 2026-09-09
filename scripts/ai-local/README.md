@@ -5,12 +5,15 @@
 > **GRIDA-GG: provider** — this proof never contacts a provider or gateway.
 
 ```sh
-node scripts/ai-local/proof.mjs
+pnpm --filter @grida/ai test:package
 ```
 
 Requires Node 24+, its bundled npm, a POSIX `tar`, and the repository's installed
 dependencies. It does not install dependencies, read dotenv files, start a
 service, use a developer credential store, or change the workspace install graph.
+The package command runs cleanup/runtime-tool regressions followed by the full
+proof. The existing package-test CI runs it on pull requests and main. The proof
+can also be invoked directly with `node scripts/ai-local/proof.mjs`.
 
 The runner builds current [`@grida/ai`](../../packages/grida-ai/README.md) and
 [`@grida/ai-models`](../../packages/grida-ai-models/README.md) into a private
@@ -71,8 +74,10 @@ HTTP/socket and DNS entry points are denied, so only the injected synthetic
 transport can service a provider operation. These are test tripwires, not an OS
 sandbox or protection against hostile dependency code.
 
-The runner removes its temporary package trees, archives, HOME and build output
-on completion or a handled failure. It writes a local, ignored report to
+The runner attempts to remove its temporary package trees, archives, HOME and
+build output on completion or a handled failure. A removal failure records
+`cleaned: false` and `passed: false` and exits unsuccessfully; it does not replace
+an earlier operation failure or skip writing the report. It writes a local, ignored report to
 `.cache/ai-local/result.json` containing source hashes, package versions, archive
 integrities, case names and counts. It verifies source hashes again at the end so
 concurrent source changes cannot receive a successful report. No tokens, prompts,

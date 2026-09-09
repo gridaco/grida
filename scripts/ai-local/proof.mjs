@@ -20,6 +20,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { npmCli } from "../npm.mjs";
 
 const execute = promisify(execFile);
 const repository = fileURLToPath(new URL("../../", import.meta.url));
@@ -29,6 +30,30 @@ const forbidden =
   /^(?:@grida\/(?!ai$|ai-models$)|@app\/|@agentclientprotocol\/|grida$|electron$|next$|react(?:-dom)?$|hono$|@hono\/|drizzle-orm$)/;
 const names = ["grida-ai-models", "grida-ai"];
 const reportPath = path.join(repository, ".cache/ai-local/result.json");
+
+// Report cleanup separately so it cannot overwrite the operation's original failure.
+export async function finishReport(owned, filename, report, failure) {
+  try {
+    await rm(owned, { recursive: true, force: true });
+    report.cleaned = true;
+  } catch {
+    report.cleaned = false;
+    report.passed = false;
+    failure ??= new Error("AI proof cleanup failed");
+  }
+  try {
+    await mkdir(path.dirname(filename), { recursive: true });
+    await writeFile(filename, JSON.stringify(report, null, 2) + "\n", {
+      mode: 0o600,
+    });
+  } catch {
+    failure ??= new Error("AI proof report could not be written");
+  }
+  if (failure) {
+    failure.proofPhase ??= report.phase;
+    throw failure;
+  }
+}
 
 async function files(directory) {
   const result = [];
@@ -93,9 +118,7 @@ async function executable(candidates) {
       if (error.code !== "ENOENT") throw error;
     }
   }
-  throw new Error(
-    "This proof requires Node's bundled npm and a POSIX tar executable"
-  );
+  throw new Error("This proof requires a POSIX tar executable");
 }
 
 async function main() {
@@ -132,6 +155,7 @@ async function main() {
       timeout: 60_000,
       maxBuffer: 2 * 1024 * 1024,
     });
+  let failure;
   try {
     for (const directory of [
       runtime,
@@ -141,16 +165,7 @@ async function main() {
     ]) {
       await mkdir(directory, { recursive: true, mode: 0o700 });
     }
-    const npm = await executable([
-      path.resolve(
-        path.dirname(process.execPath),
-        "../lib/node_modules/npm/bin/npm-cli.js"
-      ),
-      path.join(
-        path.dirname(process.execPath),
-        "node_modules/npm/bin/npm-cli.js"
-      ),
-    ]);
+    const npm = await npmCli();
     const tar = await executable(["/usr/bin/tar", "/bin/tar"]);
     const { default: semver } = await import(
       pathToFileURL(createRequire(npm).resolve("semver")).href
@@ -550,26 +565,25 @@ void [client, image, video, music, soundEffect, speech, threeD, providers, model
     report.phase = "complete";
   } catch (error) {
     error.proofPhase = report.phase;
-    throw error;
+    failure = error;
   } finally {
-    await rm(owned, { recursive: true, force: true });
-    report.cleaned = true;
-    await mkdir(path.dirname(reportPath), { recursive: true });
-    await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", {
-      mode: 0o600,
-    });
+    await finishReport(owned, reportPath, report, failure);
   }
   process.stdout.write(
     `AI package proof passed: ESM, CJS, declarations; ${report.dependencies.length} dependency instances.\n`
   );
 }
 
-main().catch((error) => {
-  // All inputs are synthetic, but avoid printing child output or environment on failure.
-  process.stderr.write(
-    `AI package proof failed: ${error.proofPhase ?? "setup"}\n`
-  );
-  if (error.cmd?.includes("typescript/lib/tsc.js"))
-    process.stderr.write(error.stdout ?? "");
-  process.exitCode = 1;
-});
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+)
+  main().catch((error) => {
+    // All inputs are synthetic, but avoid printing child output or environment on failure.
+    process.stderr.write(
+      `AI package proof failed: ${error.proofPhase ?? "setup"}\n`
+    );
+    if (error.cmd?.includes("typescript/lib/tsc.js"))
+      process.stderr.write(error.stdout ?? "");
+    process.exitCode = 1;
+  });
