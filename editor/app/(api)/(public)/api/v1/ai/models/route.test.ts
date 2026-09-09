@@ -50,6 +50,24 @@ describe("GET /api/v1/ai/models", () => {
     expect(ids).toContain("openai/gpt-image-2.5-sunburst");
   });
 
+  it("retains GPT Image 2 as deprecated while its successors stay active", async () => {
+    const { token } = await signGgToken("user-1", 7);
+    const res = await GET(request(token));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Entry[] };
+    const byId = new Map(body.data.map((entry) => [entry.id, entry]));
+    for (const [id, deprecated] of [
+      ["openai/gpt-image-2", true],
+      ["openai/gpt-image-2.5-flare", false],
+      ["openai/gpt-image-2.5-sunburst", false],
+    ] as const) {
+      expect(byId.get(id)?.grida).toMatchObject({
+        modality: "image",
+        deprecated,
+      });
+    }
+  });
+
   it("lists text+image+video with tiers, deprecation flags, and no pricing", async () => {
     const { token } = await signGgToken("user-1", 7);
     const res = await GET(request(token));

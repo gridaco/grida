@@ -3,6 +3,7 @@ Allow: /
 Disallow: /private/
 
 Sitemap: https://grida.co/sitemap.xml
+Sitemap: https://grida.co/docs/sitemap.xml
 Sitemap: https://grida.co/packages/sitemap.xml
 Sitemap: https://grida.co/library/sitemap.xml
 Sitemap: https://grida.co/library/o/sitemap.xml
