@@ -67,11 +67,13 @@ credential data are never accepted as claim sources.
 ## Credential lifecycle
 
 The provider stores one OAuth record under the `chatgpt` provider id in the
-daemon-owned `AuthStore`. OAuth remains in its owner-only `auth.json`.
-GRIDA-SEC-014 moves API keys into separate shared TOML custody. Updated
+daemon-owned `AuthStore`. OAuth remains in `auth.json`, owner-only on macOS/Linux
+and subject to inherited native ACLs on Windows.
+GRIDA-SEC-014 moves macOS/Linux API keys into separate shared TOML custody. Updated
 macOS/Linux OAuth mutations and one-time BYOK retirement share a process lock,
 preserving OAuth records and atomic writes through migration; Windows retains
-the existing OAuth behavior without claiming this new process-lock guarantee.
+its host-local API-key/OAuth backend without claiming this new process-lock
+guarantee. Provider mutations preserve the OAuth record.
 
 Access-token refresh is single-flight. A rotating refresh token is durably
 written before the corresponding access token can be used. Sign-out advances

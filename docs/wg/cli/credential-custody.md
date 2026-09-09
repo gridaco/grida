@@ -149,8 +149,8 @@ grida providers remove fal
 
 `configure` uses hidden terminal input. Automation supplies `--key-stdin`;
 there is no literal key argument. `list` reports presence and effective source,
-never key contents or verified access. Stored credentials currently require
-macOS/Linux and Node 24+ on the main thread. Windows stored BYOK is unsupported;
+never key contents or verified access. Shared stored credentials currently require
+macOS/Linux and Node 24+ on the main thread. Windows CLI stored BYOK is unsupported;
 explicit CLI environment/stdin keys remain available.
 
 Precedence is `--key-stdin`, the selected provider's environment variable, then
@@ -228,7 +228,7 @@ OpenCode documents provider API keys in a local
 These observations support the portability tradeoff; they do not define
 Grida's format or protection requirements.
 
-The updated Desktop imports legacy API keys on first provider access. Existing
+The updated macOS/Linux Desktop imports legacy API keys on first provider access. Existing
 shared keys and explicit removals win; only API-key records are retired from the
 old file, preserving ChatGPT OAuth. An interrupted retirement leaves migration
 pending and blocks stored-key operations until updated Desktop retries cleanup.
@@ -236,6 +236,13 @@ Environment/stdin overrides remain usable. After completion the old file is
 never a BYOK source again. Do not run older clients that still write the old
 provider store, delete the whole TOML file, or edit its migration metadata to
 remove a connection; use the command or Desktop connection settings.
+
+Windows Desktop retains its existing application-local provider and OAuth
+custody until the shared protocol has Windows support. This backend is selected
+before access, never as a fallback after shared storage fails. It relies on
+inherited native ACLs and in-process writer coordination; it does not claim the
+shared protocol's file protection or cross-process guarantees. Malformed provider
+custody must fail rather than silently make a different provider eligible.
 
 Account OAuth retains its keyring default. This does not export ChatGPT
 subscription credentials or persist GG grants. Provider OAuth refresh/sharing remains a separate future lifecycle

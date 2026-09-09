@@ -2,11 +2,12 @@
  * GRIDA-SEC-004 / GRIDA-SEC-008 / GRIDA-SEC-014 — native OAuth custody and
  * bounded retirement of the former mixed API-key/OAuth file.
  *
- * OAuth remains in user_data_path/auth.json. New API-key writes are refused.
+ * OAuth remains in user_data_path/auth.json. New API-key writes are refused
+ * on shared-custody platforms. Windows retains its host-local API-key backend.
  * Updated macOS/Linux writers and migration share a crash-released lock in
  * .auth-lock; lock order is legacy file then canonical provider store. Old
  * application versions do not participate and must not write concurrently.
- * Windows retains the previous OAuth queue; shared BYOK is unsupported there.
+ * Windows retains the previous native writer queue; shared BYOK is unsupported.
  */
 
 import fs from "node:fs/promises";
@@ -50,6 +51,7 @@ export type AuthFile = Record<string, AuthInfo>;
 
 const FILE_NAME = "auth.json";
 const ENV_OVERRIDE = "GRIDA_AUTH_CONTENT";
+const MAX_AUTH_FILE_BYTES = 1_048_576;
 
 /** Bits we refuse to see in the mode — anything outside owner. */
 const OWNER_ONLY_MASK = 0o077;
@@ -68,6 +70,7 @@ export class AuthPermissionsError extends Error {
 
 export class AuthStore {
   private readonly file_path: string;
+  private readonly platform = process.platform;
   /**
    * Serializes `set` / `remove` so two concurrent mutations can't
    * lose-update each other. Both ops follow read-modify-write on a
@@ -92,7 +95,7 @@ export class AuthStore {
     const next = this.write_chain
       .catch(() => undefined)
       .then(async () => {
-        if (process.platform === "win32") return task();
+        if (this.platform === "win32") return task();
         // A legacy agent directory may already be 0755. The lock gets its own
         // private subtree; no existing directory permissions are repaired.
         await fs.mkdir(this.userDataPath, { recursive: true, mode: 0o700 });
@@ -109,11 +112,9 @@ export class AuthStore {
    * Read the full auth.json. Returns `{}` if the file is missing
    * (not an error — a fresh install simply hasn't authed yet).
    *
-   * **Permission check.** If the file exists, we stat it and refuse to
-   * read if the mode has any group/world bits set. The mode is the
-   * at-rest protection for this OAuth file; silently reading a
-   * too-permissive file would mask
-   * the problem.
+   * **Permission check.** POSIX hosts refuse files with group/world bits.
+   * Windows uses its inherited ACL; stat mode bits do not establish access
+   * rights there. This legacy backend does not validate Windows DACLs.
    */
   async readAll(): Promise<AuthFile> {
     const override = process.env[ENV_OVERRIDE];
@@ -135,7 +136,9 @@ export class AuthStore {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") return {};
       throw err;
     }
-    if ((stat.mode & OWNER_ONLY_MASK) !== 0) {
+    // Windows stat mode bits do not describe its inherited ACL. Keep native
+    // compatibility without claiming the shared POSIX custody guarantees.
+    if (this.platform !== "win32" && (stat.mode & OWNER_ONLY_MASK) !== 0) {
       throw new AuthPermissionsError(this.file_path, stat.mode & 0o777);
     }
     const raw = await fs.readFile(this.file_path, "utf8");
@@ -153,14 +156,24 @@ export class AuthStore {
   }
 
   /**
-   * Atomic write — `atomicWrite` defaults the tmp mode to `0o600` so a
-   * half-written or orphaned tmp is never world-readable.
+   * Atomic write — temporary files request mode `0o600`. POSIX enforces that
+   * mode; the Windows compatibility backend retains its inherited ACL limits.
    */
   async writeAll(file: AuthFile): Promise<void> {
-    if (Object.values(file).some((entry) => entry.type === "api")) {
-      throw new Error("API keys require the shared provider credential store");
-    }
+    for (const entry of Object.values(file)) this.checkApiWrite(entry);
     return this.enqueueWrite(() => this.persist(file));
+  }
+
+  private checkApiWrite(entry: AuthInfo): void {
+    if (entry.type !== "api") return;
+    if (this.platform !== "win32")
+      throw new Error("API keys require the shared provider credential store");
+    if (
+      typeof entry.key !== "string" ||
+      !entry.key.trim() ||
+      !entry.key.isWellFormed()
+    )
+      throw new Error("Legacy provider credential is invalid");
   }
 
   /**
@@ -196,10 +209,6 @@ export class AuthStore {
     });
   }
 
-  private async readForMutation(): Promise<AuthFile> {
-    return process.platform === "win32" ? this.readAll() : this.readDisk();
-  }
-
   private async readDisk(): Promise<AuthFile> {
     let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
     try {
@@ -215,12 +224,12 @@ export class AuthStore {
       if (
         opened.dev !== stat.dev ||
         opened.ino !== stat.ino ||
-        opened.size > 1_048_576
+        opened.size > MAX_AUTH_FILE_BYTES
       ) {
         throw new Error();
       }
       const bytes = await handle.readFile();
-      if (bytes.byteLength > 1_048_576) throw new Error();
+      if (bytes.byteLength > MAX_AUTH_FILE_BYTES) throw new Error();
       const raw = new TextDecoder("utf-8", {
         fatal: true,
         ignoreBOM: true,
@@ -228,6 +237,25 @@ export class AuthStore {
       const value: unknown = JSON.parse(raw);
       if (!value || typeof value !== "object" || Array.isArray(value))
         throw new Error();
+      for (const entry of Object.values(value)) {
+        if (
+          this.platform === "win32" &&
+          (!entry ||
+            typeof entry !== "object" ||
+            Array.isArray(entry) ||
+            (entry.type !== "api" && entry.type !== "oauth"))
+        )
+          throw new Error();
+        if (
+          entry?.type === "api" &&
+          (typeof entry.key !== "string" ||
+            // The POSIX importer still retires formerly absent blank entries;
+            // a configured Windows key cannot silently become GG eligibility.
+            (this.platform === "win32" && !entry.key.trim()) ||
+            !entry.key.isWellFormed())
+        )
+          throw new Error();
+      }
       return value as AuthFile;
     } catch (error) {
       if ((error as NodeJS.ErrnoException)?.code === "ENOENT" && !handle)
@@ -242,15 +270,16 @@ export class AuthStore {
     if (
       !stat.isFile() ||
       stat.nlink !== 1 ||
-      (stat.mode & 0o7777) !== 0o600 ||
-      (process.geteuid && stat.uid !== process.geteuid())
+      (this.platform !== "win32" &&
+        ((stat.mode & 0o7777) !== 0o600 ||
+          (process.geteuid && stat.uid !== process.geteuid())))
     ) {
       throw new Error("Legacy credential storage is invalid or unavailable");
     }
   }
 
   private async checkAcl(filename: string): Promise<void> {
-    if (process.platform !== "darwin") return;
+    if (this.platform !== "darwin") return;
     const { stdout } = await promisify(execFile)(
       "/bin/ls",
       ["-lde", filename],
@@ -275,7 +304,7 @@ export class AuthStore {
   }
 
   private async syncDirectory(): Promise<void> {
-    if (process.platform === "win32") return;
+    if (this.platform === "win32") return;
     const handle = await fs.open(this.userDataPath, constants.O_RDONLY);
     try {
       await handle.sync();
@@ -285,8 +314,13 @@ export class AuthStore {
   }
 
   private async persist(file: AuthFile): Promise<void> {
-    if (process.platform === "win32") {
-      await atomicWrite(this.file_path, JSON.stringify(file));
+    // Publish only documents the strict reader can reopen. Serialize once so
+    // the byte-bound check covers exactly the bytes sent to either writer.
+    const serialized = JSON.stringify(file);
+    if (Buffer.byteLength(serialized, "utf8") > MAX_AUTH_FILE_BYTES)
+      throw new Error("Legacy credential storage is invalid or unavailable");
+    if (this.platform === "win32") {
+      await atomicWrite(this.file_path, serialized);
       return;
     }
     const temporary = path.join(
@@ -298,7 +332,7 @@ export class AuthStore {
       const handle = await fs.open(temporary, "wx", 0o600);
       staged = true;
       try {
-        await handle.writeFile(JSON.stringify(file), "utf8");
+        await handle.writeFile(serialized, "utf8");
         await handle.sync();
       } finally {
         await handle.close();
@@ -317,11 +351,46 @@ export class AuthStore {
     return all[providerId];
   }
 
-  async set(providerId: string, info: AuthInfo): Promise<void> {
-    if (info.type === "api")
+  /**
+   * Windows compatibility only. Strict disk reads never turn corrupt custody
+   * into an absent provider or import the legacy test environment override.
+   * Shared-custody hosts must use ProviderCredentialStore instead.
+   */
+  async getLegacyProviderKey(providerId: string): Promise<string | null> {
+    if (this.platform !== "win32")
+      throw new Error("API keys require the shared provider credential store");
+    const all = await this.readDisk();
+    if (!Object.hasOwn(all, providerId)) return null;
+    const entry = all[providerId];
+    if (entry?.type === "oauth") return null;
+    if (
+      !entry ||
+      entry.type !== "api" ||
+      typeof entry.key !== "string" ||
+      !entry.key.isWellFormed()
+    )
+      throw new Error("Legacy credential storage is invalid or unavailable");
+    return entry.key;
+  }
+
+  /** Windows provider deletion cannot remove an unrelated OAuth connection. */
+  async removeLegacyProviderKey(providerId: string): Promise<void> {
+    if (this.platform !== "win32")
       throw new Error("API keys require the shared provider credential store");
     return this.enqueueWrite(async () => {
-      const all = await this.readForMutation();
+      const all = await this.readDisk();
+      if (all[providerId]?.type !== "api") return;
+      delete all[providerId];
+      await this.persist(all);
+    });
+  }
+
+  async set(providerId: string, info: AuthInfo): Promise<void> {
+    this.checkApiWrite(info);
+    return this.enqueueWrite(async () => {
+      const all = await this.readDisk();
+      if (info.type === "api" && all[providerId]?.type === "oauth")
+        throw new Error("Provider keys cannot replace an OAuth connection");
       all[providerId] = info;
       await this.persist(all);
     });
@@ -329,7 +398,7 @@ export class AuthStore {
 
   async remove(providerId: string): Promise<void> {
     return this.enqueueWrite(async () => {
-      const all = await this.readForMutation();
+      const all = await this.readDisk();
       if (!(providerId in all)) return;
       delete all[providerId];
       await this.persist(all);
@@ -348,7 +417,7 @@ export class AuthStore {
     expected: AuthInfo
   ): Promise<boolean> {
     return this.enqueueWrite(async () => {
-      const all = await this.readForMutation();
+      const all = await this.readDisk();
       if (!isDeepStrictEqual(all[providerId], expected)) return false;
       delete all[providerId];
       await this.persist(all);
@@ -368,10 +437,9 @@ export class AuthStore {
     expected: AuthInfo,
     next: AuthInfo
   ): Promise<boolean> {
-    if (next.type === "api")
-      throw new Error("API keys require the shared provider credential store");
+    this.checkApiWrite(next);
     return this.enqueueWrite(async () => {
-      const all = await this.readForMutation();
+      const all = await this.readDisk();
       if (!isDeepStrictEqual(all[providerId], expected)) return false;
       all[providerId] = next;
       await this.persist(all);

@@ -45,8 +45,10 @@ editor /desktop/*
   -> owns UX only, through typed bridge clients
 ```
 
-Desktop starts with the agent enabled. Launching with `--disable-agent` selects
-media-only startup before the chat server is imported. Image, video, music,
+Desktop starts with the agent enabled. Launching the Desktop app with
+`--disable-agent` selects media-only startup before the chat server is imported.
+The supervisor translates that app flag to the sidecar's `--agent=disabled`;
+direct sidecar invocations use `--agent=enabled|disabled`. Image, video, music,
 sound effects, speech and 3D routes keep the same authenticated transport,
 BYOK key store, GG memory custody and durable media root. Agent/session routes,
 configured text-provider routes and native ChatGPT auth are absent; the
@@ -64,8 +66,9 @@ Electron's `userData` directory and are owned exclusively by main. The hosted
 renderer receives purpose-specific actions, never a generic preferences
 key/value bridge. `DesktopPreferences` uses a small versioned JSON document
 with owner-only atomic writes. Account cookies remain in Chromium's HttpOnly
-session, while BYOK API keys use the shared native `providers/credentials.toml` under
-Grida home through the sidecar's secret adapter. ChatGPT OAuth stays in the
+session, while macOS/Linux BYOK API keys use the shared native
+`providers/credentials.toml` under Grida home through the sidecar's secret adapter.
+ChatGPT OAuth stays in the
 agent's `auth.json`. On the first upgrade from Desktop 0.0.13, main consumes the former
 renderer onboarding-completion flag through one fixed hidden same-origin probe
 and records the migration before selecting an authenticated role. That legacy
@@ -78,8 +81,11 @@ path to the sidecar and its sandbox policy. An explicit
 `GRIDA_AGENT_USER_DATA` override isolates both agent state and provider custody.
 Migration preserves ChatGPT OAuth, retires old API entries and resumes pending
 cleanup without reimporting keys. Older mixed-file writers must not run
-concurrently. Windows BYOK storage is currently unsupported; existing ChatGPT
-OAuth behavior is unchanged. No renderer capability returns stored keys.
+concurrently. Windows Desktop retains its host-local `auth.json` backend for
+BYOK and ChatGPT OAuth; it does not use the shared CLI store. Backend selection
+happens before access, and malformed provider custody fails without fallback.
+Windows file privacy relies on the inherited user-directory ACL, not POSIX mode
+bits or the shared custody protocol. No renderer capability returns stored keys.
 
 On macOS and Linux, the sidecar runs under `srt` with no direct external
 destinations and `allow_local_binding: false`; Electron main supplies the two

@@ -75,21 +75,29 @@ macOS/Linux OAuth writers and migration use the same private `.auth-lock`
 process lock. Only the exact old private temporary-file pattern is retired.
 Do not run an older application that writes the mixed file concurrently:
 it does not participate in this protocol. `GRIDA_AUTH_CONTENT` is never a
-migration source, and new `AuthStore` API-key writes are refused.
+migration source, and new `AuthStore` API-key writes are refused on these
+shared-custody platforms.
 
 Shared BYOK custody currently supports macOS/Linux native main-thread hosts.
-Windows BYOK operations fail explicitly before opening storage; construction
-and the existing ChatGPT OAuth path remain available with their previous
-platform limits. Account logout and memory-only GG grants do not change this file.
+Windows Desktop retains its existing host-local `auth.json` API-key and OAuth
+backend, selected at construction. Its provider reads and mutations use strict
+disk parsing: missing files mean no keys; corrupt or unreadable files reject.
+They do not import the test environment override, open shared TOML, migrate,
+dual-write, or select another backend after failure. The host-local writer keeps
+its existing in-process queue and inherited Windows ACLs; it does not validate
+Windows DACLs or treat POSIX stat bits as an access check. This is not Windows
+support for the shared protocol or the CLI file store. Keyless
+Windows users can still resolve GG and prepare optional agent tools.
+Account logout and memory-only GG grants do not change provider custody.
 
 ## Exports
 
-| Subpath       | What                                                                                    | Platform |
-| ------------- | --------------------------------------------------------------------------------------- | -------- |
-| `.`           | handshake vocabulary (`DaemonCapabilities`, `DAEMON_PROTOCOL`), local-resource DTOs     | neutral  |
-| `./server`    | `DaemonServer`, `buildServer`, the tenant seam, `Daemon` discovery, host stores/toolkit | Node     |
-| `./transport` | `DaemonTransport` — Basic-Auth signing, fetch/SSE helpers, the daemon route client      | neutral  |
-| `./sandbox`   | sandbox policy frame (`buildDaemonSandboxPolicy`, `hostFromUrl`) — AI-free              | Node     |
+| Subpath       | What                                                                                                              | Platform |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- | -------- |
+| `.`           | handshake vocabulary (`DaemonCapabilities`, `DAEMON_PROTOCOL`), local-resource DTOs                               | neutral  |
+| `./server`    | `DaemonServer`, `buildServer`, the tenant seam, `Daemon` discovery, host stores/toolkit                           | Node     |
+| `./transport` | `DaemonTransport` — Basic-Auth signing, fetch/SSE helpers, the daemon route client                                | neutral  |
+| `./sandbox`   | sandbox policy frame (`buildDaemonSandboxPolicy`, `hostFromUrl`) and `containsPath` — AI-free, server-independent | Node     |
 
 ### Sandbox network baseline
 

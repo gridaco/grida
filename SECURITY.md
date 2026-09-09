@@ -315,8 +315,10 @@ perimeter through the typed `DaemonTenant` seam. Both currently ship in
 [`packages/grida-ai-agent`](packages/grida-ai-agent). Its separate
 `@grida/agent/media-server` entry starts the existing media routes, BYOK
 configuration and scoped GG custody without importing the chat runtime,
-chat SQLite state, skills or ACP. Provider access lazily opens only the shared
-credential owner's SQLite exclusion lock (GRIDA-SEC-014). The full `createAgentDaemon` composition uses the same
+chat SQLite state, skills or ACP. On macOS/Linux, provider access lazily opens
+only the shared credential owner's SQLite exclusion lock (GRIDA-SEC-014).
+Windows retains the host-local credential backend described in that entry.
+The full `createAgentDaemon` composition uses the same
 media/provider owner and adds agent/session behavior. This is runtime startup
 isolation; the media entry still belongs to the agent package and does not
 promise independent package installation.
@@ -857,6 +859,8 @@ lazy reads, read-only mutation, and symlink escape refusal.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
+- [Windows credential compatibility tests](packages/grida-daemon/src/secrets-windows.test.ts) and [provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — platform-selected host-local custody, preserved OAuth records and GG/ChatGPT workspace setup, with strict provider failures. These simulate platform selection with disposable files; they do not certify native Windows ACLs.
+
 - [Public SDK exports](packages/grida-ai/src/index.ts), [operation discovery](packages/grida-ai/src/media-operations.ts), [shared route eligibility](packages/grida-ai/src/media-routes.ts), [input rules](packages/grida-ai/src/media-inputs.ts), and [schema primitives](packages/grida-ai/src/input-schema.ts) — credential-free descriptors and JSON parsing share execution's route and input policy. Discovery neither constructs authority nor promises access. Image count is bounded before key reads or paid submission. [Public discovery tests](packages/grida-ai/src/media-operations.test.ts) and [native parser parity tests](packages/grida-ai/src/media-input-parity.test.ts) pin those boundaries.
 
 Today:
@@ -1323,7 +1327,8 @@ observe the short-lived bearer while transporting a request; neither is a
 durable account-credential holder.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-006 .` to enumerate.
-Today:
+
+- [Windows provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — optional BYOK discovery preserves existing GG eligibility without swallowing custody errors.
 
 - [Public SDK exports](packages/grida-ai/src/index.ts), [operation discovery](packages/grida-ai/src/media-operations.ts), [shared route eligibility](packages/grida-ai/src/media-routes.ts), and [discovery tests](packages/grida-ai/src/media-operations.test.ts), and [native parser parity tests](packages/grida-ai/src/media-input-parity.test.ts) — GG route facts grant no scoped token, organization authority or credits.
 
@@ -1532,9 +1537,11 @@ trusted merely because it is “local.”
    (`auth.json`, `0600`, atomic replacement). Updated macOS/Linux writers share
    a cross-process lock with API-key retirement under GRIDA-SEC-014, rereading
    before mutation and preserving unrelated records. BYOK moves to the separate
-   shared TOML owner; new API-key writes through `AuthStore` are refused.
-   Windows retains its existing OAuth in-process queue and does not support
-   shared BYOK.
+   shared TOML owner; new API-key writes through `AuthStore` are refused on
+   macOS/Linux. Windows retains its host-local API-key/OAuth backend and
+   in-process writer queue, with strict disk reads before mutation. Provider
+   set/delete cannot replace or remove an OAuth record. Windows privacy relies
+   on inherited native ACLs, not POSIX mode bits; it does not support shared BYOK.
    Refresh is single-flight and rotating refresh tokens are persisted before
    use. Compare-and-replace/remove guards prevent a late refresh or cancelled
    exchange from overwriting/removing a newer account. Exact attempt
@@ -1595,7 +1602,9 @@ already running as the same OS user. Moving refresh-token at-rest custody to a
 platform credential store is a separate hardening step.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-008 .` to enumerate.
-The load-bearing groups are:
+
+- [Windows credential compatibility tests](packages/grida-daemon/src/secrets-windows.test.ts) and [provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — platform-selected host-local custody, preserved OAuth records and GG/ChatGPT workspace setup, with strict provider failures. These simulate platform selection with disposable files; they do not certify native Windows ACLs.
+  The load-bearing groups are:
 
 - `desktop/src/chatgpt-configuration.ts`,
   `desktop/src/main/{oauth-loopback-callback,chatgpt-oauth}.ts`,
@@ -2442,6 +2451,15 @@ durable or discard unrelated OAuth records.
    disk before changing a record. Strict legacy reads bypass test environment
    content; retirement removes API entries only and cleans validated old temporaries.
    ChatGPT refresh and Grida account login are not migrated into this store.
+   Backend selection precedes access: Windows Desktop keeps its existing host-local
+   `auth.json`, with no shared-store access, migration, dual writes or failure
+   fallback. Its provider reads reject malformed/blank entries, invalid UTF-8,
+   non-regular or multiply linked files and oversized contents; missing files alone mean
+   absence. Writes reread disk under the existing in-process queue. Provider
+   publication checks the same 1 MiB encoded UTF-8 document limit as reads
+   before replacing a file, so a rejected write leaves custody usable. Provider
+   set/delete preserve OAuth records, and custody failures cannot silently make
+   automatic provider resolution select GG.
 6. **Explicit CLI inputs and writes.** The CLI grammar never accepts literal key
    arguments. Configure reads hidden terminal input or explicitly allocated stdin;
    input is bounded and validated before custody opens. The terminal is restored
@@ -2468,8 +2486,11 @@ durable or discard unrelated OAuth records.
 **Limits and verification.** This is plaintext user-level custody, not encryption,
 secure erasure, provider revocation, protection from same-user code, or backup
 protection. A supported filesystem, OS, runtime and dependencies are trusted.
-The native implementation supports main-thread Node 24+ on macOS/Linux; Windows
-and worker threads fail before file access. Compatibility with older applications
+The shared implementation supports main-thread Node 24+ on macOS/Linux; Windows
+and worker threads fail before shared file access. The separate Windows Desktop
+compatibility backend requests private file creation but relies on inherited user
+directory ACLs: it does not validate Windows DACLs, establish POSIX-mode privacy,
+or provide cross-process exclusion. Compatibility with older applications
 that ignore the shared locks or keep using the old API-key file is unsupported.
 Deleting the whole TOML file or manually changing migration metadata can erase
 its fences. A failure after rename may already have committed a complete change.
@@ -2484,6 +2505,8 @@ processes, mixed ESM/CommonJS copies, restart and SIGKILL recovery. This is loca
 platform evidence, not Windows or cross-platform release certification.
 
 **Files bound by this id.**
+
+- [Windows credential compatibility tests](packages/grida-daemon/src/secrets-windows.test.ts) and [provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — platform-selected host-local custody, preserved OAuth records and GG/ChatGPT workspace setup, with strict provider failures. These simulate platform selection with disposable files; they do not certify native Windows ACLs.
 
 - [Provider entry](packages/grida-auth/src/providers.ts),
   [store](packages/grida-auth/src/provider-credential-store.ts),
