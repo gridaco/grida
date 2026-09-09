@@ -20,6 +20,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { gunzipSync } from "node:zlib";
 import { npmCli } from "../npm.mjs";
 
 const execute = promisify(execFile);
@@ -238,7 +239,18 @@ async function main() {
       );
       const [metadata] = JSON.parse(stdout);
       const archive = path.join(owned, "archives", metadata.filename);
-      const listing = await execute(tar, ["-tzf", archive], {
+      // GNU tar shells out to gzip for -z; the proof deliberately supplies no
+      // ambient executable PATH. Inflate once with Node, capped at 64 MiB, then
+      // let the fixed tar executable inspect/extract only the owned plain tar.
+      const plainTar = path.join(owned, "archives", `${name}.tar`);
+      await writeFile(
+        plainTar,
+        gunzipSync(await readFile(archive), {
+          maxOutputLength: 64 * 1024 * 1024,
+        }),
+        { mode: 0o600 }
+      );
+      const listing = await execute(tar, ["-tf", plainTar], {
         env: childEnv,
         timeout: 10_000,
       });
@@ -248,7 +260,7 @@ async function main() {
           "Unsafe archive entry"
         );
       }
-      packed.set(manifest.name, { archive, source });
+      packed.set(manifest.name, { plainTar, source });
       report.archives.push({
         name: manifest.name,
         version: manifest.version,
@@ -276,8 +288,8 @@ async function main() {
         await execute(
           tar,
           [
-            "-xzf",
-            packed.get(name).archive,
+            "-xf",
+            packed.get(name).plainTar,
             "--strip-components=1",
             "-C",
             destination,

@@ -19,8 +19,11 @@ The runner builds current [`@grida/ai`](../../packages/grida-ai/README.md) and
 [`@grida/ai-models`](../../packages/grida-ai-models/README.md) into a private
 temporary directory. It runs actual `npm pack` with lifecycle scripts disabled,
 offline mode, empty npm configuration, and a constructed environment. It then
-extracts those archives and copies their declared production dependencies and
-required peers from the installed graph. Versions must satisfy the declaring
+inflates each archive with Node's built-in gzip decoder, capped at 64 MiB per
+uncompressed tar. The fixed tar executable lists and extracts that private plain
+tar; neither GNU nor BSD tar needs to discover an external decompressor on PATH.
+The report retains the original npm archive integrity. The runner copies declared
+production dependencies and required peers from the installed graph. Versions must satisfy the declaring
 manifest. Nested dependencies retain their resolution; no workspace symlinks or
 application packages are supplied. Optional dependencies absent from the current
 platform remain absent.
