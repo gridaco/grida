@@ -12,35 +12,31 @@ format: md
 
 > **Status: accepted doctrine.** Account infrastructure comes first; command
 > and media delivery follows. Examples describe the replacement CLI and are
-> not available in the legacy npm release. See the [v1 spec](./v1.md).
+> not available in the legacy npm release. See the
+> [account infrastructure spec](./account-infrastructure.md).
 
 Sign in, inspect your account, use a Grida tool, and keep the result in your
 own workflow. Type the commands yourself, put them in a script, or give them
 to your preferred agent harness. The command means the same thing in each case.
 
-## Start with Desktop's account and AI capabilities
+## Start with independent account access
 
-The first release exposes the account services and AI tools used by Grida
-Desktop as ordinary CLI operations:
+The intended account experience is:
 
 ```sh
 grida auth login
+grida account view
 grida account credits --org studio
-grida models list --modality image
-grida generate --provider gg --model openai/gpt-image-2 \
-  --org studio --input @image.json --out ./images
 ```
 
 Desktop and CLI are clients of the same capability owners. Exporting a feature
 means exposing its operation, inputs, permissions, and results through another
 interface. It does not require Desktop to be running or automate its UI.
 
-Auth and account access, model discovery, provider credentials, and media
-generation are the [v1 scope](./v1.md). The [AI tools design](./media.md)
-defines GG/BYOK availability and schema-driven invocation. Agent and render
-commands, Canvas integration, subscription billing, and MCP are deferred.
-The infrastructure establishes login, organization membership, cached credits
-and scoped GG access. Command composition and media execution build on it.
+The [account infrastructure](./account-infrastructure.md) establishes independent
+login, organization membership, cached credits and scoped GG access. CLI
+commands and media execution follow separately. Agent and render commands,
+Canvas integration, subscription billing and MCP remain deferred.
 
 The [credential custody study](./credential-custody.md) compares established
 CLIs and defines durable login storage and refresh coordination.
@@ -53,9 +49,7 @@ services and media tools retain independent owners, reusable by Desktop and
 other clients. The CLI translates arguments into their operations and presents
 the results.
 
-Use `grida models` and `grida generate` at the root. An `ai` prefix adds no
-useful distinction to these operations today. Command depth does not determine
-package ownership.
+Command depth does not determine package ownership.
 
 Products can arrive or retire independently. Removing a command removes its
 adapter and distribution dependency; its capability owner stays intact. A

@@ -1,20 +1,19 @@
 ---
 title: CLI credential custody
-description: Grida account session custody and the accepted shared TOML design for subsequent provider credential delivery.
+description: Grida native account session storage, coordinated refresh, and session-local logout independent of Desktop.
 keywords: [grida, cli, oauth, credentials, keyring, authentication]
 sidebar_label: Credential custody
-sidebar_position: 4
+sidebar_position: 3
 tags: [internal, wg, cli, architecture]
 format: md
 ---
 
 # CLI credential custody
 
-> **Status: accepted account custody and provider storage design.** Account
-> custody belongs to the infrastructure delivery; shared BYOK custody follows
-> with the CLI/media delivery. CLI commands have not shipped. The
+> **Status: accepted account custody contract.** CLI commands have not shipped. The
 > [native package contract](https://github.com/gridaco/grida/blob/main/packages/grida-auth/README.md)
-> records implemented platforms and verification limits. See the [v1 spec](./v1.md).
+> records implemented platforms and verification limits. See the
+> [account infrastructure spec](./account-infrastructure.md).
 
 Sign in once, close the terminal, and keep using Grida. Two commands running
 together must not invalidate each other's session. Signing out must survive a
@@ -81,7 +80,7 @@ the same OS user, including the user's chosen agent harness.
 Credentials belong to a trusted CLI profile: credential home, issuer, public
 client ID, and API origin. Persisted identity must match the verified account.
 Repository configuration cannot redirect credentials or select another store.
-Desktop cookies and provider keys remain separate.
+Desktop cookies, provider keys and ChatGPT subscription OAuth remain separate.
 
 The selected backend is stable for that profile. A read failure never causes
 an older file or keyring entry to become authoritative. Backend changes need
@@ -100,23 +99,6 @@ needs process coordination and protected metadata. Accepted refresh rotation
 is saved before a later identity request can fail. A remote token rotation and
 a local write cannot form one atomic transaction: a crash between them may
 still require login. Recovery must report that outcome honestly.
-
-## Planned provider custody
-
-Desktop and CLI will share one `providers/credentials.toml` beneath the user's
-Grida home. This accepted design belongs to the subsequent CLI/media delivery.
-BYOK requires no Grida login. It stays separate from account OAuth, ChatGPT
-subscription OAuth and memory-only GG grants.
-
-The TOML file is plaintext with user-only permissions. Its format is portable
-across languages; syntax adds no confidentiality. Both clients must share
-atomic publication and cross-process coordination, and fail explicitly on
-unsafe or malformed storage. Removing a stored key affects both clients;
-Grida logout leaves provider keys intact.
-
-Desktop migration must retire its legacy API-key source without moving unrelated
-OAuth records or restoring removed keys. A versioned storage protocol will
-define that migration and manual editing rules with the implementation.
 
 ## Security ownership
 
