@@ -88,7 +88,7 @@ test("tarball must contain entry, README and license, with no source, secrets, m
     );
 });
 
-test("generic Changesets publisher excludes the independently released CLI", async () => {
+test("Changesets version planning ignores the independently versioned CLI", async () => {
   const config = JSON.parse(
     await readFile(
       new URL("../../.changeset/config.json", import.meta.url),

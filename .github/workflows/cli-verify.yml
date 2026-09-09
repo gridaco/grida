@@ -16,6 +16,8 @@ on:
       - "scripts/cli-release/**"
       - "scripts/cli-media-local/**"
       - "scripts/cli-local/**"
+      - "scripts/publish-packages*.mjs"
+      - ".github/workflows/publish-packages.yml"
       - "LICENSE"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -47,6 +49,7 @@ jobs:
       - run: pnpm turbo run build --filter=grida...
       - name: Prepare and verify the installable candidate
         run: |
+          node --test scripts/publish-packages.test.mjs
           node --test scripts/cli-release/prepare.test.mjs
           node scripts/cli-release/prepare.mjs --out "$RUNNER_TEMP/grida-cli-candidate"
           node scripts/cli-release/prepare.mjs --verify --out "$RUNNER_TEMP/grida-cli-candidate"

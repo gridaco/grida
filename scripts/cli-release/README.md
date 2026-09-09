@@ -47,9 +47,21 @@ The existing token flow is historical precedent, not the authentication pattern
 to copy. Do not configure `NPM_TOKEN`, `NODE_AUTH_TOKEN` or a token fallback for
 CLI releases. Fix a failed trusted-publisher configuration before publishing.
 
-The CLI is excluded from Changesets' generic package publisher. Its version is
-reviewed explicitly in its manifest; `0.0.0` and `private: true` cannot pass the
-release guard. No workflow edits versions or removes the private flag.
+The CLI is excluded from Changesets version planning by `ignore`. That setting
+does not control `changeset publish`: it can still publish an ignored public
+package. The repository's `pnpm publish-packages` command therefore uses an
+explicit [publisher wrapper](../publish-packages.mjs) to mark only the CLI private
+while Changesets runs, then restore its exact manifest bytes. A failed child also
+restores the manifest; an uncatchable interruption can leave it private, preventing
+publication. Use this repository command instead of invoking Changesets publication
+directly. The wrapper leaves other packages' publication and the existing
+private-package Git tagging policy unchanged; those tags do not authorize a CLI
+npm release. Its regression runs the installed Changesets CLI against a synthetic
+workspace with inert npm/pnpm/git commands, including an unwrapped positive control.
+
+The CLI version is reviewed explicitly in its manifest; `0.0.0` and
+`private: true` cannot pass the release guard. `cli-release.yml` does not edit
+the version or remove `private: true`; publication requires a reviewed manifest.
 
 `cli-verify.yml` checks the packed CLI on Linux and macOS and retains one Linux
 candidate. `cli-docs.yml` checks guides, examples and installed help. Both run on
