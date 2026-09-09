@@ -9,8 +9,19 @@ const owner = new GgTokens({
   signing: () => ggConfig.signing(),
   now: () => Date.now(),
   async allowMint(userId) {
-    const limiter = await mintLimiter();
-    return limiter ? (await limiter.limit(userId)).success : true;
+    try {
+      const limiter = await mintLimiter();
+      if (!limiter) return true;
+      const result = await limiter.limit(userId);
+      // The SDK deliberately allows on timeout. Configured mint quotas must
+      // fail closed instead; a later Redis completion cannot resume this mint.
+      if (result.reason === "timeout")
+        throw new GgTokens.MintError("unavailable");
+      return result.success;
+    } catch {
+      // Provider failures may contain credentials; expose only a safe domain code.
+      throw new GgTokens.MintError("unavailable");
+    }
   },
 });
 
@@ -33,7 +44,7 @@ export namespace gg {
   export const allowMint = owner.allowMint.bind(owner);
 }
 
-type MintLimiter = { limit(key: string): Promise<{ success: boolean }> };
+type MintLimiter = Pick<import("@upstash/ratelimit").Ratelimit, "limit">;
 let configuredLimiter: Promise<MintLimiter | null> | undefined;
 
 function mintLimiter(): Promise<MintLimiter | null> {
@@ -56,5 +67,6 @@ async function createMintLimiter(): Promise<MintLimiter | null> {
     redis: new Redis(config),
     limiter: Ratelimit.slidingWindow(10, "60 s"),
     prefix: "rl:v1-ai:mint",
+    timeout: 5000,
   });
 }

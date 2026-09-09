@@ -1230,6 +1230,11 @@ levels into one.
    (fail-open when Upstash is unconfigured; the billing gate on the AI
    endpoints is the actual spend control). Both mint routes use the same
    `rl:v1-ai:mint` key space and 10/user/60s quota, not separate host allowances.
+   When configured, the shared owner rejects the SDK's five-second timeout
+   allowance and upstream failures before membership lookup or signing. Both
+   hosts return a safe 503; actual quota exhaustion remains 429. The deadline
+   bounds the quota decision, not Redis work, which may finish later and consume
+   quota. Late completion cannot resume minting, and no automatic remint occurs.
 
 **Residual risks (accepted, documented).** Org-membership revocation is
 not re-checked within a token's 900-second window plus clock tolerance. The mint rate
@@ -1594,9 +1599,10 @@ credential through reuse of an existing browser or daemon bridge.
    then succeed at the fixed issuer's `/oauth/userinfo`, whose subject must
    match. Cookies are never a fallback. Issuer calls reject redirects, bound
    response size/time, and return safe errors.
-2. **Bound browser intent.** Consent reads the browser's verified user and the
-   issuer's pending authorization. A decision requires the configured HTTP
-   Host and browser Origin, a bounded form, and a ten-minute signed proof binding user,
+2. **Bound browser intent.** Consent requires the configured incoming HTTP Host
+   before reading the browser session or issuer authorization. GET navigation
+   need not carry Origin. A decision additionally requires the configured browser
+   Origin, a bounded form, and a ten-minute signed proof binding user,
    authorization, client, callback, and scope. The pending details are read
    again before mutation. Supabase owns approval, denial, and one-use code
    issuance; Grida issues no account token. Existing-consent redirects may

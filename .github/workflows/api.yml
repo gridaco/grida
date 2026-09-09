@@ -29,8 +29,6 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build API model catalogue dependency
-        run: pnpm --filter @grida/ai-models build
       - name: Check route bindings, dependencies and offline contracts
         run: pnpm --filter editor test:api
       - name: Prove the built Next request pipeline locally

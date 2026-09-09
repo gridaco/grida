@@ -178,7 +178,9 @@ export namespace GgTokens {
   }
 
   export class MintError extends Error {
-    constructor(readonly code: "rate_limited" | "no_organization") {
+    constructor(
+      readonly code: "rate_limited" | "no_organization" | "unavailable"
+    ) {
       super(code);
       this.name = "GgMintError";
     }

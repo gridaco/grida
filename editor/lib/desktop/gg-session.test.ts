@@ -192,6 +192,22 @@ describe("ensureFresh", () => {
     expect((await gridaGateway.ensureFresh()).kind).toBe("no_organization");
   });
 
+  it.each([429, 503])(
+    "%s keeps the daemon session and returns an error without retrying",
+    async (statusCode) => {
+      mintOk();
+      await gridaGateway.ensureFresh();
+      fetchMock
+        .mockClear()
+        .mockResolvedValue(new Response("{}", { status: statusCode }));
+      set_session.mockClear();
+      expect((await gridaGateway.forceRefresh()).kind).toBe("error");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(clear_session).not.toHaveBeenCalled();
+      expect(set_session).not.toHaveBeenCalled();
+    }
+  );
+
   it("never throws: network failure degrades to error state", async () => {
     fetchMock.mockRejectedValue(new Error("offline"));
     expect((await gridaGateway.ensureFresh()).kind).toBe("error");

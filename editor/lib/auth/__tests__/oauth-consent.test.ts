@@ -221,6 +221,21 @@ describe("browser consent intent", () => {
 });
 
 describe("incoming consent authority", () => {
+  it.each([undefined, "http://127.0.0.1:55431"])(
+    "accepts the configured navigation Host independently of Origin %s",
+    (origin) => {
+      expect(() =>
+        oauthConsent.requireHost(
+          new Headers({
+            host: "127.0.0.1:3041",
+            ...(origin ? { origin } : {}),
+          }),
+          config
+        )
+      ).not.toThrow();
+    }
+  );
+
   it("accepts the configured Origin and Host when Next reconstructs an internal URL", () => {
     expect(() =>
       oauthConsent.requireOrigin(
@@ -231,6 +246,24 @@ describe("incoming consent authority", () => {
       )
     ).not.toThrow();
   });
+
+  it.each([undefined, "null", "http://127.0.0.1:55431"])(
+    "rejects a consent POST with Origin %s despite its configured Host",
+    (origin) => {
+      expect(() =>
+        oauthConsent.requireOrigin(
+          new Request(`${config.origin}/private/oauth/decision`, {
+            method: "POST",
+            headers: {
+              host: "127.0.0.1:3041",
+              ...(origin ? { origin } : {}),
+            },
+          }),
+          config
+        )
+      ).toThrow(oauthServer.Failure);
+    }
+  );
 
   it.each([undefined, "localhost:3041", "127.0.0.1:3042", "untrusted.invalid"])(
     "rejects missing or different Host %s despite forwarded-host claims",

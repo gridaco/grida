@@ -163,7 +163,10 @@ bytes after trimming) and optional `GG_TOKEN_SECRET_PREVIOUS` for verify-only
 rotation. A current key is always required. Both mint adapters share the
 `rl:v1-ai:mint` quota: 10 requests per user per 60 seconds using the configured
 Upstash REST URL/token. The existing unconfigured-limiter allowance is preserved;
-configured upstream failures do not turn into an allowance. Signing and limiter
+configured upstream failures, including the SDK's five-second timeout allowance,
+return 503 without minting. Native uses `auth_unavailable`; Desktop uses
+`mint_failed`. Actual quota exhaustion remains 429. The timeout bounds the quota
+decision but does not cancel Redis work or trigger a remint. Signing and limiter
 configuration never comes from request input.
 
 Next configuration runs before proxy. Its web slash/connect redirects explicitly
@@ -187,10 +190,9 @@ and trust assumptions in GRIDA-SEC-012 in [SECURITY.md](../../../SECURITY.md).
 
 ## Check locally
 
-Both checks use the compiled model catalogue. After installing dependencies:
+After installing dependencies, each command builds the model catalogue it needs:
 
 ```sh
-pnpm --filter @grida/ai-models build
 pnpm --filter editor test:api
 pnpm --filter editor test:api:http
 ```

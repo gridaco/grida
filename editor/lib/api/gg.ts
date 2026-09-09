@@ -28,6 +28,8 @@ export namespace ggApi {
           if (error instanceof gg.MintError) {
             if (error.code === "rate_limited")
               throw new nativeApi.Failure("rate_limited");
+            if (error.code === "unavailable")
+              throw new oauthServer.Failure("auth_unavailable");
             throw new oauthServer.Failure("forbidden");
           }
           if (error instanceof gg.TokenError && error.code === "not_configured")

@@ -1,6 +1,7 @@
 /** GRIDA-SEC-010 — browser consent; native credentials never enter this page. */
 import React from "react";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { oauthConsent } from "@/lib/auth/oauth-consent";
@@ -30,6 +31,7 @@ export default async function ConsentPage({
       (await searchParams).authorization_id
     );
     const service = new oauthConsent.Service(oauthServer.consentConfig());
+    oauthConsent.requireHost(await headers(), service.config);
     const client = await createClient();
     const {
       data: { user },

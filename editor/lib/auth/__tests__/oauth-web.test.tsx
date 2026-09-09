@@ -12,7 +12,11 @@ const auth = vi.hoisted(() => ({
   getSession: vi.fn<() => Promise<unknown>>(),
   createClient: vi.fn<() => Promise<unknown>>(),
 }));
+const incoming = vi.hoisted(() => ({
+  headers: vi.fn<() => Promise<Headers>>(),
+}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: auth.createClient }));
+vi.mock("next/headers", () => ({ headers: incoming.headers }));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
     throw new Error(`redirect:${url}`);
@@ -48,6 +52,9 @@ beforeEach(() => {
     "test-only-consent-secret-at-least-32-bytes"
   );
   vi.stubEnv("NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH", "1");
+  incoming.headers.mockResolvedValue(
+    new Headers({ host: new URL(origin).host })
+  );
   auth.createClient.mockResolvedValue({ auth });
   auth.getUser.mockResolvedValue({
     data: { user: { id: userId } },
@@ -95,7 +102,7 @@ describe("OAuth consent page", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("keeps an existing browser session on consent instead of dropping the authorization", async () => {
+  it("accepts the configured Host without an Origin header and keeps the browser session on consent", async () => {
     const html = renderToStaticMarkup(
       await ConsentPage({
         searchParams: Promise.resolve({ authorization_id: id }),
@@ -107,6 +114,45 @@ describe("OAuth consent page", () => {
     expect(html).toContain('name="proof"');
     expect(html).not.toContain("test-browser-access-token");
     expect(html).not.toContain("challenge");
+  });
+
+  it.each([undefined, "localhost:3041", "127.0.0.1:3042", "untrusted.invalid"])(
+    "rejects missing or different Host %s before browser or issuer access",
+    async (host) => {
+      incoming.headers.mockResolvedValue(
+        new Headers({
+          "x-forwarded-host": new URL(origin).host,
+          ...(host ? { host } : {}),
+        })
+      );
+      const html = renderToStaticMarkup(
+        await ConsentPage({
+          searchParams: Promise.resolve({ authorization_id: id }),
+        })
+      );
+      expect(html).toContain("Unable to authorize");
+      expect(html).not.toContain('name="proof"');
+      expect(auth.createClient).not.toHaveBeenCalled();
+      expect(auth.getUser).not.toHaveBeenCalled();
+      expect(auth.getSession).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it("accepts navigation from the issuer without requiring its Origin to match the web host", async () => {
+    incoming.headers.mockResolvedValue(
+      new Headers({
+        host: new URL(origin).host,
+        origin: "http://127.0.0.1:55431",
+      })
+    );
+    const html = renderToStaticMarkup(
+      await ConsentPage({
+        searchParams: Promise.resolve({ authorization_id: id }),
+      })
+    );
+    expect(html).toContain("Authorize Grida CLI");
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   it("keeps hosted Google sign-in's next target on this consent page", async () => {

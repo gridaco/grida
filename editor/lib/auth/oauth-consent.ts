@@ -49,17 +49,24 @@ export namespace oauthConsent {
     return `/insiders/auth/basic?${new URLSearchParams({ next })}`;
   }
 
+  /** GET navigation need not carry Origin, but must use the configured web host. */
+  export function requireHost(
+    headers: Pick<Headers, "get">,
+    config: Pick<oauthServer.ConsentConfig, "origin">
+  ): void {
+    // Next may reconstruct request.url with an internal hostname. Incoming Host
+    // is authoritative; forwarded headers never expand the configured origin.
+    if (headers.get("host") !== new URL(config.origin).host) {
+      throw new oauthServer.Failure("forbidden");
+    }
+  }
+
   export function requireOrigin(
     request: Request,
     config: oauthServer.ConsentConfig
   ): void {
-    // Next may reconstruct request.url with an internal hostname. Require the
-    // browser's exact Origin and incoming HTTP authority instead; forwarded
-    // host headers never select or expand the configured origin.
-    if (
-      request.headers.get("origin") !== config.origin ||
-      request.headers.get("host") !== new URL(config.origin).host
-    ) {
+    requireHost(request.headers, config);
+    if (request.headers.get("origin") !== config.origin) {
       throw new oauthServer.Failure("forbidden");
     }
   }

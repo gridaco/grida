@@ -212,6 +212,16 @@ describe("POST /desktop/auth/token", () => {
     expect(resolveSessionOrganization).not.toHaveBeenCalled();
   });
 
+  it("503 when the configured mint limiter is unavailable", async () => {
+    mint.mockRejectedValue(new gg.MintError("unavailable"));
+    const res = await POST(request());
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: { code: "mint_failed" } });
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(resolveSessionOrganization).not.toHaveBeenCalled();
+    expect(requireOrganizationId).not.toHaveBeenCalled();
+  });
+
   it("unexpected failures are opaque", async () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     resolveSessionOrganization.mockRejectedValue(

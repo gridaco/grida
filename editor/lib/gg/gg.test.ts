@@ -2,6 +2,7 @@
 // GRIDA-GG: token — membership, quota and signing are one producer policy.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignJWT } from "jose";
+import type { GgTokens } from "./tokens";
 
 const { signing, limiterConfig, limit, redis, rateLimit, slidingWindow } =
   vi.hoisted(() => ({
@@ -10,7 +11,8 @@ const { signing, limiterConfig, limit, redis, rateLimit, slidingWindow } =
         () => { current: Uint8Array | null; previous: Uint8Array | null }
       >(),
     limiterConfig: vi.fn<() => { url: string; token: string } | null>(),
-    limit: vi.fn<(key: string) => Promise<{ success: boolean }>>(),
+    limit:
+      vi.fn<(key: string) => Promise<{ success: boolean; reason?: string }>>(),
     redis: vi.fn<(config: unknown) => void>(),
     rateLimit: vi.fn<(config: unknown) => void>(),
     slidingWindow: vi.fn<(tokens: number, window: string) => unknown>(),
@@ -39,7 +41,7 @@ const SECRET = new TextEncoder().encode(
 
 beforeEach(() => {
   vi.resetModules();
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   signing.mockReturnValue({ current: SECRET, previous: null });
   limiterConfig.mockReturnValue({
     url: "https://limiter.test",
@@ -47,7 +49,10 @@ beforeEach(() => {
   });
   limit.mockResolvedValue({ success: true });
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("gg.mint", () => {
   it("checks one user quota, then membership, then signs the projected organization", async () => {
@@ -166,7 +171,7 @@ describe("gg.mint", () => {
     );
     expect(rateLimit).toHaveBeenCalledOnce();
     expect(rateLimit).toHaveBeenCalledWith(
-      expect.objectContaining({ prefix: "rl:v1-ai:mint" })
+      expect.objectContaining({ prefix: "rl:v1-ai:mint", timeout: 5000 })
     );
     expect(slidingWindow).toHaveBeenCalledWith(10, "60 s");
   });
@@ -191,17 +196,100 @@ describe("gg.mint", () => {
     expect(limit).not.toHaveBeenCalled();
   });
 
-  it("configured limiter failure never fails open", async () => {
+  it.each(["timeout", "request", "initialization"])(
+    "contains configured limiter %s failure before membership and signing",
+    async (failure) => {
+      const { gg } = await import("./gg");
+      if (failure === "timeout")
+        limit.mockResolvedValue({ success: true, reason: "timeout" });
+      else if (failure === "request")
+        limit.mockRejectedValue(new Error("private limiter credentials"));
+      else
+        redis.mockImplementationOnce(() => {
+          throw new Error("private limiter credentials");
+        });
+      const organization = vi.fn<GgTokens.Membership["organization"]>(
+        async () => ({ id: 7, name: "studio" })
+      );
+      const sign = vi.spyOn(SignJWT.prototype, "sign");
+      const error = await gg
+        .mint({ id: "user-1" }, { organization })
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(gg.MintError);
+      expect(error).toMatchObject({
+        code: "unavailable",
+        message: "unavailable",
+      });
+      expect(error).not.toHaveProperty("cause");
+      expect(organization).not.toHaveBeenCalled();
+      expect(sign).not.toHaveBeenCalled();
+      expect(signing).not.toHaveBeenCalled();
+    }
+  );
+
+  it("allows a later caller to initialize after failure without retrying the failed request", async () => {
     const { gg } = await import("./gg");
-    const failure = new Error("synthetic limiter failure");
-    limit.mockRejectedValue(failure);
-    const organization = vi.fn<
-      (userId: string) => Promise<{ id: number; name: string }>
-    >(async () => ({ id: 7, name: "studio" }));
-    await expect(gg.mint({ id: "user-1" }, { organization })).rejects.toBe(
-      failure
+    redis.mockImplementationOnce(() => {
+      throw new Error("synthetic initialization failure");
+    });
+    await expect(gg.allowMint("user-1")).rejects.toMatchObject({
+      code: "unavailable",
+    });
+    expect(redis).toHaveBeenCalledOnce();
+    expect(limit).not.toHaveBeenCalled();
+    await expect(gg.allowMint("user-2")).resolves.toBe(true);
+    expect(redis).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects the actual SDK timeout allowance and never mints on late Redis completion", async () => {
+    const { Ratelimit } =
+      await vi.importActual<typeof import("@upstash/ratelimit")>(
+        "@upstash/ratelimit"
+      );
+    type Config = ConstructorParameters<typeof Ratelimit>[0];
+    const started = Promise.withResolvers<void>();
+    const evaluation = Promise.withResolvers<[number, number]>();
+    const evalsha = vi.fn<() => Promise<[number, number]>>(() => {
+      started.resolve();
+      return evaluation.promise;
+    });
+    const responses: Array<{ success: boolean; reason?: string }> = [];
+    rateLimit.mockImplementation((config) => {
+      const sdk = new Ratelimit({
+        ...(config as Config),
+        redis: { evalsha } as unknown as Config["redis"],
+        limiter: Ratelimit.slidingWindow(10, "60 s"),
+      });
+      limit.mockImplementation(async (key) => {
+        const response = await sdk.limit(key);
+        responses.push(response);
+        return response;
+      });
+    });
+    const { gg } = await import("./gg");
+    const organization = vi.fn<GgTokens.Membership["organization"]>(
+      async () => ({ id: 7, name: "studio" })
     );
+    const sign = vi.spyOn(SignJWT.prototype, "sign");
+    vi.useFakeTimers();
+    const mint = gg
+      .mint({ id: "user-1" }, { organization })
+      .catch((error: unknown) => error);
+    await started.promise;
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(responses).toEqual([]);
     expect(organization).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await mint).toMatchObject({ code: "unavailable" });
+    expect(responses).toEqual([
+      expect.objectContaining({ success: true, reason: "timeout" }),
+    ]);
+    evaluation.resolve([9, 10]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(evalsha).toHaveBeenCalledOnce();
+    expect(limit).toHaveBeenCalledExactlyOnceWith("user-1");
+    expect(organization).not.toHaveBeenCalled();
+    expect(sign).not.toHaveBeenCalled();
     expect(signing).not.toHaveBeenCalled();
   });
 

@@ -177,15 +177,24 @@ describe("native GG exchange", () => {
       expect(await response.text()).not.toContain("private");
     }
   );
-  it("maps shared quota denial and failure without signing or member lookup", async () => {
-    const mint = vi
-      .spyOn(gg, "mint")
-      .mockRejectedValue(new gg.MintError("rate_limited"));
-    const response = await handlers.POST(request(await token()));
-    expect(response.status).toBe(429);
-    expect((await response.json()).error.code).toBe("rate_limited");
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    mint.mockRejectedValue(new Error("private limiter credentials"));
+  it.each([
+    ["rate_limited", 429, "rate_limited"],
+    ["unavailable", 503, "auth_unavailable"],
+  ] as const)(
+    "maps shared mint %s without member lookup",
+    async (code, status, wireCode) => {
+      vi.spyOn(gg, "mint").mockRejectedValue(new gg.MintError(code));
+      const response = await handlers.POST(request(await token()));
+      expect(response.status).toBe(status);
+      expect((await response.json()).error.code).toBe(wireCode);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    }
+  );
+  it("contains unexpected mint failures", async () => {
+    vi.spyOn(gg, "mint").mockRejectedValue(
+      new Error("private limiter credentials")
+    );
     expect(
       await (await handlers.POST(request(await token()))).text()
     ).not.toContain("private");
