@@ -18,8 +18,11 @@ Three contracts this skill protects:
 2. **The RLS spec is the source of truth — implementations follow tests, not the reverse.**
 3. **`schemas/*.sql` is the human-friendly description of the final shape.**
 
-`supabase/AGENTS.md` is the harder rule layer (RLS, grants, security
-boundaries). This skill covers the recurring workflow tasks. Read both.
+[supabase/AGENTS.md](../../../supabase/AGENTS.md) is the harder rule layer
+(RLS, grants, security boundaries). For function changes, follow its canonical
+[RPC role contract](../../../supabase/AGENTS.md#rpc-role-contract), including
+effective privileges, caller tests, and coverage of new overloads. This skill
+covers the recurring workflow tasks. Read both.
 
 For realistic optional Library data without changing schema history or the
 canonical base seed, use the [opt-library skill](../opt-library/SKILL.md).
@@ -93,7 +96,7 @@ one coherent migration per feature.
 FUNCTION`, `ADD COLUMN IF NOT EXISTS`) make local re-runs safe.
 6. **Delete the superseded local-only files.** Only those — never
    touch the applied list.
-7. **`supabase db reset`** locally. Run `supabase db test` if pgTAP
+7. **`supabase db reset`** locally. Run `supabase test db` if pgTAP
    covers the affected tables.
 8. **Note the fold in the PR description.** Reviewers shouldn't have
    to diff timestamps to figure it out.
