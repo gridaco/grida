@@ -36,6 +36,11 @@ infra:
   permalink: /infra
   description: Hosting, DNS, edge configuration, and operational architecture.
 
+cli:
+  label: CLI
+  permalink: /cli
+  description: Grida command-line interface, capability composition, and terminal workflows.
+
 routing:
   label: Routing
   permalink: /routing

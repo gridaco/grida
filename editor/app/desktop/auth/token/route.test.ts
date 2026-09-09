@@ -3,14 +3,15 @@
 /**
  * POST /desktop/auth/token — the hosted-AI token mint.
  *
- * Pins: signed-out is 401 and never reaches signing; the default org is
+ * Pins: signed-out is 401 and never reaches minting; the default org is
  * the session resolution (no request/header input ever reaches the org
  * resolver); an explicit org_id goes through the membership-verified
  * resolver as INPUT (not header); no-usable-org collapses to 409;
  * unconfigured secret is 503; all responses are no-store; failures stay
- * opaque.
+ * opaque. Shared quota/member/sign ordering is pinned by lib/gg tests;
+ * this adapter consumes only that producer's public mint contract.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const getUser =
   vi.fn<() => Promise<{ data: { user: { id: string } | null } }>>();
@@ -34,28 +35,42 @@ vi.mock("@/lib/auth/organization", () => ({
   requireOrganizationId: (opts: unknown) => requireOrganizationId(opts),
 }));
 
-const signGgToken =
-  vi.fn<
-    (sub: string, org: number) => Promise<{ token: string; expiresAt: Date }>
-  >();
-const allowGgTokenMint = vi.fn<(userId: string) => Promise<boolean>>();
-vi.mock("@/lib/auth/gg-token", () => {
-  class GgTokenError extends Error {
-    code: string;
-    constructor(code: string) {
+const mint = vi.fn<
+  (
+    principal: { id: string },
+    membership: {
+      organization(
+        userId: string
+      ): Promise<{ id: number; name: string } | null>;
+    }
+  ) => Promise<{
+    token: string;
+    expires_at: string;
+    organization: { id: number; name: string };
+  }>
+>();
+vi.mock("@/lib/gg/gg", () => {
+  class TokenError extends Error {
+    constructor(readonly code: string) {
       super(code);
-      this.code = code;
+    }
+  }
+  class MintError extends Error {
+    constructor(readonly code: string) {
+      super(code);
     }
   }
   return {
-    GgTokenError,
-    signGgToken: (sub: string, org: number) => signGgToken(sub, org),
-    allowGgTokenMint: (userId: string) => allowGgTokenMint(userId),
+    gg: {
+      TokenError,
+      MintError,
+      mint: (...args: Parameters<typeof mint>) => mint(...args),
+    },
   };
 });
 
 import { POST } from "./route";
-import { GgTokenError } from "@/lib/auth/gg-token";
+import { gg } from "@/lib/gg/gg";
 
 const EXPIRES = new Date("2026-07-03T12:00:00.000Z");
 
@@ -76,21 +91,28 @@ beforeEach(() => {
   maybeSingle.mockReset();
   resolveSessionOrganization.mockReset();
   requireOrganizationId.mockReset();
-  signGgToken.mockReset();
-  allowGgTokenMint.mockReset();
+  mint.mockReset();
   getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
-  allowGgTokenMint.mockResolvedValue(true);
-  signGgToken.mockResolvedValue({ token: "jwt-abc", expiresAt: EXPIRES });
+  mint.mockImplementation(async (principal, membership) => {
+    const organization = await membership.organization(principal.id);
+    if (!organization) throw new gg.MintError("no_organization");
+    return {
+      token: "jwt-abc",
+      expires_at: EXPIRES.toISOString(),
+      organization,
+    };
+  });
   resolveSessionOrganization.mockResolvedValue({ id: 7, name: "acme" });
 });
+afterEach(() => vi.restoreAllMocks());
 
 describe("POST /desktop/auth/token", () => {
-  it("401 when signed out; signing never runs", async () => {
+  it("401 when signed out; minting never runs", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
     const res = await POST(request());
     expect(res.status).toBe(401);
     expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(signGgToken).not.toHaveBeenCalled();
+    expect(mint).not.toHaveBeenCalled();
   });
 
   it("mints against the session organization by default", async () => {
@@ -102,7 +124,13 @@ describe("POST /desktop/auth/token", () => {
       expires_at: EXPIRES.toISOString(),
       organization: { id: 7, name: "acme" },
     });
-    expect(signGgToken).toHaveBeenCalledWith("user-1", 7);
+    expect(mint).toHaveBeenCalledWith(
+      { id: "user-1" },
+      { organization: expect.any(Function) }
+    );
+    expect(resolveSessionOrganization).toHaveBeenCalledExactlyOnceWith(
+      "user-1"
+    );
     expect(requireOrganizationId).not.toHaveBeenCalled();
   });
 
@@ -111,7 +139,7 @@ describe("POST /desktop/auth/token", () => {
     const res = await POST(request());
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: { code: "no_organization" } });
-    expect(signGgToken).not.toHaveBeenCalled();
+    expect(mint).toHaveBeenCalledOnce();
   });
 
   it("explicit org_id goes through the membership-verified resolver as input, never a header", async () => {
@@ -124,7 +152,35 @@ describe("POST /desktop/auth/token", () => {
       user_id: "user-1",
       inputOrgId: 42,
     });
-    expect(signGgToken).toHaveBeenCalledWith("user-1", 42);
+    expect(mint).toHaveBeenCalledOnce();
+  });
+
+  it("retains string org_id input and ignores an organization header", async () => {
+    requireOrganizationId.mockResolvedValue(42);
+    maybeSingle.mockResolvedValue({ data: { id: 42, name: "other" } });
+    const req = request({ org_id: "42" });
+    req.headers.set("x-grida-organization-id", "999");
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(requireOrganizationId).toHaveBeenCalledExactlyOnceWith({
+      user_id: "user-1",
+      inputOrgId: "42",
+    });
+    expect((await res.json()).organization).toEqual({ id: 42, name: "other" });
+  });
+
+  it("retains empty/malformed body fallback without forwarding the request or header", async () => {
+    const req = new Request("https://grida.test/desktop/auth/token", {
+      method: "POST",
+      body: "{",
+      headers: { "x-grida-organization-id": "999" },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(resolveSessionOrganization).toHaveBeenCalledExactlyOnceWith(
+      "user-1"
+    );
+    expect(requireOrganizationId).not.toHaveBeenCalled();
   });
 
   it("membership failure on explicit org_id → 409", async () => {
@@ -139,24 +195,35 @@ describe("POST /desktop/auth/token", () => {
   it("malformed org_id → 400", async () => {
     const res = await POST(request({ org_id: { nested: true } }));
     expect(res.status).toBe(400);
-    expect(signGgToken).not.toHaveBeenCalled();
+    expect(requireOrganizationId).not.toHaveBeenCalled();
   });
 
   it("503 when the signing secret is not configured", async () => {
-    signGgToken.mockRejectedValue(new GgTokenError("not_configured"));
+    mint.mockRejectedValue(new gg.TokenError("not_configured"));
     const res = await POST(request());
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: { code: "not_configured" } });
   });
 
   it("429 when the mint limiter refuses", async () => {
-    allowGgTokenMint.mockResolvedValue(false);
+    mint.mockRejectedValue(new gg.MintError("rate_limited"));
     const res = await POST(request());
     expect(res.status).toBe(429);
-    expect(signGgToken).not.toHaveBeenCalled();
+    expect(resolveSessionOrganization).not.toHaveBeenCalled();
+  });
+
+  it("503 when the configured mint limiter is unavailable", async () => {
+    mint.mockRejectedValue(new gg.MintError("unavailable"));
+    const res = await POST(request());
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: { code: "mint_failed" } });
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(resolveSessionOrganization).not.toHaveBeenCalled();
+    expect(requireOrganizationId).not.toHaveBeenCalled();
   });
 
   it("unexpected failures are opaque", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     resolveSessionOrganization.mockRejectedValue(
       new Error("connect ECONNREFUSED postgres")
     );
@@ -165,5 +232,8 @@ describe("POST /desktop/auth/token", () => {
     const body = JSON.stringify(await res.json());
     expect(body).toBe(JSON.stringify({ error: { code: "mint_failed" } }));
     expect(body).not.toContain("ECONNREFUSED");
+    expect(logged).toHaveBeenCalledExactlyOnceWith(
+      "[desktop-ai-token] mint failed"
+    );
   });
 });

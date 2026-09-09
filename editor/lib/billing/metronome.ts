@@ -1,4 +1,4 @@
-// Metronome integration — client + service layer.
+// GRIDA-EE: billing — Metronome integration, client and service layer.
 //
 //   Metronome: source of truth for credit balance + drain order.
 //   Stripe:    source of truth for money. Metronome facilitates the charge.
@@ -14,6 +14,7 @@ import * as crypto from "node:crypto";
 import Metronome from "@metronome/sdk";
 import { service_role } from "../supabase/server";
 import { stripe } from "./index";
+import { credits } from "./credits";
 import {
   AI_GATE_FLOOR_CENTS,
   AUTO_RELOAD_RECHARGE_MAX_CENTS,
@@ -926,13 +927,7 @@ export async function getAlertsStatus(
 // gate primitive — the seam will call this before every AI request
 // ---------------------------------------------------------------------------
 
-export type Entitlement = {
-  /** Permitted to call AI. False below floor or before any commit. */
-  allowed: boolean;
-  reason?: "no_balance" | "below_floor" | "not_provisioned";
-  cachedBalanceCents: number;
-  cachedAt: string | null;
-};
+export type Entitlement = credits.Entitlement;
 
 // Sub-100ms gate primitive. Reads grida_billing.account; never calls
 // Metronome. Cache is updated by webhooks + the refreshBalance cron.
@@ -940,35 +935,16 @@ export async function getEntitlement(
   organizationId: number
 ): Promise<Entitlement> {
   const account = await getAccount(organizationId);
-  if (!account?.metronome_customer_id) {
-    return {
-      allowed: false,
-      reason: "not_provisioned",
-      cachedBalanceCents: 0,
-      cachedAt: null,
-    };
-  }
-  if (account.cached_balance_cents < AI_GATE_FLOOR_CENTS) {
-    return {
-      allowed: false,
-      reason: "below_floor",
-      cachedBalanceCents: account.cached_balance_cents,
-      cachedAt: account.cached_balance_at,
-    };
-  }
-  if (!account.customer_entitled) {
-    return {
-      allowed: false,
-      reason: "no_balance",
-      cachedBalanceCents: account.cached_balance_cents,
-      cachedAt: account.cached_balance_at,
-    };
-  }
-  return {
-    allowed: true,
-    cachedBalanceCents: account.cached_balance_cents,
-    cachedAt: account.cached_balance_at,
-  };
+  return credits.gate(
+    account
+      ? {
+          provisioned: Boolean(account.metronome_customer_id),
+          balance_cents: account.cached_balance_cents,
+          cache_updated_at: account.cached_balance_at,
+          customer_entitled: account.customer_entitled,
+        }
+      : null
+  );
 }
 
 // Force-sync the local cache from Metronome. Called from webhook handlers

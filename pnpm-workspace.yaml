@@ -13,6 +13,10 @@ packages:
 # the reviewed decision (all skipped, as under pnpm 10). Flip one to `true` to opt in.
 strictDepBuilds: false
 allowBuilds:
+  # The pinned binding loads its bundled macOS/Linux N-API prebuilds directly.
+  # Its install script only copies them or falls back to a source build; CI
+  # verifies addon loading and macOS keyring access with that script skipped.
+  "@github/keytar": false
   "@sentry/cli": false
   canvas: false
   core-js: false

@@ -1,3 +1,5 @@
+// GRIDA-SEC-006 — transient scoped-GG transport, never account-session custody.
+// GRIDA-GG: token — destination-authorized requests through the private Chromium session.
 import { isIP } from "node:net";
 import { Readable, type Writable } from "node:stream";
 import { net, session, type IncomingMessage, type Session } from "electron";

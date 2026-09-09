@@ -1,0 +1,53 @@
+{
+  "name": "@grida/auth",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Independent Grida native OAuth client lifecycle.",
+  "license": "MIT",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./node": {
+      "import": {
+        "types": "./dist/node.d.mts",
+        "default": "./dist/node.mjs"
+      },
+      "require": {
+        "types": "./dist/node.d.cts",
+        "default": "./dist/node.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json"
+  },
+  "dependencies": {
+    "@grida/home": "workspace:*"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.1",
+    "typescript": "^6",
+    "vitest": "^4"
+  },
+  "optionalDependencies": {
+    "@github/keytar": "7.10.6"
+  }
+}

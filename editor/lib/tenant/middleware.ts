@@ -22,11 +22,11 @@ export namespace TenantMiddleware {
     const parts = hostname.split(".");
 
     if (LOCALHOST) {
-      if (hostname === "localhost") {
+      if (isLocalAppHostname(hostname)) {
         return {
           name: null,
           apex: "localhost",
-          domain: "localhost",
+          domain: hostname,
         };
       } else {
         return {
@@ -282,16 +282,28 @@ export namespace TenantMiddleware {
       });
     }
 
-    // Block direct access to tenant layout on app host (localhost / editor apex).
+    // Block direct access to tenant layout on app hosts, including local loopback IPs.
     // Allow direct `/~/...` only on tenant hosts (e.g. `tenant.localhost` or platform/custom domains).
     // In hosted env, `Env.web.HOST` includes scheme; use `NEXT_PUBLIC_URL` (host only) to detect editor apex.
     const editorHost = process.env.NEXT_PUBLIC_URL;
     const isEditorApexHost =
-      hostname === "localhost" || (!!editorHost && hostname === editorHost);
+      hostname === "localhost" ||
+      (!Env.server.IS_HOSTED && isLocalAppHostname(hostname)) ||
+      (!!editorHost && hostname === editorHost);
     if (isEditorApexHost && req.nextUrl.pathname.startsWith("/~/")) {
       return NextResponse.redirect(new URL("/", req.url));
     }
 
     return null;
+  }
+
+  function isLocalAppHostname(hostname: string): boolean {
+    // URL.hostname has already normalized IPv4 aliases and brackets IPv6.
+    // A loopback address is the app host, never the first label of a tenant.
+    return (
+      hostname === "localhost" ||
+      hostname === "[::1]" ||
+      /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)
+    );
   }
 }

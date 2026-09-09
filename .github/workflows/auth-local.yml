@@ -1,0 +1,197 @@
+# GRIDA-SEC-010 / GRIDA-SEC-011 — native custody and isolated local OAuth proof.
+name: Local OAuth proof
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/auth-local.yml"
+      - "scripts/auth-local/**"
+      - "packages/grida-auth/**"
+      - "packages/grida-account/**"
+      - "packages/grida-home/**"
+      - "packages/grida-ai-models/**"
+      - "editor/lib/auth/**"
+      - "editor/lib/gg/**"
+      - "editor/lib/ai/openai-compat/**"
+      - "editor/lib/api/**"
+      - "editor/lib/account/**"
+      - "editor/lib/billing/**"
+      - "editor/lib/supabase/**"
+      - "editor/lib/tenant/**"
+      - "editor/host/auth/**"
+      - "editor/app/(untracked)/oauth/**"
+      - "editor/app/(untracked)/layout.tsx"
+      - "editor/app/(api)/private/oauth/**"
+      - "editor/app/(api)/(public)/api/v1/auth/**"
+      - "editor/app/(api)/(public)/api/v1/account/**"
+      - "editor/app/(api)/(public)/api/v1/ai/models/**"
+      - "editor/app/(insiders)/**"
+      - "editor/e2e/auth-oauth.spec.mts"
+      - "editor/playwright.auth.config.ts"
+      - "editor/playwright.config.ts"
+      - "editor/vitest.oauth.config.ts"
+      - "editor/vitest.api.config.ts"
+      - "editor/proxy.ts"
+      - "editor/next.config.ts"
+      - "editor/package.json"
+      - "supabase/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".nvmrc"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-custody:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install Linux keyring runtime
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libsecret-1-0
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify bundled native keyring addon
+        working-directory: packages/grida-auth
+        # Import only: Linux does not need an unlocked desktop Secret Service.
+        # The separate macOS smoke below owns its temporary keychain entry.
+        run: |
+          node --input-type=module <<'NODE'
+          const native = await import("@github/keytar");
+          const binding = native.default ?? native;
+          for (const name of ["getPassword", "setPassword", "deletePassword"]) {
+            if (typeof binding[name] !== "function") {
+              throw new Error("Invalid native keyring binding");
+            }
+          }
+          NODE
+      - name: Build native package
+        run: |
+          pnpm --filter @grida/home build
+          pnpm --filter @grida/auth build
+          pnpm --filter @grida/account build
+      - name: Verify durable custody and isolated subprocess consumer
+        run: |
+          pnpm --filter @grida/auth typecheck
+          pnpm --filter @grida/auth test
+          pnpm --filter @grida/account typecheck
+          pnpm --filter @grida/account test
+      - name: Verify a disposable macOS keyring entry
+        if: runner.os == 'macOS'
+        env:
+          GRIDA_AUTH_KEYRING_SMOKE: "1"
+        run: pnpm --filter @grida/auth exec vitest run src/keyring.test.ts
+      # Synthetic profiles are temporary; do not upload credential artifacts.
+  auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared packages
+        run: pnpm turbo build --filter='./packages/*'
+      - name: Check native producer and offline contracts
+        run: |
+          pnpm --filter @grida/auth typecheck
+          pnpm --filter @grida/auth test
+          node --test scripts/auth-local/guards.test.mjs scripts/auth-local/network.test.mjs
+          node_modules/.bin/vitest run --config editor/vitest.oauth.config.ts
+      - name: Install fixture browser
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/grida-auth-browsers
+        run: editor/node_modules/.bin/playwright install --with-deps chromium
+      - name: Acquire verified Supabase release bundle
+        id: cli
+        run: |
+          AUTH_TOOLS=$(mktemp -d "$RUNNER_TEMP/grida-auth-tools-XXXXXX")
+          curl --disable --fail --location --silent --show-error \
+            https://github.com/supabase/cli/releases/download/v2.116.0/supabase_2.116.0_linux_amd64.tar.gz \
+            --output "$AUTH_TOOLS/release.tar.gz"
+          echo "5b3031cb297d51b25be4c284e4c852254460ec722ec221d3b81b07d55acfd158  $AUTH_TOOLS/release.tar.gz" | sha256sum --check
+          tar -xzf "$AUTH_TOOLS/release.tar.gz" -C "$AUTH_TOOLS"
+          echo "bin=$AUTH_TOOLS/supabase" >> "$GITHUB_OUTPUT"
+      - name: Prepare isolated local fixture
+        id: fixture
+        env:
+          AUTH_BIN: ${{ steps.cli.outputs.bin }}
+        run: |
+          node scripts/auth-local/stack.mjs prepare \
+            --supabase-bin "$AUTH_BIN" \
+            --docker-socket /var/run/docker.sock > "$RUNNER_TEMP/auth-prepare.json"
+          AUTH_STATE=$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).statePath" "$RUNNER_TEMP/auth-prepare.json")
+          echo "state=$AUTH_STATE" >> "$GITHUB_OUTPUT"
+      - name: Start and bootstrap local Auth
+        env:
+          GRIDA_AUTH_TEST_STATE: ${{ steps.fixture.outputs.state }}
+        run: |
+          node scripts/auth-local/stack.mjs start --state "$GRIDA_AUTH_TEST_STATE"
+          node scripts/auth-local/stack.mjs bootstrap --state "$GRIDA_AUTH_TEST_STATE"
+      - name: Prove browser and native auth against the local fixture
+        env:
+          GRIDA_AUTH_TEST_STATE: ${{ steps.fixture.outputs.state }}
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/grida-auth-browsers
+        run: |
+          node scripts/auth-local/editor.mjs --state "$GRIDA_AUTH_TEST_STATE" > "$RUNNER_TEMP/grida-auth-editor.log" 2>&1 &
+          AUTH_EDITOR_PID=$!
+          trap 'kill "$AUTH_EDITOR_PID" 2>/dev/null || true; wait "$AUTH_EDITOR_PID" 2>/dev/null || true' EXIT
+          AUTH_EDITOR_READY=0
+          for attempt in $(seq 1 90); do
+            if curl --disable --noproxy '*' --fail --silent --output /dev/null --max-time 2 http://127.0.0.1:3041/oauth/consent; then
+              AUTH_EDITOR_READY=1
+              break
+            fi
+            kill -0 "$AUTH_EDITOR_PID"
+            sleep 2
+          done
+          test "$AUTH_EDITOR_READY" = 1
+          editor/node_modules/.bin/playwright test --config editor/playwright.auth.config.ts
+      - name: Stop only the owned local fixture
+        if: ${{ always() && steps.fixture.outputs.state != '' }}
+        env:
+          GRIDA_AUTH_TEST_STATE: ${{ steps.fixture.outputs.state }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawnSync } from 'node:child_process';
+          import { readState } from './scripts/auth-local/stack.mjs';
+          const statePath = process.env.GRIDA_AUTH_TEST_STATE;
+          const state = await readState(statePath);
+          if (['starting', 'started', 'bootstrapped'].includes(state.phase)) {
+            const result = spawnSync(process.execPath, ['scripts/auth-local/stack.mjs', 'stop', '--state', statePath], { stdio: 'inherit' });
+            process.exitCode = result.status ?? 1;
+          }
+          NODE
+      # Fixture outputs contain local credentials. Do not upload the private
+      # workdir, editor log, browser storage, or setup files as CI artifacts.
