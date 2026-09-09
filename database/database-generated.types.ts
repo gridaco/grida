@@ -4531,6 +4531,13 @@ export type Database = {
             referencedRelation: "organization"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "public_organization_member_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_billing_credits"
+            referencedColumns: ["organization_id"]
+          },
         ]
       }
       project: {
@@ -4562,6 +4569,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organization"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_project_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_billing_credits"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -4766,7 +4780,27 @@ export type Database = {
             referencedRelation: "organization"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "audit_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_billing_credits"
+            referencedColumns: ["organization_id"]
+          },
         ]
+      }
+      v_billing_credits: {
+        Row: {
+          account_present: boolean | null
+          cached_balance_at: string | null
+          cached_balance_cents: number | null
+          credits_provisioned: boolean | null
+          customer_entitled: boolean | null
+          organization_display_name: string | null
+          organization_id: number | null
+          organization_name: string | null
+        }
+        Relationships: []
       }
       v_billing_subscription: {
         Row: {
@@ -4788,6 +4822,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organization"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_billing_credits"
+            referencedColumns: ["organization_id"]
           },
         ]
       }

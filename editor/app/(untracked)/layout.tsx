@@ -1,11 +1,11 @@
 /**
- * GRIDA-SEC-005 — analytics-free root layout.
+ * GRIDA-SEC-005 / GRIDA-SEC-010 — analytics-free root layout.
  *
  * Root layout (this repo has no top-level `app/layout.tsx`; each route group
  * owns its `<html>`). Deliberately loads NO third-party scripts — no Google
  * Analytics, no Vercel Analytics/Speed Insights — unlike the `(site)` root
  * layout. Pages here carry security-sensitive values in their URL (e.g. the
- * desktop sign-in PKCE challenge) that must not be beaconed to third parties;
+ * desktop PKCE challenge or OAuth authorization ID) that must not reach third parties;
  * a pageview capturing that URL would disclose the value. Do not add
  * analytics or any URL-reporting script to this group.
  */

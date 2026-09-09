@@ -12,6 +12,7 @@ Working group documents for Grida platform and infrastructure topics.
 
 ## Documents
 
+- [Grida CLI](../cli/index.md) — proposed CLI doctrine and v1: independent installation, account access, and composable product capabilities.
 - [Billing](./billing) — subscriptions, AI credit, Stripe ↔ Metronome sync.
 - [Grida Gateway (GG)](./hosted-ai) — the first-party metered, no-BYOK AI gateway: scoped-token federation → org-credit spend; the desktop's no-key AI path.
 - [Grida Library](./library) — curated open visual-asset corpus, content-addressed identity & ingestion, and its retrieval model (similarity & semantic search).

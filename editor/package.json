@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "audit:ai-seam": "tsx scripts/audit-ai-seam.ts",
+    "audit:api": "node --import tsx scripts/audit-api.ts",
     "build": "next build",
     "build-registry": "tsx scripts/build-registry.ts",
     "dev": "next dev",
@@ -13,6 +14,8 @@
     "start": "next start",
     "sync:public": "pnpm --filter @grida/public build",
     "test": "vitest run",
+    "test:api": "pnpm audit:api && node --test ../scripts/api-local/network.test.mjs && vitest run --config vitest.api.config.ts",
+    "test:api:http": "node ../scripts/api-local/proof.mjs",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "typegen": "next typegen"
@@ -242,6 +245,8 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@grida/account": "workspace:*",
+    "@grida/auth": "workspace:*",
     "@playwright/test": "^1.52.0",
     "@supabase/storage-js": "^2.90.1",
     "@tailwindcss/postcss": "^4",

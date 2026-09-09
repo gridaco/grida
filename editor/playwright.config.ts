@@ -1,3 +1,4 @@
+// GRIDA-SEC-011 — keep the OAuth proof out of the ordinary server/artifact runner.
 import { defineConfig, devices } from "@playwright/test";
 import path from "path";
 
@@ -13,6 +14,7 @@ export default defineConfig({
   timeout: 30 * 1000,
   // Test directory
   testDir: path.join(__dirname, "e2e"),
+  testIgnore: "auth-oauth.spec.{ts,mts}",
   // If a test fails, retry it additional 2 times
   retries: 2,
   // Artifacts folder where screenshots, videos, and traces are stored.

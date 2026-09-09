@@ -1,0 +1,37 @@
+# GRIDA-SEC-012 — every PR checks machine request isolation, including config changes.
+name: Machine API boundary
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check route bindings, dependencies and offline contracts
+        run: pnpm --filter editor test:api
+      - name: Prove the built Next request pipeline locally
+        run: pnpm --filter editor test:api:http
+      # The proof deletes its owned source/build and synthetic session state.
+      # No credentials, reports, or server logs are uploaded.

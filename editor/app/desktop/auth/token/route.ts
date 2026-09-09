@@ -25,11 +25,7 @@ import {
   requireOrganizationId,
   resolveSessionOrganization,
 } from "@/lib/auth/organization";
-import {
-  GgTokenError,
-  allowGgTokenMint,
-  signGgToken,
-} from "@/lib/auth/gg-token";
+import { gg } from "@/lib/gg/gg";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
@@ -51,30 +47,11 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!(await allowGgTokenMint(user.id))) {
-      return NextResponse.json(
-        { error: { code: "rate_limited" } },
-        { status: 429, headers: NO_STORE }
-      );
-    }
-
-    const org = await resolveMintOrganization(request, user.id, client);
-    if (org === null) {
-      return NextResponse.json(
-        { error: { code: "no_organization" } },
-        { status: 409, headers: NO_STORE }
-      );
-    }
-
-    const { token, expiresAt } = await signGgToken(user.id, org.id);
-    return NextResponse.json(
-      {
-        token,
-        expires_at: expiresAt.toISOString(),
-        organization: { id: org.id, name: org.name },
-      },
-      { headers: NO_STORE }
-    );
+    const grant = await gg.mint(user, {
+      organization: (userId) =>
+        resolveMintOrganization(request, userId, client),
+    });
+    return NextResponse.json(grant, { headers: NO_STORE });
   } catch (err) {
     return errorResponse(err);
   }
@@ -114,10 +91,16 @@ async function resolveMintOrganization(
 class MintRequestError extends Error {}
 
 function errorResponse(err: unknown): NextResponse {
-  if (err instanceof GgTokenError && err.code === "not_configured") {
+  if (err instanceof gg.TokenError && err.code === "not_configured") {
     return NextResponse.json(
       { error: { code: "not_configured" } },
       { status: 503, headers: NO_STORE }
+    );
+  }
+  if (err instanceof gg.MintError) {
+    return NextResponse.json(
+      { error: { code: err.code } },
+      { status: err.code === "rate_limited" ? 429 : 409, headers: NO_STORE }
     );
   }
   if (err instanceof MintRequestError) {
@@ -143,7 +126,8 @@ function errorResponse(err: unknown): NextResponse {
       { status: 400, headers: NO_STORE }
     );
   }
-  console.error("[desktop-ai-token] mint failed:", err);
+  // Upstream errors may carry request credentials; keep diagnostics fixed too.
+  console.error("[desktop-ai-token] mint failed");
   return NextResponse.json(
     { error: { code: "mint_failed" } },
     { status: 500, headers: NO_STORE }
