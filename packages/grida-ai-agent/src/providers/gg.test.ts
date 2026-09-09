@@ -48,13 +48,10 @@ function okJson(body: unknown): Response {
 async function callModel(
   store: GridaGatewaySessionStore,
   modelId?: string,
-  providerHttp?: ProviderHttp
+  providerHttp?: ProviderHttp,
+  baseUrl = "https://grida.test"
 ): Promise<void> {
-  const factory = makeGridaGatewayFactory(
-    store,
-    "https://grida.test",
-    providerHttp
-  );
+  const factory = makeGridaGatewayFactory(store, baseUrl, providerHttp);
   const model = factory("pro", modelId) as unknown as {
     doGenerate: (o: unknown) => Promise<unknown>;
   };
@@ -79,6 +76,38 @@ async function callModel(
 }
 
 describe("makeGridaGatewayFactory", () => {
+  it.each([
+    "http://gg.example",
+    "http://192.168.0.1",
+    "http://localhost.example",
+    "https://user:private-value@gg.example",
+    "https://gg.example?private-value",
+    "https://gg.example#private-value",
+  ])("rejects unsafe GG base %s before credential access", (base) => {
+    const store = liveStore();
+    const read = vi.spyOn(store, "getAccessToken");
+    expect(() => makeGridaGatewayFactory(store, base)).toThrow(
+      "gg_invalid_url"
+    );
+    expect(read).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "http://localhost:3000",
+    "http://127.0.0.1:3041",
+    "http://[::1]:3041",
+  ])("keeps local GG text requests on %s", async (base) => {
+    await callModel(liveStore(), undefined, undefined, base);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      `${base}/api/v1/ai/chat/completions`
+    );
+    expect(
+      new Headers(fetchMock.mock.calls[0][1]?.headers).get("authorization")
+    ).toBe("Bearer tok-1");
+  });
+
   it("builds the /api/v1/ai base and sends the LIVE token per request", async () => {
     expect(gridaGatewayApiBase("https://grida.co")).toBe(
       "https://grida.co/api/v1/ai"

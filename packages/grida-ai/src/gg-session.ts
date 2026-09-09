@@ -1,5 +1,6 @@
 // GRIDA-SEC-006 — memory-only scoped credential custody.
 // GRIDA-GG: token — no account session, refresh, mint, or persistence.
+import { gridaGatewayOrigin } from "./gg";
 /** The host supplies and clears short-lived GG grants. A lost process loses its grant. */
 export type GridaGatewayOrganization = { id: number; name: string };
 
@@ -96,6 +97,7 @@ export function liveGgMediaDeps(deps: {
   gg_base_url?: string;
 }): { session: GgTokenSource; base_url: string } | null {
   if (!deps.gg || !deps.gg_base_url) return null;
+  const base_url = gridaGatewayOrigin(deps.gg_base_url);
   if (deps.gg.getAccessToken() === null) return null;
-  return { session: deps.gg, base_url: deps.gg_base_url };
+  return { session: deps.gg, base_url };
 }

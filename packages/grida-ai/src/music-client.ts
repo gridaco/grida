@@ -7,6 +7,7 @@ import { MediaRoutes } from "./media-routes";
 import {
   GridaGatewayAuthError,
   GridaGatewayCreditsError,
+  gridaGatewayOrigin,
   postHosted,
 } from "./gg";
 import type { GgTokenSource } from "./gg-session";
@@ -30,18 +31,9 @@ export class MusicClient {
       const read = gg.getAccessToken;
       if (!(http instanceof ProviderHttp) || typeof read !== "function")
         throw 0;
-      const url = new URL(gg_base_url);
-      if (
-        !["http:", "https:"].includes(url.protocol) ||
-        url.username ||
-        url.password ||
-        url.search ||
-        url.hash
-      )
-        throw 0;
       this.#http = http;
       this.#gg = { getAccessToken: read.bind(gg) };
-      this.#origin = url.origin;
+      this.#origin = gridaGatewayOrigin(gg_base_url);
     } catch {
       throw new MusicClient.Failure("invalid_input");
     }

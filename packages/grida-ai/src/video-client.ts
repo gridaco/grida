@@ -5,7 +5,11 @@ import { models } from "@grida/ai-models";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
-import { GridaGatewayAuthError, GridaGatewayCreditsError } from "./gg";
+import {
+  GridaGatewayAuthError,
+  GridaGatewayCreditsError,
+  gridaGatewayOrigin,
+} from "./gg";
 import { liveGgMediaDeps, type GgTokenSource } from "./gg-session";
 import { ProviderHttp } from "./http";
 import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
@@ -32,16 +36,7 @@ export class VideoClient {
       if (gg !== undefined)
         this.#gg = { getAccessToken: gg.getAccessToken.bind(gg) };
       if (gg_base_url !== undefined) {
-        const url = new URL(gg_base_url);
-        if (
-          !["http:", "https:"].includes(url.protocol) ||
-          url.username ||
-          url.password ||
-          url.search ||
-          url.hash
-        )
-          throw 0;
-        this.#ggBaseUrl = url.origin;
+        this.#ggBaseUrl = gridaGatewayOrigin(gg_base_url);
       }
     } catch {
       throw new VideoClient.Failure("invalid_input");

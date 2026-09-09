@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — scoped credentials stay on the host-authorized request lane.
 // GRIDA-GG: token — shared live-token and HTTP status contract.
 import type { GgTokenSource } from "./gg-session";
-import { ProviderHttp } from "./http";
+import type { ProviderHttp } from "./http";
 /**
  * The hosted session is missing or expired. The literal code LEADS the
  * message: mid-run errors cross Electron's `contextBridge`, which strips
@@ -27,9 +27,37 @@ export class GridaGatewayCreditsError extends Error {
   }
 }
 
+/** GG endpoints require TLS except for exact loopback hosts used in local development. */
+export function gridaGatewayOrigin(baseUrl: string): string {
+  return gridaGatewayUrl(baseUrl).origin;
+}
+
+function gridaGatewayUrl(value: string): URL {
+  try {
+    if (typeof value !== "string") throw 0;
+    const url = new URL(value);
+    const loopback =
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "[::1]";
+    if (
+      (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    )
+      throw 0;
+    return url;
+  } catch {
+    // Never include a configured URL: rejected userinfo/query/fragment can contain secrets.
+    throw new Error("gg_invalid_url");
+  }
+}
+
 /** `<base>/api/v1/ai` — `@ai-sdk/openai-compatible` appends the paths. */
 export function gridaGatewayApiBase(baseUrl: string): string {
-  return new URL("/api/v1/ai", baseUrl).toString();
+  return joinApi(baseUrl, "/api/v1/ai");
 }
 
 /** The live scoped token, or throw the typed auth error (never a bare null). */
@@ -56,7 +84,14 @@ export async function throwOnGgHttpError(res: Response): Promise<void> {
 }
 
 export function joinApi(baseUrl: string, path: string): string {
-  return new URL(path, baseUrl).toString();
+  try {
+    const origin = gridaGatewayOrigin(baseUrl);
+    const url = gridaGatewayUrl(new URL(path, origin).toString());
+    if (url.origin !== origin) throw 0;
+    return url.toString();
+  } catch {
+    throw new Error("gg_invalid_url");
+  }
 }
 
 export async function postHosted<T>(args: {
@@ -68,7 +103,9 @@ export async function postHosted<T>(args: {
   provider_http: ProviderHttp;
   max_response_bytes?: number;
 }): Promise<T> {
-  const res = await args.provider_http.request(args.url, {
+  // Public provider helpers must enforce admission too, before reading scoped custody.
+  const url = gridaGatewayUrl(args.url).toString();
+  const res = await args.provider_http.request(url, {
     method: "POST",
     signal: args.abortSignal,
     headers: {

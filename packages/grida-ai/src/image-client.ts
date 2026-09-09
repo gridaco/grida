@@ -9,7 +9,11 @@ import type { ImageModelV3 } from "@ai-sdk/provider";
 import { generateImage } from "ai";
 import { makeImageModelFor } from "./image-byok";
 import { GridaGatewayImageModel } from "./image-gg";
-import { GridaGatewayAuthError, GridaGatewayCreditsError } from "./gg";
+import {
+  GridaGatewayAuthError,
+  GridaGatewayCreditsError,
+  gridaGatewayOrigin,
+} from "./gg";
 import { liveGgMediaDeps, type GgTokenSource } from "./gg-session";
 import { ProviderHttp } from "./http";
 import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
@@ -38,17 +42,7 @@ export class ImageClient {
         this.#gg = { getAccessToken: read };
       }
       if (gg_base_url !== undefined) {
-        const url = new URL(gg_base_url);
-        if (
-          !["http:", "https:"].includes(url.protocol) ||
-          url.username ||
-          url.password ||
-          url.search ||
-          url.hash
-        ) {
-          throw new ImageClient.Failure("invalid_input");
-        }
-        this.#ggBaseUrl = url.origin;
+        this.#ggBaseUrl = gridaGatewayOrigin(gg_base_url);
       }
     } catch {
       throw new ImageClient.Failure("invalid_input");

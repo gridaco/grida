@@ -566,6 +566,16 @@ it. GG is rechecked at resolution and each submission. Clearing custody blocks
 later submissions, but cannot recall a token already sent or cancel accepted
 work; server expiry and entitlement policy remain authoritative.
 
+GG text/image/video/music share one URL admission policy: HTTPS is required,
+except HTTP to exact URL-parsed loopback hosts `localhost`, `127.0.0.1`, or `[::1]`
+for local development. URL userinfo, query strings and fragments are rejected.
+Clients normalize the configured base to its origin; the shared provider helpers
+apply the same policy before reading a scoped token or making a request. This
+prevents a custom host from accidentally configuring cleartext remote GG traffic.
+It does not authorize that origin or prove its resolved address: the host still
+owns destination grants, DNS/routing and redirect enforcement. The CLI's fixed
+registration and Desktop's approved editor origin remain narrower host policies.
+
 ## Shared provider implementation entry
 
 ### First-party provider credential admission

@@ -115,6 +115,40 @@ async function assertMediaClosure(entry: string): Promise<void> {
 
 describe("built media-only entry", () => {
   for (const format of ["esm", "cjs"] as const) {
+    it(`imports sandbox helpers through public ${format} exports without the daemon server`, async () => {
+      const { stderr } = await execute(
+        process.execPath,
+        [
+          "--input-type=module",
+          "--eval",
+          String.raw`
+          import assert from "node:assert/strict";
+          import { createRequire, registerHooks } from "node:module";
+          const require = createRequire(import.meta.url);
+          registerHooks({ resolve(specifier, context, next) {
+            if (/^(?:@grida\/daemon\/server|hono|@hono\/node-server)(?:\/|$)/.test(specifier))
+              throw new Error("server dependency forbidden");
+            return next(specifier, context);
+          } });
+          assert.throws(() => require("@grida/daemon/server"), /server dependency forbidden/);
+          const helpers = ${format === "esm" ? 'await import("@grida/agent/sandbox")' : 'require("@grida/agent/sandbox")'};
+          assert.equal(typeof helpers.defaultScratchBase, "function");
+          assert.equal(typeof helpers.prepareScratchAuthority, "function");
+        `,
+        ],
+        {
+          cwd: stage,
+          timeout: 10_000,
+          env: {
+            PATH: process.env.PATH,
+            HOME: path.join(stage, "home"),
+            TMPDIR: stage,
+          },
+        }
+      );
+      expect(stderr).toBe("");
+    });
+
     it(`starts and generates through public ${format} exports with agent authority unavailable`, async () => {
       await assertMediaClosure(
         path.join(
