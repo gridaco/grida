@@ -3,7 +3,7 @@
 
 import * as gridaGateway from "@/lib/desktop/gg-session";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
 import { models } from "@grida/ai-models";
 import { Skeleton } from "@app/ui/components/skeleton";
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogTitle } from "@app/ui/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -32,6 +33,7 @@ import {
 import { images, useDesktopBridge, type MediaItem } from "@/lib/desktop/bridge";
 import { ImageModelPicker } from "./image-model-picker";
 import { MediaModelAvailability } from "../shared/media-model-availability";
+import { Transparency } from "@/grida-canvas-react/components/transparency";
 
 /** Named prompt templates — pick one from the composer menu to fill the input.
  *  Design-tool flavored starters; original to Grida. */
@@ -162,6 +164,20 @@ export function DesktopImagePlayground({
   onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
   const bridge = useDesktopBridge();
+  const providerStore = useMemo(
+    () =>
+      new MediaModelAvailability.ImageProviders(
+        bridge,
+        async () => (await gridaGateway.ensureFresh()).kind === "active"
+      ),
+    [bridge]
+  );
+  const providers = useSyncExternalStore(
+    providerStore.subscribe,
+    providerStore.getSnapshot,
+    providerStore.getSnapshot
+  );
+  useEffect(() => providerStore.connect(), [providerStore]);
   const [modelId, setModelId] = useState(
     initialModelId && models.image.models[initialModelId]?.listed
       ? initialModelId
@@ -171,9 +187,12 @@ export function DesktopImagePlayground({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [size, setSize] = useState<SizeOption>(AUTO_SIZE);
   const card = models.image.models[modelId];
-  const requiresUpdate = MediaModelAvailability.requiresImageUpdate(
+  const [transparent, setTransparent] = useState(false);
+  const access = MediaModelAvailability.image(card, providers, transparent);
+  const transparencyAccess = MediaModelAvailability.image(
     card,
-    bridge?.app.version
+    providers,
+    true
   );
   const [quality, setQuality] = useState<string>(
     () => card?.quality?.default ?? "auto"
@@ -188,12 +207,13 @@ export function DesktopImagePlayground({
   };
 
   const runGenerate = async (rawPrompt: string) => {
-    if (requiresUpdate) return;
     const prompt = rawPrompt.trim();
     if (!prompt) return;
-    // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh so a
-    // signed-in keyless user generates through the included provider.
-    // Never throws; BYOK runs are unaffected when it degrades.
+    // GRIDA-SEC-006 — refresh hosted-session readiness and key presence before
+    // submission. A removed key never silently turns transparent intent opaque.
+    const refreshed = await providerStore.refresh(card, transparent);
+    if (!MediaModelAvailability.image(card, refreshed, transparent).available)
+      return;
     const id = crypto.randomUUID();
     const model_id = modelId;
     setTiles((prev) => [
@@ -202,7 +222,6 @@ export function DesktopImagePlayground({
     ]);
     onGenerationBusyChange?.(true);
     try {
-      await gridaGateway.ensureFresh();
       const res = await images.generate({
         model_id,
         prompt,
@@ -210,6 +229,7 @@ export function DesktopImagePlayground({
           ? { width: size.width, height: size.height }
           : {}),
         ...(card?.quality || quality !== "auto" ? { quality } : {}),
+        ...(transparent ? { background: "transparent" as const } : {}),
       });
       for (let index = res.images.length - 1; index >= 0; index -= 1) {
         const stored = res.images[index]?.stored_media;
@@ -246,9 +266,9 @@ export function DesktopImagePlayground({
       {/* Header */}
       <header className="flex shrink-0 items-center justify-between px-6 py-4">
         <h1 className="text-2xl font-bold tracking-tight">Images</h1>
-        {requiresUpdate && (
+        {!access.available && (
           <p role="status" className="text-sm text-muted-foreground">
-            {MediaModelAvailability.imageUpdateMessage}
+            {access.reason}
           </p>
         )}
       </header>
@@ -305,22 +325,26 @@ export function DesktopImagePlayground({
                   onSize={setSize}
                   quality={quality}
                   onQuality={setQuality}
+                  transparent={transparent}
+                  onTransparent={setTransparent}
+                  transparencyAvailable={transparencyAccess.available}
                 />
                 <ImageModelPicker
                   value={modelId}
-                  desktopVersion={bridge?.app.version}
+                  providers={providers}
                   onValueChange={(next) => {
                     // Reset model-scoped options — a size/quality the new model
                     // doesn't expose would otherwise be sent and rejected.
                     setModelId(next);
                     setSize(AUTO_SIZE);
+                    setTransparent(false);
                     setQuality(
                       models.image.models[next]?.quality?.default ?? "auto"
                     );
                   }}
                 />
               </PromptInputTools>
-              <PromptInputSubmit disabled={requiresUpdate} />
+              <PromptInputSubmit disabled={!access.available} />
             </PromptInputFooter>
           </PromptInput>
         </PromptInputProvider>
@@ -336,12 +360,14 @@ export function DesktopImagePlayground({
             {active?.prompt ?? "Generated image"}
           </DialogTitle>
           {active?.src && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={active.src}
-              alt={active.prompt}
-              className="max-h-[85vh] w-full object-contain"
-            />
+            <Transparency>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={active.src}
+                alt={active.prompt}
+                className="max-h-[85vh] w-full object-contain"
+              />
+            </Transparency>
           )}
           {active && (
             <p className="px-4 pb-4 text-sm text-muted-foreground">
@@ -393,12 +419,18 @@ function SettingsMenu({
   onSize,
   quality,
   onQuality,
+  transparent,
+  onTransparent,
+  transparencyAvailable,
 }: {
   card: models.image.ImageModelCard | undefined;
   size: SizeOption;
   onSize: (s: SizeOption) => void;
   quality: string;
   onQuality: (q: string) => void;
+  transparent: boolean;
+  onTransparent: (value: boolean) => void;
+  transparencyAvailable: boolean;
 }) {
   const sizeOptions = sizeOptionsFor(card);
   const qualityOptions = qualityOptionsFor(card);
@@ -439,6 +471,18 @@ function SettingsMenu({
                 {q === quality && <Check className="size-4" />}
               </DropdownMenuItem>
             ))}
+          </>
+        )}
+        {/* Preserve checked intent after disconnect (see test/desktop-media-transparent-background.md). */}
+        {(transparencyAvailable || transparent) && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={transparent}
+              onCheckedChange={onTransparent}
+            >
+              Transparent background
+            </DropdownMenuCheckboxItem>
           </>
         )}
       </DropdownMenuContent>
@@ -499,7 +543,7 @@ function GalleryCell({
   }
 
   return (
-    <div className={`group overflow-hidden ${CELL}`}>
+    <Transparency className={`group overflow-hidden ${CELL}`}>
       <button
         type="button"
         onClick={onOpen}
@@ -544,6 +588,6 @@ function GalleryCell({
           <X className="size-3.5" />
         </button>
       </div>
-    </div>
+    </Transparency>
   );
 }

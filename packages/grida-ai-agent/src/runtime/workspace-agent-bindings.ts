@@ -160,7 +160,7 @@ export async function createWorkspaceAgentBindings(
     /**
      * The catalog model id `generate_image` produces with — the USER's selected
      * image model (settings), host-owned config, NOT an agent argument (the tool
-     * is prompt-only). Omit to use the catalog default ({@link defaultImageModelId}).
+     * carries generation intent only). Omit to use the catalog default ({@link defaultImageModelId}).
      */
     image_model_id?: string;
   }
@@ -424,7 +424,7 @@ function createImageGenerator(
   return {
     async generate(input) {
       // The user's connected model (settings), not the agent's concern. The
-      // tool is prompt-only — no model/provider/size/aspect/seed knobs.
+      // tool carries prompt/references/background intent, not model/provider knobs.
       //
       // The desktop host never sets `image_model_id`, so this default is
       // what every real session generates against — which makes it the
@@ -440,25 +440,26 @@ function createImageGenerator(
         };
       }
       // Image-to-image when the host supplied reference images (the curated
-      // board's pins). The model-facing tool stays prompt-only; references are
+      // board's pins). The model-facing tool carries intent only; references are
       // resolved below and ride our internal `grida` provider-options namespace,
       // which the BYOK adapter maps to the provider's own field.
       const wantsRefs = (input.references?.length ?? 0) > 0;
       let resolved;
       try {
-        resolved = await resolveImageModel(
-          imageDeps,
-          modelId,
-          wantsRefs ? { references: true } : {}
-        );
+        resolved = await resolveImageModel(imageDeps, modelId, {
+          references: wantsRefs,
+          background: input.background,
+        });
       } catch (e) {
         if (e instanceof ImageModelUnavailableError) {
           return {
             ok: false,
             reason: "unavailable",
-            message: wantsRefs
-              ? `No connected provider can generate "${modelId}" with reference images (image-to-image). Ask the user to connect an image-provider key that supports it.`
-              : `No connected provider can generate "${modelId}". Ask the user to connect an image-provider key in settings.`,
+            message: e.background
+              ? `No connected provider can generate "${modelId}" with a ${e.background} background${wantsRefs ? " and reference images" : ""}. Ask the user to connect or select a supported image provider/model. Do not retry without the requested background mode or substitute background removal without user approval.`
+              : wantsRefs
+                ? `No connected provider can generate "${modelId}" with reference images (image-to-image). Ask the user to connect an image-provider key that supports it.`
+                : `No connected provider can generate "${modelId}". Ask the user to connect an image-provider key in settings.`,
           };
         }
         throw e;

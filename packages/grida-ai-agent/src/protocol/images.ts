@@ -28,6 +28,12 @@ export type ImageGenerateRequest = {
    * an explicit provider choice.
    */
   quality?: string;
+  /**
+   * Native background intent. Omitted/auto preserves provider defaults.
+   * Explicit opaque/transparent requires a verified provider route; unsupported
+   * requests fail before generation. Transparent output is requested as PNG.
+   */
+  background?: "auto" | "opaque" | "transparent";
 };
 
 export type ImageGeneratedImage = {

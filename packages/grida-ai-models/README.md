@@ -143,6 +143,30 @@ default. Consumers should read it instead of assuming every image model accepts
 only `low`, `medium`, and `high`. GPT Image 2.5 Flare and Sunburst declare
 `auto`, `low`, `medium`, `high`, `xhigh`, and `max`, with the fal default `high`.
 
+The optional model-level `transparent_background` declares native alpha output:
+`true` means supported, `false` means unsupported, and absence means unknown.
+Each provider binding may override it with a boolean; `null` means unverified
+and blocks inheritance. An omitted binding field deliberately inherits the
+model declaration. Verify every bound generation endpoint and any advertised
+`references.id` before inheriting support; a new provider does not gain this
+capability merely by serving the same model. Background-removal postprocessing
+does not count as native support.
+
+Use `models.image.supportsTransparentBackground(card, provider)` to resolve the
+declaration. It returns `true` only for a present binding whose effective value
+is `true`; unsupported, unverified, and older snapshots without declarations
+return `false`. The helper is pure and accepts cards from the bundled catalogue
+or a parsed snapshot. Consumers must also support the provider's request mapping
+and preserve alpha in their chosen output encoding.
+
+GPT Image 2, GPT Image 2.5 Flare, and GPT Image 2.5 Sunburst declare native
+transparency, inherited by their verified fal bindings and both 2.5 Vercel
+bindings. Their OpenRouter bindings override this with `false` because the
+published background choices exclude transparency. GPT Image 2's Vercel binding
+uses `null` because its published model page does not establish support. Other
+models remain unknown until their native capability and provider exposure are
+verified.
+
 Image pricing is a discriminated union:
 
 - `per_image_tiered`: quality and size based image prices
@@ -207,19 +231,31 @@ providers. `models.image.listed_models()` returns the curated set. Cards outside
 that set retain `listed: false` and a `listed_reason`.
 
 GPT Image 2.5 has two intrinsic cards, `openai/gpt-image-2.5-flare` and
-`openai/gpt-image-2.5-sunburst`, each listed with fal as its sole and primary
-provider. Their bindings have separate generation and reference-editing ids:
+`openai/gpt-image-2.5-sunburst`, each listed on Vercel, OpenRouter, and fal, with
+Vercel as the primary provider. Vercel and OpenRouter use the canonical card id;
+fal has separate generation and reference-editing ids:
 
 | Card     | `providers.fal.id`                            | `providers.fal.references.id`        |
 | -------- | --------------------------------------------- | ------------------------------------ |
 | Flare    | `openai/gpt-image-2.5/flare/text-to-image`    | `openai/gpt-image-2.5/flare/edit`    |
 | Sunburst | `openai/gpt-image-2.5/sunburst/text-to-image` | `openai/gpt-image-2.5/sunburst/edit` |
 
-Both bindings set `references.max` to 16. The [fal generation schema](https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api)
+The fal and OpenRouter bindings set `references.max` to 16. OpenRouter accepts
+references on its generation id; Vercel reference support is not declared.
+Pricing stays specific to each provider: Vercel publishes text input, cached
+text input, and image output rates; OpenRouter publishes text input, image
+input, and image output rates; fal additionally publishes cached image input
+and text output rates. No provider inherits another provider's unpublished
+pricing fields.
+
+The [fal generation schema](https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api)
 and [editing schema](https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api)
-define the provider inputs. Grida integrates these routes through fal BYOK in
-Desktop 0.0.22 or later; older clients are excluded from selecting these cards.
-They do not have a Grida-hosted route. GPT Image 2 retains its existing
+define the provider inputs. Desktop 0.0.22 or later exposes these models for
+text-to-image generation in its playground; agent hosts can select
+`image_model_id` to use their generation or advertised editing adapters, while
+ordinary Desktop chat still defaults to GPT Image 2. Older clients are excluded
+from selecting these cards. Vercel bindings enable Grida-hosted generation;
+fal and OpenRouter also provide BYOK routes. GPT Image 2 retains its existing
 multi-provider support.
 
 Video is different: the provider ecosystem is fragmented, so a video card is

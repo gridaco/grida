@@ -17,6 +17,7 @@
 import { createGateway } from "@ai-sdk/gateway";
 import type { ImageModelV3, ImageModelV3CallOptions } from "@ai-sdk/provider";
 import type { models } from "@grida/ai-models";
+import type { ImageGenerateRequest } from "../protocol/images";
 import {
   assertAllowedUrl,
   falQueueOutcome,
@@ -60,21 +61,77 @@ export function makeImageModelFor(
   provider: ImageProvider,
   apiKey: string,
   id: string,
-  providerHttp: ProviderHttp = new ProviderHttp()
+  providerHttp: ProviderHttp = new ProviderHttp(),
+  background?: ImageGenerateRequest["background"]
 ): ImageModelV3 {
+  let model: ImageModelV3;
   switch (provider) {
     case "openrouter":
-      return makeOpenRouterImageModel(apiKey, id, providerHttp);
+      model = makeOpenRouterImageModel(apiKey, id, providerHttp);
+      break;
     case "vercel":
-      return makeVercelImageModel(apiKey, id, providerHttp);
+      model = makeVercelImageModel(apiKey, id, providerHttp);
+      break;
     case "fal":
-      return makeFalImageModel(apiKey, id, providerHttp);
+      model = makeFalImageModel(apiKey, id, providerHttp);
+      break;
+  }
+  // Resolution has already checked the exact route's catalogue declaration.
+  // Capture its explicit intent outside caller-owned providerOptions: a later
+  // raw background/encoding option must not defeat that admitted requirement.
+  return background && background !== "auto"
+    ? new BackgroundImageModel(model, provider, background)
+    : model;
+}
+
+/** Immutable request intent over a route admitted by the resolver. */
+class BackgroundImageModel implements ImageModelV3 {
+  readonly specificationVersion = "v3" as const;
+
+  constructor(
+    private readonly model: ImageModelV3,
+    private readonly routeProvider: ImageProvider,
+    private readonly background: "opaque" | "transparent"
+  ) {}
+
+  get provider() {
+    return this.model.provider;
+  }
+
+  get modelId() {
+    return this.model.modelId;
+  }
+
+  get maxImagesPerCall() {
+    return this.model.maxImagesPerCall;
+  }
+
+  doGenerate(options: ImageModelV3CallOptions) {
+    // Gateway forwards providerOptions unchanged; native OpenAI settings live
+    // under openai, not vercel. Catalogue admission is checked independently.
+    const namespace =
+      this.routeProvider === "vercel" ? "openai" : this.routeProvider;
+    return this.model.doGenerate({
+      ...options,
+      providerOptions: {
+        ...options.providerOptions,
+        [namespace]: {
+          ...options.providerOptions?.[namespace],
+          background: this.background,
+          ...(this.background === "transparent"
+            ? { output_format: "png" }
+            : {}),
+        },
+      },
+    });
   }
 }
 
 // ── OpenRouter adapter ──────────────────────────────────────────────
 
 const OPENROUTER_IMAGE_URL = "https://openrouter.ai/api/v1/images";
+const OPENROUTER_GPT_IMAGE_2_5_ROUTE =
+  /^openai\/gpt-image-2\.5-(?:flare|sunburst)$/;
 
 /**
  * `ImageModelV3` over OpenRouter's dedicated Unified Image API
@@ -105,6 +162,14 @@ export class OpenRouterImageModel implements ImageModelV3 {
   ): Promise<Awaited<ReturnType<ImageModelV3["doGenerate"]>>> {
     const { prompt, n, size, aspectRatio, seed, providerOptions, abortSignal } =
       options;
+    // The exact GPT Image 2.5 endpoint descriptors expose aspect_ratio but no
+    // seed capability. Do not forward an unsupported typed SDK control.
+    if (
+      OPENROUTER_GPT_IMAGE_2_5_ROUTE.test(this.modelId) &&
+      seed !== undefined
+    ) {
+      throw new Error("[openrouter] GPT Image 2.5 does not support seed");
+    }
     // Drop any caller-supplied `input_references` from the passthrough extras:
     // the sanitized, capped list built from our internal `grida` namespace below
     // is authoritative, so a raw `openrouter.input_references` must NOT override
@@ -226,6 +291,16 @@ export class FalImageModel implements ImageModelV3 {
       options;
 
     const isGptImage25 = FAL_GPT_IMAGE_2_5_ROUTE.test(this.modelId);
+    // These routes expose image_size, not aspect_ratio or seed. A typed SDK
+    // control must not be sent as an undocumented field and silently ignored.
+    if (isGptImage25 && aspectRatio !== undefined) {
+      throw new Error(
+        "[fal] GPT Image 2.5 does not support aspectRatio; use an explicit size instead"
+      );
+    }
+    if (isGptImage25 && seed !== undefined) {
+      throw new Error("[fal] GPT Image 2.5 does not support seed");
+    }
     // An omitted SDK size means Auto in the UI. GPT Image 2.5's t2i default
     // is landscape_4_3, so send auto explicitly instead of accepting that default.
     const image_size =

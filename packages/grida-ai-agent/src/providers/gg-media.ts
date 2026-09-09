@@ -139,7 +139,8 @@ export class GridaGatewayImageModel implements ImageModelV3 {
     private readonly session: GridaGatewaySessionStore,
     private readonly baseUrl: string,
     readonly modelId: string,
-    private readonly providerHttp: ProviderHttp = new ProviderHttp()
+    private readonly providerHttp: ProviderHttp = new ProviderHttp(),
+    private readonly background?: "opaque" | "transparent"
   ) {}
 
   async doGenerate(
@@ -176,6 +177,10 @@ export class GridaGatewayImageModel implements ImageModelV3 {
         aspect_ratio: aspectRatio,
         quality,
         seed,
+        // Captured at capability-aware resolution; raw provider options cannot
+        // override the requirement. The hosted endpoint independently validates
+        // it before billing and chooses the alpha-preserving output encoding.
+        background: this.background,
       },
     });
     return {

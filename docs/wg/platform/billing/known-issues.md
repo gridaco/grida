@@ -23,6 +23,7 @@ status: living
 | KI-BILL-001 | AI credit · auto-reload    | Medium   | Mitigated |
 | KI-BILL-002 | Subscriptions              | Low      | Accepted  |
 | KI-BILL-003 | Subscriptions · plan grant | Medium   | Resolved  |
+| KI-BILL-004 | AI credit · image receipts | Medium   | Mitigated |
 
 ---
 
@@ -140,6 +141,47 @@ younger than the Checkout session TTL.
 **Why accepted for v1.** Risk is to Grida (we refund manually on the
 duplicate Stripe sub), not the customer. Volume in v1 is bounded by
 manual onboarding; not worth the schema work yet.
+
+---
+
+## KI-BILL-004 — Image-cost fallback does not reconcile token usage
+
+**Area.** Hosted image generation · prepaid AI credit.
+
+**Discovered.** September 2026, while adding the six quality levels of GPT
+Image 2.5. This is a metering finding, not a new pricing policy.
+
+**Cause.** Token-priced images have variable input, cache, quality, and size
+costs. A single average invocation estimate cannot represent every request;
+aggregate input/output token counts also cannot distinguish differently priced
+text and image tokens.
+
+**Current behavior.** When Gateway supplies a valid response cost, hosted image
+usage is metered from that USD receipt, including a legitimate zero. Otherwise,
+the existing catalog estimate is used. For GPT Image 2.5 that fallback is
+$0.055 per requested image, regardless of quality and dimensions, and can
+overcharge or undercharge relative to the provider's actual charge. It is not
+an exact per-image price.
+
+**Mitigation.** [PR #1031](https://github.com/gridaco/grida/pull/1031) prefers
+the upstream receipt over the estimate, does not round away fractional mills,
+and never treats malformed receipts as free usage. The receipt is trusted only
+from the provider response, never from a caller-supplied field. BYOK requests
+are paid directly to the provider and are unaffected.
+
+**Remaining work.** Verify receipt coverage for each hosted image route and
+add provider-specific reconciliation where a receipt is absent. A missing
+receipt must remain distinguishable from a genuine zero charge. Coverage
+cannot be inferred from a model-list entry or from mocked transport tests.
+
+**Why the fallback remains.** This preserves the existing hosted-image billing
+contract when no exact meter is returned; it does not guess a modality split
+or discard an already-generated result. The [user-facing pricing notes](../../../models/index.md)
+disclose the approximation. Provider receipt coverage has not been verified
+with paid live generations in this change.
+
+**Implementation references.** [Image billing middleware](https://github.com/gridaco/grida/blob/main/editor/lib/ai/server.ts)
+and [fallback pricing](https://github.com/gridaco/grida/blob/main/editor/lib/ai/image-cost.ts).
 
 ---
 

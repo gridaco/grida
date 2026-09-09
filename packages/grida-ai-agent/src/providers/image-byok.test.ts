@@ -65,6 +65,27 @@ function falQueue(
 }
 
 describe("FalImageModel.doGenerate", () => {
+  it.each([
+    "openai/gpt-image-2.5/flare/text-to-image",
+    "openai/gpt-image-2.5/sunburst/text-to-image",
+    "openai/gpt-image-2.5/flare/edit",
+    "openai/gpt-image-2.5/sunburst/edit",
+  ])(
+    "rejects unadvertised typed aspectRatio and seed controls before I/O for %s",
+    async (id) => {
+      const queue = falQueue();
+      const model = new FalImageModel("key", id, queue.http);
+      await expect(
+        model.doGenerate(callOptions({ aspectRatio: "16:9" }))
+      ).rejects.toThrow(/aspectRatio; use an explicit size/);
+      await expect(model.doGenerate(callOptions({ seed: 0 }))).rejects.toThrow(
+        /does not support seed/
+      );
+      expect(queue.request).not.toHaveBeenCalled();
+      expect(queue.download).not.toHaveBeenCalled();
+    }
+  );
+
   it("submits, polls until COMPLETED, and returns image bytes", async () => {
     const calls: Array<{ url: string; method: string; body?: unknown }> = [];
     let statusPolls = 0;
@@ -378,6 +399,80 @@ describe("FalImageModel.doGenerate", () => {
 });
 
 describe("OpenRouterImageModel.doGenerate", () => {
+  describe.each([
+    "openai/gpt-image-2.5-flare",
+    "openai/gpt-image-2.5-sunburst",
+  ])("GPT Image 2.5 route %s", (id) => {
+    it.each(["auto", "low", "medium", "high", "xhigh", "max"])(
+      "forwards documented %s quality and curated references to the unified image API",
+      async (quality) => {
+        const request = vi.fn<typeof fetch>(async () =>
+          Response.json({
+            data: [{ b64_json: "iVBORw==", media_type: "image/png" }],
+          })
+        );
+        const download = vi.fn<typeof fetch>();
+        const model = new OpenRouterImageModel(
+          "key",
+          id,
+          new ProviderHttp({ request, download })
+        );
+        const references = Array.from(
+          { length: 16 },
+          (_, i) => `https://example.test/reference-${i}.png`
+        );
+        await model.doGenerate(
+          callOptions({
+            size: undefined,
+            aspectRatio: "16:9",
+            providerOptions: {
+              openrouter: {
+                quality,
+                input_references: [
+                  {
+                    type: "image_url",
+                    image_url: { url: "https://wrong.test/override.png" },
+                  },
+                ],
+              },
+              grida: { references },
+            },
+          })
+        );
+        expect(String(request.mock.calls[0]?.[0])).toBe(
+          "https://openrouter.ai/api/v1/images"
+        );
+        const body = JSON.parse(String(request.mock.calls[0]?.[1]?.body));
+        expect(body).toMatchObject({
+          model: id,
+          quality,
+          aspect_ratio: "16:9",
+          input_references: references.map((url) => ({
+            type: "image_url",
+            image_url: { url },
+          })),
+        });
+        expect(body).not.toHaveProperty("grida");
+        expect(body).not.toHaveProperty("background");
+        expect(download).not.toHaveBeenCalled();
+      }
+    );
+
+    it("rejects unsupported typed seed before provider I/O", async () => {
+      const request = vi.fn<typeof fetch>();
+      const download = vi.fn<typeof fetch>();
+      await expect(
+        new OpenRouterImageModel(
+          "key",
+          id,
+          new ProviderHttp({ request, download })
+        ).doGenerate(callOptions({ seed: 0 }))
+      ).rejects.toThrow(/does not support seed/);
+      expect(request).not.toHaveBeenCalled();
+      expect(download).not.toHaveBeenCalled();
+    });
+  });
+
   it("POSTs the unified /v1/images route and returns base64 images", async () => {
     let called: { url: string; body: unknown } | undefined;
     vi.stubGlobal(
@@ -464,6 +559,110 @@ describe("OpenRouterImageModel.doGenerate", () => {
 });
 
 describe("makeImageModelFor", () => {
+  it.each([
+    "fal-ai/gpt-image-2",
+    "openai/gpt-image-2.5/flare/text-to-image",
+    "openai/gpt-image-2.5/sunburst/text-to-image",
+    "openai/gpt-image-2.5/flare/edit",
+    "openai/gpt-image-2.5/sunburst/edit",
+  ])("captures transparent PNG intent after raw extras for %s", async (id) => {
+    const queue = falQueue();
+    const model = makeImageModelFor("fal", "sk", id, queue.http, "transparent");
+    const refs = id.endsWith("/edit")
+      ? ["https://example.test/reference.png"]
+      : undefined;
+    await model.doGenerate(
+      callOptions({
+        providerOptions: {
+          fal: {
+            background: "opaque",
+            output_format: "jpeg",
+            quality: "high",
+            image_urls: ["https://untrusted.test/override.png"],
+          },
+          ...(refs ? { grida: { references: refs } } : {}),
+        },
+      })
+    );
+    const body = JSON.parse(String(queue.request.mock.calls[0]?.[1]?.body));
+    expect(body).toMatchObject({
+      background: "transparent",
+      output_format: "png",
+      quality: "high",
+    });
+    expect(body.image_urls).toEqual(refs);
+  });
+
+  it.each([undefined, "auto"] as const)(
+    "does not add background/encoding controls for %s",
+    async (background) => {
+      const queue = falQueue();
+      await makeImageModelFor(
+        "fal",
+        "sk",
+        "fal-ai/gpt-image-2",
+        queue.http,
+        background
+      ).doGenerate(callOptions());
+      const body = JSON.parse(String(queue.request.mock.calls[0]?.[1]?.body));
+      expect(body).not.toHaveProperty("background");
+      expect(body).not.toHaveProperty("output_format");
+    }
+  );
+
+  it("captures opaque intent without forcing an unnecessary encoding", async () => {
+    const queue = falQueue();
+    await makeImageModelFor(
+      "fal",
+      "sk",
+      "fal-ai/gpt-image-2",
+      queue.http,
+      "opaque"
+    ).doGenerate(
+      callOptions({
+        providerOptions: {
+          fal: { background: "transparent", output_format: "webp" },
+        },
+      })
+    );
+    expect(
+      JSON.parse(String(queue.request.mock.calls[0]?.[1]?.body))
+    ).toMatchObject({ background: "opaque", output_format: "webp" });
+  });
+
+  it.each(["openrouter", "vercel"] as const)(
+    "maps admitted background options honestly on the %s adapter",
+    async (provider) => {
+      // Adapter contract only, not a claim these current catalogue routes qualify.
+      const request = vi.fn<typeof fetch>(async () =>
+        Response.json(
+          provider === "vercel"
+            ? { images: ["iVBORw=="] }
+            : { data: [{ b64_json: "iVBORw==" }] }
+        )
+      );
+      const model = makeImageModelFor(
+        provider,
+        "sk",
+        "openai/gpt-image-2",
+        new ProviderHttp({ request, download: vi.fn<typeof fetch>() }),
+        "transparent"
+      );
+      await model.doGenerate(
+        callOptions({
+          providerOptions: {
+            openai: { background: "opaque", output_format: "jpeg" },
+            openrouter: { background: "opaque", output_format: "jpeg" },
+          },
+        })
+      );
+      const body = JSON.parse(String(request.mock.calls[0]?.[1]?.body));
+      expect(
+        provider === "vercel" ? body.providerOptions.openai : body
+      ).toMatchObject({ background: "transparent", output_format: "png" });
+    }
+  );
+
   it("returns a fal adapter for the fal provider", () => {
     const m = makeImageModelFor("fal", "sk", "fal-ai/flux-2-pro");
     expect(m).toBeInstanceOf(FalImageModel);

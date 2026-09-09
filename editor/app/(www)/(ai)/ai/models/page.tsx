@@ -388,6 +388,18 @@ function ImageProviderRequirement({
   );
 }
 
+function ImageTransparency({ model }: { model: AITypes.image.ImageModelCard }) {
+  const providers = ai.image.providers.filter((provider) =>
+    ai.image.supportsTransparentBackground(model, provider)
+  );
+  if (!providers.length) return null;
+  return (
+    <p className="text-xs text-muted-foreground">
+      Transparent background via {providers.join(", ")}
+    </p>
+  );
+}
+
 function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
   return (
     <Card className="flex flex-col bg-card/50 border-muted overflow-hidden">
@@ -413,6 +425,7 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
         {/* Pricing */}
         <PricingDetail pricing={model.pricing} />
         <ImageProviderRequirement model={model} />
+        <ImageTransparency model={model} />
 
         {/* Constraints */}
         {model.constraints && (
@@ -719,6 +732,7 @@ export default function AIModelsCatalogPage() {
                             {model.id}
                           </code>
                           <ImageProviderRequirement model={model} />
+                          <ImageTransparency model={model} />
                           <ReleaseDate
                             release={model.release}
                             prefix

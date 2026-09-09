@@ -475,6 +475,9 @@ describe("models.snapshot media — seed and round-trip", () => {
     });
     expect(gpt.listed).toBe(true);
     expect(gpt.providers.vercel!.id).toBe("openai/gpt-image-2");
+    expect(gpt.transparent_background).toBe(true);
+    expect(gpt.providers.openrouter!.transparent_background).toBe(false);
+    expect(gpt.providers.vercel!.transparent_background).toBeNull();
     const veo = parsed.video!.models["google/veo-3.1"]!;
     expect(veo.providers.fal!.id).toBe("fal-ai/veo3.1/image-to-video");
     expect(veo.providers.fal!.pricing.usd_per_second["4k"]).toEqual({
@@ -504,6 +507,11 @@ describe("models.snapshot media — image validation", () => {
     ["a missing label", { label: "" }],
     ["a non-boolean listed", { listed: "yes" }],
     ["a non-boolean deprecated", { deprecated: 1 }],
+    ["a null model transparency declaration", { transparent_background: null }],
+    [
+      "a non-boolean model transparency declaration",
+      { transparent_background: "true" },
+    ],
     ["a negative avg_cost_usd", { avg_cost_usd: -1 }],
     ["a missing styles key", { styles: undefined }],
     ["a missing sizes key", { sizes: undefined }],
@@ -560,17 +568,79 @@ describe("models.snapshot media — image validation", () => {
     expect(snapshot.parse(withMedia({ image }))!.image).toBeDefined();
   });
 
+  it("keeps older snapshots without transparency declarations unknown", () => {
+    const image = seedImage();
+    const card = image["openai/gpt-image-2"]!;
+    delete card.transparent_background;
+    for (const route of Object.values(card.providers)) {
+      delete route.transparent_background;
+    }
+    const parsed = snapshot.parse(wire(withMedia({ image })))!;
+    const out = snapshot.view(parsed).image.cardById(card.id)!;
+    expect(out.transparent_background).toBeUndefined();
+    for (const provider of models.image.providers) {
+      expect(out.providers[provider]?.transparent_background).toBeUndefined();
+      expect(models.image.supportsTransparentBackground(out, provider)).toBe(
+        false
+      );
+    }
+  });
+
+  it.each([
+    [true, undefined, true],
+    [false, undefined, false],
+    [undefined, true, true],
+    [true, false, false],
+    [true, null, false],
+  ] as const)(
+    "round-trips model support %s and binding override %s with effective support %s",
+    (modelSupport, providerSupport, expected) => {
+      const image = seedImage();
+      const card = image["openai/gpt-image-2"]!;
+      card.transparent_background = modelSupport;
+      card.providers.fal!.transparent_background = providerSupport;
+      const payload = wire(withMedia({ image }));
+      const parsed = snapshot.parse(payload)!;
+      const out = snapshot.view(parsed).image.cardById(card.id)!;
+      expect(out.transparent_background).toBe(modelSupport);
+      expect(out.providers.fal!.transparent_background).toBe(providerSupport);
+      expect(models.image.supportsTransparentBackground(out, "fal")).toBe(
+        expected
+      );
+      expect(wire(parsed.image!.models)).toEqual(wire(image));
+    }
+  );
+
+  it.each(["true", 1, [], {}])(
+    "rejects a malformed provider transparency declaration: %j",
+    (value) => {
+      const image = seedImage();
+      const route = image["openai/gpt-image-2"]!.providers.fal!;
+      (route as Record<string, unknown>).transparent_background = value;
+      const parsed = snapshot.parse(wire(withMedia({ image })))!;
+      expect(parsed.text.catalog).toBeDefined();
+      expect(parsed.image).toBeUndefined();
+    }
+  );
+
   it.each(["flare", "sunburst"] as const)(
-    "round-trips the FAL-only %s card with quality, edit route and split rates",
+    "round-trips the multi-provider %s card with quality, edit routes and provider rates",
     (variant) => {
       const id = `openai/gpt-image-2.5-${variant}`;
       const parsed = snapshot.parse(withMedia({ image: seedImage() }))!;
       const card = parsed.image!.models[id]!;
       expect(card).toEqual(models.image.models[id]);
-      expect(card.provider).toBe("fal");
+      expect(card.provider).toBe("vercel");
       expect(card.quality?.default).toBe("high");
       expect(card.providers.fal?.references?.max).toBe(16);
       expect(card.providers.fal?.pricing).toMatchObject({ text_output: 10 });
+      expect(card.providers.openrouter?.references).toEqual({ id, max: 16 });
+      expect(card.providers.openrouter?.transparent_background).toBe(false);
+      expect(card.providers.vercel?.references).toBeUndefined();
+      expect(card.pricing).toEqual(card.providers.vercel?.pricing);
+      expect(models.image.supportsTransparentBackground(card, "vercel")).toBe(
+        true
+      );
     }
   );
 

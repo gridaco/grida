@@ -21,8 +21,8 @@ const QUALITY_TIERS = new Set(["high", "medium", "low"]);
  *   `medium`). Off-tier requests fall back to the card's
  *   `avg_cost_usd` — the documented pricing-anchor behavior for
  *   in-envelope but off-preset sizes.
- * - `per_token` — priced post-hoc by providers; billed at the card's
- *   average (the card's documented approximation).
+ * - `per_token` — fallback to the card's documented average approximation.
+ *   The billing middleware prefers Gateway's actual response cost when present.
  */
 export function computeImageCostMills(
   card: ai.image.ImageModelCard,

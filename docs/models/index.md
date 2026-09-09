@@ -126,9 +126,13 @@ OpenAI image models are billed by token usage, including text and image inputs. 
 
 **GPT Image 2.5 Flare** (`openai/gpt-image-2.5-flare`) and **GPT Image 2.5 Sunburst** (`openai/gpt-image-2.5-sunburst`)
 
-[Released September 8, 2026](https://openai.com/index/introducing-chatgpt-images-2-5/), Flare is the faster everyday option; Sunburst prioritizes precise edits and intricate detail, with longer generation times. Both are available in Grida Desktop 0.0.22 or later with a connected **fal** key. They are not available through Grida-hosted credit, Vercel AI Gateway, or OpenRouter in Grida.
+[Released September 8, 2026](https://openai.com/index/introducing-chatgpt-images-2-5/), Flare is the faster everyday option; Sunburst prioritizes precise edits and intricate detail, with longer generation times. Both are available through Grida-hosted credit and connected **fal**, **OpenRouter**, or **Vercel AI Gateway** keys. Desktop requires version 0.0.22 or later, including when the hosted model catalog has already refreshed.
 
-Both variants support generation and editing with up to 16 reference images and 1–4 outputs per request. Quality options are `auto`, `low`, `medium`, `high`, `xhigh`, and `max`; fal defaults to `high`. Dimensions must be multiples of 16, neither edge may exceed 3840 px, the aspect ratio must be at most 3:1, and total area must be 655,360–8,294,400 pixels. Transparent backgrounds require PNG or WebP output. See the [Flare API](https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api) and [Sunburst editing API](https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api).
+Both variants support generation and, through fal or OpenRouter, editing with up to 16 reference images. Grida accepts 1–4 outputs per request. Quality options are `auto`, `low`, `medium`, `high`, `xhigh`, and `max`; Grida selects `high` initially. Dimensions must be multiples of 16, neither edge may exceed 3840 px, the aspect ratio must be at most 3:1, and total area must be 655,360–8,294,400 pixels. Transparent backgrounds require PNG or WebP output. See the [Flare API](https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api) and [Sunburst editing API](https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api).
+
+The Desktop image playground generates from text. This update does not add a
+reference-image editing control there; the editing bindings are available to
+agent hosts that explicitly select one of these variants.
 
 Both variants have the same [fal token rates](https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image), in USD per 1M tokens:
 
@@ -138,6 +142,8 @@ Both variants have the same [fal token rates](https://fal.ai/models/openai/gpt-i
 | Image      | $8.00 | $2.00        | $30.00 |
 
 For a 1024x1024 image, OpenAI's [output-token calculator](https://developers.openai.com/api/docs/guides/image-generation) estimates $0.01317 at `medium` and $0.05268 at `high`. These are output-only estimates, not fixed per-image prices; input tokens add to the bill. fal rounds the total charge up to the nearest $0.0001.
+
+[Vercel AI Gateway](https://vercel.com/ai-gateway/models/gpt-image-2.5-flare) publishes $5/M input tokens, $1.25/M cached input tokens, and $30/M output tokens. [OpenRouter](https://openrouter.ai/api/v1/images/models/openai/gpt-image-2.5-flare/endpoints) publishes $5/M text input, $8/M image input, and $30/M image output tokens. Grida keeps each provider's published meter separately. Hosted image billing uses Gateway's reported response cost when available. Without that receipt, it falls back to the catalog's coarse per-image estimate ($0.055 for these variants), which can differ from actual token cost across quality levels and dimensions.
 
 **GPT Image 2** (`openai/gpt-image-2`)
 
@@ -152,6 +158,28 @@ Per 1M tokens: `text input $5.00 · text cached $1.25 · image input $8.00 · im
 GPT Image 2 also accepts arbitrary resolutions (multiples of 16, edges ≤ 3840 px, aspect ratio ≤ 3:1, total pixels in 655,360 – 8,294,400). Cost for non-standard sizes is computed from output token count.
 
 GPT Image 2 remains available through Vercel AI Gateway, fal, and OpenRouter, including Grida's hosted route.
+
+**Transparent backgrounds**
+
+In Grida Desktop 0.0.22 or later, GPT Image 2 offers native transparent
+backgrounds with a connected fal key. Both GPT Image 2.5 variants additionally
+support transparency through Vercel AI Gateway, including Grida-hosted credit.
+Select
+**Transparent background** in the image playground settings; Grida requests
+PNG output and preserves the original image bytes when saving or downloading.
+This does not run a background-removal model afterward.
+
+Provider support is checked separately from the model's native capability.
+OpenAI added GPT Image 2 transparency in its [August 20 update](https://developers.openai.com/api/docs/changelog),
+and fal exposes it. OpenRouter's [GPT Image 2 endpoint](https://openrouter.ai/api/v1/images/models/openai/gpt-image-2/endpoints)
+and current GPT Image 2.5 endpoints still accept only `auto` or `opaque`.
+Vercel transparency for GPT Image 2 remains unverified, although its
+[Flare](https://vercel.com/ai-gateway/models/gpt-image-2.5-flare) and
+[Sunburst](https://vercel.com/ai-gateway/models/gpt-image-2.5-sunburst) pages
+explicitly support it. Grida only offers transparency on verified routes.
+If a required provider is disconnected, generation is blocked rather than
+silently producing an opaque image. Older Desktop versions do not send the
+new background setting.
 
 **GPT Image Mini** (`openai/gpt-image-1-mini`)
 

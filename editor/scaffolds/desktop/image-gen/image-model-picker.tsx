@@ -19,12 +19,12 @@ export function ImageModelPicker({
   value,
   onValueChange,
   disabled,
-  desktopVersion,
+  providers,
 }: {
   value: string;
   onValueChange: (id: string) => void;
   disabled?: boolean;
-  desktopVersion?: string;
+  providers: MediaModelAvailability.ImageProviderState;
 }) {
   const listed = models.image.listed_models();
   return (
@@ -34,14 +34,16 @@ export function ImageModelPicker({
       </MediaModelPickerTrigger>
       <SelectContent>
         {listed.map((card) => {
-          const requiresUpdate = MediaModelAvailability.requiresImageUpdate(
-            card,
-            desktopVersion
-          );
+          const access = MediaModelAvailability.image(card, providers);
           return (
-            <SelectItem key={card.id} value={card.id} disabled={requiresUpdate}>
+            <SelectItem
+              key={card.id}
+              value={card.id}
+              disabled={!access.available}
+            >
               {card.label}
-              {models.image.binding(card, "fal") &&
+              {access.available &&
+                models.image.binding(card, "fal") &&
                 !models.image.binding(card, "vercel") &&
                 !models.image.binding(card, "openrouter") && (
                   <span className="text-muted-foreground">
@@ -49,10 +51,10 @@ export function ImageModelPicker({
                     · fal key required
                   </span>
                 )}
-              {requiresUpdate && (
+              {!access.available && (
                 <span className="text-muted-foreground">
                   {" "}
-                  · Update Grida Desktop
+                  · {access.reason}
                 </span>
               )}
             </SelectItem>

@@ -19,12 +19,16 @@ export function useImageModelConfig(defaultModel: ai.image.ImageModelId) {
   const [card, setCard] = useState<ai.image.ImageModelCard | undefined>(
     ai.image.models[defaultModel]
   );
+  const [quality, setQuality] = useState<string | undefined>(
+    () => ai.image.models[defaultModel]?.quality?.default
+  );
 
   const select = useCallback((modelId: ai.image.ImageModelId) => {
     const card = ai.image.models[modelId];
     setCard(card);
     setModelId(modelId);
     setConfig(card?.default ?? _default_size);
+    setQuality(card?.quality?.default);
   }, []);
 
   const setSize = (
@@ -92,11 +96,13 @@ export function useImageModelConfig(defaultModel: ai.image.ImageModelId) {
     width: config.width,
     height: config.height,
     aspect_ratio: config.aspect_ratio,
+    quality,
     models: Object.values(ai.image.models).filter(
       (model): model is NonNullable<typeof model> =>
         !!model && !!ai.image.binding(model, "vercel")
     ),
     select,
     setSize,
+    setQuality,
   };
 }

@@ -65,6 +65,9 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       n: v.optional(v.number),
       seed: v.optional(v.number),
       quality: v.optional(v.string),
+      background: v.optional(
+        v.oneOf(["auto", "opaque", "transparent"] as const)
+      ),
     });
     if (!r.ok) return r.res;
     const {
@@ -77,6 +80,7 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       n,
       seed,
       quality,
+      background,
     } = r.data;
 
     let resolved;
@@ -84,11 +88,14 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       resolved = await resolveImageModel(
         { secrets, gg, gg_base_url, provider_http, catalog },
         model_id,
-        provider ? { explicit: provider } : {}
+        { ...(provider ? { explicit: provider } : {}), background }
       );
     } catch (e) {
       if (e instanceof ImageModelUnavailableError) {
-        return c.json({ error: e.message, model_id: e.model_id }, 400);
+        return c.json(
+          { error: e.message, code: e.code, model_id: e.model_id },
+          400
+        );
       }
       throw e;
     }
@@ -98,12 +105,16 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
         ? (`${Math.round(width)}x${Math.round(height)}` as `${number}x${number}`)
         : undefined;
 
-    // Quality is forwarded as a provider-option keyed by the resolved provider.
-    // The OpenRouter/fal adapters spread their provider-option bag into the
-    // upstream request body, so `{ quality }` reaches the provider that supports
-    // it; others ignore it. NB: keyed by provider, never `grida` (no billing).
+    // Gateway forwards native OpenAI options under `openai`; our OpenRouter/fal
+    // adapters spread their own namespace into the upstream body. Never use
+    // `grida` here (the web billing namespace).
+    const qualityNamespace =
+      resolved.provider_id === "vercel" &&
+      resolved.binding_id.startsWith("openai/")
+        ? "openai"
+        : resolved.provider_id;
     const providerOptions = quality
-      ? { [resolved.provider_id]: { quality } }
+      ? { [qualityNamespace]: { quality } }
       : undefined;
 
     let generation;
