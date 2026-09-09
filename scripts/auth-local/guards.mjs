@@ -20,6 +20,20 @@ export const fixture = Object.freeze({
 });
 
 export const guards = {
+  images({ auth, postgres }) {
+    // The pinned CLI can fall back between Supabase-owned image registries.
+    // Admit exact repositories; retain the Auth release and PostgreSQL major.
+    // https://github.com/supabase/cli/blob/v2.116.0/apps/cli-go/internal/utils/docker.go
+    assert.match(
+      auth,
+      /^(?:supabase\/gotrue|public\.ecr\.aws\/supabase\/gotrue|ghcr\.io\/supabase\/(?:gotrue|cli\/auth)):v2\.196\.0$/
+    );
+    assert.match(
+      postgres,
+      /^(?:supabase\/postgres|public\.ecr\.aws\/supabase\/postgres|ghcr\.io\/supabase\/postgres):15\./
+    );
+  },
+
   localUrl(value, origin = fixture.apiUrl) {
     const url = new URL(value);
     assert.equal(

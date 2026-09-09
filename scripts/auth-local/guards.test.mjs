@@ -3,6 +3,50 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fixture, guards } from "./guards.mjs";
 
+test("fixture images admit pinned versions from Supabase registry fallbacks", () => {
+  for (const auth of [
+    "supabase/gotrue:v2.196.0",
+    "public.ecr.aws/supabase/gotrue:v2.196.0",
+    "ghcr.io/supabase/cli/auth:v2.196.0",
+    "ghcr.io/supabase/gotrue:v2.196.0",
+  ]) {
+    for (const postgres of [
+      "supabase/postgres:15.8.1.085",
+      "public.ecr.aws/supabase/postgres:15.8.1.085",
+      "ghcr.io/supabase/postgres:15.8.1.085",
+    ]) {
+      guards.images({ auth, postgres });
+    }
+  }
+});
+
+test("fixture image checks reject other publishers and versions", () => {
+  for (const auth of [
+    "ghcr.io/other/gotrue:v2.196.0",
+    "ghcr.io/supabase/gotrue:v2.195.0",
+    "ghcr.io/supabase/gotrue:latest",
+    "ghcr.io/supabase/gotrue:v2.196.0-extra",
+    "evil.example/ghcr.io/supabase/gotrue:v2.196.0",
+    "ghcr.io/supabase/gotrue:v2.196.0@sha256:unreviewed",
+  ]) {
+    assert.throws(() =>
+      guards.images({ auth, postgres: "supabase/postgres:15.8.1.085" })
+    );
+  }
+  for (const postgres of [
+    "other/postgres:15.8.1.085",
+    "supabase/postgres:17.6.1.054",
+    "supabase/postgres:latest",
+    "ghcr.io/other/postgres:15.8.1.085",
+    "ghcr.io/supabase/postgres:17.6.1.054",
+    "ghcr.io/supabase/postgres:latest",
+  ]) {
+    assert.throws(() =>
+      guards.images({ auth: "supabase/gotrue:v2.196.0", postgres })
+    );
+  }
+});
+
 test("a fresh Auth server omits the empty client collection", () => {
   assert.deepEqual(guards.oauthClients({}), []);
   const client = {
