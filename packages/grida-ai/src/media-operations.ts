@@ -100,7 +100,8 @@ export class MediaOperations {
     try {
       const { kind, model_id, provider_id, variant } = descriptor;
       switch (kind) {
-        case "image":
+        case "image": {
+          const input = imageRule(descriptor).parse(value, true);
           return {
             kind,
             model_id,
@@ -108,9 +109,11 @@ export class MediaOperations {
               model_id,
               provider: provider_id as ImageClient.Provider,
               references: variant === "references",
+              background: input.background,
             },
-            input: imageRule(descriptor).parse(value, true),
+            input,
           };
+        }
         case "video":
           return {
             kind,
@@ -220,6 +223,9 @@ export namespace MediaOperations {
     variant: Variant;
     status: "listed" | "staged";
     references_max?: number;
+    native_background?: true;
+    /** A retained historical choice; deprecation alone does not remove its routes. */
+    deprecated?: true;
     input_schema: Schema;
     output: Output;
   }>;
@@ -297,9 +303,15 @@ function validateFilter(value: MediaOperations.Filter) {
     throw 0;
 }
 function imageRule(
-  descriptor: Pick<MediaOperations.Descriptor, "references_max">
+  descriptor: Pick<
+    MediaOperations.Descriptor,
+    "references_max" | "native_background" | "provider_id" | "binding_id"
+  >
 ) {
-  return MediaInputs.image(descriptor);
+  return MediaInputs.image({
+    ...descriptor,
+    provider_id: descriptor.provider_id as ImageClient.Provider,
+  });
 }
 function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
   const result: MediaOperations.Descriptor[] = [];
@@ -310,6 +322,8 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
       provider_id: MediaOperations.Provider;
       binding_id: string;
       references_max?: number;
+      native_background?: true;
+      deprecated?: true;
     },
     variant: MediaOperations.Variant,
     status: "listed" | "staged",
@@ -323,6 +337,10 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
       ...(metadata.references_max === undefined
         ? {}
         : { references_max: metadata.references_max }),
+      ...(metadata.deprecated ? { deprecated: true as const } : {}),
+      ...(metadata.native_background
+        ? { native_background: true as const }
+        : {}),
       variant,
       status,
       input_schema: {
@@ -339,7 +357,10 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
         if (route)
           add(
             "image",
-            route,
+            {
+              ...route,
+              ...(card.deprecated ? { deprecated: true as const } : {}),
+            },
             references ? "references" : "text",
             "listed",
             imageRule(route)
@@ -354,7 +375,10 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
         if (route)
           add(
             "video",
-            route,
+            {
+              ...route,
+              ...(card.deprecated ? { deprecated: true as const } : {}),
+            },
             image ? "image" : "text",
             "listed",
             MediaInputs.video(image, provider)

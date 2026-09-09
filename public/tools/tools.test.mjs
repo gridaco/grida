@@ -2,7 +2,7 @@
 //
 // Synthetic units run in tmp dirs (outside git → the clean-tree snapshot is
 // skipped there); the git guards get their own throwaway repos; determinism
-// and the zip→dotcanvas roundtrip pin the REAL slides-templates unit.
+// and the zip→dotcanvas roundtrip use isolated copies of the real template sources.
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -194,54 +194,75 @@ describe("materialize", () => {
   });
 });
 
-describe("slides-templates unit (the real tenant)", () => {
-  it("build is deterministic: rebuild → byte-identical zips", async () => {
-    const build = () =>
-      execFileSync(
-        process.execPath,
-        [path.join(PUBLIC_ROOT, "slides-templates", "build.mjs")],
-        {
-          cwd: path.join(PUBLIC_ROOT, "slides-templates"),
-        }
-      );
-    const hash = async () => {
-      const out = path.join(PUBLIC_ROOT, "slides-templates", "out");
-      const h = createHash("sha256");
-      for (const f of (await fs.readdir(out)).sort())
-        h.update(await fs.readFile(path.join(out, f)));
-      return h.digest("hex");
-    };
-    build();
-    const first = await hash();
-    build();
-    expect(await hash()).toBe(first);
-  });
-
-  it("zip → in-memory fs → dotcanvas.read roundtrip preserves the deck contract", async () => {
-    const zipPath = path.join(
-      PUBLIC_ROOT,
-      "slides-templates",
-      "out",
-      "startup-pitch.canvas.zip"
+// The builder clears out/ relative to its own file. Copy its real sources so
+// tests cannot delete artifacts that a concurrent production build is publishing.
+async function withSlidesUnit(run) {
+  const unit = await fs.mkdtemp(path.join(os.tmpdir(), "grida-slides-test-"));
+  try {
+    const source = path.join(PUBLIC_ROOT, "slides-templates");
+    await fs.copyFile(
+      path.join(source, "build.mjs"),
+      path.join(unit, "build.mjs")
     );
-    const entries = unzipSync(new Uint8Array(await fs.readFile(zipPath)));
-    const dec = new TextDecoder();
-    // The ~5-line ReadableFs shim — the same shape the editor loader uses.
-    const zipFs = {
-      list: async () => Object.keys(entries),
-      read: async (p) => (p in entries ? dec.decode(entries[p]) : null),
-    };
-    const canvas = await dotcanvas.read(zipFs);
-    expect(canvas.editor).toBe("slides");
-    expect(canvas.documents.map((d) => d.id).slice(0, 3)).toEqual([
-      "cover",
-      "problem",
-      "why-now",
-    ]);
-    expect(canvas.documents).toHaveLength(12);
-    const ext = canvas.manifest?.ext?.["co.grida.templates"];
-    expect(ext?.title).toBe("Startup Pitch");
-    expect(ext?.prompt).toMatch(/pitch deck/);
-    expect(canvas.warnings).toEqual([]);
-  });
+    await fs.cp(path.join(source, "decks"), path.join(unit, "decks"), {
+      recursive: true,
+    });
+    // The unchanged builder resolves its installed dependency from the copy.
+    await fs.symlink(
+      path.join(PUBLIC_ROOT, "node_modules"),
+      path.join(unit, "node_modules"),
+      process.platform === "win32" ? "junction" : "dir"
+    );
+    await run(unit);
+  } finally {
+    await fs.rm(unit, { recursive: true, force: true });
+  }
+}
+
+describe("slides-templates unit (the real tenant)", () => {
+  it("build is deterministic: rebuild → byte-identical zips", () =>
+    withSlidesUnit(async (unit) => {
+      const build = () =>
+        execFileSync(process.execPath, [path.join(unit, "build.mjs")], {
+          cwd: unit,
+        });
+      const hash = async () => {
+        const out = path.join(unit, "out");
+        const h = createHash("sha256");
+        for (const f of (await fs.readdir(out)).sort())
+          h.update(await fs.readFile(path.join(out, f)));
+        return h.digest("hex");
+      };
+      build();
+      const first = await hash();
+      build();
+      expect(await hash()).toBe(first);
+    }));
+
+  it("zip → in-memory fs → dotcanvas.read roundtrip preserves the deck contract", () =>
+    withSlidesUnit(async (unit) => {
+      execFileSync(process.execPath, [path.join(unit, "build.mjs")], {
+        cwd: unit,
+      });
+      const zipPath = path.join(unit, "out", "startup-pitch.canvas.zip");
+      const entries = unzipSync(new Uint8Array(await fs.readFile(zipPath)));
+      const dec = new TextDecoder();
+      // The ~5-line ReadableFs shim — the same shape the editor loader uses.
+      const zipFs = {
+        list: async () => Object.keys(entries),
+        read: async (p) => (p in entries ? dec.decode(entries[p]) : null),
+      };
+      const canvas = await dotcanvas.read(zipFs);
+      expect(canvas.editor).toBe("slides");
+      expect(canvas.documents.map((d) => d.id).slice(0, 3)).toEqual([
+        "cover",
+        "problem",
+        "why-now",
+      ]);
+      expect(canvas.documents).toHaveLength(12);
+      const ext = canvas.manifest?.ext?.["co.grida.templates"];
+      expect(ext?.title).toBe("Startup Pitch");
+      expect(ext?.prompt).toMatch(/pitch deck/);
+      expect(canvas.warnings).toEqual([]);
+    }));
 });

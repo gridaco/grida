@@ -7,6 +7,7 @@ import { GridaGatewaySessionStore, ProviderHttp } from "@grida/ai";
 import type { MediaItem } from "@grida/daemon";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import { registerImagesRoutes } from "./images";
+import { TRANSPARENT_PNG_BASE64 } from "../../testing/transparent-png";
 
 const PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
@@ -240,3 +241,109 @@ describe("images route billing isolation", () => {
     expect(src).not.toMatch(/generateImage|\.model\b/);
   });
 });
+
+describe.each(["openai/gpt-image-2.5-flare", "openai/gpt-image-2.5-sunburst"])(
+  "GPT Image 2.5 route %s",
+  (model_id) => {
+    it.each(["auto", "xhigh", "max"])(
+      "forwards %s quality through OpenRouter",
+      async (quality) => {
+        const { app, request } = appWith({ keys: { openrouter: "key" } });
+        expect(
+          (await post(app, { model_id, prompt: "x", quality })).status
+        ).toBe(200);
+        expect(
+          JSON.parse(String(request.mock.calls[0]?.[1]?.body))
+        ).toMatchObject({ quality });
+      }
+    );
+
+    it.each(["vercel", "gg"] as const)(
+      "preserves actual transparent PNG bytes and quality through %s",
+      async (provider) => {
+        const gg = new GridaGatewaySessionStore();
+        gg.set({
+          access_token: "test-token",
+          expires_at: Date.now() + 900_000,
+        });
+        const save = vi.fn<MediaPersistence["save"]>().mockResolvedValue({
+          id: "7ccb8e68-a201-40d9-a793-44de9e6c6fc6",
+          file_name: "image-1.png",
+          media_type: "image/png",
+          byte_size: Buffer.from(TRANSPARENT_PNG_BASE64, "base64").length,
+          created_at: 1,
+        });
+        const { app, request, download } = appWith({
+          keys: { vercel: "key" },
+          gg,
+          media: { save },
+          request: async () =>
+            Response.json(
+              provider === "vercel"
+                ? { images: [TRANSPARENT_PNG_BASE64] }
+                : {
+                    images: [
+                      {
+                        base64: TRANSPARENT_PNG_BASE64,
+                        media_type: "image/png",
+                      },
+                    ],
+                  }
+            ),
+        });
+        const res = await post(app, {
+          model_id,
+          provider,
+          prompt: "isolated sticker",
+          quality: "max",
+          background: "transparent",
+        });
+        expect(res.status).toBe(200);
+        expect(await res.json()).toMatchObject({
+          model_id,
+          provider_id: provider,
+          images: [{ base64: TRANSPARENT_PNG_BASE64, media_type: "image/png" }],
+        });
+        expect(save).toHaveBeenCalledWith({
+          file_name: "image-1.png",
+          media_type: "image/png",
+          bytes: Buffer.from(TRANSPARENT_PNG_BASE64, "base64"),
+        });
+        expect(
+          JSON.parse(String(request.mock.calls[0]?.[1]?.body))
+        ).toMatchObject(
+          provider === "vercel"
+            ? {
+                providerOptions: {
+                  openai: {
+                    quality: "max",
+                    background: "transparent",
+                    output_format: "png",
+                  },
+                },
+              }
+            : { quality: "max", background: "transparent" }
+        );
+        expect(request).toHaveBeenCalledOnce();
+        expect(download).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(["checkerboard", "transparent"])(
+      "rejects invalid or unsupported OpenRouter background %s before provider I/O",
+      async (background) => {
+        const { app, request } = appWith({
+          keys: { openrouter: "key", fal: "key" },
+        });
+        const res = await post(app, {
+          model_id,
+          provider: "openrouter",
+          prompt: "x",
+          background,
+        });
+        expect(res.status).toBe(400);
+        expect(request).not.toHaveBeenCalled();
+      }
+    );
+  }
+);

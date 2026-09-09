@@ -1302,6 +1302,11 @@ levels into one.
    (fail-open when Upstash is unconfigured; the billing gate on the AI
    endpoints is the actual spend control). Both mint routes use the same
    `rl:v1-ai:mint` key space and 10/user/60s quota, not separate host allowances.
+   When configured, the shared owner rejects the SDK's five-second timeout
+   allowance and upstream failures before membership lookup or signing. Both
+   hosts return a safe 503; actual quota exhaustion remains 429. The deadline
+   bounds the quota decision, not Redis work, which may finish later and consume
+   quota. Late completion cannot resume minting, and no automatic remint occurs.
 
 **Residual risks (accepted, documented).** Org-membership revocation is
 not re-checked within a token's 900-second window plus clock tolerance. The mint rate
@@ -1707,9 +1712,10 @@ credential through reuse of an existing browser or daemon bridge.
    then succeed at the fixed issuer's `/oauth/userinfo`, whose subject must
    match. Cookies are never a fallback. Issuer calls reject redirects, bound
    response size/time, and return safe errors.
-2. **Bound browser intent.** Consent reads the browser's verified user and the
-   issuer's pending authorization. A decision requires the configured HTTP
-   Host and browser Origin, a bounded form, and a ten-minute signed proof binding user,
+2. **Bound browser intent.** Consent requires the configured incoming HTTP Host
+   before reading the browser session or issuer authorization. GET navigation
+   need not carry Origin. A decision additionally requires the configured browser
+   Origin, a bounded form, and a ten-minute signed proof binding user,
    authorization, client, callback, and scope. The pending details are read
    again before mutation. Supabase owns approval, denial, and one-use code
    issuance; Grida issues no account token. Existing-consent redirects may
@@ -1838,7 +1844,7 @@ The GG extension also passed against local Auth 2.196.0 and PostgreSQL
 removed-membership denial, revocation, and copied-package restart/remint with
 unchanged billing snapshots and no persisted GG grant. An accepted grant retained
 its documented expiry window. Neither this local result nor offline checks
-substitute for hosted upload-limit verification under GRIDA-SEC-012. A model-list
+substitute for hosted routing verification and the ingress assumptions under GRIDA-SEC-012. A model-list
 result establishes access, not credit eligibility or provider readiness.
 It also passed separate-process restart using a copied package and disposable
 test custody. This verifies the local fixture and that test adapter; separate
@@ -1910,7 +1916,7 @@ membership separately, without a snapshot guarantee across page requests.
   [credit query](editor/lib/supabase/credits-data.ts) and
   [tests](editor/lib/supabase/credits-data.test.ts) — fixed read-only credit access
   with explicit unknown data and no provider or privileged dependency.
-- [Credits view migration](supabase/migrations/20260906184233_grida_billing_credits.sql),
+- [Credits view migration](supabase/migrations/20260909103531_grida_billing_credits.sql),
   [schema reference](supabase/schemas/grida_billing.sql), and
   [pgTAP contract](supabase/tests/test_grida_billing_credits_test.sql) — narrow
   columns, member RLS and SELECT-only grants; also GRIDA-SEC-012.
@@ -2147,8 +2153,16 @@ Next.js 16.2.6's Node proxy clones POST bodies in `next-server.js` and awaits
 `requestData.body.finalize()` before route entry. In `body-streams.js`, that
 finalizer awaits the original stream's `endPromise`. The application's
 1024-byte/one-second mint parser therefore does not bound pre-route upload
-buffering or upload time. An external hosting/reverse-proxy body-size limit and
-upload deadline, verified on the deployed path, are release requirements.
+buffering or upload time. Managed Vercel deployments rely on the platform's
+request-size limits and slow-client protections for this shared ingress layer:
+Vercel documents a [4 MB Routing Middleware body limit](https://vercel.com/docs/routing-middleware#limits-on-requests),
+a [4.5 MB Function payload limit](https://vercel.com/docs/functions/limitations#request-body-size),
+and [pre-routing Slowloris defenses](https://vercel.com/blog/life-of-a-vercel-request-what-happens-when-a-user-presses-enter).
+These are hosting assumptions, not guarantees implemented by the mint parser.
+The application promises no particular network upload deadline; a function's
+execution timeout does not establish one. Deployment checks must confirm the
+intended hosting/routing path. Self-hosted deployments must supply their own
+ingress size and slow-client controls before exposing the application.
 The local HTTP proof replaces unrelated web services with tripwires and uses a
 synthetic issuer. It does not certify the full web build, actual Supabase
 cryptography/RLS, those web modules' import side effects, or deployment routing.
@@ -2181,7 +2195,7 @@ release requirement.
   [operation tests](editor/lib/api/credits.test.ts),
   [credit owner](editor/lib/billing/credits.ts) and [tests](editor/lib/billing/credits.test.ts),
   [credit query](editor/lib/supabase/credits-data.ts) and [tests](editor/lib/supabase/credits-data.test.ts),
-  [view migration](supabase/migrations/20260906184233_grida_billing_credits.sql),
+  [view migration](supabase/migrations/20260909103531_grida_billing_credits.sql),
   [schema reference](supabase/schemas/grida_billing.sql), and
   [pgTAP tests](supabase/tests/test_grida_billing_credits_test.sql) — also GRIDA-SEC-010.
 - [Proxy](editor/proxy.ts), [dispatch tests](editor/lib/api/proxy.test.ts),

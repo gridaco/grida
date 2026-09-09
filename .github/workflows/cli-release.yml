@@ -1,0 +1,15 @@
+name: Release CLI
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  bootstrap:
+    if: github.repository == 'gridaco/grida' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Release is not enabled
+        run: echo "CLI release workflow registered. Publishing is not enabled."

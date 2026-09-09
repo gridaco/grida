@@ -131,7 +131,7 @@ describe("ImageClient public operations", () => {
     );
     expect(JSON.parse(String(init?.body))).toMatchObject({
       size: "256x256",
-      providerOptions: { vercel: { quality: "low" } },
+      providerOptions: { openai: { quality: "low" } },
     });
     expect(download).not.toHaveBeenCalled();
   });
@@ -544,4 +544,71 @@ describe("ImageClient public operations", () => {
     );
     expect(request).not.toHaveBeenCalled();
   });
+});
+
+describe("ImageClient native background admission", () => {
+  it("captures resolution intent and refuses later weakening before another key read", async () => {
+    const { client, request, get } = setup();
+    const operation = await client.resolve({
+      model_id: "openai/gpt-image-2.5-flare",
+      provider: "fal",
+      background: "transparent",
+    });
+    const reads = get.mock.calls.length;
+    for (const background of ["auto", "opaque"] as const) {
+      await failure(
+        operation.generate({ prompt: "sticker", background }),
+        "invalid_input"
+      );
+    }
+    expect(request).not.toHaveBeenCalled();
+    expect(get).toHaveBeenCalledTimes(reads);
+  });
+
+  it("does not infer native background support from a vendor or a connected key", async () => {
+    const { client, request, get } = setup();
+    await failure(
+      client.resolve({
+        model_id: "openai/gpt-image-2.5-flare",
+        provider: "openrouter",
+        background: "transparent",
+      }),
+      "provider_unavailable"
+    );
+    expect(get).not.toHaveBeenCalled();
+    const operation = await client.resolve({
+      model_id: "openai/gpt-image-2.5-flare",
+      provider: "openrouter",
+    });
+    get.mockClear();
+    await failure(
+      operation.generate({ prompt: "sticker", background: "transparent" }),
+      "invalid_input"
+    );
+    expect(get).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it.each(["fal", "openrouter"] as const)(
+    "refuses unsupported GPT Image 2.5 controls on %s before generation key lookup",
+    async (provider) => {
+      const { client, request, get } = setup();
+      const operation = await client.resolve({
+        model_id: "openai/gpt-image-2.5-sunburst",
+        provider,
+      });
+      get.mockClear();
+      await failure(
+        operation.generate({ prompt: "sticker", seed: 0 }),
+        "invalid_input"
+      );
+      if (provider === "fal")
+        await failure(
+          operation.generate({ prompt: "sticker", aspect_ratio: "1:1" }),
+          "invalid_input"
+        );
+      expect(get).not.toHaveBeenCalled();
+      expect(request).not.toHaveBeenCalled();
+    }
+  );
 });

@@ -98,6 +98,12 @@ function errorResponse(err: unknown): NextResponse {
     );
   }
   if (err instanceof gg.MintError) {
+    if (err.code === "unavailable") {
+      return NextResponse.json(
+        { error: { code: "mint_failed" } },
+        { status: 503, headers: NO_STORE }
+      );
+    }
     return NextResponse.json(
       { error: { code: err.code } },
       { status: err.code === "rate_limited" ? 429 : 409, headers: NO_STORE }

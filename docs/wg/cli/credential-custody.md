@@ -11,8 +11,8 @@ format: md
 # CLI credential custody
 
 > **Status: accepted design; the replacement CLI has not shipped.** Native
-> account custody is implemented locally. Shared BYOK storage in TOML is
-> accepted but not implemented; the current CLI uses environment/stdin keys.
+> account custody and shared BYOK storage in TOML are implemented.
+> Environment/stdin keys remain explicit per-invocation overrides.
 > The [native package contract](https://github.com/gridaco/grida/blob/main/packages/grida-auth/README.md)
 > records implemented platforms and verification limits. See the [v1 spec](./v1.md).
 

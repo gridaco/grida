@@ -19,6 +19,7 @@ export type ResolveImageDeps = {
 export type ResolveImageOptions = {
   explicit?: ImageClient.Provider;
   references?: boolean;
+  background?: ImageClient.Background;
 };
 
 export class ImageModelUnavailableError extends Error {
@@ -26,14 +27,19 @@ export class ImageModelUnavailableError extends Error {
   constructor(
     public readonly model_id: string,
     public readonly provider_id?: string,
-    references = false
+    references = false,
+    public readonly background?: "opaque" | "transparent"
   ) {
     super(
-      references
-        ? `[agent-host-images] no connected provider can generate ${model_id} with reference images (image-to-image)`
-        : provider_id
-          ? `[agent-host-images] explicit provider not available: ${provider_id} for ${model_id}`
-          : `[agent-host-images] no provider available for ${model_id}`
+      background
+        ? `[agent-host-images] no connected provider can generate ${model_id} with a ${background} background` +
+            (references ? " and reference images" : "") +
+            (provider_id ? ` using ${provider_id}` : "")
+        : references
+          ? `[agent-host-images] no connected provider can generate ${model_id} with reference images (image-to-image)`
+          : provider_id
+            ? `[agent-host-images] explicit provider not available: ${provider_id} for ${model_id}`
+            : `[agent-host-images] no provider available for ${model_id}`
     );
     this.name = "ImageModelUnavailableError";
   }
@@ -85,6 +91,7 @@ export async function resolveImageModel(
       model_id: modelId,
       provider: options.explicit ?? "auto",
       references: options.references,
+      background: options.background,
     });
   } catch (error) {
     if (
@@ -97,7 +104,8 @@ export async function resolveImageModel(
       throw new ImageModelUnavailableError(
         modelId,
         options.explicit,
-        options.references
+        options.references,
+        options.background === "auto" ? undefined : options.background
       );
     }
     throw error;

@@ -65,8 +65,27 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - name: Install Linux keyring runtime
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libsecret-1-0
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify bundled native keyring addon
+        working-directory: packages/grida-auth
+        # Import only: Linux does not need an unlocked desktop Secret Service.
+        # The separate macOS smoke below owns its temporary keychain entry.
+        run: |
+          node --input-type=module <<'NODE'
+          const native = await import("@github/keytar");
+          const binding = native.default ?? native;
+          for (const name of ["getPassword", "setPassword", "deletePassword"]) {
+            if (typeof binding[name] !== "function") {
+              throw new Error("Invalid native keyring binding");
+            }
+          }
+          NODE
       - name: Build native package
         run: |
           pnpm --filter @grida/home build

@@ -21,6 +21,8 @@ import {
 import type { SecretsStore } from "@grida/daemon/server";
 import { AgentFs } from "../fs";
 import { AgentVision } from "../vision";
+import { ProviderHttp } from "../providers/http";
+import { TRANSPARENT_PNG_BASE64 } from "../testing/transparent-png";
 import {
   WorkspaceAgentFsBackend,
   createWorkspaceAgentBindings,
@@ -791,6 +793,123 @@ describe("createWorkspaceAgentBindings — image_gen gating", () => {
       // no scratch_dir
     });
     expect(bindings?.image_gen).toBeUndefined();
+  });
+
+  it("returns unavailable before reference reads or provider I/O and never drops transparency", async () => {
+    const request = vi.fn<typeof fetch>();
+    const download = vi.fn<typeof fetch>();
+    const bindings = await createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "auto" },
+      {
+        workspace_registry: registry,
+        secrets: fakeSecrets({ openrouter: "private-key" }),
+        image_gen_enabled: true,
+        scratch_dir: scratchRoot,
+        provider_http: new ProviderHttp({ request, download }),
+      }
+    );
+    const output = await bindings!.image_gen!.generate({
+      prompt: "secret-prompt",
+      background: "transparent",
+      references: ["missing-secret-reference.png"],
+    });
+    expect(output).toMatchObject({ ok: false, reason: "unavailable" });
+    expect(JSON.stringify(output)).toContain(
+      "transparent background and reference images"
+    );
+    expect(JSON.stringify(output)).toContain("Do not retry without");
+    expect(JSON.stringify(output)).not.toMatch(
+      /private-key|secret-prompt|missing-secret-reference/
+    );
+    expect(request).not.toHaveBeenCalled();
+    expect(download).not.toHaveBeenCalled();
+    expect(await fs.readdir(scratchRoot)).toEqual([]);
+  });
+
+  it("generates a transparent reference-conditioned PNG and saves original alpha bytes", async () => {
+    const request = vi.fn<typeof fetch>(async (url, init) => {
+      if (init?.method === "POST")
+        return Response.json({
+          request_id: "transparent",
+          status_url: "https://queue.fal.run/transparent/status",
+          response_url: "https://queue.fal.run/transparent/result",
+        });
+      if (String(url).endsWith("/status"))
+        return Response.json({ status: "COMPLETED" });
+      return Response.json({
+        images: [{ url: "https://v3.fal.media/transparent.png" }],
+      });
+    });
+    const png = Buffer.from(TRANSPARENT_PNG_BASE64, "base64");
+    const download = vi.fn<typeof fetch>(async () => new Response(png));
+    const bindings = await createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "auto" },
+      {
+        workspace_registry: registry,
+        secrets: fakeSecrets({ fal: "private-key" }),
+        image_gen_enabled: true,
+        image_model_id: "openai/gpt-image-2.5-flare",
+        scratch_dir: scratchRoot,
+        provider_http: new ProviderHttp({ request, download }),
+      }
+    );
+    const output = await bindings!.image_gen!.generate({
+      prompt: "a transparent sticker",
+      background: "transparent",
+      references: [`data:image/png;base64,${TRANSPARENT_PNG_BASE64}`],
+    });
+    expect(output).toMatchObject({
+      ok: true,
+      mime: "image/png",
+      width: 1,
+      height: 1,
+      bytes: png.length,
+      data: TRANSPARENT_PNG_BASE64,
+    });
+    if (!output.ok) throw new Error(output.message);
+    expect(await fs.readFile(output.path)).toEqual(png);
+    expect(output.path).toMatch(/\.png$/);
+    expect(String(request.mock.calls[0]?.[0])).toBe(
+      "https://queue.fal.run/openai/gpt-image-2.5/flare/edit"
+    );
+    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toMatchObject({
+      background: "transparent",
+      output_format: "png",
+      image_urls: [`data:image/png;base64,${TRANSPARENT_PNG_BASE64}`],
+    });
+  });
+
+  it("keeps provider error bodies out of failed transparent tool results", async () => {
+    const request = vi.fn<typeof fetch>(
+      async () => new Response("secret-key-and-upstream-body", { status: 422 })
+    );
+    const bindings = await createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "auto" },
+      {
+        workspace_registry: registry,
+        secrets: fakeSecrets({ fal: "private-key" }),
+        image_gen_enabled: true,
+        scratch_dir: scratchRoot,
+        provider_http: new ProviderHttp({
+          request,
+          download: vi.fn<typeof fetch>(),
+        }),
+      }
+    );
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const output = await bindings!.image_gen!.generate({
+        prompt: "a sticker",
+        background: "transparent",
+      });
+      expect(output).toMatchObject({ ok: false, reason: "generation_failed" });
+      expect(JSON.stringify(output)).not.toContain(
+        "secret-key-and-upstream-body"
+      );
+      expect(request).toHaveBeenCalledOnce();
+    } finally {
+      log.mockRestore();
+    }
   });
 });
 

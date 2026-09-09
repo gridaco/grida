@@ -28,10 +28,23 @@ export namespace MediaInputs {
     voice: true,
   });
   export function image(
-    descriptor: Pick<ImageClient.Descriptor, "references_max">
+    descriptor: Pick<
+      ImageClient.Descriptor,
+      "references_max" | "native_background" | "provider_id" | "binding_id"
+    >
   ): S.Rule<
     Omit<ImageClient.Input, "references"> & { n: number; references?: string[] }
   > {
+    // Exact researched endpoint contracts; the internal adapters independently
+    // reject these unsupported controls rather than letting providers ignore them.
+    const fal25 =
+      descriptor.provider_id === "fal" &&
+      /^openai\/gpt-image-2\.5\/(?:flare|sunburst)\/(?:text-to-image|edit)$/.test(
+        descriptor.binding_id
+      );
+    const openrouter25 =
+      descriptor.provider_id === "openrouter" &&
+      /^openai\/gpt-image-2\.5-(?:flare|sunburst)$/.test(descriptor.binding_id);
     return S.object({
       prompt: S.string({ nonblank: true }),
       n: S.optional(
@@ -39,9 +52,18 @@ export namespace MediaInputs {
         1
       ),
       size: S.optional(S.pair("x")),
-      aspect_ratio: S.optional(S.pair(":", false)),
-      seed: S.optional(S.number({ integer: true })),
+      ...(fal25 ? {} : { aspect_ratio: S.optional(S.pair(":", false)) }),
+      ...(fal25 || openrouter25
+        ? {}
+        : { seed: S.optional(S.number({ integer: true })) }),
       quality: S.optional(S.string({ max: 128, unit: "utf16" })),
+      background: S.optional(
+        S.enumeration(
+          descriptor.native_background
+            ? ["auto", "opaque", "transparent"]
+            : ["auto"]
+        )
+      ),
       ...(descriptor.references_max === undefined
         ? {}
         : {

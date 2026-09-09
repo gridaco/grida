@@ -110,7 +110,7 @@ function buildHostedModelList(): HostedModelEntry[] {
         modality: "image",
         tier: null,
         label: card.label,
-        deprecated: false,
+        deprecated: card.deprecated,
       },
     });
   }

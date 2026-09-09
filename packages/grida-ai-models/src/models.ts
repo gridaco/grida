@@ -795,6 +795,8 @@ export namespace models {
     export type ImageModelId =
       // OpenAI
       | "openai/gpt-image-2"
+      | "openai/gpt-image-2.5-flare"
+      | "openai/gpt-image-2.5-sunburst"
       | "openai/gpt-image-1.5"
       | "openai/gpt-image-1-mini"
       // Google (multimodal LLMs with image output)
@@ -857,6 +859,8 @@ export namespace models {
       image_input?: number;
       /** USD per 1M cached image input tokens. */
       cached_image_input?: number;
+      /** USD per 1M text output tokens, when the provider bills them separately. */
+      text_output?: number;
       /**
        * USD per 1M output tokens.
        *
@@ -944,8 +948,8 @@ export namespace models {
     export type ImageProviderBinding = {
       provider: ImageProvider;
       /**
-       * Provider-specific call id. Format varies — `openai/gpt-image-2` (Vercel),
-       * `fal-ai/gpt-image-2` (fal), `openai/gpt-image-2` (OpenRouter).
+       * Provider-specific call id, e.g. `openai/gpt-image-2` (Vercel) or
+       * `openai/gpt-image-2.5/flare/text-to-image` (fal).
        */
       id: string;
       /** Real upstream pricing for **this** provider — meters differ across providers. */
@@ -959,6 +963,14 @@ export namespace models {
       deprecated?: boolean;
       /** Provider's page for this binding; UI falls back to the card. */
       url?: string;
+      /**
+       * Native transparent-background support across {@link id} and any
+       * advertised {@link references} route. Booleans override the model;
+       * `null` means unverified and blocks inheritance. Omission deliberately
+       * inherits the model declaration only after verifying these endpoints.
+       * Background-removal postprocessing does not count as native support.
+       */
+      transparent_background?: boolean | null;
       /**
        * Image-to-image (reference-conditioned generation) support for **this**
        * provider's route. Absent ⇒ the provider serves text-to-image only for
@@ -1050,17 +1062,16 @@ export namespace models {
       release?: ModelRelease;
       vendor: Vendor;
       /**
-       * Primary/default provider for legacy single-provider readers (the web
-       * Grida-billed path). Equals one of the keys in {@link providers}. Kept
-       * alongside {@link providers} so existing consumers compile unchanged.
+       * Primary/default provider for single-provider readers. Equals one of
+       * the keys in {@link providers}. Hosted consumers must still verify a
+       * Vercel binding; a listed card can be BYOK-only.
        */
-      provider: Provider;
+      provider: ImageProvider;
       /**
        * Whether this model is surfaced in the curated, user-facing list.
-       * Curation rule: proprietary · SOTA · **universal** (served by every
-       * supported provider, so one BYOK key serves the whole list). Models that
-       * fail the rule stay in the catalog (resolvable by id) but are hidden from
-       * the default picker. See {@link listed_reason}.
+       * Listed models need at least one verified, integrated provider route.
+       * Provider coverage may differ; consumers must resolve a bound provider
+       * the user can access rather than assuming any connected key works.
        */
       listed: boolean;
       /** Why a card is `listed: false` (legacy, superseded, or not universal). */
@@ -1082,6 +1093,14 @@ export namespace models {
        * {@link ImageSizeConstraints}).
        */
       constraints: ImageSizeConstraints | null;
+      /** Provider-documented quality choices; independent of the pricing unit. */
+      quality?: { options: string[]; default: string };
+      /**
+       * Native transparent-background generation: `true` supported, `false`
+       * unsupported, absent unknown. Provider bindings may override this;
+       * use {@link supportsTransparentBackground} for a specific provider.
+       */
+      transparent_background?: boolean;
       /** Real provider pricing data. */
       pricing: ImageModelPricing;
       /**
@@ -1100,6 +1119,39 @@ export namespace models {
 
     type CatalogCard = ImageModelCard & {
       release: ModelRelease;
+    };
+
+    // Both 2.5 variants use this fal meter. Keep the separate text-output
+    // rate: fal publishes it even though its result schema exposes only images.
+    // https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image
+    // https://fal.ai/models/openai/gpt-image-2.5/sunburst/text-to-image
+    const GPT_IMAGE_2_5_FAL_PRICING: PerTokenPricing = {
+      type: "per_token",
+      input: 5,
+      cached_input: 1.25,
+      image_input: 8,
+      cached_image_input: 2,
+      text_output: 10,
+      output: 30,
+    };
+
+    // Each serving provider publishes its own meter; do not copy fal's extra
+    // image-cache/text-output rates into providers that do not advertise them.
+    // https://ai-gateway.vercel.sh/v1/models (verified 2026-09-09 KST)
+    const GPT_IMAGE_2_5_VERCEL_PRICING: PerTokenPricing = {
+      type: "per_token",
+      input: 5,
+      cached_input: 1.25,
+      output: 30,
+    };
+    // Both variants' /api/v1/images/models/{id}/endpoints publish this meter.
+    // https://openrouter.ai/api/v1/images/models/openai/gpt-image-2.5-flare/endpoints
+    // https://openrouter.ai/api/v1/images/models/openai/gpt-image-2.5-sunburst/endpoints
+    const GPT_IMAGE_2_5_OPENROUTER_PRICING: PerTokenPricing = {
+      type: "per_token",
+      input: 5,
+      image_input: 8,
+      output: 30,
     };
 
     export const toCompact = (card: ImageModelCard): ImageModelCardCompact => {
@@ -1128,12 +1180,15 @@ export namespace models {
           source_url:
             "https://developers.openai.com/api/docs/models/gpt-image-2",
         },
-        deprecated: false,
+        deprecated: true,
         short_description:
-          "State-of-the-art image generation and editing with flexible resolutions",
+          "Previous-generation image model. Superseded by GPT Image 2.5.",
         vendor: "openai",
         provider: "vercel",
         listed: true,
+        // Native transparency added 2026-08-20; provider exposure differs.
+        // https://developers.openai.com/api/docs/changelog
+        transparent_background: true,
         // ids/prices verified 2026-06-29, see github.com/gridaco/grida/issues/908
         providers: {
           vercel: {
@@ -1141,6 +1196,9 @@ export namespace models {
             id: "openai/gpt-image-2",
             pricing: { type: "per_token", input: 5.0, output: 30.0 },
             avg_cost_usd: 0.053,
+            // This provider's page does not establish background support.
+            // https://vercel.com/ai-gateway/models/gpt-image-2 (2026-09-09)
+            transparent_background: null,
           },
           openrouter: {
             provider: "openrouter",
@@ -1148,6 +1206,9 @@ export namespace models {
             pricing: { type: "per_token", input: 8.0, output: 8.0 },
             avg_cost_usd: 0.05,
             url: "https://openrouter.ai/openai/gpt-image-2",
+            // Published background enum is auto | opaque (2026-09-09).
+            // https://openrouter.ai/api/v1/images/models/openai/gpt-image-2/endpoints
+            transparent_background: false,
             // input_references advertised by OpenRouter (0–16), 2026-07-01.
             references: { id: "openai/gpt-image-2", max: 16 },
           },
@@ -1164,6 +1225,8 @@ export namespace models {
             },
             avg_cost_usd: 0.053,
             url: "https://fal.ai/models/openai/gpt-image-2",
+            // Inherits native transparency: fal-ai/gpt-image-2's published
+            // background enum includes transparent (verified 2026-09-09).
           },
         },
         speed_label: "medium",
@@ -1209,6 +1272,158 @@ export namespace models {
           height: 1024,
           aspect_ratio: "1:1",
         },
+      },
+      // Released as two distinct models. All three providers now list both
+      // variants; fal separates generation and edit endpoint ids, while
+      // OpenRouter advertises input_references on the same id (2026-09-09 KST).
+      "openai/gpt-image-2.5-flare": {
+        id: "openai/gpt-image-2.5-flare",
+        label: "GPT Image 2.5 Flare",
+        release: {
+          date: "2026-09-08",
+          basis: "model",
+          source_url:
+            "https://openai.com/index/introducing-chatgpt-images-2-5/",
+        },
+        deprecated: false,
+        short_description:
+          "Fast image generation and reference-guided editing.",
+        vendor: "openai",
+        provider: "vercel",
+        listed: true,
+        // Both fal generation and edit schemas expose background=transparent.
+        // https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api
+        // https://fal.ai/models/openai/gpt-image-2.5/flare/edit/api
+        transparent_background: true,
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "openai/gpt-image-2.5-flare",
+            pricing: GPT_IMAGE_2_5_VERCEL_PRICING,
+            avg_cost_usd: 0.055,
+            // The model page exposes background=transparent; reference input
+            // is not established by the gateway feed (2026-09-09 KST).
+            url: "https://vercel.com/ai-gateway/models/gpt-image-2.5-flare",
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "openai/gpt-image-2.5-flare",
+            pricing: GPT_IMAGE_2_5_OPENROUTER_PRICING,
+            avg_cost_usd: 0.055,
+            url: "https://openrouter.ai/openai/gpt-image-2.5-flare",
+            // Endpoint schema's background enum is auto | opaque.
+            transparent_background: false,
+            references: { id: "openai/gpt-image-2.5-flare", max: 16 },
+          },
+          fal: {
+            provider: "fal",
+            id: "openai/gpt-image-2.5/flare/text-to-image",
+            pricing: GPT_IMAGE_2_5_FAL_PRICING,
+            avg_cost_usd: 0.055,
+            url: "https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image",
+            references: { id: "openai/gpt-image-2.5/flare/edit", max: 16 },
+          },
+        },
+        speed_label: "fast",
+        speed_max: "varies",
+        styles: null,
+        sizes: [
+          [1024, 1024, "1:1"],
+          [1024, 1536, "2:3"],
+          [1536, 1024, "3:2"],
+        ],
+        // Model-specific fal documentation overrides its generic ImageSize
+        // component's wider bounds. The API also accepts auto-sized output.
+        // https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api
+        constraints: {
+          step: 16,
+          max_edge: 3840,
+          min_pixels: 655_360,
+          max_pixels: 8_294_400,
+          aspect_ratio: { max: 3 },
+        },
+        quality: {
+          options: ["auto", "low", "medium", "high", "xhigh", "max"],
+          default: "high",
+        },
+        pricing: GPT_IMAGE_2_5_VERCEL_PRICING,
+        // High 1024² output estimate is $0.05268, plus a small input allowance.
+        // Not a fixed per-image price: actual cost depends on all billed tokens.
+        // https://developers.openai.com/api/docs/guides/image-generation
+        avg_cost_usd: 0.055,
+        default: { width: 1024, height: 1024, aspect_ratio: "1:1" },
+      },
+      "openai/gpt-image-2.5-sunburst": {
+        id: "openai/gpt-image-2.5-sunburst",
+        label: "GPT Image 2.5 Sunburst",
+        release: {
+          date: "2026-09-08",
+          basis: "model",
+          source_url:
+            "https://openai.com/index/introducing-chatgpt-images-2-5/",
+        },
+        deprecated: false,
+        short_description:
+          "Detailed image generation and precise editing with longer generation times.",
+        vendor: "openai",
+        provider: "vercel",
+        listed: true,
+        // Both fal generation and edit schemas expose background=transparent.
+        // https://fal.ai/models/openai/gpt-image-2.5/sunburst/text-to-image/api
+        // https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api
+        transparent_background: true,
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "openai/gpt-image-2.5-sunburst",
+            pricing: GPT_IMAGE_2_5_VERCEL_PRICING,
+            avg_cost_usd: 0.055,
+            // The model page exposes background=transparent; reference input
+            // is not established by the gateway feed (2026-09-09 KST).
+            url: "https://vercel.com/ai-gateway/models/gpt-image-2.5-sunburst",
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "openai/gpt-image-2.5-sunburst",
+            pricing: GPT_IMAGE_2_5_OPENROUTER_PRICING,
+            avg_cost_usd: 0.055,
+            url: "https://openrouter.ai/openai/gpt-image-2.5-sunburst",
+            // Endpoint schema's background enum is auto | opaque.
+            transparent_background: false,
+            references: { id: "openai/gpt-image-2.5-sunburst", max: 16 },
+          },
+          fal: {
+            provider: "fal",
+            id: "openai/gpt-image-2.5/sunburst/text-to-image",
+            pricing: GPT_IMAGE_2_5_FAL_PRICING,
+            avg_cost_usd: 0.055,
+            url: "https://fal.ai/models/openai/gpt-image-2.5/sunburst/text-to-image",
+            references: { id: "openai/gpt-image-2.5/sunburst/edit", max: 16 },
+          },
+        },
+        speed_label: "slow",
+        speed_max: "varies",
+        styles: null,
+        sizes: [
+          [1024, 1024, "1:1"],
+          [1024, 1536, "2:3"],
+          [1536, 1024, "3:2"],
+        ],
+        // https://fal.ai/models/openai/gpt-image-2.5/sunburst/text-to-image/api
+        constraints: {
+          step: 16,
+          max_edge: 3840,
+          min_pixels: 655_360,
+          max_pixels: 8_294_400,
+          aspect_ratio: { max: 3 },
+        },
+        quality: {
+          options: ["auto", "low", "medium", "high", "xhigh", "max"],
+          default: "high",
+        },
+        pricing: GPT_IMAGE_2_5_VERCEL_PRICING,
+        avg_cost_usd: 0.055,
+        default: { width: 1024, height: 1024, aspect_ratio: "1:1" },
       },
       // https://developers.openai.com/api/docs/models/gpt-image-1.5
       "openai/gpt-image-1.5": {
@@ -2249,6 +2464,24 @@ export namespace models {
       provider: ImageProvider
     ): ImageProviderBinding | null {
       return card.providers[provider] ?? null;
+    }
+
+    /**
+     * Whether a bound provider declares native transparent-background support.
+     * Missing bindings and unknown declarations return `false`; a binding's
+     * explicit `false` or `null` masks the model declaration. This is catalogue
+     * metadata, not a promise that a consumer's adapter can map the request.
+     */
+    export function supportsTransparentBackground(
+      card: ImageModelCard,
+      provider: ImageProvider
+    ): boolean {
+      const route = binding(card, provider);
+      if (!route) return false;
+      const support = route.transparent_background;
+      return (
+        (support === undefined ? card.transparent_background : support) === true
+      );
     }
 
     let _listed: readonly ImageModelCard[] | null = null;
@@ -4089,7 +4322,12 @@ export namespace models {
       if (!isRate(v.input) || !isRate(v.output)) return false;
       into.input = v.input;
       into.output = v.output;
-      for (const key of ["cached_input", "image_input", "cached_image_input"]) {
+      for (const key of [
+        "cached_input",
+        "image_input",
+        "cached_image_input",
+        "text_output",
+      ]) {
         if (v[key] === undefined) continue;
         if (!isRate(v[key])) return false;
         into[key] = v[key];
@@ -4233,6 +4471,16 @@ export namespace models {
       const out = parseMediaBinding(provider, v, parseImagePricing);
       if (!out) return undefined;
       const card: image.ImageProviderBinding = out;
+      if (
+        !optional(
+          card,
+          v as Record<string, unknown>,
+          "transparent_background",
+          (value) => value === null || typeof value === "boolean"
+        )
+      ) {
+        return undefined;
+      }
       const refs = (v as Record<string, unknown>).references;
       if (refs !== undefined) {
         // Dropping this silently disables image-to-image routing.
@@ -4367,14 +4615,14 @@ export namespace models {
         parseImageBinding
       );
       if (!providers) return undefined;
-      // The card's primary provider must actually be bound — the hosted
-      // arm and `/api/v1/ai/models` both filter on it.
-      if (v.provider !== "vercel" || !providers.vercel) return undefined;
-      // The one-key promise: a curated card is servable by EVERY provider,
-      // so one connected key serves the whole list. `resolve-image.ts`
-      // relies on it, and a listed card missing a binding is a silent
-      // capability hole.
-      if (v.listed && image.providers.some((p) => !providers[p])) {
+      // A listed model can launch on one provider first. Its primary route
+      // must be known and bound; runtime selection intersects the available
+      // bindings with connected keys, and hosted calls still require Vercel.
+      if (!image.providers.includes(v.provider as image.ImageProvider)) {
+        return undefined;
+      }
+      const primary = v.provider as image.ImageProvider;
+      if (!providers[primary]) {
         return undefined;
       }
 
@@ -4384,7 +4632,7 @@ export namespace models {
         deprecated: v.deprecated,
         short_description: v.short_description,
         vendor: v.vendor as Vendor,
-        provider: "vercel",
+        provider: primary,
         listed: v.listed,
         providers,
         styles,
@@ -4400,6 +4648,33 @@ export namespace models {
           aspect_ratio: v.default.aspect_ratio,
         },
       };
+      if (
+        !optional(
+          card,
+          v,
+          "transparent_background",
+          (value) => typeof value === "boolean"
+        )
+      ) {
+        return undefined;
+      }
+      if (v.quality !== undefined) {
+        const quality = v.quality;
+        if (
+          !isRecord(quality) ||
+          !Array.isArray(quality.options) ||
+          quality.options.length === 0 ||
+          !quality.options.every(isText) ||
+          !isText(quality.default) ||
+          !quality.options.includes(quality.default)
+        ) {
+          return undefined;
+        }
+        card.quality = {
+          options: [...quality.options],
+          default: quality.default,
+        };
+      }
       if (release) card.release = release;
       if (!optional(card, v, "listed_reason", isText)) return undefined;
       return card;

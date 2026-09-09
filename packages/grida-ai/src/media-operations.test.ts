@@ -124,6 +124,8 @@ describe("MediaOperations discovery", () => {
           "status",
           "input_schema",
           "output",
+          ...(descriptor.native_background ? ["native_background"] : []),
+          ...(descriptor.deprecated ? ["deprecated"] : []),
           ...(descriptor.references_max === undefined
             ? []
             : ["references_max"]),
@@ -598,6 +600,76 @@ describe("MediaOperations JSON input", () => {
         },
         model_id: music.model_id,
         provider: "gg",
+      })
+    );
+  });
+});
+
+describe("image discovery after catalogue evolution", () => {
+  const operations = new MediaOperations();
+  const model_id = "openai/gpt-image-2.5-flare";
+  it("keeps deprecated models callable and identifies their status", () => {
+    const old = operations.list({
+      kind: "image",
+      model_id: "openai/gpt-image-2",
+    });
+    expect(old.length).toBeGreaterThan(0);
+    expect(old.every((entry) => entry.deprecated === true)).toBe(true);
+    expect(
+      operations
+        .list({ kind: "image", model_id })
+        .every((entry) => !entry.deprecated)
+    ).toBe(true);
+  });
+  it.each(["fal", "vercel", "gg"] as const)(
+    "describes and parses supported %s background intent for native resolution",
+    (provider) => {
+      const selector = { kind: "image", model_id, provider } as const;
+      expect(properties(operations.inspect(selector)).background.enum).toEqual([
+        "auto",
+        "opaque",
+        "transparent",
+      ]);
+      expect(
+        operations.parseInput(selector, {
+          prompt: "sticker",
+          background: "transparent",
+        })
+      ).toMatchObject({
+        selection: { background: "transparent" },
+        input: { background: "transparent" },
+      });
+    }
+  );
+  it("withholds unsupported provider controls in the schema and parser", () => {
+    for (const provider of ["fal", "openrouter"] as const) {
+      const selector = { kind: "image", model_id, provider } as const;
+      expect(properties(operations.inspect(selector))).not.toHaveProperty(
+        "seed"
+      );
+      rejects(() =>
+        operations.parseInput(selector, { prompt: "sticker", seed: 0 })
+      );
+    }
+    const fal = { kind: "image", model_id, provider: "fal" } as const;
+    expect(properties(operations.inspect(fal))).not.toHaveProperty(
+      "aspect_ratio"
+    );
+    rejects(() =>
+      operations.parseInput(fal, { prompt: "sticker", aspect_ratio: "1:1" })
+    );
+    const openrouter = {
+      kind: "image",
+      model_id,
+      provider: "openrouter",
+    } as const;
+    expect(properties(operations.inspect(openrouter)).background.enum).toEqual([
+      "auto",
+    ]);
+    rejects(() =>
+      operations.parseInput(openrouter, {
+        prompt: "sticker",
+        background: "transparent",
       })
     );
   });

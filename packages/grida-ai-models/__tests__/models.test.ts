@@ -84,7 +84,7 @@ describe("models.image.findImageModelCard", () => {
   });
 
   it("returns null when the bare name matches no card", () => {
-    // "gpt-image" is a prefix of three OpenAI ids but is not the
+    // "gpt-image" is a prefix of several OpenAI ids but is not the
     // bare name of any of them — must refuse rather than guess.
     expect(models.image.findImageModelCard("gpt-image")).toBeNull();
   });
@@ -105,6 +105,16 @@ describe("models.image catalogue invariants", () => {
     for (const id of Object.keys(models.image.models)) {
       expect(models.image.models[id]).toBeDefined();
     }
+  });
+
+  it("retains GPT Image 2 as a listed, deprecated model", () => {
+    const card = models.image.findImageModelCard("openai/gpt-image-2")!;
+    expect(card).toMatchObject({
+      id: "openai/gpt-image-2",
+      listed: true,
+      deprecated: true,
+    });
+    expect(models.image.listed_models()).toContain(card);
   });
 
   it("toCompact preserves id, label, release, pricing, speed_label, deprecated", () => {
@@ -147,16 +157,75 @@ describe("models.image provider-binding invariants", () => {
     }
   });
 
-  it("listed cards are universal (served by every supported provider)", () => {
-    // The one-key promise: a single connected provider serves every listed
-    // card. If a listed card loses a binding, this fails loudly.
-    const ALL: models.image.ImageProvider[] = ["vercel", "fal", "openrouter"];
-    for (const card of models.image.listed_models()) {
-      for (const p of ALL) {
-        expect(models.image.binding(card, p)).not.toBeNull();
-      }
+  it.each(["flare", "sunburst"] as const)(
+    "lists GPT Image 2.5 %s on each verified provider with that provider's meter",
+    (variant) => {
+      const card = models.image.models[`openai/gpt-image-2.5-${variant}`]!;
+      expect(card).toMatchObject({
+        listed: true,
+        deprecated: false,
+        provider: "vercel",
+        release: { date: "2026-09-08", basis: "model" },
+        quality: {
+          options: ["auto", "low", "medium", "high", "xhigh", "max"],
+          default: "high",
+        },
+        constraints: {
+          step: 16,
+          max_edge: 3840,
+          min_pixels: 655360,
+          max_pixels: 8294400,
+          aspect_ratio: { max: 3 },
+        },
+      });
+      expect(Object.keys(card.providers).sort()).toEqual([
+        "fal",
+        "openrouter",
+        "vercel",
+      ]);
+      const vercel = models.image.binding(card, "vercel")!;
+      expect(vercel.id).toBe(card.id);
+      expect(vercel.pricing).toEqual({
+        type: "per_token",
+        input: 5,
+        cached_input: 1.25,
+        output: 30,
+      });
+      expect(card.pricing).toEqual(vercel.pricing);
+      expect(vercel.references).toBeUndefined();
+      expect(models.image.supportsTransparentBackground(card, "vercel")).toBe(
+        true
+      );
+      const openrouter = models.image.binding(card, "openrouter")!;
+      expect(openrouter.id).toBe(card.id);
+      expect(openrouter.pricing).toEqual({
+        type: "per_token",
+        input: 5,
+        image_input: 8,
+        output: 30,
+      });
+      expect(openrouter.references).toEqual({ id: card.id, max: 16 });
+      expect(openrouter.transparent_background).toBe(false);
+      expect(models.image.binding(card, "fal")).toMatchObject({
+        id: `openai/gpt-image-2.5/${variant}/text-to-image`,
+        references: {
+          id: `openai/gpt-image-2.5/${variant}/edit`,
+          max: 16,
+        },
+        // All six rates are published by FAL for both generation and edits,
+        // in USD per million tokens (not OpenAI's old per-image tiers).
+        pricing: {
+          type: "per_token",
+          input: 5,
+          cached_input: 1.25,
+          image_input: 8,
+          cached_image_input: 2,
+          text_output: 10,
+          output: 30,
+        },
+      });
     }
-  });
+  );
 
   it("binding() resolves a present provider and nulls an absent one", () => {
     const kontext = models.image.models["bfl/flux-kontext-max"]!;
@@ -311,6 +380,106 @@ describe("models.image provider-binding invariants", () => {
     for (const card of models.image.listed_models()) {
       expect(card.listed).toBe(true);
     }
+  });
+});
+
+describe("models.image.supportsTransparentBackground", () => {
+  // The model default is portable metadata; a serving provider may expose
+  // less, or have its own verified declaration while the model is unknown.
+  it.each([
+    ["inherits verified model support", true, undefined, true],
+    ["inherits an unsupported model", false, undefined, false],
+    ["keeps absent declarations unknown", undefined, undefined, false],
+    ["accepts explicit provider support", undefined, true, true],
+    ["allows a provider boolean to override the model", false, true, true],
+    ["honors an unsupported provider override", true, false, false],
+    ["lets an unverified provider mask model support", true, null, false],
+  ] as const)("%s", (_name, modelSupport, providerSupport, expected) => {
+    const base = models.image.models["openai/gpt-image-2"]!;
+    const card: models.image.ImageModelCard = {
+      ...base,
+      transparent_background: modelSupport,
+      providers: {
+        fal: {
+          ...base.providers.fal!,
+          transparent_background: providerSupport,
+        },
+      },
+    };
+    expect(models.image.supportsTransparentBackground(card, "fal")).toBe(
+      expected
+    );
+  });
+
+  it("never grants model support to a missing provider binding", () => {
+    const base = models.image.models["openai/gpt-image-2.5-flare"]!;
+    const card: models.image.ImageModelCard = {
+      ...base,
+      provider: "fal",
+      providers: { fal: base.providers.fal! },
+    };
+    expect(card.transparent_background).toBe(true);
+    expect(models.image.supportsTransparentBackground(card, "vercel")).toBe(
+      false
+    );
+  });
+
+  it("keeps provider overrides independent without mutating the card", () => {
+    const base = models.image.models["openai/gpt-image-2"]!;
+    const card = Object.freeze({
+      ...base,
+      transparent_background: true,
+      providers: Object.freeze({
+        fal: Object.freeze({ ...base.providers.fal! }),
+        openrouter: Object.freeze({
+          ...base.providers.openrouter!,
+          transparent_background: false,
+        }),
+        vercel: Object.freeze({
+          ...base.providers.vercel!,
+          transparent_background: null,
+        }),
+      }),
+    });
+    const before = JSON.stringify(card);
+    expect(models.image.supportsTransparentBackground(card, "openrouter")).toBe(
+      false
+    );
+    expect(models.image.supportsTransparentBackground(card, "vercel")).toBe(
+      false
+    );
+    expect(models.image.supportsTransparentBackground(card, "fal")).toBe(true);
+    expect(JSON.stringify(card)).toBe(before);
+  });
+
+  it("declares only verified native transparency and provider exposure", () => {
+    // Published fal schemas expose transparent backgrounds for GPT Image 2
+    // and both 2.5 variants. OpenRouter's enums exclude it. Vercel publishes
+    // support for 2.5 but not GPT Image 2 (verified 2026-09-09 KST).
+    for (const id of [
+      "openai/gpt-image-2",
+      "openai/gpt-image-2.5-flare",
+      "openai/gpt-image-2.5-sunburst",
+    ]) {
+      const card = models.image.models[id]!;
+      expect(card.transparent_background).toBe(true);
+      expect(card.providers.fal?.transparent_background).toBeUndefined();
+      expect(models.image.supportsTransparentBackground(card, "fal")).toBe(
+        true
+      );
+      expect(models.image.supportsTransparentBackground(card, "vercel")).toBe(
+        id !== "openai/gpt-image-2"
+      );
+      expect(
+        models.image.supportsTransparentBackground(card, "openrouter")
+      ).toBe(false);
+    }
+    const gpt2 = models.image.models["openai/gpt-image-2"]!;
+    expect(gpt2.providers.openrouter?.transparent_background).toBe(false);
+    expect(gpt2.providers.vercel?.transparent_background).toBeNull();
+    expect(
+      models.image.models["bfl/flux-pro-1.1"]?.transparent_background
+    ).toBeUndefined();
   });
 });
 

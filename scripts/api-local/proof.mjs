@@ -1484,7 +1484,7 @@ async function ggAssertions(port, issuer, safe, alpha, beta, signingSecret) {
   }
   // Next 16.2.6 clones POST bodies for proxy and awaits the original EOF in
   // getCloneableBody.finalize before invoking this route. Its upload wait is
-  // outside the route's own one-second read timer; hosting must bound that wait.
+  // outside the route's one-second timer and relies on the hosting ingress policy.
   beforeAuth = issuer.calls;
   beforeData = issuer.databaseCalls;
   const delayed = mint(alpha, alphaOrg.id, { bodyEndDelayMs: 1500 });

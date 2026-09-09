@@ -10,9 +10,10 @@ format: md
 
 # Grida CLI
 
-> **Status: proposed doctrine, awaiting ratification.** Examples describe the
+> **Status: accepted doctrine.** Examples describe the
 > replacement CLI; they are not available in the legacy npm release.
-> See the [v1 spec](./v1.md) for the immediate scope.
+> See the [v1 spec](./v1.md) for the immediate scope and
+> [account infrastructure](./account-infrastructure.md) for its foundation.
 
 Sign in, inspect your account, use a Grida tool, and keep the result in your
 own workflow. Type the commands yourself, put them in a script, or give them

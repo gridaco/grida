@@ -20,18 +20,33 @@ export namespace MediaRoutes {
   export function image(
     card: models.image.ImageModelCard,
     provider: ImageClient.Provider,
-    references: boolean
+    references: boolean,
+    background?: ImageClient.Background
   ): ImageClient.Descriptor | null {
     if (!imageModel(card)) return null;
+    const native_background = models.image.supportsTransparentBackground(
+      card,
+      provider === "gg" ? "vercel" : provider
+    );
+    if (background && background !== "auto" && !native_background) return null;
+    const capability = native_background
+      ? { native_background: true as const }
+      : {};
     if (provider === "gg")
       return !references && models.image.binding(card, "vercel")
-        ? { model_id: card.id, binding_id: card.id, provider_id: "gg" }
+        ? {
+            model_id: card.id,
+            binding_id: card.id,
+            provider_id: "gg",
+            ...capability,
+          }
         : null;
     const binding = models.image.binding(card, provider);
     if (!binding || (references && !binding.references)) return null;
     return {
       model_id: card.id,
       provider_id: provider,
+      ...capability,
       binding_id: references ? binding.references!.id : binding.id,
       ...(references ? { references_max: binding.references!.max } : {}),
     };

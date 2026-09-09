@@ -65,7 +65,9 @@ The kinds are `image`, `video`, `music`, `sound-effect`, `text-to-speech`, and
 `three-d`. Discovery excludes `auto` and custom endpoints: each descriptor names
 one provider, binding, and input variant. Existing staged SFX, speech, and 3D
 operations remain discoverable with their actual `status`; discovery does not
-change catalogue publication policy.
+change catalogue publication policy. A retained deprecated image or video card
+remains callable and carries `deprecated: true`; removal of its binding still
+withholds that route.
 
 `inspect` takes those three selector fields and an optional `variant`. Image
 variants are `text` and, where supported, `references`; video variants are `text`
@@ -165,10 +167,21 @@ generation without references on that binding, or references on a text-only
 binding, fails before submission. The package does not read local files. The
 caller trims or rejects excess references before loading assets.
 
+Native `background` intent (`auto`, `opaque`, `transparent`) can participate in
+resolution before the host reads references. Explicit non-auto modes require a
+verified catalogue capability on that exact provider; unknown or unsupported
+routes are rejected without fallback. The resolved operation captures that
+requirement, and generation cannot weaken it. Transparent generation forces PNG.
+JSON schemas expose only supported background choices and pass the same intent
+to native resolution. This does not promise that every returned pixel is transparent.
+
 Generation accepts an integer `n` from 1 through 16, positive integer `size`, positive
-numeric `aspect_ratio`, integer `seed`, optional `quality`, and `signal`.
-`auto` quality is omitted; other quality values keep the existing provider option
-namespace. Provider batch limits remain authoritative: a requested count may
+numeric `aspect_ratio`, integer `seed`, optional `quality`, and `signal`, subject
+to the selected endpoint's input schema. GPT Image 2.5's OpenRouter and fal routes
+do not accept seed; fal also rejects aspect ratio and uses explicit dimensions or
+auto size. fal edits use the distinct catalogue edit binding with 1–16 references.
+Explicit quality values, including `auto`, are forwarded; Vercel's OpenAI models
+use the `openai` namespace. Provider batch limits remain authoritative: a requested count may
 require multiple submissions. Every batch sets **`maxRetries: 0`**. Failed
 generation is never automatically resubmitted; fal status polling is separate.
 Cancellation cannot undo an accepted provider job or its charge.

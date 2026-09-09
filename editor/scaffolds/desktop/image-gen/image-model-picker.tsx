@@ -8,21 +8,23 @@ import {
   SelectValue,
 } from "@app/ui/components/select";
 import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 
 /**
  * Provider-hidden image-model picker (#908). Lists only the curated
- * (`listed: true`) models by their friendly label and what they're good for —
- * never by provider. The provider is implied by the user's connected key and
- * resolved per request by the agent host.
+ * (`listed: true`) models by their friendly label. Provider-limited models
+ * name their required key; the agent host resolves the connected provider.
  */
 export function ImageModelPicker({
   value,
   onValueChange,
   disabled,
+  providers,
 }: {
   value: string;
   onValueChange: (id: string) => void;
   disabled?: boolean;
+  providers: MediaModelAvailability.ImageProviderState;
 }) {
   const listed = models.image.listed_models();
   return (
@@ -31,11 +33,33 @@ export function ImageModelPicker({
         <SelectValue placeholder="Choose a model" />
       </MediaModelPickerTrigger>
       <SelectContent>
-        {listed.map((card) => (
-          <SelectItem key={card.id} value={card.id}>
-            {card.label}
-          </SelectItem>
-        ))}
+        {listed.map((card) => {
+          const access = MediaModelAvailability.image(card, providers);
+          return (
+            <SelectItem
+              key={card.id}
+              value={card.id}
+              disabled={!access.available}
+            >
+              {card.label}
+              {access.available &&
+                models.image.binding(card, "fal") &&
+                !models.image.binding(card, "vercel") &&
+                !models.image.binding(card, "openrouter") && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · fal key required
+                  </span>
+                )}
+              {!access.available && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {access.reason}
+                </span>
+              )}
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

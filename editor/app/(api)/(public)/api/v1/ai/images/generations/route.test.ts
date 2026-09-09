@@ -18,6 +18,7 @@ vi.mock("@/lib/ai/openai-compat/limits", () => ({
 const h = vi.hoisted(() => ({
   imageCalls: 0,
   lastOptions: null as unknown,
+  reportedCost: undefined as unknown,
 }));
 
 vi.mock("@/lib/billing/metronome", () => ({
@@ -42,8 +43,9 @@ vi.mock("@/lib/auth/organization", () => ({
   requireOrganizationId: vi.fn<(...args: never[]) => unknown>(),
 }));
 
-// Tiny valid PNG header so `generateImage` sniffs image/png.
-const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAA7";
+// One transparent grayscale+alpha pixel; the response must preserve its bytes.
+const PNG_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
 
 vi.mock("@/lib/ai/models", async (orig) => {
   const real = await orig<typeof import("@/lib/ai/models")>();
@@ -66,6 +68,7 @@ vi.mock("@/lib/ai/models", async (orig) => {
           return {
             images: [PNG_B64],
             warnings: [],
+            providerMetadata: { gateway: { cost: h.reportedCost } },
             response: {
               timestamp: new Date(),
               modelId,
@@ -113,6 +116,7 @@ beforeEach(() => {
   process.env.GG_TOKEN_SECRET = SECRET;
   h.imageCalls = 0;
   h.lastOptions = null;
+  h.reportedCost = undefined;
   mockedGetEntitlement.mockReset();
   mockedIngest.mockReset();
   mockedGetEntitlement.mockResolvedValue({
@@ -124,6 +128,45 @@ beforeEach(() => {
 });
 
 describe("POST /api/v1/ai/images/generations", () => {
+  it.each([0, "0", 0.21072, "0.01317"])(
+    "bills the upstream receipt %j once instead of the image-count estimate",
+    async (cost) => {
+      h.reportedCost = cost;
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request(
+          {
+            model_id: "openai/gpt-image-2.5-sunburst",
+            prompt: "x",
+            n: 2,
+            quality: "max",
+            // Caller-controlled receipt-shaped data is never authoritative.
+            providerMetadata: { gateway: { cost: 0 } },
+          },
+          token
+        )
+      );
+      expect(res.status).toBe(200);
+      expect(mockedIngest).toHaveBeenCalledTimes(1);
+      expect(mockedIngest.mock.calls[0]![1]).toBe(Number(cost) * 1000);
+    }
+  );
+
+  it.each([undefined, null, "", " ", "invalid", -1, "-1", Infinity, true, {}])(
+    "retains the documented estimate when the receipt is invalid or absent: %j",
+    async (cost) => {
+      h.reportedCost = cost;
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request({ model_id: CARD.id, prompt: "x" }, token)
+      );
+      expect(res.status).toBe(200);
+      expect(mockedIngest.mock.calls[0]![1]).toBe(
+        computeImageCostMills(CARD, {})
+      );
+    }
+  );
+
   it("generates through the billed middleware with pre-priced mills", async () => {
     const { token } = await signGgToken("user-1", 7);
     const res = await POST(
@@ -149,20 +192,131 @@ describe("POST /api/v1/ai/images/generations", () => {
     expect(mockedIngest.mock.calls[0]![1]).toBe(expected);
   });
 
-  it("forwards the requested quality tier to the origin provider", async () => {
+  it.each(["high", "auto"])(
+    "forwards quality %s to the origin provider",
+    async (quality) => {
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request({ model_id: CARD.id, prompt: "x", quality }, token)
+      );
+      expect(res.status).toBe(200);
+      // The billed tier must actually reach the provider (Vercel AI Gateway
+      // keys providerOptions by origin provider, e.g. `openai`).
+      const binding = ai.image.binding(CARD, "vercel")!;
+      const originProvider = binding.id.split("/")[0]!;
+      const opts = h.lastOptions as {
+        providerOptions?: Record<string, Record<string, unknown>>;
+      };
+      expect(opts.providerOptions?.[originProvider]?.quality).toBe(quality);
+    }
+  );
+
+  it.each(["transparent", "opaque"])(
+    "rejects unverified %s background before billing or inference",
+    async (background) => {
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request(
+          { model_id: "openai/gpt-image-2", prompt: "x", background },
+          token
+        )
+      );
+      expect(res.status).toBe(400);
+      expect((await res.json()).error.code).toBe("invalid_request_error");
+      expect(h.imageCalls).toBe(0);
+      expect(mockedGetEntitlement).not.toHaveBeenCalled();
+      expect(mockedIngest).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([null, true, "remove", 1, {}])(
+    "rejects malformed background %j",
+    async (background) => {
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request({ model_id: CARD.id, prompt: "x", background }, token)
+      );
+      expect(res.status).toBe(400);
+      expect(h.imageCalls).toBe(0);
+      expect(mockedGetEntitlement).not.toHaveBeenCalled();
+      expect(mockedIngest).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([CARD.id, "xai/grok-imagine-image-2.0"])(
+    "keeps auto background equivalent to the omitted default for %s",
+    async (modelId) => {
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request({ model_id: modelId, prompt: "x", background: "auto" }, token)
+      );
+      expect(res.status).toBe(200);
+      const card = ai.image.findImageModelCard(modelId)!;
+      const binding = ai.image.binding(card, "vercel")!;
+      const originProvider = binding.id.split("/")[0]!;
+      const opts = h.lastOptions as {
+        providerOptions?: Record<string, Record<string, unknown>>;
+      };
+      expect(
+        opts.providerOptions?.[originProvider]?.background
+      ).toBeUndefined();
+      expect(
+        opts.providerOptions?.[originProvider]?.output_format
+      ).toBeUndefined();
+    }
+  );
+
+  it("forwards options to the binding namespace when it differs from the card", async () => {
     const { token } = await signGgToken("user-1", 7);
     const res = await POST(
-      request({ model_id: CARD.id, prompt: "x", quality: "high" }, token)
+      request(
+        { model_id: "xai/grok-imagine-image-2.0", prompt: "x", quality: "low" },
+        token
+      )
     );
     expect(res.status).toBe(200);
-    // The billed tier must actually reach the provider (Vercel AI Gateway
-    // keys providerOptions by origin provider, e.g. `openai`).
-    const originProvider = CARD.id.slice(0, CARD.id.indexOf("/"));
     const opts = h.lastOptions as {
       providerOptions?: Record<string, Record<string, unknown>>;
     };
-    expect(opts.providerOptions?.[originProvider]?.quality).toBe("high");
+    expect(opts.providerOptions?.spacexai).toEqual({ quality: "low" });
+    expect(opts.providerOptions?.xai).toBeUndefined();
   });
+
+  it.each(["openai/gpt-image-2.5-flare", "openai/gpt-image-2.5-sunburst"])(
+    "serves %s with native transparency, alpha-safe PNG and hosted billing",
+    async (modelId) => {
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request(
+          {
+            model_id: modelId,
+            prompt: "x",
+            background: "transparent",
+            output_format: "jpeg",
+          },
+          token
+        )
+      );
+      expect(res.status).toBe(200);
+      expect((await res.json()).images[0]).toEqual({
+        base64: PNG_B64,
+        media_type: "image/png",
+      });
+      expect(h.imageCalls).toBe(1);
+      expect(mockedGetEntitlement).toHaveBeenCalledWith(7);
+      const card = ai.image.findImageModelCard(modelId)!;
+      expect(mockedIngest.mock.calls[0]![1]).toBe(
+        computeImageCostMills(card, {})
+      );
+      const opts = h.lastOptions as {
+        providerOptions?: Record<string, Record<string, unknown>>;
+      };
+      expect(opts.providerOptions?.openai).toEqual({
+        background: "transparent",
+        output_format: "png",
+      });
+    }
+  );
 
   it("401 without token; 404 for unknown models — provider untouched", async () => {
     expect(
@@ -175,6 +329,57 @@ describe("POST /api/v1/ai/images/generations", () => {
     expect(res.status).toBe(404);
     expect(h.imageCalls).toBe(0);
     expect(mockedGetEntitlement).not.toHaveBeenCalled();
+  });
+
+  it.each(["auto", "low", "medium", "high", "xhigh", "max"])(
+    "forwards GPT Image 2.5 quality %s to OpenAI",
+    async (quality) => {
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request(
+          { model_id: "openai/gpt-image-2.5-sunburst", prompt: "x", quality },
+          token
+        )
+      );
+      expect(res.status).toBe(200);
+      expect(h.lastOptions).toMatchObject({
+        providerOptions: { openai: { quality } },
+      });
+    }
+  );
+
+  it("rejects an unsupported declared quality before billing or inference", async () => {
+    const { token } = await signGgToken("user-1", 7);
+    const res = await POST(
+      request(
+        {
+          model_id: "openai/gpt-image-2.5-flare",
+          prompt: "x",
+          quality: "ultra",
+        },
+        token
+      )
+    );
+    expect(res.status).toBe(400);
+    expect(h.imageCalls).toBe(0);
+    expect(mockedGetEntitlement).not.toHaveBeenCalled();
+    expect(mockedIngest).not.toHaveBeenCalled();
+  });
+
+  it("refuses a model without a Vercel binding before billing", async () => {
+    const binding = vi.spyOn(ai.image, "binding").mockReturnValue(null);
+    try {
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request({ model_id: CARD.id, prompt: "x" }, token)
+      );
+      expect(res.status).toBe(404);
+      expect(h.imageCalls).toBe(0);
+      expect(mockedGetEntitlement).not.toHaveBeenCalled();
+      expect(mockedIngest).not.toHaveBeenCalled();
+    } finally {
+      binding.mockRestore();
+    }
   });
 
   it("402 for blocked orgs, before the provider call", async () => {

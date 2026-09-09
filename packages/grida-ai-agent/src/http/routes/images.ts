@@ -65,6 +65,9 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       n: v.optional(v.number),
       seed: v.optional(v.number),
       quality: v.optional(v.string),
+      background: v.optional(
+        v.oneOf(["auto", "opaque", "transparent"] as const)
+      ),
     });
     if (!r.ok) return r.res;
     const {
@@ -77,6 +80,7 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       n,
       seed,
       quality,
+      background,
     } = r.data;
 
     let resolved;
@@ -84,11 +88,14 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       resolved = await resolveImageModel(
         { secrets, gg, gg_base_url, provider_http, catalog },
         model_id,
-        provider ? { explicit: provider } : {}
+        { ...(provider ? { explicit: provider } : {}), background }
       );
     } catch (e) {
       if (e instanceof ImageModelUnavailableError) {
-        return c.json({ error: e.message, model_id: e.model_id }, 400);
+        return c.json(
+          { error: e.message, code: e.code, model_id: e.model_id },
+          400
+        );
       }
       return c.json({ error: "image generation failed", model_id }, 502);
     }

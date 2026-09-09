@@ -311,14 +311,7 @@ async function inspect(state) {
   );
   assert.equal(auth.Name, `/supabase_auth_${fixture.projectId}`);
   assert.equal(db.Name, `/supabase_db_${fixture.projectId}`);
-  assert.match(
-    auth.Config.Image,
-    /^(?:supabase\/gotrue|public\.ecr\.aws\/supabase\/gotrue|ghcr\.io\/supabase\/cli\/auth):v2\.196\.0$/
-  );
-  assert.match(
-    db.Config.Image,
-    /^(?:supabase\/postgres|public\.ecr\.aws\/supabase\/postgres):15\./
-  );
+  guards.images({ auth: auth.Config.Image, postgres: db.Config.Image });
   const env = Object.fromEntries(
     auth.Config.Env.map((item) => {
       const i = item.indexOf("=");

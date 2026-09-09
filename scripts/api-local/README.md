@@ -6,12 +6,13 @@
 This proof builds and starts Next.js in **production mode**, then sends real
 HTTP requests to the current `/api/v1/auth/me`, `/api/v1/account/organizations`,
 `/api/v1/account/credits`, `/api/v1/auth/gg`, and `/api/v1/ai/models` implementations. It needs Node.js
-24+ and the repository's installed dependencies. It does not install packages,
-start Docker, use Supabase services, or read account credentials.
+24+ and the repository's installed dependencies. The command builds the model
+catalogue before starting the proof. It does not install packages, start Docker,
+use Supabase services, or read account credentials.
 
 ```sh
 node --test scripts/api-local/network.test.mjs
-node scripts/api-local/proof.mjs
+pnpm --filter editor test:api:http
 ```
 
 The proof copies the current API operation inventory, request policy, account
@@ -95,7 +96,11 @@ membership work occurs before upload completion, then the valid request succeeds
 The route's one-second read deadline starts only when it receives the stream;
 its separate unit contracts cover a stalled stream at that boundary. This HTTP
 proof does not establish a network upload deadline or a pre-route 1 KiB limit.
-Hosting upload time and body-size limits remain release requirements.
+Pre-route resource protection belongs to the hosting layer. Managed Vercel relies
+on its documented request-size limits and slow-client protections; self-hosted
+deployments must supply equivalent ingress controls. See the
+[API hosting contract](../../editor/lib/api/README.md#configuration). This proof
+does not certify a platform upload timeout.
 
 This proves the **Next request pipeline**, not Supabase token cryptography,
 OAuth consent, grant revocation, RLS, or hosted infrastructure. The separate

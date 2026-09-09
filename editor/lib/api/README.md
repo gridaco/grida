@@ -163,7 +163,10 @@ bytes after trimming) and optional `GG_TOKEN_SECRET_PREVIOUS` for verify-only
 rotation. A current key is always required. Both mint adapters share the
 `rl:v1-ai:mint` quota: 10 requests per user per 60 seconds using the configured
 Upstash REST URL/token. The existing unconfigured-limiter allowance is preserved;
-configured upstream failures do not turn into an allowance. Signing and limiter
+configured upstream failures, including the SDK's five-second timeout allowance,
+return 503 without minting. Native uses `auth_unavailable`; Desktop uses
+`mint_failed`. Actual quota exhaustion remains 429. The timeout bounds the quota
+decision but does not cancel Redis work or trigger a remint. Signing and limiter
 configuration never comes from request input.
 
 Next configuration runs before proxy. Its web slash/connect redirects explicitly
@@ -173,19 +176,29 @@ Next still normalizes malformed repeated slashes/backslashes before proxy;
 those framework redirects are outside the machine response contract.
 Next.js 16.2.6 also clones POST bodies for the Node proxy and waits for the
 original stream to end before entering the route. The mint parser's 1024-byte
-limit and one-second deadline start after that step. They are not upload limits:
-verify an external body-size limit and upload deadline at the hosting/reverse
-proxy layer before releasing the endpoint.
+limit and one-second deadline start after that step. They do not bound network
+upload time. On managed Vercel, pre-route ingress relies on the platform's
+[request-size limits](https://vercel.com/docs/routing-middleware#limits-on-requests)
+and [slow-client protections](https://vercel.com/blog/life-of-a-vercel-request-what-happens-when-a-user-presses-enter),
+as does the rest of this application. The documented Routing Middleware ceiling
+is 4 MB; the separate [Function payload ceiling](https://vercel.com/docs/functions/limitations#request-body-size)
+is 4.5 MB. This application promises no particular network upload deadline.
+Record the deployment's host/runtime and verify its routing and authentication
+behavior; local parser tests do not certify hosting infrastructure. Self-hosted
+deployments must provide ingress size and slow-client controls. See the limits
+and trust assumptions in GRIDA-SEC-012 in [SECURITY.md](../../../SECURITY.md).
 
 ## Check locally
+
+After installing dependencies, each command builds the model catalogue it needs:
 
 ```sh
 pnpm --filter editor test:api
 pnpm --filter editor test:api:http
 ```
 
-The first command audits real source and runs offline contracts without loading
-dotenv files. The second builds a minimal production-mode Next snapshot with the
+`test:api` audits real source and runs offline contracts without loading
+dotenv files. `test:api:http` builds a minimal production-mode Next snapshot with the
 real proxy, configuration, native account/GG bindings, signer and model list,
 an owned synthetic issuer,
 and recording replacements for unrelated web services. See the

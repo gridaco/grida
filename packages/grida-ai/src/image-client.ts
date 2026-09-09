@@ -69,10 +69,10 @@ export class ImageClient {
       if (selected.provider === "gg") {
         if (selected.references)
           throw new ImageClient.Failure("references_unsupported");
-        const route = MediaRoutes.image(card, "gg", false);
+        const route = MediaRoutes.image(card, "gg", false, selected.background);
         if (!route) throw new ImageClient.Failure("provider_unavailable");
         this.#hosted();
-        return this.#operation(route);
+        return this.#operation(route, selected.background);
       }
       const order =
         selected.provider === "auto"
@@ -85,21 +85,27 @@ export class ImageClient {
         const route = MediaRoutes.image(
           card,
           provider,
-          selected.references ?? false
+          selected.references ?? false,
+          selected.background
         );
         if (!route) continue;
         referenceCapable = true;
         if (!(await this.#key(provider))) continue;
-        return this.#operation(route);
+        return this.#operation(route, selected.background);
       }
-      const hostedRoute = MediaRoutes.image(card, "gg", false);
+      const hostedRoute = MediaRoutes.image(
+        card,
+        "gg",
+        false,
+        selected.background
+      );
       if (
         selected.provider === "auto" &&
         !selected.references &&
         hostedRoute &&
         liveGgMediaDeps({ gg: this.#gg, gg_base_url: this.#ggBaseUrl })
       ) {
-        return this.#operation(hostedRoute);
+        return this.#operation(hostedRoute, selected.background);
       }
 
       throw new ImageClient.Failure(
@@ -126,21 +132,36 @@ export class ImageClient {
     return hosted;
   }
 
-  #operation(metadata: ImageClient.Descriptor): ImageClient.Resolved {
+  #operation(
+    metadata: ImageClient.Descriptor,
+    background?: ImageClient.Background
+  ): ImageClient.Resolved {
+    const capturedBackground = background === "auto" ? undefined : background;
     const descriptor = Object.freeze({ ...metadata });
     return Object.freeze({
       ...descriptor,
-      generate: (input: ImageClient.Input) => this.#generate(descriptor, input),
+      generate: (input: ImageClient.Input) =>
+        this.#generate(descriptor, input, capturedBackground),
     });
   }
 
   async #generate(
     descriptor: ImageClient.Descriptor,
-    input: ImageClient.Input
+    input: ImageClient.Input,
+    capturedBackground?: "opaque" | "transparent"
   ): Promise<ImageClient.Result> {
     let signal: AbortSignal | undefined;
     try {
       const args = generationInput(input, descriptor);
+      if (
+        capturedBackground &&
+        args.background !== undefined &&
+        args.background !== capturedBackground
+      )
+        throw new ImageClient.Failure("invalid_input");
+      const background =
+        capturedBackground ??
+        (args.background === "auto" ? undefined : args.background);
       signal = args.signal;
       if (signal?.aborted) throw new ImageClient.Failure("aborted");
       const provider = descriptor.provider_id;
@@ -151,7 +172,8 @@ export class ImageClient {
           hosted.session,
           hosted.base_url,
           descriptor.binding_id,
-          this.#http
+          this.#http,
+          background
         );
       } else {
         const key = await this.#key(provider);
@@ -160,7 +182,8 @@ export class ImageClient {
           provider,
           key,
           descriptor.binding_id,
-          this.#http
+          this.#http,
+          background
         );
       }
       if (signal?.aborted) throw new ImageClient.Failure("aborted");
@@ -176,6 +199,10 @@ export class ImageClient {
           warnings: [],
         }),
       };
+      const qualityNamespace =
+        provider === "vercel" && descriptor.binding_id.startsWith("openai/")
+          ? "openai"
+          : provider;
       const result = await generateImage({
         model: safeModel,
         prompt: args.prompt,
@@ -187,8 +214,8 @@ export class ImageClient {
         // Respect provider batch limits; never retry a failed paid batch.
         maxRetries: 0,
         providerOptions: {
-          ...(args.quality && args.quality !== "auto"
-            ? { [provider]: { quality: args.quality } }
+          ...(args.quality
+            ? { [qualityNamespace]: { quality: args.quality } }
             : {}),
           ...(args.references
             ? { grida: { references: args.references } }
@@ -220,6 +247,7 @@ export class ImageClient {
 }
 
 export namespace ImageClient {
+  export type Background = "auto" | "opaque" | "transparent";
   export type ByokProvider = models.image.ImageProvider;
   export type Provider = ByokProvider | "gg";
   /** Private host capability. It is never returned or forwarded to a model. */
@@ -238,12 +266,16 @@ export namespace ImageClient {
     model_id: string;
     provider: Provider | "auto";
     references?: boolean;
+    /** Native intent participates in provider selection before host asset reads. */
+    background?: Background;
   };
   export type Descriptor = Readonly<{
     model_id: string;
     provider_id: Provider;
     binding_id: string;
     references_max?: number;
+    /** Both explicit opaque and transparent require verified native support. */
+    native_background?: true;
   }>;
   export type Resolved = Descriptor & {
     readonly generate: (input: Input) => Promise<Result>;
@@ -256,6 +288,8 @@ export namespace ImageClient {
     aspect_ratio?: `${number}:${number}`;
     seed?: number;
     quality?: string;
+    /** Cannot override a non-auto mode captured during resolution. */
+    background?: Background;
     /** Already authorized and resolved by the host: HTTPS or inline image data URLs. */
     references?: readonly string[];
     signal?: AbortSignal;
@@ -291,8 +325,8 @@ function isImageProvider(value: string): value is ImageClient.ByokProvider {
 
 function selection(value: ImageClient.Selection): ImageClient.Selection {
   try {
-    exactKeys(value, ["model_id", "provider", "references"]);
-    const { model_id, provider, references } = value;
+    exactKeys(value, ["model_id", "provider", "references", "background"]);
+    const { model_id, provider, references, background } = value;
     if (
       typeof model_id !== "string" ||
       !model_id ||
@@ -302,10 +336,12 @@ function selection(value: ImageClient.Selection): ImageClient.Selection {
         provider === "gg" ||
         isImageProvider(provider)
       ) ||
-      (references !== undefined && typeof references !== "boolean")
+      (references !== undefined && typeof references !== "boolean") ||
+      (background !== undefined &&
+        !["auto", "opaque", "transparent"].includes(background))
     )
       throw 0;
-    return { model_id, provider, references };
+    return { model_id, provider, references, background };
   } catch {
     throw new ImageClient.Failure("invalid_input");
   }
@@ -316,10 +352,14 @@ function generationInput(
   descriptor: ImageClient.Descriptor
 ) {
   try {
+    const rule = MediaInputs.image(descriptor);
+    const properties = rule.schema.properties as Record<string, unknown>;
     return InputSchema.native(
-      MediaInputs.image(descriptor),
+      rule,
       value,
-      descriptor.references_max === undefined ? ["references"] : []
+      ["references", "seed", "aspect_ratio"].filter(
+        (key) => !(key in properties)
+      )
     );
   } catch {
     throw new ImageClient.Failure("invalid_input");

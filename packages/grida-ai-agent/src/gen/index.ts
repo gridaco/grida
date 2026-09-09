@@ -32,6 +32,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import type { ImageGenerateRequest } from "../protocol/images";
 
 export namespace AgentGen {
   // -------------------------------------------------------------------------
@@ -52,6 +53,8 @@ export namespace AgentGen {
      * message. Absent/empty ⇒ text-to-image.
      */
     references?: string[];
+    /** Native background intent; unsupported routes fail without generation. */
+    background?: ImageGenerateRequest["background"];
   };
 
   /**
@@ -110,7 +113,7 @@ export namespace AgentGen {
 
   export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
 
-  // Two arguments, both genuine agent intent. Everything else is deliberately
+  // Prompt, references, and background are genuine agent intent. Everything else is deliberately
   // NOT a parameter:
   //   - model / provider: the user's connected choice (settings), not the
   //     agent's — and the agent has no way to enumerate valid ids.
@@ -140,6 +143,16 @@ export namespace AgentGen {
           "workspace file path OR an image URL — the system reads/fetches it for " +
           "you. Use this to build on gathered references or to iterate on a " +
           "previous image (pass its path). Omit for plain text-to-image."
+      ),
+    background: z
+      .enum(["auto", "opaque", "transparent"])
+      .optional()
+      .describe(
+        "Native background intent. Use transparent for isolated assets with real " +
+          "alpha, not a drawn checkerboard. Omit or use auto for the provider default. " +
+          "Explicit opaque/transparent requires a supported connected provider; " +
+          "otherwise the call fails without generating. Do not drop a requested " +
+          "background mode or substitute background removal without user approval."
       ),
   });
 
@@ -226,7 +239,8 @@ export namespace AgentGen {
       return {
         ok: false,
         reason: "invalid_input",
-        message: "generate_image requires a non-empty `prompt` string.",
+        message:
+          "generate_image requires a non-empty `prompt`, optional image `references`, and an optional `background` of auto, opaque, or transparent.",
       };
     }
     // `references` (image-to-image inputs) ride the validated model input; the

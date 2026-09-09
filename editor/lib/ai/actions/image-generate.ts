@@ -6,12 +6,7 @@
  * Library bucket and a row inserted in `object`.
  */
 
-import {
-  generateImage,
-  type GeneratedFile,
-  type GenerateImageResult,
-  type ImageModel,
-} from "ai";
+import { generateImage, type GeneratedFile } from "ai";
 import imageSize from "image-size";
 import { service_role } from "@/lib/supabase/server";
 import { LibraryCAS } from "@/lib/library/cas";
@@ -29,6 +24,8 @@ export type GenerateAiImageInput = {
   width?: number;
   height?: number;
   aspect_ratio?: ai.image.AspectRatioString;
+  /** Opt-in choice from the model card's declared quality options. */
+  quality?: string;
   model: ai.image.ProviderModel | ai.image.ImageModelId;
   /** Verified org id — falls back to header / inferred via supabase auth. */
   organizationId?: number;
@@ -63,6 +60,19 @@ export async function generateAiImage(
       status: 400,
     };
   }
+  // This action's new quality input is metadata-backed. Unlike the legacy
+  // hosted API, it never previously forwarded quality for older model cards.
+  if (
+    input.quality !== undefined &&
+    !model.card.quality?.options.includes(input.quality)
+  ) {
+    return {
+      success: false,
+      code: "bad_request",
+      message: "unsupported quality for this model",
+      status: 400,
+    };
+  }
 
   return withAiAuth(
     "ai/image/generate",
@@ -72,16 +82,30 @@ export async function generateAiImage(
         n: 1,
         width: input.width,
         height: input.height,
+        quality: input.quality,
       });
 
-      const generation = await generateImageWithSize({
+      const binding = ai.image.binding(model.card, "vercel")!;
+      const originProvider = binding.id.split("/")[0]!;
+      const generation = await generateImage({
         prompt: input.prompt,
-        width: input.width,
-        height: input.height,
-        aspect_ratio: input.aspect_ratio,
+        size:
+          input.width && input.height
+            ? `${input.width}x${input.height}`
+            : undefined,
+        aspectRatio: input.aspect_ratio,
         model: model.model,
-        organizationId,
-        costMills,
+        n: 1,
+        providerOptions: {
+          ...gridaProviderOptions({
+            organizationId,
+            feature: "ai/image/generate",
+            costMills,
+          }),
+          ...(input.quality
+            ? { [originProvider]: { quality: input.quality } }
+            : {}),
+        },
       });
 
       const meta = generation.responses[0];
@@ -204,38 +228,4 @@ async function uploadGeneratedToLibrary({
     .data.publicUrl;
 
   return { object, publicUrl };
-}
-
-async function generateImageWithSize({
-  model,
-  prompt,
-  width,
-  height,
-  aspect_ratio,
-  organizationId,
-  costMills,
-}: {
-  model: ImageModel;
-  prompt: string;
-  width?: number;
-  height?: number;
-  aspect_ratio?: ai.image.AspectRatioString;
-  organizationId: number;
-  costMills: number;
-}): Promise<GenerateImageResult> {
-  const size: ai.image.SizeString | undefined =
-    width && height ? `${width}x${height}` : undefined;
-
-  return await generateImage({
-    model,
-    prompt,
-    size,
-    aspectRatio: aspect_ratio,
-    n: 1,
-    providerOptions: gridaProviderOptions({
-      organizationId,
-      feature: "ai/image/generate",
-      costMills,
-    }),
-  });
 }

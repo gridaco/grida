@@ -14,7 +14,8 @@ export class GridaGatewayImageModel implements ImageModelV3 {
     private readonly session: GgTokenSource,
     private readonly baseUrl: string,
     readonly modelId: string,
-    private readonly providerHttp: ProviderHttp = new ProviderHttp()
+    private readonly providerHttp: ProviderHttp = new ProviderHttp(),
+    private readonly background?: "opaque" | "transparent"
   ) {}
 
   async doGenerate(
@@ -51,6 +52,8 @@ export class GridaGatewayImageModel implements ImageModelV3 {
         aspect_ratio: aspectRatio,
         quality,
         seed,
+        // Captured, capability-checked intent; provider options cannot override it.
+        background: this.background,
       },
     });
     return {
