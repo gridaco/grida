@@ -6,10 +6,12 @@
 This proof builds and starts Next.js in **production mode**, then sends real
 HTTP requests to the current `/api/v1/auth/me`, `/api/v1/account/organizations`,
 `/api/v1/account/credits`, `/api/v1/auth/gg`, and `/api/v1/ai/models` implementations. It needs Node.js
-24+ and the repository's installed dependencies. It does not install packages,
+24+, the repository's installed dependencies, and the compiled model catalogue.
+It does not install packages,
 start Docker, use Supabase services, or read account credentials.
 
 ```sh
+pnpm --filter @grida/ai-models build
 node --test scripts/api-local/network.test.mjs
 node scripts/api-local/proof.mjs
 ```

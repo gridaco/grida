@@ -187,13 +187,16 @@ and trust assumptions in GRIDA-SEC-012 in [SECURITY.md](../../../SECURITY.md).
 
 ## Check locally
 
+Both checks use the compiled model catalogue. After installing dependencies:
+
 ```sh
+pnpm --filter @grida/ai-models build
 pnpm --filter editor test:api
 pnpm --filter editor test:api:http
 ```
 
-The first command audits real source and runs offline contracts without loading
-dotenv files. The second builds a minimal production-mode Next snapshot with the
+`test:api` audits real source and runs offline contracts without loading
+dotenv files. `test:api:http` builds a minimal production-mode Next snapshot with the
 real proxy, configuration, native account/GG bindings, signer and model list,
 an owned synthetic issuer,
 and recording replacements for unrelated web services. See the
