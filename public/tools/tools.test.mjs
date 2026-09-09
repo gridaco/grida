@@ -220,30 +220,24 @@ async function withSlidesUnit(run) {
 }
 
 describe("slides-templates unit (the real tenant)", () => {
-  // This integration test launches two full builds; parallel package CI can
-  // exceed Vitest's 5 s default even when both builds finish deterministically.
-  it(
-    "build is deterministic: rebuild → byte-identical zips",
-    () =>
-      withSlidesUnit(async (unit) => {
-        const build = () =>
-          execFileSync(process.execPath, [path.join(unit, "build.mjs")], {
-            cwd: unit,
-          });
-        const hash = async () => {
-          const out = path.join(unit, "out");
-          const h = createHash("sha256");
-          for (const f of (await fs.readdir(out)).sort())
-            h.update(await fs.readFile(path.join(out, f)));
-          return h.digest("hex");
-        };
-        build();
-        const first = await hash();
-        build();
-        expect(await hash()).toBe(first);
-      }),
-    15_000
-  );
+  it("build is deterministic: rebuild → byte-identical zips", () =>
+    withSlidesUnit(async (unit) => {
+      const build = () =>
+        execFileSync(process.execPath, [path.join(unit, "build.mjs")], {
+          cwd: unit,
+        });
+      const hash = async () => {
+        const out = path.join(unit, "out");
+        const h = createHash("sha256");
+        for (const f of (await fs.readdir(out)).sort())
+          h.update(await fs.readFile(path.join(out, f)));
+        return h.digest("hex");
+      };
+      build();
+      const first = await hash();
+      build();
+      expect(await hash()).toBe(first);
+    }));
 
   it("zip → in-memory fs → dotcanvas.read roundtrip preserves the deck contract", () =>
     withSlidesUnit(async (unit) => {

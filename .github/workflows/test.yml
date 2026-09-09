@@ -36,4 +36,6 @@ jobs:
       - name: Run Lint
         run: pnpm lint
       - name: Run Tests
-        run: pnpm turbo test
+        # Each package starts its own parallel test workers. Limit CPU and memory
+        # contention between package worker pools on the shared runner.
+        run: pnpm turbo test --concurrency=2
