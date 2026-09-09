@@ -21,23 +21,23 @@ you like while changing the part you asked to change, including across
 successive edits. OpenAI reports up to 50% lower generation latency compared
 with Images 2.0; this is a vendor claim, not a Grida benchmark.
 
-There are two models to choose from, rather than a cheaper model and a
-higher-priced premium model:
+The variants differ in speed and editing precision, not their per-token
+rate card:
 
 - **Flare** is the everyday starting point: fast iteration, concept
   exploration, and high-volume image generation.
 - **Sunburst** is for work where precise edits and fine detail justify
   a longer wait, such as carefully controlled product or campaign imagery.
 
-Both accept text and image inputs and offer six quality settings, from `low`
-through `max`, plus `auto`. Model choice and quality are separate controls:
+Both accept text and image inputs and offer five fixed quality levels
+(`low`, `medium`, `high`, `xhigh`, `max`) plus `auto`. Model choice and quality are separate controls:
 Sunburst is not simply Flare with its quality setting turned up.
 See OpenAI's [Flare model card](https://developers.openai.com/api/docs/models/gpt-image-2.5-flare)
 and [Sunburst model card](https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst).
 
 ## Same token prices, different image costs
 
-OpenAI's published rates, in USD per million tokens:
+OpenAI's standard API rates, in USD per million tokens:
 
 | Token type         | GPT Image 2 | 2.5 Flare | 2.5 Sunburst |
 | ------------------ | ----------- | --------- | ------------ |
