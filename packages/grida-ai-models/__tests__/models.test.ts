@@ -107,6 +107,16 @@ describe("models.image catalogue invariants", () => {
     }
   });
 
+  it("retains GPT Image 2 as a listed, deprecated model", () => {
+    const card = models.image.findImageModelCard("openai/gpt-image-2")!;
+    expect(card).toMatchObject({
+      id: "openai/gpt-image-2",
+      listed: true,
+      deprecated: true,
+    });
+    expect(models.image.listed_models()).toContain(card);
+  });
+
   it("toCompact preserves id, label, release, pricing, speed_label, deprecated", () => {
     const card = models.image.models["bfl/flux-pro-1.1"]!;
     const compact = models.image.toCompact(card);

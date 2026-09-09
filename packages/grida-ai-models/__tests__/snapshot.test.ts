@@ -474,6 +474,7 @@ describe("models.snapshot media — seed and round-trip", () => {
       max: 16,
     });
     expect(gpt.listed).toBe(true);
+    expect(gpt.deprecated).toBe(true);
     expect(gpt.providers.vercel!.id).toBe("openai/gpt-image-2");
     expect(gpt.transparent_background).toBe(true);
     expect(gpt.providers.openrouter!.transparent_background).toBe(false);

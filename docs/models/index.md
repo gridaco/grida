@@ -128,6 +128,10 @@ OpenAI image models are billed by token usage, including text and image inputs. 
 
 [Released September 8, 2026](https://openai.com/index/introducing-chatgpt-images-2-5/), Flare is the faster everyday option; Sunburst prioritizes precise edits and intricate detail, with longer generation times. Both are available through Grida-hosted credit and connected **fal**, **OpenRouter**, or **Vercel AI Gateway** keys. Desktop requires version 0.0.22 or later, including when the hosted model catalog has already refreshed.
 
+Read [GPT Image 2.5: two variants, one rate card](./gpt-image-2-5.md) for why
+2.5 succeeds GPT Image 2 and how equal token prices can produce different
+per-image costs.
+
 Both variants support generation and, through fal or OpenRouter, editing with up to 16 reference images. Grida accepts 1–4 outputs per request. Quality options are `auto`, `low`, `medium`, `high`, `xhigh`, and `max`; Grida selects `high` initially. Dimensions must be multiples of 16, neither edge may exceed 3840 px, the aspect ratio must be at most 3:1, and total area must be 655,360–8,294,400 pixels. Transparent backgrounds require PNG or WebP output. See the [Flare API](https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api) and [Sunburst editing API](https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api).
 
 The Desktop image playground generates from text. This update does not add a
@@ -141,11 +145,16 @@ Both variants have the same [fal token rates](https://fal.ai/models/openai/gpt-i
 | Text       | $5.00 | $1.25        | $10.00 |
 | Image      | $8.00 | $2.00        | $30.00 |
 
-For a 1024x1024 image, OpenAI's [output-token calculator](https://developers.openai.com/api/docs/guides/image-generation) estimates $0.01317 at `medium` and $0.05268 at `high`. These are output-only estimates, not fixed per-image prices; input tokens add to the bill. fal rounds the total charge up to the nearest $0.0001.
+Equal token rates do not imply equal per-image costs: model choice, quality,
+dimensions, and inputs affect token usage. OpenAI's [Flare model card](https://developers.openai.com/api/docs/models/gpt-image-2.5-flare)
+explicitly says that the GPT Image 2 calculator does not estimate GPT Image
+2.5 token consumption. Use actual provider usage when comparing the variants;
+do not apply GPT Image 2's per-image table to them. fal rounds the total charge
+up to the nearest $0.0001.
 
 [Vercel AI Gateway](https://vercel.com/ai-gateway/models/gpt-image-2.5-flare) publishes $5/M input tokens, $1.25/M cached input tokens, and $30/M output tokens. [OpenRouter](https://openrouter.ai/api/v1/images/models/openai/gpt-image-2.5-flare/endpoints) publishes $5/M text input, $8/M image input, and $30/M image output tokens. Grida keeps each provider's published meter separately. Hosted image billing uses Gateway's reported response cost when available. Without that receipt, it falls back to the catalog's coarse per-image estimate ($0.055 for these variants), which can differ from actual token cost across quality levels and dimensions.
 
-**GPT Image 2** (`openai/gpt-image-2`)
+**GPT Image 2** (`openai/gpt-image-2`) — _deprecated in Grida, superseded by GPT Image 2.5_
 
 Per 1M tokens: `text input $5.00 · text cached $1.25 · image input $8.00 · image cached $2.00 · output $30.00`
 
@@ -157,7 +166,10 @@ Per 1M tokens: `text input $5.00 · text cached $1.25 · image input $8.00 · im
 
 GPT Image 2 also accepts arbitrary resolutions (multiples of 16, edges ≤ 3840 px, aspect ratio ≤ 3:1, total pixels in 655,360 – 8,294,400). Cost for non-standard sizes is computed from output token count.
 
-GPT Image 2 remains available through Vercel AI Gateway, fal, and OpenRouter, including Grida's hosted route.
+GPT Image 2 remains available through Vercel AI Gateway, fal, and OpenRouter,
+including Grida's hosted route. Deprecation marks it as a legacy choice; it is
+not an upstream OpenAI retirement and does not remove its ID, change existing
+defaults, or replace saved model selections.
 
 **Transparent backgrounds**
 

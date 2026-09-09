@@ -1180,9 +1180,9 @@ export namespace models {
           source_url:
             "https://developers.openai.com/api/docs/models/gpt-image-2",
         },
-        deprecated: false,
+        deprecated: true,
         short_description:
-          "State-of-the-art image generation and editing with flexible resolutions",
+          "Previous-generation image model. Superseded by GPT Image 2.5.",
         vendor: "openai",
         provider: "vercel",
         listed: true,
