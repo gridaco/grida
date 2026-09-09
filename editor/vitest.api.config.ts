@@ -23,7 +23,6 @@ export default defineConfig({
       "lib/gg/**/*.test.ts",
       "lib/auth/gg-token.test.ts",
       "app/desktop/auth/token/route.test.ts",
-      "lib/desktop/gg-session.test.ts",
       "lib/ai/openai-compat/hosted-models.test.ts",
       "lib/billing/credits.test.ts",
       "lib/billing/metronome-entitlement.test.ts",
