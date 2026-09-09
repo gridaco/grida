@@ -64,6 +64,11 @@ brief but explicit:
    for the id may list specific tests; use `grep -rn GRIDA-SEC-<id>
 --include='*test*' --include='*spec*'` to find any others.
 
+For database-backed boundaries, follow the canonical
+[RPC role contract](../../../supabase/AGENTS.md#rpc-role-contract). Trace public
+entry points through their role privileges and tenant policies; a private inner
+schema or a service-role grant comment does not prove that callers are denied.
+
 If you cannot satisfy steps 1–4, do not commit. Either revert the
 change, or explicitly amend the SECURITY.md entry to reflect a
 deliberate update of the contract — and surface that to the user.

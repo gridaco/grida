@@ -1,3 +1,4 @@
+-- GRIDA-EE: billing
 -- grida_billing schema
 --
 -- Core billing primitives. Mirrors Stripe lifecycle objects (Customer,
@@ -5,8 +6,8 @@
 -- the product can react to billing changes without ever touching Stripe
 -- directly.
 --
--- The schema is locked down: only postgres owner and service_role can
--- reach grida_billing.* tables. PostgREST surface lives in public.*.
+-- Billing writes and server RPCs require service_role. Authenticated members
+-- retain RLS-scoped reads through the invoker views in public.*.
 --
 -- Stripe-sourced amounts are in CENTS (Stripe's smallest currency unit)
 -- and stored as `*_cents` columns to keep the boundary explicit.
@@ -34,10 +35,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA grida_billing GRANT ALL ON 
 ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE ALL ON TABLES    FROM authenticated, anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE ALL ON ROUTINES  FROM authenticated, anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE ALL ON SEQUENCES FROM authenticated, anon;
--- Default-privileges only revoke from authenticated/anon explicitly; PUBLIC
--- still inherits EXECUTE on every routine and authenticated inherits PUBLIC.
--- Strip PUBLIC too so the schema USAGE we grant above doesn't make signed-in
--- users able to call internal SECURITY DEFINER functions like the projector.
+-- Per-schema defaults cannot remove globally granted PUBLIC EXECUTE. This
+-- statement only reverses a matching per-schema grant; explicit per-function
+-- revocations below enforce the boundary for existing and new routines.
 ALTER DEFAULT PRIVILEGES IN SCHEMA grida_billing REVOKE EXECUTE ON ROUTINES FROM PUBLIC;
 
 
@@ -989,7 +989,7 @@ AS $$
   SELECT * FROM grida_billing.fn_apply_stripe_event(p_event_id, p_event_type, p_payload);
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_billing_apply_stripe_event(text, text, jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_billing_apply_stripe_event(text, text, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_billing_apply_stripe_event(text, text, jsonb) TO service_role;
 
 
@@ -1012,7 +1012,7 @@ AS $$
   SELECT grida_billing.fn_stamp_failure(p_event_id, p_event_type, p_reason);
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_billing_stamp_failure(text, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_billing_stamp_failure(text, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_billing_stamp_failure(text, text, text) TO service_role;
 
 
@@ -1032,7 +1032,7 @@ AS $$
   SELECT * FROM grida_billing.fn_attach_stripe_customer(p_org_id, p_stripe_customer_id);
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_billing_attach_stripe_customer(bigint, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_billing_attach_stripe_customer(bigint, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_billing_attach_stripe_customer(bigint, text) TO service_role;
 
 
@@ -1051,7 +1051,7 @@ AS $$
   SELECT stripe_customer_id FROM grida_billing.account WHERE organization_id = p_org_id;
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_billing_get_customer_id(bigint) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_billing_get_customer_id(bigint) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_billing_get_customer_id(bigint) TO service_role;
 
 
@@ -1085,7 +1085,7 @@ AS $$
    LIMIT 1;
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_billing_get_active_subscription(bigint) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_billing_get_active_subscription(bigint) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_billing_get_active_subscription(bigint) TO service_role;
 
 
@@ -1110,7 +1110,7 @@ AS $$
    WHERE id = p_id;
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_billing_get_catalogue(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_billing_get_catalogue(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_billing_get_catalogue(text) TO service_role;
 
 
@@ -1144,7 +1144,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_billing_setup_product(text, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_billing_setup_product(text, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_billing_setup_product(text, text, text) TO service_role;
 
 
@@ -1168,7 +1168,7 @@ AS $$
    WHERE id = p_event_id;
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_billing_get_ai_credit_processed(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_billing_get_ai_credit_processed(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_billing_get_ai_credit_processed(text) TO service_role;
 
 
@@ -1194,5 +1194,26 @@ AS $$
     ai_credit_processed_at = EXCLUDED.ai_credit_processed_at;
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_billing_stamp_ai_credit_processed(text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_billing_stamp_ai_credit_processed(text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_billing_stamp_ai_credit_processed(text, text) TO service_role;
+
+
+---------------------------------------------------------------------
+-- Metronome RPC permission reference (definitions not yet mirrored here).
+-- Definitions and account/event extensions live in
+-- ../migrations/20260508130000_grida_billing_metronome.sql.
+-- ../migrations/20260909090825_billing_rpc_grants.sql applies their grants:
+-- service_role has EXECUTE; PUBLIC, anon and authenticated have none.
+-- Keep this inventory as comments until the definitions are mirrored, so
+-- declarative schema tooling does not execute grants on absent functions.
+-- ../tests/billing_rpc_grants_test.sql verifies the migrated permissions.
+---------------------------------------------------------------------
+-- public.fn_billing_apply_metronome_event(text, text, jsonb)
+-- public.fn_billing_get_metronome_account(bigint)
+-- public.fn_billing_set_metronome_ids(bigint, text, text)
+-- public.fn_billing_set_balance_cache(bigint, bigint, boolean)
+-- public.fn_billing_set_auto_reload(bigint, boolean, integer, integer)
+-- public.fn_billing_resolve_org_by_metronome_customer(text)
+-- public.fn_billing_list_provisioned_orgs()
+-- public.fn_billing_list_metronome_events(bigint, integer)
+-- public.fn_billing_debit_balance_cache(bigint, bigint, bigint)

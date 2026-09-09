@@ -91,8 +91,11 @@ supabase test new <name>
 Run tests against your local database:
 
 ```bash
-supabase db test
+supabase test db
 ```
+
+For RPC permissions and the required privilege and caller tests, follow the
+canonical [RPC role contract](AGENTS.md#rpc-role-contract).
 
 ### Supabase Types
 

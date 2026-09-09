@@ -79,7 +79,7 @@ This codebase currently contains **multiple schema conventions** and is not perf
   - Keep wrappers tenant-safe (RLS-safe, no widening joins) and backed by pgTAP tests.
 - **Be explicit and defensive**.
   - Minimize grants; avoid accidental exposure via default privileges.
-  - For any `SECURITY DEFINER` in `public`, set a safe `search_path`, fully qualify referenced relations, validate tenant boundary inside the function, and prove behavior with tests.
+  - For any `SECURITY DEFINER` in `public`, set a safe `search_path`, fully qualify referenced relations, and prove its [RPC role contract](#rpc-role-contract). User-callable functions must validate the tenant boundary inside the function.
 
 ---
 
@@ -99,7 +99,7 @@ This codebase currently contains **multiple schema conventions** and is not perf
 - **Permissive policies for `anon`** unless explicitly required and tested.
 - **Policy predicates that don’t include tenant boundary** (easy to leak cross-tenant).
 - **Views that bypass RLS** (e.g. selecting from tables without RLS or using privileged functions).
-- **`SECURITY DEFINER` functions that read tenant tables without enforcing tenant checks internally**.
+- **User-callable `SECURITY DEFINER` functions that read tenant tables without enforcing tenant checks internally**.
 
 ---
 
@@ -109,7 +109,7 @@ We use **pgTAP** to assert RLS behavior at the database level.
 
 - **Tests live in** `supabase/tests/*.sql`.
 - Create new tests with `supabase test new <name>` (local only).
-- Run tests with `supabase db test` (local only).
+- Run tests with `supabase test db` (local only).
 
 **How tests should be written**
 
@@ -230,34 +230,90 @@ Prefer **plain RLS + normal DML**. Use RPC only when you need:
 - performance that would be hard to achieve through PostgREST
 - carefully audited “capability” operations (e.g. safe cascade deletion)
 
-### If you must use `SECURITY DEFINER`
+### RPC role contract
 
-Non-negotiables for privileged RPC:
+Declare the intended callers for every function signature, including overloads:
 
-- **Set a safe `search_path`**
-- **Fully qualify** tables/functions where reasonable (`public.my_table`)
-- **Validate inputs** (types, existence, tenant boundary)
-- **Lock down privileges** (`REVOKE ALL ... FROM PUBLIC;` then grant to the minimum role)
-- **Test escalation resistance** (outsider cannot delete/read/modify cross-tenant)
+- **Service-only:** grant `EXECUTE` only to the intended trusted role, normally
+  `service_role`. A privileged wrapper must deny `anon` and `authenticated`
+  even when its internal tables/functions are private or protected by RLS.
+- **User-callable tenant operations:** prefer `SECURITY INVOKER`. If `SECURITY DEFINER` is necessary,
+  require an authenticated caller and enforce the tenant boundary inside the
+  function. Bind user-scoped lookups to `auth.uid()`; reject a supplied foreign
+  user ID. Grant only the intended API roles.
 
-Template:
+Every definer function needs a safe `search_path`, fully qualified relation and
+function references, and input validation appropriate to that contract.
+
+PostgreSQL grants function `EXECUTE` to `PUBLIC` by default. This repository also
+has defaults granting `public` functions created by `postgres` directly to `anon`
+and `authenticated`. Revoking from `PUBLIC` leaves those direct grants intact;
+grants inherited through other roles also count. `GRANT ... TO service_role`
+does not make access exclusive.
+
+Create/replace the function and set privileges for its exact signature in the
+same transaction, so no permissive intermediate state is committed. Service-only
+template:
 
 ```sql
-CREATE OR REPLACE FUNCTION public.my_rpc(arg_project_id uuid)
+BEGIN;
+
+CREATE OR REPLACE FUNCTION public.my_rpc(arg_project_id bigint)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-  -- enforce tenant boundary explicitly inside the function
-  -- ... do work ...
+  -- Validate inputs and perform the privileged operation.
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.my_rpc(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.my_rpc(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.my_rpc(bigint) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.my_rpc(bigint) TO service_role;
+
+COMMIT;
 ```
+
+For a user-callable RPC, use the same explicit revoke, implement the caller/tenant
+guard, then grant the intended roles. Inspect existing ACLs and role memberships
+for additional grants; `CREATE OR REPLACE FUNCTION` preserves existing ACLs.
+
+**Default privileges are not a substitute for function ACLs.** They apply only to
+future objects created by the specified creator role. Schema-scoped
+`ALTER DEFAULT PRIVILEGES ... REVOKE` cannot cancel a global default grant,
+including PostgreSQL's built-in `PUBLIC EXECUTE` on functions. Verify a default
+change by creating a test function as the actual migration role and checking its
+ACLs, then roll back. Do not change global defaults or revoke unrelated `public`
+functions as a shortcut for a scoped permission fix.
+
+**Required pgTAP proof:**
+
+- Replay the complete migration history and seed locally (`supabase db reset`),
+  then run `supabase test db`. A function tested in an empty scratch schema may
+  miss inherited defaults and grants.
+- Check `has_function_privilege(role, 'public.my_rpc(bigint)', 'EXECUTE')` for
+  `anon`, `authenticated`, and `service_role`, against the declared contract.
+  This checks effective access, including inherited grants. Separately assert
+  no unintended `PUBLIC EXECUTE` ACL: inspect
+  `aclexplode(coalesce(proacl, acldefault('f', proowner)))` in `pg_proc`, where
+  `grantee = 0` denotes PUBLIC. A NULL `proacl` means the built-in default
+  function ACL, not an empty ACL.
+- Make real calls after `SET LOCAL ROLE`, with appropriate JWT claims. Prove
+  permission denial (`42501`) for untrusted callers and a successful call as
+  `service_role` for service-only RPCs; a call as `postgres` does not prove that
+  path. Use valid fixtures/arguments so validation errors cannot stand in for
+  permission denial.
+  For user-callable RPCs, cover own-tenant success, other tenant, no membership,
+  anon, and supplied foreign user IDs where applicable. Table/view denial alone
+  does not prove an RPC is denied.
+- Discover the complete RPC family and overloads from the catalog and assert
+  the expected signatures as well as their privileges. A new function or
+  overload must trigger coverage rather than silently escape a fixed test list.
+
+When reviewing history, reconstruct access from role memberships, ownership,
+grants/defaults, wrapper bodies, policies, and role-based tests at the relevant
+revisions. Comments and grant intent are not evidence of effective access.
 
 ---
 
@@ -286,7 +342,7 @@ Agents are allowed to run **local-only** Supabase commands.
 - `supabase migration new ...`
 - `supabase migration up`
 - `supabase test new ...`
-- `supabase db test`
+- `supabase test db`
 - `supabase gen types typescript --local ...`
 
 **Forbidden without explicit user permission**
@@ -307,8 +363,8 @@ Agents are allowed to run **local-only** Supabase commands.
 
 - **RLS**: enabled (and forced when appropriate) for tenant/user data tables.
 - **Policies**: minimal, tenant-scoped, and readable.
-- **Grants**: no accidental `PUBLIC` access; only required roles have access.
-- **RPC**: privileged functions have safe `search_path`, locked-down `EXECUTE`, and tenant checks inside.
+- **Grants**: no unintended effective access through `PUBLIC`, direct grants, or role membership.
+- **RPC**: every signature satisfies the [RPC role contract](#rpc-role-contract), including caller/tenant guards for user-callable definer functions.
 - **Tests**: pgTAP added/updated to prove tenant isolation and intended access.
 - **Seed**: still supports multi-tenant scenarios and hasn’t become brittle.
 - **Privileged code**: no unnecessary `SECURITY DEFINER`, safe `search_path` where used.
