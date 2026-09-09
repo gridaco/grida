@@ -202,7 +202,8 @@ describe("POST /api/v1/ai/images/generations", () => {
       expect(res.status).toBe(200);
       // The billed tier must actually reach the provider (Vercel AI Gateway
       // keys providerOptions by origin provider, e.g. `openai`).
-      const originProvider = CARD.id.slice(0, CARD.id.indexOf("/"));
+      const binding = ai.image.binding(CARD, "vercel")!;
+      const originProvider = binding.id.split("/")[0]!;
       const opts = h.lastOptions as {
         providerOptions?: Record<string, Record<string, unknown>>;
       };
@@ -242,17 +243,43 @@ describe("POST /api/v1/ai/images/generations", () => {
     }
   );
 
-  it("keeps auto background equivalent to the omitted default", async () => {
+  it.each([CARD.id, "xai/grok-imagine-image-2.0"])(
+    "keeps auto background equivalent to the omitted default for %s",
+    async (modelId) => {
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request({ model_id: modelId, prompt: "x", background: "auto" }, token)
+      );
+      expect(res.status).toBe(200);
+      const card = ai.image.findImageModelCard(modelId)!;
+      const binding = ai.image.binding(card, "vercel")!;
+      const originProvider = binding.id.split("/")[0]!;
+      const opts = h.lastOptions as {
+        providerOptions?: Record<string, Record<string, unknown>>;
+      };
+      expect(
+        opts.providerOptions?.[originProvider]?.background
+      ).toBeUndefined();
+      expect(
+        opts.providerOptions?.[originProvider]?.output_format
+      ).toBeUndefined();
+    }
+  );
+
+  it("forwards options to the binding namespace when it differs from the card", async () => {
     const { token } = await signGgToken("user-1", 7);
     const res = await POST(
-      request({ model_id: CARD.id, prompt: "x", background: "auto" }, token)
+      request(
+        { model_id: "xai/grok-imagine-image-2.0", prompt: "x", quality: "low" },
+        token
+      )
     );
     expect(res.status).toBe(200);
     const opts = h.lastOptions as {
       providerOptions?: Record<string, Record<string, unknown>>;
     };
-    expect(opts.providerOptions?.openai?.background).toBeUndefined();
-    expect(opts.providerOptions?.openai?.output_format).toBeUndefined();
+    expect(opts.providerOptions?.spacexai).toEqual({ quality: "low" });
+    expect(opts.providerOptions?.xai).toBeUndefined();
   });
 
   it.each(["openai/gpt-image-2.5-flare", "openai/gpt-image-2.5-sunburst"])(

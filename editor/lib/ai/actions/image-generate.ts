@@ -24,6 +24,7 @@ export type GenerateAiImageInput = {
   width?: number;
   height?: number;
   aspect_ratio?: ai.image.AspectRatioString;
+  /** Opt-in choice from the model card's declared quality options. */
   quality?: string;
   model: ai.image.ProviderModel | ai.image.ImageModelId;
   /** Verified org id — falls back to header / inferred via supabase auth. */
@@ -59,10 +60,11 @@ export async function generateAiImage(
       status: 400,
     };
   }
+  // This action's new quality input is metadata-backed. Unlike the legacy
+  // hosted API, it never previously forwarded quality for older model cards.
   if (
-    input.quality &&
-    model.card.quality &&
-    !model.card.quality.options.includes(input.quality)
+    input.quality !== undefined &&
+    !model.card.quality?.options.includes(input.quality)
   ) {
     return {
       success: false,

@@ -128,21 +128,44 @@ describe.each(variants)("generateAiImage (%s)", (model) => {
     }
   );
 
-  it("rejects unsupported quality before authentication, generation, or storage", async () => {
+  it.each(["ultra", ""])(
+    "rejects unsupported quality %j before authentication, generation, or storage",
+    async (quality) => {
+      expect(
+        await generateAiImage({ model, prompt: "An icon", quality })
+      ).toMatchObject({ success: false, code: "bad_request", status: 400 });
+      expect(mocks.auth).not.toHaveBeenCalled();
+      expect(mocks.generate).not.toHaveBeenCalled();
+      expect(mocks.upload).not.toHaveBeenCalled();
+    }
+  );
+});
+
+const legacyModels = ["openai/gpt-image-2", "bfl/flux-2-pro"] as const;
+
+it.each(legacyModels)(
+  "does not newly forward quality for %s without declared options",
+  async (model) => {
+    expect(models.image.models[model]!.quality).toBeUndefined();
     expect(
-      await generateAiImage({ model, prompt: "An icon", quality: "ultra" })
+      await generateAiImage({ model, prompt: "An icon", quality: "high" })
     ).toMatchObject({ success: false, code: "bad_request", status: 400 });
     expect(mocks.auth).not.toHaveBeenCalled();
     expect(mocks.generate).not.toHaveBeenCalled();
     expect(mocks.upload).not.toHaveBeenCalled();
-  });
-});
+  }
+);
 
-it("preserves the existing omitted-quality request shape", async () => {
-  await generateAiImage({ model: variants[0], prompt: "An icon" });
-  expect(mocks.generate).toHaveBeenCalledWith(
-    expect.objectContaining({
-      providerOptions: { grida: expect.any(Object) },
-    })
-  );
-});
+it.each([variants[0], ...legacyModels])(
+  "preserves the existing omitted-quality request shape for %s",
+  async (model) => {
+    expect(await generateAiImage({ model, prompt: "An icon" })).toMatchObject({
+      success: true,
+    });
+    expect(mocks.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerOptions: { grida: expect.any(Object) },
+      })
+    );
+  }
+);
