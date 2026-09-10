@@ -10,7 +10,7 @@ format: md
 
 # CLI credential custody
 
-> **Status: accepted design; the replacement CLI has not shipped.** Native
+> **Status: accepted custody design for the CLI preview.** Native
 > account custody and shared BYOK storage in TOML are implemented.
 > Environment/stdin keys remain explicit per-invocation overrides.
 > The [native package contract](https://github.com/gridaco/grida/blob/main/packages/grida-auth/README.md)
@@ -106,7 +106,7 @@ still require login. Recovery must report that outcome honestly.
 
 ## Provider credentials
 
-**Implemented in the development preview:** Desktop and CLI share
+**Implemented in the CLI preview:** Desktop and CLI share
 `providers/credentials.toml` for BYOK API keys under the user's Grida home
 (`~/.grida` by default, or the explicit `GRIDA_HOME`). Plaintext
 with user-only permissions is the default. Both clients use the same credential

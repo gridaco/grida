@@ -10,9 +10,8 @@ format: md
 
 # AI tools
 
-> **Command contract for the private development preview.** These commands are
-> implemented locally; the replacement npm CLI has not been released. Broader
-> provider-native execution and detached jobs remain proposals below.
+> **Command contract for the CLI preview.** Broader provider-native execution
+> and detached jobs remain proposals below.
 
 **Discover by modality. Invoke one exact operation through a provider.**
 `models`, `providers`, `voices` and `generate` are root commands. Desktop does

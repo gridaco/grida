@@ -10,7 +10,7 @@ format: md
 
 # Grida CLI
 
-> **Status: accepted doctrine; implementation is a private preview.** Examples
+> **Status: accepted doctrine for the CLI preview.** Examples
 > describe the replacement CLI, not the legacy npm release.
 > See the [v1 spec](./v1.md) for the immediate scope and
 > [account infrastructure](./account-infrastructure.md) for its foundation.

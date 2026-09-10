@@ -13,26 +13,16 @@ format: md
 Discover models, generate media, and keep the files in your own workflow.
 Desktop does not need to be running.
 
-> **Private development preview.** These guides describe the replacement CLI
-> in this repository. It has not been published to npm. Installing the legacy
-> `grida` package does not provide these commands. Hosted Grida login and GG
-> setup are not yet available for this preview.
+> **Preview.** Install the replacement CLI from npm's `next` channel. The legacy
+> `latest` package does not provide these commands.
 
-## Run the preview
+## Install
 
-Use Node.js 24 or later and a repository checkout with dependencies installed.
-Build and invoke the preview from the repository root:
+Use Node.js 24 or later:
 
 ```sh grida-setup
-pnpm --filter grida... build
-node packages/grida-cli/dist/bin.mjs --help
+npm install -g grida@next
 ```
-
-Below, `grida` means that executable. During development, replace it with
-`node packages/grida-cli/dist/bin.mjs` from the repository root. See the
-[contributing guide](https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md)
-for checkout setup. Global installation instructions will accompany the npm
-release.
 
 Stored credentials currently support macOS and Linux. Windows users can supply
 BYOK through explicit environment variables or stdin; durable account login is
@@ -75,7 +65,7 @@ grida docs generate
 
 `--help` describes your installed version and works offline. `docs` prints a
 guide URL without opening a browser; reading the guide needs a connection.
-These pages describe the development preview. Agent, render, and MCP commands
+These pages describe the `next` preview. Agent, render, and MCP commands
 are deferred.
 
 ## Use Grida in scripts

@@ -1,9 +1,9 @@
 # CLI package preparation and release
 
 For maintainers preparing the independently installed `grida` executable.
-The CLI remains a private preview until deployed account access, public
-documentation and release configuration are ready. These scripts do not provision
-services or make the package publishable.
+Publication requires deployed account access, public documentation and release
+configuration. These scripts do not provision services or change the package's
+release metadata.
 
 ## Local candidate
 
@@ -16,7 +16,7 @@ pnpm turbo run typecheck test --filter=grida...
 node --test scripts/cli-release/prepare.test.mjs
 node scripts/cli-release/prepare.mjs --out "$PWD/.cache/cli-candidate"
 node scripts/cli-release/prepare.mjs --verify --out "$PWD/.cache/cli-candidate"
-node scripts/cli-media-local/proof.mjs --archive "$PWD/.cache/cli-candidate/grida-0.0.0.tgz"
+node scripts/cli-media-local/proof.mjs --archive "$PWD/.cache/cli-candidate/grida-0.1.0-next.0.tgz"
 ```
 
 Use the actual archive name from `candidate.json` after a version change. The

@@ -59,6 +59,20 @@ test("literal guide parsing preserves quoted prompts, escaped quotes, false and 
 });
 
 test("guide commands never acquire shell evaluation and cannot silently opt out", () => {
+  assert.deepEqual(
+    CliDocs.examples("```sh grida-setup\nnpm install -g grida@next\n```"),
+    { examples: [], files: [] }
+  );
+  for (const setup of [
+    "npm install -g grida",
+    "npm install -g grida@latest",
+    "npm install -g grida@next\ngrida removed-command",
+    "npm install -g grida@next; id",
+    "pnpm --filter grida... build\nnode packages/grida-cli/dist/bin.mjs --help",
+  ])
+    assert.throws(() =>
+      CliDocs.examples(`\`\`\`sh grida-setup\n${setup}\n\`\`\``)
+    );
   for (const text of [
     "grida $(id)",
     "grida `id`",

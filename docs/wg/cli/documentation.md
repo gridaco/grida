@@ -10,9 +10,8 @@ format: md
 
 # CLI documentation
 
-> **Status: implemented for the private preview.** The public guide source and
-> local currency check exist. Publication and the first npm release remain
-> separate release steps; local validation does not establish deployment.
+> **Status: implemented for the CLI preview.** Public guides and their currency
+> check accompany the npm release. Local validation does not establish deployment.
 
 ## Current position
 

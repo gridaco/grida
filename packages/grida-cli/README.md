@@ -6,12 +6,25 @@
 The `grida` command composes Grida's account services and tools for people and
 their own harnesses. It runs independently of Desktop.
 
-**Private development preview.** This package is not published. The legacy npm
-release does not provide these commands. Current commands cover auth, credential
-storage, identity, organization membership, cached credits, help/version and docs.
+**Preview.** Install the replacement CLI from npm's `next` channel. The legacy
+`latest` package does not provide these commands. Current commands cover auth,
+credential storage, identity, organization membership, cached credits, help/version
+and docs.
 Media commands discover models/schemas, inspect provider key presence, list speech
 voices and generate image, video, music, sound effects, speech and supported 3D.
 Agent, render and MCP are deferred.
+
+Use Node.js 24 or later:
+
+```sh
+npm install -g grida@next
+grida --version
+grida --help
+```
+
+Stored credentials support macOS and Linux. Windows users can supply BYOK
+through explicit environment variables or stdin; durable account login is not
+supported there yet.
 
 User documentation has one canonical home: the
 [Grida CLI guide](https://grida.co/docs/cli). Contributor design lives in the
