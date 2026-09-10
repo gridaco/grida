@@ -1,4 +1,5 @@
 // GRIDA-SEC-006 — see /SECURITY.md
+// GRIDA-SEC-015 — separate signing, audience and lifetime prevent credential substitution.
 // GRIDA-GG: token — policy runs only against explicit host capabilities.
 import { describe, expect, it, vi } from "vitest";
 import { SignJWT, jwtVerify } from "jose";

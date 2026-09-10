@@ -1,4 +1,5 @@
 // GRIDA-SEC-006 — see /SECURITY.md
+// GRIDA-SEC-015 — media grants have a separate verifier from account credentials.
 // GRIDA-GG: token — policy receives its clock, key reader and quota capability.
 import { SignJWT, jwtVerify, errors as joseErrors } from "jose";
 

@@ -1142,7 +1142,11 @@ paths, and params are public, so the design must not rely on obscurity.
    ever delivers a build its own declared scheme.
 
 Electron main holds no durable desktop account or provider credential.
-Chromium's default session owns the HttpOnly cookie jar;
+Chromium's default session owns the account cookie jar. The current Supabase SSR
+helpers do not configure these cookies as HttpOnly; trusted same-origin renderer
+code is not excluded from that cookie authority. This boundary relies on the
+fixed ceremony, renderer/navigation controls and native capability separation,
+not a renderer-inaccessible cookie guarantee;
 the entry account client invokes `session.defaultSession.fetch` only for the
 two fixed same-origin account routes. Main never reads or exports cookie/token
 material, and `DesktopAccountSession` returns only the three-state projection
@@ -2585,9 +2589,77 @@ platform evidence, not Windows or cross-platform release certification.
 
 ---
 
+### `GRIDA-SEC-015` — Account-to-media credential handoff
+
+**What it protects.** Composing native account access with media execution does
+not make the account access or refresh token a provider credential. The CLI
+host explicitly selects BYOK or a scoped GG handoff, and the corresponding
+account/GG server verifiers keep their credential families separate. The
+[client authentication blueprint](docs/reference/authentication.md) maps this
+composition alongside browser, Desktop and independent provider sessions.
+
+**Vulnerable scenario (prevented).** A new media command forwards the user's
+full account token as an AI key, treats a GG grant as account identity, or turns
+a missing BYOK key into implicit account access/credit spending. Sharing model
+operations must not merge the credentials held by their different hosts.
+
+**Why it's specifically risky here.** CLI and Desktop expose the same models
+through different account ceremonies and storage owners. A common account,
+provider interface or HTTP bearer shape does not make those credentials
+interchangeable. Public application registration/API keys are not user identity.
+
+**How the code prevents it.**
+
+1. **Explicit CLI composition.** `MediaCommands` resolves the selected provider
+   and validates generation input/output admission before account authority. Its
+   GG branch opens native auth with one captured in-memory grant sink; the media
+   HTTP owner receives a GG store and an empty BYOK reader. Its BYOK branch opens
+   provider custody without opening native account custody. Errors do not switch
+   the selected provider or funding path; final cleanup clears the GG store.
+2. **Account ingress is not GG ingress.** The native bearer owner admits only
+   the configured issuer/client and required user/session/expiry claims, then
+   verifies the same bearer at fixed live OAuth userinfo. Cookies and GG tokens
+   cannot satisfy that account contract. GRIDA-SEC-010/012 own the full native
+   principal and machine request boundary.
+3. **Scoped media authority has its own verifier.** GG signs/verifies with its
+   dedicated server key, HS256 algorithm, `gg:ai` audience, organization and bounded
+   lifetime. The shared mint policy resolves membership before signing. An
+   account bearer cannot substitute for that grant; a resulting GG grant is
+   rejected by the account API. GRIDA-SEC-006 owns cryptographic scope and the
+   Desktop/native mint adapters; GRIDA-SEC-013 owns CLI credential egress.
+4. **Existing owners stay independent.** GRIDA-SEC-005 owns Desktop account
+   cookies, 010 owns CLI account custody, 008 owns ChatGPT provider OAuth, and
+   014 owns shared BYOK. The blueprint is an index of those owners, not a new
+   store, token type, authentication service or permission mechanism.
+
+**Limits.** This is a composition contract over existing enforcement. It does
+not certify hosted logout, make all clients' logout scope identical, revoke
+already-issued GG grants immediately, or sandbox an account bearer against
+every legacy/browser/Supabase endpoint. CLI explicit-provider policy is not an
+account-wide BYOK-only preference. Independent stores do not prevent deliberate
+account-wide revocation by another client. Keep release-specific acceptance and
+incident investigations out of the architectural guarantee.
+
+**Files bound by this id.**
+
+- [CLI media composition](packages/grida-cli/src/media-run.ts) and
+  [tests](packages/grida-cli/src/media-run.test.ts) — real SDK handoff, BYOK/account
+  independence, missing-key failure, no stale grant reuse or credential output.
+- [Native bearer verifier](editor/lib/auth/bearer.ts) and
+  [tests](editor/lib/auth/__tests__/oauth-bearer.test.ts) — accepted account family
+  and live issuer verification, including rejection of other credential classes.
+- [GG token policy](editor/lib/gg/tokens.ts) and
+  [tests](editor/lib/gg/tokens.test.ts) — separate scoped authority and lifetime.
+- [Native GG exchange tests](editor/lib/api/gg.test.ts) — membership-bound mint
+  and the minted grant's rejection as account authority.
+- [Client authentication blueprint](docs/reference/authentication.md) — the
+  cross-client authority and lifecycle model contributors must keep aligned.
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-015` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-016` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

@@ -1,3 +1,4 @@
+// GRIDA-SEC-015 — scoped media credentials cannot establish native account identity.
 import "server-only";
 import { decodeJwt } from "jose";
 import { oauthServer } from "./oauth-server";

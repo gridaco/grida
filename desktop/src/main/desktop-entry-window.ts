@@ -42,7 +42,7 @@ type DesktopEntryWindowOptions = {
  * Authentication, onboarding completion, and native window role remain three
  * separate authorities:
  *
- * - {@link DesktopAccountSession} projects the HttpOnly cookie session.
+ * - {@link DesktopAccountSession} projects Chromium's account cookie session.
  * - {@link DesktopPreferences} owns native onboarding completion.
  * - this controller owns the exact BrowserWindow and turns those facts into a
  *   mutually exclusive full-window role.
