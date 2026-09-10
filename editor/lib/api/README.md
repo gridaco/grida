@@ -144,6 +144,11 @@ GG's `gg:ai` tokens remain different credential families.
 
 ## Configuration
 
+Native account access also requires the server-owned
+[OAuth deployment configuration](../auth/README.md): issuer, registered client
+allowlist and the separate browser consent settings. Configure and verify the
+deployed web server before releasing a CLI that depends on it.
+
 `GRIDA_API_ORIGIN` sets one exact canonical origin, without a trailing slash,
 path or credentials. HTTPS is required except for explicit HTTP loopback origins.
 Set it for a custom self-hosted address or local fixture; forwarded headers never
