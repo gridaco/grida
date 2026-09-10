@@ -12,7 +12,7 @@ format: md
 
 > **Status: accepted architecture.** This specifies the account foundation for
 > independent native clients. CLI commands, media execution and npm distribution
-> are separate delivery. The replacement CLI has not shipped. See the
+> have their own contracts. See the
 > [doctrine](./index.md) for product boundaries.
 
 ## Scope and ownership

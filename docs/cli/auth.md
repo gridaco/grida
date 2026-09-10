@@ -13,10 +13,6 @@ format: md
 Grida login is for account services and Grida Gateway (GG). [BYOK generation](./providers.md)
 uses your provider key independently and does not require this login.
 
-> **Preview status:** this CLI has not been released. Hosted account access is
-> awaiting deployment verification. Contributors can use the isolated
-> [local CLI proof](https://github.com/gridaco/grida/tree/main/scripts/cli-local).
-
 ## Sign in
 
 ```sh
