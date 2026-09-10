@@ -47,11 +47,11 @@ import {
   OpenRouterLogo,
   VercelLogo,
 } from "@grida/react-icons/logos";
-// Pull the catalog from the framework-free `@grida/ai-models` package,
+// Pull the catalog from the framework-free `@grida/ai-models/grida` entry,
 // NOT the editor's `@/lib/ai/models` seam — that seam constructs server
 // providers (live keys) and is lint-blocked from the desktop renderer
-// (GRIDA-SEC-004). This package is pure data and renderer-safe.
-import _models from "@grida/ai-models";
+// (GRIDA-SEC-004). This entry is pure data and renderer-safe.
+import { catalog as _models } from "@grida/ai-models/grida";
 import type {
   ChatSessionRow,
   EndpointProviderConfig,
@@ -259,6 +259,9 @@ function ModelPickerGroupItems({
         >
           {option.label}
         </span>
+        {option.deprecated && (
+          <span className="shrink-0 text-muted-foreground">Legacy</span>
+        )}
         <CheckIcon
           aria-hidden="true"
           className={cn("size-3.5", selected ? "opacity-100" : "opacity-0")}

@@ -5,16 +5,13 @@
  * ids. Consumers pick a tier; the same tier resolves to the same
  * model id everywhere the table is imported.
  *
- * The tier→id table type-uses `models.text.CatalogId` from `./models`,
- * so the compiler enforces that every tier-mapped id has a matching
- * entry in the text-model catalogue. The dependency is type-only —
- * there is no runtime cycle, and `./models` runtime-imports
- * `TIER_MODEL_IDS` from this file to build `models.text.byTier`.
+ * The tier→id table type-uses the factual producer's CatalogId. The service
+ * also validates that each selected id belongs to its own membership.
  *
  * @module
  */
 
-import type { models } from "./models";
+import type { models } from "../models";
 
 /**
  * Model tier — capability bracket.
@@ -33,7 +30,7 @@ export type ModelTier = "nano" | "mini" | "pro" | "max";
  *
  * Constrained to `models.text.CatalogId` so the compiler rejects any
  * tier mapped to an id that lacks a matching entry in the text
- * catalogue (see `./models`).
+ * factual catalogue. Service membership is validated separately.
  *
  * Each tier is one adjacent rung in the current capability ladder:
  * GPT-6 Astra > GPT-5.6 Sol > GPT-5.6 Terra > GPT-5.6 Luna. When a new
@@ -41,12 +38,12 @@ export type ModelTier = "nano" | "mini" | "pro" | "max";
  * one rung; do not skip a still-current model or collapse tiers without a
  * separate reason to change the topology.
  */
-export const TIER_MODEL_IDS = {
+export const TIER_MODEL_IDS = Object.freeze({
   nano: "openai/gpt-5.6-luna",
   mini: "openai/gpt-5.6-terra",
   pro: "openai/gpt-5.6-sol",
   max: "openai/gpt-6-astra",
-} as const satisfies Record<ModelTier, models.text.CatalogId>;
+} as const satisfies Record<ModelTier, models.text.CatalogId>);
 
 /** Literal union of tier-mapped model ids (values of {@link TIER_MODEL_IDS}). */
 export type TierModelId = (typeof TIER_MODEL_IDS)[ModelTier];

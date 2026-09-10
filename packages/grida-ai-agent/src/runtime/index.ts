@@ -106,7 +106,7 @@ import { buildReplayPrefix } from "./replay-prefix";
 import type { ChatMessageWithParts } from "../session/rows";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
-import type { models } from "@grida/ai-models";
+import type { catalog as models } from "@grida/ai-models/grida";
 import { catalogView } from "../providers/model-catalog";
 import { isChatGptProviderId } from "../protocol/chatgpt";
 import { tierModelId as chatGptTierModelId } from "../providers/chatgpt";

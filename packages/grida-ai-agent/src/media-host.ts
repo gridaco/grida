@@ -7,7 +7,7 @@ import {
   ModelCatalogStore,
   ProviderHttp,
 } from "@grida/ai";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import type { MediaTenantOptions } from "./media-server";
 import type { EndpointProvidersStore } from "./providers/endpoints";
 import { registerSecretsRoutes } from "./http/routes/secrets";

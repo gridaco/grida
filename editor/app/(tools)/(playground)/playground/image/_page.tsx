@@ -101,7 +101,7 @@ function CanvasConsumer() {
   const { withAuth, session } = useContinueWithAuth();
   const credits = useAiCredits();
   const editor = useCurrentEditor();
-  const model = useImageModelConfig("openai/gpt-image-1-mini");
+  const model = useImageModelConfig();
   const [loading, startGenerate] = useTransition();
 
   const onCommit = (value: { text: string }) => {
@@ -320,6 +320,11 @@ function Chat({
               <SelectItem key={m.id} value={m.id}>
                 <div className="w-full flex items-center justify-between gap-2">
                   {m.label}
+                  {m.deprecated && (
+                    <span className="text-xs text-muted-foreground">
+                      Legacy
+                    </span>
+                  )}
                   <Badge variant="outline">
                     {m.speed_max === "varies" ? "Varies" : `~${m.speed_max}`}
                   </Badge>

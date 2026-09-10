@@ -4,7 +4,7 @@
  * the model catalogue, parseable by every client that consumes it.
  */
 import { describe, it, expect } from "vitest";
-import { models, TIER_MODEL_IDS } from "@grida/ai-models";
+import { catalog as models, TIER_MODEL_IDS } from "@grida/ai-models/grida";
 import { GET } from "./route";
 import { isHostedTextModel } from "@/lib/ai/openai-compat/hosted-models";
 
@@ -35,7 +35,24 @@ describe("GET /api/v1/models/catalog", () => {
     const parsed = models.snapshot.parse(await body());
     expect(parsed).not.toBeNull();
     expect(parsed!.schema).toBe(models.snapshot.SCHEMA);
+    expect(parsed!.schema).toBe(1);
     expect(parsed!.version.length).toBeGreaterThan(0);
+  });
+
+  it("keeps the legacy image fields consumed by installed version-one clients", async () => {
+    const parsed = models.snapshot.parse(await body())!;
+    expect(parsed.image?.models["openai/gpt-image-2"]).toMatchObject({
+      id: "openai/gpt-image-2",
+      listed: true,
+      deprecated: true,
+      provider: "vercel",
+    });
+    expect(parsed.image?.models["openai/gpt-image-2.5-flare"]).toMatchObject({
+      id: "openai/gpt-image-2.5-flare",
+      listed: true,
+      deprecated: false,
+      provider: "vercel",
+    });
   });
 
   it("publishes the same table the server-side gate enforces", async () => {
@@ -57,6 +74,15 @@ describe("GET /api/v1/models/catalog", () => {
     for (const id of Object.values(parsed.text.tier_model_ids)) {
       expect(parsed.text.catalog[id]).toBeDefined();
     }
+  });
+
+  it("publishes the shared image recommendation without replacing an explicit legacy choice", async () => {
+    const parsed = models.snapshot.parse(await body())!;
+    expect(parsed.preferences?.image?.default_id).toBe(models.image.default_id);
+    const view = models.snapshot.view(parsed).image;
+    expect(view.default_id).toBe("openai/gpt-image-2.5-flare");
+    expect(view.cardById("openai/gpt-image-2")?.deprecated).toBe(true);
+    expect(view.listed().at(-1)?.id).toBe("openai/gpt-image-2");
   });
 
   it("carries the pricing and limits a client needs to estimate cost", async () => {

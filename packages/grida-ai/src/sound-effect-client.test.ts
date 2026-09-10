@@ -1,6 +1,6 @@
 // GRIDA-SEC-004 — public SFX provider authority, live keys, bounded audio, safe failures.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import { SoundEffectClient, ProviderHttp } from "./index";
 
 const ID = "eleven_text_to_sound_v2";

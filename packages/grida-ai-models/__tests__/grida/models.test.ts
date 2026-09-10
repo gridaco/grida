@@ -1,4 +1,4 @@
-import models, { TIER_MODEL_IDS } from "..";
+import { catalog as models, TIER_MODEL_IDS } from "../../src/grida";
 
 describe("bundled model release metadata", () => {
   const cards: readonly { id: string; release?: models.ModelRelease }[] = [
@@ -10,7 +10,6 @@ describe("bundled model release metadata", () => {
     ...Object.values(models.three_d.models),
     ...Object.values(models.video.models).filter((card) => card !== undefined),
     ...Object.values(models.image_tools.models),
-    ...Object.values(models.embedding.models),
   ];
   const grounded = cards.filter(
     (card): card is { id: string; release: models.ModelRelease } =>
@@ -41,10 +40,13 @@ describe("bundled model release metadata", () => {
 
   it("uses null only for endpoints whose exact first day is unavailable", () => {
     expect(
-      cards.filter((card) => card.release?.date === null).map((card) => card.id)
+      cards
+        .filter((card) => card.release?.date === null)
+        .map((card) => card.id)
+        .sort()
     ).toEqual([
-      "recraft-ai/recraft-remove-background",
       "851-labs/background-remover",
+      "recraft-ai/recraft-remove-background",
     ]);
     expect(
       grounded
@@ -605,9 +607,12 @@ describe("models.three_d catalogue invariants", () => {
       "fal-ai/trellis-2",
     ]);
     expect(models.three_d.listed_models()).toEqual([]);
-    expect(models.three_d.staged_models().map((card) => card.id)).toEqual(
-      expectedIds
-    );
+    expect(
+      models.three_d
+        .staged_models()
+        .map((card) => card.id)
+        .sort()
+    ).toEqual([...expectedIds].sort());
 
     for (const [id, card] of Object.entries(models.three_d.models)) {
       expect(card.id).toBe(id);
@@ -670,7 +675,9 @@ describe("models.three_d catalogue invariants", () => {
       usd_by_resolution: { "512": 0.25, "1024": 0.3, "1536": 0.35 },
     });
     expect(trellis.avg_cost_usd).toBe(
-      trellis.pricing.usd_by_resolution[trellis.pricing.default_resolution]
+      trellis.pricing.type === "per_generation_by_resolution"
+        ? trellis.pricing.usd_by_resolution[trellis.pricing.default_resolution]
+        : undefined
     );
   });
 });

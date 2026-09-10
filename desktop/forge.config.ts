@@ -93,7 +93,7 @@ function packageIgnore(file: string): boolean {
   // `@grida/*` are bundled (devDependencies); their node_modules entries are
   // `link:` symlinks to ../../packages that point out of the package and make
   // asar fail ("links out of the package"). Exclude them explicitly.
-  if (file.startsWith("/node_modules/@grida")) return true;
+  if (/^\/node_modules\/@grida(?:\/|$)/.test(file)) return true;
   // pnpm internals (.pnpm store, .bin shims, lockfile metadata) — not needed at
   // runtime; the hoisted prod deps are real dirs at the top level.
   if (file.startsWith("/node_modules/.")) return true;

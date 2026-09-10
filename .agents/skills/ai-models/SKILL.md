@@ -23,16 +23,18 @@ description: >
 
 ## Key Files
 
-| File                                       | Role                                                                                                                                                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/grida-ai-models/src/models.ts`   | Central catalogue. Sole export is the `models` namespace: `models.text` (`ModelSpec`, `catalog`, `byTier`, `modelSpecById`), `models.image`, `models.audio`, `models.video`, `models.image_tools` |
-| `packages/grida-ai-models/src/tiers.ts`    | `ModelTier` set + `TIER_MODEL_IDS` (type-uses `models.text.CatalogId` from `models.ts`)                                                                                                           |
-| `editor/lib/ai/models.ts`                  | AI Gateway + BYOK provider seam (catalogue is re-exported from `@grida/ai-models`)                                                                                                                |
-| `editor/lib/ai/ai.ts`                      | `toMills()` + Replicate call shapes; re-aggregates the shared catalogue under `ai.*`                                                                                                              |
-| `editor/lib/ai/server.ts`                  | AI seam: prepaid-credit gate, provider call, and post-flight usage ingest                                                                                                                         |
-| `editor/lib/billing/metronome.ts`          | Organization credit entitlement, cached balance gate, and Metronome usage ledger                                                                                                                  |
-| `editor/app/(www)/(ai)/ai/models/page.tsx` | Public models catalog page                                                                                                                                                                        |
-| `docs/models/index.md`                     | User-facing models & pricing documentation                                                                                                                                                        |
+| File                                                | Role                                                                                                             |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `packages/grida-ai-models/src/models.ts`            | Agnostic facts: identities, capabilities, provider bindings, published rates and provenance (`models` namespace) |
+| `packages/grida-ai-models/src/grida/catalog.ts`     | Grida service membership/lifecycle and joined views; compatible schema-1 snapshot (`catalog` namespace)          |
+| `packages/grida-ai-models/src/grida/preferences.ts` | Optional default and independent partial order per service family                                                |
+| `packages/grida-ai-models/src/grida/tiers.ts`       | Grida text `ModelTier` set and `TIER_MODEL_IDS`                                                                  |
+| `editor/lib/ai/models.ts`                           | AI Gateway + BYOK provider seam (service catalog from `@grida/ai-models/grida`)                                  |
+| `editor/lib/ai/ai.ts`                               | `toMills()` + Replicate call shapes; re-aggregates the shared catalogue under `ai.*`                             |
+| `editor/lib/ai/server.ts`                           | AI seam: prepaid-credit gate, provider call, and post-flight usage ingest                                        |
+| `editor/lib/billing/metronome.ts`                   | Organization credit entitlement, cached balance gate, and Metronome usage ledger                                 |
+| `editor/app/(www)/(ai)/ai/models/page.tsx`          | Public models catalog page                                                                                       |
+| `docs/models/index.md`                              | User-facing models & pricing documentation                                                                       |
 
 ## Tools
 
@@ -71,8 +73,8 @@ providers; an id is never portable. Two cataloguing patterns:
 
 - **text / audio / image_tools / 3D** — one card = one provider or exact endpoint;
   `id` is in that provider's format, and the `provider` field (or namespace) fixes the route.
-- **image** — one intrinsic card carries per-provider bindings, like video, plus a
-  primary provider retained for older single-provider consumers.
+- **image** — one intrinsic card carries per-provider bindings, like video. The
+  service view adds a primary provider for older single-provider consumers.
 - **video** — the ecosystem is fragmented, so a card is **canonical** (`vendor/model`,
   e.g. `google/veo-3.1`) and carries a `providers` record (keyed by provider) of bindings,
   each with its own call id + meter. Default-provider choice is deferred (see Video Models).
@@ -87,12 +89,31 @@ providers; an id is never portable. Two cataloguing patterns:
 
 - **Availability + price differ per provider.** **Veo 3.1 Lite** is on OpenRouter/fal.ai but **not** the Vercel gateway — a canonical card just omits the Vercel binding. Veo 3.1 audio-on is `$0.40/s` on both Vercel and fal, but fal also meters silent (`$0.20/s`) and 4K, while **OpenRouter exposes only `$0/MTok` token pricing for video — no usable per-second meter (don't invent one).**
 - **fal.ai** is the broadest video/image catalogue (pay-per-use); billing unit is per-model — per-image, per-megapixel, or per-second video — retrievable from its Platform pricing API.
-- Image cards are multi-homed across Vercel, fal, and OpenRouter where verified;
-  `listed` cards must retain the catalogue's one-key/universal-provider promise.
+- Image facts are multi-homed across Vercel, fal, and OpenRouter where verified.
+  Service listing is a separate decision; a listed card does not establish that
+  every provider, installed adapter, or request mode can serve it.
 
 ---
 
 ## What the catalogue is for
+
+Keep one package with two explicit entries: `@grida/ai-models` for facts and
+`@grida/ai-models/grida` for service policy. Service definitions consume facts;
+the root entry never imports or re-exports Grida policy.
+Add verified model facts independently of Grida admission. Manage Grida choices
+in the service definitions, not source declaration order or provider timestamps.
+
+The shared execution SDK (`@grida/ai`) retains its Grida defaults by explicitly
+importing the service entry where needed. Its catalog store accepts an optional
+snapshot or refresh URL; callers need not inject a catalog. Keep provider
+execution and refresh lifecycle in the SDK and the schema-1 codec in the service
+entry; do not restore agent-local adapters or duplicate membership.
+
+Preference discipline: an optional default must be listed and nonlegacy. The
+independent order is partial; unknown and duplicate IDs are errors. Views sort
+default first, other active models before legacy, then explicit rank, label and
+ID. Explicit user selections are not replaced by a recommendation. Native
+subscription and custom-endpoint choices remain with their own runtime owners.
 
 The catalogue states what is true and useful **now**. Its shape must never be a
 record of how recently someone got round to updating it — a stale entry is a
@@ -104,16 +125,20 @@ wrong answer, not a conservative one.
   silent cost increase. Recheck when that date passes: a promotion can also be
   made permanent, which changes the fact, not the rule.
 - **Deprecate a card that is still a real choice; remove one that is not.**
-  `deprecated: true` is for a model someone might still reasonably pick — same
+  Grida `legacy: true` (projected as `deprecated` for existing consumers) is for a model someone might still reasonably pick — same
   price as its successor, or better at something. Delete the entry when the
   successor is _strictly dominant_ (never worse on any axis, better on at least
   one): a card nobody should choose is noise in every picker, and keeping it is
   not caution.
 
-Removal is the kill switch — the id stops passing the run gate, and on a
+Removal from the service catalog is the kill switch — the id stops passing the run gate, and on a
 published catalogue that reaches installed clients within a refresh interval
 (`docs/wg/platform/hosted-ai.md`). That decisiveness is the point; it also means
-removal is the wrong tool for tidying.
+removal is the wrong tool for tidying. It does not require deleting factual
+identity or imply upstream retirement. Preserve schema-1 membership and legacy
+fields when publishing; installed clients ignore additive preferences. The v1
+snapshot still has broad GG/BYOK membership and per-family fallback behavior;
+runtime adapter support and authorization remain independent checks.
 
 ## Release dates and provenance
 
@@ -160,7 +185,7 @@ and the narrow `null` rule.
 
 ## Text Models
 
-Live in `packages/grida-ai-models/src/models.ts` under `models.text.catalog: Record<CatalogId, ModelSpec>`. The tier set and tier→model id table sit in `packages/grida-ai-models/src/tiers.ts` and type-use `models.text.CatalogId` from `models.ts` — so every tier id must resolve to a real catalogued spec.
+Facts live in `packages/grida-ai-models/src/models.ts` under `models.text.catalog: Record<CatalogId, ModelSpec>`. Grida tier assignments live in `packages/grida-ai-models/src/grida/tiers.ts`; each must resolve to a listed service member.
 
 Fields to update per tier:
 
@@ -172,7 +197,7 @@ Fields to update per tier:
 
 ## Image Models
 
-Live in `packages/grida-ai-models/src/models.ts` under `models.image.models`. Editor consumers reach the same data via `import { ai } from "@/lib/ai/ai"` (a thin re-aggregator that adds `ai.toMills` and `ai.server.methods.*`).
+Facts live in `packages/grida-ai-models/src/models.ts` under `models.image.models`. The service view adds membership, legacy state, primary-provider choice and request presets. Editor consumers reach that joined view via `import { ai } from "@/lib/ai/ai"` (which also adds `ai.toMills` and `ai.server.methods.*`).
 
 ### Pricing types
 
@@ -192,7 +217,7 @@ per_token         — charged by token (e.g. Google Gemini)
 ### Fields per model
 
 - `pricing` — real provider data, one of the three types above
-- `avg_cost_usd` — fallback billable-cost estimate, not displayed to users. Mid-tier for tiered, flat rate for flat, conservative estimate for per-token.
+- `avg_cost_usd` — existing fallback billable-cost estimate, not a provider quote. Retained compatibility surface; do not treat it as independently verified pricing or expand it into service routing/billing policy.
 - `release` — intrinsic model release; do not use a provider-binding date
 - `min_width`, `max_width`, `min_height`, `max_height`, `sizes` — dimension constraints
 - Add new model IDs to the `ImageModelId` type union
@@ -207,11 +232,11 @@ Image generation currently routes through the Vercel AI Gateway (`gateway.image(
 
 ## Video Models
 
-Live in `models.video.models` in `packages/grida-ai-models/src/models.ts`. The video provider ecosystem is **fragmented**, so unlike image/audio (one card = one provider) a video card is **canonical**: `id` is provider-agnostic (`vendor/model`, e.g. `google/veo-3.1`) and holds the intrinsic specs; per-provider routes live in `providers`, a record keyed by provider.
+Facts live in `models.video.models` in `packages/grida-ai-models/src/models.ts`. Like image, a video card is **canonical**: `id` is provider-agnostic (`vendor/model`, e.g. `google/veo-3.1`) and holds intrinsic specs; per-provider routes live in `providers`, keyed by provider.
 
 ### Card shape
 
-- **Model (intrinsic):** `id` (canonical), `label`, `release`, `vendor`, `aspect_ratios`, `min_duration`/`max_duration`, `audio`, `default` (resolution/aspect/duration/audio), `url` (original vendor's model card).
+- **Model (intrinsic):** `id` (canonical), `label`, `release`, `vendor`, `aspect_ratios`, `min_duration`/`max_duration`, `audio`, `url` (original vendor's model card). Grida request `default` (resolution/aspect/duration/audio) belongs to the service view.
 - **`providers: Partial<Record<VideoProvider, VideoProviderBinding>>`** — one binding per serving provider: `provider`, `id`, `pricing`, `avg_cost_usd`, optional `url`/`deprecated`. **No preference order** — the default-provider choice is deliberately deferred to the runtime. Look a route up with `video.binding(card, provider)`.
 
 Cards catalogue the **image-to-video** route only (canvas-relevant; Grok's sole mode), so each binding has a single `id` — on fal the capability is keyed into the id (`fal-ai/veo3.1/image-to-video`). Don't add a per-capability `endpoints` map until a second capability is actually served: identical ids across capabilities are YAGNI, and divergent ones (other fal endpoints) are a new binding/id when needed.
@@ -240,11 +265,10 @@ resolution **and** whether audio is generated, so the keys are the exact
 
 ### Adding a model / route
 
-- Catalogue boundary: never add or list a model Grida cannot call. A model
-  requires at least one verified provider binding with grounded pricing;
-  announcements, `listed: false`, and compatibility-only records stay out
-  entirely.
-- New model → add the canonical id to `VideoModelId` and a card with ≥1 binding. Every binding must price the model's `default` `(resolution, audio)` — enforced by catalogue-invariant tests (plus: provider field matches key).
+- Factual boundary: a model requires verified provider bindings and grounded
+  rates. Service boundary: list it only after Grida can execute the offering;
+  factual identity alone is not admission.
+- New model → add the canonical id to `VideoModelId` and a factual card with ≥1 binding. Separately define service membership and request presets; the chosen preset must be supported and priced by the route that executes it.
 - New route for an existing model → add a `VideoProviderBinding` under its provider key, **only with a verified rate** (e.g. OpenRouter surfaces `$0/MTok` for video — not usable; leave it out).
 - New capability (e.g. text-to-video) → only when actually used. If a provider keys it into a separate id (fal), that's a new binding/id; revisit the single-`id` shape only then.
 
@@ -271,6 +295,9 @@ credit. Unit: **mills** (1 mill = $0.001 USD).
 
 ## After Any Update
 
+- [ ] Facts and Grida membership/preferences were updated in their separate canonical homes
+- [ ] Optional defaults still resolve to active listed members; order is deliberate, partial, and duplicate-free
+- [ ] Existing explicit selections, runtime provider gates and installed schema-1 clients remain compatible
 - [ ] Every bundled model has a complete `release`; date semantics and source priority were followed
 - [ ] `models.dev` dates were treated as discovery hints and verified against authoritative sources
 - [ ] `pnpm tsc --noEmit` passes

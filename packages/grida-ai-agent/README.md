@@ -64,6 +64,15 @@ The SDK resolves compatibility and executes the selected provider. The host
 reads reference files and persists returned bytes to media storage or session
 scratch.
 
+The service policy comes from `@grida/ai-models/grida`, which joins Grida membership,
+legacy status, tiers, request presets and optional recommendations to the neutral
+`@grida/ai-models` facts. The shared SDK retains its Grida defaults and owns the
+refresh store, using the service entry's seed and schema-1 parser. The image and
+video routes and chat runtime share that store; audio and 3D retain their bundled
+catalogs. The optional image default
+is used only when the caller has not chosen a model. Explicit legacy selections
+remain valid while the service still admits them.
+
 The shared operation does not retry a failed paid batch. Requesting multiple
 images can still require multiple submissions under the provider's batch limit.
 Image failures contain safe codes; raw upstream errors and warnings do not enter

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import {
   PromptInput,
   PromptInputBody,
@@ -33,9 +33,7 @@ import {
   useElevenLabsConnection,
 } from "./elevenlabs-connection";
 
-const SOUND_EFFECT_MODELS = models.audio.sound_effects.model_ids.map(
-  (id) => models.audio.sound_effects.models[id]
-);
+const SOUND_EFFECT_MODELS = models.audio.sound_effects.ordered_models();
 
 export type SoundEffectGeneratedPreview = Readonly<{
   file: File;

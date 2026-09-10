@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — public video authority, whole-operation bounds, safe results.
 // GRIDA-GG: token — synthetic scoped credentials only; no services or provider calls.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import {
   VideoClient,
   ProviderHttp,

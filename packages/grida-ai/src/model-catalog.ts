@@ -2,7 +2,7 @@
 /**
  * The catalogue this host resolves against.
  *
- * `@grida/ai-models` is compiled into the binary, so a shipped host can
+ * `@grida/ai-models/grida` is compiled into the binary, so a shipped host can
  * only see the catalogue it was built with: a model added on the server
  * is rejected by this host's own run gate until someone ships a release.
  * This store removes that coupling — the bundled catalogue becomes a
@@ -23,7 +23,7 @@
  * leaves the last good view in place. `start()` never throws and never
  * blocks a caller; `view()` is synchronous and always answers.
  */
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 
 /** Published catalogue path on the Grida base URL. */
 export const CATALOG_PATH = "/api/v1/models/catalog";

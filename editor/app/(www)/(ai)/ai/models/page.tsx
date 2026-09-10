@@ -1,10 +1,9 @@
 import type { FC } from "react";
 import type { Metadata } from "next";
 import ai from "@/lib/ai";
+import { catalog as serviceCatalog } from "@grida/ai-models/grida";
 import {
   models as textModels,
-  catalog as textCatalog,
-  type CatalogId,
   type ModelRelease,
   type ModelSpec,
   type ModelTier,
@@ -131,12 +130,9 @@ const LONG_CONTEXT_PRICING_NOTE =
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function groupByVendor(
-  models: Partial<Record<string, AITypes.image.ImageModelCard>>
-) {
+function groupByVendor(models: readonly AITypes.image.ImageModelCard[]) {
   const groups = new Map<string, AITypes.image.ImageModelCard[]>();
-  for (const model of Object.values(models)) {
-    if (!model) continue;
+  for (const model of models) {
     const list = groups.get(model.vendor) ?? [];
     list.push(model);
     groups.set(model.vendor, list);
@@ -459,7 +455,7 @@ function ModelCard({ model }: { model: AITypes.image.ImageModelCard }) {
             <div className="flex justify-between">
               <span>Status</span>
               <Badge variant="outline" className="text-xs h-4 font-normal">
-                Deprecated
+                Legacy
               </Badge>
             </div>
           )}
@@ -553,7 +549,7 @@ function CatalogRow({ spec }: { spec: ModelSpec }) {
                   variant="outline"
                   className="h-4 px-1.5 text-[10px] font-normal"
                 >
-                  Deprecated
+                  Legacy
                 </Badge>
               )}
             </div>
@@ -586,7 +582,7 @@ function CatalogRow({ spec }: { spec: ModelSpec }) {
 }
 
 function CatalogSection() {
-  const entries = Object.entries(textCatalog) as [CatalogId, ModelSpec][];
+  const entries = serviceCatalog.text.ordered_models();
   if (entries.length === 0) return null;
   return (
     <div className="container mx-auto px-4 pb-12">
@@ -611,8 +607,8 @@ function CatalogSection() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {entries.map(([id, spec]) => (
-              <CatalogRow key={id} spec={spec} />
+            {entries.map((spec) => (
+              <CatalogRow key={spec.id} spec={spec} />
             ))}
           </TableBody>
         </Table>
@@ -683,7 +679,8 @@ function TextModelsSection() {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AIModelsCatalogPage() {
-  const grouped = groupByVendor(ai.image.models);
+  const imageModels = ai.image.ordered_models();
+  const grouped = groupByVendor(imageModels);
 
   return (
     <main className="min-h-screen">
@@ -720,52 +717,57 @@ export default function AIModelsCatalogPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {[...grouped.entries()].map(([vendor, models]) => {
-                return models.map((model) => (
-                  <TableRow key={model.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <MakerLogo vendor={vendor} className="size-4" />
-                        <div>
-                          <div className="font-medium">{model.label}</div>
-                          <code className="text-xs text-muted-foreground">
-                            {model.id}
-                          </code>
-                          <ImageProviderRequirement model={model} />
-                          <ImageTransparency model={model} />
-                          <ReleaseDate
-                            release={model.release}
-                            prefix
-                            className="block text-xs text-muted-foreground md:hidden"
-                          />
+              {imageModels.map((model) => (
+                <TableRow key={model.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <MakerLogo vendor={model.vendor} className="size-4" />
+                      <div>
+                        <div className="font-medium">
+                          {model.label}
+                          {model.deprecated && (
+                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                              Legacy
+                            </span>
+                          )}
                         </div>
+                        <code className="text-xs text-muted-foreground">
+                          {model.id}
+                        </code>
+                        <ImageProviderRequirement model={model} />
+                        <ImageTransparency model={model} />
+                        <ReleaseDate
+                          release={model.release}
+                          prefix
+                          className="block text-xs text-muted-foreground md:hidden"
+                        />
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <PricingBadge pricing={model.pricing} />
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Badge
-                        variant="outline"
-                        className="capitalize font-normal text-xs"
-                      >
-                        {model.speed_label}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground ml-2">
-                        {model.speed_max === "varies"
-                          ? "Varies"
-                          : `~${model.speed_max}`}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
-                      {dimLabel(model)}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
-                      <ReleaseDate release={model.release} />
-                    </TableCell>
-                  </TableRow>
-                ));
-              })}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <PricingBadge pricing={model.pricing} />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <Badge
+                      variant="outline"
+                      className="capitalize font-normal text-xs"
+                    >
+                      {model.speed_label}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      {model.speed_max === "varies"
+                        ? "Varies"
+                        : `~${model.speed_max}`}
+                    </span>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                    {dimLabel(model)}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                    <ReleaseDate release={model.release} />
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
@@ -1055,7 +1057,7 @@ function MusicModelCard({ model }: { model: AITypes.audio.music.ModelCard }) {
             <div className="flex justify-between">
               <span>Status</span>
               <Badge variant="outline" className="text-xs h-4 font-normal">
-                Deprecated
+                Legacy
               </Badge>
             </div>
           )}
@@ -1156,9 +1158,7 @@ function MusicModelsCards() {
 // ── Sound effect models ───────────────────────────────────────────────────
 
 function SoundEffectModelsSection() {
-  const models = Object.values(ai.audio.sound_effects.models).filter(
-    (model) => !model.deprecated
-  );
+  const models = ai.audio.sound_effects.ordered_models();
   if (models.length === 0) return null;
 
   return (
@@ -1301,9 +1301,7 @@ function ThreeDPricing({
 }
 
 function ThreeDModelsSection() {
-  const models = Object.values(ai.three_d.models).filter(
-    (model) => !model.deprecated
-  );
+  const models = ai.three_d.ordered_models();
   if (models.length === 0) return null;
 
   return (

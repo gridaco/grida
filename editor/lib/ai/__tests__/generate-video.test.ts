@@ -10,7 +10,7 @@
  * card so price updates don't rot the test.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { models as ai_models } from "@grida/ai-models";
+import { catalog as ai_models } from "@grida/ai-models/grida";
 
 vi.mock("@/lib/billing/metronome", () => ({
   getEntitlement: vi.fn<(...args: never[]) => unknown>(),

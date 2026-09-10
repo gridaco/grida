@@ -1,6 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — discovery grants no provider or GG authority.
 // GRIDA-GG: provider — executable route facts do not establish scoped access or credits.
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import { InputSchema, type InputJsonSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";

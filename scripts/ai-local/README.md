@@ -31,6 +31,9 @@ platform remain absent.
 The public consumer runs once using ESM imports and once using CJS `require`.
 Both root and `/providers` exports must work; private media implementations and Grida
 agent, daemon, auth, account, CLI, Desktop and framework packages are unavailable.
+The factual `@grida/ai-models` root and service `@grida/ai-models/grida` entry
+must both load in ESM and CommonJS. Snapshot codecs and types come from the
+service entry; the SDK retains its bundled service defaults.
 Synthetic transports exercise OpenRouter, Vercel, fal and scoped GG image
 generation and video submit/poll/result chains, input capability discovery, credential-free result downloads,
 explicit provider selection, missing credentials, single submission on failure,

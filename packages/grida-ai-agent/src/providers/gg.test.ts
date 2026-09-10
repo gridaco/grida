@@ -9,7 +9,7 @@
  * (the contextBridge detection contract).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { TIER_MODEL_IDS } from "@grida/ai-models";
+import { TIER_MODEL_IDS } from "@grida/ai-models/grida";
 import {
   GridaGatewayAuthError,
   GridaGatewayCreditsError,

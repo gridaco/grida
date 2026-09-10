@@ -43,6 +43,23 @@ vi.mock("@/lib/auth/organization", () => ({
   requireOrganizationId: vi.fn<(...args: never[]) => unknown>(),
 }));
 
+// Keep the shared catalog immutable; override only the route's binding seam.
+vi.mock("@/lib/ai", async (orig) => {
+  const real = await orig<typeof import("@/lib/ai")>();
+  return {
+    ...real,
+    default: {
+      ...real.default,
+      image: {
+        ...real.default.image,
+        binding: vi.fn<typeof real.default.image.binding>(
+          real.default.image.binding
+        ),
+      },
+    },
+  };
+});
+
 // One transparent grayscale+alpha pixel; the response must preserve its bytes.
 const PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
@@ -117,6 +134,7 @@ beforeEach(() => {
   h.imageCalls = 0;
   h.lastOptions = null;
   h.reportedCost = undefined;
+  vi.mocked(ai.image.binding).mockReset();
   mockedGetEntitlement.mockReset();
   mockedIngest.mockReset();
   mockedGetEntitlement.mockResolvedValue({
@@ -367,19 +385,13 @@ describe("POST /api/v1/ai/images/generations", () => {
   });
 
   it("refuses a model without a Vercel binding before billing", async () => {
-    const binding = vi.spyOn(ai.image, "binding").mockReturnValue(null);
-    try {
-      const { token } = await signGgToken("user-1", 7);
-      const res = await POST(
-        request({ model_id: CARD.id, prompt: "x" }, token)
-      );
-      expect(res.status).toBe(404);
-      expect(h.imageCalls).toBe(0);
-      expect(mockedGetEntitlement).not.toHaveBeenCalled();
-      expect(mockedIngest).not.toHaveBeenCalled();
-    } finally {
-      binding.mockRestore();
-    }
+    vi.mocked(ai.image.binding).mockReturnValueOnce(null);
+    const { token } = await signGgToken("user-1", 7);
+    const res = await POST(request({ model_id: CARD.id, prompt: "x" }, token));
+    expect(res.status).toBe(404);
+    expect(h.imageCalls).toBe(0);
+    expect(mockedGetEntitlement).not.toHaveBeenCalled();
+    expect(mockedIngest).not.toHaveBeenCalled();
   });
 
   it("402 for blocked orgs, before the provider call", async () => {

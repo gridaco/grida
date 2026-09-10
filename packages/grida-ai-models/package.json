@@ -2,7 +2,7 @@
   "name": "@grida/ai-models",
   "version": "0.0.0",
   "private": true,
-  "description": "Typed AI model catalogue: tier vocabulary, text-model specs, and media-generation catalogues (image, audio, image-tools). Catalogue data only — not a provider registry, not a billing package.",
+  "description": "Canonical AI model facts, with Grida service membership and preferences at @grida/ai-models/grida.",
   "license": "MIT",
   "author": "Grida",
   "repository": "https://github.com/gridaco/grida",
@@ -16,9 +16,24 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./grida": {
+      "import": {
+        "types": "./dist/grida.d.mts",
+        "default": "./dist/grida.mjs"
+      },
+      "require": {
+        "types": "./dist/grida.d.ts",
+        "default": "./dist/grida.js"
+      }
     }
   },
   "scripts": {
@@ -26,6 +41,7 @@
     "dev": "tsdown --watch",
     "prepack": "tsdown",
     "test": "vitest run",
+    "test:package": "tsdown && node --test scripts/check-entries.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

@@ -467,10 +467,16 @@ async function main() {
       await writeFile(
         path.join(runtime, `consumer.${extension}`),
         `
-import { ImageClient, VideoClient, MusicClient, SoundEffectClient, TextToSpeechClient, ThreeDClient, ProviderHttp, GridaGatewaySessionStore } from "@grida/ai";
+import { ImageClient, VideoClient, MusicClient, SoundEffectClient, TextToSpeechClient, ThreeDClient, ProviderHttp, GridaGatewaySessionStore, ModelCatalogStore, MediaOperations } from "@grida/ai";
 import { byokProvidersFor } from "@grida/ai/providers";
 import { models } from "@grida/ai-models";
+import { catalog } from "@grida/ai-models/grida";
 declare const http: ProviderHttp;
+const snapshot: catalog.snapshot.Snapshot = catalog.snapshot.seed();
+const parsed: catalog.snapshot.Snapshot | null = catalog.snapshot.parse(snapshot);
+const view: catalog.snapshot.View = catalog.snapshot.view(snapshot);
+const store = new ModelCatalogStore({ snapshot });
+const operations = new MediaOperations({ snapshot });
 const client = new ImageClient({ http, keys: { get: () => null }, gg: new GridaGatewaySessionStore() });
 const providers: readonly string[] = byokProvidersFor("image").map(provider => provider.id);
 async function image(): Promise<Uint8Array> {
@@ -534,7 +540,7 @@ async function threeD(): Promise<Uint8Array> {
   }
   return result.glb.data;
 }
-void [client, image, video, music, soundEffect, speech, threeD, providers, models];
+void [client, image, video, music, soundEffect, speech, threeD, providers, models, snapshot, parsed, view, store, operations];
 `,
         { mode: 0o600 }
       );

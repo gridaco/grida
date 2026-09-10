@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { Loader2, Sparkles } from "lucide-react";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import {
   PromptInput,
   PromptInputBody,
@@ -51,9 +51,7 @@ import {
   type TextToSpeechVoiceCatalogueSnapshot,
 } from "./text-to-speech-voice-catalogue";
 
-const TEXT_TO_SPEECH_MODELS = models.audio.text_to_speech.model_ids.map(
-  (id) => models.audio.text_to_speech.models[id]
-);
+const TEXT_TO_SPEECH_MODELS = models.audio.text_to_speech.ordered_models();
 const AUDIO_TAG_GROUPS = ["Emotion", "Delivery", "Reaction"] as const;
 
 export type VoiceGeneratedPreview = Readonly<{

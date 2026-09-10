@@ -1,6 +1,6 @@
 // GRIDA-SEC-004 — public speech authority, safe voice paths/text, bounded audio and failures.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import { TextToSpeechClient, ProviderHttp } from "./index";
 
 const ID = "eleven_v3";

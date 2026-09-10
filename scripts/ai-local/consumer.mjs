@@ -39,9 +39,11 @@ const {
   ProviderHttp,
   GridaGatewaySessionStore,
   ModelCatalogStore,
+  MediaOperations,
 } = await load("@grida/ai");
 const providers = await load("@grida/ai/providers");
 const { models } = await load("@grida/ai-models");
+const { catalog } = await load("@grida/ai-models/grida");
 const cases = [];
 async function check(name, run) {
   try {
@@ -178,6 +180,17 @@ await check("host packages and private SDK adapters unavailable", async () => {
       .some((provider) => provider.id === "fal")
   );
   assert.equal(typeof new ModelCatalogStore().view, "function");
+  assert.equal(requests.length, 0);
+});
+await check("factual root and service snapshot public exports", async () => {
+  assert.equal(models.snapshot, undefined);
+  assert.equal(models.image.models[model].listed, undefined);
+  const snapshot = catalog.snapshot.parse(catalog.snapshot.seed());
+  assert(snapshot);
+  const store = new ModelCatalogStore({ snapshot });
+  assert(store.view().image.cardById(model));
+  assert(new MediaOperations({ snapshot }).list({ kind: "image" }).length > 0);
+  store.dispose();
   assert.equal(requests.length, 0);
 });
 for (const provider of ["openrouter", "vercel", "fal", "gg"]) {

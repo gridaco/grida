@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import { ModelCatalogStore } from "./model-catalog";
 import { ProviderHttp } from "./http";
 import { TRANSPARENT_PNG_BASE64 } from "../testing/transparent-png";
@@ -9,7 +9,6 @@ import {
   ImageModelUnavailableError,
   resolveImageModel,
 } from "./resolve-image";
-import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
 import { GridaGatewaySessionStore } from "./gg-session";
 
 /** Fake SecretsStore exposing only the `_getKey` the resolver uses. */
@@ -29,11 +28,29 @@ const GPT_IMAGE_2_5 = [
 ];
 
 describe("defaultImageModelId", () => {
-  it("is the explicit tracked pin (gpt-image-2), not catalog order", () => {
-    // The default is a deliberate preference (see ./preferences), so it stays
-    // gpt-image-2 regardless of how cards happen to sort in the catalog.
-    expect(DEFAULT_IMAGE_MODEL_ID).toBe("openai/gpt-image-2");
-    expect(defaultImageModelId()).toBe("openai/gpt-image-2");
+  it("uses the shared service recommendation for a new choice", () => {
+    expect(defaultImageModelId()).toBe("openai/gpt-image-2.5-flare");
+    expect(defaultImageModelId()).toBe(models.image.default_id);
+  });
+
+  it("uses recommendations from the effective snapshot, not the bundled pin", () => {
+    const snapshot = models.snapshot.seed();
+    snapshot.preferences!.image = { default_id: "bfl/flux-2-pro" };
+    const parsed = models.snapshot.parse(snapshot)!;
+    expect(defaultImageModelId(models.snapshot.view(parsed))).toBe(
+      "bfl/flux-2-pro"
+    );
+  });
+
+  it("falls back deterministically when an older snapshot omits recommendations", () => {
+    const snapshot = models.snapshot.seed();
+    delete snapshot.preferences;
+    const view = models.snapshot.view(models.snapshot.parse(snapshot)!);
+    expect(view.image.default_id).toBeUndefined();
+    expect(defaultImageModelId(view)).toBe(view.image.listed()[0]?.id);
+    expect(
+      view.image.cardById(defaultImageModelId(view)!)?.deprecated
+    ).not.toBe(true);
   });
 });
 

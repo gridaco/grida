@@ -1,6 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — credential-free eligibility shared by discovery and execution.
 // GRIDA-GG: provider — GG is an explicit route, never account authority or readiness.
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import type { ImageClient } from "./image-client";
 import type { VideoClient } from "./video-client";
 import type { MusicClient } from "./music-client";

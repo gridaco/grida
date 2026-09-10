@@ -8,7 +8,10 @@ const _default_size = {
   aspect_ratio: "1:1" as ai.image.AspectRatioString,
 };
 
-export function useImageModelConfig(defaultModel: ai.image.ImageModelId) {
+export function useImageModelConfig(
+  defaultModel: ai.image.ImageModelId = ai.image.default_id ??
+    ai.image.listed_models()[0]!.id
+) {
   const [modelId, setModelId] = useState<ai.image.ImageModelId>(defaultModel);
   const [config, setConfig] = useState<{
     width?: number;
@@ -97,10 +100,9 @@ export function useImageModelConfig(defaultModel: ai.image.ImageModelId) {
     height: config.height,
     aspect_ratio: config.aspect_ratio,
     quality,
-    models: Object.values(ai.image.models).filter(
-      (model): model is NonNullable<typeof model> =>
-        !!model && !!ai.image.binding(model, "vercel")
-    ),
+    models: ai.image
+      .ordered_models()
+      .filter((model) => !!ai.image.binding(model, "vercel")),
     select,
     setSize,
     setQuality,

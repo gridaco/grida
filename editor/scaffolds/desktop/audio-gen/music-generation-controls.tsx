@@ -2,7 +2,7 @@
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
 
 import { useState } from "react";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import {
   PromptInput,
   PromptInputBody,
@@ -27,9 +27,7 @@ import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
 import { MediaModelAvailability } from "../shared/media-model-availability";
 import { generatedMediaFile } from "../shared/generated-media-file";
 
-const MUSIC_MODELS = models.audio.music.model_ids.map(
-  (id) => models.audio.music.models[id]
-);
+const MUSIC_MODELS = models.audio.music.listed_models();
 
 type MusicGenerationDependencies = Readonly<{
   generate: (req: MusicGenerateRequest) => Promise<MusicGenerateResult>;
@@ -60,7 +58,11 @@ export function MusicGenerationControls(props: MusicGenerationControlsProps) {
     MUSIC_MODELS,
     props.modelIds
   );
-  const fallbackModel = availableModels[0];
+  const fallbackModel = MediaModelAvailability.select(
+    availableModels,
+    undefined,
+    models.audio.music.default_id
+  );
   if (!fallbackModel) return <MusicGenerationUnavailable />;
 
   return (

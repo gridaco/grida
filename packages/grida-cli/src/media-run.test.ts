@@ -223,6 +223,30 @@ afterEach(async () => {
 });
 
 describe("MediaCommands offline discovery and access observations", () => {
+  it("uses the service catalogue without hiding explicit legacy or staged operations", async () => {
+    const { env, read } = forbiddenEnv();
+    const test = fixture(env);
+    expect(await test.invoke(["models", "list"])).toBe(0);
+    const operations = test.result().operations;
+    for (const [model_id, status, deprecated] of [
+      ["openai/gpt-image-2", "listed", true],
+      ["openai/gpt-image-2.5-flare", "listed", undefined],
+      ["fal-ai/trellis-2", "staged", undefined],
+    ]) {
+      const operation = operations.find(
+        (entry: { model_id: string }) => entry.model_id === model_id
+      );
+      expect(operation).toBeDefined();
+      expect(operation.status).toBe(status);
+      expect(operation.deprecated === true).toBe(deprecated === true);
+    }
+    expect(read).not.toHaveBeenCalled();
+    expect(test.openStore).not.toHaveBeenCalled();
+    expect(test.openAuth).not.toHaveBeenCalled();
+    expect(test.transport).not.toHaveBeenCalled();
+    test.assertSafe();
+  });
+
   it.each([
     "missing-file",
     "malformed-image",

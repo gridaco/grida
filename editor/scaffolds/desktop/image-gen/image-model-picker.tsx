@@ -1,6 +1,6 @@
 "use client";
 
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import {
   Select,
   SelectContent,
@@ -42,6 +42,9 @@ export function ImageModelPicker({
               disabled={!access.available}
             >
               {card.label}
+              {card.deprecated && (
+                <span className="text-muted-foreground"> · Legacy</span>
+              )}
               {access.available &&
                 models.image.binding(card, "fal") &&
                 !models.image.binding(card, "vercel") &&

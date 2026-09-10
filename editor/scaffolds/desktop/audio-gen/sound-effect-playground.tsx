@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { AudioWaveform, FileUp, FolderSearch, X } from "lucide-react";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import { Button } from "@app/ui/components/button";
 import {
   Empty,

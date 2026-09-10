@@ -5,7 +5,7 @@
  * escapes to a caller.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import { CATALOG_PATH, ModelCatalogStore } from "./model-catalog";
 
 const BASE_URL = "https://grida.test";

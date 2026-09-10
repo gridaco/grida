@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — credential-free executable descriptions and shared input rules.
 // GRIDA-GG: provider — discovery describes routes, never scoped access or credit eligibility.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import { MediaOperations } from "./index";
 
 const music = {
@@ -39,10 +39,8 @@ const trellis = {
   model_id: "fal-ai/trellis-2",
   provider: "fal",
 } as const;
-const imageCard = models.snapshot
-  .view()
-  .image.listed()
-  .find((card) => models.image.binding(card, "openrouter")?.references)!;
+// This input contract accepts seed; the recommended GPT Image 2.5 routes do not.
+const imageCard = models.snapshot.view().image.models["openai/gpt-image-2"]!;
 const image = {
   kind: "image",
   model_id: imageCard.id,

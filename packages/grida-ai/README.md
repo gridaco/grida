@@ -17,14 +17,18 @@ producer tests; there are no reserved executors or empty future subpaths.
 The configured [`@grida/agent`](../grida-ai-agent), its prompts/tools/skills, chat storage, workspace
 policy, HTTP routes, application defaults, and external-agent runtimes belong to
 their hosts. This package must not import their source, types, manifests, or test
-setup. `@grida/ai-models` remains the catalogue data leaf. A result contains bytes
+setup. `@grida/ai-models` supplies canonical facts; its explicit
+`@grida/ai-models/grida` entry supplies this SDK's existing bundled service
+catalogue and schema-1 defaults. The SDK retains those Grida defaults and does
+not promise service-policy neutrality. A result contains bytes
 and a media type, never a host persistence receipt, workspace path, or `MediaItem`.
 
 ### Anti-goals and admission
 
 Being AI-related or convenient to import is insufficient for admission. Shared
 code must own a tested, application-independent capability. Configured agents,
-host/framework adapters, credential persistence, and product defaults stay outside.
+host/framework adapters, and credential persistence stay outside. Service model
+defaults remain owned by `@grida/ai-models/grida` and are consumed explicitly here.
 Do not duplicate catalogue data, add a plugin registry, or invent universal schema
 or executor scaffolding to anticipate future operations.
 
@@ -547,6 +551,10 @@ remote downloads; supplying both host operations is the intended independent-hos
 integration. Private methods and fields use runtime private slots: the client
 and resolved operation expose no credential getter or SDK model.
 
+`ModelCatalogStore()` uses the bundled Grida catalogue by default. Image and video
+clients accept an optional store and use that bundled view when omitted.
+`ModelCatalogStore({ base_url, fetch })` uses the existing
+`/api/v1/models/catalog` schema-1 refresh path; every option remains optional.
 `ModelCatalogStore` keeps the bundled catalogue or a validated published snapshot
 in memory. Construction has no network or timer work. A supplied snapshot pins
 it; the host explicitly calls `start`/`dispose` for background refresh. A missing

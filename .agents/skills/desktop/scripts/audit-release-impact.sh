@@ -49,6 +49,7 @@ readonly -a release_paths=(
   packages/grida-ai-agent
   packages/grida-ai
   packages/grida-daemon
+  packages/grida-auth
   packages/grida-ai-models
   packages/grida-desktop-bridge
   packages/grida-home

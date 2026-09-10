@@ -1,11 +1,10 @@
 // GRIDA-GG: provider — agent defaults and legacy auto selection over the shared image operation.
 // GRIDA-SEC-004 / GRIDA-SEC-006 — host credentials and transport stay inside the operation.
 import { ImageClient, ProviderHttp } from "@grida/ai";
-import { models } from "@grida/ai-models";
+import { catalog as models } from "@grida/ai-models/grida";
 import type { SecretsStore } from "@grida/daemon/server";
 import { byokProvidersFor } from "../protocol/provider-ids";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
-import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
 import type { ModelCatalogStore } from "./model-catalog";
 
 export type ResolvedImageModel = ImageClient.Resolved;
@@ -45,13 +44,11 @@ export class ImageModelUnavailableError extends Error {
   }
 }
 
+/** Service recommendation from the effective view; explicit choices bypass it. */
 export function defaultImageModelId(
   view: models.snapshot.View = models.snapshot.view()
 ): string | undefined {
-  if (view.image.cardById(DEFAULT_IMAGE_MODEL_ID)?.listed) {
-    return DEFAULT_IMAGE_MODEL_ID;
-  }
-  return view.image.listed()[0]?.id;
+  return view.image.default_id ?? view.image.listed()[0]?.id;
 }
 
 /**
