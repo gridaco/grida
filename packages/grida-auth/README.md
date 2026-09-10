@@ -27,6 +27,7 @@ import { createNativeAuth } from "@grida/auth/node";
 const config: AuthClient.Config = {
   clientId: "registered-public-client-id",
   issuer: "http://127.0.0.1:55431/auth/v1",
+  publishableKey: "sb_publishable_fixture_project_key",
   apiOrigin: "http://127.0.0.1:3041",
   redirectUris: [
     "http://127.0.0.1:55435/callback",
@@ -71,11 +72,16 @@ bearer-only `/api/v1/auth/me` and refreshes near expiry when needed.
 
 `logout()` returns `{state: "signed-out", revocation}`. Revocation is
 `confirmed`, `unconfirmed`, or `not-needed`; a network failure does not restore
-locally cleared credentials. It sends only `POST <issuer>/logout?scope=local`,
-never global sign-out or application-grant revocation. Custody failures reject
-instead of claiming local sign-out. Server behavior, including preservation of
-other sessions and already-issued JWT lifetime, still needs the real issuer
-integration proof.
+locally cleared credentials. After clearing, it validates the captured session
+target. A near-expired or expired session gets at most one detached refresh in
+memory, with the same issuer, user, client and session binding. Neither renewed
+credentials nor signed-in metadata are persisted or returned. Live identity
+verification precedes `POST <issuer>/logout?scope=local`; the request supplies
+the public project admission key alongside the user bearer. A completed 200/204
+confirms revocation; response bodies are discarded. Other statuses or failures
+remain unconfirmed, with no retry or global/application-grant fallback. Custody
+failures reject instead of claiming local sign-out. Issued JWT/GG lifetimes and
+other sessions still require the real issuer integration proof.
 
 Failures are `AuthClient.Failure` with a stable `code` and a fixed message.
 Upstream error bodies and thrown host error messages are not exposed.
@@ -237,6 +243,12 @@ retry policy require a separate producer contract with the media owner.
   `http://127.0.0.1:<port>` origins. The issuer must end in `/auth/v1`.
   Production and local HTTP origins cannot be mixed. No discovery, redirect,
   or token payload can change this trusted binding.
+- `publishableKey` is required trusted registration metadata in
+  `sb_publishable_...` form. Secret/service-role keys and legacy JWT keys are
+  rejected before custody. Only the fixed issuer logout request receives its
+  `apikey` header; OAuth token, account and GG requests do not. It grants no user
+  identity and is excluded from durable profile identity, so rotating it does
+  not strand the user's saved session.
 - Redirects are an explicit list of fixed `http://127.0.0.1:<port>/<path>`
   addresses, registered ahead of time. There is no `localhost`, wildcard,
   port zero, query, fragment, or arbitrary ephemeral callback fallback.
@@ -305,6 +317,9 @@ consent, and checks the revision when committing the verified session. Logout
 clears under the same authority even when already signed out, so a prior login
 cannot recreate that session. Remote revocation uses the captured old session
 after releasing authority; it cannot clear a newer login.
+Detached logout renewal likewise stays outside custody: it uses only the captured
+refresh token and must match that session before revocation. Normal persisting
+refresh is never reused after the local clear.
 
 An accepted refresh rotation is saved before the separate live identity check.
 Until that check succeeds, custody retains the previous access token, expiry,

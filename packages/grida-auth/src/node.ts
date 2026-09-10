@@ -296,9 +296,11 @@ function nativeRequest(
         await response.body?.cancel();
         return { status: response.status, body: null };
       }
-      if (response.status === 204) {
+      // Logout confirms by status alone. Discard its body without buffering or
+      // parsing it; other successful operations still require bounded JSON.
+      if (request.response === "empty" || response.status === 204) {
         await response.body?.cancel();
-        return { status: 204, body: null };
+        return { status: response.status, body: null };
       }
       const reader = response.body?.getReader();
       if (!reader) throw new AuthClient.Failure("invalid_response");

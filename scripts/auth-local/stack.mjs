@@ -480,6 +480,7 @@ async function bootstrap(state) {
   assert.equal(dbUrl.hostname, "127.0.0.1");
   assert.equal(dbUrl.port, "55432");
   assert.equal(typeof status.ANON_KEY, "string");
+  assert.match(status.PUBLISHABLE_KEY, /^sb_publishable_[A-Za-z0-9_-]+$/);
   assert.equal(typeof status.SERVICE_ROLE_KEY, "string");
   const credentials = {
     token: status.SERVICE_ROLE_KEY,
@@ -509,13 +510,14 @@ async function bootstrap(state) {
   assert.match(client.client_id, /^[0-9a-f-]{36}$/);
   const publicClient = {
     clientId: client.client_id,
+    publishableKey: status.PUBLISHABLE_KEY,
     issuer: fixture.issuer,
     apiOrigin: fixture.editorOrigin,
     redirectUris: fixture.redirectUris,
   };
   const editorEnv = {
     NEXT_PUBLIC_SUPABASE_URL: fixture.apiUrl,
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: status.ANON_KEY,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: status.PUBLISHABLE_KEY,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: status.ANON_KEY,
     SUPABASE_SECRET_KEY: status.SERVICE_ROLE_KEY,
     SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
@@ -534,6 +536,7 @@ async function bootstrap(state) {
   await privateJson(state.setupPath, {
     apiUrl: fixture.apiUrl,
     anonKey: status.ANON_KEY,
+    publishableKey: status.PUBLISHABLE_KEY,
     serviceRoleKey: status.SERVICE_ROLE_KEY,
     editorOrigin: fixture.editorOrigin,
     editorEnv,

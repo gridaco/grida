@@ -51,12 +51,15 @@ observations, not an atomic identity/membership snapshot.
 
 ## OAuth client registration
 
-The production client ID, issuer, API origin and callback URLs live in
+The production client ID, issuer, public project admission key, API origin and callback URLs live in
 [`src/oauth-client-registration.ts`](https://github.com/gridaco/grida/blob/main/packages/grida-cli/src/oauth-client-registration.ts).
 These public values are intentionally versioned in Git and bundled with the CLI.
 The CLI host consumes them; the shared auth SDK remains registration-agnostic.
 Changes must stay aligned with the Supabase OAuth app and Grida server allowlist.
 Issuer/client/API changes also affect existing credential profile identity.
+The public project key is sent only to the fixed issuer logout endpoint;
+rotating that key does not change credential profile identity. It is distinct
+from the OAuth client ID and from every user/provider credential.
 
 Account commands use this hosted public registration:
 Grida's HTTPS issuer/API and the two registered loopback callbacks. Public client

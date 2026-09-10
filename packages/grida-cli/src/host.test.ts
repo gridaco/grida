@@ -28,6 +28,7 @@ vi.mock("@grida/auth/node", () => ({
 
 const config = {
   clientId: "local-public-client",
+  publishableKey: "sb_publishable_local_fixture",
   issuer: "http://127.0.0.1:55431/auth/v1",
   apiOrigin: "http://127.0.0.1:3041",
   redirectUris: [
@@ -37,6 +38,7 @@ const config = {
 };
 const hostedConfig = {
   clientId: "ab2b3b01-a0a1-4d40-969c-b8fc177a2557",
+  publishableKey: "sb_publishable_dRc62vMF3jbqm2UD8cTGig_blvDStbc",
   issuer: "https://mozagqllybnbytfcmvdh.supabase.co/auth/v1",
   apiOrigin: "https://grida.co",
   redirectUris: config.redirectUris,
@@ -118,6 +120,7 @@ describe("CliHost.open", () => {
         GRIDA_OAUTH_ORIGIN: "https://untrusted.example",
         GRIDA_API_ORIGIN: "https://untrusted.example",
         NEXT_PUBLIC_SUPABASE_URL: "https://untrusted.example",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_untrusted",
       }
     );
     expect(nativeFactory).toHaveBeenCalledExactlyOnceWith(hostedConfig, {
@@ -248,6 +251,19 @@ describe("CliHost.open", () => {
     ).not.toHaveProperty("storage");
   });
 
+  it("passes the explicit local key without borrowing or discovering a hosted key", async () => {
+    const local = { ...config, publishableKey: "sb_publishable_rotated_local" };
+    await writeConfig(local);
+    await CliHost.open(
+      {},
+      {
+        ...env,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: hostedConfig.publishableKey,
+      }
+    );
+    expect(nativeFactory.mock.calls[0]![0]).toEqual(local);
+  });
+
   it("propagates public custody failure without fallback or browser launch", async () => {
     const failure = new Error("synthetic public custody failure");
     vi.mocked(createPersistentNativeAuth).mockRejectedValueOnce(failure);
@@ -269,6 +285,9 @@ describe("CliHost.open", () => {
     { redirectUris: [] },
     { clientId: "untrusted client id" },
     { clientId: "" },
+    { publishableKey: null },
+    { publishableKey: 42 },
+    { publishableKey: undefined },
     { client_secret: "must-never-be-read" },
   ])("rejects untrusted registration before custody: %j", async (change) => {
     await writeConfig({ ...config, ...change });

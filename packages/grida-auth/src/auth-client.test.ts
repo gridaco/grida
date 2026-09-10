@@ -6,6 +6,7 @@ import { AuthClient } from "./index";
 const config: AuthClient.Config = {
   issuer: "https://auth.example.com/auth/v1",
   clientId: "native-client",
+  publishableKey: "sb_publishable_synthetic",
   apiOrigin: "https://api.example.com",
   redirectUris: ["http://127.0.0.1:55435/callback"],
 };
@@ -16,6 +17,22 @@ const identity = {
 };
 const state = "s".repeat(43);
 const now = 1_800_000_000_000;
+const sessionId = "11111111-1111-4111-8111-111111111111";
+function access(suffix: string, claims: Record<string, unknown> = {}) {
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "ES256" })}.${encode({
+    iss: config.issuer,
+    aud: "authenticated",
+    sub: identity.id,
+    client_id: config.clientId,
+    session_id: sessionId,
+    exp: now / 1000 + 3600,
+    ...claims,
+  })}.${encode(suffix)}`;
+}
+const oldAccess = access("old");
+const newAccess = access("new");
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -32,7 +49,7 @@ function session(
 ): AuthClient.Session {
   return {
     ...config,
-    accessToken: "old-access-secret",
+    accessToken: oldAccess,
     refreshToken: "old-refresh-secret",
     expiresAt: now + 3_600_000,
     identity,
@@ -91,7 +108,7 @@ function harness(
             ? {
                 status: 200,
                 body: {
-                  access_token: "new-access-secret",
+                  access_token: newAccess,
                   refresh_token: "new-refresh-secret",
                   token_type: "Bearer",
                   expires_in: 3600,
@@ -189,7 +206,7 @@ function tokenResponse(suffix: string): AuthClient.Response {
   return {
     status: 200,
     body: {
-      access_token: `access-${suffix}`,
+      access_token: access(suffix),
       refresh_token: `refresh-${suffix}`,
       token_type: "Bearer",
       expires_in: 3600,
@@ -290,7 +307,7 @@ describe("AuthClient.requestGgAccess", () => {
         url: `${config.apiOrigin}/api/v1/auth/gg`,
         method: "POST",
         headers: {
-          authorization: "Bearer old-access-secret",
+          authorization: `Bearer ${oldAccess}`,
           "content-type": "application/json",
         },
         body: '{"organization_id":7}',
@@ -519,7 +536,7 @@ describe("AuthClient.requestGgAccess", () => {
         "new-refresh-secret"
       );
       expect(h.requests.at(-1)?.headers.authorization).toBe(
-        "Bearer new-access-secret"
+        `Bearer ${newAccess}`
       );
       expect(accept).not.toHaveBeenCalled();
       expect(
@@ -760,7 +777,7 @@ describe("AuthClient.requestAccount credits.read", () => {
       {
         url: `${config.apiOrigin}/api/v1/account/credits?organization_id=7`,
         method: "GET",
-        headers: { authorization: "Bearer old-access-secret" },
+        headers: { authorization: `Bearer ${oldAccess}` },
       },
     ]);
     expect(h.writes).toHaveLength(0);
@@ -981,7 +998,7 @@ describe("AuthClient.requestAccount credits.read", () => {
         {
           url: `${config.apiOrigin}/api/v1/account/credits?organization_id=7`,
           method: "GET",
-          headers: { authorization: "Bearer new-access-secret" },
+          headers: { authorization: `Bearer ${newAccess}` },
         },
       ]);
     }
@@ -1073,7 +1090,7 @@ describe("AuthClient.requestAccount", () => {
       {
         url: `${config.apiOrigin}/api/v1/account/organizations?after=3`,
         method: "GET",
-        headers: { authorization: "Bearer old-access-secret" },
+        headers: { authorization: `Bearer ${oldAccess}` },
       },
     ]);
     expect(h.writes).toHaveLength(0);
@@ -1272,7 +1289,7 @@ describe("AuthClient.requestAccount", () => {
     );
     expect(reads).toHaveLength(2);
     expect(
-      reads.every((r) => r.headers.authorization === "Bearer new-access-secret")
+      reads.every((r) => r.headers.authorization === `Bearer ${newAccess}`)
     ).toBe(true);
   });
 
@@ -1292,7 +1309,7 @@ describe("AuthClient.requestAccount", () => {
       )
     ).toHaveLength(1);
     expect(second.requests[0]?.headers.authorization).toBe(
-      "Bearer new-access-secret"
+      `Bearer ${newAccess}`
     );
     expect(store.acquisitions()).toBe(2);
     expect(store.active()).toBe(0);
@@ -1306,7 +1323,7 @@ describe("AuthClient.requestAccount", () => {
       h.client.requestAccount("organizations.list")
     ).rejects.toMatchObject({ code: "unavailable" });
     expect(store.stored()?.refreshToken).toBe("new-refresh-secret");
-    expect(store.stored()?.accessToken).toBe("new-access-secret");
+    expect(store.stored()?.accessToken).toBe(newAccess);
     expect(
       h.requests.filter((r) => r.url.includes("/account/organizations"))
     ).toHaveLength(1);
@@ -1519,9 +1536,7 @@ describe("AuthClient", () => {
     expect(h.requests[0]!.headers["content-type"]).toBe(
       "application/x-www-form-urlencoded"
     );
-    expect(h.requests[1]!.headers.authorization).toBe(
-      "Bearer new-access-secret"
-    );
+    expect(h.requests[1]!.headers.authorization).toBe(`Bearer ${newAccess}`);
     expect(h.stored()?.refreshToken).toBe("new-refresh-secret");
     expect(status).toEqual({
       state: "signed-in",
@@ -1550,7 +1565,7 @@ describe("AuthClient", () => {
       h.callback.resolve(callback);
       expect(await result).toMatchObject({ code });
       expect(h.requests).toHaveLength(0);
-      expect(h.stored()?.accessToken).toBe("old-access-secret");
+      expect(h.stored()?.accessToken).toBe(oldAccess);
       expect(h.listener.close).toHaveBeenCalledOnce();
     }
   );
@@ -1598,7 +1613,7 @@ describe("AuthClient", () => {
     await h.bound;
     h.callback.resolve({ state, code: "code" });
     await expect(login).rejects.toMatchObject({ code: "token_rejected" });
-    expect(h.stored()?.accessToken).toBe("old-access-secret");
+    expect(h.stored()?.accessToken).toBe(oldAccess);
   });
 
   it("single-flights refresh and saves the rotated refresh token before returning", async () => {
@@ -1624,15 +1639,13 @@ describe("AuthClient", () => {
     const h = harness(session());
     const token = deferred<AuthClient.Response>();
     const entered = deferred<void>();
+    const original = h.host.request;
     h.host.request = (request) => {
       if (request.url.endsWith("/oauth/token")) {
         entered.resolve();
         return { result: token.promise, cancel() {} };
       }
-      return {
-        result: Promise.resolve({ status: 204, body: null }),
-        cancel() {},
-      };
+      return original(request);
     };
     const refreshing = h.client.refresh();
     const rejected = refreshing.catch((error: unknown) => error);
@@ -1658,13 +1671,14 @@ describe("AuthClient", () => {
 
   it("clears only its custody and requests session-local logout even when remote revocation fails", async () => {
     const h = harness(session());
+    const original = h.host.request;
+    const attempted: AuthClient.Request[] = [];
+    let observedCustody: AuthClient.Session | null | undefined;
     h.host.request = (request) => {
-      expect(h.stored()).toBeNull();
-      expect(request).toEqual({
-        url: `${config.issuer}/logout?scope=local`,
-        method: "POST",
-        headers: { authorization: "Bearer old-access-secret" },
-      });
+      if (!request.url.endsWith("/logout?scope=local"))
+        return original(request);
+      observedCustody = h.stored();
+      attempted.push(request);
       return {
         cancel() {},
         result: Promise.reject(new Error("secret-upstream-body")),
@@ -1674,10 +1688,23 @@ describe("AuthClient", () => {
       state: "signed-out",
       revocation: "unconfirmed",
     });
+    expect(observedCustody).toBeNull();
+    expect(attempted).toEqual([
+      {
+        url: `${config.issuer}/logout?scope=local`,
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${oldAccess}`,
+          apikey: config.publishableKey,
+        },
+        response: "empty",
+      },
+    ]);
     expect(await h.client.logout()).toEqual({
       state: "signed-out",
       revocation: "not-needed",
     });
+    expect(attempted).toHaveLength(1);
   });
 
   it("rejects custody from a different issuer, client, or API before network I/O", async () => {
@@ -1725,7 +1752,7 @@ describe("AuthClient", () => {
     const release = deferred<void>();
     const original = h.host.custody.write;
     h.host.custody.write = async (next) => {
-      if (next.accessToken === "new-access-secret") {
+      if (next.accessToken === newAccess) {
         writing.resolve();
         await release.promise;
       }
@@ -1739,7 +1766,7 @@ describe("AuthClient", () => {
     await h.client.cancelLogin();
     release.resolve();
     expect(await rejected).toMatchObject({ code: "cancelled" });
-    expect(h.stored()?.accessToken).toBe("old-access-secret");
+    expect(h.stored()?.accessToken).toBe(oldAccess);
   });
 
   it("does not let an earlier live verification overwrite rotated credentials", async () => {
@@ -1748,7 +1775,7 @@ describe("AuthClient", () => {
     const entered = deferred<void>();
     const original = h.host.request;
     h.host.request = (request) => {
-      if (request.headers.authorization === "Bearer old-access-secret") {
+      if (request.headers.authorization === `Bearer ${oldAccess}`) {
         entered.resolve();
         return { result: verifying.promise, cancel() {} };
       }
@@ -1781,14 +1808,14 @@ describe("AuthClient", () => {
     };
     const logout = h.client.logout();
     await entered.promise;
-    expect(revoked).toEqual(["Bearer old-access-secret"]);
+    expect(revoked).toEqual([`Bearer ${oldAccess}`]);
     const login = h.client.login();
     await h.bound;
     h.callback.resolve({ state, code: "new-code" });
     await login;
     revocation.resolve({ status: 204, body: null });
     await logout;
-    expect(h.stored()?.accessToken).toBe("new-access-secret");
+    expect(h.stored()?.accessToken).toBe(newAccess);
   });
 
   it.each([
@@ -1817,7 +1844,7 @@ describe("AuthClient", () => {
       await expect(h.client.refresh()).rejects.toMatchObject({
         code: "invalid_response",
       });
-      expect(h.stored()?.accessToken).toBe("old-access-secret");
+      expect(h.stored()?.accessToken).toBe(oldAccess);
     }
   );
 
@@ -1920,7 +1947,7 @@ describe("AuthClient", () => {
     expect(new URLSearchParams(grants[1]!.body).get("refresh_token")).toBe(
       "new-refresh-secret"
     );
-    expect(h.stored()?.accessToken).toBe("new-access-secret");
+    expect(h.stored()?.accessToken).toBe(newAccess);
   });
 
   it("fails before identity I/O when accepted rotation cannot be saved", async () => {
@@ -1935,7 +1962,7 @@ describe("AuthClient", () => {
     expect(h.requests.map((request) => request.url)).toEqual([
       `${config.issuer}/oauth/token`,
     ]);
-    expect(h.stored()?.accessToken).toBe("old-access-secret");
+    expect(h.stored()?.accessToken).toBe(oldAccess);
   });
 
   it("lets logout win after rotation is saved while live identity is still pending", async () => {
@@ -1944,7 +1971,10 @@ describe("AuthClient", () => {
     const entered = deferred<void>();
     const original = h.host.request;
     h.host.request = (request) => {
-      if (request.method === "GET") {
+      if (
+        request.method === "GET" &&
+        request.headers.authorization === `Bearer ${newAccess}`
+      ) {
         entered.resolve();
         return { result: verifying.promise, cancel() {} };
       }
@@ -1953,7 +1983,7 @@ describe("AuthClient", () => {
     const refresh = h.client.refresh().catch((error: unknown) => error);
     await entered.promise;
     expect(h.stored()?.refreshToken).toBe("new-refresh-secret");
-    expect(h.stored()?.accessToken).toBe("old-access-secret");
+    expect(h.stored()?.accessToken).toBe(oldAccess);
     expect((await h.client.logout()).revocation).toBe("confirmed");
     verifying.resolve({ status: 200, body: identity });
     expect(await refresh).toMatchObject({ code: "cancelled" });
@@ -2022,7 +2052,7 @@ describe("AuthClient", () => {
     release.resolve({ status: 200, body: identity });
     await Promise.all([refresh, verify]);
     expect(second.requests[0]?.headers.authorization).toBe(
-      "Bearer new-access-secret"
+      `Bearer ${newAccess}`
     );
     expect(store.stored()?.refreshToken).toBe("new-refresh-secret");
     expect(store.revision()).toBe(3);
@@ -2070,7 +2100,7 @@ describe("AuthClient", () => {
     first.callback.resolve({ state, code: "late-code" });
     expect(await a).toMatchObject({ code: "session_changed" });
     expect(store.writes).toHaveLength(1);
-    expect(store.stored()?.accessToken).toBe("new-access-secret");
+    expect(store.stored()?.accessToken).toBe(newAccess);
   });
 
   it("releases authority after identity failure without rolling back an accepted rotation", async () => {
@@ -2086,7 +2116,7 @@ describe("AuthClient", () => {
       code: "unavailable",
     });
     expect(store.stored()?.refreshToken).toBe("new-refresh-secret");
-    expect(store.stored()?.accessToken).toBe("old-access-secret");
+    expect(store.stored()?.accessToken).toBe(oldAccess);
     expect(store.active()).toBe(0);
     await second.client.refresh();
     expect(
@@ -2219,11 +2249,9 @@ describe("AuthClient", () => {
     await login;
     expect(store.writes.map((value) => value?.accessToken ?? null)).toEqual([
       null,
-      "new-access-secret",
+      newAccess,
     ]);
-    expect(h.requests[0]?.headers.authorization).toBe(
-      "Bearer old-access-secret"
-    );
+    expect(h.requests[0]?.headers.authorization).toBe(`Bearer ${oldAccess}`);
   });
 
   it("does not compensate an accepted memory-custody rotation when logout arrives during its write", async () => {
@@ -2246,5 +2274,321 @@ describe("AuthClient", () => {
       "new-refresh-secret",
     ]);
     expect(h.stored()).toBeNull();
+  });
+});
+
+describe("session-local logout lifecycle", () => {
+  it("accepts UTF-8 metadata but rejects noncanonical base64url of otherwise valid claims", async () => {
+    const token = access("unicode", { name: "안녕 👋" });
+    const valid = harness(session({ accessToken: token }));
+    expect((await valid.client.logout()).revocation).toBe("confirmed");
+    const parts = token.split(".");
+    // Choose a valid payload with padding bits, then change only unused bits.
+    let padding = "";
+    while (parts[1]!.length % 4 === 0) {
+      padding += "x";
+      parts[1] = access("unicode", { name: "안녕 👋", padding }).split(".")[1]!;
+    }
+    const alphabet =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const payload = parts[1]!;
+    parts[1] =
+      payload.slice(0, -1) + alphabet[alphabet.indexOf(payload.at(-1)!) | 1];
+    const invalid = harness(session({ accessToken: parts.join(".") }));
+    expect((await invalid.client.logout()).revocation).toBe("unconfirmed");
+    expect(invalid.requests).toEqual([]);
+    expect(invalid.stored()).toBeNull();
+  });
+
+  it.each([
+    undefined,
+    "",
+    "sb_secret_synthetic",
+    "eyJhbGci.synthetic.jwt",
+    "sb_publishable_key\n",
+    "sb_publishable_" + "x".repeat(257),
+  ])(
+    "rejects missing, secret, legacy or malformed public admission metadata (%s)",
+    (publishableKey) => {
+      const h = harness();
+      expect(
+        () =>
+          new AuthClient(
+            { ...config, publishableKey } as AuthClient.Config,
+            h.host
+          )
+      ).toThrow(expect.objectContaining({ code: "invalid_config" }));
+      expect(h.requests).toHaveLength(0);
+    }
+  );
+
+  it.each([false, true])(
+    "renews an expired captured session only in memory after clearing (coordinated=%s)",
+    async (coordinated) => {
+      const previous = session({
+        accessToken: access("expired", { exp: now / 1000 - 1 }),
+        expiresAt: now - 1000,
+      });
+      const store = sharedCustody(previous);
+      const h = coordinated ? store.client() : harness(previous);
+      const stored = coordinated ? store.stored : h.stored;
+      const observed: (AuthClient.Session | null)[] = [];
+      const original = h.host.request;
+      h.host.request = (request) => {
+        observed.push(stored());
+        return original(request);
+      };
+      expect(await h.client.logout()).toEqual({
+        state: "signed-out",
+        revocation: "confirmed",
+      });
+      expect(observed).toEqual([null, null, null]);
+      expect(h.requests.map((r) => r.url)).toEqual([
+        `${config.issuer}/oauth/token`,
+        `${config.apiOrigin}/api/v1/auth/me`,
+        `${config.issuer}/logout?scope=local`,
+      ]);
+      expect(h.requests.map((r) => r.headers.apikey)).toEqual([
+        undefined,
+        undefined,
+        config.publishableKey,
+      ]);
+      expect(
+        new URLSearchParams(h.requests[0]!.body).get("refresh_token")
+      ).toBe(previous.refreshToken);
+      expect(h.requests[2]!.headers.authorization).toBe(`Bearer ${newAccess}`);
+      expect(coordinated ? store.writes : h.writes).toEqual(
+        coordinated ? [null] : []
+      );
+      expect(await h.client.status()).toEqual({ state: "signed-out" });
+    }
+  );
+
+  it.each([
+    { expiresAt: now + 30_000 },
+    { accessToken: access("near-expiry", { exp: now / 1000 + 20 }) },
+  ])(
+    "uses the earlier token or saved expiry for near-expiry logout",
+    async (change) => {
+      const h = harness(session(change));
+      expect((await h.client.logout()).revocation).toBe("confirmed");
+      expect(
+        h.requests.filter((r) => r.url.endsWith("/oauth/token"))
+      ).toHaveLength(1);
+      expect(h.writes).toEqual([]);
+    }
+  );
+
+  it.each([
+    { session_id: undefined },
+    { session_id: "" },
+    { session_id: "not-a-session" },
+    { session_id: "00000000-0000-0000-0000-000000000000" },
+    { iss: "https://elsewhere.example/auth/v1" },
+    { sub: "another-user" },
+    { client_id: "another-client" },
+    { aud: "gg:ai" },
+    { exp: "1800000000" },
+    { exp: null },
+    { exp: 0 },
+  ])(
+    "refuses malformed or mismatched captured authority before I/O: %j",
+    async (claims) => {
+      const h = harness(
+        session({
+          accessToken: access("malformed", claims),
+          expiresAt: now - 1,
+        })
+      );
+      expect(await h.client.logout()).toEqual({
+        state: "signed-out",
+        revocation: "unconfirmed",
+      });
+      expect(h.stored()).toBeNull();
+      expect(h.requests).toEqual([]);
+    }
+  );
+
+  it.each(["not-a-jwt", "e30.A.eA", "e30._w.eA", "e30.eyJ.eA", "e30.e30=.eA"])(
+    "contains malformed JWT encoding without network or credential output (%s)",
+    async (accessToken) => {
+      const h = harness(session({ accessToken }));
+      expect(await h.client.logout()).toEqual({
+        state: "signed-out",
+        revocation: "unconfirmed",
+      });
+      expect(h.requests).toEqual([]);
+      expect(h.stored()).toBeNull();
+    }
+  );
+
+  it.each([
+    { session_id: "22222222-2222-4222-8222-222222222222" },
+    { session_id: undefined },
+    { sub: "another-user" },
+    { client_id: "another-client" },
+    { iss: "https://elsewhere.example/auth/v1" },
+    { exp: now / 1000 - 1 },
+  ])(
+    "does not revoke or persist a renewed token with changed authority: %j",
+    async (claims) => {
+      const h = harness(session({ expiresAt: now - 1 }));
+      const calls: AuthClient.Request[] = [];
+      h.host.request = (request) => {
+        calls.push(request);
+        return {
+          cancel() {},
+          result: Promise.resolve({
+            status: 200,
+            body: {
+              access_token: access("renewed", claims),
+              refresh_token: "rotated-refresh",
+              expires_in: 3600,
+              token_type: "Bearer",
+            },
+          }),
+        };
+      };
+      expect((await h.client.logout()).revocation).toBe("unconfirmed");
+      expect(calls.map((r) => r.url)).toEqual([`${config.issuer}/oauth/token`]);
+      expect(h.stored()).toBeNull();
+      expect(h.writes).toEqual([]);
+    }
+  );
+
+  it.each(["refresh", "identity", "identity-subject", "revoke"])(
+    "keeps local sign-out and never retries when detached %s fails",
+    async (phase) => {
+      const h = harness(session({ expiresAt: now - 1 }));
+      const original = h.host.request;
+      const calls: AuthClient.Request[] = [];
+      h.host.request = (request) => {
+        calls.push(request);
+        if (
+          (phase === "refresh" && request.url.endsWith("/oauth/token")) ||
+          (phase === "identity" && request.url.endsWith("/auth/me")) ||
+          (phase === "revoke" && request.url.endsWith("/logout?scope=local"))
+        )
+          return {
+            cancel() {},
+            result: Promise.resolve({
+              status: 401,
+              body: { secret: "never-expose" },
+            }),
+          };
+        if (phase === "identity-subject" && request.url.endsWith("/auth/me"))
+          return {
+            cancel() {},
+            result: Promise.resolve({
+              status: 200,
+              body: { ...identity, id: "other" },
+            }),
+          };
+        return original(request);
+      };
+      expect(await h.client.logout()).toEqual({
+        state: "signed-out",
+        revocation: "unconfirmed",
+      });
+      expect(calls).toHaveLength(
+        phase === "refresh" ? 1 : phase === "revoke" ? 3 : 2
+      );
+      expect(h.stored()).toBeNull();
+      expect(h.writes).toEqual([]);
+    }
+  );
+
+  it.each([200, 204, 202, 302, 401, 500])(
+    "reports only completed logout statuses as confirmed (%s)",
+    async (status) => {
+      const h = harness(session());
+      const original = h.host.request;
+      h.host.request = (request) =>
+        request.url.endsWith("/logout?scope=local")
+          ? { cancel() {}, result: Promise.resolve({ status, body: null }) }
+          : original(request);
+      expect((await h.client.logout()).revocation).toBe(
+        [200, 204].includes(status) ? "confirmed" : "unconfirmed"
+      );
+      expect(h.requests.some((r) => r.url.endsWith("/oauth/token"))).toBe(
+        false
+      );
+    }
+  );
+
+  it.each([false, true])(
+    "detached expiry refresh cannot overwrite or revoke a newer login (coordinated=%s)",
+    async (coordinated) => {
+      const previous = session({ expiresAt: now - 1 });
+      const store = sharedCustody(previous);
+      const h = coordinated ? store.client() : harness(previous);
+      const newer = coordinated ? store.client() : h;
+      const stored = coordinated ? store.stored : h.stored;
+      const entered = deferred<void>();
+      const released = deferred<AuthClient.Response>();
+      const original = h.host.request;
+      const replacement = access("new-session", {
+        session_id: "22222222-2222-4222-8222-222222222222",
+      });
+      const revoked: string[] = [];
+      const handle: AuthClient.Host["request"] = (request) => {
+        const grant = new URLSearchParams(request.body).get("grant_type");
+        if (grant === "refresh_token") {
+          entered.resolve();
+          return { cancel() {}, result: released.promise };
+        }
+        if (grant === "authorization_code")
+          return {
+            cancel() {},
+            result: Promise.resolve({
+              status: 200,
+              body: {
+                access_token: replacement,
+                refresh_token: "new-login-refresh",
+                expires_in: 3600,
+                token_type: "Bearer",
+              },
+            }),
+          };
+        if (request.url.endsWith("/logout?scope=local"))
+          revoked.push(request.headers.authorization!);
+        return original(request);
+      };
+      h.host.request = handle;
+      newer.host.request = handle;
+      const logout = h.client.logout();
+      await entered.promise;
+      expect(stored()).toBeNull();
+      const login = newer.client.login();
+      await newer.bound;
+      newer.callback.resolve({ state, code: "new-login-code" });
+      await login;
+      expect(stored()?.accessToken).toBe(replacement);
+      released.resolve({
+        status: 200,
+        body: {
+          access_token: newAccess,
+          refresh_token: "detached-rotation",
+          expires_in: 3600,
+          token_type: "Bearer",
+        },
+      });
+      expect((await logout).revocation).toBe("confirmed");
+      expect(revoked).toEqual([`Bearer ${newAccess}`]);
+      expect(stored()?.accessToken).toBe(replacement);
+      expect(stored()?.refreshToken).toBe("new-login-refresh");
+    }
+  );
+
+  it("does not claim sign-out or contact the issuer when custody cannot clear", async () => {
+    const h = harness(session());
+    h.host.custody.clear = async () => {
+      throw new Error("private custody error");
+    };
+    await expect(h.client.logout()).rejects.toMatchObject({
+      code: "custody_failed",
+    });
+    expect(h.requests).toEqual([]);
+    expect(h.stored()).not.toBeNull();
   });
 });

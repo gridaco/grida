@@ -49,6 +49,10 @@ function send(message) { process.send(message); }
 process.on('message', async (message) => {
   try {
     if (message.type === 'init') {
+      // Test clock only: exercise real persisted expiry across process restarts
+      // without changing the machine clock or adding a production clock hook.
+      const now = Date.now;
+      Date.now = () => now() + message.clockOffsetMs;
       let nativeAddonAbsent = false;
       try { require.resolve('@github/keytar'); }
       catch (error) { nativeAddonAbsent = error.code === 'MODULE_NOT_FOUND'; }
@@ -109,7 +113,12 @@ class Consumer {
   private listeners = new Set<() => void>();
   private ended = false;
 
-  constructor(root: string, config: object, home: string) {
+  constructor(
+    root: string,
+    config: object,
+    home: string,
+    clockOffsetMs: number
+  ) {
     this.child = spawn(process.execPath, [path.join(root, "consumer.mjs")], {
       cwd: root,
       env: {
@@ -127,7 +136,7 @@ class Consumer {
       this.ended = true;
       for (const listener of this.listeners) listener();
     });
-    this.child.send({ type: "init", config, home });
+    this.child.send({ type: "init", config, home, clockOffsetMs });
   }
 
   wait(type: string): Promise<Message> {
@@ -185,16 +194,26 @@ class Issuer {
     { challenge: string; redirect: string }
   >();
   private readonly refreshTokens = new Map<string, number>();
-  private readonly accessTokens = new Map<string, number>();
+  private readonly accessTokens = new Map<
+    string,
+    { session: number; expiresAt: number }
+  >();
   private readonly active = new Set<number>();
   private sequence = 0;
   private rotation = 0;
   private gate: {
-    kind: "refresh" | "verify";
+    kind: "refresh" | "verify" | "logout";
     entered: ReturnType<typeof deferred<void>>;
     release: ReturnType<typeof deferred<void>>;
   } | null = null;
   private releases: (() => void)[] = [];
+  private rejectVerification = false;
+  clockOffsetMs = 0;
+  readonly issuedTokens: {
+    session: number;
+    access: string;
+    refresh: string;
+  }[] = [];
   readonly refreshes: string[] = [];
   readonly verifications: string[] = [];
   readonly revocations: string[] = [];
@@ -202,6 +221,7 @@ class Issuer {
     issuer: string;
     apiOrigin: string;
     clientId: string;
+    publishableKey: string;
     redirectUris: string[];
   };
 
@@ -218,15 +238,24 @@ class Issuer {
       issuer: `${origin}/auth/v1`,
       apiOrigin: origin,
       clientId: "synthetic-public-client",
+      publishableKey: "sb_publishable_synthetic",
       redirectUris: [`http://127.0.0.1:${port}/callback`],
     };
   }
 
-  hold(kind: "refresh" | "verify") {
+  hold(kind: "refresh" | "verify" | "logout") {
     const gate = { kind, entered: deferred<void>(), release: deferred<void>() };
     this.gate = gate;
     this.releases.push(() => gate.release.resolve());
     return gate;
+  }
+
+  rejectNextVerification() {
+    this.rejectVerification = true;
+  }
+
+  sessionFor(access: string) {
+    return this.accessTokens.get(access)?.session;
   }
 
   async approve(authorization: string) {
@@ -268,10 +297,21 @@ class Issuer {
 
   private tokens(session: number) {
     const suffix = `${session}-${++this.rotation}`;
-    const access = `synthetic-access-${suffix}`;
+    const expiresAt = Date.now() + this.clockOffsetMs + 3_600_000;
+    const encode = (value: unknown) =>
+      Buffer.from(JSON.stringify(value)).toString("base64url");
+    const access = `${encode({ alg: "ES256" })}.${encode({
+      iss: this.config.issuer,
+      aud: "authenticated",
+      sub: identity.id,
+      client_id: this.config.clientId,
+      session_id: `11111111-1111-4111-8111-${String(session).padStart(12, "0")}`,
+      exp: Math.floor(expiresAt / 1000),
+    })}.${encode(suffix)}`;
     const refresh = `synthetic-refresh-${suffix}`;
-    this.accessTokens.set(access, session);
+    this.accessTokens.set(access, { session, expiresAt });
     this.refreshTokens.set(refresh, session);
+    this.issuedTokens.push({ session, access, refresh });
     return {
       access_token: access,
       refresh_token: refresh,
@@ -280,7 +320,7 @@ class Issuer {
     };
   }
 
-  private async pause(kind: "refresh" | "verify") {
+  private async pause(kind: "refresh" | "verify" | "logout") {
     if (this.gate?.kind !== kind) return;
     const gate = this.gate;
     this.gate = null;
@@ -328,19 +368,31 @@ class Issuer {
       return this.respond(response, 400, {});
     }
     const token = request.headers.authorization?.replace(/^Bearer /, "") ?? "";
-    const session = this.accessTokens.get(token);
-    if (!session || !this.active.has(session))
+    const grant = this.accessTokens.get(token);
+    if (
+      !grant ||
+      !this.active.has(grant.session) ||
+      grant.expiresAt <= Date.now() + this.clockOffsetMs
+    )
       return this.respond(response, 401, {});
+    const session = grant.session;
     if (request.method === "GET" && request.url === "/api/v1/auth/me") {
       this.verifications.push(token);
       await this.pause("verify");
+      if (this.rejectVerification) {
+        this.rejectVerification = false;
+        return this.respond(response, 401, {});
+      }
       return this.respond(response, 200, identity);
     }
     if (
       request.method === "POST" &&
       request.url === "/auth/v1/logout?scope=local"
     ) {
+      if (request.headers.apikey !== this.config.publishableKey)
+        return this.respond(response, 401, {});
       this.revocations.push(token);
+      await this.pause("logout");
       this.active.delete(session);
       return this.respond(response, 200, {});
     }
@@ -406,7 +458,12 @@ describe.skipIf(!["darwin", "linux"].includes(process.platform))(
     });
 
     async function consumer() {
-      const value = new Consumer(root, issuer.config, home);
+      const value = new Consumer(
+        root,
+        issuer.config,
+        home,
+        issuer.clockOffsetMs
+      );
       consumers.push(value);
       const ready = await value.wait("ready");
       expect(ready.nativeAddonAbsent).toBe(true);
@@ -437,6 +494,8 @@ describe.skipIf(!["darwin", "linux"].includes(process.platform))(
       expect(JSON.stringify(result)).not.toMatch(
         /synthetic-access|synthetic-refresh|code_verifier/
       );
+      for (const issued of issuer.issuedTokens)
+        expect(JSON.stringify(result)).not.toContain(issued.access);
       expect(issuer.verifications).toHaveLength(requestCount);
     }, 20_000);
 
@@ -459,7 +518,7 @@ describe.skipIf(!["darwin", "linux"].includes(process.platform))(
       ]);
       const restarted = await consumer();
       expect(await restarted.run("verify")).toMatchObject({ ok: true });
-      expect(issuer.verifications.at(-1)).toBe("synthetic-access-1-3");
+      expect(issuer.verifications.at(-1)).toBe(issuer.issuedTokens[2]?.access);
     }, 20_000);
 
     it("keeps verification writes from overwriting a concurrent process rotation", async () => {
@@ -477,7 +536,7 @@ describe.skipIf(!["darwin", "linux"].includes(process.platform))(
       expect(await b).toMatchObject({ ok: true });
       const restarted = await consumer();
       expect(await restarted.run("verify")).toMatchObject({ ok: true });
-      expect(issuer.verifications.at(-1)).toBe("synthetic-access-1-2");
+      expect(issuer.verifications.at(-1)).toBe(issuer.issuedTokens[1]?.access);
     }, 20_000);
 
     it("persists logout invalidation against an earlier browser login in another process", async () => {
@@ -501,6 +560,95 @@ describe.skipIf(!["darwin", "linux"].includes(process.platform))(
         ok: true,
         result: { state: "signed-out" },
       });
+    }, 20_000);
+
+    it("captures the latest durable refresh rotation when another process's expired refresh fails verification", async () => {
+      await login();
+      issuer.clockOffsetMs = 3_601_000;
+      const [refresher, signingOut] = await Promise.all([
+        consumer(),
+        consumer(),
+      ]);
+      const rotation = issuer.hold("refresh");
+      const refresh = refresher.run("refresh");
+      await rotation.entered.promise;
+      const logout = signingOut.run("logout");
+      await signingOut.wait("started");
+      await delay(100);
+      expect(issuer.refreshes).toEqual(["synthetic-refresh-1-1"]);
+      expect(issuer.revocations).toHaveLength(0);
+
+      // Rotation has spent the issuer credential. Its replacement must be
+      // retained under the lock even when the following live check fails.
+      issuer.rejectNextVerification();
+      rotation.release.resolve();
+      expect(await refresh).toMatchObject({
+        ok: false,
+        code: "token_rejected",
+      });
+      expect(await logout).toMatchObject({
+        ok: true,
+        result: { state: "signed-out", revocation: "confirmed" },
+      });
+      expect(issuer.refreshes).toEqual([
+        "synthetic-refresh-1-1",
+        "synthetic-refresh-1-2",
+      ]);
+      expect(issuer.revocations).toEqual([issuer.issuedTokens[2]?.access]);
+      const restarted = await consumer();
+      expect(await restarted.run("status")).toMatchObject({
+        ok: true,
+        result: { state: "signed-out" },
+      });
+    }, 20_000);
+
+    it("keeps a newer same-home login and rotation while an expired logout finishes detached revocation", async () => {
+      await login();
+      issuer.clockOffsetMs = 3_601_000;
+      const signingOut = await consumer();
+      const rotation = issuer.hold("refresh");
+      const logout = signingOut.run("logout");
+      await rotation.entered.promise;
+
+      // Reaching the issuer does not hold the old profile lock. A separate
+      // process observes the durable clear while the old refresh is pending.
+      const cleared = await consumer();
+      expect(await cleared.run("status")).toMatchObject({
+        ok: true,
+        result: { state: "signed-out" },
+      });
+      await login();
+      const revocation = issuer.hold("logout");
+      rotation.release.resolve();
+      await revocation.entered.promise;
+      expect(issuer.revocations).toHaveLength(1);
+      expect(issuer.sessionFor(issuer.revocations[0]!)).toBe(1);
+
+      // The replacement session has independent issuer authority and can
+      // rotate while the old logout is pending. Old completion cannot rewrite
+      // its durable envelope or revoke that replacement session.
+      const replacement = await consumer();
+      expect(await replacement.run("refresh")).toMatchObject({
+        ok: true,
+        result: { state: "signed-in", identity },
+      });
+      expect(issuer.refreshes).toEqual([
+        "synthetic-refresh-1-1",
+        "synthetic-refresh-2-2",
+      ]);
+      revocation.release.resolve();
+      expect(await logout).toMatchObject({
+        ok: true,
+        result: { state: "signed-out", revocation: "confirmed" },
+      });
+      const restarted = await consumer();
+      expect(await restarted.run("verify")).toMatchObject({
+        ok: true,
+        result: { state: "signed-in", identity },
+      });
+      expect(issuer.verifications.at(-1)).toBe(issuer.issuedTokens[3]?.access);
+      expect(issuer.sessionFor(issuer.verifications.at(-1)!)).toBe(2);
+      expect(issuer.revocations).toHaveLength(1);
     }, 20_000);
   }
 );

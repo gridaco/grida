@@ -179,13 +179,14 @@ async function localRegistration(
       data === null ||
       Array.isArray(data) ||
       Object.keys(data).sort().join(",") !==
-        "apiOrigin,clientId,issuer,redirectUris"
+        "apiOrigin,clientId,issuer,publishableKey,redirectUris"
     )
       throw new CliHost.Failure("invalid_config");
     const config = data as Record<string, unknown>;
     if (
       typeof config.clientId !== "string" ||
       !/^[A-Za-z0-9_-]{1,256}$/.test(config.clientId) ||
+      typeof config.publishableKey !== "string" ||
       config.issuer !== localIssuer ||
       config.apiOrigin !== localApiOrigin ||
       !Array.isArray(config.redirectUris) ||
@@ -199,6 +200,9 @@ async function localRegistration(
       throw new CliHost.Failure("invalid_config");
     return Object.freeze({
       clientId: config.clientId,
+      // The SDK validates key admission before constructing durable custody.
+      // An explicit local registration never borrows the hosted project's key.
+      publishableKey: config.publishableKey,
       issuer: localIssuer,
       apiOrigin: localApiOrigin,
       redirectUris: Object.freeze([

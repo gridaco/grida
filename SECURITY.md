@@ -1766,8 +1766,15 @@ credential through reuse of an existing browser or daemon bridge.
    and refresh, and invalidates stale work on logout/cancellation. Accepted
    refresh rotations survive a later identity-check failure; the access token
    and identity remain the last verified values until that check succeeds. Logout
-   clears this custody and requests only `scope=local`; failed remote
-   revocation is reported rather than changing to global/grant revocation.
+   clears this custody before remote work. It constrains the captured JWT to
+   the configured issuer/client/user and a non-nil session ID; missing session
+   targeting cannot reach an issuer fallback to account-wide logout. Expired
+   or near-expired logout performs at most one detached refresh in memory and
+   requires the same session binding. It never persists the renewed credentials
+   or emits signed-in metadata after clearing. Live identity verifies the
+   selected bearer before requesting only `scope=local`; failed remote revocation
+   is reported rather than changing to global/grant revocation. Only completed
+   200/204 responses confirm logout; their bodies are discarded.
 5. **Durable profile authority.** The Node factory binds a private profile to
    canonical home, issuer, client ID, and API origin. Keyring is the initial
    default; explicit file selection is remembered. Backend failure never
@@ -1836,6 +1843,10 @@ credential through reuse of an existing browser or daemon bridge.
     registered loopback callbacks. No environment or repository configuration
     changes hosted destination authority. Custody uses the canonical Grida home
     or an explicit absolute `GRIDA_HOME`, with issuer/client/API profile binding.
+    The bundled `sb_publishable_...` project key supplies admission only on the
+    fixed issuer logout request, alongside the user bearer. It is not identity;
+    key rotation does not create a different credential profile. Secret/service
+    keys and legacy JWT keys fail configuration validation before custody.
     Empty/relative overrides and filesystem-root/user-home targets fail before
     custody. The explicit local fixture file remains bounded and owner-controlled,
     accepts only the fixed local issuer/API and registered callbacks, and requires
@@ -2062,9 +2073,13 @@ defaults would cross those boundaries.
    the exact fixture API/editor ports and callback listeners, and refuses
    external module resolution. The macOS custody owner's exact read-only ACL
    command remains real. Reports contain hashes and safe phase metadata only;
-   owned browser/profile/process cleanup precedes report writing. One bounded
-   application-clock injection exercises real near-expiry refresh without
-   modifying issuer time, tokens or credential files.
+   owned browser/profile/process cleanup precedes report writing. Bounded
+   application-clock injections exercise near-expiry reads and detached logout
+   renewal without modifying issuer time, tokens or credential files. The fixture
+   explicitly asserts the logout admission key and its absence on other account
+   requests; the more permissive local gateway alone cannot prove hosted key
+   admission. Both captured and renewed refresh tokens must fail after logout,
+   while another native session and the browser remain usable.
 
 **Limits.** This is local provisioning, not hosted deployment certification.
 The executable, repository, dependencies, Docker engine, and same-user process

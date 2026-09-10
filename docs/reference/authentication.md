@@ -61,7 +61,10 @@ Desktop installation has adopted that store.
    The CLI renews credentials directly at Supabase when an online operation
    needs them and saves accepted rotation under its custody rules.
 6. **Sign out.** The CLI clears local custody and asks Supabase to revoke only
-   the captured CLI session. It reports remote revocation as `confirmed`,
+   the captured CLI session. Near expiry, one detached refresh stays in memory;
+   the renewed bearer must belong to the same user, client and session. Live
+   identity verification precedes the fixed logout request, which carries the
+   public project admission key. It reports remote revocation as `confirmed`,
    `unconfirmed`, or `not-needed`, separately from local clearing.
 
 Existing browser consent can skip the decision screen; it still authorizes a
@@ -79,6 +82,9 @@ An online account operation refreshes near expiry as needed. `auth status` only
 reads local metadata. Refresh rotation and custody writes are coordinated across
 CLI processes; an accepted rotation must not be replaced with an old refresh
 token after a later request fails. Ordinary account reads never start login.
+Logout's detached renewal never saves credentials after local clearing and cannot
+replace or revoke a newer independent login. A missing/mismatched session target
+fails closed; account-wide and application-grant revocation are never substitutes.
 
 ## Which credential means what
 
@@ -163,15 +169,15 @@ See [Supabase sign-out semantics](https://supabase.com/docs/guides/auth/signout)
 
 ## Configuration and change ownership
 
-| Concern                                      | Canonical owner                                                                                                           | Change consequence                                                                                                                          |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| CLI issuer, client ID, API origin, callbacks | [Public CLI registration](https://github.com/gridaco/grida/blob/main/packages/grida-cli/src/oauth-client-registration.ts) | Bundled into installed binaries; coordinate registration, allowlists and client releases. Issuer/client/API also bind durable profiles.     |
-| Native bearer acceptance and consent         | [Web auth configuration](https://github.com/gridaco/grida/blob/main/editor/lib/auth/README.md)                            | Web deployment plus matching Supabase OAuth registration. Consent signing authority stays server-only.                                      |
-| Auth issuer versus Data API origin           | Same web configuration                                                                                                    | The canonical issuer is independent of a same-project Data API replica/load-balancer URL. Never infer one by rewriting the other.           |
-| API gateway admission                        | Endpoint contract plus public application configuration                                                                   | Public project keys and user tokens are distinct. OAuth token exchange and ordinary Auth endpoints can have different gateway requirements. |
-| Native account lifecycle and persistence     | [`@grida/auth`](https://github.com/gridaco/grida/blob/main/packages/grida-auth/README.md)                                 | Shared lifecycle/host changes need package and installed-client tests.                                                                      |
-| Desktop cookie ceremony and native entry     | [Desktop](https://github.com/gridaco/grida/blob/main/desktop/README.md), GRIDA-SEC-005                                    | Distinguish hosted renderer changes from native payload releases.                                                                           |
-| Organization, billing and GG authority       | Account APIs, RLS and GG policy                                                                                           | Client configuration cannot grant membership or replace server checks.                                                                      |
+| Concern                                                  | Canonical owner                                                                                                           | Change consequence                                                                                                                          |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| CLI issuer, client ID, public key, API origin, callbacks | [Public CLI registration](https://github.com/gridaco/grida/blob/main/packages/grida-cli/src/oauth-client-registration.ts) | Bundled into installed binaries; coordinate registration, allowlists and client releases. Issuer/client/API also bind durable profiles.     |
+| Native bearer acceptance and consent                     | [Web auth configuration](https://github.com/gridaco/grida/blob/main/editor/lib/auth/README.md)                            | Web deployment plus matching Supabase OAuth registration. Consent signing authority stays server-only.                                      |
+| Auth issuer versus Data API origin                       | Same web configuration                                                                                                    | The canonical issuer is independent of a same-project Data API replica/load-balancer URL. Never infer one by rewriting the other.           |
+| API gateway admission                                    | Endpoint contract plus public application configuration                                                                   | Public project keys and user tokens are distinct. OAuth token exchange and ordinary Auth endpoints can have different gateway requirements. |
+| Native account lifecycle and persistence                 | [`@grida/auth`](https://github.com/gridaco/grida/blob/main/packages/grida-auth/README.md)                                 | Shared lifecycle/host changes need package and installed-client tests.                                                                      |
+| Desktop cookie ceremony and native entry                 | [Desktop](https://github.com/gridaco/grida/blob/main/desktop/README.md), GRIDA-SEC-005                                    | Distinguish hosted renderer changes from native payload releases.                                                                           |
+| Organization, billing and GG authority                   | Account APIs, RLS and GG policy                                                                                           | Client configuration cannot grant membership or replace server checks.                                                                      |
 
 The environment topology is production and disposable local Supabase. A Vercel
 Preview deployment is not an isolated auth/database environment. Local fixtures

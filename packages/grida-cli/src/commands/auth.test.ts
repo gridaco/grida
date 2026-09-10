@@ -4,12 +4,29 @@ import { AuthCommands } from "./auth";
 
 const config: AuthClient.Config = {
   clientId: "synthetic-public-client",
+  publishableKey: "sb_publishable_synthetic",
   issuer: "https://issuer.invalid/auth/v1",
   apiOrigin: "https://grida.invalid",
   redirectUris: ["http://127.0.0.1:55435/callback"],
 };
 const identity = { id: "synthetic-user", email: null, display_name: "Insider" };
 const now = 1_800_000_000_000;
+const accessToken = [
+  Buffer.from(JSON.stringify({ alg: "ES256", typ: "JWT" })).toString(
+    "base64url"
+  ),
+  Buffer.from(
+    JSON.stringify({
+      iss: config.issuer,
+      aud: "authenticated",
+      sub: identity.id,
+      client_id: config.clientId,
+      session_id: "11111111-1111-4111-8111-111111111111",
+      exp: now / 1000 + 3600,
+    })
+  ).toString("base64url"),
+  "synthetic-access",
+].join(".");
 
 function setup() {
   let session: AuthClient.Session | null = null;
@@ -23,7 +40,7 @@ function setup() {
       return {
         status: 200,
         body: {
-          access_token: "synthetic-access",
+          access_token: accessToken,
           refresh_token: "synthetic-refresh",
           expires_in: 3600,
           token_type: "bearer",
@@ -118,6 +135,25 @@ describe("AuthCommands", () => {
       revocation: "not-needed",
     });
     expect(send).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns confirmed session-local logout without exposing admission or account tokens", async () => {
+    const { runtime, send } = setup();
+    await AuthCommands.login(runtime);
+    expect(await AuthCommands.logout(runtime)).toEqual({
+      state: "signed-out",
+      revocation: "confirmed",
+    });
+    expect(send).toHaveBeenLastCalledWith({
+      url: `${config.issuer}/logout?scope=local`,
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        apikey: config.publishableKey,
+      },
+      response: "empty",
+    });
+    expect(await AuthCommands.status(runtime)).toEqual({ state: "signed-out" });
   });
 
   it("preserves a safe producer failure without retry or inventing a session", async () => {

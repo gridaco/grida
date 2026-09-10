@@ -28,7 +28,9 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-async function server(handler?: Parameters<typeof createServer>[0]) {
+async function server(
+  handler?: NonNullable<Parameters<typeof createServer>[1]>
+) {
   const instance = handler ? createServer(handler) : createServer();
   const sockets = new Set<Socket>();
   instance.on("connection", (socket) => {
@@ -55,14 +57,23 @@ async function redirect() {
   return `${reservation.origin}/callback`;
 }
 
-async function fixture() {
+async function fixture(logout?: (response: ServerResponse) => void) {
   const calls: { path: string; body: string; authorization?: string }[] = [];
+  const logoutRequests: {
+    method?: string;
+    cookie?: string;
+    apiKey?: string | string[];
+  }[] = [];
   const ggRequests: {
     method?: string;
     cookie?: string;
     contentType?: string;
   }[] = [];
   const upstream = await server();
+  const accessTokens = {
+    initial: syntheticAccessToken(`${upstream.origin}/auth/v1`, "initial"),
+    rotated: syntheticAccessToken(`${upstream.origin}/auth/v1`, "rotated"),
+  };
   upstream.instance.on("request", (request, response) => {
     const parts: Buffer[] = [];
     request.on("data", (chunk) => parts.push(chunk));
@@ -81,8 +92,8 @@ async function fixture() {
           JSON.stringify({
             token_type: "Bearer",
             access_token: isRefresh
-              ? "rotated-access-secret"
-              : "initial-access-secret",
+              ? accessTokens.rotated
+              : accessTokens.initial,
             refresh_token: isRefresh
               ? "rotated-refresh-secret"
               : "initial-refresh-secret",
@@ -115,6 +126,12 @@ async function fixture() {
           })
         );
       } else if (call.path === "/auth/v1/logout?scope=local") {
+        logoutRequests.push({
+          method: request.method,
+          cookie: request.headers.cookie,
+          apiKey: request.headers.apikey,
+        });
+        if (logout) return logout(response);
         response.writeHead(204);
         response.end();
       } else {
@@ -137,6 +154,7 @@ async function fixture() {
   };
   const config: AuthClient.Config = {
     clientId: "synthetic-public-client",
+    publishableKey: "sb_publishable_synthetic-project-key",
     issuer: `${upstream.origin}/auth/v1`,
     apiOrigin: upstream.origin,
     redirectUris: [await redirect()],
@@ -146,9 +164,28 @@ async function fixture() {
     custody,
     calls,
     ggRequests,
+    logoutRequests,
     session: () => session,
     upstream,
+    accessTokens,
   };
+}
+
+function syntheticAccessToken(issuer: string, signature: string) {
+  return [
+    { alg: "ES256", typ: "JWT" },
+    {
+      iss: issuer,
+      aud: "authenticated",
+      sub: "synthetic-user",
+      client_id: "synthetic-public-client",
+      session_id: "11111111-1111-4111-8111-111111111111",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    },
+  ]
+    .map((part) => Buffer.from(JSON.stringify(part)).toString("base64url"))
+    .concat(Buffer.from(signature).toString("base64url"))
+    .join(".");
 }
 
 function callback(authorizationUrl: string) {
@@ -234,7 +271,7 @@ describe("createNativeAuth", () => {
           {
             path: "/api/v1/auth/gg",
             body: '{"organization_id":7}',
-            authorization: "Bearer initial-access-secret",
+            authorization: `Bearer ${f.accessTokens.initial}`,
           },
         ]
       );
@@ -353,6 +390,7 @@ describe("createNativeAuth", () => {
         issuer: `${upstream.origin}/auth/v1`,
         apiOrigin: upstream.origin,
         clientId: "synthetic-public-client",
+        publishableKey: "sb_publishable_synthetic-project-key",
         redirectUris: ["http://127.0.0.1:55435/callback"],
       };
       const session: AuthClient.Session = {
@@ -458,11 +496,145 @@ describe("createNativeAuth", () => {
     expect(f.calls.at(-1)).toEqual({
       path: "/auth/v1/logout?scope=local",
       body: "",
-      authorization: "Bearer rotated-access-secret",
+      authorization: `Bearer ${f.accessTokens.rotated}`,
     });
     expect(f.session()).toBeNull();
     expect(JSON.stringify(status)).not.toMatch(/secret|ignored/);
     await provesClosed(f.config.redirectUris[0]!);
+  });
+
+  it.each([200, 204])(
+    "accepts the logout operation's empty HTTP %s response without JSON parsing",
+    async (status) => {
+      const f = await fixture((response) => response.writeHead(status).end());
+      const client = createNativeAuth(f.config, {
+        custody: f.custody,
+        async openBrowser(url) {
+          await fetch(callback(url));
+        },
+      });
+      await client.login();
+      expect(await client.logout()).toEqual({
+        state: "signed-out",
+        revocation: "confirmed",
+      });
+      expect(f.calls.slice(-2).map((call) => call.path)).toEqual([
+        "/api/v1/auth/me",
+        "/auth/v1/logout?scope=local",
+      ]);
+      expect(f.calls.at(-1)).toEqual({
+        path: "/auth/v1/logout?scope=local",
+        body: "",
+        authorization: `Bearer ${f.accessTokens.initial}`,
+      });
+      expect(f.logoutRequests).toEqual([
+        {
+          method: "POST",
+          cookie: undefined,
+          apiKey: f.config.publishableKey,
+        },
+      ]);
+      expect(f.session()).toBeNull();
+    }
+  );
+
+  it("discards a logout success body without parsing, retaining, or waiting for it to finish", async () => {
+    const closed = deferred<void>();
+    const f = await fixture((response) => {
+      response.once("close", () => closed.resolve());
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.write("upstream-secret-that-must-not-escape");
+      // The server deliberately never ends this body. Status-only handling
+      // cancels the stream instead of reading it until the network deadline.
+    });
+    const client = createNativeAuth(f.config, {
+      custody: f.custody,
+      async openBrowser(url) {
+        await fetch(callback(url));
+      },
+    });
+    await client.login();
+    expect(await client.logout()).toEqual({
+      state: "signed-out",
+      revocation: "confirmed",
+    });
+    await closed.promise;
+    expect(f.session()).toBeNull();
+  });
+
+  it.each(["", "upstream-secret-that-is-not-json"])(
+    "still requires token JSON when the successful response body is %j",
+    async (body) => {
+      const f = await fixture();
+      f.upstream.instance.removeAllListeners("request");
+      f.upstream.instance.on("request", (_request, response) => {
+        response.writeHead(200).end(body);
+      });
+      const client = createNativeAuth(f.config, {
+        custody: f.custody,
+        async openBrowser(url) {
+          await fetch(callback(url));
+        },
+      });
+      await expect(client.login()).rejects.toMatchObject({
+        code: "invalid_response",
+        message: "Grida authentication failed (invalid_response)",
+      });
+      expect(f.session()).toBeNull();
+    }
+  );
+
+  it("refuses logout redirects without forwarding credentials or exposing an upstream body", async () => {
+    const capture = vi.fn<() => void>();
+    const destination = await server((_request, response) => {
+      capture();
+      response.writeHead(200).end();
+    });
+    const f = await fixture((response) => {
+      response
+        .writeHead(307, {
+          location: `${destination.origin}/capture`,
+          "set-cookie": "upstream-secret=must-not-be-retained",
+        })
+        .end("upstream-secret-that-must-not-escape");
+    });
+    const client = createNativeAuth(f.config, {
+      custody: f.custody,
+      async openBrowser(url) {
+        await fetch(callback(url));
+      },
+    });
+    await client.login();
+    expect(await client.logout()).toEqual({
+      state: "signed-out",
+      revocation: "unconfirmed",
+    });
+    expect(capture).not.toHaveBeenCalled();
+    expect(f.logoutRequests).toHaveLength(1);
+    expect(f.logoutRequests[0]?.cookie).toBeUndefined();
+    expect(f.session()).toBeNull();
+  });
+
+  it("retains the network deadline for a logout that never returns response headers", async () => {
+    const entered = deferred<void>();
+    const f = await fixture(() => entered.resolve());
+    const client = createNativeAuth(f.config, {
+      custody: f.custody,
+      async openBrowser(url) {
+        await fetch(callback(url));
+      },
+    });
+    await client.login();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const logout = client.logout();
+    await entered.promise;
+    await vi.advanceTimersByTimeAsync(15_000);
+    vi.useRealTimers();
+    expect(await logout).toEqual({
+      state: "signed-out",
+      revocation: "unconfirmed",
+    });
+    expect(f.session()).toBeNull();
   });
 
   it("keeps a pending ceremony usable after wrong method, path, host, state, and duplicate parameters", async () => {

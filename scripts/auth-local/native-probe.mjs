@@ -23,13 +23,16 @@ assert.equal((await fs.stat(root)).mode & 0o777, 0o700);
 const config = JSON.parse(await fs.readFile(configPath, "utf8"));
 assert.equal(config.issuer, "http://127.0.0.1:55431/auth/v1");
 assert.equal(config.apiOrigin, "http://127.0.0.1:3041");
+assert.match(config.publishableKey, /^sb_publishable_[A-Za-z0-9_-]+$/);
 assert.deepEqual(config.redirectUris, [
   "http://127.0.0.1:55435/callback",
   "http://127.0.0.1:55436/callback",
 ]);
 
+let rotatedLogoutTokens;
+let logoutRefreshRequests = 0;
 const originalFetch = globalThis.fetch;
-globalThis.fetch = (input, init) => {
+globalThis.fetch = async (input, init) => {
   const url = new URL(
     typeof input === "string"
       ? input
@@ -42,7 +45,36 @@ globalThis.fetch = (input, init) => {
     "Probe network escaped the fixture"
   );
   assert(!url.username && !url.password && !url.hash);
-  return originalFetch(input, { ...init, redirect: "manual" });
+  const headers = new Headers(init?.headers);
+  if (url.pathname === "/auth/v1/logout") {
+    assert.equal(url.search, "?scope=local");
+    // Local Kong also accepts a bearer without this key; enforce the hosted
+    // admission contract explicitly so this proof cannot repeat that blind spot.
+    assert(headers.get("apikey") === config.publishableKey);
+    assert(headers.get("authorization")?.startsWith("Bearer "));
+  } else {
+    assert(headers.get("apikey") !== config.publishableKey);
+  }
+  if (
+    operation === "logout-expired" &&
+    url.pathname === "/auth/v1/oauth/token"
+  ) {
+    assert.equal(++logoutRefreshRequests, 1);
+  }
+  const response = await originalFetch(input, { ...init, redirect: "manual" });
+  if (
+    operation === "logout-expired" &&
+    url.pathname === "/auth/v1/oauth/token" &&
+    response.status === 200
+  ) {
+    assert.equal(rotatedLogoutTokens, undefined);
+    const tokens = await response.clone().json();
+    rotatedLogoutTokens = {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+    };
+  }
+  return response;
 };
 
 const custody = {
@@ -69,6 +101,29 @@ const custody = {
     await fs.rm(sessionPath, { force: true });
   },
 };
+
+let capturedLogoutSession;
+if (["logout", "logout-expired"].includes(operation)) {
+  capturedLogoutSession = await custody.read();
+  assert(capturedLogoutSession);
+  if (operation === "logout-expired") {
+    // Advance only this isolated application's clock beyond its issued JWT.
+    // GoTrue keeps its real clock; this proves detached renewal, not natural
+    // issuer expiry. Leave time for the replacement JWT to have a later expiry.
+    await new Promise((resolve) => setTimeout(resolve, 2_100));
+    const claims = JSON.parse(
+      Buffer.from(
+        capturedLogoutSession.accessToken.split(".")[1],
+        "base64url"
+      ).toString("utf8")
+    );
+    const now = Date.now;
+    const offset =
+      Math.max(capturedLogoutSession.expiresAt, claims.exp * 1000) + 1 - now();
+    assert(Number.isSafeInteger(offset) && offset > 0 && offset <= 3_600_000);
+    Date.now = () => now() + offset;
+  }
+}
 
 let browserOpened;
 let ggGrant;
@@ -170,8 +225,43 @@ try {
     } finally {
       ggGrant = undefined;
     }
-  } else if (operation === "logout") result = await auth.logout();
-  else throw new Error("Unknown probe operation");
+  } else if (["logout", "logout-expired"].includes(operation)) {
+    result = await auth.logout();
+    assert.deepEqual(result, { state: "signed-out", revocation: "confirmed" });
+    assert.equal(await custody.read(), null);
+    if (operation === "logout-expired") {
+      assert.equal(logoutRefreshRequests, 1);
+      assert(rotatedLogoutTokens);
+      assert(
+        rotatedLogoutTokens.refreshToken !== capturedLogoutSession.refreshToken
+      );
+    }
+    for (const tokens of [capturedLogoutSession, rotatedLogoutTokens].filter(
+      Boolean
+    )) {
+      const identity = await fetch(`${config.apiOrigin}/api/v1/auth/me`, {
+        headers: { authorization: `Bearer ${tokens.accessToken}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+      assert.equal(identity.status, 401);
+      await identity.body?.cancel();
+      // Use the underlying guarded destination directly so these negative probes
+      // cannot be mistaken for the application's one detached renewal above.
+      const refresh = await originalFetch(`${config.issuer}/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          client_id: config.clientId,
+          refresh_token: tokens.refreshToken,
+        }).toString(),
+        redirect: "manual",
+        signal: AbortSignal.timeout(15_000),
+      });
+      assert([400, 401].includes(refresh.status));
+      await refresh.body?.cancel();
+    }
+  } else throw new Error("Unknown probe operation");
   await browserOpened;
   process.send({ type: "result", result });
 } catch {
@@ -179,5 +269,7 @@ try {
   process.exitCode = 1;
 } finally {
   ggGrant = undefined;
+  capturedLogoutSession = undefined;
+  rotatedLogoutTokens = undefined;
   process.disconnect();
 }
