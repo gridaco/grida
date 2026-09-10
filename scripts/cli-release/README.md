@@ -5,6 +5,11 @@ Publication requires deployed account access, public documentation and release
 configuration. These scripts do not provision services or change the package's
 release metadata.
 
+The web server's [OAuth deployment reference](../../editor/lib/auth/README.md)
+owns the required environment variables, registration alignment, secret rotation
+and hosted verification. Supabase registration and green CI do not activate
+those settings in an existing Vercel deployment.
+
 ## Local candidate
 
 Use Node 24 and its bundled npm. Build before packing; choose a new absolute
