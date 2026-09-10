@@ -13,8 +13,10 @@ format: md
 Discover models, generate media, and keep the files in your own workflow.
 Desktop does not need to be running.
 
-> **Preview.** Install the replacement CLI from npm's `next` channel. The legacy
-> `latest` package does not provide these commands.
+> **Preview channel: `next`.** Installation requires a published `next` version;
+> check [npm's versions and tags](https://www.npmjs.com/package/grida?activeTab=versions)
+> for availability. Before that tag exists, the command below cannot install the
+> preview. The legacy `latest` package does not provide these commands.
 
 ## Install
 
