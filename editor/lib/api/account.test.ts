@@ -5,6 +5,7 @@ import { accountApi } from "./account";
 import { bearer } from "../auth/bearer";
 
 const issuer = "http://127.0.0.1:55431/auth/v1";
+const dataOrigin = "http://127.0.0.1:55432";
 const endpoint = "http://127.0.0.1:3041/api/v1/auth/me";
 const clientId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
@@ -64,7 +65,8 @@ const fetcher = vi.fn<typeof fetch>(async (_url, init) => {
 beforeEach(() => {
   fetcher.mockClear();
   vi.stubGlobal("fetch", fetcher);
-  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55431");
+  vi.stubEnv("GRIDA_OAUTH_ISSUER", issuer);
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", dataOrigin);
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "synthetic-public-key");
   vi.stubEnv("GRIDA_OAUTH_CLIENT_IDS", clientId);
   // Account identity cannot acquire unrelated infrastructure configuration.
@@ -107,6 +109,7 @@ describe("accountApi.bind", () => {
   it.each([
     ["cookie-only", null],
     ["ordinary account token", { client_id: undefined }],
+    ["Data API alias issuer", { iss: `${dataOrigin}/auth/v1` }],
     ["GG token", { aud: "gg:ai" }],
     ["other OAuth client", { client_id: sessionId }],
   ])(
@@ -145,6 +148,7 @@ describe("accountApi.bind", () => {
 
   it("OPTIONS reports only the allowed methods without account or issuer configuration", async () => {
     vi.stubEnv("GRIDA_OAUTH_CLIENT_IDS", "");
+    vi.stubEnv("GRIDA_OAUTH_ISSUER", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
     const response = await handlers.OPTIONS(request("OPTIONS"));
     expect(response.status).toBe(204);

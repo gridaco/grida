@@ -32,6 +32,8 @@ const id = "authorization_1234567890";
 const clientId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
 const origin = "http://127.0.0.1:3041";
+const issuer = "http://127.0.0.1:55431/auth/v1";
+const dataOrigin = "http://127.0.0.1:55432";
 const callback = "http://127.0.0.1:55435/callback";
 const details = {
   authorization_id: id,
@@ -42,7 +44,8 @@ const details = {
 };
 
 beforeEach(() => {
-  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55431");
+  vi.stubEnv("GRIDA_OAUTH_ISSUER", issuer);
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", dataOrigin);
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "test-public-key");
   vi.stubEnv("GRIDA_OAUTH_CLIENT_IDS", clientId);
   vi.stubEnv("GRIDA_OAUTH_ORIGIN", origin);
@@ -153,6 +156,10 @@ describe("OAuth consent page", () => {
     );
     expect(html).toContain("Authorize Grida CLI");
     expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledWith(
+      `${issuer}/oauth/authorizations/${id}`,
+      expect.objectContaining({ method: "GET", redirect: "error" })
+    );
   });
 
   it("keeps hosted Google sign-in's next target on this consent page", async () => {

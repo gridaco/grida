@@ -6,6 +6,7 @@ import { nativeData } from "./native-data";
 const user = "22222222-2222-4222-8222-222222222222";
 const config = {
   issuer: "http://127.0.0.1:55431/auth/v1",
+  dataOrigin: "http://127.0.0.1:55432",
   publishableKey: "synthetic-key",
   clientIds: [],
 };
@@ -27,8 +28,9 @@ describe("ggData.forBearer", () => {
     ).toEqual({ id: 4, name: "local" });
     const [target, init] = fetcher.mock.calls[0];
     const url = new URL(String(target));
+    expect(url.origin).not.toBe(new URL(config.issuer).origin);
     expect(url.origin + url.pathname).toBe(
-      "http://127.0.0.1:55431/rest/v1/organization_member"
+      "http://127.0.0.1:55432/rest/v1/organization_member"
     );
     expect(Object.fromEntries(url.searchParams)).toEqual({
       select: "organization_id,organization!inner(id,name)",

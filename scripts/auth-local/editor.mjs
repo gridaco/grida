@@ -33,6 +33,7 @@ async function main() {
     setup.editorOrigin !== "http://127.0.0.1:3041" ||
     setup.apiUrl !== "http://127.0.0.1:55431" ||
     fixtureEnv.NEXT_PUBLIC_SUPABASE_URL !== setup.apiUrl ||
+    fixtureEnv.GRIDA_OAUTH_ISSUER !== `${setup.apiUrl}/auth/v1` ||
     fixtureEnv.GRIDA_OAUTH_ORIGIN !== setup.editorOrigin
   ) {
     throw new Error("Expected the isolated local auth fixture origins");

@@ -16,16 +16,26 @@ configuration.
 
 | Variable                     | Shape                                                            | Purpose                                                                                                                                                                                                                                                                |
 | ---------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GRIDA_OAUTH_ISSUER`         | Exact canonical HTTPS Auth issuer ending in `/auth/v1`           | Pins token issuer comparison and Auth requests. Use `issuer` from the [public registration](../../../packages/grida-cli/src/oauth-client-registration.ts). A Data API load balancer or read-replica alias is not this identity.                                        |
 | `GRIDA_OAUTH_CLIENT_IDS`     | Comma-separated UUIDs; nonempty                                  | Allows registered native clients at consent and the account API. For the shipped CLI, use `clientId` from the [public registration](../../../packages/grida-cli/src/oauth-client-registration.ts).                                                                     |
 | `GRIDA_OAUTH_ORIGIN`         | One HTTPS origin, without a path, query, fragment or credentials | Pins the browser consent Host/Origin and proof issuer. It must match the deployed consent page's origin and the Supabase OAuth authorization-path configuration.                                                                                                       |
 | `GRIDA_OAUTH_REDIRECT_URIS`  | Comma-separated exact callback URLs; nonempty                    | Allows only the registered CLI callbacks. Use `redirectUris` from the same public registration; keep Supabase's app registration identical. Each URL must be canonical HTTP on `127.0.0.1`, with an explicit port at least 1024 and no query, fragment or credentials. |
 | `GRIDA_OAUTH_CONSENT_SECRET` | Independent random server-only string, at least 32 UTF-8 bytes   | Signs ten-minute browser consent proofs. Store as a sensitive Vercel variable. It is not an OAuth client secret, Supabase key or GG signing key.                                                                                                                       |
 
 The common reader also requires `NEXT_PUBLIC_SUPABASE_URL` and
-`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for the same Supabase project. It derives
-the issuer by appending `/auth/v1` to that URL. Never substitute a privileged
-Supabase credential for the publishable key. The four `GRIDA_OAUTH_*` variables
-must not acquire a `NEXT_PUBLIC_` prefix.
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for the same Supabase project. The URL
+supplies the Data API origin; it may use that project's read-replica or load
+balancer hostname. It does not select the OAuth issuer. Native organization,
+credit and membership reads retain that data origin, while consent and live
+identity verification use `GRIDA_OAUTH_ISSUER`. Never substitute a privileged
+Supabase credential for the publishable key. The `GRIDA_OAUTH_*` variables must
+not acquire a `NEXT_PUBLIC_` prefix.
+
+Both destinations are trusted server configuration and must belong to the same
+Supabase project. Do not derive the issuer by rewriting a replica hostname or
+reading a JWT claim. Keep the canonical issuer explicit even when Auth and Data
+API traffic currently use one hostname. Changing data routing must not change
+which issuer is accepted, and changing auth configuration must not reroute data.
 
 The client ID and callback addresses are public registration metadata. Keep
 their concrete values in the linked CLI registration file instead of copying
@@ -50,8 +60,8 @@ auth environment merely because it has a different web URL.
 
 For local auth development, use the [disposable OAuth fixture](../../../scripts/auth-local/README.md).
 It creates its own client, local Supabase settings and independent consent/GG
-secrets, and supplies them to an isolated editor. The reader permits HTTP origins
-only on `127.0.0.1` for this use. Restart the fixture editor after bootstrap
+secrets, and supplies an explicit local issuer to an isolated editor. The reader
+permits HTTP origins only on `127.0.0.1` for this use. Restart the fixture editor after bootstrap
 changes its settings. The blank entries in [the environment example](../../.env.example)
 only make the required names discoverable; they do not enable native OAuth.
 
@@ -78,6 +88,11 @@ returns JSON `503` with `error.code: "not_configured"`. Consent-only configurati
 errors likewise prevent approval; the decision endpoint returns a safe error,
 while the consent GET renders an error page and may still return HTTP `200`.
 An HTML status alone is not a readiness check.
+
+Configure `GRIDA_OAUTH_ISSUER` before deploying code that requires it. Confirm it
+matches the installed CLI registration and the issuer in Supabase's public OAuth
+discovery metadata. A reachable Data API alias is not evidence of a matching JWT
+issuer; a mismatch rejects login before the live identity request.
 
 A credential-free request to the canonical production origin is a useful first
 check:

@@ -9,6 +9,7 @@ const userId = "22222222-2222-4222-8222-222222222222";
 const callback = "http://127.0.0.1:55435/callback";
 const config: oauthServer.ConsentConfig = {
   issuer: "http://127.0.0.1:55431/auth/v1",
+  dataOrigin: "http://127.0.0.1:55432",
   publishableKey: "test-public-key",
   clientIds: [clientId],
   origin: "http://127.0.0.1:3041",
@@ -93,6 +94,11 @@ describe("browser consent intent", () => {
         target.searchParams.get(action === "approve" ? "code" : "error")
       ).toBe(action === "approve" ? "test-code" : "access_denied");
       expect(f.fetcher).toHaveBeenCalledTimes(3);
+      expect(f.fetcher.mock.calls.map(([target]) => String(target))).toEqual([
+        `${config.issuer}/oauth/authorizations/${id}`,
+        `${config.issuer}/oauth/authorizations/${id}`,
+        `${config.issuer}/oauth/authorizations/${id}/consent`,
+      ]);
       const [url, init] = f.fetcher.mock.calls[2]!;
       expect(url).toBe(`${config.issuer}/oauth/authorizations/${id}/consent`);
       expect(JSON.parse(init?.body as string)).toEqual({ action });
@@ -311,7 +317,8 @@ describe("issuer callback perimeter", () => {
 
 describe("server-owned configuration", () => {
   it("requires explicit client, web origin, callbacks, and consent secret", () => {
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55431");
+    vi.stubEnv("GRIDA_OAUTH_ISSUER", config.issuer);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", config.dataOrigin);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "test-public-key");
     vi.stubEnv("GRIDA_OAUTH_CLIENT_IDS", clientId);
     vi.stubEnv("GRIDA_OAUTH_ORIGIN", config.origin);
@@ -322,12 +329,14 @@ describe("server-owned configuration", () => {
     );
     expect(oauthServer.consentConfig()).toMatchObject({
       issuer: config.issuer,
+      dataOrigin: config.dataOrigin,
       origin: config.origin,
       clientIds: [clientId],
       redirectUris: config.redirectUris,
     });
     for (const [key, value] of [
       ["GRIDA_OAUTH_CLIENT_IDS", ""],
+      ["GRIDA_OAUTH_ISSUER", ""],
       ["GRIDA_OAUTH_ORIGIN", "http://untrusted.invalid"],
       ["NEXT_PUBLIC_SUPABASE_URL", "https://example.invalid/selected-issuer"],
       ["GRIDA_OAUTH_REDIRECT_URIS", `${callback}?unregistered=query`],

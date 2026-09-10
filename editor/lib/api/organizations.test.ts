@@ -4,6 +4,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { accountApi } from "./account";
 
 const issuer = "http://127.0.0.1:55431/auth/v1";
+const dataOrigin = "http://127.0.0.1:55432";
 const endpoint = "http://127.0.0.1:3041/api/v1/account/organizations";
 const clientId = "11111111-1111-4111-8111-111111111111";
 const users = [
@@ -49,7 +50,7 @@ const fetcher = vi.fn<typeof fetch>(async (target, init) => {
     { issuer, audience: "authenticated" }
   );
   const url = new URL(String(target));
-  if (url.pathname === "/auth/v1/oauth/userinfo") {
+  if (url.href === `${issuer}/oauth/userinfo`) {
     return Response.json({
       sub: payload.sub,
       name: "Verified User",
@@ -57,6 +58,7 @@ const fetcher = vi.fn<typeof fetch>(async (target, init) => {
     });
   }
   if (
+    url.origin !== dataOrigin ||
     url.pathname !== "/rest/v1/organization" ||
     headers.get("apikey") !== "synthetic-public-key" ||
     headers.has("cookie")
@@ -83,7 +85,8 @@ beforeEach(() => {
   visible = { [users[0]]: [orgs[0]], [users[1]]: [orgs[1]] };
   fetcher.mockClear();
   vi.stubGlobal("fetch", fetcher);
-  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55431");
+  vi.stubEnv("GRIDA_OAUTH_ISSUER", issuer);
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", dataOrigin);
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "synthetic-public-key");
   vi.stubEnv("GRIDA_OAUTH_CLIENT_IDS", clientId);
   for (const name of [
@@ -116,6 +119,10 @@ describe("native organization operation", () => {
       expect(response.headers.has("location")).toBe(false);
       const recent = fetcher.mock.calls.slice(-2);
       expect(recent).toHaveLength(2);
+      expect(recent.map(([target]) => new URL(String(target)).origin)).toEqual([
+        new URL(issuer).origin,
+        dataOrigin,
+      ]);
       for (const [, init] of recent)
         expect(new Headers(init?.headers).get("authorization")).toBe(
           `Bearer ${credential}`

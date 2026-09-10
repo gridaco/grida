@@ -6,11 +6,13 @@ import { oauthServer } from "../oauth-server";
 import { GET } from "@/app/(api)/(public)/api/v1/auth/me/route";
 
 const issuer = "http://127.0.0.1:55431/auth/v1";
+const dataOrigin = "http://127.0.0.1:55432";
 const clientId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
 const sessionId = "33333333-3333-4333-8333-333333333333";
 const config: oauthServer.Config = {
   issuer,
+  dataOrigin,
   clientIds: [clientId],
   publishableKey: "test-public-key",
 };
@@ -68,7 +70,8 @@ function identityIssuer() {
 }
 
 beforeEach(() => {
-  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55431");
+  vi.stubEnv("GRIDA_OAUTH_ISSUER", issuer);
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", dataOrigin);
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "test-public-key");
   vi.stubEnv("GRIDA_OAUTH_CLIENT_IDS", clientId);
 });
@@ -108,6 +111,7 @@ describe("OAuth bearer identity", () => {
 
   it.each([
     ["wrong issuer", { iss: "https://untrusted.invalid/auth/v1" }],
+    ["Data API alias issuer", { iss: `${dataOrigin}/auth/v1` }],
     ["GG audience", { aud: "grida-gateway" }],
     ["other client", { client_id: "44444444-4444-4444-8444-444444444444" }],
     ["ordinary browser token", { client_id: undefined }],

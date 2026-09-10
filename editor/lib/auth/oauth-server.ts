@@ -4,6 +4,7 @@ import "server-only";
 export namespace oauthServer {
   export type Config = Readonly<{
     issuer: string;
+    dataOrigin: string;
     publishableKey: string;
     clientIds: readonly string[];
   }>;
@@ -80,7 +81,10 @@ export namespace oauthServer {
 
   /** Config is server-owned. No request header, cookie, or JWT selects an issuer. */
   export function config(): Config {
-    const base = origin(process.env.NEXT_PUBLIC_SUPABASE_URL);
+    // A Data API load-balancer/replica alias is not the token's canonical issuer.
+    // Keep both destinations explicit; neither is inferred from the other.
+    const authIssuer = issuer(process.env.GRIDA_OAUTH_ISSUER);
+    const dataOrigin = origin(process.env.NEXT_PUBLIC_SUPABASE_URL);
     const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
     const clientIds = list(process.env.GRIDA_OAUTH_CLIENT_IDS);
     if (
@@ -90,7 +94,7 @@ export namespace oauthServer {
     ) {
       throw new Failure("not_configured");
     }
-    return { issuer: `${base}/auth/v1`, publishableKey, clientIds };
+    return { issuer: authIssuer, dataOrigin, publishableKey, clientIds };
   }
 
   export function consentConfig(): ConsentConfig {
@@ -149,6 +153,15 @@ export namespace oauthServer {
       throw new Failure("not_configured");
     }
     return url.origin;
+  }
+
+  function issuer(value: string | undefined): string {
+    const path = "/auth/v1";
+    if (!value?.endsWith(path)) throw new Failure("not_configured");
+    const base = origin(value.slice(0, -path.length));
+    const canonical = `${base}${path}`;
+    if (value !== canonical) throw new Failure("not_configured");
+    return canonical;
   }
 
   export function uuid(value: unknown): value is string {

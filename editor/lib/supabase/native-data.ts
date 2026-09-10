@@ -6,7 +6,7 @@ import { oauthServer } from "../auth/oauth-server";
 export namespace nativeData {
   export function forBearer(
     authorization: string,
-    config: oauthServer.Config,
+    config: Pick<oauthServer.Config, "dataOrigin" | "publishableKey">,
     fetcher: typeof fetch = globalThis.fetch
   ) {
     if (
@@ -17,7 +17,6 @@ export namespace nativeData {
     ) {
       throw new oauthServer.Failure("unauthorized");
     }
-    const origin = config.issuer.slice(0, -"/auth/v1".length);
     return Object.freeze({
       async page(
         table: "organization" | "organization_member" | "v_billing_credits",
@@ -31,7 +30,7 @@ export namespace nativeData {
           ].includes(table)
         )
           throw new oauthServer.Failure("invalid_request");
-        const url = new URL(`/rest/v1/${table}`, origin);
+        const url = new URL(`/rest/v1/${table}`, config.dataOrigin);
         for (const [key, value] of Object.entries(query))
           url.searchParams.set(key, value);
         let response: Response;
