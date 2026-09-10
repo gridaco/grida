@@ -4,7 +4,7 @@
 /**
  * Hosted-model allowlist — the single availability source for the
  * `/api/v1/ai/*` endpoints, composed from the ONE catalog
- * (`@app/ai-catalog`) so nothing drifts:
+ * (`@grida/ai-models/grida`) so nothing drifts:
  *
  * - text: exact listed service members. Staged members remain reference
  *   data and cannot run through the hosted gateway. Listed legacy entries
@@ -21,7 +21,7 @@ import {
   catalog as models,
   TIER_MODEL_IDS,
   type ModelTier,
-} from "@app/ai-catalog";
+} from "@grida/ai-models/grida";
 
 const HOSTED_TEXT_MODELS = models.text.listed_models();
 const HOSTED_TEXT_MODEL_IDS = new Set(

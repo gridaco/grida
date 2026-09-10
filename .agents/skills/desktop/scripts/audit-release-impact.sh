@@ -48,7 +48,6 @@ readonly -a release_paths=(
   skills
   packages/grida-ai-agent
   packages/grida-ai
-  packages/grida-ai-catalog
   packages/grida-daemon
   packages/grida-auth
   packages/grida-ai-models

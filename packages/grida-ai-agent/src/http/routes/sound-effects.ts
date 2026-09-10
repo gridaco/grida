@@ -11,7 +11,6 @@ import { SoundEffectClient } from "@grida/ai";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
 import { ProviderHttp } from "../../providers/http";
-import { ModelCatalogStore } from "../../providers/model-catalog";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
 import { mediaGenerationError } from "./media-generation-errors";
 
@@ -19,7 +18,6 @@ export type SoundEffectsRoutesDeps = {
   secrets: SecretsStore;
   media?: MediaPersistence | null;
   provider_http?: ProviderHttp;
-  catalog?: ModelCatalogStore;
 };
 
 export function registerSoundEffectsRoutes(
@@ -41,7 +39,6 @@ export function registerSoundEffectsRoutes(
       r.data;
     try {
       const operation = await new SoundEffectClient({
-        catalog: deps.catalog ?? new ModelCatalogStore(),
         keys: { get: (provider) => deps.secrets._getKey(provider) },
         http: providerHttp,
       }).resolve({ model_id, provider: "elevenlabs" });

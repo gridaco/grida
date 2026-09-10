@@ -21,7 +21,7 @@
  * Every resolved product default carries provider identity; an explicit or
  * stored provider/model pair always wins.
  */
-import { TIER_MODEL_IDS } from "@app/ai-catalog";
+import { TIER_MODEL_IDS } from "@grida/ai-models/grida";
 import {
   CHATGPT_PROVIDER_ID,
   GG_PROVIDER_ID,

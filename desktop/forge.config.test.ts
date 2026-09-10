@@ -26,18 +26,17 @@ describe("Desktop package file filter", () => {
       ...manifest.devDependencies,
     }).filter(([, specifier]) => specifier.startsWith("link:../packages/"));
 
-    expect(linked.map(([name]) => name)).toContain("@app/ai-catalog");
+    expect(linked.map(([name]) => name)).toContain("@grida/ai-models");
     for (const [name] of linked) {
       expect(ignore(`/node_modules/${name}`)).toBe(true);
       expect(ignore(`/node_modules/${name}/dist/index.js`)).toBe(true);
     }
   });
 
-  it("excludes only the exact bundled workspace scopes", () => {
-    expect(ignore("/node_modules/@app")).toBe(true);
+  it("excludes only the exact bundled workspace scope", () => {
     expect(ignore("/node_modules/@grida")).toBe(true);
     for (const file of [
-      "/node_modules/@application/vendor/index.js",
+      "/node_modules/@app/vendor/index.js",
       "/node_modules/@gridaco/vendor/index.js",
       "/node_modules/@hono/node-server/index.js",
       "/node_modules/hono/index.js",

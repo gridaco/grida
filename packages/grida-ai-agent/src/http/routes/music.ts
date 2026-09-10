@@ -12,7 +12,6 @@ import type { MediaPersistence } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
 import type { GridaGatewaySessionStore } from "../../providers/gg-session";
 import { ProviderHttp } from "../../providers/http";
-import { ModelCatalogStore } from "../../providers/model-catalog";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
 import { mediaGenerationError } from "./media-generation-errors";
 
@@ -21,7 +20,6 @@ export type MusicRoutesDeps = {
   gg?: GridaGatewaySessionStore;
   gg_base_url?: string;
   provider_http?: ProviderHttp;
-  catalog?: ModelCatalogStore;
 };
 
 export function registerMusicRoutes(app: Hono, deps: MusicRoutesDeps) {
@@ -46,7 +44,6 @@ export function registerMusicRoutes(app: Hono, deps: MusicRoutesDeps) {
 
     try {
       const operation = await new MusicClient({
-        catalog: deps.catalog ?? new ModelCatalogStore(),
         http: providerHttp,
         gg: deps.gg,
         gg_base_url: deps.gg_base_url,

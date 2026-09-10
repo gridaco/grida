@@ -83,17 +83,17 @@ const osxNotarize =
 // postPackage hook) fails the build if any external is still missing, so a
 // misclassified dependency can't ship.
 //
-// `@grida/*` and `@app/*` are bundled (devDependencies, never external — enforced by
+// `@grida/*` are bundled (devDependencies, never external — enforced by
 // vite.guards.ts); keeping them out of `dependencies` also keeps their `link:`
 // symlinks out of the pruner's path.
 function packageIgnore(file: string): boolean {
   if (!file) return false; // app root
   if (file === "/package.json") return false;
   if (file.startsWith("/.vite")) return false;
-  // Workspace packages are bundled (devDependencies); their node_modules entries are
+  // `@grida/*` are bundled (devDependencies); their node_modules entries are
   // `link:` symlinks to ../../packages that point out of the package and make
   // asar fail ("links out of the package"). Exclude them explicitly.
-  if (/^\/node_modules\/@(?:grida|app)(?:\/|$)/.test(file)) return true;
+  if (/^\/node_modules\/@grida(?:\/|$)/.test(file)) return true;
   // pnpm internals (.pnpm store, .bin shims, lockfile metadata) — not needed at
   // runtime; the hoisted prod deps are real dirs at the top level.
   if (file.startsWith("/node_modules/.")) return true;

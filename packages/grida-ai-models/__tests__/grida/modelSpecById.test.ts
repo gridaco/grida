@@ -1,4 +1,4 @@
-import { catalog as models, TIER_MODEL_IDS } from "../src";
+import { catalog as models, TIER_MODEL_IDS } from "../../src/grida";
 
 describe("models.text.modelSpecById", () => {
   it.each([

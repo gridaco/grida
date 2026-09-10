@@ -3,7 +3,7 @@
  *
  * Owns the attributed AI Gateway provider ({@link gateway}) and the
  * BYOK branch ({@link byok}). All catalogue data (text-model specs,
- * tier→spec map, lookup helpers) lives in `@app/ai-catalog` under
+ * tier→spec map, lookup helpers) lives in `@grida/ai-models/grida` under
  * its `catalog.text.*` namespace and is re-exported here under its
  * original editor-side names so existing call sites keep working
  * unchanged.
@@ -11,21 +11,21 @@
  * ## Updating models
  *
  * Grida membership, lifecycle, defaults, and tiers live in
- * `packages/grida-ai-catalog/src/`. Factual capabilities, release provenance,
- * and provider rates live in `packages/grida-ai-models/src/`.
+ * `packages/grida-ai-models/src/grida/`. Factual capabilities, release provenance,
+ * and provider rates live in `packages/grida-ai-models/src/models.ts`.
  *
  * @module
  */
 
 import { createGateway } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import _catalog, { TIER_MODEL_IDS } from "@app/ai-catalog";
+import { catalog as _catalog, TIER_MODEL_IDS } from "@grida/ai-models/grida";
 
 // ---------------------------------------------------------------------------
 // Catalogue re-exports — keep the original editor-side names.
 // ---------------------------------------------------------------------------
 
-export type { ModelTier } from "@app/ai-catalog";
+export type { ModelTier } from "@grida/ai-models/grida";
 
 export type ModelCostPerMillion = _catalog.text.ModelCostPerMillion;
 export type ModelSpec = _catalog.text.ModelSpec;
@@ -37,7 +37,7 @@ export const modelSpecById = _catalog.text.modelSpecById;
 
 /**
  * Read-only map of tier → model spec, sourced from
- * `@app/ai-catalog`'s `catalog.text.byTier`. Same shape as before the
+ * `@grida/ai-models/grida`'s `catalog.text.byTier`. Same shape as before the
  * catalogue move so consumers can keep `import { models } from
  * "@/lib/ai/models"` and read `models[tier]`.
  */
@@ -45,7 +45,7 @@ export const models = _catalog.text.byTier;
 
 /**
  * Read-only map of tier → catalog model ID. Alias of `TIER_MODEL_IDS`
- * from `@app/ai-catalog`; the editor-side name stays `tiers` for
+ * from `@grida/ai-models/grida`; the editor-side name stays `tiers` for
  * backwards compatibility.
  */
 export const tiers = TIER_MODEL_IDS;

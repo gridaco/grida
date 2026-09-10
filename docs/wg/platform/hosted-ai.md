@@ -255,13 +255,16 @@ The catalogue is therefore **published, not shipped**: authored in-repo
 (it is a curated product decision, not a scrape) and served at
 `GET /api/v1/models/catalog`.
 
-**Facts and service choices have different owners.** A factual model catalog
+**One package, two explicit entries.** The factual `@grida/ai-models` entry
 describes identities, capabilities, verified provider bindings, and published
-rates independently of Grida. The service catalog selects offerings from those
+rates independently of Grida. The `@grida/ai-models/grida` service entry selects offerings from those
 facts and owns listing, legacy status, request presets, tiers, and presentation
 preferences. A legacy offering remains a valid explicit choice; legacy is not
 a claim that an upstream provider has retired it. Removing service membership
-does not erase factual identity.
+does not erase factual identity. The root entry never imports or re-exports
+service policy. The execution SDK keeps its existing Grida defaults by explicitly
+consuming the service entry; hosts do not need to inject a catalog to retain
+existing behavior.
 
 **Recommendation is not authorization.** A service family may configure a
 default independently from a partial manual order. A default must be listed

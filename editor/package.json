@@ -14,8 +14,8 @@
     "start": "next start",
     "sync:public": "pnpm --filter @grida/public build",
     "test": "vitest run",
-    "test:api": "pnpm --filter @app/ai-catalog... build && pnpm audit:api && node --test ../scripts/api-local/network.test.mjs && vitest run --config vitest.api.config.ts",
-    "test:api:http": "pnpm --filter @app/ai-catalog... build && node ../scripts/api-local/proof.mjs",
+    "test:api": "pnpm --filter @grida/ai-models build && pnpm audit:api && node --test ../scripts/api-local/network.test.mjs && vitest run --config vitest.api.config.ts",
+    "test:api:http": "pnpm --filter @grida/ai-models build && node ../scripts/api-local/proof.mjs",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "typegen": "next typegen"
@@ -27,7 +27,6 @@
     "@ai-sdk/react": "3.0.199",
     "@ai-sdk/replicate": "2.0.0",
     "@ai-sdk/rsc": "2.0.1",
-    "@app/ai-catalog": "workspace:*",
     "@app/database": "workspace:*",
     "@app/ui": "workspace:*",
     "@base-ui/react": "^1.2.0",

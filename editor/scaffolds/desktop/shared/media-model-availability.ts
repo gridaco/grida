@@ -1,4 +1,4 @@
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import { byokProvidersFor } from "@grida/agent";
 import type { DesktopBridge } from "@/lib/desktop/bridge";
 

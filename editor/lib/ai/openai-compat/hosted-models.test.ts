@@ -12,8 +12,9 @@ vi.mock("@ai-sdk/openai-compatible", () => {
   throw new Error("provider SDK must not initialize");
 });
 
-vi.mock("@app/ai-catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@app/ai-catalog")>();
+vi.mock("@grida/ai-models/grida", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@grida/ai-models/grida")>();
   const base = actual.catalog.text.listed_models()[0]!;
   const active = { ...base, id: "fixture/active" };
   const legacy = { ...base, id: "fixture/legacy", deprecated: true };
@@ -46,7 +47,7 @@ vi.mock("@app/ai-catalog", async (importOriginal) => {
   };
 });
 
-import { catalog as models, TIER_MODEL_IDS } from "@app/ai-catalog";
+import { catalog as models, TIER_MODEL_IDS } from "@grida/ai-models/grida";
 import { hostedModelList, isHostedTextModel } from "./hosted-models";
 
 describe("hosted catalog", () => {

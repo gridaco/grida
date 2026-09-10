@@ -64,12 +64,12 @@ The SDK resolves compatibility and executes the selected provider. The host
 reads reference files and persists returned bytes to media storage or session
 scratch.
 
-The service policy comes from `@app/ai-catalog`, which joins Grida membership,
+The service policy comes from `@grida/ai-models/grida`, which joins Grida membership,
 legacy status, tiers, request presets and optional recommendations to the neutral
-`@grida/ai-models` facts. The agent's catalog binding supplies that seed and the
-schema-1 parser to the shared SDK's refresh store. The SDK owns bounded fetching
-and operation execution, but never imports Grida's service policy. Every media
-route and the chat runtime share the resulting store; its optional image default
+`@grida/ai-models` facts. The shared SDK retains its Grida defaults and owns the
+refresh store, using the service entry's seed and schema-1 parser. The image and
+video routes and chat runtime share that store; audio and 3D retain their bundled
+catalogs. The optional image default
 is used only when the caller has not chosen a model. Explicit legacy selections
 remain valid while the service still admits them.
 

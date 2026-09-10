@@ -1,4 +1,4 @@
-import { catalog as models, TIER_MODEL_IDS } from "../src";
+import { catalog as models, TIER_MODEL_IDS } from "../../src/grida";
 
 describe("bundled model release metadata", () => {
   const cards: readonly { id: string; release?: models.ModelRelease }[] = [

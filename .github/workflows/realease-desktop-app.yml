@@ -93,7 +93,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build linked workspace packages
-        # The isolated ./desktop pnpm project `link:`s several
+        # The isolated ./desktop pnpm project `link:`s several @grida/*
         # workspace packages whose dist/ is gitignored and is therefore
         # absent on a clean checkout. The desktop Vite build resolves and
         # bundles them from source-built dist/ — without this they can't be
@@ -114,7 +114,6 @@ jobs:
             --filter=@grida/agent \
             --filter=@grida/daemon \
             --filter=@grida/ai-models \
-            --filter=@app/ai-catalog \
             --filter=@grida/home
 
       - name: Import Apple signing certificate

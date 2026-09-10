@@ -4,7 +4,6 @@ import { models } from "@grida/ai-models";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
-import type { ModelCatalogStore } from "./model-catalog";
 import {
   GridaGatewayAuthError,
   GridaGatewayCreditsError,
@@ -22,19 +21,16 @@ const MAX_RESPONSE_BYTES = MAX_BASE64_CHARACTERS + 4 * 1024;
 /** Existing hosted Lyria operation. Hosts own scoped custody, egress, and persistence. */
 export class MusicClient {
   readonly #http: ProviderHttp;
-  readonly #catalog: ModelCatalogStore;
   readonly #gg: GgTokenSource;
   readonly #origin: string;
 
   constructor(options: MusicClient.Options) {
     try {
-      exactKeys(options, ["http", "gg", "gg_base_url", "catalog"]);
-      const { http, gg, gg_base_url, catalog } = options;
+      exactKeys(options, ["http", "gg", "gg_base_url"]);
+      const { http, gg, gg_base_url } = options;
       const read = gg.getAccessToken;
       if (!(http instanceof ProviderHttp) || typeof read !== "function")
         throw 0;
-      if (!catalog || typeof catalog.view !== "function") throw 0;
-      this.#catalog = catalog;
       this.#http = http;
       this.#gg = { getAccessToken: read.bind(gg) };
       this.#origin = gridaGatewayOrigin(gg_base_url);
@@ -46,7 +42,7 @@ export class MusicClient {
   async resolve(input: MusicClient.Selection): Promise<MusicClient.Resolved> {
     try {
       const id = selection(input);
-      if (!MediaRoutes.music(id, this.#catalog.view()))
+      if (!MediaRoutes.music(id))
         throw new MusicClient.Failure("model_unavailable");
       if (!this.#gg.getAccessToken())
         throw new MusicClient.Failure("gg_token_expired");
@@ -108,7 +104,6 @@ export class MusicClient {
 export namespace MusicClient {
   export type ModelId = models.audio.music.ModelId;
   export type Options = {
-    catalog: ModelCatalogStore;
     http: ProviderHttp;
     gg: GgTokenSource;
     gg_base_url: string;

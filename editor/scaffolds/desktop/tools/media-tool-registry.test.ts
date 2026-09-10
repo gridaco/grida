@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import { DesktopMediaTool } from "./media-tool-registry";
 
 describe("DesktopMediaTool", () => {

@@ -1,5 +1,5 @@
-import { catalog } from "../src";
-import { models as facts } from "@grida/ai-models";
+import { catalog } from "../../src/grida";
+import { models as facts } from "../../src";
 
 const cards = {
   c: { id: "c", label: "Alpha", cost: { usd: 3 } },

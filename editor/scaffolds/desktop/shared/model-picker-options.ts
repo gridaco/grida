@@ -18,7 +18,7 @@ import {
   type ByokProviderId,
   type EndpointProviderConfig,
 } from "@grida/agent";
-import _models from "@app/ai-catalog";
+import { catalog as _models } from "@grida/ai-models/grida";
 
 export type ModelPickerSelection = Readonly<{
   model_id: string;

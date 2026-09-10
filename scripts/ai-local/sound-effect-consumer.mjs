@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 — standalone SFX with explicit ElevenLabs authority and synthetic bytes.
 import assert from "node:assert/strict";
 
-export async function proveSoundEffects({ load, require, check, catalog }) {
+export async function proveSoundEffects({ load, require, check }) {
   const { SoundEffectClient, ProviderHttp } = await load("@grida/ai");
   const model = "eleven_text_to_sound_v2";
   const selection = { model_id: model, provider: "elevenlabs" };
@@ -85,7 +85,7 @@ export async function proveSoundEffects({ load, require, check, catalog }) {
       throw new Error("Sound effects cannot grant a download destination");
     },
   });
-  const client = new SoundEffectClient({ catalog, keys, http });
+  const client = new SoundEffectClient({ keys, http });
   const failure = (code) => (error) => {
     assert(error instanceof SoundEffectClient.Failure);
     assert.deepEqual(error.toJSON(), { code, message: code });
@@ -106,7 +106,7 @@ export async function proveSoundEffects({ load, require, check, catalog }) {
       assert.throws(() => require.resolve("@grida/ai/media-request"));
       assert.deepEqual(Object.keys(client), []);
       assert.throws(
-        () => new SoundEffectClient({ catalog, keys, http, gg: {} }),
+        () => new SoundEffectClient({ keys, http, gg: {} }),
         failure("invalid_input")
       );
     }

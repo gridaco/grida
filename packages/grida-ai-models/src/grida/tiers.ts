@@ -11,7 +11,7 @@
  * @module
  */
 
-import type { models } from "@grida/ai-models";
+import type { models } from "../models";
 
 /**
  * Model tier — capability bracket.

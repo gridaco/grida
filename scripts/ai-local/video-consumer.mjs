@@ -2,7 +2,7 @@
 // GRIDA-GG: provider — synthetic video bytes and memory-only scoped authority.
 import assert from "node:assert/strict";
 
-export async function proveVideo({ load, require, check, catalog }) {
+export async function proveVideo({ load, require, check }) {
   const { VideoClient, ProviderHttp, GridaGatewaySessionStore } =
     await load("@grida/ai");
   const { models } = await load("@grida/ai-models");
@@ -107,7 +107,6 @@ export async function proveVideo({ load, require, check, catalog }) {
     },
   });
   const client = new VideoClient({
-    catalog,
     http,
     keys: { get: () => key },
     gg,
@@ -183,7 +182,6 @@ export async function proveVideo({ load, require, check, catalog }) {
     async () => {
       let available = true;
       const selected = new VideoClient({
-        catalog,
         http,
         keys: {
           get: (provider) => (provider === "vercel" && !available ? null : key),
@@ -238,7 +236,6 @@ export async function proveVideo({ load, require, check, catalog }) {
       let pending = false;
       let resolveKey;
       const selected = new VideoClient({
-        catalog,
         http,
         keys: {
           get: () =>

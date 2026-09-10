@@ -193,7 +193,6 @@ async function sourceHashes() {
     "grida-cli",
     "grida-ai",
     "grida-ai-models",
-    "grida-ai-catalog",
     "grida-auth",
     "grida-account",
     "grida-home",

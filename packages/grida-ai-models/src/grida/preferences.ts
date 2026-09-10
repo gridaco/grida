@@ -1,4 +1,4 @@
-import type { models } from "@grida/ai-models";
+import type { models } from "../models";
 import type { catalog } from "./catalog";
 
 /** Independent service recommendations. Omit a default to make no recommendation. */

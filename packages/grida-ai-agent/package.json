@@ -164,7 +164,6 @@
     "@ai-sdk/openai": "3.0.0",
     "@ai-sdk/openai-compatible": "2.0.48",
     "@ai-sdk/provider": "3.0.10",
-    "@app/ai-catalog": "workspace:*",
     "@grida/ai": "workspace:*",
     "@grida/ai-models": "workspace:*",
     "@grida/daemon": "workspace:*",

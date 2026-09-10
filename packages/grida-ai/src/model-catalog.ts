@@ -1,36 +1,32 @@
 // GRIDA-GG: gateway — catalogue distribution, see docs/wg/platform/hosted-ai.md
-/** Host-supplied catalog views; this owner manages refresh, never product policy. */
-import type { models } from "@grida/ai-models";
+/**
+ * The catalogue this host resolves against.
+ *
+ * `@grida/ai-models/grida` is compiled into the binary, so a shipped host can
+ * only see the catalogue it was built with: a model added on the server
+ * is rejected by this host's own run gate until someone ships a release.
+ * This store removes that coupling — the bundled catalogue becomes a
+ * SEED, and the published one (`GET /api/v1/models/catalog` on the
+ * configured Grida base URL) becomes the authority.
+ *
+ * Remote wins over the seed, and that is the right way round even when
+ * the binary is newer: the published snapshot and the server's own model
+ * gate are the same static import in the same deploy, so converging on
+ * the published table is converging on the table that will actually be
+ * enforced.
+ *
+ * IN MEMORY ONLY, deliberately. The seed is the offline story and a
+ * restart is the reset — which also means a bad-but-valid snapshot can
+ * never outlive the process that fetched it. Nothing here touches disk.
+ *
+ * Fail-safe throughout: a fetch that errors, 404s, or fails validation
+ * leaves the last good view in place. `start()` never throws and never
+ * blocks a caller; `view()` is synchronous and always answers.
+ */
+import { catalog as models } from "@grida/ai-models/grida";
 
-/** Trusted host projection. Presence is not provider or account authority. */
-export interface ModelCatalogView {
-  readonly image: ModelCatalogView.Media<
-    models.image.ImageModelCard & ModelCatalogView.Admission,
-    models.image.ImageProvider,
-    models.image.ImageProviderBinding
-  >;
-  readonly video: ModelCatalogView.Media<
-    models.video.VideoModelCard & ModelCatalogView.Admission,
-    models.video.VideoProvider,
-    models.video.VideoProviderBinding
-  >;
-  readonly lifecycle: Readonly<
-    Record<
-      "music" | "sound_effects" | "text_to_speech" | "three_d",
-      Readonly<Record<string, ModelCatalogView.Lifecycle>>
-    >
-  >;
-}
-export namespace ModelCatalogView {
-  export type Admission = { listed: boolean; deprecated?: boolean };
-  export type Lifecycle = { status: "listed" | "staged"; deprecated?: boolean };
-  export interface Media<Card, Provider extends string, Binding> {
-    readonly models: Readonly<Record<string, Card>>;
-    listed(): readonly Card[];
-    cardById(id: string): Card | undefined;
-    binding(card: Card, provider: Provider): Binding | null;
-  }
-}
+/** Published catalogue path on the Grida base URL. */
+export const CATALOG_PATH = "/api/v1/models/catalog";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 60 * 60 * 1_000;
 
@@ -48,18 +44,23 @@ const FETCH_TIMEOUT_MS = 10_000;
 /** Why a refresh ran — for logs, and to keep the miss path rate-limited. */
 export type RefreshReason = "boot" | "interval" | "gate-miss";
 
-export type ModelCatalogStoreOptions<
-  V extends ModelCatalogView = ModelCatalogView,
-> = {
-  /** Already validated, immutable host view. No built-in service membership. */
-  seed: V;
-  /** Optional public-data source. The host owns its URL, wire schema and parser. */
-  source?: {
-    url: string;
-    fetch?: typeof globalThis.fetch;
-    /** Return a validated immutable view, or null to keep the previous view. */
-    parse(value: unknown): V | null;
-  };
+export type ModelCatalogStoreOptions = {
+  /**
+   * Grida base URL (the tenant's `gg_base_url`). Absent ⇒ the store never
+   * fetches and stays on the seed, which is the CLI's normal state.
+   */
+  base_url?: string;
+  /**
+   * How to reach it. Desktop passes the host-routed provider transport —
+   * ambient `fetch` is unreachable from the sandboxed sidecar. Defaults
+   * to ambient `fetch` for the CLI.
+   */
+  fetch?: typeof globalThis.fetch;
+  /**
+   * A catalogue supplied by the host. Freezes the store: no fetch, no
+   * interval. The escape hatch for pinned or air-gapped deployments.
+   */
+  snapshot?: models.snapshot.Snapshot;
   /** Called after the view actually changes (not on a no-op refresh). */
   on_change?: () => void;
   /** `null` disables the periodic refresh. */
@@ -68,9 +69,8 @@ export type ModelCatalogStoreOptions<
   now?: () => number;
 };
 
-export class ModelCatalogStore<V extends ModelCatalogView = ModelCatalogView> {
-  private current: V;
-  private readonly parse?: (value: unknown) => V | null;
+export class ModelCatalogStore {
+  private current: models.snapshot.View;
   private currentRaw: string | null = null;
   private readonly url: string | null;
   private readonly fetchImpl: typeof globalThis.fetch;
@@ -85,17 +85,21 @@ export class ModelCatalogStore<V extends ModelCatalogView = ModelCatalogView> {
   private disposed = false;
   private warned = new Set<string>();
 
-  constructor(options: ModelCatalogStoreOptions<V>) {
-    this.current = options.seed;
-    this.parse = options.source?.parse;
-    this.fetchImpl = options.source?.fetch ?? globalThis.fetch;
+  constructor(options: ModelCatalogStoreOptions = {}) {
+    this.current = models.snapshot.view(options.snapshot);
+    this.fetchImpl = options.fetch ?? globalThis.fetch;
     this.onChange = options.on_change;
     this.refreshIntervalMs =
       options.refresh_interval_ms === undefined
         ? DEFAULT_REFRESH_INTERVAL_MS
         : options.refresh_interval_ms;
     this.now = options.now ?? Date.now;
-    this.url = options.source ? safeCatalogUrl(options.source.url) : null;
+    // A supplied snapshot pins the store: no URL means no fetch, no timer,
+    // and `refreshable === false` for every caller that asks.
+    this.url =
+      options.snapshot === undefined && options.base_url
+        ? safeCatalogUrl(options.base_url)
+        : null;
   }
 
   /** True when this store can ever change (a URL to fetch, not frozen). */
@@ -108,7 +112,7 @@ export class ModelCatalogStore<V extends ModelCatalogView = ModelCatalogView> {
    * this sits on the run gate's hot path, and a host that has not
    * fetched yet must still answer from the seed rather than block.
    */
-  view(): V {
+  view(): models.snapshot.View {
     return this.current;
   }
 
@@ -219,18 +223,18 @@ export class ModelCatalogStore<V extends ModelCatalogView = ModelCatalogView> {
       this.warnOnce("parse", "published catalogue was not JSON; ignoring it");
       return false;
     }
-    const view = this.parse?.(parsed);
-    if (!view) {
+    const snapshot = models.snapshot.parse(parsed);
+    if (!snapshot) {
       // Whole-or-reject: a catalogue that fails validation is never
       // half-applied, and the last good one keeps serving.
       this.warnOnce(
         "schema",
-        "published catalogue did not match the host schema; ignoring it"
+        `published catalogue did not match schema ${models.snapshot.SCHEMA}; ignoring it`
       );
       return false;
     }
     if (this.disposed) return false;
-    this.current = view;
+    this.current = models.snapshot.view(snapshot);
     this.currentRaw = raw;
     // The catalogue is ALREADY live at this point, so a listener that
     // throws must not be reported as a refresh that did not happen: the
@@ -313,11 +317,22 @@ export class ModelCatalogStore<V extends ModelCatalogView = ModelCatalogView> {
   }
 }
 
-/** Read one host-supplied view per decision; never mix snapshots across a refresh. */
-export function catalogView<V extends ModelCatalogView>(
-  store: ModelCatalogStore<V>
-): V {
-  return store.view();
+/**
+ * The catalogue a call site resolves against: the host's store when one is
+ * wired, the bundled seed otherwise.
+ *
+ * One definition on purpose. Every resolver, gate, and estimator needs the
+ * same "absent ⇒ bundled" rule, and a hand-inlined `?? models.snapshot.view()`
+ * at each of them is a rule stated N times — the shape that drifts the day
+ * one site starts defaulting to something else.
+ *
+ * Call it ONCE per decision and reuse the result: a background refresh can
+ * land between two calls, and a gate that admits from one catalogue while
+ * the factory resolves against another is exactly the skew this store
+ * exists to remove.
+ */
+export function catalogView(store?: ModelCatalogStore): models.snapshot.View {
+  return store?.view() ?? models.snapshot.view();
 }
 
 /**
@@ -333,20 +348,20 @@ export function catalogView<V extends ModelCatalogView>(
  * `missed` is called on the current view and, if it refreshed, the caller
  * re-reads from the returned one.
  */
-export async function catalogViewOnMiss<V extends ModelCatalogView>(
-  store: ModelCatalogStore<V>,
-  missed: (view: V) => boolean
-): Promise<V> {
+export async function catalogViewOnMiss(
+  store: ModelCatalogStore | undefined,
+  missed: (view: models.snapshot.View) => boolean
+): Promise<models.snapshot.View> {
   const view = catalogView(store);
   if (!missed(view) || !store?.refreshable) return view;
   await store.refreshOnMiss();
   return catalogView(store);
 }
 
-/** `null` for anything that is not an explicit http(s) source URL. */
+/** `null` for anything that is not an http(s) base URL we can extend. */
 function safeCatalogUrl(baseUrl: string): string | null {
   try {
-    const url = new URL(baseUrl);
+    const url = new URL(CATALOG_PATH, baseUrl);
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
     return url.toString();
   } catch {

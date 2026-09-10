@@ -2,9 +2,12 @@
 // GRIDA-SEC-006 / GRIDA-GG: provider — one per-launch GG store and catalogue.
 import type { Hono } from "hono";
 import type { DaemonServices } from "@grida/daemon/server";
-import { GridaGatewaySessionStore, ProviderHttp } from "@grida/ai";
-import { catalog as models } from "@app/ai-catalog";
-import { ModelCatalogStore } from "./providers/model-catalog";
+import {
+  GridaGatewaySessionStore,
+  ModelCatalogStore,
+  ProviderHttp,
+} from "@grida/ai";
+import { catalog as models } from "@grida/ai-models/grida";
 import type { MediaTenantOptions } from "./media-server";
 import type { EndpointProvidersStore } from "./providers/endpoints";
 import { registerSecretsRoutes } from "./http/routes/secrets";
@@ -103,7 +106,6 @@ export class MediaHost {
     }
     if (caps.three_d) {
       registerThreeDRoutes(app, {
-        catalog: modelCatalog,
         secrets: services.secrets,
         media: services.media,
         provider_http: providerHttp,
@@ -111,7 +113,6 @@ export class MediaHost {
     }
     if (caps.music) {
       registerMusicRoutes(app, {
-        catalog: modelCatalog,
         media: services.media,
         gg: gridaSession,
         gg_base_url: gridaGatewayBaseUrl,
@@ -120,7 +121,6 @@ export class MediaHost {
     }
     if (caps.sound_effects) {
       registerSoundEffectsRoutes(app, {
-        catalog: modelCatalog,
         secrets: services.secrets,
         media: services.media,
         provider_http: providerHttp,
@@ -128,7 +128,6 @@ export class MediaHost {
     }
     if (caps.text_to_speech) {
       registerTextToSpeechRoutes(app, {
-        catalog: modelCatalog,
         secrets: services.secrets,
         media: services.media,
         provider_http: providerHttp,

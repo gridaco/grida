@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SecretsStore } from "@grida/daemon/server";
 import type { EndpointProviderConfig } from "../protocol/endpoints";
 import type { EndpointProvidersStore } from "./endpoints";
-import { TIER_MODEL_IDS } from "@app/ai-catalog";
+import { TIER_MODEL_IDS } from "@grida/ai-models/grida";
 import { ProviderUnavailableError, resolveProvider } from "./index";
 
 function deps(

@@ -2,7 +2,6 @@
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
-import type { ModelCatalogStore } from "./model-catalog";
 import { delay } from "./fetch-helpers";
 import { ProviderHttp } from "./http";
 import { MediaRequest } from "./media-request";
@@ -14,17 +13,14 @@ const MAX_GLB_BYTES = MediaInputs.limits.glb;
 /** The three existing fal endpoints, with endpoint-specific input and result types. */
 export class ThreeDClient {
   readonly #http: ProviderHttp;
-  readonly #catalog: ModelCatalogStore;
   readonly #getKey: ThreeDClient.Keys["get"];
 
   constructor(options: ThreeDClient.Options) {
     try {
-      exactKeys(options, ["keys", "http", "catalog"]);
-      const { keys, http, catalog } = options;
+      exactKeys(options, ["keys", "http"]);
+      const { keys, http } = options;
       const get = keys.get;
       if (!(http instanceof ProviderHttp) || typeof get !== "function") throw 0;
-      if (!catalog || typeof catalog.view !== "function") throw 0;
-      this.#catalog = catalog;
       this.#http = http;
       this.#getKey = get.bind(keys);
     } catch {
@@ -46,7 +42,7 @@ export class ThreeDClient {
     let request: MediaRequest | undefined;
     try {
       const id = selection(input);
-      if (!MediaRoutes.threeD(id, this.#catalog.view()))
+      if (!MediaRoutes.threeD(id))
         throw new ThreeDClient.Failure("model_unavailable");
       request = new MediaRequest(this.#http);
       await this.#key(request);
@@ -157,11 +153,7 @@ export namespace ThreeDClient {
   export type Keys = {
     get(provider: "fal"): string | null | Promise<string | null>;
   };
-  export type Options = {
-    keys: Keys;
-    http: ProviderHttp;
-    catalog: ModelCatalogStore;
-  };
+  export type Options = { keys: Keys; http: ProviderHttp };
   export type Image = {
     data: Uint8Array;
     media_type: "image/png" | "image/jpeg" | "image/webp";

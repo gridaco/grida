@@ -1,7 +1,7 @@
 import type { FC } from "react";
 import type { Metadata } from "next";
 import ai from "@/lib/ai";
-import { catalog as serviceCatalog } from "@app/ai-catalog";
+import { catalog as serviceCatalog } from "@grida/ai-models/grida";
 import {
   models as textModels,
   type ModelRelease,

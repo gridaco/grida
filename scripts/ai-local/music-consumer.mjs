@@ -2,7 +2,7 @@
 // GRIDA-GG: provider — synthetic MP3 prefix bytes, no provider or account access.
 import assert from "node:assert/strict";
 
-export async function proveMusic({ load, require, check, catalog }) {
+export async function proveMusic({ load, require, check }) {
   const { MusicClient, ProviderHttp, GridaGatewaySessionStore } =
     await load("@grida/ai");
   const model = "google/lyria-3";
@@ -77,7 +77,6 @@ export async function proveMusic({ load, require, check, catalog }) {
     },
   });
   const client = new MusicClient({
-    catalog,
     http,
     gg,
     gg_base_url: "https://gg.example.invalid",

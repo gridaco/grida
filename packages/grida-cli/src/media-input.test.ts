@@ -1,6 +1,5 @@
 // GRIDA-SEC-013 — file flags and JSON share validation before authority.
 import { MediaOperations } from "@grida/ai";
-import { catalog } from "@app/ai-catalog";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -10,7 +9,7 @@ import { Cli } from "./cli";
 import { MediaFiles } from "./media-files";
 import { MediaInput } from "./media-input";
 
-const operations = new MediaOperations({ catalog: catalog.snapshot.view() });
+const operations = new MediaOperations();
 const roots: string[] = [];
 // A complete 1x1 PNG: local intake tests do not rely on output-only signature stubs.
 const PNG = Buffer.from(

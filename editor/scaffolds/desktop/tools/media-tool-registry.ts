@@ -1,4 +1,4 @@
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 
 export type DesktopMediaToolId =
   | "image-generator"

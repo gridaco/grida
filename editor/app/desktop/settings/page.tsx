@@ -33,7 +33,7 @@ import {
   CardTitle,
 } from "@app/ui/components/card";
 import { Skeleton } from "@app/ui/components/skeleton";
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import {
   AlibabaCloudLogo,
   BlackForestLabsLogo,

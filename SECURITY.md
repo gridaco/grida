@@ -859,11 +859,6 @@ lazy reads, read-only mutation, and symlink escape refusal.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
-- [Independent catalog proof input](scripts/ai-local/catalog.mjs) — explicit,
-  immutable host membership built from public facts for the standalone SDK
-  proof. The runtime guard permits reading this exact fixture module, not an
-  application catalog, credential store, or additional filesystem root.
-
 - [Windows credential compatibility tests](packages/grida-daemon/src/secrets-windows.test.ts) and [provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — platform-selected host-local custody, preserved OAuth records and GG/ChatGPT workspace setup, with strict provider failures. These simulate platform selection with disposable files; they do not certify native Windows ACLs.
 
 - [Public SDK exports](packages/grida-ai/src/index.ts), [operation discovery](packages/grida-ai/src/media-operations.ts), [shared route eligibility](packages/grida-ai/src/media-routes.ts), [input rules](packages/grida-ai/src/media-inputs.ts), and [schema primitives](packages/grida-ai/src/input-schema.ts) — credential-free descriptors and JSON parsing share execution's route and input policy. Discovery neither constructs authority nor promises access. Image count is bounded before key reads or paid submission. [Public discovery tests](packages/grida-ai/src/media-operations.test.ts) and [native parser parity tests](packages/grida-ai/src/media-input-parity.test.ts) pin those boundaries.
@@ -1342,10 +1337,6 @@ durable account-credential holder.
 - [Public SDK exports](packages/grida-ai/src/index.ts), [operation discovery](packages/grida-ai/src/media-operations.ts), [shared route eligibility](packages/grida-ai/src/media-routes.ts), and [discovery tests](packages/grida-ai/src/media-operations.test.ts), and [native parser parity tests](packages/grida-ai/src/media-input-parity.test.ts) — GG route facts grant no scoped token, organization authority or credits.
 
 - [Host media error mapping](packages/grida-ai-agent/src/http/routes/media-generation-errors.ts) — preserves actionable expired-GG and insufficient-credit codes from safely projected operation failures. BYOK adapters cannot pass arbitrary upstream codes through as GG authority.
-
-- [Independent catalog proof input](scripts/ai-local/catalog.mjs) — synthetic
-  host membership grants no credential or entitlement; scoped GG custody and
-  submission checks remain independently enforced by the real SDK.
 
 Every file below also carries the `GRIDA-GG` surface marker (`token` /
 `gateway` / `provider` / `desktop`); the [`gg`](.agents/skills/gg/SKILL.md) skill

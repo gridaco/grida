@@ -5,10 +5,10 @@
  * catalogue predates it, without a release.
  *
  * Every test here would fail against the pre-store code — that is the
- * point. `model-catalog.test.ts` covers the store's own failure modes.
+ * point. `@grida/ai`'s model-catalog tests cover the store's own failure modes.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import { ModelCatalogStore } from "./model-catalog";
 import { resolveProvider, type ResolveDeps } from "./index";
 import {

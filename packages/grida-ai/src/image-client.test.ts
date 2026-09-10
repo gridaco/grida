@@ -1,13 +1,12 @@
-import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — public image authority, output, and no-retry contracts.
 // GRIDA-GG: token — synthetic scoped credentials only; no services or provider calls.
 import { describe, expect, it, vi } from "vitest";
+import { catalog as models } from "@grida/ai-models/grida";
 import { ImageClient, ProviderHttp, GridaGatewaySessionStore } from "./index";
 
-const view = CatalogFixture.view();
-const card = view.image
-  .listed()
-  .find((entry) => view.image.binding(entry, "openrouter")?.references)!;
+const view = models.snapshot.view();
+// These wire assertions target GPT Image 2's controls, independent of recommendations.
+const card = view.image.models["openai/gpt-image-2"]!;
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 const BASE64 = "iVBORw0KGgo=";
 const PROMPT = "synthetic-private-prompt";
@@ -21,7 +20,6 @@ function setup(overrides: Partial<ImageClient.Options> = {}) {
   const download = vi.fn<typeof fetch>(async () => new Response(PNG));
   const get = vi.fn<ImageClient.Keys["get"]>(() => KEY);
   const client = new ImageClient({
-    catalog: CatalogFixture.store(),
     keys: { get },
     http: new ProviderHttp({ request, download }),
     ...overrides,

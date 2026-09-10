@@ -8,7 +8,6 @@ import {
 import { ProviderHttp } from "./http";
 import { probeEndpointModels } from "./probe";
 import { ImageClient, VideoClient } from "@grida/ai";
-import { ModelCatalogStore } from "./model-catalog";
 
 const PROMPT = {
   prompt: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
@@ -197,7 +196,6 @@ describe("ProviderHttp", () => {
     const http = new ProviderHttp({ request, download });
 
     const images = new ImageClient({
-      catalog: new ModelCatalogStore(),
       keys: { get: () => "synthetic-key" },
       http,
     });
@@ -209,7 +207,6 @@ describe("ProviderHttp", () => {
       await operation.generate({ prompt: "image" }).catch(() => undefined);
     }
     const video = await new VideoClient({
-      catalog: new ModelCatalogStore(),
       keys: { get: () => "synthetic-key" },
       http,
     }).resolve({ model_id: "google/veo-3.1", provider: "vercel" });

@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 const AI_DEP_PATTERN =
-  /^(?:ai(?:\/|$)|@ai-sdk\/|@app\/ai-catalog(?:\/|$)|@grida\/(?:ai(?:[-/]|$)|agent(?:\/|$))|@anthropic-ai\/|@agentclientprotocol\/|openai(?:\/|$)|@openrouter\/)/;
+  /^(?:ai(?:\/|$)|@ai-sdk\/|@grida\/(?:ai(?:[-/]|$)|agent(?:\/|$))|@anthropic-ai\/|@agentclientprotocol\/|openai(?:\/|$)|@openrouter\/)/;
 
 const pkgDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 

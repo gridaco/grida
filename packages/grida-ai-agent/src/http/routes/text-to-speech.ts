@@ -12,7 +12,6 @@ import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
 import type { TextToSpeechListVoicesResult } from "../../protocol/text-to-speech";
 import { ProviderHttp } from "../../providers/http";
-import { ModelCatalogStore } from "../../providers/model-catalog";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
 import { mediaGenerationError } from "./media-generation-errors";
 
@@ -20,7 +19,6 @@ export type TextToSpeechRoutesDeps = {
   secrets: SecretsStore;
   media?: MediaPersistence | null;
   provider_http?: ProviderHttp;
-  catalog?: ModelCatalogStore;
 };
 
 export function registerTextToSpeechRoutes(
@@ -28,7 +26,6 @@ export function registerTextToSpeechRoutes(
   deps: TextToSpeechRoutesDeps
 ) {
   const speech = new TextToSpeechClient({
-    catalog: deps.catalog ?? new ModelCatalogStore(),
     keys: { get: (provider) => deps.secrets._getKey(provider) },
     http: deps.provider_http ?? new ProviderHttp(),
   });

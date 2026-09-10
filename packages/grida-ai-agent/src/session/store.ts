@@ -53,7 +53,7 @@ import type {
   SessionListFilter,
   SessionListPage,
 } from "./rows";
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import { baseCostUsdFromMessageUsage, usageTokenTotal } from "./cost";
 
 export type AppendMessageInput = {

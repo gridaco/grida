@@ -13,7 +13,6 @@ on:
       - "packages/grida-home/**"
       - "packages/grida-ai/**"
       - "packages/grida-ai-models/**"
-      - "packages/grida-ai-catalog/**"
       - "scripts/cli-release/**"
       - "scripts/cli-media-local/**"
       - "scripts/cli-local/**"

@@ -1,4 +1,3 @@
-import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — GG music public input, safe bytes, and bounded authority.
 // GRIDA-GG: token — synthetic scoped credentials only; no services or paid generation.
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -31,7 +30,6 @@ function setup(overrides: Partial<MusicClient.Options> = {}) {
   });
   const read = vi.fn<() => string | null>(() => TOKEN);
   const client = new MusicClient({
-    catalog: CatalogFixture.store(),
     http: new ProviderHttp({ request, download }),
     gg: { getAccessToken: read },
     gg_base_url: ORIGIN,
@@ -363,7 +361,6 @@ describe("MusicClient public operation", () => {
     expect(
       () =>
         new MusicClient({
-          catalog: CatalogFixture.store(),
           http,
           gg: { getAccessToken: () => TOKEN },
           gg_base_url: ORIGIN,
@@ -373,7 +370,6 @@ describe("MusicClient public operation", () => {
     expect(
       () =>
         new MusicClient({
-          catalog: CatalogFixture.store(),
           http,
           gg: { getAccessToken: () => TOKEN },
           gg_base_url: "https://user:secret@gg.example",

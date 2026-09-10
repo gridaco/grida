@@ -17,14 +17,18 @@ producer tests; there are no reserved executors or empty future subpaths.
 The configured [`@grida/agent`](../grida-ai-agent), its prompts/tools/skills, chat storage, workspace
 policy, HTTP routes, application defaults, and external-agent runtimes belong to
 their hosts. This package must not import their source, types, manifests, or test
-setup. `@grida/ai-models` remains the factual data leaf. Hosts supply their own execution catalog; no application catalog is imported here. A result contains bytes
+setup. `@grida/ai-models` supplies canonical facts; its explicit
+`@grida/ai-models/grida` entry supplies this SDK's existing bundled service
+catalogue and schema-1 defaults. The SDK retains those Grida defaults and does
+not promise service-policy neutrality. A result contains bytes
 and a media type, never a host persistence receipt, workspace path, or `MediaItem`.
 
 ### Anti-goals and admission
 
 Being AI-related or convenient to import is insufficient for admission. Shared
 code must own a tested, application-independent capability. Configured agents,
-host/framework adapters, credential persistence, and product defaults stay outside.
+host/framework adapters, and credential persistence stay outside. Service model
+defaults remain owned by `@grida/ai-models/grida` and are consumed explicitly here.
 Do not duplicate catalogue data, add a plugin registry, or invent universal schema
 or executor scaffolding to anticipate future operations.
 
@@ -37,11 +41,9 @@ serializable. They describe route support, not account access, credits, pricing,
 or a promise that an upstream provider will accept a request.
 
 ```ts
-import { MediaOperations, ImageClient, ModelCatalogStore } from "@grida/ai";
+import { MediaOperations, ImageClient } from "@grida/ai";
 
-// The host owns this validated immutable ModelCatalogView.
-const catalog = new ModelCatalogStore({ seed: hostCatalogView });
-const operations = new MediaOperations({ catalog: catalog.view() });
+const operations = new MediaOperations();
 const choices = operations.list({ kind: "image", provider: "openrouter" });
 const selector = {
   kind: "image",
@@ -56,7 +58,7 @@ const parsed = operations.parseInput(selector, {
   n: 1,
 });
 if (parsed.kind === "image") {
-  const client = new ImageClient({ keys, http, catalog });
+  const client = new ImageClient({ keys, http });
   const operation = await client.resolve(parsed.selection);
   const result = await operation.generate({ ...parsed.input, signal });
 }
@@ -80,7 +82,12 @@ with `operation_unavailable`; malformed options, selectors, and inputs fail with
 `invalid_input`. `MediaOperations.Failure` exposes only that code as its message
 and JSON representation.
 
-Pass an explicit `{ catalog: ModelCatalogView }` to discovery and a `catalog: ModelCatalogStore` to each media client. The view contains image/video factual cards with host-supplied `listed` admission and optional `deprecated` metadata, plus lifecycle maps for music, sound effects, speech and 3D. The SDK owns neither membership nor recommendations. Hosts validate their wire format before constructing the immutable view. Discovery copies and freezes its resulting descriptors; later host mutation cannot change them. A removed entry or binding stays removed. Video uses the factual package's exact-match legacy input fallback. Audio and 3D retain their fixed executable binding contracts, intersected with supplied membership; staged operations remain callable where already supported.
+Pass `{ snapshot }` to pin an explicitly supplied catalogue. The constructor owns
+a validated copy; later caller mutations cannot alter descriptors. Image and video
+use that view's bindings and capability facts, including explicit removals and
+the catalogue's exact-match legacy video fallback. Absent snapshot sections retain
+the existing bundled-section behavior. Audio and 3D use their existing fixed
+bundled contracts. There is no implicit refresh or provider discovery.
 
 The input schema uses JSON Schema 2020-12 plus the following `x-grida-*` rules.
 **`parseInput` is normative**: a general JSON Schema validator alone does not
@@ -126,7 +133,6 @@ callers dispatch to the existing typed clients, including the exact 3D model uni
 import { ImageClient, ProviderHttp } from "@grida/ai";
 
 const images = new ImageClient({
-  catalog,
   keys: { get: readAuthorizedProviderKey },
   http: new ProviderHttp({
     request: authorizedProviderRequest,
@@ -298,7 +304,7 @@ The host owns persistence, receipts, HTTP status mapping, and GG acquisition.
 ```ts
 import { MusicClient } from "@grida/ai";
 
-const music = new MusicClient({ http, gg, gg_base_url, catalog });
+const music = new MusicClient({ http, gg, gg_base_url });
 const operation = await music.resolve({
   model_id: "google/lyria-3",
   provider: "gg",
@@ -347,7 +353,7 @@ recall an accepted job or its charge.
 ```ts
 import { SoundEffectClient } from "@grida/ai";
 
-const sounds = new SoundEffectClient({ keys, http, catalog });
+const sounds = new SoundEffectClient({ keys, http });
 const operation = await sounds.resolve({
   model_id: "eleven_text_to_sound_v2",
   provider: "elevenlabs",
@@ -398,7 +404,7 @@ accepted paid request.
 ```ts
 import { TextToSpeechClient } from "@grida/ai";
 
-const speech = new TextToSpeechClient({ keys, http, catalog });
+const speech = new TextToSpeechClient({ keys, http });
 const voices = await speech.listVoices({ provider: "elevenlabs", signal });
 // voices: readonly { voice_id: string; name: string }[]
 const operation = await speech.resolve({
@@ -459,7 +465,7 @@ access, account readiness, or affordability.
 ```ts
 import { ThreeDClient } from "@grida/ai";
 
-const threeD = new ThreeDClient({ keys, http, catalog });
+const threeD = new ThreeDClient({ keys, http });
 const text = await threeD.resolve({
   model_id: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
   provider: "fal",
@@ -545,7 +551,16 @@ remote downloads; supplying both host operations is the intended independent-hos
 integration. Private methods and fields use runtime private slots: the client
 and resolved operation expose no credential getter or SDK model.
 
-`ModelCatalogStore<V extends ModelCatalogView>` keeps an explicit host `seed` and preserves additional typed fields on that view. No source means a pinned catalog. An optional `source: { url, fetch?, parse }` supplies a public-data URL, host-authorized transport and parser returning a validated immutable view or `null`. The host owns wire schema, fallback and publication policy; the SDK owns bounded reads, single-flight refresh, hourly scheduling and rate-limited refresh on lookup misses. Construction does no network work. The host calls `start`/`dispose`; failed refresh retains the last good view. The service schema-1 codec and bundled Grida seed belong to `@app/ai-catalog`, supplied by Grida hosts without adding that dependency to this SDK.
+`ModelCatalogStore()` uses the bundled Grida catalogue by default. Image and video
+clients accept an optional store and use that bundled view when omitted.
+`ModelCatalogStore({ base_url, fetch })` uses the existing
+`/api/v1/models/catalog` schema-1 refresh path; every option remains optional.
+`ModelCatalogStore` keeps the bundled catalogue or a validated published snapshot
+in memory. Construction has no network or timer work. A supplied snapshot pins
+it; the host explicitly calls `start`/`dispose` for background refresh. A missing
+model may cause `resolve` to request its bounded, rate-limited refresh. Failed
+refresh keeps the last good catalogue. Optional direct catalogue fetch is a
+separate public-data capability.
 
 `GridaGatewaySessionStore` is memory-only scoped-token custody. Its host supplies
 `{access_token, expires_at, organization?}`, where expiry is epoch milliseconds,

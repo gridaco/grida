@@ -5,7 +5,7 @@ import * as gridaGateway from "@/lib/desktop/gg-session";
 
 import { useState } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@app/ui/components/dialog";

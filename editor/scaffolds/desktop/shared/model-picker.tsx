@@ -47,11 +47,11 @@ import {
   OpenRouterLogo,
   VercelLogo,
 } from "@grida/react-icons/logos";
-// Pull the catalog from the framework-free `@app/ai-catalog` package,
+// Pull the catalog from the framework-free `@grida/ai-models/grida` entry,
 // NOT the editor's `@/lib/ai/models` seam — that seam constructs server
 // providers (live keys) and is lint-blocked from the desktop renderer
-// (GRIDA-SEC-004). This package is pure data and renderer-safe.
-import _models from "@app/ai-catalog";
+// (GRIDA-SEC-004). This entry is pure data and renderer-safe.
+import { catalog as _models } from "@grida/ai-models/grida";
 import type {
   ChatSessionRow,
   EndpointProviderConfig,

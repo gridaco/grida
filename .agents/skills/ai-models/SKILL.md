@@ -23,18 +23,18 @@ description: >
 
 ## Key Files
 
-| File                                           | Role                                                                                                             |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `packages/grida-ai-models/src/models.ts`       | Agnostic facts: identities, capabilities, provider bindings, published rates and provenance (`models` namespace) |
-| `packages/grida-ai-catalog/src/catalog.ts`     | Grida service membership/lifecycle and joined views; compatible schema-1 snapshot (`catalog` namespace)          |
-| `packages/grida-ai-catalog/src/preferences.ts` | Optional default and independent partial order per service family                                                |
-| `packages/grida-ai-catalog/src/tiers.ts`       | Grida text `ModelTier` set and `TIER_MODEL_IDS`                                                                  |
-| `editor/lib/ai/models.ts`                      | AI Gateway + BYOK provider seam (service catalog from `@app/ai-catalog`)                                         |
-| `editor/lib/ai/ai.ts`                          | `toMills()` + Replicate call shapes; re-aggregates the shared catalogue under `ai.*`                             |
-| `editor/lib/ai/server.ts`                      | AI seam: prepaid-credit gate, provider call, and post-flight usage ingest                                        |
-| `editor/lib/billing/metronome.ts`              | Organization credit entitlement, cached balance gate, and Metronome usage ledger                                 |
-| `editor/app/(www)/(ai)/ai/models/page.tsx`     | Public models catalog page                                                                                       |
-| `docs/models/index.md`                         | User-facing models & pricing documentation                                                                       |
+| File                                                | Role                                                                                                             |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `packages/grida-ai-models/src/models.ts`            | Agnostic facts: identities, capabilities, provider bindings, published rates and provenance (`models` namespace) |
+| `packages/grida-ai-models/src/grida/catalog.ts`     | Grida service membership/lifecycle and joined views; compatible schema-1 snapshot (`catalog` namespace)          |
+| `packages/grida-ai-models/src/grida/preferences.ts` | Optional default and independent partial order per service family                                                |
+| `packages/grida-ai-models/src/grida/tiers.ts`       | Grida text `ModelTier` set and `TIER_MODEL_IDS`                                                                  |
+| `editor/lib/ai/models.ts`                           | AI Gateway + BYOK provider seam (service catalog from `@grida/ai-models/grida`)                                  |
+| `editor/lib/ai/ai.ts`                               | `toMills()` + Replicate call shapes; re-aggregates the shared catalogue under `ai.*`                             |
+| `editor/lib/ai/server.ts`                           | AI seam: prepaid-credit gate, provider call, and post-flight usage ingest                                        |
+| `editor/lib/billing/metronome.ts`                   | Organization credit entitlement, cached balance gate, and Metronome usage ledger                                 |
+| `editor/app/(www)/(ai)/ai/models/page.tsx`          | Public models catalog page                                                                                       |
+| `docs/models/index.md`                              | User-facing models & pricing documentation                                                                       |
 
 ## Tools
 
@@ -97,16 +97,17 @@ providers; an id is never portable. Two cataloguing patterns:
 
 ## What the catalogue is for
 
-Keep the dependency one-way: agent/CLI/editor/GG → `@app/ai-catalog` →
-`@grida/ai-models`. Facts never import or re-export Grida service policy.
+Keep one package with two explicit entries: `@grida/ai-models` for facts and
+`@grida/ai-models/grida` for service policy. Service definitions consume facts;
+the root entry never imports or re-exports Grida policy.
 Add verified model facts independently of Grida admission. Manage Grida choices
 in the service definitions, not source declaration order or provider timestamps.
 
-The shared execution SDK (`@grida/ai`) imports facts, never `@app/*`. Hosts
-supply its catalog view explicitly: the agent binds the service seed/parser to
-the shared refresh store, while the CLI pins a service view per invocation.
-Keep provider execution in the SDK and the schema-1 codec in the service catalog;
-do not restore agent-local adapters or duplicate membership to bridge the split.
+The shared execution SDK (`@grida/ai`) retains its Grida defaults by explicitly
+importing the service entry where needed. Its catalog store accepts an optional
+snapshot or refresh URL; callers need not inject a catalog. Keep provider
+execution and refresh lifecycle in the SDK and the schema-1 codec in the service
+entry; do not restore agent-local adapters or duplicate membership.
 
 Preference discipline: an optional default must be listed and nonlegacy. The
 independent order is partial; unknown and duplicate IDs are errors. Views sort
@@ -184,7 +185,7 @@ and the narrow `null` rule.
 
 ## Text Models
 
-Facts live in `packages/grida-ai-models/src/models.ts` under `models.text.catalog: Record<CatalogId, ModelSpec>`. Grida tier assignments live in `packages/grida-ai-catalog/src/tiers.ts`; each must resolve to a listed service member.
+Facts live in `packages/grida-ai-models/src/models.ts` under `models.text.catalog: Record<CatalogId, ModelSpec>`. Grida tier assignments live in `packages/grida-ai-models/src/grida/tiers.ts`; each must resolve to a listed service member.
 
 Fields to update per tier:
 

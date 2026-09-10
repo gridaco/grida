@@ -2,7 +2,7 @@
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
 
 import { useState } from "react";
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import {
   PromptInput,
   PromptInputBody,

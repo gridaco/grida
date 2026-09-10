@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 — exact 3D operations through synthetic queue and asset capabilities.
 import assert from "node:assert/strict";
 
-export async function proveThreeD({ load, require, check, catalog }) {
+export async function proveThreeD({ load, require, check }) {
   const { ThreeDClient, ProviderHttp } = await load("@grida/ai");
   const textId = "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d";
   const imageId = "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d";
@@ -122,7 +122,7 @@ export async function proveThreeD({ load, require, check, catalog }) {
       });
     },
   });
-  const client = new ThreeDClient({ catalog, keys, http });
+  const client = new ThreeDClient({ keys, http });
   const resolve = () => client.resolve({ model_id: modelId, provider: "fal" });
   const failure = (code) => (error) => {
     assert(error instanceof ThreeDClient.Failure);
@@ -152,7 +152,7 @@ export async function proveThreeD({ load, require, check, catalog }) {
       assert.throws(() => require.resolve("@grida/ai/three-d-client"));
       assert.deepEqual(Object.keys(client), []);
       assert.throws(
-        () => new ThreeDClient({ catalog, keys, http, gg: {} }),
+        () => new ThreeDClient({ keys, http, gg: {} }),
         failure("invalid_input")
       );
     }

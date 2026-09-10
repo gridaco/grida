@@ -29,7 +29,7 @@
  * withholding rates is what would make it drift. The same numbers are
  * already public on `/ai/models` and in `docs/models`.
  */
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 
 /**
  * A CDN-cacheable payload — the only one under `(api)/(public)`, where

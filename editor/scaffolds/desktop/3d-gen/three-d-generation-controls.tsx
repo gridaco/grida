@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ImagePlus } from "lucide-react";
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import {
   PromptInput,
   PromptInputAttachment,

@@ -3,7 +3,7 @@
 import { VideoClient, ProviderHttp } from "@grida/ai";
 import type { SecretsStore } from "@grida/daemon/server";
 import type { GridaGatewaySessionStore } from "./gg-session";
-import { ModelCatalogStore } from "./model-catalog";
+import type { ModelCatalogStore } from "./model-catalog";
 
 export type ResolvedVideoModel = VideoClient.Resolved;
 export type ResolveVideoDeps = {
@@ -45,7 +45,7 @@ export async function resolveVideoModel(
     // Explicit legacy host choice: standalone requests may use ambient fetch;
     // remote downloads still require a supplied host transport.
     http: deps.provider_http ?? new ProviderHttp(),
-    catalog: deps.catalog ?? new ModelCatalogStore(),
+    catalog: deps.catalog,
     gg: deps.gg,
     gg_base_url: deps.gg_base_url,
   });

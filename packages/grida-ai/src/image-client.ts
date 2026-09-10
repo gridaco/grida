@@ -23,7 +23,7 @@ import { byokProvidersFor } from "./provider-ids";
 export class ImageClient {
   readonly #getKey: ImageClient.Keys["get"];
   readonly #http: ProviderHttp;
-  readonly #catalog: ModelCatalogStore;
+  readonly #catalog?: ModelCatalogStore;
   readonly #gg?: GgTokenSource;
   readonly #ggBaseUrl?: string;
 
@@ -36,7 +36,6 @@ export class ImageClient {
       }
       this.#getKey = get.bind(keys);
       this.#http = http;
-      if (!catalog || typeof catalog.view !== "function") throw 0;
       this.#catalog = catalog;
       if (gg !== undefined) {
         const read = gg.getAccessToken.bind(gg);
@@ -253,7 +252,7 @@ export namespace ImageClient {
     keys: Keys;
     /** Explicit host choice. ImageClient never constructs an ambient transport. */
     http: ProviderHttp;
-    catalog: ModelCatalogStore;
+    catalog?: ModelCatalogStore;
     gg?: GgTokenSource;
     gg_base_url?: string;
   };

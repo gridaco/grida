@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import { ModelCatalogStore } from "./model-catalog";
 import { ProviderHttp } from "./http";
 import { TRANSPARENT_PNG_BASE64 } from "../testing/transparent-png";

@@ -1,4 +1,3 @@
-import { CatalogFixture } from "./catalog-fixture";
 // GRIDA-SEC-004 — public voice discovery, fixed authority, safe projection and bounded pagination.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProviderHttp, TextToSpeechClient } from "./index";
@@ -18,7 +17,6 @@ function setup() {
     throw new Error("synthetic-private-download-must-not-run");
   });
   const client = new TextToSpeechClient({
-    catalog: CatalogFixture.store(),
     keys: { get },
     http: new ProviderHttp({ request, download }),
   });

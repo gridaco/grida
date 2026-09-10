@@ -425,10 +425,6 @@ async function main() {
     }
     report.audited_source_and_declaration_files = audited;
     await cp(
-      fileURLToPath(new URL("./catalog.mjs", import.meta.url)),
-      path.join(runtime, "catalog.mjs")
-    );
-    await cp(
       fileURLToPath(new URL("./consumer.mjs", import.meta.url)),
       path.join(runtime, "consumer.mjs")
     );
@@ -471,14 +467,17 @@ async function main() {
       await writeFile(
         path.join(runtime, `consumer.${extension}`),
         `
-import { ImageClient, VideoClient, MusicClient, SoundEffectClient, TextToSpeechClient, ThreeDClient, ProviderHttp, GridaGatewaySessionStore, ModelCatalogStore, MediaOperations, type ModelCatalogView } from "@grida/ai";
+import { ImageClient, VideoClient, MusicClient, SoundEffectClient, TextToSpeechClient, ThreeDClient, ProviderHttp, GridaGatewaySessionStore, ModelCatalogStore, MediaOperations } from "@grida/ai";
 import { byokProvidersFor } from "@grida/ai/providers";
 import { models } from "@grida/ai-models";
+import { catalog } from "@grida/ai-models/grida";
 declare const http: ProviderHttp;
-declare const view: ModelCatalogView;
-const catalog = new ModelCatalogStore({ seed: view });
-const operations = new MediaOperations({ catalog: view });
-const client = new ImageClient({ catalog, http, keys: { get: () => null }, gg: new GridaGatewaySessionStore() });
+const snapshot: catalog.snapshot.Snapshot = catalog.snapshot.seed();
+const parsed: catalog.snapshot.Snapshot | null = catalog.snapshot.parse(snapshot);
+const view: catalog.snapshot.View = catalog.snapshot.view(snapshot);
+const store = new ModelCatalogStore({ snapshot });
+const operations = new MediaOperations({ snapshot });
+const client = new ImageClient({ http, keys: { get: () => null }, gg: new GridaGatewaySessionStore() });
 const providers: readonly string[] = byokProvidersFor("image").map(provider => provider.id);
 async function image(): Promise<Uint8Array> {
   const operation = await client.resolve({ model_id: "example", provider: "fal" });
@@ -487,7 +486,7 @@ async function image(): Promise<Uint8Array> {
   return result.images[0].data;
 }
 async function video(): Promise<Uint8Array> {
-  const client = new VideoClient({ catalog, http, keys: { get: () => null }, gg: new GridaGatewaySessionStore() });
+  const client = new VideoClient({ http, keys: { get: () => null }, gg: new GridaGatewaySessionStore() });
   const operation = await client.resolve({ model_id: "example", provider: "fal", image: true });
   const input: models.video.VideoInput = operation.input;
   const result = await operation.generate({ prompt: "Synthetic type probe", image_url: "https://assets.example.invalid/frame.png", signal: new AbortController().signal });
@@ -495,21 +494,21 @@ async function video(): Promise<Uint8Array> {
   return result.videos[0].data;
 }
 async function music(): Promise<Uint8Array> {
-  const client = new MusicClient({ catalog, http, gg: new GridaGatewaySessionStore(), gg_base_url: "https://gg.example.invalid" });
+  const client = new MusicClient({ http, gg: new GridaGatewaySessionStore(), gg_base_url: "https://gg.example.invalid" });
   const operation = await client.resolve({ model_id: "google/lyria-3", provider: "gg" });
   const result = await operation.generate({ prompt: "Synthetic type probe", seed: 0, signal: new AbortController().signal });
   const mediaType: "audio/mpeg" = result.audio.media_type;
   return result.audio.data;
 }
 async function soundEffect(): Promise<Uint8Array> {
-  const client = new SoundEffectClient({ catalog, http, keys: { get: provider => null } });
+  const client = new SoundEffectClient({ http, keys: { get: provider => null } });
   const operation = await client.resolve({ model_id: "eleven_text_to_sound_v2", provider: "elevenlabs" });
   const result = await operation.generate({ prompt: "Synthetic type probe", duration_seconds: 0.5, loop: false, prompt_influence: 0, signal: new AbortController().signal });
   const mediaType: "audio/mpeg" = result.audio.media_type;
   return result.audio.data;
 }
 async function speech(): Promise<Uint8Array> {
-  const client = new TextToSpeechClient({ catalog, http, keys: { get: provider => null } });
+  const client = new TextToSpeechClient({ http, keys: { get: provider => null } });
   const voices: readonly TextToSpeechClient.Voice[] = await client.listVoices({ provider: "elevenlabs", signal: new AbortController().signal });
   const operation = await client.resolve({ model_id: "eleven_v3", provider: "elevenlabs", voice_id: "synthetic-voice" });
   const voice: string = operation.voice_id;
@@ -518,7 +517,7 @@ async function speech(): Promise<Uint8Array> {
   return result.audio.data;
 }
 async function threeD(): Promise<Uint8Array> {
-  const client = new ThreeDClient({ catalog, http, keys: { get: provider => null } });
+  const client = new ThreeDClient({ http, keys: { get: provider => null } });
   const text = await client.resolve({ model_id: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d", provider: "fal" });
   const result = await text.generate({ prompt: "Synthetic type probe" });
   const mediaType: "model/gltf-binary" = result.glb.media_type;
@@ -541,7 +540,7 @@ async function threeD(): Promise<Uint8Array> {
   }
   return result.glb.data;
 }
-void [client, image, video, music, soundEffect, speech, threeD, providers, models, operations];
+void [client, image, video, music, soundEffect, speech, threeD, providers, models, snapshot, parsed, view, store, operations];
 `,
         { mode: 0o600 }
       );

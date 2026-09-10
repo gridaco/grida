@@ -27,19 +27,8 @@ describe("externalizedWorkspaceImports", () => {
         "hono",
         "hono/jsx",
         "undici",
-        "@application/vendor",
       ])
     ).toEqual([]);
-  });
-
-  it("flags private application catalog imports, including subpaths", () => {
-    expect(
-      externalizedWorkspaceImports([
-        "@app/ai-catalog",
-        "@app/ai-catalog/snapshot",
-        "@app/ai-catalog",
-      ])
-    ).toEqual(["@app/ai-catalog", "@app/ai-catalog/snapshot"]);
   });
 
   it("dedupes repeated offenders", () => {

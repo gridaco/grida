@@ -1,10 +1,14 @@
-import { models as facts } from "@grida/ai-models";
+import { models as facts } from "../models";
 import { TIER_MODEL_IDS, type ModelTier } from "./tiers";
 import { preferences } from "./preferences";
 
 // Keep the imported value lookup outside the namespace that exports `models`.
 // The declaration bundler otherwise shadows the import with that local value.
 type FactualThreeDModels = typeof facts.three_d.models;
+type FactualImageBinding = typeof facts.image.binding;
+type FactualImageBackground = typeof facts.image.supportsTransparentBackground;
+type FactualVideoInput = typeof facts.video.input;
+type FactualVideoBinding = typeof facts.video.binding;
 
 /** Copy the input before freezing so no caller or producer loses ownership. */
 function own<T>(value: T): T {
@@ -657,8 +661,8 @@ export namespace catalog {
     export type ImageProvider = facts.image.ImageProvider;
     export type ImageProviderBinding = facts.image.ImageProviderBinding;
     export type ImageSizeConstraints = facts.image.ImageSizeConstraints;
-    export const binding = facts.image.binding;
-    export const supportsTransparentBackground =
+    export const binding: FactualImageBinding = facts.image.binding;
+    export const supportsTransparentBackground: FactualImageBackground =
       facts.image.supportsTransparentBackground;
     export type RequestDefaults = {
       width: number;
@@ -777,9 +781,9 @@ export namespace catalog {
     export type VideoModelPricing = facts.video.VideoModelPricing;
     export type VideoProviderBinding = facts.video.VideoProviderBinding;
     export type VideoInput = facts.video.VideoInput;
-    export const input = facts.video.input;
+    export const input: FactualVideoInput = facts.video.input;
 
-    export const binding = facts.video.binding;
+    export const binding: FactualVideoBinding = facts.video.binding;
     export type RequestDefaults = {
       resolution: ResolutionLabel;
       aspect_ratio: image.AspectRatioString;
@@ -1210,18 +1214,6 @@ export namespace catalog {
       ): text.registry.ResolvedModelSpec | undefined;
       readonly image: ImageView;
       readonly video: VideoView;
-      /** Bundled service lifecycle for media families outside the schema-1 wire. */
-      readonly lifecycle: Readonly<
-        Record<
-          "music" | "sound_effects" | "text_to_speech" | "three_d",
-          Readonly<
-            Record<
-              string,
-              { status: "listed" | "staged"; deprecated?: boolean }
-            >
-          >
-        >
-      >;
     }
 
     const TIERS: readonly ModelTier[] = ["nano", "mini", "pro", "max"];
@@ -2098,22 +2090,6 @@ export namespace catalog {
 
     function build(s: Snapshot): View {
       s = own(s);
-      const lifecycle = (
-        cards: Readonly<
-          Record<string, { status: "listed" | "staged"; deprecated?: boolean }>
-        >
-      ) =>
-        own(
-          Object.fromEntries(
-            Object.entries(cards).map(([id, card]) => [
-              id,
-              {
-                status: card.status,
-                ...(card.deprecated ? { deprecated: true } : {}),
-              },
-            ])
-          )
-        );
       const catalog = s.text.catalog;
       const specs = Object.values(catalog);
       const tier_model_ids = s.text.tier_model_ids;
@@ -2151,12 +2127,6 @@ export namespace catalog {
             (video.models as Record<string, video.VideoModelCard>),
           s.preferences?.video
         ),
-        lifecycle: Object.freeze({
-          music: lifecycle(audio.music.models),
-          sound_effects: lifecycle(audio.sound_effects.models),
-          text_to_speech: lifecycle(audio.text_to_speech.models),
-          three_d: lifecycle(three_d.models),
-        }),
       });
     }
 

@@ -1,4 +1,4 @@
-import { catalog as models } from "../src";
+import { catalog as models } from "../../src/grida";
 
 const video = models.video;
 type Card = models.video.VideoModelCard;

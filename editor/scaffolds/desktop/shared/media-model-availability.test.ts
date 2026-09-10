@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MediaModelAvailability } from "./media-model-availability";
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import type { DesktopBridge } from "@/lib/desktop/bridge";
 
 const catalogue = Object.freeze([

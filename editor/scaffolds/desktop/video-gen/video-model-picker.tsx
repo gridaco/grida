@@ -1,6 +1,6 @@
 "use client";
 
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import {
   Select,
   SelectContent,

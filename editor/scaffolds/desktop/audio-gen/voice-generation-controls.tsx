@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { Loader2, Sparkles } from "lucide-react";
-import { catalog as models } from "@app/ai-catalog";
+import { catalog as models } from "@grida/ai-models/grida";
 import {
   PromptInput,
   PromptInputBody,

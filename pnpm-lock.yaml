@@ -300,9 +300,6 @@ importers:
       '@ai-sdk/rsc':
         specifier: 2.0.1
         version: 2.0.1(react@19.2.5)(zod@4.3.6)
-      '@app/ai-catalog':
-        specifier: workspace:*
-        version: link:../packages/grida-ai-catalog
       '@app/database':
         specifier: workspace:*
         version: link:../database
@@ -1137,9 +1134,6 @@ importers:
       '@ai-sdk/provider':
         specifier: 3.0.10
         version: 3.0.10
-      '@app/ai-catalog':
-        specifier: workspace:*
-        version: link:../grida-ai-catalog
       '@grida/ai':
         specifier: workspace:*
         version: link:../grida-ai
@@ -1170,22 +1164,6 @@ importers:
       zod:
         specifier: ^4
         version: 4.3.6
-    devDependencies:
-      tsdown:
-        specifier: ^0.22.1
-        version: 0.22.1(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.36)
-      typescript:
-        specifier: 6.0.3
-        version: 6.0.3
-      vitest:
-        specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
-
-  packages/grida-ai-catalog:
-    dependencies:
-      '@grida/ai-models':
-        specifier: workspace:*
-        version: link:../grida-ai-models
     devDependencies:
       tsdown:
         specifier: ^0.22.1
@@ -1484,9 +1462,6 @@ importers:
 
   packages/grida-cli:
     devDependencies:
-      '@app/ai-catalog':
-        specifier: workspace:*
-        version: link:../grida-ai-catalog
       '@grida/account':
         specifier: workspace:*
         version: link:../grida-account

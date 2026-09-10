@@ -10,7 +10,6 @@ export { MediaOperations } from "./media-operations";
 export { ProviderHttp, type ProviderHttpTransport } from "./http";
 export {
   ModelCatalogStore,
-  type ModelCatalogView,
   type ModelCatalogStoreOptions,
 } from "./model-catalog";
 export {

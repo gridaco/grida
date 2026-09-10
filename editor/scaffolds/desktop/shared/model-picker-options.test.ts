@@ -3,7 +3,7 @@ import {
   CHATGPT_SUBSCRIPTION_MODEL_IDS,
   GG_PROVIDER_ID,
 } from "@grida/agent";
-import _models from "@app/ai-catalog";
+import { catalog as _models } from "@grida/ai-models/grida";
 import { describe, expect, it } from "vitest";
 import {
   model_picker_options,

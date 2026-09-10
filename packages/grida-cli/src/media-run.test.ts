@@ -3,7 +3,6 @@
 // GRIDA-SEC-006 — only the public native scoped sink supplies GG to the real media SDK.
 // GRIDA-GG: token — synthetic tokens only; no services, auth custody or provider calls.
 import { MediaOperations } from "@grida/ai";
-import { catalog } from "@app/ai-catalog";
 import { AuthClient } from "@grida/auth";
 import { ProviderCredentialStore } from "@grida/auth/providers";
 import {
@@ -32,7 +31,7 @@ const PROMPT = "synthetic-private-prompt";
 const PNG = Buffer.from("iVBORw0KGgo=", "base64");
 const MP3 = Uint8Array.of(0x49, 0x44, 0x33);
 const organization = { id: 7, name: "studio", display_name: "Studio" };
-const discovery = new MediaOperations({ catalog: catalog.snapshot.view() });
+const discovery = new MediaOperations();
 const image = discovery
   .list({ kind: "image", provider: "openrouter" })
   .find((entry) => entry.variant === "text")!;

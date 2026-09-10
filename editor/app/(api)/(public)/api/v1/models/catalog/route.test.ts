@@ -4,7 +4,7 @@
  * the model catalogue, parseable by every client that consumes it.
  */
 import { describe, it, expect } from "vitest";
-import { catalog as models, TIER_MODEL_IDS } from "@app/ai-catalog";
+import { catalog as models, TIER_MODEL_IDS } from "@grida/ai-models/grida";
 import { GET } from "./route";
 import { isHostedTextModel } from "@/lib/ai/openai-compat/hosted-models";
 
