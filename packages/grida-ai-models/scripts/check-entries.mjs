@@ -8,6 +8,10 @@ import ts from "typescript";
 
 const packageRoot = fileURLToPath(new URL("../", import.meta.url));
 
+function relativePath(path) {
+  return relative(packageRoot, path).replaceAll("\\", "/");
+}
+
 // Walk actual module edges, including the emitted shared chunks. A root import
 // must never acquire service policy through a barrel or a shared dependency.
 function dependencies(entry) {
@@ -47,8 +51,18 @@ function dependencies(entry) {
     walk(source);
   }
   visit(resolve(packageRoot, entry));
-  return [...visited].map((path) => relative(packageRoot, path));
+  return [...visited].map(relativePath);
 }
+
+test("dependency paths use forward slashes on every platform", () => {
+  for (const separator of ["/", "\\"]) {
+    const path = resolve(
+      packageRoot,
+      ["src", "grida", "catalog.ts"].join(separator)
+    );
+    assert.equal(relativePath(path), "src/grida/catalog.ts");
+  }
+});
 
 for (const entry of ["src/index.ts", "dist/index.js", "dist/index.mjs"]) {
   test(`${entry} dependency graph excludes Grida service policy`, () => {
