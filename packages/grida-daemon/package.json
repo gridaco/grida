@@ -65,6 +65,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json"
   },
   "dependencies": {
+    "@grida/auth": "workspace:*",
     "@hono/node-server": "1.19.9",
     "hono": "4.11.8"
   },

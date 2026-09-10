@@ -25,6 +25,7 @@ Grida는 오픈소스 캔버스 에디터이자 렌더링 엔진이며, Figma �
 - Figma에서 가져오기, Assistant 사용, Figma 관련 설정이 목적이라면 [With Figma](./with-figma/index.md)를 보세요.
 - 폼 흐름, 알림, 응답 처리를 다루고 있다면 [Forms](./forms/respondent-email-notifications.md)를 보세요.
 - 제품 인프라, 고객, 태그, 플랫폼 기능을 다루고 있다면 [Platform](./platform/index.md)을 보세요.
+- 터미널에서 계정과 미디어 도구를 사용하려면 [CLI](https://grida.co/docs/cli)를 보세요. 현재 개발 프리뷰입니다.
 - Grida 캔버스를 임베드하거나 통합하고 있다면 [Canvas SDK](./canvas/sdk/index.md)를 보세요.
 
 ## 제품 문서 영역
@@ -45,7 +46,6 @@ Grida는 오픈소스 캔버스 에디터이자 렌더링 엔진이며, Figma �
 
 ## 오래되었거나 특수한 문서
 
-- [CLI](./cli/index.md)는 호환성을 위해 유지되지만, 특정 작업이 아니라면 deprecated 문서로 취급해야 합니다.
 - `docs/@designto-code/**`는 외부 소스에서 동기화되는 참고 자료입니다.
 
 ## 프로젝트 링크

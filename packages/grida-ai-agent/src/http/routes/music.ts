@@ -7,18 +7,13 @@
  */
 
 import type { Hono } from "hono";
-import { models } from "@grida/ai-models";
+import { MusicClient } from "@grida/ai";
 import type { MediaPersistence } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
-import type { MusicGenerateRequest } from "../../protocol/music";
-import { GridaGatewayMusicProvider } from "../../providers/gg-media";
 import type { GridaGatewaySessionStore } from "../../providers/gg-session";
 import { ProviderHttp } from "../../providers/http";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
 import { mediaGenerationError } from "./media-generation-errors";
-
-const MUSIC_MODEL_IDS = models.audio.music.model_ids;
-const MAX_MUSIC_PROMPT_CHARACTERS = 4_096;
 
 export type MusicRoutesDeps = {
   media?: MediaPersistence | null;
@@ -31,27 +26,15 @@ export function registerMusicRoutes(app: Hono, deps: MusicRoutesDeps) {
   const providerHttp = deps.provider_http ?? new ProviderHttp();
 
   // GRIDA-GG: provider — hosted music generation.
-  // GRIDA-SEC-006 — the session token is read per call by the GG adapter.
+  // GRIDA-SEC-006 — the shared operation reads the scoped token at submission.
   app.post("/audio/music/generate", async (c) => {
     const r = await body(c, {
-      model_id: v.oneOf(MUSIC_MODEL_IDS),
+      model_id: v.string,
       prompt: v.string,
       seed: v.optional(v.number),
     });
     if (!r.ok) return r.res;
-    const prompt = r.data.prompt.trim();
-    if (!prompt) return c.json({ error: "prompt must not be blank" }, 400);
-    if ([...prompt].length > MAX_MUSIC_PROMPT_CHARACTERS) {
-      return c.json(
-        {
-          error: `prompt must not exceed ${MAX_MUSIC_PROMPT_CHARACTERS} characters`,
-        },
-        400
-      );
-    }
-    if (r.data.seed !== undefined && !Number.isSafeInteger(r.data.seed)) {
-      return c.json({ error: "seed must be a safe integer" }, 400);
-    }
+    const { model_id, prompt, seed } = r.data;
     if (!deps.gg || !deps.gg_base_url) {
       return c.json(
         { error: "hosted music generation is unavailable", provider_id: "gg" },
@@ -59,33 +42,54 @@ export function registerMusicRoutes(app: Hono, deps: MusicRoutesDeps) {
       );
     }
 
-    const request: MusicGenerateRequest = {
-      model_id: r.data.model_id,
-      prompt,
-      ...(r.data.seed === undefined ? {} : { seed: r.data.seed }),
-    };
     try {
-      const result = await new GridaGatewayMusicProvider(
-        deps.gg,
-        deps.gg_base_url,
-        providerHttp
-      ).generate(request, c.req.raw.signal);
+      const operation = await new MusicClient({
+        http: providerHttp,
+        gg: deps.gg,
+        gg_base_url: deps.gg_base_url,
+      }).resolve({ model_id, provider: "gg" });
+      const result = await operation.generate({
+        prompt,
+        seed,
+        signal: c.req.raw.signal,
+      });
+      // The host owns wire encoding and filenames. Provider metadata never
+      // enters a receipt; preserve the hosted route's canonical model basename.
+      const audio = {
+        base64: Buffer.from(result.audio.data).toString("base64"),
+        media_type: result.audio.media_type,
+        file_name: `${operation.model_id.split("/").at(-1) ?? "music"}.mp3`,
+      };
       const storedMedia = await GeneratedMediaPersistence.save(
         deps.media,
-        result.audio
+        audio
       );
       return c.json({
-        model_id: result.model_id,
-        provider_id: result.provider_id,
-        audio: result.audio,
+        model_id: operation.model_id,
+        provider_id: operation.provider_id,
+        audio,
         ...(storedMedia ? { stored_media: storedMedia } : {}),
       });
     } catch (error) {
+      if (error instanceof MusicClient.Failure) {
+        if (error.code === "invalid_input") {
+          return c.json(
+            { error: "invalid music input", code: error.code },
+            400
+          );
+        }
+        if (error.code === "model_unavailable") {
+          return c.json({ error: "music model is unavailable", model_id }, 400);
+        }
+      }
       return mediaGenerationError(c, {
-        error,
+        error:
+          error instanceof MusicClient.Failure
+            ? error
+            : new MusicClient.Failure("generation_failed"),
         scope: "agent-host-music",
         label: "music generation failed",
-        model_id: request.model_id,
+        model_id,
         provider_id: "gg",
       });
     }

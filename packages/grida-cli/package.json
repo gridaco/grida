@@ -1,0 +1,37 @@
+{
+  "name": "grida",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Grida command line: account access and tools, independent of Desktop.",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/gridaco/grida",
+  "bin": {
+    "grida": "./dist/bin.mjs"
+  },
+  "files": [
+    "dist",
+    "THIRD-PARTY-NOTICES.txt"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@grida/account": "workspace:*",
+    "@grida/ai": "workspace:*",
+    "@grida/auth": "workspace:*",
+    "@grida/home": "workspace:*",
+    "@types/node": "^24",
+    "tsdown": "^0.22.1",
+    "typescript": "^6",
+    "vitest": "^4"
+  },
+  "optionalDependencies": {
+    "@github/keytar": "7.10.6"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

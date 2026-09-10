@@ -1,3 +1,5 @@
+// GRIDA-SEC-014 — explicit provider-root forwarding and host isolation.
+// GRIDA-SEC-004 — sidecar supervision and launch-scoped command authority.
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,6 +30,8 @@ vi.mock("./sandbox/manager", () => ({
 }));
 
 import { AgentSidecarSupervisor } from "./agent-sidecar-supervisor";
+import { app } from "electron";
+import { ensureInitialized, wrap } from "./sandbox/manager";
 
 describe("AgentSidecarSupervisor recovery", () => {
   beforeEach(() => {
@@ -39,7 +43,75 @@ describe("AgentSidecarSupervisor recovery", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     vi.useRealTimers();
+  });
+
+  it("starts the media sandbox without preparing scratch or command authority", async () => {
+    const supervisor = new AgentSidecarSupervisor({ agent: false });
+    const state = supervisor as unknown as {
+      initSandbox(): Promise<void>;
+      scratchBase: string | null;
+      commandHost: unknown;
+    };
+    vi.mocked(app.getPath).mockClear();
+    vi.mocked(ensureInitialized).mockClear();
+
+    await state.initSandbox();
+
+    expect(state.scratchBase).toBeNull();
+    expect(state.commandHost).toBeNull();
+    expect(app.getPath).not.toHaveBeenCalledWith("temp");
+    expect(ensureInitialized).toHaveBeenCalledWith(
+      expect.objectContaining({
+        network: expect.objectContaining({
+          allowedDomains: [],
+          allowLocalBinding: false,
+        }),
+      })
+    );
+    supervisor.stop();
+  });
+
+  it("forwards disabled agent startup without scratch or skill arguments", async () => {
+    const supervisor = new AgentSidecarSupervisor({ agent: false });
+    const state = supervisor as unknown as { spawnOne(): Promise<unknown> };
+    // Inspect the exact wrapped argv, then stop before spawning a real child.
+    vi.mocked(wrap).mockRejectedValueOnce(new Error("stop before spawn"));
+
+    await expect(state.spawnOne()).rejects.toThrow("stop before spawn");
+
+    const command = vi.mocked(wrap).mock.calls.at(-1)?.[0];
+    expect(command).toContain("--agent=disabled");
+    expect(command).toContain("--media-root=");
+    expect(command).toContain("--provider-home=");
+    expect(command).not.toContain("--scratch-base=");
+    expect(command).not.toContain("--skills-root=");
+    supervisor.stop();
+  });
+
+  it("shares the canonical Grida home and isolates an explicit agent data override", async () => {
+    vi.stubEnv("GRIDA_HOME", "/synthetic/grida-home");
+    vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);
+    const shared = new AgentSidecarSupervisor({ agent: false }) as unknown as {
+      user_data_path: string;
+      provider_home: string;
+      stop(): void;
+    };
+    expect(shared.user_data_path).toBe("/synthetic/grida-home/agent");
+    expect(shared.provider_home).toBe("/synthetic/grida-home");
+    shared.stop();
+    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/isolated-agent");
+    const isolated = new AgentSidecarSupervisor({
+      agent: false,
+    }) as unknown as {
+      user_data_path: string;
+      provider_home: string;
+      stop(): void;
+    };
+    expect(isolated.user_data_path).toBe("/synthetic/isolated-agent");
+    expect(isolated.provider_home).toBe("/synthetic/isolated-agent");
+    isolated.stop();
   });
 
   it("retires and restarts when a grant snapshot is not acknowledged", async () => {

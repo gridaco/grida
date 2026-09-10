@@ -29,8 +29,8 @@ It owns:
   [daemon.md](../../docs/wg/ai/agent/daemon.md), #798): registration
   record, persistent credential, authenticated probe, connect-or-spawn.
 - **Host primitives tenants build on.** The shell runner (structural
-  GRIDA-SEC-004 gates), `SecretsStore`/`AuthStore` (presence/set/delete;
-  raw reads stay server-side), `MediaPersistence` (path-free binary-media
+  GRIDA-SEC-004 gates), `SecretsStore` (shared native BYOK adapter) and
+  `AuthStore` (tenant OAuth custody; raw reads stay server-side), `MediaPersistence` (path-free binary-media
   publication backed by a separately injected host store), path containment,
   request validation, and the sandbox policy frame.
 
@@ -54,14 +54,50 @@ AI-specific — no `ai`, no model catalogs, no provider SDKs. Enforced by
 `src/__boundary__.test.ts`; if that test is in your way, the change
 belongs in a tenant.
 
+## Provider credentials
+
+> GRIDA-SEC-014 — one shared native BYOK authority; existing HTTP perimeter and
+> ChatGPT OAuth remain GRIDA-SEC-004 and GRIDA-SEC-008.
+
+`provider_home` is an explicit host option. Desktop passes the canonical Grida
+home, so Desktop and CLI use the same `providers/credentials.toml` through
+[`@grida/auth/providers`](https://github.com/gridaco/grida/blob/main/packages/grida-auth/README.md).
+Omitting this option keeps direct/embedded daemons isolated under their supplied
+`user_data_path`; the daemon never discovers a real user home or project config.
+`SecretsStore` keeps its presence/set/delete interface and trusted `_getKey`
+reader. It does not return keys through HTTP or cache them across operations.
+
+First use migrates API-key entries from `user_data_path/auth.json`. Canonical
+values and earlier removals win. A durable pending fence precedes source
+retirement; retry finishes cleanup without importing again. Completed migration
+never reads the legacy file again. OAuth records stay in `auth.json`; updated
+macOS/Linux OAuth writers and migration use the same private `.auth-lock`
+process lock. Only the exact old private temporary-file pattern is retired.
+Do not run an older application that writes the mixed file concurrently:
+it does not participate in this protocol. `GRIDA_AUTH_CONTENT` is never a
+migration source, and new `AuthStore` API-key writes are refused on these
+shared-custody platforms.
+
+Shared BYOK custody currently supports macOS/Linux native main-thread hosts.
+Windows Desktop retains its existing host-local `auth.json` API-key and OAuth
+backend, selected at construction. Its provider reads and mutations use strict
+disk parsing: missing files mean no keys; corrupt or unreadable files reject.
+They do not import the test environment override, open shared TOML, migrate,
+dual-write, or select another backend after failure. The host-local writer keeps
+its existing in-process queue and inherited Windows ACLs; it does not validate
+Windows DACLs or treat POSIX stat bits as an access check. This is not Windows
+support for the shared protocol or the CLI file store. Keyless
+Windows users can still resolve GG and prepare optional agent tools.
+Account logout and memory-only GG grants do not change provider custody.
+
 ## Exports
 
-| Subpath       | What                                                                                    | Platform |
-| ------------- | --------------------------------------------------------------------------------------- | -------- |
-| `.`           | handshake vocabulary (`DaemonCapabilities`, `DAEMON_PROTOCOL`), local-resource DTOs     | neutral  |
-| `./server`    | `DaemonServer`, `buildServer`, the tenant seam, `Daemon` discovery, host stores/toolkit | Node     |
-| `./transport` | `DaemonTransport` — Basic-Auth signing, fetch/SSE helpers, the daemon route client      | neutral  |
-| `./sandbox`   | sandbox policy frame (`buildDaemonSandboxPolicy`, `hostFromUrl`) — AI-free              | Node     |
+| Subpath       | What                                                                                                              | Platform |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- | -------- |
+| `.`           | handshake vocabulary (`DaemonCapabilities`, `DAEMON_PROTOCOL`), local-resource DTOs                               | neutral  |
+| `./server`    | `DaemonServer`, `buildServer`, the tenant seam, `Daemon` discovery, host stores/toolkit                           | Node     |
+| `./transport` | `DaemonTransport` — Basic-Auth signing, fetch/SSE helpers, the daemon route client                                | neutral  |
+| `./sandbox`   | sandbox policy frame (`buildDaemonSandboxPolicy`, `hostFromUrl`) and `containsPath` — AI-free, server-independent | Node     |
 
 ### Sandbox network baseline
 
@@ -96,3 +132,13 @@ pnpm --filter @grida/daemon test:browser   # perimeter system harness (Chromium)
 The browser suite boots two real daemons (with a stub tenant) and proves
 the CORS / Referer / query-token rules from a real browser context —
 things a forged-header Node test cannot prove.
+
+`@grida/daemon/server` exports the Node-only `ProtectedRoots` topology gate. It
+accepts fixed absolute protected roots and checks an absolute candidate with
+`overlaps(path)`, resolving existing ancestors even before the protected subtree
+exists. Unresolvable aliases fail closed. `WorkspaceRegistry` accepts these roots
+as its third constructor argument and `FileRegistry` as its first; both recheck
+saved grants before returning file authority. The daemon supplies its provider
+credential directory to both registries. This prevents opening that directory, a
+child or an ancestor as an ordinary file/workspace grant; it is not an OS sandbox
+or protection against a hostile process racing filesystem mutations.

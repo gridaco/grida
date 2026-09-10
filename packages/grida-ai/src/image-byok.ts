@@ -1,0 +1,441 @@
+// GRIDA-SEC-004 — provider-owned submissions and credential-free result downloads.
+/** Internal AI SDK adapters; ImageClient owns the safe public operation boundary. */
+
+import { createGateway } from "@ai-sdk/gateway";
+import type { ImageModelV3, ImageModelV3CallOptions } from "@ai-sdk/provider";
+import type { models } from "@grida/ai-models";
+import type { ImageClient } from "./image-client";
+import {
+  assertAllowedUrl,
+  falQueueOutcome,
+  pollQueue,
+  safeText,
+} from "./fetch-helpers";
+import { ProviderHttp } from "./http";
+
+type ImageProvider = models.image.ImageProvider;
+
+// Internal per-provider builders — the public entry is makeImageModelFor.
+function makeOpenRouterImageModel(
+  apiKey: string,
+  id: string,
+  providerHttp: ProviderHttp
+): ImageModelV3 {
+  return new OpenRouterImageModel(apiKey, id, providerHttp);
+}
+
+function makeVercelImageModel(
+  apiKey: string,
+  id: string,
+  providerHttp: ProviderHttp
+): ImageModelV3 {
+  return createGateway({ apiKey, fetch: providerHttp.request }).imageModel(id);
+}
+
+function makeFalImageModel(
+  apiKey: string,
+  id: string,
+  providerHttp: ProviderHttp
+): ImageModelV3 {
+  return new FalImageModel(apiKey, id, providerHttp);
+}
+
+/**
+ * Build the `ImageModelV3` for a resolved (provider, binding-id) pair using the
+ * user's key. The single switch the image resolver calls.
+ */
+export function makeImageModelFor(
+  provider: ImageProvider,
+  apiKey: string,
+  id: string,
+  providerHttp: ProviderHttp = new ProviderHttp(),
+  background?: ImageClient.Background
+): ImageModelV3 {
+  let model: ImageModelV3;
+  switch (provider) {
+    case "openrouter":
+      model = makeOpenRouterImageModel(apiKey, id, providerHttp);
+      break;
+    case "vercel":
+      model = makeVercelImageModel(apiKey, id, providerHttp);
+      break;
+    case "fal":
+      model = makeFalImageModel(apiKey, id, providerHttp);
+      break;
+  }
+  // Resolution has already checked the exact route's catalogue declaration.
+  // Capture its explicit intent outside caller-owned providerOptions: a later
+  // raw background/encoding option must not defeat that admitted requirement.
+  return background && background !== "auto"
+    ? new BackgroundImageModel(model, provider, background)
+    : model;
+}
+
+/** Immutable request intent over a route admitted by the resolver. */
+class BackgroundImageModel implements ImageModelV3 {
+  readonly specificationVersion = "v3" as const;
+
+  constructor(
+    private readonly model: ImageModelV3,
+    private readonly routeProvider: ImageProvider,
+    private readonly background: "opaque" | "transparent"
+  ) {}
+
+  get provider() {
+    return this.model.provider;
+  }
+
+  get modelId() {
+    return this.model.modelId;
+  }
+
+  get maxImagesPerCall() {
+    return this.model.maxImagesPerCall;
+  }
+
+  doGenerate(options: ImageModelV3CallOptions) {
+    // Gateway forwards providerOptions unchanged; native OpenAI settings live
+    // under openai, not vercel. Catalogue admission is checked independently.
+    const namespace =
+      this.routeProvider === "vercel" ? "openai" : this.routeProvider;
+    return this.model.doGenerate({
+      ...options,
+      providerOptions: {
+        ...options.providerOptions,
+        [namespace]: {
+          ...options.providerOptions?.[namespace],
+          background: this.background,
+          ...(this.background === "transparent"
+            ? { output_format: "png" }
+            : {}),
+        },
+      },
+    });
+  }
+}
+
+// ── OpenRouter adapter ──────────────────────────────────────────────
+
+const OPENROUTER_IMAGE_URL = "https://openrouter.ai/api/v1/images";
+const OPENROUTER_GPT_IMAGE_2_5_ROUTE =
+  /^openai\/gpt-image-2\.5-(?:flare|sunburst)$/;
+
+/**
+ * `ImageModelV3` over OpenRouter's dedicated Unified Image API
+ * (`POST /api/v1/images`). OpenRouter has NO OpenAI-style
+ * `/images/generations` endpoint — `@ai-sdk/openai-compatible`'s `.imageModel()`
+ * 404s there. The unified route normalizes `model`/`prompt`/`size`/
+ * `aspect_ratio`/`seed` across all OpenRouter image models and returns base64 in
+ * `data[].b64_json` (verified live 2026-06-29).
+ *
+ * NOTE: a thrown error may include a truncated provider response body (`safeText`)
+ * — it is NOT model-safe. ImageClient catches and
+ * replaces it with a safe Failure; callers of internal adapters must not expose it.
+ */
+export class OpenRouterImageModel implements ImageModelV3 {
+  readonly specificationVersion = "v3" as const;
+  readonly provider = "openrouter";
+  readonly maxImagesPerCall = 4;
+
+  constructor(
+    private readonly apiKey: string,
+    readonly modelId: string,
+    private readonly providerHttp: ProviderHttp = new ProviderHttp()
+  ) {}
+
+  async doGenerate(
+    options: ImageModelV3CallOptions
+  ): Promise<Awaited<ReturnType<ImageModelV3["doGenerate"]>>> {
+    const { prompt, n, size, aspectRatio, seed, providerOptions, abortSignal } =
+      options;
+    // The exact GPT Image 2.5 endpoint descriptors expose aspect_ratio but no
+    // seed capability. Do not forward an unsupported typed SDK control.
+    if (
+      OPENROUTER_GPT_IMAGE_2_5_ROUTE.test(this.modelId) &&
+      seed !== undefined
+    ) {
+      throw new Error("[openrouter] GPT Image 2.5 does not support seed");
+    }
+    // Drop any caller-supplied `input_references` from the passthrough extras:
+    // the sanitized, capped list built from our internal `grida` namespace below
+    // is authoritative, so a raw `openrouter.input_references` must NOT override
+    // it (createImageGenerator/resolveImageModel already resolved + trimmed them).
+    const { input_references: _ignoredRefs, ...orExtra } =
+      (providerOptions?.openrouter as Record<string, unknown> | undefined) ??
+      {};
+    // Image-to-image: OpenRouter's Unified Image API conditions on
+    // `input_references` (same endpoint as t2i). References arrive on our
+    // internal `grida` namespace (NEVER spread raw into the body). Each is an
+    // https or base64 data URL. Verified live 2026-07-01.
+    const refs = gridaReferences(providerOptions);
+    const input_references = refs?.map((url) => ({
+      type: "image_url" as const,
+      image_url: { url },
+    }));
+
+    const res = await this.providerHttp.request(OPENROUTER_IMAGE_URL, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${this.apiKey}`,
+        "content-type": "application/json",
+      },
+      signal: abortSignal,
+      body: JSON.stringify({
+        model: this.modelId,
+        prompt,
+        n,
+        ...(size ? { size } : {}),
+        ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
+        ...(seed !== undefined ? { seed } : {}),
+        ...orExtra,
+        // Our sanitized refs win over any passthrough extras (spread last).
+        ...(input_references ? { input_references } : {}),
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `[openrouter] image request failed (${res.status}): ${await safeText(res)}`
+      );
+    }
+    const json = (await res.json()) as {
+      data?: Array<{ b64_json?: string }>;
+    };
+    const images = (json.data ?? [])
+      .map((d) => d.b64_json)
+      .filter((b): b is string => typeof b === "string" && b.length > 0);
+    if (images.length === 0) {
+      throw new Error("[openrouter] response contained no image data");
+    }
+    return {
+      images, // base64 strings — the AI SDK detects the media type
+      warnings: [],
+      response: {
+        timestamp: new Date(),
+        modelId: this.modelId,
+        headers: undefined,
+      },
+      providerMetadata: { openrouter: { images: images.map(() => ({})) } },
+    };
+  }
+}
+
+// ── fal adapter ─────────────────────────────────────────────────────
+
+const FAL_QUEUE_BASE = "https://queue.fal.run";
+/** Hosts fal responses may point us at (queue + media CDN). A response that
+ *  redirects elsewhere must not receive the key or a sidecar fetch. */
+const FAL_HOSTS = ["*.fal.run", "fal.run", "fal.media", "*.fal.media"] as const;
+/** Total poll budget. fal image jobs are typically seconds; cap to stay bounded. */
+const FAL_POLL_TIMEOUT_MS = 120_000;
+/** GPT Image 2.5 includes the slower Sunburst renderer. Give this family the
+ * same bounded queue budget as fal's longer-running media jobs. */
+const FAL_GPT_IMAGE_2_5_POLL_TIMEOUT_MS = 600_000;
+const FAL_POLL_INTERVAL_MS = 1_000;
+const FAL_GPT_IMAGE_2_5_ROUTE =
+  /^openai\/gpt-image-2\.5\/(?:flare|sunburst)\/(?:text-to-image|edit)$/;
+
+type FalSubmitResponse = {
+  request_id: string;
+  status_url: string;
+  response_url: string;
+};
+
+type FalStatus = "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | (string & {});
+
+/**
+ * Minimal `ImageModelV3` over fal's queue REST API.
+ *
+ * `modelId` is the fal endpoint id from the catalog binding, e.g.
+ * `fal-ai/flux-2-pro` or `fal-ai/bytedance/seedream/v4.5/text-to-image`.
+ *
+ * NOTE: like {@link OpenRouterImageModel}, a thrown error may include a truncated
+ * provider response body — NOT model-safe. ImageClient catches and
+ * replaces it with a safe Failure.
+ */
+export class FalImageModel implements ImageModelV3 {
+  readonly specificationVersion = "v3" as const;
+  readonly provider = "fal";
+  readonly maxImagesPerCall = 4;
+
+  constructor(
+    private readonly apiKey: string,
+    readonly modelId: string,
+    private readonly providerHttp: ProviderHttp = new ProviderHttp()
+  ) {}
+
+  private headers(): Record<string, string> {
+    return {
+      authorization: `Key ${this.apiKey}`,
+      "content-type": "application/json",
+    };
+  }
+
+  async doGenerate(
+    options: ImageModelV3CallOptions
+  ): Promise<Awaited<ReturnType<ImageModelV3["doGenerate"]>>> {
+    const { prompt, n, size, aspectRatio, seed, providerOptions, abortSignal } =
+      options;
+
+    const isGptImage25 = FAL_GPT_IMAGE_2_5_ROUTE.test(this.modelId);
+    // These routes expose image_size, not aspect_ratio or seed. A typed SDK
+    // control must not be sent as an undocumented field and silently ignored.
+    if (isGptImage25 && aspectRatio !== undefined) {
+      throw new Error(
+        "[fal] GPT Image 2.5 does not support aspectRatio; use an explicit size instead"
+      );
+    }
+    if (isGptImage25 && seed !== undefined) {
+      throw new Error("[fal] GPT Image 2.5 does not support seed");
+    }
+    // An omitted SDK size means Auto in the UI. GPT Image 2.5's t2i default
+    // is landscape_4_3, so send auto explicitly instead of accepting that default.
+    const image_size =
+      (size ? whFromSize(size) : undefined) ??
+      (isGptImage25 ? "auto" : undefined);
+    // Curated, capped references from the internal namespace are authoritative.
+    // A passthrough image_urls field must not inject or replace those inputs.
+    // Keep sync_mode at its false default: this adapter consumes CDN results.
+    const {
+      image_urls: _ignoredRefs,
+      sync_mode: _ignoredSync,
+      ...falExtra
+    } = (providerOptions?.fal as Record<string, unknown> | undefined) ?? {};
+    const acceptsReferences = isGptImage25 && this.modelId.endsWith("/edit");
+    const refs = gridaReferences(providerOptions);
+
+    // Only these researched edit schemas consume image_urls. Keep other routes
+    // closed so adding a catalog binding cannot silently degrade i2i to t2i.
+    if (refs && !acceptsReferences) {
+      throw new Error(
+        "[fal] image-to-image references are not supported on this fal route"
+      );
+    }
+    if (acceptsReferences && (!refs || refs.length > 16)) {
+      throw new Error(
+        "[fal] GPT Image 2.5 edits require 1–16 reference images"
+      );
+    }
+
+    // 1. submit
+    const submitRes = await this.providerHttp.request(
+      `${FAL_QUEUE_BASE}/${this.modelId}`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        signal: abortSignal,
+        body: JSON.stringify({
+          prompt,
+          num_images: n,
+          ...(image_size ? { image_size } : {}),
+          ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
+          ...(seed !== undefined ? { seed } : {}),
+          ...falExtra,
+          ...(refs ? { image_urls: refs } : {}),
+        }),
+      }
+    );
+    if (!submitRes.ok) {
+      throw new Error(
+        `[fal] submit failed (${submitRes.status}): ${await safeText(submitRes)}`
+      );
+    }
+    const submit = (await submitRes.json()) as FalSubmitResponse;
+
+    // GRIDA-SEC-004: the key-bearing poll/result fetches use URLs from the
+    // response body — pin them to fal hosts so a hostile response can't exfil
+    // the key or drive the sidecar to an arbitrary origin.
+    assertAllowedUrl(submit.status_url, FAL_HOSTS, "[fal] status_url");
+    assertAllowedUrl(submit.response_url, FAL_HOSTS, "[fal] response_url");
+
+    // 2. poll until COMPLETED (bounded, abort-aware)
+    await pollQueue<{ status: FalStatus }>(
+      submit.status_url,
+      {
+        headers: this.headers(),
+        timeoutMs: isGptImage25
+          ? FAL_GPT_IMAGE_2_5_POLL_TIMEOUT_MS
+          : FAL_POLL_TIMEOUT_MS,
+        intervalMs: FAL_POLL_INTERVAL_MS,
+        label: "[fal]",
+        classify: falQueueOutcome,
+        fetch: this.providerHttp.request,
+      },
+      abortSignal
+    );
+
+    // 3. fetch the result, download each image to bytes
+    const resultRes = await this.providerHttp.request(submit.response_url, {
+      headers: this.headers(),
+      signal: abortSignal,
+    });
+    if (!resultRes.ok) {
+      throw new Error(
+        `[fal] result fetch failed (${resultRes.status}): ${await safeText(resultRes)}`
+      );
+    }
+    const result = (await resultRes.json()) as {
+      images?: Array<{ url?: string; content_type?: string }>;
+    };
+    const entries = result.images ?? [];
+    if (entries.length === 0) {
+      throw new Error("[fal] response contained no image");
+    }
+    // Keep every provider-result URL in one credential-free bounded batch; the
+    // batch refuses excessive count/aggregate bytes and consumes sequentially.
+    const urls = entries.map((img) => {
+      const value = img.url ?? "";
+      assertAllowedUrl(value, FAL_HOSTS, "[fal] image url");
+      return new URL(value);
+    });
+    const downloaded = await this.providerHttp.downloadProviderAssets(urls, {
+      signal: abortSignal,
+    });
+    const images = downloaded.map((image) => image.data);
+
+    return {
+      images,
+      warnings: [],
+      response: {
+        timestamp: new Date(),
+        modelId: this.modelId,
+        headers: undefined,
+      },
+      providerMetadata: {
+        fal: { images: entries.map((e) => ({ content_type: e.content_type })) },
+      },
+    };
+  }
+}
+
+// ── helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Pull image-to-image reference URLs off our INTERNAL `grida` provider-options
+ * namespace. The host (`createImageGenerator`) puts the curated board's
+ * references here as https or base64 data URLs; adapters map them to each
+ * provider's own field (OpenRouter `input_references`, fal `image_urls`). This
+ * namespace is never forwarded raw to a provider. Returns `undefined` when
+ * there are no usable references.
+ */
+function gridaReferences(
+  providerOptions: ImageModelV3CallOptions["providerOptions"]
+): string[] | undefined {
+  const raw = (providerOptions?.grida as Record<string, unknown> | undefined)
+    ?.references;
+  if (!Array.isArray(raw)) return undefined;
+  const urls = raw.filter(
+    (u): u is string => typeof u === "string" && u.length > 0
+  );
+  return urls.length > 0 ? urls : undefined;
+}
+
+function whFromSize(
+  size: `${number}x${number}`
+): { width: number; height: number } | undefined {
+  const [w, h] = size.split("x").map(Number);
+  // `size` is typed `${number}x${number}` but reaches here from a runtime
+  // call-options value — a malformed one (`"auto"`, unicode `×`) yields NaN.
+  // Omit `image_size` rather than post NaN dimensions to fal.
+  if (!Number.isFinite(w) || !Number.isFinite(h)) return undefined;
+  return { width: w, height: h };
+}

@@ -32,6 +32,16 @@
         "types": "./dist/node.d.cts",
         "default": "./dist/node.cjs"
       }
+    },
+    "./providers": {
+      "import": {
+        "types": "./dist/providers.d.mts",
+        "default": "./dist/providers.mjs"
+      },
+      "require": {
+        "types": "./dist/providers.d.cts",
+        "default": "./dist/providers.cjs"
+      }
     }
   },
   "scripts": {
@@ -40,7 +50,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json"
   },
   "dependencies": {
-    "@grida/home": "workspace:*"
+    "@grida/home": "workspace:*",
+    "smol-toml": "1.8.0"
   },
   "devDependencies": {
     "tsdown": "^0.22.1",

@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 /**
  * GRIDA-SEC-004 — supervisor-owned, per-command shell confinement.
  *
@@ -43,6 +44,8 @@ type WrappedCommand = Readonly<{
 export type AgentCommandHostOptions = Readonly<{
   scratchBase: string;
   userData: string;
+  /** Shared provider store; never a workspace or finite-worker capability. */
+  providerRoot?: string;
   mediaRoot: string;
   home: string;
   filesystemPolicy: FilesystemPolicy;
@@ -94,6 +97,7 @@ export class AgentCommandHost {
 
   private readonly scratchBase: string;
   private readonly userData: string;
+  private readonly providerRoot: string;
   private readonly mediaRoot: string;
   private readonly home: string;
   private readonly filesystemPolicy: FilesystemPolicy;
@@ -106,6 +110,9 @@ export class AgentCommandHost {
   constructor(options: AgentCommandHostOptions) {
     this.scratchBase = path.resolve(options.scratchBase);
     this.userData = path.resolve(options.userData);
+    this.providerRoot = path.resolve(
+      options.providerRoot ?? path.join(options.userData, "providers")
+    );
     this.mediaRoot = path.resolve(options.mediaRoot);
     this.home = path.resolve(options.home);
     this.filesystemPolicy = options.filesystemPolicy;
@@ -179,6 +186,7 @@ export class AgentCommandHost {
     scratchRoot?: string;
     scratchBase: string;
     userData: string;
+    providerRoot: string;
     mediaRoot: string;
     cwd: string;
   }> {
@@ -195,7 +203,18 @@ export class AgentCommandHost {
       "workspace"
     );
     const userData = await realpathNearest(this.userData);
+    const providerRoot = await realpathNearest(this.providerRoot);
     const mediaRoot = await realpathNearest(this.mediaRoot);
+    for (const root of [workspaceRoot, expectedScratchBase, mediaRoot]) {
+      if (
+        containsPath(providerRoot, root) ||
+        containsPath(root, providerRoot)
+      ) {
+        throw new Error(
+          "command authority overlaps the provider credential root"
+        );
+      }
+    }
     if (
       containsPath(userData, workspaceRoot) ||
       containsPath(workspaceRoot, userData)
@@ -264,6 +283,7 @@ export class AgentCommandHost {
       scratchRoot,
       scratchBase: expectedScratchBase,
       userData,
+      providerRoot,
       mediaRoot,
       cwd,
     };
@@ -275,6 +295,7 @@ export class AgentCommandHost {
       scratchRoot?: string;
       scratchBase: string;
       userData: string;
+      providerRoot: string;
       mediaRoot: string;
     },
     commandTemp: string
@@ -312,6 +333,7 @@ export class AgentCommandHost {
         denyRead: uniquePaths([
           ...this.filesystemPolicy.deny_read,
           grant.userData,
+          grant.providerRoot,
           grant.mediaRoot,
           grant.scratchBase,
           ...sharedWriteDefaults,
@@ -327,6 +349,7 @@ export class AgentCommandHost {
         denyWrite: uniquePaths([
           ...this.filesystemPolicy.deny_write,
           grant.userData,
+          grant.providerRoot,
           grant.mediaRoot,
           ...sharedWriteDefaults,
         ]),

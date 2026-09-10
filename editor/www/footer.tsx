@@ -137,12 +137,6 @@ export default function Footer() {
                 >
                   Figma Assistant
                 </Link>
-                <Link
-                  href={sitemap.links.figma_ci}
-                  className="text-xs md:text-sm text-muted-foreground"
-                >
-                  Figma Ci
-                </Link>
               </FooterColumn>
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Contact</h3>

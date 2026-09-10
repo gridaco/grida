@@ -1,3 +1,4 @@
+// GRIDA-SEC-004 / GRIDA-SEC-014 — finite workers cannot read shared provider custody.
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +15,7 @@ describe("AgentCommandHost", () => {
   let root: string;
   let userData: string;
   let mediaRoot: string;
+  let providerRoot: string;
   let scratchBase: string;
   let workspaceA: string;
   let workspaceB: string;
@@ -24,15 +26,22 @@ describe("AgentCommandHost", () => {
     root = await fs.mkdtemp(path.join(os.tmpdir(), "grida-command-host-"));
     userData = path.join(root, "userdata");
     mediaRoot = path.join(root, "media");
+    providerRoot = path.join(root, "shared-providers");
     scratchBase = path.join(root, "scratch-base");
     workspaceA = path.join(root, "workspace-a");
     workspaceB = path.join(root, "workspace-b");
     scratchA = path.join(scratchBase, "sessions", "ses_A", "scratch");
     scratchB = path.join(scratchBase, "sessions", "ses_B", "scratch");
     await Promise.all(
-      [userData, mediaRoot, workspaceA, workspaceB, scratchA, scratchB].map(
-        (dir) => fs.mkdir(dir, { recursive: true })
-      )
+      [
+        userData,
+        mediaRoot,
+        providerRoot,
+        workspaceA,
+        workspaceB,
+        scratchA,
+        scratchB,
+      ].map((dir) => fs.mkdir(dir, { recursive: true }))
     );
   });
 
@@ -110,6 +119,12 @@ describe("AgentCommandHost", () => {
       await fs.realpath(workspaceB)
     );
     expect(policy?.filesystem?.denyRead).toContain(
+      await fs.realpath(providerRoot)
+    );
+    expect(policy?.filesystem?.denyWrite).toContain(
+      await fs.realpath(providerRoot)
+    );
+    expect(policy?.filesystem?.denyRead).toContain(
       await fs.realpath(mediaRoot)
     );
     expect(policy?.filesystem?.denyWrite).toContain(
@@ -121,6 +136,15 @@ describe("AgentCommandHost", () => {
     expect(policy?.filesystem?.allowWrite).not.toContain(
       await fs.realpath(mediaRoot)
     );
+  });
+
+  it("refuses a workspace inside shared provider custody", async () => {
+    await expect(
+      commandHost().shellExecutor(
+        { cmd: "pwd", args: [], cwd: providerRoot },
+        { ...scopeA(), workspace_root: providerRoot }
+      )
+    ).rejects.toThrow("provider credential root");
   });
 
   it("refuses a cwd in another registered session workspace", async () => {
@@ -270,6 +294,7 @@ describe("AgentCommandHost", () => {
     return new AgentCommandHost({
       scratchBase,
       userData,
+      providerRoot,
       mediaRoot,
       home: root,
       filesystemPolicy: {

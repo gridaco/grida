@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 /**
  * GRIDA-SEC-004 — Desktop's fail-closed outer-sandbox authority intent.
  */
@@ -8,6 +9,7 @@ import path from "node:path";
 export namespace DesktopAgentSandboxPolicy {
   export function build(input: {
     userData: string;
+    providerRoot?: string;
     mediaRoot: string;
     home: string;
     ggHost: string;
@@ -27,6 +29,9 @@ export namespace DesktopAgentSandboxPolicy {
       direct_network_access: "none",
     });
     const mediaRoot = path.resolve(input.mediaRoot);
+    const providerRoot = path.resolve(
+      input.providerRoot ?? path.join(input.userData, "providers")
+    );
     return {
       ...policy,
       filesystem: {
@@ -37,8 +42,13 @@ export namespace DesktopAgentSandboxPolicy {
         allow_read: uniquePaths([
           ...(policy.filesystem.allow_read ?? []),
           mediaRoot,
+          providerRoot,
         ]),
-        allow_write: uniquePaths([...policy.filesystem.allow_write, mediaRoot]),
+        allow_write: uniquePaths([
+          ...policy.filesystem.allow_write,
+          mediaRoot,
+          providerRoot,
+        ]),
       },
     };
   }

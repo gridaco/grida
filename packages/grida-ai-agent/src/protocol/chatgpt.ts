@@ -11,6 +11,22 @@
 
 export const CHATGPT_PROVIDER_ID = "chatgpt" as const;
 
+/** Native-host auth wire paths; knowledge of a path grants no daemon authority. */
+export const CHATGPT_AUTH_ROUTE_PATHS = Object.freeze({
+  start: "/auth/chatgpt/start",
+  complete: "/auth/chatgpt/complete",
+  cancel: "/auth/chatgpt/cancel",
+  status: "/auth/chatgpt/status",
+  sign_out: "/auth/chatgpt/sign-out",
+} as const);
+
+/** Native-host ceremony response; contains no access or refresh credential. */
+export type ChatGptAuthStart = {
+  attempt_id: string;
+  state: string;
+  authorization_url: string;
+};
+
 export const CHATGPT_PROVIDER_METADATA = {
   id: CHATGPT_PROVIDER_ID,
   label: "ChatGPT",

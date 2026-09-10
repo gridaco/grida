@@ -1,3 +1,4 @@
+// GRIDA-SEC-004 — composed daemon perimeter, shared 3D SDK, and host-owned storage.
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -112,6 +113,13 @@ describe("createAgentDaemon media-root forwarding", () => {
     });
     expect(generated.status).toBe(200);
     const result = (await generated.json()) as ThreeDGenerateResult;
+    expect(result.model_id).toBe("fal-ai/hunyuan-3d/v3.1/pro/text-to-3d");
+    expect(result.provider_id).toBe("fal");
+    expect(Object.keys(result.glb).sort()).toEqual([
+      "base64",
+      "file_name",
+      "media_type",
+    ]);
     expect(result.glb.base64).toBe(Buffer.from(GLB_BYTES).toString("base64"));
     expect(result.stored_media).toMatchObject({
       file_name: "model.glb",
@@ -123,7 +131,13 @@ describe("createAgentDaemon media-root forwarding", () => {
       result.stored_media!.id
     );
     expect(stored.bytes).toEqual(GLB_BYTES);
+    expect(request).toHaveBeenCalledTimes(3);
     expect(download).toHaveBeenCalledOnce();
+    expect(
+      new Headers(download.mock.calls[0][1]?.headers).get("authorization")
+    ).toBeNull();
+    expect(JSON.stringify(result)).not.toContain("fal-secret");
+    expect(JSON.stringify(result)).not.toContain(GLB_URL);
   });
 });
 

@@ -148,7 +148,7 @@ describe("resolveImageModel", () => {
     });
   });
 
-  it("resolves the only connected provider (one key serves the list)", async () => {
+  it("resolves the matching route with only its provider connected", async () => {
     const r = await resolveImageModel(
       { secrets: fakeSecrets({ fal: "sk-fal" }) },
       LISTED
@@ -156,7 +156,8 @@ describe("resolveImageModel", () => {
     expect(r.provider_id).toBe("fal");
     expect(r.model_id).toBe(LISTED);
     expect(r.binding_id).toBe("fal-ai/gpt-image-2");
-    expect(r.model.provider).toBe("fal");
+    expect(r.generate).toBeTypeOf("function");
+    expect(r).not.toHaveProperty("model");
   });
 
   it("follows precedence when multiple keys exist (openrouter before fal)", async () => {
@@ -240,24 +241,20 @@ describe("resolveImageModel", () => {
           id,
           { explicit, background: "transparent" }
         );
-        const generated = await resolved.model.doGenerate({
+        const generated = await resolved.generate({
           prompt: "an isolated sticker",
           n: 1,
           size: "1536x1024",
-          aspectRatio: undefined,
-          seed: undefined,
-          files: undefined,
-          mask: undefined,
-          providerOptions: {
-            openai: {
-              quality: "max",
-              background: "opaque",
-              output_format: "jpeg",
-            },
-            gg: { quality: "max", background: "opaque", output_format: "jpeg" },
-          },
+          quality: "max",
         });
-        expect(generated.images).toEqual([TRANSPARENT_PNG_BASE64]);
+        expect(generated.images).toEqual([
+          {
+            data: Uint8Array.from(
+              Buffer.from(TRANSPARENT_PNG_BASE64, "base64")
+            ),
+            media_type: "image/png",
+          },
+        ]);
         expect(request).toHaveBeenCalledOnce();
         expect(download).not.toHaveBeenCalled();
         const body = JSON.parse(String(request.mock.calls[0]?.[1]?.body));
@@ -416,7 +413,7 @@ describe("resolveImageModel", () => {
         resolveImageModel({ secrets: fakeSecrets({ vercel: "sk-v" }) }, id, {
           references: true,
         })
-      ).rejects.toThrow(/reference images.*connect a key for: .*openrouter/is);
+      ).rejects.toThrow(/reference images/is);
       const gg = new GridaGatewaySessionStore();
       gg.set({ access_token: "token", expires_at: Date.now() + 900_000 });
       await expect(
@@ -456,15 +453,14 @@ describe("resolveImageModel", () => {
       ).rejects.toBeInstanceOf(ImageModelUnavailableError);
     });
 
-    it("names the i2i-capable provider(s) when an i2i resolution fails", async () => {
-      // A fal-only user picks references → no fal i2i route. The error must tell
-      // the agent WHICH key unlocks i2i (openrouter today), not a bare
-      // "unavailable", so it can ask the user to connect the right provider.
+    it("keeps an actionable reference capability message when resolution fails", async () => {
+      // The agent preserves a reference-specific hint without duplicating
+      // shared provider capability resolution in its error formatting.
       await expect(
         resolveImageModel({ secrets: fakeSecrets({ fal: "sk-fal" }) }, LISTED, {
           references: true,
         })
-      ).rejects.toThrow(/reference images.*connect a key for: .*openrouter/is);
+      ).rejects.toThrow(/reference images/i);
     });
 
     it("leaves references_max unset for a plain t2i resolution", async () => {

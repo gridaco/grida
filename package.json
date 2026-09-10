@@ -1,5 +1,5 @@
 {
-  "name": "grida",
+  "name": "grida-workspace",
   "private": true,
   "license": "Apache 2.0",
   "scripts": {
@@ -14,7 +14,7 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "prepare": "lefthook install --force",
-    "publish-packages": "turbo run build test && pnpm lint && changeset version && changeset publish",
+    "publish-packages": "turbo run build test && pnpm lint && changeset version && node scripts/publish-packages.mjs",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck"
   },

@@ -6,6 +6,9 @@ import type { Socket } from "node:net";
 import { AuthClient } from "./auth-client";
 import { CredentialStore } from "./credential-store";
 
+// GRIDA-SEC-014 — shared writer exclusion, independent of account lifecycle.
+export { CredentialLock } from "./credential-lock";
+
 /** Native adapter; credentials and browser launch remain explicit host capabilities. */
 export function createNativeAuth(
   config: AuthClient.Config,

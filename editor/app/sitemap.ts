@@ -80,11 +80,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
-      url: "https://grida.co/figma/ci",
-      changeFrequency: "monthly",
-      priority: 0.5,
-    },
-    {
       url: "https://grida.co/figma/assistant",
       changeFrequency: "monthly",
       priority: 0.5,

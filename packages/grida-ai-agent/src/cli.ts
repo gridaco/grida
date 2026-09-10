@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-GG: provider — the `--editor-base-url` GG base URL flag (docs/wg/platform/hosted-ai.md)
 /**
  * grida-agent CLI — the canonical, host-agnostic entrypoint to the agent
@@ -64,6 +65,7 @@ export type CliWriter = { write(text: string): void };
 type CliConfig = {
   password: string;
   user_data_path: string;
+  provider_home: string;
 };
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -527,6 +529,7 @@ async function createHost(
   return createAgentDaemon({
     password: config.password,
     user_data_path: config.user_data_path,
+    provider_home: config.provider_home,
     http_access: {
       // The canonical local-client origin is always admitted; additional
       // origins (e.g. a dev web client) are an explicit serve-time opt-in.
@@ -606,8 +609,13 @@ function readConfig(): CliConfig {
   const password =
     process.env.GRIDA_AGENT_PASSWORD ??
     crypto.randomBytes(32).toString("base64url");
-  const userDataPath = process.env.GRIDA_AGENT_USER_DATA ?? home.join("agent");
-  return { password, user_data_path: userDataPath };
+  const isolated = process.env.GRIDA_AGENT_USER_DATA;
+  const userDataPath = isolated ?? home.join("agent");
+  return {
+    password,
+    user_data_path: userDataPath,
+    provider_home: isolated ?? home.dir(),
+  };
 }
 
 async function waitForShutdown(

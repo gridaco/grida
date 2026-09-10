@@ -2,11 +2,10 @@
 /**
  * Shared error posture for hosted and BYOK media-generation routes.
  *
- * Expected GG session/credit failures remain actionable to the renderer. Every
- * other failure logs its detail — which can embed upstream body text
- * (fal/OpenRouter adapters call `safeText(res)`) — in the sidecar ONLY and
- * returns a generic 502. Single-sourced so every media route keeps the same
- * non-leaking contract without implying that BYOK failures belong to GG.
+ * Callers supply safely projected failures; raw upstream errors must never be
+ * passed here. Expected GG session/credit failures remain actionable to the
+ * renderer. Every other failure logs its supplied safe detail in the sidecar
+ * and returns a generic 502, without implying that BYOK failures belong to GG.
  */
 
 import type { Context } from "hono";

@@ -1,29 +1,19 @@
 /**
- * GRIDA-SEC-004 — ElevenLabs Text to Speech generation and voice discovery.
+ * GRIDA-SEC-004 — ElevenLabs speech generation and voice discovery.
  *
- * The route receives only the BYOK secrets authority needed to resolve the
- * user's ElevenLabs key. Provider credentials and unprojected voice metadata
- * never cross to the renderer.
+ * The public operation owns model/input validation, credential selection, and
+ * provider execution. This host route owns HTTP shape, renderer wire values,
+ * and optional persistence; it receives no GG authority.
  */
 
 import type { Context, Hono } from "hono";
-import { models } from "@grida/ai-models";
+import { TextToSpeechClient } from "@grida/ai";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
-import type {
-  TextToSpeechGenerateRequest,
-  TextToSpeechGenerateResult,
-  TextToSpeechListVoicesResult,
-} from "../../protocol/text-to-speech";
-import { ElevenLabsTextToSpeechProvider } from "../../providers/elevenlabs-text-to-speech";
+import type { TextToSpeechListVoicesResult } from "../../protocol/text-to-speech";
 import { ProviderHttp } from "../../providers/http";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
 import { mediaGenerationError } from "./media-generation-errors";
-
-const TEXT_TO_SPEECH_MODEL_IDS = models.audio.text_to_speech.model_ids;
-const MAX_TEXT_CHARACTERS =
-  models.audio.text_to_speech.models.eleven_v3.input.max_characters;
-const MAX_VOICE_ID_CHARACTERS = 256;
 
 export type TextToSpeechRoutesDeps = {
   secrets: SecretsStore;
@@ -35,36 +25,31 @@ export function registerTextToSpeechRoutes(
   app: Hono,
   deps: TextToSpeechRoutesDeps
 ) {
-  const providerHttp = deps.provider_http ?? new ProviderHttp();
+  const speech = new TextToSpeechClient({
+    keys: { get: (provider) => deps.secrets._getKey(provider) },
+    http: deps.provider_http ?? new ProviderHttp(),
+  });
 
   app.get("/audio/text-to-speech/voices", async (c) => {
-    const apiKey = await deps.secrets._getKey("elevenlabs");
-    if (!apiKey?.trim()) return providerKeyRequired(c);
-
     try {
-      const voices = await new ElevenLabsTextToSpeechProvider(
-        apiKey.trim(),
-        providerHttp
-      ).listVoices(c.req.raw.signal);
+      const voices = await speech.listVoices({
+        provider: "elevenlabs",
+        signal: c.req.raw.signal,
+      });
       const result: TextToSpeechListVoicesResult = {
         provider_id: "elevenlabs",
-        voices,
+        voices: voices.map(({ voice_id, name }) => ({ voice_id, name })),
       };
       return c.json(result);
     } catch (error) {
-      if ((error as { code?: unknown })?.code === "provider_access_denied") {
-        return c.json(
-          {
-            error: "provider_access_denied: provider access denied",
-            code: "provider_access_denied" as const,
-            provider_id: "elevenlabs" as const,
-          },
-          403
-        );
-      }
-      const detail = error instanceof Error ? error.message : String(error);
+      const accessError = providerAccessError(c, error);
+      if (accessError) return accessError;
+      const failure =
+        error instanceof TextToSpeechClient.Failure
+          ? error
+          : new TextToSpeechClient.Failure("generation_failed");
       console.error(
-        `[agent-host-text-to-speech] failed provider=elevenlabs operation=list-voices: ${detail}`
+        `[agent-host-text-to-speech] failed provider=elevenlabs operation=list-voices: ${failure.code}`
       );
       return c.json(
         { error: "voice listing failed", provider_id: "elevenlabs" },
@@ -75,79 +60,90 @@ export function registerTextToSpeechRoutes(
 
   app.post("/audio/text-to-speech/generate", async (c) => {
     const r = await body(c, {
-      model_id: v.oneOf(TEXT_TO_SPEECH_MODEL_IDS),
+      model_id: v.string,
       voice_id: v.string,
       text: v.string,
     });
     if (!r.ok) return r.res;
-
-    const voiceId = r.data.voice_id.trim();
-    if (!voiceId) return c.json({ error: "voice_id must not be blank" }, 400);
-    if ([...voiceId].length > MAX_VOICE_ID_CHARACTERS) {
-      return c.json(
-        {
-          error: `voice_id must not exceed ${MAX_VOICE_ID_CHARACTERS} characters`,
-        },
-        400
-      );
-    }
-    if (voiceId === "." || voiceId === "..") {
-      return c.json({ error: "voice_id must not be a dot path segment" }, 400);
-    }
-    if (!r.data.text.trim()) {
-      return c.json({ error: "text must not be blank" }, 400);
-    }
-    if ([...r.data.text].length > MAX_TEXT_CHARACTERS) {
-      return c.json(
-        { error: `text must not exceed ${MAX_TEXT_CHARACTERS} characters` },
-        400
-      );
-    }
-
-    const apiKey = await deps.secrets._getKey("elevenlabs");
-    if (!apiKey?.trim()) return providerKeyRequired(c);
-
-    const request: TextToSpeechGenerateRequest = {
-      model_id: r.data.model_id,
-      voice_id: voiceId,
-      text: r.data.text,
-    };
+    const { model_id, voice_id, text } = r.data;
     try {
-      const audio = await new ElevenLabsTextToSpeechProvider(
-        apiKey.trim(),
-        providerHttp
-      ).generate(request, c.req.raw.signal);
+      const operation = await speech.resolve({
+        model_id,
+        provider: "elevenlabs",
+        voice_id,
+      });
+      const result = await operation.generate({
+        text,
+        signal: c.req.raw.signal,
+      });
+      const audio = {
+        base64: Buffer.from(result.audio.data).toString("base64"),
+        media_type: result.audio.media_type,
+        file_name: "speech.mp3",
+      };
       const storedMedia = await GeneratedMediaPersistence.save(
         deps.media,
         audio
       );
-      const result: TextToSpeechGenerateResult = {
-        model_id: request.model_id,
-        provider_id: "elevenlabs",
-        voice_id: request.voice_id,
+      return c.json({
+        model_id: operation.model_id,
+        provider_id: operation.provider_id,
+        voice_id: operation.voice_id,
         audio,
         ...(storedMedia ? { stored_media: storedMedia } : {}),
-      };
-      return c.json(result);
+      });
     } catch (error) {
+      const accessError = providerAccessError(c, error);
+      if (accessError) return accessError;
+      if (error instanceof TextToSpeechClient.Failure) {
+        if (error.code === "invalid_input") {
+          return c.json(
+            { error: "invalid text-to-speech input", code: error.code },
+            400
+          );
+        }
+        if (error.code === "model_unavailable") {
+          return c.json(
+            { error: "text-to-speech model is unavailable", model_id },
+            400
+          );
+        }
+      }
       return mediaGenerationError(c, {
-        error,
+        error:
+          error instanceof TextToSpeechClient.Failure
+            ? error
+            : new TextToSpeechClient.Failure("generation_failed"),
         scope: "agent-host-text-to-speech",
         label: "text-to-speech generation failed",
-        model_id: request.model_id,
+        model_id,
         provider_id: "elevenlabs",
       });
     }
   });
 }
 
-function providerKeyRequired(c: Context): Response {
-  return c.json(
-    {
-      error: "no ElevenLabs key is connected",
-      code: "provider_key_required" as const,
-      provider_id: "elevenlabs" as const,
-    },
-    400
-  );
+function providerAccessError(c: Context, error: unknown): Response | null {
+  if (!(error instanceof TextToSpeechClient.Failure)) return null;
+  if (error.code === "provider_key_required") {
+    return c.json(
+      {
+        error: "no ElevenLabs key is connected",
+        code: error.code,
+        provider_id: "elevenlabs",
+      },
+      400
+    );
+  }
+  if (error.code === "provider_access_denied") {
+    return c.json(
+      {
+        error: "provider_access_denied: provider access denied",
+        code: error.code,
+        provider_id: "elevenlabs",
+      },
+      403
+    );
+  }
+  return null;
 }

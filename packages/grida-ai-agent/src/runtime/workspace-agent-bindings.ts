@@ -1,3 +1,4 @@
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-GG: provider — thread the `gg` session deps into image gen (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — workspace-bound agent bindings.
@@ -11,9 +12,8 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { lstatSync, realpathSync } from "node:fs";
 import { realpath } from "node:fs/promises";
-import { generateImage } from "ai";
 import { AgentFs } from "../fs";
-import { containsPath } from "@grida/daemon/server";
+import { containsPath, ProtectedRoots } from "@grida/daemon/server";
 import { isProtectedWrite } from "../fs/scope";
 import { isReadOnlyCommand } from "@grida/daemon/server";
 import { AgentTodos } from "../todos";
@@ -118,6 +118,8 @@ export async function createWorkspaceAgentBindings(
      * runtime; absent on the no-bindings path. See `shell/runner.ts`.
      */
     secrets_root?: string;
+    /** GRIDA-SEC-014 — shared provider custody is separate from chat state. */
+    protected_read_roots?: readonly string[];
     /**
      * GRIDA-SEC-004 — host-owned finite-command capability. When absent,
      * `run_command` is withheld. A Desktop host supplies an OS-confined
@@ -222,7 +224,8 @@ export async function createWorkspaceAgentBindings(
     new WorkspaceAgentFsBackend(
       workspace,
       scratchDir ? [{ id: "scratch", root: scratchDir }] : [],
-      directoryScopes
+      directoryScopes,
+      deps.protected_read_roots
     ),
     {
       write_guard: (pathname) => {
@@ -249,7 +252,10 @@ export async function createWorkspaceAgentBindings(
             workspace_root: workspace.root,
             scratch_root: scratchDir,
             scratch_base: scratchBase,
-            protected_read_roots: deps.secrets_root ? [deps.secrets_root] : [],
+            protected_read_roots: [
+              ...(deps.secrets_root ? [deps.secrets_root] : []),
+              ...(deps.protected_read_roots ?? []),
+            ],
             executor: deps.shell_executor,
             // Flush the agent fs's pending writes before a command runs, so a
             // script the agent just wrote via write_file is on disk when the
@@ -279,7 +285,7 @@ export async function createWorkspaceAgentBindings(
   // modality, a scratch sink exists (produced bytes land there — S3), and the
   // user actually holds a provider key. The last check mirrors vision's
   // `bytesReadable` gate — never advertise a producer that would refuse every
-  // call. The async key probe is cheap (a file read of auth.json).
+  // call. The key probe reads the shared native provider store.
   let image_gen: AgentGen.ImageGenerator | undefined;
   if (workspace && deps.image_gen_enabled && deps.secrets && scratchDir) {
     const secrets = deps.secrets;
@@ -411,9 +417,8 @@ function extForMime(mime: string): string {
  * pixels to a media block. Expected failures (no key, provider error) come back
  * as the typed `ok: false` — never thrown into the agent loop.
  *
- * NB billing (#908): like `/images/generate`, this calls `generateImage` WITHOUT
- * `providerOptions.grida`, so the user's own key pays the provider and no Grida
- * credit is metered. Do not add `providerOptions.grida` here.
+ * Provider shaping, credentials, safe failures and paid-request retry policy
+ * belong to @grida/ai. This adapter owns reference reads and scratch persistence.
  */
 function createImageGenerator(
   imageDeps: import("../providers/resolve-image").ResolveImageDeps,
@@ -441,8 +446,8 @@ function createImageGenerator(
       }
       // Image-to-image when the host supplied reference images (the curated
       // board's pins). The model-facing tool carries intent only; references are
-      // resolved below and ride our internal `grida` provider-options namespace,
-      // which the BYOK adapter maps to the provider's own field.
+      // resolved below and passed to the shared image operation, which maps
+      // them to the provider's own field.
       const wantsRefs = (input.references?.length ?? 0) > 0;
       let resolved;
       try {
@@ -462,7 +467,11 @@ function createImageGenerator(
                 : `No connected provider can generate "${modelId}". Ask the user to connect an image-provider key in settings.`,
           };
         }
-        throw e;
+        return {
+          ok: false,
+          reason: "generation_failed",
+          message: "Image generation could not access its provider.",
+        };
       }
       // Resolve each reference to something a provider can ingest. The caller
       // passes dumb inputs — a workspace path, an https URL, or a data URL — and
@@ -488,25 +497,12 @@ function createImageGenerator(
       }
       let generation;
       try {
-        // TODO(image-quality): pin a `quality: "medium"` default for gpt-image-2
-        // instead of inheriting the provider default (OpenAI defaults to high/auto
-        // → pricier; the catalog's avg_cost_usd is the medium tier). Quality is an
-        // OpenAI-specific knob (low|medium|high|auto) and the resolved provider
-        // varies (vercel `openai` ns / openrouter `orExtra` / fal `falExtra`), so
-        // it must be threaded per-namespace. Track + add later.
-        generation = await generateImage({
-          model: resolved.model,
+        generation = await resolved.generate({
           prompt: input.prompt,
           n: 1,
-          ...(references ? { providerOptions: { grida: { references } } } : {}),
+          ...(references ? { references } : {}),
         });
-      } catch (e) {
-        // Upstream detail (may embed provider body text) stays in the sidecar
-        // log only; the model gets a generic, actionable message.
-        const detail = e instanceof Error ? e.message : String(e);
-        console.error(
-          `[agent-host-image-gen] generation failed provider=${resolved.provider_id} model=${modelId}: ${detail}`
-        );
+      } catch {
         return {
           ok: false,
           reason: "generation_failed",
@@ -521,18 +517,16 @@ function createImageGenerator(
           message: "The provider returned no image.",
         };
       }
-      const bytes = file.uint8Array;
+      const bytes = file.data;
       // Sniff for the honest mime + dimensions; fall back to the provider's
       // declared media type when the format isn't one we parse.
       const sniffed = AgentVision.sniff(bytes);
-      const mime = sniffed?.mime ?? file.mediaType;
+      const mime = sniffed?.mime ?? file.media_type;
       const filename = `image-${Date.now()}.${extForMime(mime)}`;
       let savedPath: string;
       try {
         savedPath = await writeScratchFile(scratchDir, filename, bytes);
-      } catch (e) {
-        const detail = e instanceof Error ? e.message : String(e);
-        console.error(`[agent-host-image-gen] scratch write failed: ${detail}`);
+      } catch {
         return {
           ok: false,
           reason: "generation_failed",
@@ -551,7 +545,7 @@ function createImageGenerator(
         ...(sniffed?.width ? { width: sniffed.width } : {}),
         ...(sniffed?.height ? { height: sniffed.height } : {}),
         bytes: bytes.byteLength,
-        data: file.base64,
+        data: Buffer.from(file.data).toString("base64"),
       };
     },
   };
@@ -570,7 +564,7 @@ export class ReferenceResolveError extends Error {}
  *     fetch.
  *   - a **data:** URL is decoded and validated exactly like a file (size cap +
  *     image sniff), then re-emitted canonically — so a non-image or oversized
- *     data URL can't skip the checks a path gets and reach `generateImage()`.
+ *     data URL can't skip the checks a path gets and reach image execution.
  *   - a **path** is read via the shared vision {@link AgentVision.ByteReader}
  *     (same scoping + size cap as `view_image`) and inlined as a base64 data URL.
  * Throws {@link ReferenceResolveError} with an agent-readable message when a
@@ -720,6 +714,7 @@ type ResolvedAgentScope =
 
 export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   private readonly directoryScopes: ReadonlyMap<string, DirectoryScopeBinding>;
+  private readonly protectedRoots: ProtectedRoots;
 
   constructor(
     private readonly workspace: Workspace | null,
@@ -738,14 +733,30 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
      * so it never needed this; `read_file` reads the hydrated map, so it did.
      */
     private readonly additionalRoots: ReadonlyArray<workspaceFs.Scope> = [],
-    directoryScopes: readonly DirectoryScopeBinding[] = []
+    directoryScopes: readonly DirectoryScopeBinding[] = [],
+    protectedRoots: readonly string[] = []
   ) {
+    this.protectedRoots = new ProtectedRoots(protectedRoots);
     this.directoryScopes = new Map(
       normalizeDirectoryScopes(directoryScopes).map((scope) => [
         scope.id,
         scope,
       ])
     );
+    // Before AgentFs hydration: no reachable root can contain native credentials.
+    this.assertRootsAllowed();
+  }
+
+  private assertRootsAllowed(): void {
+    const roots = [
+      ...(this.workspace ? [this.workspace.root] : []),
+      ...this.additionalRoots.map((scope) => scope.root),
+      ...[...this.directoryScopes.values()].map((scope) => scope.root),
+    ];
+    for (const root of roots) {
+      if (this.protectedRoots.overlaps(root))
+        throw new Error("agent-fs-overlaps-protected-root");
+    }
   }
 
   /**
@@ -758,6 +769,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
    * Promise.all" failure this guards against.
    */
   async list(): Promise<string[]> {
+    this.assertRootsAllowed();
     const out: string[] = [];
     // The workspace tree — emitted in the fs tools' logical "/"-rooted form.
     let truncated = this.workspace
@@ -788,6 +800,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   }
 
   async list_directory(pathname: string): Promise<AgentFs.ListEntries> {
+    this.assertRootsAllowed();
     try {
       if (pathname === DIRECTORY_REFERENCE_ROOT) {
         return {
@@ -878,6 +891,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
    * AgentFs's in-memory grep and are deliberately not walked again here.
    */
   async grep(args: AgentFs.GrepArgs): Promise<AgentFs.BackendGrepResult> {
+    this.assertRootsAllowed();
     if (args.pattern.length === 0 || this.directoryScopes.size === 0) {
       return { matches: [], paths_scanned: [] };
     }
@@ -1152,6 +1166,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
    * space). `workspaceFs`'s own realpath containment still rejects escapes.
    */
   private scopeFor(p: string): ResolvedAgentScope {
+    this.assertRootsAllowed();
     if (!p.startsWith("/")) {
       throw new Error(`agent-fs path must start with "/": ${p}`);
     }
@@ -1302,6 +1317,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     depth: number,
     out: string[]
   ): Promise<boolean> {
+    this.assertRootsAllowed();
     if (depth > SCAN_MAX_DEPTH) return true;
     let entries: workspaceFs.Entry[];
     try {

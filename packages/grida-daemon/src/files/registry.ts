@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-004 — daemon-side file path registry.
+ * GRIDA-SEC-004 / GRIDA-SEC-014 — daemon-side file path registry.
  *
  * The agent host owns the path↔docId mapping. The client never sees an
  * absolute path; it talks to the agent host by `docId` only. This is what
@@ -31,6 +31,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { ProtectedRoots } from "../protected-roots";
 
 export type RegistryEntry = {
   /** Absolute filesystem path, normalized on first sight. */
@@ -66,6 +67,12 @@ function normalize(filePath: string): string {
 }
 
 export class FileRegistry {
+  private readonly protectedRoots: ProtectedRoots;
+
+  constructor(protectedRoots: readonly string[] = []) {
+    this.protectedRoots = new ProtectedRoots(protectedRoots);
+  }
+
   private state: RegistryState = {
     by_doc_id: new Map(),
     by_path: new Map(),
@@ -78,6 +85,8 @@ export class FileRegistry {
    */
   registerPath(filePath: string): string {
     const normalized = normalize(filePath);
+    if (this.protectedRoots.overlaps(normalized))
+      throw new Error("file-overlaps-protected-root");
     const existing = this.state.by_path.get(normalized);
     if (existing) return existing;
     const docId = crypto.randomUUID();
@@ -87,7 +96,15 @@ export class FileRegistry {
   }
 
   getEntry(docId: string): RegistryEntry | undefined {
-    return this.state.by_doc_id.get(docId);
+    const entry = this.state.by_doc_id.get(docId);
+    if (!entry) return undefined;
+    // Saved docIds do not preserve authority after a directory or target changes.
+    try {
+      if (this.protectedRoots.overlaps(entry.path)) return undefined;
+    } catch {
+      return undefined;
+    }
+    return { ...entry };
   }
 
   removeEntry(docId: string): void {

@@ -47,7 +47,7 @@ import type { Stats } from "node:fs";
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { containsPath } from "@grida/daemon/server";
+import { containsPath } from "@grida/daemon/sandbox";
 
 /** Where every session's scratch dir lives under a `base`. */
 const SESSIONS_DIRNAME = "sessions";

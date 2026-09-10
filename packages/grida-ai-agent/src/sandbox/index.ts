@@ -1,3 +1,4 @@
+// GRIDA-SEC-004 — host sandbox policy and explicit scratch authority preparation.
 /**
  * `@grida/agent/sandbox` — the composed agent-daemon sandbox policy.
  *
@@ -18,3 +19,8 @@ export {
   buildAgentDaemonSandboxPolicy,
   type AgentDaemonSandboxPolicy,
 } from "./policy";
+// Host setup can prepare scratch authority without loading the chat server.
+export {
+  defaultScratchBase,
+  prepareScratchAuthority,
+} from "../session/scratch";

@@ -24,6 +24,7 @@ The most actively maintained docs areas are:
 - `docs/with-figma/**` — Figma interoperability, guides, and Assistant product docs
 - `docs/design/**` — design-oriented product/reference docs
 - `docs/math/**` — supporting technical references
+- `docs/cli/**` — CLI user guides and command workflows
 
 ## SEO frontmatter
 
@@ -92,7 +93,9 @@ When creating or revising a Docusaurus doc, use this decision flow:
 
 Some docs trees are intentionally kept, but have different ownership rules:
 
-- `docs/cli/**` is deprecated. Keep it unless the task explicitly removes or rewrites deprecated CLI docs.
+- `docs/cli/**` describes the replacement CLI preview. Keep release availability explicit;
+  the legacy npm package does not provide these commands. Its unlisted Flutter
+  retirement page preserves an old deep link without advertising the old tool.
 - `docs/@designto-code/**` is synced from an external source. Do not restructure or rewrite it unless the task explicitly targets that sync source.
 - `docs/_history/**` contains archived, code-facing record material. It is not part of the user-facing docs surface; if you archive new docs, move them under `_history/` and mark each page `unlisted: true`.
 
@@ -184,7 +187,7 @@ This prevents all MDX-related parsing issues for the entire file.
 | [/docs/with-figma](./with-figma)         | with-figma     | Grida with Figma - Grida &lt;-&gt; Figma compatibility and user guides                                                                      | yes    |
 | [/docs/design](./design)                 | design         | Design-oriented docs and visual behavior notes                                                                                              | yes    |
 | [/docs/canvas](./canvas)                 | canvas         | Grida Canvas SDK - User Documentation                                                                                                       | no     |
-| [/docs/cli](./cli)                       | cli            | Deprecated CLI docs kept for compatibility                                                                                                  | no     |
+| [/docs/cli](./cli)                       | cli            | CLI user guides and command workflows                                                                                                       | yes    |
 | [/docs/@designto-code](./@designto-code) | design-to-code | Externally synced reference docs                                                                                                            | no     |
 | [/docs/\_history](./_history)            | history        | Archived, code-facing record docs not meant for user navigation                                                                             | no     |
 | [/docs/together](./together)             | together       | Contributing, Support, Community, etc                                                                                                       | no     |

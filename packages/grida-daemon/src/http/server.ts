@@ -1,4 +1,5 @@
-// GRIDA-SEC-008 — one shared AuthStore serializes OAuth and BYOK mutations.
+// GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
+// GRIDA-SEC-008 — AuthStore preserves OAuth across bounded BYOK retirement.
 import { Hono } from "hono";
 import {
   makeCorsMiddleware,
@@ -49,13 +50,13 @@ export type DaemonServices = {
    *
    * This is an in-process host service, not an HTTP capability: tenants may
    * read their own named records, while renderer routes must continue to
-   * expose only purpose-built, secret-free status/mutation DTOs. Keeping one
-   * instance also keeps every auth.json mutation on one write chain.
+   * expose only purpose-built, secret-free status/mutation DTOs. Updated native
+   * writers coordinate auth.json mutations with legacy API-key retirement.
    */
   auth: AuthStore;
   /**
-   * BYOK credential store (presence/set/delete semantics; raw reads stay
-   * server-side). The STORE is daemon-owned host persistence; the `/secrets`
+   * BYOK adapter for shared native custody (presence/set/delete; raw reads stay
+   * server-side). Persistence is owned by @grida/auth/providers; the `/secrets`
    * ROUTE group is tenant-registered because its allowlist vocabulary
    * (provider ids) belongs to the tenant.
    */
@@ -109,6 +110,8 @@ export type ServerOptions = {
    * `auth.json`, and `workspaces.json`. See {@link DaemonServices}.
    */
   user_data_path: string;
+  /** GRIDA-SEC-014 — native-host input, never renderer/project configuration. */
+  provider_home?: string;
   /**
    * GRIDA-SEC-004 — host-injected managed root under which the auto-create
    * flow (`POST /workspaces/create`) mints new project folders (desktop:
@@ -191,14 +194,17 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   // Per-launch daemon state (registry is in-memory and resets on restart;
   // recent.json / auth.json / workspaces.json are on disk and persist).
   const auth = new AuthStore(opts.user_data_path);
+  const secrets = new SecretsStore(auth, opts.provider_home);
   const services: DaemonServices = {
     user_data_path: opts.user_data_path,
-    files: new FileRegistry(),
+    files: new FileRegistry([secrets.directory]),
     recent: new RecentStore(opts.user_data_path),
     media: createMediaPersistence(opts.media_root),
-    workspaces: new WorkspaceRegistry(opts.user_data_path, opts.projects_root),
+    workspaces: new WorkspaceRegistry(opts.user_data_path, opts.projects_root, [
+      secrets.directory,
+    ]),
     auth,
-    secrets: new SecretsStore(auth),
+    secrets,
   };
 
   // Daemon-owned routes. Capabilities describe the route groups mounted.

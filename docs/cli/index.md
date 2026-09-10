@@ -1,193 +1,93 @@
 ---
-id: cli
-title: "CLI"
+title: Grida CLI
+description: Use Grida's account services and media tools from your terminal, scripts, or your own agent harness.
+keywords: [grida, cli, command line, byok, media generation]
+sidebar_label: Getting started
+sidebar_position: 1
+tags: [cli]
+format: md
 ---
 
-# CLI
+# Grida CLI
 
-![introducing grida cli - a cli for your figma design](./assets/supercharged-with-cli.png)
+Discover models, generate media, and keep the files in your own workflow.
+Desktop does not need to be running.
 
-Grida CLI is a package manager for design, that enables you to add designs like a module to use directly from your code. In advance, you can use Grida CLI to create a CI/CD pipeline for your design-production workflow.
+> **Private development preview.** These guides describe the replacement CLI
+> in this repository. It has not been published to npm. Installing the legacy
+> `grida` package does not provide these commands. Hosted Grida login and GG
+> setup are not yet available for this preview.
 
-## Install CLI
+## Run the preview
 
-```
-npm i -g grida
-```
+Use Node.js 24 or later and a repository checkout with dependencies installed.
+Build and invoke the preview from the repository root:
 
-> Note: It is recommended to install Griad CLI inside a project (instead of globally) - `yarn add --dev grida` or `npm i --save-dev grida`.
-
-## `grida init`
-
-Fisrt, you need to initialize your project with `grida init`.
-grida init works for both empty project and for existing project.
-
-If you don't have a existing node project (react, rn, svelte, ...) (with package.json) or dart/flutter project (with pubspec.yaml), grida will prompt you to create a new project.
-
-**Starting from scratch (no existing project)**
-
-You'll get the message below if you run grida init under empty directory with no project root.
-
+```sh grida-setup
+pnpm --filter grida... build
+node packages/grida-cli/dist/bin.mjs --help
 ```
 
-\$ grida init
+Below, `grida` means that executable. During development, replace it with
+`node packages/grida-cli/dist/bin.mjs` from the repository root. See the
+[contributing guide](https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md)
+for checkout setup. Global installation instructions will accompany the npm
+release.
 
-> No project root is found (package.json or pubspec.yml) with framework configuration. Do you want to continue without creating a project? (y/N)
+Stored credentials currently support macOS and Linux. Windows users can supply
+BYOK through explicit environment variables or stdin; durable account login is
+not supported there yet.
 
+## Generate your first image
+
+Bring an OpenRouter API key and enter it at the hidden prompt:
+
+```sh
+grida providers configure openrouter
+grida models list --provider openrouter --modality image --available
+grida generate --provider openrouter --model openai/gpt-image-2 \
+  --prompt "A blue ceramic teapot on a warm neutral background" --out ./image
 ```
 
-- No (default) - grida will walk you through to create a new base project.
-- Yes - grida ignores the base project and continues with the initialization. (this make break the configuration afterwards. not recommanded)
+Generation sends your input to the selected provider and may incur charges on
+that provider account. `./image` must not already exist. A successful command
+saves media and `receipt.json`, then prints their paths.
 
-### 1. Design source configuration
+BYOK needs no Grida login. [Provider credentials](./providers.md) explains
+storage and overrides. [Grida login](./auth.md) and [account credits](./account.md)
+describe the separate account path required by GG.
 
-Once init is complete, you'll be prompted to configure the design source like below.
+## Find the right command
 
-```
-> Where from to import your design? : figma
-> Please enter your figma file url : https://www.figma.com/file/xxx
-> Please enter your figma personal access token.: ******************
-```
+| Task                                   | Guide                       |
+| -------------------------------------- | --------------------------- |
+| Sign in and manage a Grida session     | [Auth](./auth.md)           |
+| Inspect memberships and cached credits | [Account](./account.md)     |
+| Configure your own provider keys       | [Providers](./providers.md) |
+| Discover models and accepted inputs    | [Models](./models.md)       |
+| Generate media and chain local files   | [Generate](./generate.md)   |
 
-- origin : The provider of your design (figma, sketch, ...)
-- file : The unique identifier or file path to your design.
-- token (for figma) : A [personal-access-token](../with-figma/guides/how-to-get-personal-access-token) for grida cli to read your design (readonly).
-
-### 2. Framework configuration
-
-Once the design source configuration is complete, you'll be prompt to configure settings for your framework.
-The promps & specs vary by frameworks, you can see each configurations at [`@grida/builder-config`](https://github.com/gridaco/code/tree/main/packages/builder-config).
-
-You may follow the cli prompts to configure your project. You can edit this manually in grida.config.js once the init process is complete.
-
-**React example of framework config**
-
-```js
-/**
- * @type {import('@grida/builder-config').FrameworkConfig}
- */
-const frameworkConfig = {
-  framework: "react",
-  language: "tsx",
-  component_declaration_style: {
-    exporting_style: {
-      type: "export-named-functional-component",
-      declaration_syntax_choice: "function",
-      exporting_position: "with-declaration",
-    },
-  },
-};
+```sh
+grida --version
+grida --help
+grida docs generate
 ```
 
-### Project structure
+`--help` describes your installed version and works offline. `docs` prints a
+guide URL without opening a browser; reading the guide needs a connection.
+These pages describe the development preview. Agent, render, and MCP commands
+are deferred.
 
-Once project setup is complete, you'll see you project tree organized like below.
+## Use Grida in scripts
 
-**For example, NextJS**
+Use `--json` where supported for one structured result on stdout; diagnostics
+go to stderr. Errors have `error.code` and `error.message`. Exit codes are `0`
+for success, `1` for operation failure, and `2` for invalid usage. Signed-out
+`auth status` and logout with unconfirmed remote revocation return `1`.
 
-```
-...
-├── .grida             (created)
-├── .env               (modified)
-├── .gitignore         (modified)
-├── README.md
-├── grida              (created)
-│   └── .gitkeep       (created)
-├── grida.config.js    (created)
-├── next-env.d.ts
-├── package.json       (modified)
-├── pages
-│   ├── _app.tsx
-│   └── index.tsx
-├── public
-├── styles
-├── tsconfig.json
-└── ...
-```
+`--no-input` prevents terminal questions where supported. It does not suppress
+OS keyring dialogs. Interactive login rejects `--json` and `--no-input`.
+Never put a key itself in a command argument.
 
-**For example, Flutter**
-
-```
-...
-├── .grida                   (created)
-├── .env                     (modified)
-├── .gitignore               (modified)
-├── README.md
-├── analysis_options.yaml
-├── build
-├── flutter_app.iml
-├── grida.config.js
-├── lib
-│   ├── grida                (created)
-│   │   └── .gitkeep
-│   └── main.dart
-├── pubspec.lock
-├── pubspec.yaml
-├── test
-│   └── widget_test.dart
-├── web
-├── macos
-├── ios
-├── landroid
-├── linux
-├── windows
-└── ...
-```
-
-## `grida add`
-
-grida works like a package manager that you might already be familiar with. The syntax is,
-
-```
-grida add [modules...]
-# use project configuration
-grida add
-# add specific design module
-grida add <modules...>
-```
-
-**Running `grida add` without arguments**
-
-Running `grida add` without any arguments will prompt you to select a design module to add. This is automatically managed by grida cli. but this is not recommended since idendifying your design with its name may cause human errors.
-
-**Adding package**
-
-> `grida add <module>`
-
-**Adding package with figma url**
-
-You can import target design with, `grida add <figma-url>`.
-
-> If the givven figma url points to entire file or a page, You might be importing tons of modules at one time. It is recommended to use frame-level url instead.
-
-```bash
-$ grida add https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/examples?node-id=2422%3A10181
-
-# or you can add with id only (the target should be a node that is inside the file you have in grida.config.js)
-
-$ grida add 2422:10181
-```
-
-The added package will be added to `/grida` or `/lib/grida` (for flutter) by default, unless you have additional configuration.
-
-You are now good to go with your main working file, and import the added module.
-
-So for example (react), In your `pages/index.tsx`, you may import like..
-
-```tsx
-import { NewModuleFromFigma } from "../grida/new-module-from-figma";
-
-export default function () {
-  return (
-    <>
-      {/* ... */}
-      <NewModuleFromFigma />
-      {/* ... */}
-    </>
-  );
-}
-```
-
-## See also
-
-- [(ko) Grida CLI @ disquiet.io](https://disquiet.io/product/figma-cli-by-grida)
+Generation does not automatically retry a possibly accepted paid request.
+Check errors and saved paths before deciding to submit again.

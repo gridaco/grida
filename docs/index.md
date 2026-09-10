@@ -25,6 +25,7 @@ This site is the main entry point for product documentation. If you are new to G
 - Use [With Figma](./with-figma/index.md) if you are importing from Figma, using Assistant, or working through Figma-related setup.
 - Use [Forms](./forms/respondent-email-notifications.md) if you are building form flows, notifications, or response handling.
 - Use [Platform](./platform/index.md) if you are working with product infrastructure, customers, tags, or platform features.
+- Use [CLI](./cli/index.md) for account access and media tools from a terminal or your own harness.
 - Use [Canvas SDK](./canvas/sdk/index.md) if you are embedding or integrating Grida canvas capabilities.
 
 ## Product Areas
@@ -45,7 +46,6 @@ This site is the main entry point for product documentation. If you are new to G
 
 ## Older Or Specialized Docs
 
-- [CLI](./cli/index.md) is kept for compatibility, but should be treated as deprecated unless a task explicitly targets it.
 - `docs/@designto-code/**` is synced from an external source and remains in place as reference material.
 
 ## Project Links

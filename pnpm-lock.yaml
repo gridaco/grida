@@ -1092,6 +1092,31 @@ importers:
         specifier: ^4
         version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
+  packages/grida-ai:
+    dependencies:
+      '@ai-sdk/gateway':
+        specifier: 3.0.125
+        version: 3.0.125(zod@4.3.6)
+      '@ai-sdk/provider':
+        specifier: 3.0.10
+        version: 3.0.10
+      '@grida/ai-models':
+        specifier: workspace:*
+        version: link:../grida-ai-models
+      ai:
+        specifier: 6.0.197
+        version: 6.0.197(zod@4.3.6)
+    devDependencies:
+      tsdown:
+        specifier: ^0.22.1
+        version: 0.22.1(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.36)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+
   packages/grida-ai-agent:
     dependencies:
       '@agentclientprotocol/sdk':
@@ -1109,6 +1134,9 @@ importers:
       '@ai-sdk/provider':
         specifier: 3.0.10
         version: 3.0.10
+      '@grida/ai':
+        specifier: workspace:*
+        version: link:../grida-ai
       '@grida/ai-models':
         specifier: workspace:*
         version: link:../grida-ai-models
@@ -1164,6 +1192,9 @@ importers:
       '@grida/home':
         specifier: workspace:*
         version: link:../grida-home
+      smol-toml:
+        specifier: 1.8.0
+        version: 1.8.0
     devDependencies:
       tsdown:
         specifier: ^0.22.1
@@ -1429,10 +1460,44 @@ importers:
         specifier: workspace:*
         version: link:../grida-svg
 
+  packages/grida-cli:
+    devDependencies:
+      '@grida/account':
+        specifier: workspace:*
+        version: link:../grida-account
+      '@grida/ai':
+        specifier: workspace:*
+        version: link:../grida-ai
+      '@grida/auth':
+        specifier: workspace:*
+        version: link:../grida-auth
+      '@grida/home':
+        specifier: workspace:*
+        version: link:../grida-home
+      '@types/node':
+        specifier: ^24
+        version: 24.12.2
+      tsdown:
+        specifier: ^0.22.1
+        version: 0.22.1(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.36)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+    optionalDependencies:
+      '@github/keytar':
+        specifier: 7.10.6
+        version: 7.10.6
+
   packages/grida-cmath: {}
 
   packages/grida-daemon:
     dependencies:
+      '@grida/auth':
+        specifier: workspace:*
+        version: link:../grida-auth
       '@hono/node-server':
         specifier: 1.19.9
         version: 1.19.9(hono@4.11.8)
@@ -13883,6 +13948,10 @@ packages:
   slash@4.0.0:
     resolution: {integrity: sha512-3dOsAHXXUkQTpOYcoAxLIorMTp4gIQr5IW3iVb7A7lFIp0VHhnynm9izx6TssdrIcVIESAlVjtnO2K8bg+Coew==}
     engines: {node: '>=12'}
+
+  smol-toml@1.8.0:
+    resolution: {integrity: sha512-kCZr2V3ch9i00x8zXRhjUNVcjG9ijES5dDudkXvUVCT5QlJNQWElSJdZqyPemffHoLNUYwOcou0Fy+ojN0uHSQ==}
+    engines: {node: '>= 18'}
 
   snake-case@3.0.4:
     resolution: {integrity: sha512-LAOh4z89bGQvl9pFfNF8V146i7o7/CqFPbqzYgP+yYzDIDeS9HaNFtXABamRW+AQzEVODcvE79ljJ+8a9YSdMg==}
@@ -29866,6 +29935,8 @@ snapshots:
   slash@3.0.0: {}
 
   slash@4.0.0: {}
+
+  smol-toml@1.8.0: {}
 
   snake-case@3.0.4:
     dependencies:

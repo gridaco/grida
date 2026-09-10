@@ -1,10 +1,18 @@
 # `@grida/agent`
 
-Grida's AI agent system in one package. Private, `workspace:*`, in
-active development. The **agent tenant** of
+Grida's configured agent and its application runtime. Private, `workspace:*`,
+in active development. The **agent tenant** of
 [`@grida/daemon`](../grida-daemon/README.md) (issue #927): the daemon
 owns the loopback perimeter and the host capability routes; this package
-depends on it and mounts everything AI behind it.
+depends on it and currently mounts the agent and media routes behind it.
+
+Shared model operations belong to [`@grida/ai`](../grida-ai/README.md).
+This package owns Grida's prompts, installed tools and skills, model defaults,
+chat sessions, workspace bindings, and external-agent integration. Runtime-neutral
+code can still be Grida-specific: `createAgent` remains here because it assembles
+the Grida agent. Reusable agent primitives may move to `@grida/ai` once their
+contracts work without this application policy; a hypothetical future caller is
+not a reason to extract them.
 
 It owns three agent-system concerns:
 
@@ -40,11 +48,116 @@ bundle.
 | `./todos`            | plan store + `todo_write` ([README](./src/todos/README.md))                                                                                                                           | neutral  |
 | `./surface`          | server-executed artifact-surface tools, turn snapshot, and browser observer                                                                                                           | neutral  |
 | `./server`           | `createAgentTenant` + `createAgentDaemon` (the composed daemon), daemon re-exports                                                                                                    | Node     |
+| `./media-server`     | `createMediaTenant` + `createMediaDaemon`, media options and provider transport type; no chat startup                                                                                 | Node     |
 | `./sandbox`          | composed sandbox policy (`buildAgentDaemonSandboxPolicy` — daemon frame + AI upstream hosts)                                                                                          | Node     |
 | `./transport`        | `AgentTransport` namespace — extends `DaemonTransport.Client` with the agent tenant's routes                                                                                          | neutral  |
 
 The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
 public subpath; workspace bindings use it in-process.
+
+## Shared media operations
+
+The image HTTP route and `generate_image` tool use `@grida/ai`'s `ImageClient`.
+This package adapts shared native provider custody and provider transport, chooses the agent's
+default model, and explicitly selects the existing automatic provider policy.
+The SDK resolves compatibility and executes the selected provider. The host
+reads reference files and persists returned bytes to media storage or session
+scratch.
+
+The shared operation does not retry a failed paid batch. Requesting multiple
+images can still require multiple submissions under the provider's batch limit.
+Image failures contain safe codes; raw upstream errors and warnings do not enter
+the host's image error logs.
+
+The video HTTP route uses `VideoClient` with the same host capabilities. The SDK
+checks the selected binding's text/start-frame support before submitting, reads
+the selected credential at invocation, and returns video bytes with safe failure
+codes. One video submission, its polling, and result reads share a five-minute
+deadline and the caller's abort signal. A BYOK credential stays fixed for that
+job; changing credentials cannot move accepted work to another account. Clearing
+GG custody blocks subsequent invocations but cannot recall an accepted request.
+The route retains its wire protocol, GG status mapping and media receipts.
+
+The music HTTP route uses `MusicClient` with GG authority and provider transport;
+it does not receive BYOK keys. The SDK validates the two bundled Lyria models,
+text/seed input and a bounded MP3 response. The route converts bytes to its
+existing wire shape, derives the canonical model filename, and adds an optional
+root-level storage receipt. GG refresh remains with the host. Music, sound
+effects and speech have separate contracts under the audio modality.
+
+The sound-effects HTTP route uses `SoundEffectClient` with only an ElevenLabs
+key reader and provider transport. The SDK owns the existing model selection,
+text/duration/loop/influence validation and bounded MP3 execution. The route owns
+base64 output, `sound-effect.mp3`, optional root-level receipts and missing-key
+recovery status. It supplies no GG authority and performs no result download.
+
+The text-to-speech routes use `TextToSpeechClient` for generation and voice
+discovery. The SDK owns text/voice validation, bounded pagination and projected
+voice IDs/names, while the host owns picker choices, missing-key/access-denied
+status, `speech.mp3`, wire encoding and optional root-level receipts. Speech
+text is preserved verbatim; the SDK descriptor supplies the normalized voice ID.
+
+The 3D route uses `ThreeDClient`'s exact model contracts. The SDK owns input
+semantics, fal queue execution and bounded primary GLB bytes; the host owns
+structural request admission, bounded base64 decoding, `model.glb`, wire encoding,
+optional root-level receipts and its one-generation-at-a-time memory budget.
+Catalogue options beyond the implemented single-image/text paths are not exposed
+by this route. Future 3D workflows need their own reviewed host wire adaptations.
+
+## Independent media startup
+
+Hosts can import `createMediaDaemon` from `@grida/agent/media-server` to run the
+existing media routes without importing the chat runtime, opening a chat
+SQLite database, discovering skills or starting ACP. Shared provider custody
+lazily uses SQLite only for its private cross-process lock after startup. It uses the same daemon perimeter and host-owned credentials,
+provider transport and media store. Media and BYOK settings default on; GG
+routes require `gg_base_url`. Chat, sessions, endpoint-provider settings,
+native ChatGPT auth and shell remain absent. `createMediaTenant` supplies the
+same composition for hosts that already own a `DaemonServer`.
+
+```ts
+import { createMediaDaemon } from "@grida/agent/media-server";
+
+const daemon = createMediaDaemon({
+  password,
+  user_data_path,
+  provider_home, // Explicit shared Grida home; omit for an isolated embedded host.
+  media_root,
+  http_access,
+  provider_http,
+  gg_base_url,
+});
+await daemon.start({ listen: false });
+// Deliver authenticated Requests through daemon.fetch(request).
+// Stop aborts and joins active delivered requests before clearing GG custody
+// and disposing the catalogue. Persisted BYOK keys remain host-owned.
+await daemon.stop();
+```
+
+The full `createAgentDaemon` defaults and routes remain unchanged. Its media
+routes and chat runtime share one private media owner, with one GG memory store,
+catalogue and provider transport per launch. Explicitly disabling both `agent`
+and `sessions` also skips chat allocation and scratch sweeping in the legacy
+entry, but that entry still imports chat modules. Use `media-server` for module
+isolation. Choosing one composition per launch avoids duplicate credential
+stores or routes; there is no fallback from failed chat startup to media mode.
+This is startup independence within the existing package, not a separate
+installation or a runtime plugin system.
+
+Native host setup can import `defaultScratchBase` and `prepareScratchAuthority`
+from `@grida/agent/sandbox`, and `CHATGPT_AUTH_ROUTE_PATHS` and the
+`ChatGptAuthStart` wire type from the neutral root. Their existing `server`
+exports remain compatible. Route names and wire types grant no native auth
+authority; the host still owns that ceremony.
+
+The daemon's `SecretsStore` now delegates BYOK persistence to the shared
+native TOML owner (GRIDA-SEC-014). The native host supplies `provider_home`;
+media and agent code continue to receive only a key reader. The standalone
+`grida-agent` host uses the canonical Grida home by default; its explicit
+`GRIDA_AGENT_USER_DATA` override also isolates provider custody under that
+path. ChatGPT OAuth remains in the daemon's separate `auth.json` and GG stays
+in memory. Directory references and finite-command scopes protect both the
+agent state root and the shared provider directory.
 
 ## Provider HTTP
 
@@ -248,3 +361,11 @@ pnpm --filter @grida/agent test    # vitest
 
 `smoke:sessions:live` exercises the sessions store against a real SQLite
 file — a manual smoke check, not part of `test`.
+
+The native host excludes the provider credential tree from workspace, scratch and
+attached-directory grants before structured filesystem hydration. The same
+`ProtectedRoots` owner from `@grida/daemon/server` rechecks those roots before
+backend I/O and revalidates pending or cached directory grants. An ancestor such
+as the entire Grida home is refused too; ordinary workspace symlinks continue to
+use the daemon filesystem's containment checks. These are application authority
+checks, not protection against a hostile local process racing path mutations.

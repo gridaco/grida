@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": ["src/index.ts", "src/providers.ts"],
+  "exclude": ["src/**/*.test.ts", "dist"]
+}

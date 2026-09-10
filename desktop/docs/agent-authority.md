@@ -268,8 +268,8 @@ capabilities:
 This outer boundary cannot hide sidecar-owned BYOK/session data from a
 compromise in the same process, and by itself cannot distinguish roots held by
 one sidecar. The per-command host closes the model-selected ambient-path gap
-for scratch and secrets: main denies the shared scratch parent and `userData`,
-then re-allows only the request's own scratch and private temp. Workspace reads
+for scratch and secrets: main denies the shared scratch parent, `userData`,
+and the shared provider credential directory (GRIDA-SEC-014), then re-allows only the request's own scratch and private temp. Workspace reads
 retain SRT's default broad-read posture; the exact workspace is the command's
 cwd/write grant, not its exclusive readable tree.
 
@@ -449,3 +449,10 @@ Desktop release audit, signed/notarized macOS verification, packaged Linux
 verification, and explicit daemon, hosted-AI, and ChatGPT OAuth security
 reviews. The architecture does not justify a dependency-version bump by
 itself; the version decision belongs to the implementing change set.
+
+Shared provider credentials also remain outside structured file access: the
+daemon refuses overlapping file/workspace grants and rechecks saved IDs, while
+agent bindings refuse overlapping workspace, scratch and directory-reference
+roots before hydration and recheck them before backend I/O. This covers ancestor
+selections and resolved aliases without granting the worker access to the shared
+provider directory.

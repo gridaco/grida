@@ -1,7 +1,7 @@
 /** GRIDA-SEC-004 — sandbox-side provider transport over the private channel. */
 import crypto from "node:crypto";
 import type { Readable, Writable } from "node:stream";
-import type { ProviderHttpTransport } from "@grida/agent/server";
+import type { ProviderHttpTransport } from "@grida/agent/media-server";
 import type {
   ShellExecutionScope,
   ShellExecutor,

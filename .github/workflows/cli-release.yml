@@ -2,14 +2,88 @@ name: Release CLI
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Exact version already reviewed in packages/grida-cli/package.json
+        required: true
+        type: string
+      tag:
+        description: npm distribution tag (first public preview uses next)
+        required: true
+        type: choice
+        default: next
+        options: [next, latest]
 
-permissions: {}
+permissions:
+  contents: read
+
+concurrency:
+  group: grida-cli-release
+  cancel-in-progress: false
 
 jobs:
-  bootstrap:
-    if: github.repository == 'gridaco/grida' && github.ref == 'refs/heads/main'
+  guard:
     runs-on: ubuntu-latest
-    timeout-minutes: 1
     steps:
-      - name: Release is not enabled
-        run: echo "CLI release workflow registered. Publishing is not enabled."
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Require main and an explicitly publishable, reviewed version
+        env:
+          CLI_VERSION: ${{ inputs.version }}
+          CLI_TAG: ${{ inputs.tag }}
+        run: |
+          test "$GITHUB_REPOSITORY" = gridaco/grida
+          test "$GITHUB_REF" = refs/heads/main
+          node scripts/cli-release/prepare.mjs --check-only --release-version "$CLI_VERSION" --tag "$CLI_TAG"
+  package:
+    needs: guard
+    uses: ./.github/workflows/cli-verify.yml
+  docs:
+    needs: package
+    uses: ./.github/workflows/cli-docs.yml
+    with:
+      archive_artifact: grida-cli-candidate
+  auth:
+    needs: guard
+    uses: ./.github/workflows/auth-local.yml
+  api:
+    needs: guard
+    uses: ./.github/workflows/api.yml
+  publish:
+    needs: [package, docs, auth, api]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Require the configured release environment
+        env:
+          CLI_NPM_RELEASE_ENABLED: ${{ vars.CLI_NPM_RELEASE_ENABLED }}
+        run: test "$CLI_NPM_RELEASE_ENABLED" = true
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v4
+        with:
+          name: grida-cli-candidate
+          path: ${{ runner.temp }}/grida-cli-candidate
+      - name: Verify and publish the exact tested tarball through npm OIDC
+        env:
+          CLI_VERSION: ${{ inputs.version }}
+          CLI_TAG: ${{ inputs.tag }}
+        run: |
+          node scripts/cli-release/prepare.mjs --verify --out "$RUNNER_TEMP/grida-cli-candidate" --release-version "$CLI_VERSION" --tag "$CLI_TAG"
+          node -e 'const [major, minor, patch] = process.argv[1].split(".").map(Number); if (!(major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1))))) process.exit(1)' "$(npm --version)"
+          CLI_ARCHIVE=$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).archive" "$RUNNER_TEMP/grida-cli-candidate/candidate.json")
+          npm publish "$RUNNER_TEMP/grida-cli-candidate/$CLI_ARCHIVE" --access public --provenance --tag "$CLI_TAG" --ignore-scripts --registry https://registry.npmjs.org
+      # No static npm token. The npm publisher must authorize this workflow and
+      # npm-publish environment, including npm publish permission (not stage only).

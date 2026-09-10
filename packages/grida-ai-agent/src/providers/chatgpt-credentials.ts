@@ -10,7 +10,11 @@
 
 import crypto from "node:crypto";
 import type { AuthStore, OAuthEntry } from "@grida/daemon/server";
-import type { ChatGptSubscriptionStatus } from "../protocol/chatgpt";
+import type {
+  ChatGptAuthStart,
+  ChatGptSubscriptionStatus,
+} from "../protocol/chatgpt";
+export type { ChatGptAuthStart } from "../protocol/chatgpt";
 import { CHATGPT_PROVIDER_ID } from "../protocol/chatgpt";
 import { ProviderHttp } from "./http";
 
@@ -44,12 +48,6 @@ export type ChatGptOAuthConfig = Readonly<{
   refresh_skew_ms?: number;
   attempt_ttl_ms?: number;
 }>;
-
-export type ChatGptAuthStart = {
-  attempt_id: string;
-  state: string;
-  authorization_url: string;
-};
 
 export type ChatGptAccessCredentials = {
   access_token: string;

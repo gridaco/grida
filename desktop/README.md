@@ -6,8 +6,9 @@ The desktop app is the Electron host for the Grida editor. It loads the
 hosted editor under `/desktop/*`, exposes a path-scoped preload bridge,
 and starts the agent sidecar through `desktop/src/agent-sidecar.ts`.
 
-Most native behavior does not belong in this directory. The agent system
-lives in `@grida/agent`; desktop should stay thin: windows, menus,
+Most native behavior does not belong in this directory. Shared model operations
+live in `@grida/ai`; their HTTP adapters and the agent system live in
+`@grida/agent`. Desktop stays thin: windows, menus,
 protocol routing, app lifecycle, IPC sender validation, and sidecar
 supervision.
 
@@ -32,9 +33,10 @@ Electron main/preload (desktop)
   -> owns provider destination grants and a dedicated Chromium network session
   -> loads editor /desktop/*
 
-@grida/agent
-  -> owns BYOK/native-provider secrets, provider selection/credential
-     injection, files, workspaces, sessions, and desktop agent execution
+Desktop sidecar composition
+  -> @grida/daemon owns the perimeter, shared-provider adapter and local resources
+  -> @grida/agent/media-server serves media through @grida/ai without chat startup
+  -> full @grida/agent/server also enables sessions and desktop agent execution
   -> serves authenticated daemon HTTP only on main-transferred sockets
   -> sends only provider requests and credential-free provider-asset downloads
      over bounded framed stdin/stdout
@@ -43,16 +45,47 @@ editor /desktop/*
   -> owns UX only, through typed bridge clients
 ```
 
+Desktop starts with the agent enabled. Launching the Desktop app with
+`--disable-agent` selects media-only startup before the chat server is imported.
+The supervisor translates that app flag to the sidecar's `--agent=disabled`;
+direct sidecar invocations use `--agent=enabled|disabled`. Image, video, music,
+sound effects, speech and 3D routes keep the same authenticated transport,
+BYOK key store, GG memory custody and durable media root. Agent/session routes,
+configured text-provider routes and native ChatGPT auth are absent; the
+handshake reports those capabilities as unavailable. No chat database, skill
+discovery, scratch preparation or finite-command authority is initialized.
+This is a host launch choice, not a renderer setting or fallback after failure.
+
+The separate media entry is an application adapter in the existing package.
+It establishes startup independence; Desktop still bundles the agent package.
+The independently usable model SDK is `@grida/ai`, which owns no HTTP routes,
+Desktop lifecycle or chat state.
+
 Small, non-secret native preferences live in `preferences.json` under
 Electron's `userData` directory and are owned exclusively by main. The hosted
 renderer receives purpose-specific actions, never a generic preferences
 key/value bridge. `DesktopPreferences` uses a small versioned JSON document
 with owner-only atomic writes. Account cookies remain in Chromium's HttpOnly
-session, while provider credentials and API keys remain in the sidecar's secret
-store. On the first upgrade from Desktop 0.0.13, main consumes the former
+session, while macOS/Linux BYOK API keys use the shared native
+`providers/credentials.toml` under Grida home through the sidecar's secret adapter.
+ChatGPT OAuth stays in the
+agent's `auth.json`. On the first upgrade from Desktop 0.0.13, main consumes the former
 renderer onboarding-completion flag through one fixed hidden same-origin probe
 and records the migration before selecting an authenticated role. That legacy
 flag is never consulted again.
+
+Shared BYOK custody (GRIDA-SEC-014) is private plaintext on macOS/Linux.
+Desktop and CLI see the same provider changes without either requiring the
+other to run. The supervisor resolves Grida home once and forwards that exact
+path to the sidecar and its sandbox policy. An explicit
+`GRIDA_AGENT_USER_DATA` override isolates both agent state and provider custody.
+Migration preserves ChatGPT OAuth, retires old API entries and resumes pending
+cleanup without reimporting keys. Older mixed-file writers must not run
+concurrently. Windows Desktop retains its host-local `auth.json` backend for
+BYOK and ChatGPT OAuth; it does not use the shared CLI store. Backend selection
+happens before access, and malformed provider custody fails without fallback.
+Windows file privacy relies on the inherited user-directory ACL, not POSIX mode
+bits or the shared custody protocol. No renderer capability returns stored keys.
 
 On macOS and Linux, the sidecar runs under `srt` with no direct external
 destinations and `allow_local_binding: false`; Electron main supplies the two

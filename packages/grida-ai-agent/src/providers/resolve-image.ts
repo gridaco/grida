@@ -1,70 +1,33 @@
-// GRIDA-GG: provider — the `gg` image-provider arm (docs/wg/platform/hosted-ai.md)
-/**
- * GRIDA-SEC-004 — image-model provider resolver (in-package providers layer).
- *
- * The image counterpart of {@link ./index.ts}'s `resolveProvider`. Given a
- * canonical image-model id, it picks a provider the user has a key for and
- * which serves that model, then builds the runnable `ImageModelV3`. Like the
- * language resolver this is node-only and in-process: it reads the
- * package-owned `SecretsStore` (credentials never cross IPC) and never calls
- * the model — only constructs the factory.
- *
- * Precedence mirrors `resolveProvider`: `BYOK_PROVIDER_METADATA` order,
- * intersected with (a) providers this card binds and (b) providers with a
- * stored key. A listed card may initially bind only one provider, so the
- * connection must match that card's verified bindings. Non-`listed` cards
- * are not part of the BYOK surface and are rejected.
- */
-
+// GRIDA-GG: provider — agent defaults and legacy auto selection over the shared image operation.
+// GRIDA-SEC-004 / GRIDA-SEC-006 — host credentials and transport stay inside the operation.
+import { ImageClient, ProviderHttp } from "@grida/ai";
 import { models } from "@grida/ai-models";
-import type { ImageModelV3 } from "@ai-sdk/provider";
 import type { SecretsStore } from "@grida/daemon/server";
-import { byokProvidersFor, GG_PROVIDER_ID } from "../protocol/provider-ids";
-import { makeImageModelFor } from "./image-byok";
-import { GridaGatewayImageModel } from "./gg-media";
+import { byokProvidersFor } from "../protocol/provider-ids";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
-import type { ProviderHttp } from "./http";
-import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
-import type { ImageGenerateRequest } from "../protocol/images";
+import type { ModelCatalogStore } from "./model-catalog";
 
-type ImageProvider = models.image.ImageProvider;
-
-function isImageProvider(id: string): id is ImageProvider {
-  return (models.image.providers as readonly string[]).includes(id);
-}
-
-export type ResolvedImageModel = {
-  /** A BYOK image provider, or the hosted `grida` provider (GRIDA-SEC-006). */
-  provider_id: ImageProvider | typeof GG_PROVIDER_ID;
-  /** Canonical catalog id (our key). */
-  model_id: string;
-  /** Provider-specific call id actually handed to the SDK. */
-  binding_id: string;
-  model: ImageModelV3;
-  /**
-   * Max reference images the resolved (provider, route) accepts, when resolved
-   * for image-to-image (`options.references`). Absent for a text-to-image
-   * resolution. The caller trims references to this cap.
-   */
-  references_max?: number;
+export type ResolvedImageModel = ImageClient.Resolved;
+export type ResolveImageDeps = {
+  secrets: SecretsStore;
+  catalog?: ModelCatalogStore;
+  provider_http?: ProviderHttp;
+  gg?: GridaGatewaySessionStore;
+  gg_base_url?: string;
+};
+export type ResolveImageOptions = {
+  explicit?: ImageClient.Provider;
+  references?: boolean;
+  background?: ImageClient.Background;
 };
 
-/**
- * One error class for both "unknown / not-listed model" and "you picked
- * provider X but it isn't available". The route maps `provider_id` being
- * present to a 4xx that surfaces the picked id.
- */
 export class ImageModelUnavailableError extends Error {
   readonly code = "image_model_unavailable" as const;
   constructor(
     public readonly model_id: string,
     public readonly provider_id?: string,
-    /** Set when the failed resolution was for image-to-image (references). The
-     *  agent-visible message then names WHY (needs a reference-capable route)
-     *  and, when known, which providers serve it — so the agent can tell the
-     *  user which key to connect instead of a bare "unavailable". */
-    references?: { capable_providers: readonly string[] },
+    references = false,
     public readonly background?: "opaque" | "transparent"
   ) {
     super(
@@ -73,10 +36,7 @@ export class ImageModelUnavailableError extends Error {
             (references ? " and reference images" : "") +
             (provider_id ? ` using ${provider_id}` : "")
         : references
-          ? `[agent-host-images] no connected provider can generate ${model_id} with reference images (image-to-image)` +
-            (references.capable_providers.length > 0
-              ? ` — connect a key for: ${references.capable_providers.join(", ")}`
-              : "")
+          ? `[agent-host-images] no connected provider can generate ${model_id} with reference images (image-to-image)`
           : provider_id
             ? `[agent-host-images] explicit provider not available: ${provider_id} for ${model_id}`
             : `[agent-host-images] no provider available for ${model_id}`
@@ -85,61 +45,6 @@ export class ImageModelUnavailableError extends Error {
   }
 }
 
-/**
- * The providers whose binding serves the image-to-image (references) route for
- * `card` — the set a user could connect a key for to unlock i2i. Reads the
- * catalog so the error message stays honest as provider edit bindings change.
- */
-function referenceCapableProviders(
-  card: models.image.ImageModelCard,
-  view: models.snapshot.View
-): ImageProvider[] {
-  return models.image.providers.filter(
-    (p) => view.image.binding(card, p)?.references
-  );
-}
-
-export type ResolveImageDeps = {
-  secrets: SecretsStore;
-  /**
-   * The image catalogue to resolve against. Absent ⇒ the bundled one,
-   * which is what this file read directly before the store existed.
-   */
-  catalog?: ModelCatalogStore;
-  /** Host-fed provider HTTP, resolved at the server construction edge. */
-  provider_http?: ProviderHttp;
-  /** Grida Cloud session (GRIDA-SEC-006) — optional; absent or token-less
-   *  ⇒ the hosted provider never resolves. */
-  gg?: GridaGatewaySessionStore;
-  /** Origin of the hosted endpoints; absent ⇒ hosted provider disabled. */
-  gg_base_url?: string;
-};
-
-export type ResolveImageOptions = {
-  /** Caller override. If set, precedence is skipped and only this provider is checked. */
-  explicit?: ImageProvider | typeof GG_PROVIDER_ID;
-  /**
-   * Resolve for image-to-image. When true, only providers whose binding has a
-   * `references` capability are eligible, and the resolved `binding_id` is the
-   * edit route (`binding.references.id`). A reference-bearing call therefore
-   * never lands on a text-to-image-only route.
-   */
-  references?: boolean;
-  /** Explicit non-auto modes require a verified native-background route. */
-  background?: ImageGenerateRequest["background"];
-};
-
-/**
- * The default image model for a caller that doesn't pick one (e.g. a bare
- * `generate_image({prompt})`). An EXPLICIT, tracked pin — {@link
- * DEFAULT_IMAGE_MODEL_ID} (see `./preferences`) — not "whatever the catalog
- * lists first". The default pin binds every image provider; newer listed cards
- * may require a specific provider connection.
- *
- * Fallback to the first curated `listed` card guards catalog drift only: if the
- * pin were ever dropped/unlisted, a connected key can still serve *some* default
- * rather than 404. `undefined` only if the catalog ships no listed image card.
- */
 export function defaultImageModelId(
   view: models.snapshot.View = models.snapshot.view()
 ): string | undefined {
@@ -159,166 +64,50 @@ export async function hasUsableImageProvider(
   deps: ResolveImageDeps
 ): Promise<boolean> {
   for (const p of byokProvidersFor("image")) {
-    if (!isImageProvider(p.id)) continue;
     if (await deps.secrets._getKey(p.id)) return true;
   }
-  // Grida hosted (GRIDA-SEC-006): a live session serves cards with a Vercel
-  // binding too — a signed-in keyless user gets in-chat image generation.
+  // Grida hosted (GRIDA-SEC-006): a live session serves the curated list
+  // too — a signed-in keyless user gets in-chat image generation.
   return liveGgMediaDeps(deps) !== null;
 }
 
-/**
- * Build the resolved hosted image model — shared by the explicit-pick and
- * post-BYOK fallback arms, which produce the identical descriptor.
- */
-function resolvedGgImage(
-  modelId: string,
-  card: models.image.ImageModelCard,
-  hosted: { session: GridaGatewaySessionStore; base_url: string },
-  providerHttp?: ProviderHttp,
-  background?: "opaque" | "transparent"
-): ResolvedImageModel {
-  return {
-    provider_id: GG_PROVIDER_ID,
-    model_id: modelId,
-    binding_id: card.id,
-    model: new GridaGatewayImageModel(
-      hosted.session,
-      hosted.base_url,
-      card.id,
-      providerHttp,
-      background
-    ),
-  };
-}
-
+/** The agent deliberately retains its existing BYOK-then-GG automatic choice. */
 export async function resolveImageModel(
   deps: ResolveImageDeps,
   modelId: string,
   options: ResolveImageOptions = {}
 ): Promise<ResolvedImageModel> {
-  // One read for the whole resolution: a mid-resolution refresh must not
-  // let the listed-gate and the binding lookup disagree.
-  //
-  // The one deliberate exception is a MISS. The renderer builds this
-  // tool's model list from its own deploy-fresh catalogue
-  // (`editor/scaffolds/desktop/tools/media-tool-registry.ts`), so the
-  // model the agent was just offered can be one this host has not
-  // fetched yet. Refresh once and re-read — both the card and every
-  // binding below then come from the same, newer catalogue.
-  const view = await catalogViewOnMiss(
-    deps.catalog,
-    (v) => !v.image.cardById(modelId)
-  );
-  const card = view.image.cardById(modelId);
-  const background =
-    options.background === "auto" ? undefined : options.background;
-  // Unknown id, or a non-curated card — not part of the BYOK image surface.
-  if (!card || !card.listed) {
-    throw new ImageModelUnavailableError(
-      modelId,
-      options.explicit,
-      undefined,
-      background
-    );
-  }
-
-  // Explicit hosted pick — only grida is checked (mirrors the BYOK
-  // explicit path). Hosted image is text-to-image only in v1: the wire
-  // has no references field, so i2i must ride a BYOK route.
-  if (options.explicit === GG_PROVIDER_ID) {
-    const hosted = !options.references && liveGgMediaDeps(deps);
+  const images = new ImageClient({
+    keys: { get: (provider) => deps.secrets._getKey(provider) },
+    // Explicit legacy host choice: standalone requests may use ambient fetch;
+    // remote downloads still require a supplied host transport.
+    http: deps.provider_http ?? new ProviderHttp(),
+    catalog: deps.catalog,
+    gg: deps.gg,
+    gg_base_url: deps.gg_base_url,
+  });
+  try {
+    return await images.resolve({
+      model_id: modelId,
+      provider: options.explicit ?? "auto",
+      references: options.references,
+      background: options.background,
+    });
+  } catch (error) {
     if (
-      !hosted ||
-      !view.image.binding(card, "vercel") ||
-      (background &&
-        !models.image.supportsTransparentBackground(card, "vercel"))
+      error instanceof ImageClient.Failure &&
+      (error.code === "model_unavailable" ||
+        error.code === "provider_unavailable" ||
+        error.code === "references_unsupported" ||
+        error.code === "gg_token_expired")
     ) {
       throw new ImageModelUnavailableError(
         modelId,
-        GG_PROVIDER_ID,
-        undefined,
-        background
+        options.explicit,
+        options.references,
+        options.background === "auto" ? undefined : options.background
       );
     }
-    return resolvedGgImage(
-      modelId,
-      card,
-      hosted,
-      deps.provider_http,
-      background
-    );
+    throw error;
   }
-
-  const order: ImageProvider[] = options.explicit
-    ? [options.explicit as ImageProvider]
-    : byokProvidersFor("image")
-        .map((p) => p.id)
-        .filter(isImageProvider);
-
-  for (const provider of order) {
-    const binding = view.image.binding(card, provider);
-    if (!binding) continue;
-    // Native alpha support is the conservative admission gate for both explicit
-    // modes. Unknown controls are not inferred from a model's vendor or name.
-    if (
-      background &&
-      !models.image.supportsTransparentBackground(card, provider)
-    )
-      continue;
-    // For an image-to-image resolution, the provider must serve the edit route.
-    // Skip t2i-only bindings so references never land where they're ignored.
-    if (options.references && !binding.references) continue;
-    const key = await deps.secrets._getKey(provider);
-    if (!key) continue;
-    const binding_id = options.references ? binding.references!.id : binding.id;
-    return {
-      provider_id: provider,
-      model_id: modelId,
-      binding_id,
-      model: makeImageModelFor(
-        provider,
-        key.trim(),
-        binding_id,
-        deps.provider_http,
-        background
-      ),
-      ...(options.references
-        ? { references_max: binding.references!.max }
-        : {}),
-    };
-  }
-
-  // Grida hosted (GRIDA-SEC-006) — after BYOK, before giving up. Serves
-  // any card the hosted gateway can (a vercel binding), t2i only.
-  if (!options.explicit && !options.references) {
-    const hosted = liveGgMediaDeps(deps);
-    if (
-      hosted &&
-      view.image.binding(card, "vercel") &&
-      (!background ||
-        models.image.supportsTransparentBackground(card, "vercel"))
-    ) {
-      return resolvedGgImage(
-        modelId,
-        card,
-        hosted,
-        deps.provider_http,
-        background
-      );
-    }
-  }
-
-  // No connected provider served the resolution. For an image-to-image call the
-  // usual cause is that i2i rides a narrower set of providers than t2i (the tool
-  // is offered on any image key, but references need a reference-capable route),
-  // so name that set — otherwise the agent only learns "unavailable".
-  throw new ImageModelUnavailableError(
-    modelId,
-    options.explicit,
-    options.references
-      ? { capable_providers: referenceCapableProviders(card, view) }
-      : undefined,
-    background
-  );
 }

@@ -40,6 +40,9 @@ Hosts must provide:
 
 - `password` for per-request Basic Auth.
 - `user_data_path` for persistent local state.
+- optionally, `provider_home` for shared native provider custody (GRIDA-SEC-014).
+  Omission isolates provider keys under `user_data_path`; the daemon does not
+  discover Grida home itself.
 - optionally, `media_root` for a dedicated durable binary-media store kept
   separate from secret/session state and workspaces.
 - `http_access` for CORS and Referer policy.

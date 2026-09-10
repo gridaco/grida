@@ -13,10 +13,7 @@ import type {
   ChatGptSubscriptionStatus,
 } from "@grida/agent";
 import type { ChatGptConnectResult } from "@grida/desktop-bridge";
-import {
-  CHATGPT_AUTH_ROUTE_PATHS,
-  type ChatGptAuthStart,
-} from "@grida/agent/server";
+import { CHATGPT_AUTH_ROUTE_PATHS, type ChatGptAuthStart } from "@grida/agent";
 import {
   CHATGPT_CALLBACK_PATH,
   CHATGPT_CALLBACK_PORTS,

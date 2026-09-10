@@ -21,3 +21,4 @@ export {
   hostFromUrl,
   type DaemonSandboxPolicy,
 } from "./policy";
+export { containsPath } from "../path-contains";

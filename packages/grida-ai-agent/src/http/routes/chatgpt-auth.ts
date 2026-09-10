@@ -15,14 +15,8 @@ import {
   type ChatGptCredentialManager,
 } from "../../providers/chatgpt-credentials";
 import { ProviderReady } from "./provider-ready";
-
-export const CHATGPT_AUTH_ROUTE_PATHS = Object.freeze({
-  start: "/auth/chatgpt/start",
-  complete: "/auth/chatgpt/complete",
-  cancel: "/auth/chatgpt/cancel",
-  status: "/auth/chatgpt/status",
-  sign_out: "/auth/chatgpt/sign-out",
-} as const);
+import { CHATGPT_AUTH_ROUTE_PATHS } from "../../protocol/chatgpt";
+export { CHATGPT_AUTH_ROUTE_PATHS } from "../../protocol/chatgpt";
 
 export type ChatGptAuthRoutesDeps = {
   credentials: ChatGptCredentialManager;

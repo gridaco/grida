@@ -1,0 +1,98 @@
+name: Verify CLI package
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  pull_request:
+    paths:
+      - ".github/workflows/cli-*.yml"
+      - ".changeset/config.json"
+      - "packages/grida-cli/**"
+      - "packages/grida-auth/**"
+      - "packages/grida-account/**"
+      - "packages/grida-home/**"
+      - "packages/grida-ai/**"
+      - "packages/grida-ai-models/**"
+      - "scripts/cli-release/**"
+      - "scripts/cli-media-local/**"
+      - "scripts/cli-local/**"
+      - "scripts/npm*.mjs"
+      - "scripts/publish-packages*.mjs"
+      - ".github/workflows/publish-packages.yml"
+      - "LICENSE"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - ".nvmrc"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=grida...
+      - name: Prepare and verify the installable candidate
+        run: |
+          node --test scripts/publish-packages.test.mjs scripts/npm.test.mjs
+          node --test scripts/cli-release/prepare.test.mjs
+          node scripts/cli-release/prepare.mjs --out "$RUNNER_TEMP/grida-cli-candidate"
+          node scripts/cli-release/prepare.mjs --verify --out "$RUNNER_TEMP/grida-cli-candidate"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grida-cli-candidate
+          path: ${{ runner.temp }}/grida-cli-candidate/
+          if-no-files-found: error
+          retention-days: 7
+  package:
+    needs: candidate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build, typecheck and test the CLI dependency closure
+        run: |
+          pnpm turbo run build --filter=grida...
+          pnpm turbo run typecheck test --filter=grida...
+      - name: Check release guards and offline network instrumentation
+        run: node --test scripts/cli-release/prepare.test.mjs scripts/cli-media-local/network.test.mjs scripts/cli-local/network.test.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          name: grida-cli-candidate
+          path: ${{ runner.temp }}/grida-cli-candidate
+      - name: Verify the shared candidate
+        run: node scripts/cli-release/prepare.mjs --verify --out "$RUNNER_TEMP/grida-cli-candidate"
+      - name: Exercise this candidate with synthetic providers and owned local auth
+        run: |
+          CLI_ARCHIVE=$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).archive" "$RUNNER_TEMP/grida-cli-candidate/candidate.json")
+          node scripts/cli-media-local/proof.mjs --archive "$RUNNER_TEMP/grida-cli-candidate/$CLI_ARCHIVE"
+      # Only the package/report are uploaded. Synthetic profiles, inputs, local
+      # credentials and generated outputs are removed by the proof itself.

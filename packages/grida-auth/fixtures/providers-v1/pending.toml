@@ -1,0 +1,7 @@
+# GRIDA-SEC-014 — published import awaiting durable source retirement.
+version = 1
+[migration]
+state = "pending"
+removed = []
+[providers.example]
+api_key = "synthetic-imported"

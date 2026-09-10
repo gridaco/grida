@@ -40,6 +40,7 @@ export default defineConfig([
     ...shared,
     entry: [
       "src/server.ts",
+      "src/media-server.ts",
       "src/sandbox/index.ts",
       "src/transport.ts",
       "src/acp/index.ts",

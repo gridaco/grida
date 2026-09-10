@@ -3,8 +3,9 @@
  *
  * Client-safe request/result shapes for `POST /three-d/generate`. The request
  * names only a closed catalogue model and carries at most one renderer-owned
- * image. The route normalizes the provider result to the primary GLB bytes, so
- * no provider URL or credential crosses the renderer boundary (GRIDA-SEC-004).
+ * image. The SDK validates and downloads the primary GLB; the host encodes its
+ * bytes and adds an optional receipt. No provider URL or credential crosses
+ * the renderer boundary (GRIDA-SEC-004).
  */
 
 import type { models } from "@grida/ai-models";

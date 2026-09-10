@@ -4,8 +4,11 @@
 > [security registry](https://github.com/gridaco/grida/blob/main/SECURITY.md).
 > **GRIDA-SEC-006 / GRIDA-GG: token** — scoped GG grants go only to an explicit
 > trusted memory sink.
+> **GRIDA-SEC-014** — separate native provider API-key custody and private writer
+> exclusion; see the [provider file protocol](PROVIDER-CREDENTIALS-V1.md).
 
-Independent Grida native OAuth lifecycle. Private, experimental `0.0.0`; no
+Independent Grida native OAuth lifecycle and separate provider API-key custody.
+Private, experimental `0.0.0`; no
 compatibility guarantees yet. This package can be consumed without a CLI,
 Desktop, Electron, an agent, or a daemon.
 
@@ -399,7 +402,86 @@ can still require login; no local adapter can make those two systems atomic.
   are transport only; other operations require a new producer contract.
 - No bespoke tokens, token-claim identity inference, social-PKCE fallback,
   Desktop deep links/cookies, global logout, or grant revocation.
-- No Desktop/provider credential sharing, machine-wide store, or daemon lifetime.
+- No account credential sharing with Desktop/provider stores, machine-wide store,
+  or daemon lifetime. The explicit provider export shares API keys only.
+
+## Independent native provider credentials
+
+`@grida/auth/providers` exports `ProviderCredentialStore`, an independent Node 24+
+API-key owner. It needs no account login, application, daemon, model catalog, or
+provider request. It never opens account custody. Construction accepts only an
+explicit absolute canonical Grida home and performs no I/O.
+
+```ts
+import { ProviderCredentialStore } from "@grida/auth/providers";
+
+const providers = new ProviderCredentialStore({ home: "/absolute/grida-home" });
+await providers.set("example", "synthetic-api-key");
+await providers.list(); // [{provider: "example"}], sorted presence only
+const apiKey = await providers.read("example"); // secret: trusted SDK injection only
+await providers.remove("example");
+```
+
+The single plaintext authority is `<home>/providers/credentials.toml`. Its private
+0700 parent allows an existing Grida home to remain 0755; files are 0600. Unsafe
+permissions, ownership, aliases, hard links, special files, or macOS ACL grants
+fail closed without repair. Main-thread Node on local macOS/Linux filesystems is
+supported; Windows ACL support and worker-thread coordination are unimplemented
+and refuse I/O. Same-user processes, OS and dependencies are trusted.
+
+Each operation takes a crash-released process lock, rereads current TOML, and
+publishes complete mutations with file fsync, atomic rename and directory fsync.
+Set/remove preserve other providers across independent processes. Read returns
+the named key or null; list returns only IDs. Absence is never substituted for
+an unreadable, corrupt, unsupported, or unsafe store. No method verifies a key
+with a provider. Explicit caller-supplied credential overrides can bypass store
+construction and I/O entirely; precedence belongs to the host.
+
+The [language-independent v1 protocol](PROVIDER-CREDENTIALS-V1.md) defines UTF-8,
+schema, exact ID/key bounds, failures, publication, locking and crash recovery;
+its [synthetic fixtures](fixtures/providers-v1/README.md) are reusable by ports.
+`ProviderCredentialStore.Failure` exposes only its stable code and fixed message.
+Public diagnostics never include parser bodies, filesystem paths or key values.
+The key returned by read and the input to set are deliberately secret-bearing.
+
+### One-time import
+
+The source owner retains decoding and retirement of its old format. Hold its
+exclusive writer lock before `migrate`, through completion. Its lazy `read`
+returns only API-key entries; `retire` durably removes those entries while
+preserving unrelated records. Both callbacks are captured once, and must never
+reenter either the source lock or provider store.
+
+```ts
+await sourceWriter.run(async () => {
+  await providers.migrate({
+    read: readLegacyApiKeys, // Promise<readonly {provider, apiKey}[]>
+    retire: retireLegacyApiKeys, // idempotent durable Promise<void>
+  });
+});
+```
+
+Existing canonical values and pre-import deletion tombstones win. Import first
+publishes a durable `pending` fence, then retires the source, then publishes
+`complete`. A failed retirement leaves ordinary operations blocked with
+`migration_pending`. Retry invokes only retirement, never rereads/imports stale
+keys. Complete migration invokes neither callback. Source callbacks that fail
+produce fixed `migration_failed` errors. Deletion preserves protocol metadata;
+manually deleting the entire file or restoring old backups erases its fences.
+Old applications that keep reading/writing the legacy file are not coordinated.
+
+`@grida/auth/node` also exports `CredentialLock({directory})`, which supplies the
+same native exclusion foundation to an independent credential-file writer. The
+directory must be explicit, canonical, and private. `run(callback)` has a fixed
+30-second acquisition deadline, never steals a running callback, and returns its
+result. It does not read/serialize credentials or repair paths. Acquisition and
+release errors are fixed `CredentialLock.Failure` codes; callback errors remain
+the host's responsibility and are propagated unchanged. Migration's mandatory
+lock order is source writer then provider store.
+
+Provider anti-goals: no OAuth/keyring migration, account sessions, machine-wide
+secrets, ambient/project credential discovery, provider network verification,
+credential export command, backend plugin, or arbitrary file/connection getter.
 
 ## Verification
 

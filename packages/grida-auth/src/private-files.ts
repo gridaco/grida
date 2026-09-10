@@ -1,4 +1,5 @@
 // GRIDA-SEC-010 — owner-only local files; no ambient credential discovery.
+// GRIDA-SEC-014 — shared private native provider-file foundations.
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { constants, type Stats } from "node:fs";

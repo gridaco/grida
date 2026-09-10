@@ -17,13 +17,17 @@ describe("resolveVideoModel", () => {
   it("resolves a connected provider that serves the model", async () => {
     const r = await resolveVideoModel(
       { secrets: fakeSecrets({ fal: "sk-fal" }) },
-      VEO
+      VEO,
+      { image: true }
     );
     expect(r.provider_id).toBe("fal");
     expect(r.binding_id).toBe("fal-ai/veo3.1/image-to-video");
+    expect(r.input).toBe("image");
+    expect(r).not.toHaveProperty("model");
+    expect(Object.isFrozen(r)).toBe(true);
   });
 
-  it("prefers Vercel (video precedence) when both keys exist", async () => {
+  it("prefers Vercel over fal when both keys exist", async () => {
     const r = await resolveVideoModel(
       { secrets: fakeSecrets({ vercel: "sk-v", fal: "sk-fal" }) },
       VEO
@@ -42,7 +46,8 @@ describe("resolveVideoModel", () => {
   it("resolves Seedance with a fal key", async () => {
     const r = await resolveVideoModel(
       { secrets: fakeSecrets({ fal: "sk-fal" }) },
-      SEEDANCE
+      SEEDANCE,
+      { image: true }
     );
     expect(r.provider_id).toBe("fal");
     expect(r.binding_id).toBe("bytedance/seedance-2.0/image-to-video");
@@ -66,9 +71,32 @@ describe("resolveVideoModel", () => {
     const r = await resolveVideoModel(
       { secrets: fakeSecrets({ vercel: "sk-v", fal: "sk-fal" }) },
       VEO,
-      { explicit: "fal" }
+      { explicit: "fal", image: true }
     );
     expect(r.provider_id).toBe("fal");
+  });
+
+  it("retains automatic OpenRouter precedence among compatible connected providers", async () => {
+    const resolved = await resolveVideoModel(
+      {
+        secrets: fakeSecrets({
+          openrouter: "key-or",
+          vercel: "key-v",
+          fal: "key-f",
+        }),
+      },
+      VEO
+    );
+    expect(resolved.provider_id).toBe("openrouter");
+    expect(resolved.input).toBe("text-or-image");
+  });
+
+  it("rejects text input on an image-only binding", async () => {
+    await expect(
+      resolveVideoModel({ secrets: fakeSecrets({ fal: "key" }) }, VEO, {
+        explicit: "fal",
+      })
+    ).rejects.toBeInstanceOf(VideoModelUnavailableError);
   });
 
   it("throws with no key", async () => {
