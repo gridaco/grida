@@ -1,5 +1,6 @@
 // GRIDA-GG: token — native exchange enforcing-binding contract.
 // GRIDA-SEC-006 / GRIDA-SEC-010 / GRIDA-SEC-012
+// GRIDA-SEC-015 — account-to-GG exchange does not create a new account credential.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignJWT, jwtVerify } from "jose";
 import { ggApi } from "./gg";

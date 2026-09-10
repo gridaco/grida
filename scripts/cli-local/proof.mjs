@@ -117,6 +117,8 @@ async function main() {
   );
   assert.equal(registration.issuer, fixture.issuer);
   assert.equal(registration.apiOrigin, fixture.editorOrigin);
+  assert.match(registration.publishableKey, /^sb_publishable_[A-Za-z0-9_-]+$/);
+  assert.equal(registration.publishableKey, setup.publishableKey);
   assert.deepEqual(registration.redirectUris, fixture.redirectUris);
   const owned = await realpath(
     await mkdtemp(path.join(tmpdir(), "grida-cli-proof-"))
@@ -693,6 +695,41 @@ async function main() {
         assert(
           !jwt.test(await readFile(file.filename, "utf8")),
           "Logout retained a bearer credential"
+        );
+        await login(profiles[0], "insider@grida.co");
+        const expiring = (await json(["auth", "status"])).value;
+        // Advance only this application's clock beyond the issued expiry.
+        // Leave time for the replacement JWT to have a later real expiry.
+        await new Promise((resolve) => setTimeout(resolve, 2_100));
+        const offset = expiring.expiresAt + 1 - Date.now();
+        assert(
+          Number.isSafeInteger(offset) && offset > 0 && offset <= 3_600_000
+        );
+        const expiredLogout = await json(["auth", "logout"], {
+          extra: { GRIDA_CLI_PROOF_CLOCK_OFFSET: String(offset) },
+        });
+        assert.deepEqual(expiredLogout.value, {
+          state: "signed-out",
+          revocation: "confirmed",
+        });
+        assert.equal(
+          expiredLogout.stats.requests.filter(
+            (value) => value.path === "/auth/v1/oauth/token"
+          ).length,
+          1,
+          "Expired logout must consume exactly one detached rotation"
+        );
+        assert.equal(
+          (await json(["auth", "status"], { code: 1 })).value.state,
+          "signed-out"
+        );
+        assert(
+          !jwt.test(await readFile(file.filename, "utf8")),
+          "Expired logout restored a bearer credential"
+        );
+        assert.deepEqual(
+          (await json(["account", "view"], { profile: profiles[1] })).value,
+          secondAccount
         );
         assert.equal(
           (await json(["auth", "logout"], { profile: profiles[1] })).value

@@ -65,14 +65,19 @@ Small, non-secret native preferences live in `preferences.json` under
 Electron's `userData` directory and are owned exclusively by main. The hosted
 renderer receives purpose-specific actions, never a generic preferences
 key/value bridge. `DesktopPreferences` uses a small versioned JSON document
-with owner-only atomic writes. Account cookies remain in Chromium's HttpOnly
-session, while macOS/Linux BYOK API keys use the shared native
+with owner-only atomic writes. Account cookies remain in Chromium's default
+session cookie jar, while macOS/Linux BYOK API keys use the shared native
 `providers/credentials.toml` under Grida home through the sidecar's secret adapter.
 ChatGPT OAuth stays in the
 agent's `auth.json`. On the first upgrade from Desktop 0.0.13, main consumes the former
 renderer onboarding-completion flag through one fixed hidden same-origin probe
 and records the migration before selecting an authenticated role. That legacy
 flag is never consulted again.
+
+The [client authentication blueprint](https://grida.co/docs/reference/authentication)
+maps the separate web, Desktop, CLI and provider lifecycles. Current account
+cookies are not configured as HttpOnly; this is not a guarantee of isolation
+from the trusted same-origin renderer.
 
 Shared BYOK custody (GRIDA-SEC-014) is private plaintext on macOS/Linux.
 Desktop and CLI see the same provider changes without either requiring the

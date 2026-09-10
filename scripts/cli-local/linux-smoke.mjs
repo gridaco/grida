@@ -51,6 +51,7 @@ async function main() {
       env.GRIDA_CLI_LOCAL_CONFIG,
       JSON.stringify({
         clientId: "cli-offline-smoke",
+        publishableKey: "sb_publishable_synthetic_offline",
         issuer: "http://127.0.0.1:55431/auth/v1",
         apiOrigin: "http://127.0.0.1:3041",
         redirectUris: [

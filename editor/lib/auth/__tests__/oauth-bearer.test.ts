@@ -1,4 +1,5 @@
 // GRIDA-SEC-010 — native bearer identity rejects other credential classes.
+// GRIDA-SEC-015 — account ingress remains separate from scoped media authority.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignJWT, jwtVerify } from "jose";
 import { bearer } from "../bearer";

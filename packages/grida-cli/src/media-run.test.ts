@@ -1,4 +1,5 @@
 // GRIDA-SEC-013 — CLI preflight, explicit BYOK, safe media publication.
+// GRIDA-SEC-015 — composing real media clients does not mix account, GG and BYOK authority.
 // GRIDA-SEC-006 — only the public native scoped sink supplies GG to the real media SDK.
 // GRIDA-GG: token — synthetic tokens only; no services, auth custody or provider calls.
 import { MediaOperations } from "@grida/ai";

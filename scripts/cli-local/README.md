@@ -56,7 +56,9 @@ The proof covers:
   to ten seconds before its observed expiry. This avoids waiting an hour; JWTs,
   token exchange, issuer time, and credential files are unchanged by the harness.
 - Safe offline failures, local status without network, session-local logout,
-  cleared credential envelopes, and survival of the other CLI session.
+  cleared credential envelopes, and survival of the other CLI session. A second
+  logout advances the application clock past its captured expiry and requires
+  exactly one detached refresh without restoring credentials.
 
 The CLI preload permits only the exact API/editor ports and callback listeners.
 It records method/path counts without headers or bodies, rejects outside module
@@ -69,7 +71,10 @@ These are tripwires for a trusted repository/runtime, not an OS sandbox. The
 guard, clock injection, real local issuer and manual browser path do not certify
 hosted registration, the system browser launcher, Windows, native keyring
 availability, or naturally expired JWT behavior. The fixture's existing OAuth
-proof separately covers revocation and API/RLS details.
+proof separately covers revocation of both captured and detached-rotation refresh
+credentials, same-user session/browser preservation, and API/RLS details. Local
+Kong is more permissive about the logout admission key than the hosted gateway;
+the auth proof and unit tests enforce that header contract explicitly.
 
 All CLI children, browser storage and temporary installation/profile files are
 removed before a safe report is written under ignored `.cache/cli-local`.

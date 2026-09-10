@@ -1,4 +1,5 @@
 // GRIDA-SEC-014 — shared provider custody retains explicit host authority.
+// GRIDA-SEC-015 — account authority enters media only through an explicit scoped GG handoff.
 // GRIDA-SEC-013 — explicit CLI media authority, preflight and safe result presentation.
 // GRIDA-SEC-006 — the native account owner hands off only a scoped in-memory GG grant.
 // GRIDA-GG: token — one invocation, no persistence, remint or provider fallback.

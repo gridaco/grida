@@ -254,6 +254,10 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
   );
   expect(config.issuer).toBe(`${api}/auth/v1`);
   expect(config.apiOrigin).toBe(web);
+  expect(/^sb_publishable_[A-Za-z0-9_-]+$/.test(config.publishableKey)).toBe(
+    true
+  );
+  expect(config.publishableKey === setup.publishableKey).toBe(true);
   expect(config.redirectUris).toEqual(callbacks);
   const insider: User = setup.users.find(
     (user: User) => user.email === "insider@grida.co"
@@ -275,6 +279,16 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           ? input.href
           : input.url;
     if (!allowed(url)) throw new Error("Node request escaped the fixture");
+    if (
+      new URL(url).pathname === "/auth/v1/logout" &&
+      new URL(url).search === "?scope=local"
+    ) {
+      // Local Kong does not require this key when a bearer is present. Keep
+      // hosted admission an explicit fixture contract, not an accidental pass.
+      const headers = new Headers(init?.headers);
+      expect(headers.get("apikey") === config.publishableKey).toBe(true);
+      expect(headers.get("authorization")?.startsWith("Bearer ")).toBe(true);
+    }
     if (new URL(url).pathname === "/auth/v1/oauth/token") {
       tokenPosts++;
       if (
@@ -973,11 +987,22 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
       "local logout revokes only the captured native session",
       async () => {
         const oldAccess = first.session()!.accessToken;
+        const oldRefresh = first.session()!.refreshToken;
         expect(await first.auth.logout()).toEqual({
           state: "signed-out",
           revocation: "confirmed",
         });
         expect(await accountStatus(oldAccess)).toBe(401);
+        const refresh = await request("/auth/v1/oauth/token", {
+          method: "POST",
+          form: new URLSearchParams({
+            grant_type: "refresh_token",
+            client_id: config.clientId,
+            refresh_token: oldRefresh,
+          }).toString(),
+        });
+        expect([400, 401].includes(refresh.status)).toBe(true);
+        await refresh.body?.cancel();
         expect(await mintStatus(oldAccess, logoutGrant!.organization.id)).toBe(
           401
         );
@@ -1114,7 +1139,7 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         expect(
           await probe("organizations", organizations.organizations[0]!.id)
         ).toEqual({ organizations: [], next_cursor: null });
-        expect(await probe("logout")).toEqual({
+        expect(await probe("logout-expired")).toEqual({
           state: "signed-out",
           revocation: "confirmed",
         });
@@ -1125,6 +1150,14 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           )
         ).toBe(false);
         expect((await second.auth.verify()).state).toBe("signed-in");
+        const afterExpiredLogout = client(page);
+        expect(
+          (await login(afterExpiredLogout, page, insider, "Allow", "reuse")).ok
+        ).toBe(true);
+        expect(await afterExpiredLogout.auth.logout()).toEqual({
+          state: "signed-out",
+          revocation: "confirmed",
+        });
       }
     );
 

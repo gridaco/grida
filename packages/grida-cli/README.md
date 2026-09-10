@@ -6,8 +6,7 @@
 The `grida` command composes Grida's account services and tools for people and
 their own harnesses. It runs independently of Desktop.
 
-**Preview.** Install the replacement CLI from npm's `next` channel. The legacy
-`latest` package does not provide these commands. Current commands cover auth,
+This README describes the Grida CLI 0.1 release line. Commands cover auth,
 credential storage, identity, organization membership, cached credits, help/version
 and docs.
 Media commands discover models/schemas, inspect provider key presence, list speech
@@ -17,7 +16,7 @@ Agent, render and MCP are deferred.
 Use Node.js 24 or later:
 
 ```sh
-npm install -g grida@next
+npm install -g grida
 grida --version
 grida --help
 ```
@@ -51,12 +50,15 @@ observations, not an atomic identity/membership snapshot.
 
 ## OAuth client registration
 
-The production client ID, issuer, API origin and callback URLs live in
+The production client ID, issuer, public project admission key, API origin and callback URLs live in
 [`src/oauth-client-registration.ts`](https://github.com/gridaco/grida/blob/main/packages/grida-cli/src/oauth-client-registration.ts).
 These public values are intentionally versioned in Git and bundled with the CLI.
 The CLI host consumes them; the shared auth SDK remains registration-agnostic.
 Changes must stay aligned with the Supabase OAuth app and Grida server allowlist.
 Issuer/client/API changes also affect existing credential profile identity.
+The public project key is sent only to the fixed issuer logout endpoint;
+rotating that key does not change credential profile identity. It is distinct
+from the OAuth client ID and from every user/provider credential.
 
 Account commands use this hosted public registration:
 Grida's HTTPS issuer/API and the two registered loopback callbacks. Public client

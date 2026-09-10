@@ -1142,7 +1142,11 @@ paths, and params are public, so the design must not rely on obscurity.
    ever delivers a build its own declared scheme.
 
 Electron main holds no durable desktop account or provider credential.
-Chromium's default session owns the HttpOnly cookie jar;
+Chromium's default session owns the account cookie jar. The current Supabase SSR
+helpers do not configure these cookies as HttpOnly; trusted same-origin renderer
+code is not excluded from that cookie authority. This boundary relies on the
+fixed ceremony, renderer/navigation controls and native capability separation,
+not a renderer-inaccessible cookie guarantee;
 the entry account client invokes `session.defaultSession.fetch` only for the
 two fixed same-origin account routes. Main never reads or exports cookie/token
 material, and `DesktopAccountSession` returns only the three-state projection
@@ -1762,8 +1766,15 @@ credential through reuse of an existing browser or daemon bridge.
    and refresh, and invalidates stale work on logout/cancellation. Accepted
    refresh rotations survive a later identity-check failure; the access token
    and identity remain the last verified values until that check succeeds. Logout
-   clears this custody and requests only `scope=local`; failed remote
-   revocation is reported rather than changing to global/grant revocation.
+   clears this custody before remote work. It constrains the captured JWT to
+   the configured issuer/client/user and a non-nil session ID; missing session
+   targeting cannot reach an issuer fallback to account-wide logout. Expired
+   or near-expired logout performs at most one detached refresh in memory and
+   requires the same session binding. It never persists the renewed credentials
+   or emits signed-in metadata after clearing. Live identity verifies the
+   selected bearer before requesting only `scope=local`; failed remote revocation
+   is reported rather than changing to global/grant revocation. Only completed
+   200/204 responses confirm logout; their bodies are discarded.
 5. **Durable profile authority.** The Node factory binds a private profile to
    canonical home, issuer, client ID, and API origin. Keyring is the initial
    default; explicit file selection is remembered. Backend failure never
@@ -1832,6 +1843,10 @@ credential through reuse of an existing browser or daemon bridge.
     registered loopback callbacks. No environment or repository configuration
     changes hosted destination authority. Custody uses the canonical Grida home
     or an explicit absolute `GRIDA_HOME`, with issuer/client/API profile binding.
+    The bundled `sb_publishable_...` project key supplies admission only on the
+    fixed issuer logout request, alongside the user bearer. It is not identity;
+    key rotation does not create a different credential profile. Secret/service
+    keys and legacy JWT keys fail configuration validation before custody.
     Empty/relative overrides and filesystem-root/user-home targets fail before
     custody. The explicit local fixture file remains bounded and owner-controlled,
     accepts only the fixed local issuer/API and registered callbacks, and requires
@@ -2058,9 +2073,13 @@ defaults would cross those boundaries.
    the exact fixture API/editor ports and callback listeners, and refuses
    external module resolution. The macOS custody owner's exact read-only ACL
    command remains real. Reports contain hashes and safe phase metadata only;
-   owned browser/profile/process cleanup precedes report writing. One bounded
-   application-clock injection exercises real near-expiry refresh without
-   modifying issuer time, tokens or credential files.
+   owned browser/profile/process cleanup precedes report writing. Bounded
+   application-clock injections exercise near-expiry reads and detached logout
+   renewal without modifying issuer time, tokens or credential files. The fixture
+   explicitly asserts the logout admission key and its absence on other account
+   requests; the more permissive local gateway alone cannot prove hosted key
+   admission. Both captured and renewed refresh tokens must fail after logout,
+   while another native session and the browser remain usable.
 
 **Limits.** This is local provisioning, not hosted deployment certification.
 The executable, repository, dependencies, Docker engine, and same-user process
@@ -2585,9 +2604,77 @@ platform evidence, not Windows or cross-platform release certification.
 
 ---
 
+### `GRIDA-SEC-015` — Account-to-media credential handoff
+
+**What it protects.** Composing native account access with media execution does
+not make the account access or refresh token a provider credential. The CLI
+host explicitly selects BYOK or a scoped GG handoff, and the corresponding
+account/GG server verifiers keep their credential families separate. The
+[client authentication blueprint](docs/reference/authentication.md) maps this
+composition alongside browser, Desktop and independent provider sessions.
+
+**Vulnerable scenario (prevented).** A new media command forwards the user's
+full account token as an AI key, treats a GG grant as account identity, or turns
+a missing BYOK key into implicit account access/credit spending. Sharing model
+operations must not merge the credentials held by their different hosts.
+
+**Why it's specifically risky here.** CLI and Desktop expose the same models
+through different account ceremonies and storage owners. A common account,
+provider interface or HTTP bearer shape does not make those credentials
+interchangeable. Public application registration/API keys are not user identity.
+
+**How the code prevents it.**
+
+1. **Explicit CLI composition.** `MediaCommands` resolves the selected provider
+   and validates generation input/output admission before account authority. Its
+   GG branch opens native auth with one captured in-memory grant sink; the media
+   HTTP owner receives a GG store and an empty BYOK reader. Its BYOK branch opens
+   provider custody without opening native account custody. Errors do not switch
+   the selected provider or funding path; final cleanup clears the GG store.
+2. **Account ingress is not GG ingress.** The native bearer owner admits only
+   the configured issuer/client and required user/session/expiry claims, then
+   verifies the same bearer at fixed live OAuth userinfo. Cookies and GG tokens
+   cannot satisfy that account contract. GRIDA-SEC-010/012 own the full native
+   principal and machine request boundary.
+3. **Scoped media authority has its own verifier.** GG signs/verifies with its
+   dedicated server key, HS256 algorithm, `gg:ai` audience, organization and bounded
+   lifetime. The shared mint policy resolves membership before signing. An
+   account bearer cannot substitute for that grant; a resulting GG grant is
+   rejected by the account API. GRIDA-SEC-006 owns cryptographic scope and the
+   Desktop/native mint adapters; GRIDA-SEC-013 owns CLI credential egress.
+4. **Existing owners stay independent.** GRIDA-SEC-005 owns Desktop account
+   cookies, 010 owns CLI account custody, 008 owns ChatGPT provider OAuth, and
+   014 owns shared BYOK. The blueprint is an index of those owners, not a new
+   store, token type, authentication service or permission mechanism.
+
+**Limits.** This is a composition contract over existing enforcement. It does
+not certify hosted logout, make all clients' logout scope identical, revoke
+already-issued GG grants immediately, or sandbox an account bearer against
+every legacy/browser/Supabase endpoint. CLI explicit-provider policy is not an
+account-wide BYOK-only preference. Independent stores do not prevent deliberate
+account-wide revocation by another client. Keep release-specific acceptance and
+incident investigations out of the architectural guarantee.
+
+**Files bound by this id.**
+
+- [CLI media composition](packages/grida-cli/src/media-run.ts) and
+  [tests](packages/grida-cli/src/media-run.test.ts) — real SDK handoff, BYOK/account
+  independence, missing-key failure, no stale grant reuse or credential output.
+- [Native bearer verifier](editor/lib/auth/bearer.ts) and
+  [tests](editor/lib/auth/__tests__/oauth-bearer.test.ts) — accepted account family
+  and live issuer verification, including rejection of other credential classes.
+- [GG token policy](editor/lib/gg/tokens.ts) and
+  [tests](editor/lib/gg/tokens.test.ts) — separate scoped authority and lifetime.
+- [Native GG exchange tests](editor/lib/api/gg.test.ts) — membership-bound mint
+  and the minted grant's rejection as account authority.
+- [Client authentication blueprint](docs/reference/authentication.md) — the
+  cross-client authority and lifecycle model contributors must keep aligned.
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-015` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-016` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

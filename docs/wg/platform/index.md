@@ -12,6 +12,7 @@ Working group documents for Grida platform and infrastructure topics.
 
 ## Documents
 
+- [Client authentication blueprint](../../reference/authentication.md) — current web, Desktop and CLI flows, credential owners and security boundaries.
 - [Grida CLI](../cli/index.md) — CLI doctrine and independent account infrastructure: native login, memberships, cached credits, and scoped GG access.
 - [Billing](./billing) — subscriptions, AI credit, Stripe ↔ Metronome sync.
 - [Grida Gateway (GG)](./hosted-ai) — the first-party metered, no-BYOK AI gateway: scoped-token federation → org-credit spend; the desktop's no-key AI path.

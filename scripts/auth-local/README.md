@@ -87,8 +87,9 @@ mode `0700`. Outputs have mode `0600`:
 
 - `fixture.json`: validated paths, versions, lifecycle phase, and copied-source
   hashes. `readState(path)` is exported from `stack.mjs` for the editor launcher.
-- `public-client.json`: `{clientId, issuer, apiOrigin, redirectUris}` for the native
-  auth producer. It contains no OAuth client secret.
+- `public-client.json`: `{clientId, publishableKey, issuer, apiOrigin, redirectUris}`
+  for the native auth producer. The fixture's `sb_publishable_…` admission key
+  comes from local CLI status; it is not an OAuth client secret or user authority.
 - `setup.json`: fixture API keys, seeded test credentials, and an `editorEnv`
   object for the isolated editor launcher. These are local fixture credentials.
 - `editor.env`: the same editor settings for tools that explicitly consume an env
@@ -167,6 +168,19 @@ endpoints. It verifies browser sign-in, denial and reused consent, one-use codes
 bearer credential rejection, independent native sessions, rotating refresh,
 seeded `local`/`acme` organization RLS, and the distinct effects of session-local
 logout, application-grant revocation, and account-wide logout.
+
+Session-local logout checks rejection of the captured refresh credential and
+account bearer while another native session and the browser remain usable. A
+standalone process also advances only its application clock beyond the captured
+JWT expiry, performs one detached renewal, and proves both the original and
+renewed refresh credentials are rejected afterward. Renewed credentials never
+return to custody or IPC. Issuer time and token bytes stay unchanged: this covers
+the application's expired-session path, not naturally expired issuer JWTs.
+
+Local Kong accepts a user bearer on `/auth/v1/logout` without an admission key;
+the hosted gateway requires the publishable `apikey` too. The proof explicitly
+checks that native logout carries both, and unit tests cover rejection when the
+key is absent. A successful local run does not certify hosted gateway admission.
 
 The account check calls the package's public
 `auth.requestAccount("organizations.list", { after })` operation through Grida's

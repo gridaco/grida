@@ -12,6 +12,7 @@ const config: AuthClient.Config = {
   issuer: "http://127.0.0.1:55431/auth/v1",
   apiOrigin: "http://127.0.0.1:3041",
   clientId: "synthetic-public-client",
+  publishableKey: "sb_publishable_synthetic",
   redirectUris: ["http://127.0.0.1:55435/callback"],
 };
 const session: AuthClient.Session = {
@@ -90,6 +91,25 @@ describe.skipIf(process.platform === "win32")("durable native custody", () => {
     expect(await next.info()).toMatchObject({ backend: "file" });
     expect(keyring.read).not.toHaveBeenCalled();
     expect(keyring.write).not.toHaveBeenCalled();
+  });
+
+  it("keeps the credential profile and revision across public admission-key rotation", async () => {
+    const { store, directory, keyring } = await setup("file");
+    await save(store);
+    const before = await snapshot(store);
+    const rotated = await CredentialStore.open(
+      {
+        ...config,
+        publishableKey: "sb_publishable_rotated",
+      },
+      { home: directory, keyring }
+    );
+    expect(await rotated.info()).toEqual(await store.info());
+    expect(await snapshot(rotated)).toEqual(before);
+    expect(await readdir(join(directory, "auth"))).toHaveLength(1);
+    expect(await readFile(await metadataPath(directory), "utf8")).not.toContain(
+      config.publishableKey
+    );
   });
 
   it("keeps invalidation durable even when already signed out", async () => {

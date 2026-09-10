@@ -1,5 +1,9 @@
 # Native OAuth deployment configuration
 
+The [client authentication blueprint](https://grida.co/docs/reference/authentication)
+maps web, Desktop, CLI and provider authority. This document owns the concrete
+web-server configuration for native OAuth; avoid duplicating its variable table.
+
 For operators deploying Grida's browser consent and native account API. The
 configuration reader is [oauth-server.ts](oauth-server.ts); consent proofs belong
 to [oauth-consent.ts](oauth-consent.ts). Keep this reference and deployment notes

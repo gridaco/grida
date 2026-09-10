@@ -71,5 +71,6 @@ grida auth logout
 
 Logout removes this CLI's credentials and requests remote session revocation.
 Local removal still happens offline; unconfirmed revocation is reported with
-exit code `1`. Already signed out locally is a successful no-op. Logout leaves
+exit code `1`. When online, logout renews expired credentials if needed to revoke
+that session, without saving them again. Already signed out locally is a successful no-op. Logout leaves
 provider API keys intact.

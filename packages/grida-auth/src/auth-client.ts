@@ -362,15 +362,54 @@ export class AuthClient {
     await closeListener(listener);
     if (!session) return { state: "signed-out", revocation: "not-needed" };
     try {
+      // The issuer can fall back to account-wide logout when session_id is
+      // absent. Claims only constrain the target; live identity below supplies
+      // authority. Never use grant/global revocation as a fallback.
+      const captured = logoutSession(
+        session.accessToken,
+        this.config,
+        session.identity
+      );
+      let accessToken = session.accessToken;
+      if (
+        Math.min(session.expiresAt, captured.expiresAt) <=
+        this.host.now() + 30_000
+      ) {
+        // Custody is already cleared. This detached rotation must never use the
+        // persisting refresh path or publish signed-in metadata, even on failure.
+        const tokens = await this.exchange(
+          {
+            grant_type: "refresh_token",
+            client_id: this.config.clientId,
+            refresh_token: session.refreshToken,
+          },
+          session.refreshToken
+        );
+        const renewed = logoutSession(
+          tokens.accessToken,
+          this.config,
+          session.identity
+        );
+        if (renewed.id !== captured.id || renewed.expiresAt <= this.host.now())
+          throw new AuthClient.Failure("token_rejected");
+        accessToken = tokens.accessToken;
+      }
+      const identity = await this.identity(accessToken);
+      if (identity.id !== session.identity.id)
+        throw new AuthClient.Failure("token_rejected");
       const response = await this.request({
         url: `${this.config.issuer}/logout?scope=local`,
         method: "POST",
-        headers: { authorization: `Bearer ${session.accessToken}` },
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          apikey: this.config.publishableKey,
+        },
+        response: "empty",
       });
       return {
         state: "signed-out",
         revocation:
-          response.status >= 200 && response.status < 300
+          response.status === 200 || response.status === 204
             ? "confirmed"
             : "unconfirmed",
       };
@@ -741,6 +780,10 @@ export namespace AuthClient {
   export type Config = {
     clientId: string;
     issuer: string;
+    /** Public project admission for issuer logout; never a secret/service key.
+     * Rotation does not change the issuer/client/API credential profile identity.
+     */
+    publishableKey: string;
     apiOrigin: string;
     redirectUris: readonly string[];
   };
@@ -866,6 +909,8 @@ export namespace AuthClient {
     method: "GET" | "POST";
     headers: Record<string, string>;
     body?: string;
+    /** JSON is required by default; logout explicitly has no response payload. */
+    response?: "json" | "empty";
   };
   export type Response = { status: number; body: unknown };
   export type RequestOperation = { result: Promise<Response>; cancel(): void };
@@ -1118,10 +1163,68 @@ function timestamp(value: unknown): value is string {
   return month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1]!;
 }
 
+/** Target constraint only, never signature/identity verification. Kept neutral
+ * (no Node/DOM decoder); the fixed live account API verifies the same bearer.
+ */
+function logoutSession(
+  token: string,
+  config: AuthClient.Config,
+  identity: AuthClient.Identity
+) {
+  try {
+    if (!opaque(token)) throw new Error();
+    const parts = token.split(".");
+    if (
+      parts.length !== 3 ||
+      parts.some((part) => !/^[A-Za-z0-9_-]+$/.test(part))
+    )
+      throw new Error();
+    const encoded = parts[1]!;
+    if (encoded.length % 4 === 1) throw new Error();
+    const alphabet =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let bits = 0;
+    let value = 0;
+    let bytes = "";
+    for (const character of encoded) {
+      value = (value << 6) | alphabet.indexOf(character);
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        bytes += `%${((value >> bits) & 255).toString(16).padStart(2, "0")}`;
+      }
+    }
+    if ((value & ((1 << bits) - 1)) !== 0) throw new Error();
+    const claims = record(JSON.parse(decodeURIComponent(bytes)));
+    if (
+      !claims ||
+      claims.iss !== config.issuer ||
+      claims.aud !== "authenticated" ||
+      claims.client_id !== config.clientId ||
+      claims.sub !== identity.id ||
+      typeof claims.session_id !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        claims.session_id
+      ) ||
+      claims.session_id === "00000000-0000-0000-0000-000000000000" ||
+      typeof claims.exp !== "number" ||
+      !Number.isSafeInteger(claims.exp) ||
+      claims.exp <= 0 ||
+      !Number.isSafeInteger(claims.exp * 1000)
+    )
+      throw new Error();
+    return { id: claims.session_id, expiresAt: claims.exp * 1000 };
+  } catch {
+    throw new AuthClient.Failure("token_rejected");
+  }
+}
+
 function validateConfig(config: AuthClient.Config) {
   if (
     !config ||
     !opaque(config.clientId) ||
+    typeof config.publishableKey !== "string" ||
+    !/^sb_publishable_[A-Za-z0-9_-]{1,256}$/.test(config.publishableKey) ||
     !Array.isArray(config.redirectUris) ||
     config.redirectUris.length === 0 ||
     config.redirectUris.length > 8 ||

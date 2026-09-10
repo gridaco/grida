@@ -15,6 +15,10 @@ format: md
 > have their own contracts. See the
 > [doctrine](./index.md) for product boundaries.
 
+The [client authentication blueprint](../../reference/authentication.md) maps
+this native contract alongside current web, Desktop and provider lifecycles.
+It distinguishes independent custody from server-side logout scope.
+
 ## Scope and ownership
 
 A native client can sign in, inspect its own account and obtain scoped Grida

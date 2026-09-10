@@ -537,6 +537,7 @@ async function main() {
       path.join(owned, "public-client.json"),
       JSON.stringify({
         clientId: "synthetic-media-client",
+        publishableKey: "sb_publishable_synthetic_media",
         issuer: "http://127.0.0.1:55431/auth/v1",
         apiOrigin: "http://127.0.0.1:3041",
         redirectUris: [

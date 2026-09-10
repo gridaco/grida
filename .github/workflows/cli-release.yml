@@ -8,11 +8,11 @@ on:
         required: true
         type: string
       tag:
-        description: npm distribution tag (first public preview uses next)
+        description: npm distribution tag (stable releases use latest)
         required: true
         type: choice
-        default: next
-        options: [next, latest]
+        default: latest
+        options: [latest, next]
 
 permissions:
   contents: read

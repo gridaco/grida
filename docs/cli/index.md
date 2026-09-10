@@ -13,17 +13,16 @@ format: md
 Discover models, generate media, and keep the files in your own workflow.
 Desktop does not need to be running.
 
-> **Preview channel: `next`.** Installation requires a published `next` version;
-> check [npm's versions and tags](https://www.npmjs.com/package/grida?activeTab=versions)
-> for availability. Before that tag exists, the command below cannot install the
-> preview. The legacy `latest` package does not provide these commands.
+These guides describe Grida CLI 0.1. See
+[npm's versions and tags](https://www.npmjs.com/package/grida?activeTab=versions)
+for published release availability.
 
 ## Install
 
 Use Node.js 24 or later:
 
 ```sh grida-setup
-npm install -g grida@next
+npm install -g grida
 ```
 
 Stored credentials currently support macOS and Linux. Windows users can supply
@@ -67,8 +66,7 @@ grida docs generate
 
 `--help` describes your installed version and works offline. `docs` prints a
 guide URL without opening a browser; reading the guide needs a connection.
-These pages describe the `next` preview. Agent, render, and MCP commands
-are deferred.
+Agent, render, and MCP commands are deferred.
 
 ## Use Grida in scripts
 
