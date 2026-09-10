@@ -40,7 +40,8 @@ beforeEach(() => {
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("GRIDA_API_ORIGIN", "http://127.0.0.1:3041");
   vi.stubEnv("GRIDA_API_MAINTENANCE", "0");
-  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55431");
+  vi.stubEnv("GRIDA_OAUTH_ISSUER", "http://127.0.0.1:55431/auth/v1");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55432");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "synthetic");
   web.maintenance.mockResolvedValue(false);
   web.session.mockImplementation(async () => NextResponse.next());

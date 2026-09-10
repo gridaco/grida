@@ -194,11 +194,13 @@ function issuerFixture() {
       })),
       [{ id: 1001, name: "beta", display_name: "Beta organization" }],
     ],
-    origin: "",
+    authOrigin: "",
+    dataOrigin: "",
+    wrongServiceCalls: 0,
   };
   fixture.token = (index, claims = {}) => {
     const payload = {
-      iss: `${fixture.origin}/auth/v1`,
+      iss: `${fixture.authOrigin}/auth/v1`,
       aud: "authenticated",
       sub: users[index].id,
       session_id: randomUUID(),
@@ -214,11 +216,26 @@ function issuerFixture() {
     tokens.set(token, index);
     return token;
   };
-  fixture.server = createServer((req, response) => {
-    const url = new URL(req.url, fixture.origin);
+  const handler = (service) => (req, response) => {
+    const url = new URL(
+      req.url,
+      service === "auth" ? fixture.authOrigin : fixture.dataOrigin
+    );
     const database = url.pathname === "/rest/v1/organization";
     const credits = url.pathname === "/rest/v1/v_billing_credits";
     const membership = url.pathname === "/rest/v1/organization_member";
+    const userinfo = req.url === "/auth/v1/oauth/userinfo";
+    response.setHeader("cache-control", "no-store");
+    // Auth and Data API aliases need not share an origin. Neither fixture can
+    // answer the other service's paths, so incorrect production wiring fails.
+    if (
+      (service === "auth" && !userinfo) ||
+      (service === "data" && !database && !credits && !membership)
+    ) {
+      fixture.wrongServiceCalls++;
+      response.writeHead(500).end();
+      return;
+    }
     if (credits) {
       fixture.creditsCalls++;
       fixture.databaseCalls++;
@@ -227,13 +244,8 @@ function issuerFixture() {
       fixture.databaseCalls++;
     } else if (database) fixture.databaseCalls++;
     else fixture.calls++;
-    response.setHeader("cache-control", "no-store");
     if (
       req.method !== "GET" ||
-      (!database &&
-        !credits &&
-        !membership &&
-        req.url !== "/auth/v1/oauth/userinfo") ||
       req.headers.apikey !== "synthetic-publishable-key"
     ) {
       response.writeHead(500).end();
@@ -272,7 +284,7 @@ function issuerFixture() {
       }
       if (mode === "redirect") {
         response
-          .writeHead(302, { location: `${fixture.origin}/unexpected-gg` })
+          .writeHead(302, { location: `${fixture.dataOrigin}/unexpected-gg` })
           .end();
         return;
       }
@@ -353,7 +365,9 @@ function issuerFixture() {
       }
       if (mode === "redirect") {
         response
-          .writeHead(302, { location: `${fixture.origin}/unexpected-credits` })
+          .writeHead(302, {
+            location: `${fixture.dataOrigin}/unexpected-credits`,
+          })
           .end();
         return;
       }
@@ -418,7 +432,9 @@ function issuerFixture() {
       }
       if (fixture.databaseMode === "redirect") {
         response
-          .writeHead(302, { location: `${fixture.origin}/unexpected-database` })
+          .writeHead(302, {
+            location: `${fixture.dataOrigin}/unexpected-database`,
+          })
           .end();
         return;
       }
@@ -450,7 +466,7 @@ function issuerFixture() {
     }
     if (fixture.mode === "redirect") {
       response
-        .writeHead(302, { location: `${fixture.origin}/unexpected` })
+        .writeHead(302, { location: `${fixture.authOrigin}/unexpected` })
         .end();
       return;
     }
@@ -466,7 +482,9 @@ function issuerFixture() {
             ignored: "upstream-only field",
           })
     );
-  });
+  };
+  fixture.authServer = createServer(handler("auth"));
+  fixture.dataServer = createServer(handler("data"));
   return fixture;
 }
 
@@ -1626,6 +1644,8 @@ async function assertions(port, issuer, tripwire, signingSecret) {
     auth("gg_synthetic_credential"),
     auth(issuer.token(0, { exp: Math.floor(Date.now() / 1000) - 1 })),
     auth(issuer.token(0, { iss: "https://untrusted.invalid/auth/v1" })),
+    // A reachable, configured Data API alias is still not the Auth issuer.
+    auth(issuer.token(0, { iss: `${issuer.dataOrigin}/auth/v1` })),
     auth(issuer.token(0, { client_id: randomUUID() })),
   ]) {
     safe(
@@ -1904,8 +1924,14 @@ async function main() {
     await mkdir(home, { mode: 0o700 });
     const tripwire = path.join(workspace, "tripwire.log");
     await put(tripwire, "");
-    const issuerPort = await listen(issuer.server);
-    issuer.origin = `http://127.0.0.1:${issuerPort}`;
+    const issuerPort = await listen(issuer.authServer);
+    issuer.authOrigin = `http://127.0.0.1:${issuerPort}`;
+    const dataPort = await listen(issuer.dataServer);
+    issuer.dataOrigin = `http://127.0.0.1:${dataPort}`;
+    check(
+      issuerPort !== dataPort,
+      "Auth and Data fixtures must be independent"
+    );
     const port = await listen(reservation);
     await close(reservation);
     const apiOrigin = `http://127.0.0.1:${port}`;
@@ -1921,7 +1947,8 @@ async function main() {
       NODE_ENV: "production",
       NEXT_TELEMETRY_DISABLED: "1",
       NEXT_PUBLIC_GRIDA_USE_TELEMETRY: "0",
-      NEXT_PUBLIC_SUPABASE_URL: issuer.origin,
+      NEXT_PUBLIC_SUPABASE_URL: issuer.dataOrigin,
+      GRIDA_OAUTH_ISSUER: `${issuer.authOrigin}/auth/v1`,
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "synthetic-publishable-key",
       NEXT_PUBLIC_DOCS_URL: apiOrigin,
       NEXT_PUBLIC_BLOG_URL: apiOrigin,
@@ -1929,7 +1956,7 @@ async function main() {
       GRIDA_API_ORIGIN: apiOrigin,
       GRIDA_API_MAINTENANCE: "0",
       GG_TOKEN_SECRET: signingSecret,
-      GRIDA_API_TEST_PORTS: `${port},${issuerPort}`,
+      GRIDA_API_TEST_PORTS: `${port},${issuerPort},${dataPort}`,
       GRIDA_API_TEST_TRIPWIRE: tripwire,
       NODE_OPTIONS: `--require=${JSON.stringify(path.join(scripts, "network.cjs"))}`,
     };
@@ -2061,6 +2088,10 @@ async function main() {
       logs.push(active.log());
       active = undefined;
     }
+    check(
+      issuer.wrongServiceCalls === 0,
+      "Auth and Data API destinations crossed"
+    );
     passed = true;
   } finally {
     clearInterval(progress);
@@ -2068,7 +2099,8 @@ async function main() {
       active
         ? active.stop().finally(() => logs.push(active.log()))
         : Promise.resolve(),
-      close(issuer.server),
+      close(issuer.authServer),
+      close(issuer.dataServer),
       close(reservation),
     ]);
     try {

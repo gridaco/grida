@@ -5,6 +5,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { ggApi } from "./gg";
 import { gg } from "../gg/gg";
 const issuer = "http://127.0.0.1:55431/auth/v1";
+const dataOrigin = "http://127.0.0.1:55432";
 const endpoint = "http://127.0.0.1:3041/api/v1/auth/gg";
 const user = "22222222-2222-4222-8222-222222222222";
 const clientId = "11111111-1111-4111-8111-111111111111";
@@ -20,9 +21,10 @@ const fetcher = vi.fn<typeof fetch>(async (target, init) => {
     { issuer, audience: "authenticated" }
   );
   const url = new URL(String(target));
-  if (url.pathname === "/auth/v1/oauth/userinfo")
+  if (url.href === `${issuer}/oauth/userinfo`)
     return Response.json({ sub: payload.sub, email: null, name: "Test" });
   if (
+    url.origin !== dataOrigin ||
     url.pathname !== "/rest/v1/organization_member" ||
     url.searchParams.get("user_id") !== `eq.${payload.sub}` ||
     headers.has("cookie")
@@ -74,7 +76,8 @@ beforeEach(() => {
   dbStatus = 200;
   fetcher.mockClear();
   vi.stubGlobal("fetch", fetcher);
-  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55431");
+  vi.stubEnv("GRIDA_OAUTH_ISSUER", issuer);
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", dataOrigin);
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "synthetic-public-key");
   vi.stubEnv("GRIDA_OAUTH_CLIENT_IDS", clientId);
   vi.stubEnv("GG_TOKEN_SECRET", "fixture-gg-signing-key-only-".repeat(3));
@@ -116,6 +119,9 @@ describe("native GG exchange", () => {
     expect(claims.exp - claims.iat).toBe(900);
     expect(Date.parse(grant.expires_at)).toBe(claims.exp * 1000);
     expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(
+      fetcher.mock.calls.map(([target]) => new URL(String(target)).origin)
+    ).toEqual([new URL(issuer).origin, dataOrigin]);
     for (const [, init] of fetcher.mock.calls)
       expect(new Headers(init?.headers).get("authorization")).toBe(
         `Bearer ${value}`

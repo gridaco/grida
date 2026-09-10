@@ -1721,8 +1721,12 @@ credential through reuse of an existing browser or daemon bridge.
 **How the code prevents it.**
 
 1. **Server-owned authority.** Issuer, allowed client IDs, web origin, and exact
-   callback URIs come from server configuration. Bearer preflight requires the
-   exact issuer, `authenticated` audience, expiry, user/session IDs, and an
+   callback URIs come from server configuration. The required `GRIDA_OAUTH_ISSUER`
+   pins the canonical Auth issuer independently of the same project's Data API
+   origin (`NEXT_PUBLIC_SUPABASE_URL`), which may use a replica or load balancer.
+   Neither JWT claims nor hostname rewriting selects either destination.
+   Bearer preflight requires the exact issuer, `authenticated` audience, expiry,
+   user/session IDs, and an
    allowed client ID. Decoded JWT claims are not identity: the same token must
    then succeed at the fixed issuer's `/oauth/userinfo`, whose subject must
    match. Cookies are never a fallback. Issuer calls reject redirects, bound
@@ -1901,7 +1905,9 @@ membership separately, without a snapshot guarantee across page requests.
 - [editor/lib/auth/oauth-server.ts](editor/lib/auth/oauth-server.ts),
   [bearer.ts](editor/lib/auth/bearer.ts), and
   [oauth-consent.ts](editor/lib/auth/oauth-consent.ts) — configured authority,
-  issuer verification, consent proof, and callback policy.
+  issuer verification, consent proof, and callback policy. Configuration
+  separation and fail-closed validation are covered by
+  [oauth-server.test.ts](editor/lib/auth/__tests__/oauth-server.test.ts).
 - [Consent page](<editor/app/(untracked)/oauth/consent/page.tsx>),
   [decision route](<editor/app/(api)/private/oauth/decision/route.ts>), and
   [identity route](<editor/app/(api)/(public)/api/v1/auth/me/route.ts>) — browser
@@ -2143,8 +2149,10 @@ browser cookies, UI code or request-global state into account operations.
    bodyless OPTIONS declares its methods, while GET/HEAD and other methods are 405. The parser rejects extra/duplicate fields, query input, malformed UTF-8,
    invalid media/encoding/length declarations and noncanonical IDs before issuer
    work. It bounds route-entry body reads to 1024 bytes and one second. The shared
-   REST transport retains the verified bearer; the mint's member query filters
-   that user and organization together before the GG owner signs. Authentication,
+   REST transport retains the verified bearer and uses the independently configured
+   same-project Data API origin, never a destination derived from the Auth issuer;
+   the mint's member query filters that user and organization together before
+   the GG owner signs. Authentication,
    parsing, membership and signing failures keep the native no-store envelope.
 4. **Source checks reject drift.** `audit-api.ts` compares real App/Pages route
    placements with the inventory and verifies the complete native binding AST.
@@ -2155,8 +2163,9 @@ browser cookies, UI code or request-global state into account operations.
    prove the checks fail. The API workflow runs on every PR without path filters.
 5. **Runtime proof stays local.** `scripts/api-local` builds a private production
    Next snapshot from the real API, proxy and config sources. Its synthetic
-   loopback issuer and web tripwires verify two-user identity/cache separation,
-   credential rejection, method/input errors, configured hosts, API maintenance,
+   loopback Auth and Data servers reject crossed service requests; web tripwires
+   verify two-user identity/cache separation, credential rejection, method/input
+   errors, configured hosts, API maintenance,
    organization pagination and failure semantics, and production insiders gating.
    The GG extension uses a fresh synthetic signing key with the real mint and
    model-list implementations, including credential-family separation and

@@ -6,6 +6,7 @@ import { creditsData } from "./credits-data";
 
 const config = {
   issuer: "http://127.0.0.1:55431/auth/v1",
+  dataOrigin: "http://127.0.0.1:55432",
   publishableKey: "synthetic-public-key",
   clientIds: ["11111111-1111-4111-8111-111111111111"],
 };
@@ -23,8 +24,9 @@ describe("creditsData.forBearer", () => {
     expect(fetcher).toHaveBeenCalledOnce();
     const [target, init] = fetcher.mock.calls[0]!;
     const url = new URL(String(target));
+    expect(url.origin).not.toBe(new URL(config.issuer).origin);
     expect(url.origin + url.pathname).toBe(
-      "http://127.0.0.1:55431/rest/v1/v_billing_credits"
+      "http://127.0.0.1:55432/rest/v1/v_billing_credits"
     );
     expect(Object.fromEntries(url.searchParams)).toEqual({
       select:

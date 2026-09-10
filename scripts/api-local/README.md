@@ -40,14 +40,19 @@ record all three calls and emit its synthetic cookie, proving the tripwires are
 active. This verifies dispatch and calls, not import-time behavior of the
 original web modules. A fixture insiders handler must never run in production.
 
-A newly owned loopback HTTP server supplies `/auth/v1/oauth/userinfo` and
-synthetic `/rest/v1/organization`, `/rest/v1/organization_member`, and
-`/rest/v1/v_billing_credits` responses. It accepts
-only exact synthetic tokens issued in memory for two synthetic users. The real
-bearer verifier performs its normal preflight and HTTP request. The database
-fixture requires the exact caller bearer, publishable key, public schema and
-fixed query shape; its per-user rows simulate visibility without implementing
-Postgres RLS. Cases cover live
+Two independently owned loopback HTTP servers represent canonical Auth and a
+separate Data API origin, such as a read-replica alias. `GRIDA_OAUTH_ISSUER` selects
+the Auth server's `/auth/v1`; only that server supplies `/auth/v1/oauth/userinfo`.
+`NEXT_PUBLIC_SUPABASE_URL` selects the Data server, which supplies synthetic
+`/rest/v1/organization`, `/rest/v1/organization_member`, and
+`/rest/v1/v_billing_credits` responses. Each server rejects the other service's
+paths. Both accept only exact synthetic tokens issued in memory for two
+synthetic users. A token claiming the reachable Data API alias as its issuer is
+rejected before issuer I/O; shared configuration does not make that alias an
+Auth authority. The real bearer verifier performs its normal preflight and HTTP
+request. The database fixture requires the exact caller bearer, publishable key,
+public schema and fixed query shape; its per-user rows simulate visibility
+without implementing Postgres RLS. Cases cover live
 identity changes, two-user cache isolation, invalid credential classes, issuer
 failure/revocation/mismatch/redirects, HEAD/OPTIONS and rejected methods/input,
 unknown paths and hosts, forwarded-host spoofing, encoded path aliases, API
