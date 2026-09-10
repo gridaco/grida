@@ -21,7 +21,7 @@ pnpm turbo run typecheck test --filter=grida...
 node --test scripts/cli-release/prepare.test.mjs
 node scripts/cli-release/prepare.mjs --out "$PWD/.cache/cli-candidate"
 node scripts/cli-release/prepare.mjs --verify --out "$PWD/.cache/cli-candidate"
-node scripts/cli-media-local/proof.mjs --archive "$PWD/.cache/cli-candidate/grida-0.1.0-next.0.tgz"
+node scripts/cli-media-local/proof.mjs --archive "$PWD/.cache/cli-candidate/grida-0.1.0.tgz"
 ```
 
 Use the actual archive name from `candidate.json` after a version change. The
@@ -103,8 +103,10 @@ default to staged publication only, so direct publishing must be explicitly
 allowed in npm. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 and [provenance](https://docs.npmjs.com/generating-provenance-statements/).
 
-The first preview uses the `next` distribution tag. A prerelease cannot replace
-`latest`. Review the existing reserved package's versions and tags before
+Stable releases use the `latest` distribution tag, the workflow's default.
+The standalone CLI's first stable version is `0.1.0`, installed with
+`npm install -g grida`. Prereleases use `next` and cannot replace
+`latest`. Review the existing package's versions and tags before
 choosing a version; an old package name does not imply an empty release history.
 Successful CI is a prerequisite, not evidence that docs, OAuth or API changes
 have been deployed. Verify those separately before approving publication.

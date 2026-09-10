@@ -10,13 +10,13 @@ format: md
 
 # CLI documentation
 
-> **Status: implemented for the CLI preview.** Public guides and their currency
+> **Status: implemented for Grida CLI 0.1.** Public guides and their currency
 > check accompany the npm release. Local validation does not establish deployment.
 
 ## Current position
 
 The [user guide](../../cli/index.md), installed help, and package README cover
-the implemented preview. `grida docs` links to the user guides. The
+the 0.1 release line. `grida docs` links to the user guides. The
 [v1](./v1.md), [media](./media.md), and
 [credential custody](./credential-custody.md) documents retain contributor
 design and rationale.
@@ -39,7 +39,7 @@ routes are produced by the local docs build; publication is a release step.
 
 | Route                 | The reader's task                                                                                                                                        |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/docs/cli`           | Install the supported release, check its version, configure one access route, and save the first result. State platform support and preview limitations. |
+| `/docs/cli`           | Install the supported release, check its version, configure one access route, and save the first result. State platform support and current limitations. |
 | `/docs/cli/auth`      | Sign in to Grida, inspect the session, choose credential storage, and sign out.                                                                          |
 | `/docs/cli/account`   | Inspect memberships and select an organization for cached credits.                                                                                       |
 | `/docs/cli/providers` | Configure BYOK, locate and safely edit the TOML file, understand precedence, validate a key, and remove it.                                              |
@@ -58,8 +58,8 @@ and which failures can have incurred a charge.
 `grida docs [command...]` continues to print a URL without fetching it or opening
 a browser. Every supported topic maps to its owning public page or explicit
 section. Installed help remains authoritative for the installed version;
-hosted pages identify the preview until release, then describe the latest
-released version and mark newer examples with a minimum version when needed.
+hosted pages describe the latest released version and mark newer examples with
+a minimum version when needed.
 No bundled guide tree or separate agent-only
 documentation is required.
 
@@ -80,7 +80,7 @@ marketing links and the docs ownership index as part of that migration.
 Installed help, `grida docs`, and the npm README share the new guide home.
 Publish the matching guides before promoting the executable. An install
 example must identify an available release, never imply
-that the legacy npm package contains preview commands.
+that the retired design-to-code package contains the replacement CLI's commands.
 
 ## Keep it current with a small check
 

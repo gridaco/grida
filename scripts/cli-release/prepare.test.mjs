@@ -29,6 +29,7 @@ const files = () =>
   ].map((path) => ({ path }));
 
 test("release guard refuses private/placeholder/mismatched/unreviewed package releases", () => {
+  CliRelease.release(manifest(), "1.0.0", "latest");
   CliRelease.release(manifest(), "1.0.0", "next");
   CliRelease.release(
     { ...manifest(), version: "1.0.0-rc.1" },

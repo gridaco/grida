@@ -42,7 +42,7 @@ proof owns synthetic execution and saving behavior.
 Author ordinary `sh` fences with one literal Grida invocation per logical line;
 backslash continuation and shell quotes are supported. Shell expansion, pipes,
 redirection, and arbitrary shell evaluation are rejected. Only the exact
-`npm install -g grida@next` setup block is marked `grida-setup` and exempted; the
+`npm install -g grida` setup block is marked `grida-setup` and exempted; the
 checker never runs that command. Named `text`/`json` fences are copied literally
 into each guide's temporary directory.
 If a workflow needs additional shell orchestration, explain it separately and

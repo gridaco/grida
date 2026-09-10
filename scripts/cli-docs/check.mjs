@@ -120,8 +120,8 @@ export const CliDocs = {
       if (info === "sh grida-setup") {
         assert.equal(
           body.trim(),
-          "npm install -g grida@next",
-          "Only the documented preview install is exempt from command parsing"
+          "npm install -g grida",
+          "Only the documented install is exempt from command parsing"
         );
       } else if (info === "sh") {
         for (const line of body.replace(/\\\r?\n/g, "").split(/\r?\n/)) {
