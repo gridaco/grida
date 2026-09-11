@@ -5,6 +5,8 @@ import { preferences } from "./preferences";
 // Keep the imported value lookup outside the namespace that exports `models`.
 // The declaration bundler otherwise shadows the import with that local value.
 type FactualThreeDModels = typeof facts.three_d.models;
+type FactualModelGenerationModels =
+  typeof facts.three_d.model_generation.models;
 type FactualImageBinding = typeof facts.image.binding;
 type FactualImageBackground = typeof facts.image.supportsTransparentBackground;
 type FactualVideoInput = typeof facts.video.input;
@@ -483,6 +485,14 @@ export namespace catalog {
       },
       ...preferences["three_d"],
     },
+    "three_d.model_generation": {
+      members: {
+        "tripo/h3.1": { status: "listed" },
+        "tripo/p1": { status: "listed" },
+        "tripo/p2": { status: "listed" },
+      },
+      ...preferences["three_d.model_generation"],
+    },
     video: {
       members: {
         "google/veo-3.1": {
@@ -576,6 +586,7 @@ export namespace catalog {
     "audio.sound_effects": policy.Definition<facts.audio.sound_effects.ModelId>;
     "audio.text_to_speech": policy.Definition<facts.audio.text_to_speech.ModelId>;
     three_d: policy.Definition<facts.three_d.ThreeDModelId>;
+    "three_d.model_generation": policy.Definition<facts.three_d.model_generation.ModelId>;
     image_tools: policy.Definition<facts.image_tools.ImageToolModelId>;
   });
   export namespace text {
@@ -977,6 +988,59 @@ export namespace catalog {
     }
   }
   export namespace three_d {
+    export namespace model_generation {
+      export type ModelId =
+        keyof (typeof definitions)["three_d.model_generation"]["members"];
+      export type InputVariant = facts.three_d.model_generation.InputVariant;
+      export type TextureQuality =
+        facts.three_d.model_generation.TextureQuality;
+      export type GeometryQuality =
+        facts.three_d.model_generation.GeometryQuality;
+      export type ModelCard = facts.three_d.model_generation.ModelCard & {
+        deprecated: boolean;
+        status: CatalogueStatus;
+      };
+      type CatalogModels = {
+        [Id in ModelId]: FactualModelGenerationModels[Id] & {
+          deprecated: boolean;
+          status: CatalogueStatus;
+        };
+      };
+      const resolved = policy.resolve(
+        facts.three_d.model_generation.models,
+        definitions["three_d.model_generation"]
+      );
+      export const models: CatalogModels = own(
+        Object.fromEntries(
+          resolved.all().map((card) => {
+            const { legacy, reason: _reason, ...fact } = card;
+            return [card.id, { ...fact, deprecated: !!legacy }];
+          })
+        )
+      ) as unknown as CatalogModels;
+      export const model_ids = Object.freeze(Object.keys(models) as ModelId[]);
+      export const default_id = (
+        preferences["three_d.model_generation"] as policy.Preferences<ModelId>
+      ).default_id;
+      export function is_model_id(id: string): id is ModelId {
+        return Object.hasOwn(models, id);
+      }
+      export function listed_models(): readonly ModelCard[] {
+        return Object.freeze(
+          resolved.listed().map((card) => models[card.id as ModelId])
+        );
+      }
+      export function ordered_models(): readonly ModelCard[] {
+        return Object.freeze(
+          resolved.all().map((card) => models[card.id as ModelId])
+        );
+      }
+      export function staged_models(): readonly ModelCard[] {
+        return Object.freeze(
+          resolved.staged().map((card) => models[card.id as ModelId])
+        );
+      }
+    }
     export type TextToThreeDModelId = facts.three_d.TextToThreeDModelId;
     export type ImageToThreeDModelId = facts.three_d.ImageToThreeDModelId;
     export type ThreeDModelId = facts.three_d.ThreeDModelId;

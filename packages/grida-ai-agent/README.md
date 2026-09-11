@@ -18,7 +18,7 @@ It owns three agent-system concerns:
 
 - **The agent tenant.** `createAgentTenant` registers the AI route
   groups (`/agent`, `/events`, `/sessions`, `/secrets`, `/providers`,
-  `/images`, `/video`, `/three-d`, `/audio/music`, `/audio/sound-effects`,
+  `/images`, `/video`, `/three-d`, `/model-generation`, `/audio/music`, `/audio/sound-effects`,
   `/audio/text-to-speech`, and optional native-provider auth)
   through the daemon's `DaemonTenant` seam, and
   owns their state — the run loop, chat sessions (SQLite), BYOK
@@ -112,6 +112,19 @@ structural request admission, bounded base64 decoding, `model.glb`, wire encodin
 optional root-level receipts and its one-generation-at-a-time memory budget.
 Catalogue options beyond the implemented single-image/text paths are not exposed
 by this route. Future 3D workflows need their own reviewed host wire adaptations.
+
+The model-generation route uses `TripoClient` for direct Tripo BYOK. Model
+identity (H3.1, P1 or P2 Preview) is separate from the explicit model-generation
+feature and its text, image or named multiview input. `AgentTransport.Client`'s
+`modelGeneration.generate` accepts the SDK JSON input, with base64 in image
+`data` fields, under a 48 MiB total request limit. The SDK validates inputs
+before credential access and returns an uncompressed, self-contained GLB.
+The host returns GLB bytes, a safe task ID and reported Tripo credits, plus
+an optional media receipt. Tripo account credit failures remain attributed to
+Tripo. Accepted work is never resubmitted after a timeout or download failure.
+Rigging, remeshing and other processing operations need distinct feature
+contracts; they are not advertised by this generation route. The existing
+`three_d` host capability gates both 3D generation route groups.
 
 ## Independent media startup
 

@@ -53,6 +53,8 @@ import {
   type ThreeDGenerateRequest,
   type ThreeDGenerateResult,
   type ThreeDInputImage,
+  type ModelGenerationGenerateRequest,
+  type ModelGenerationGenerateResult,
   type VideoGenerateRequest,
   type VideoGenerateResult,
   type PatchSessionOptions,
@@ -112,6 +114,8 @@ export {
   type ThreeDGenerateRequest,
   type ThreeDGenerateResult,
   type ThreeDInputImage,
+  type ModelGenerationGenerateRequest,
+  type ModelGenerationGenerateResult,
   type VideoGenProvider,
   type VideoGenerateRequest,
   type VideoGenerateResult,
@@ -613,6 +617,24 @@ export namespace threeD {
     const bridge = bridgeOrThrow().threeD;
     if (!bridge) throw new DesktopBridgeMissingError();
     return await bridge.generate(req);
+  }
+}
+
+/** Explicit model-generation feature, available only on compatible native hosts. */
+export namespace modelGeneration {
+  export function isSupported(bridge = getDesktopBridge()): boolean {
+    return (
+      bridge?.caps?.media?.tripo === true &&
+      typeof bridge.modelGeneration?.generate === "function"
+    );
+  }
+
+  export async function generate(
+    request: ModelGenerationGenerateRequest
+  ): Promise<ModelGenerationGenerateResult> {
+    const bridge = bridgeOrThrow();
+    if (!isSupported(bridge)) throw new DesktopBridgeMissingError();
+    return await bridge.modelGeneration!.generate(request);
   }
 }
 

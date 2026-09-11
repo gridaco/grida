@@ -47,6 +47,14 @@ describe("DesktopBridge ChatGPT connect result", () => {
 });
 
 describe("DesktopBridge media generation", () => {
+  it("keeps Tripo native readiness optional for older Desktop binaries", () => {
+    type Media = NonNullable<DesktopBridge["caps"]["media"]>;
+    expectTypeOf<Media["tripo"]>().toEqualTypeOf<boolean | undefined>();
+    const older: Media = {};
+    const supported: Media = { tripo: true };
+    expect(older.tripo === true).toBe(false);
+    expect(supported.tripo).toBe(true);
+  });
   it("keeps the optional 3D and nested audio namespaces aligned with the agent transport", () => {
     type ThreeDGenerate = NonNullable<DesktopBridge["threeD"]>["generate"];
     type Audio = NonNullable<DesktopBridge["audio"]>;

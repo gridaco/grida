@@ -120,7 +120,7 @@ without Grida login. `providers configure <provider>` stores a key using hidden 
 or `--key-stdin`; `providers remove <provider>` removes the shared stored key.
 All selected keys (file, environment or stdin) pass cheap static validation through
 [the shared provider policy](https://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md).
-`configure` additionally checks OpenRouter, Vercel and fal once before saving;
+`configure` additionally checks OpenRouter, Vercel, fal and Tripo once before saving;
 rejection, denial or an unavailable check leaves the old key unchanged. ElevenLabs
 has no suitable permission-neutral check and saves with `verification.status` set
 to `not_supported`. Successful supported checks report `accepted`, which proves
@@ -132,6 +132,8 @@ Environment keys or `--key-stdin` override storage without opening it or persist
 input. Blank/malformed explicit keys fail; unset a variable to select storage.
 Stored BYOK currently supports macOS/Linux only; Windows CLI users can supply
 explicit environment/stdin keys. Account OAuth and ChatGPT stores remain separate.
+First-party Tripo uses `TRIPO_API_KEY`, `--key-stdin`, or the shared `tripo` slot.
+The CLI does not load dotenv files.
 GG needs account login and an organization through the selected registration
 above. The auth owner hands a scoped grant into
 one invocation's memory store; account tokens never enter provider execution.
@@ -151,6 +153,15 @@ variant; they never switch provider, model or billing route. Human `models inspe
 shows inputs and an example; `--json` keeps the full descriptor.
 The fal Veo 3.1 Lite route accepts `--param generate_audio=false` for silent video;
 omission retains the provider's audio-enabled default. Unadvertised routes refuse it.
+
+Tripo model generation uses the `tripo` provider independently of fal's 3D routes.
+`models list --provider tripo` lists its executable models and variants. Text uses
+`--prompt`; a supported single-image variant uses `--image` with a local PNG/JPEG.
+Multiview uses `--variant multiview --input @input.json` with the advertised inline
+image schema. JSON does not expand paths or read referenced local files. Uploaded
+images and generation requests go to Tripo's fixed API; result downloads use the
+SDK's reviewed Tripo data origin. The CLI saves returned GLB bytes with its usual
+safe local receipt and never performs an automatic generation retry.
 
 Explicit file paths resolve from the working directory. Text uses UTF-8; local
 PNG/JPEG/static WebP images use content-based header admission, without pixel

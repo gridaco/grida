@@ -20,6 +20,10 @@ export const preferences = {
       "fal-ai/trellis-2",
     ],
   },
+  "three_d.model_generation": {
+    default_id: "tripo/h3.1",
+    order: ["tripo/p1", "tripo/p2"],
+  },
   image_tools: { order: ["recraft-ai/recraft-remove-background"] },
 } as const satisfies {
   text: catalog.policy.Preferences<models.text.CatalogId>;
@@ -29,5 +33,6 @@ export const preferences = {
   "audio.sound_effects": catalog.policy.Preferences<models.audio.sound_effects.ModelId>;
   "audio.text_to_speech": catalog.policy.Preferences<models.audio.text_to_speech.ModelId>;
   three_d: catalog.policy.Preferences<models.three_d.ThreeDModelId>;
+  "three_d.model_generation": catalog.policy.Preferences<models.three_d.model_generation.ModelId>;
   image_tools: catalog.policy.Preferences<models.image_tools.ImageToolModelId>;
 };

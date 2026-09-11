@@ -10,6 +10,8 @@ import type { MusicClient } from "./music-client";
 import type { SoundEffectClient } from "./sound-effect-client";
 import type { TextToSpeechClient } from "./text-to-speech-client";
 import type { ThreeDClient } from "./three-d-client";
+import type { TripoClient } from "./tripo-client";
+import { TripoInputs } from "./tripo-inputs";
 
 /** Immutable bundled/pinned operation facts and the explicit JSON input contract. */
 export class MediaOperations {
@@ -43,15 +45,16 @@ export class MediaOperations {
     filter: MediaOperations.Filter = {}
   ): readonly MediaOperations.Descriptor[] {
     try {
-      InputSchema.exact(filter, ["kind", "model_id", "provider"]);
-      const { kind, model_id, provider } = filter;
-      validateFilter({ kind, model_id, provider });
+      InputSchema.exact(filter, ["kind", "model_id", "provider", "feature"]);
+      const { kind, model_id, provider, feature } = filter;
+      validateFilter({ kind, model_id, provider, feature });
       return Object.freeze(
         this.#descriptors.filter(
           (entry) =>
             (kind === undefined || entry.kind === kind) &&
             (model_id === undefined || entry.model_id === model_id) &&
-            (provider === undefined || entry.provider_id === provider)
+            (provider === undefined || entry.provider_id === provider) &&
+            (feature === undefined || entry.feature === feature)
         )
       );
     } catch {
@@ -62,18 +65,34 @@ export class MediaOperations {
   inspect(selector: MediaOperations.Selector): MediaOperations.Descriptor {
     let requested: MediaOperations.Selector;
     try {
-      InputSchema.exact(selector, ["kind", "model_id", "provider", "variant"]);
-      const { kind, model_id, provider, variant } = selector;
-      validateFilter({ kind, model_id, provider });
+      InputSchema.exact(selector, [
+        "kind",
+        "model_id",
+        "provider",
+        "variant",
+        "feature",
+      ]);
+      const { kind, model_id, provider, variant, feature } = selector;
+      validateFilter({ kind, model_id, provider, feature });
       if (
         !kind ||
         !model_id ||
         !provider ||
         (variant !== undefined &&
-          !["text", "references", "image"].includes(variant))
+          !["text", "references", "image", "multiview"].includes(variant)) ||
+        (provider === "tripo" &&
+          (feature !== "model-generation" ||
+            kind !== "three-d" ||
+            variant === undefined))
       )
         throw 0;
-      requested = { kind, model_id, provider, variant };
+      requested = {
+        kind,
+        model_id,
+        provider,
+        variant,
+        feature,
+      } as MediaOperations.Selector;
     } catch {
       throw new MediaOperations.Failure("invalid_input");
     }
@@ -81,7 +100,8 @@ export class MediaOperations {
       (entry) =>
         entry.kind === requested.kind &&
         entry.model_id === requested.model_id &&
-        entry.provider_id === requested.provider
+        entry.provider_id === requested.provider &&
+        (requested.feature === undefined || entry.feature === requested.feature)
     );
     const variant =
       requested.variant ??
@@ -152,11 +172,33 @@ export class MediaOperations {
           };
         }
         case "three-d": {
+          if (provider_id === "tripo") {
+            if (
+              !models.three_d.model_generation.is_model_id(model_id) ||
+              variant === "references"
+            )
+              throw 0;
+            return {
+              kind,
+              model_id,
+              provider_id,
+              feature: "model-generation",
+              variant,
+              selection: {
+                model_id,
+                provider: "tripo",
+                feature: "model-generation",
+                variant,
+              },
+              input: TripoInputs.rule(model_id, variant).parse(value, true),
+            } as MediaOperations.Parsed;
+          }
           switch (model_id) {
             case "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d":
               return {
                 kind,
                 model_id,
+                provider_id: "fal",
                 selection: { model_id, provider: "fal" },
                 input: MediaInputs.threeDText.parse(value, true),
               };
@@ -164,6 +206,7 @@ export class MediaOperations {
               return {
                 kind,
                 model_id,
+                provider_id: "fal",
                 selection: { model_id, provider: "fal" },
                 input: MediaInputs.threeDImage.parse(value, true),
               };
@@ -171,6 +214,7 @@ export class MediaOperations {
               return {
                 kind,
                 model_id,
+                provider_id: "fal",
                 selection: { model_id, provider: "fal" },
                 input: MediaInputs.threeDImage.parse(value, true),
               };
@@ -196,15 +240,24 @@ export namespace MediaOperations {
   export type Provider =
     | ImageClient.Provider
     | VideoClient.Provider
-    | "elevenlabs";
-  export type Variant = "text" | "references" | "image";
-  export type Filter = { kind?: Kind; model_id?: string; provider?: Provider };
-  export type Selector = {
-    kind: Kind;
-    model_id: string;
-    provider: Provider;
-    variant?: Variant;
+    | "elevenlabs"
+    | "tripo";
+  export type Variant = "text" | "references" | "image" | "multiview";
+  export type Filter = {
+    kind?: Kind;
+    model_id?: string;
+    provider?: Provider;
+    feature?: "model-generation";
   };
+  export type Selector =
+    | {
+        kind: Kind;
+        model_id: string;
+        provider: Exclude<Provider, "tripo">;
+        variant?: Variant;
+        feature?: "model-generation";
+      }
+    | ({ kind: "three-d" } & TripoClient.Selection<string>);
   export type Schema = InputJsonSchema;
   export type Output = Readonly<{
     representation: "native";
@@ -217,6 +270,7 @@ export namespace MediaOperations {
   }>;
   export type Descriptor = Readonly<{
     kind: Kind;
+    feature?: "model-generation";
     model_id: string;
     provider_id: Provider;
     binding_id: string;
@@ -263,11 +317,25 @@ export namespace MediaOperations {
     | {
         [K in ThreeDClient.ModelId]: {
           kind: "three-d";
+          provider_id: "fal";
           model_id: K;
           selection: ThreeDClient.Selection<K>;
           input: ThreeDClient.Input<K>;
         };
-      }[ThreeDClient.ModelId];
+      }[ThreeDClient.ModelId]
+    | {
+        [M in TripoClient.ModelId]: {
+          [V in TripoClient.Variant]: {
+            kind: "three-d";
+            provider_id: "tripo";
+            feature: "model-generation";
+            model_id: M;
+            variant: V;
+            selection: TripoClient.Selection<M, V>;
+            input: TripoClient.Input<M, V>;
+          };
+        }[TripoClient.Variant];
+      }[TripoClient.ModelId];
   export class Failure extends Error {
     readonly code: "invalid_input" | "operation_unavailable";
     constructor(code: "invalid_input" | "operation_unavailable") {
@@ -290,9 +358,10 @@ const kinds = [
   "text-to-speech",
   "three-d",
 ];
-const providers = ["openrouter", "vercel", "fal", "gg", "elevenlabs"];
+const providers = ["openrouter", "vercel", "fal", "gg", "elevenlabs", "tripo"];
 function validateFilter(value: MediaOperations.Filter) {
   if (
+    (value.feature !== undefined && value.feature !== "model-generation") ||
     (value.kind !== undefined && !kinds.includes(value.kind)) ||
     (value.provider !== undefined && !providers.includes(value.provider)) ||
     (value.model_id !== undefined &&
@@ -331,6 +400,7 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
   ) {
     result.push({
       kind,
+      ...(kind === "three-d" ? { feature: "model-generation" as const } : {}),
       model_id: metadata.model_id,
       provider_id: metadata.provider_id,
       binding_id: metadata.binding_id,
@@ -429,6 +499,21 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
         models.three_d.models[id].status,
         MediaInputs.threeD(id)
       );
+  }
+  for (const card of Object.values(models.three_d.model_generation.models)) {
+    for (const variant of card.inputs) {
+      add(
+        "three-d",
+        {
+          model_id: card.id,
+          binding_id: card.binding_id,
+          provider_id: card.provider,
+        },
+        variant,
+        card.status,
+        TripoInputs.rule(card.id, variant)
+      );
+    }
   }
   return result.sort((a, b) => {
     const first = `${a.kind}/${a.model_id}/${a.provider_id}/${a.variant}`;

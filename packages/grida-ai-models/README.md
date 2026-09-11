@@ -28,7 +28,7 @@ const fal = image && models.image.binding(image, "fal");
 
 Records live under `text.catalog`, `image.models`, `video.models`,
 `audio.music.models`, `audio.sound_effects.models`, `audio.text_to_speech.models`,
-`three_d.models`, and `image_tools.models`. Their declaration order has no
+`three_d.models`, `three_d.model_generation.models`, and `image_tools.models`. Their declaration order has no
 preference meaning. Bundled tables, cards, and nested values are frozen at
 runtime. Lookup does not imply an application has an adapter for a binding.
 
@@ -140,7 +140,7 @@ const serialized = JSON.stringify(
 ```
 
 Families are `text`, `image`, `video`, `audio.music`, `audio.sound_effects`,
-`audio.text_to_speech`, `three_d`, and `image_tools`. Their neutral public
+`audio.text_to_speech`, `three_d`, `three_d.model_generation`, and `image_tools`. Their neutral public
 types/helpers remain available for migration convenience. Factual consumers
 should import the factual producer directly. Library embedding is not re-exported.
 
@@ -227,3 +227,37 @@ pnpm typecheck
 pnpm build
 pnpm test:package
 ```
+
+### 3D model-generation features
+
+`models.three_d.model_generation.models` contains one card per direct Tripo
+model: `tripo/h3.1`, `tripo/p1`, and `tripo/p2` (Preview). These cards keep the
+`model-generation` feature separate from the model identity and its accepted
+`text`, `image`, and `multiview` input variants. `binding_id` records the exact
+upstream snapshot. The existing `models.three_d.models` fal endpoint catalogue
+remains available for its existing consumers.
+
+Cards describe native generation facts: default uncompressed GLB output,
+texture tiers, face-count bounds, and H3.1-only geometry quality. They do not
+grant application support for quad output, remeshing, or rigging. Capabilities
+come from current [H-series](https://developers.tripo3d.ai/en/docs/generation-text-to-model/standard)
+and [P-series](https://developers.tripo3d.ai/en/docs/generation-text-to-model/p)
+API contracts. `@grida/ai` owns native and JSON validation and execution.
+
+Grida admission lives in `catalog.three_d.model_generation` from the `/grida`
+entry. Its service definition lists these three models; its independent
+preference chooses H3.1 as the default, followed by P1 and P2. Use
+`listed_models()` and `default_id` for product selection. The factual entry
+contains no listing status, recommendation, or display order. Schema-1 snapshots
+still distribute text/image/video; model-generation service membership remains
+bundled.
+
+Pricing retains provider credits rather than inventing one flat price per model.
+`base_credits` is the untextured cost by input variant. `texture_credits` is the
+additive total for the selected texture tier; `detailed_geometry_credits` is
+additive for H3.1 detailed geometry. One credit is $0.01. The
+[current pricing page](https://developers.tripo3d.ai/en/pricing), including its
+P Series tab, is the source. These are catalogue prices, not reservations,
+affordability checks, or observed usage. Release provenance records the public
+model announcements, including P2's public preview date, rather than interpreting
+snapshot ID suffixes as release dates.

@@ -54,6 +54,10 @@ import type {
   TextToSpeechGenerateResult,
   TextToSpeechListVoicesResult,
 } from "./protocol/text-to-speech";
+import type {
+  ModelGenerationGenerateRequest,
+  ModelGenerationGenerateResult,
+} from "./protocol/model-generation";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type { DirectoryScopeDescriptor } from "./protocol/context";
 import type {
@@ -247,6 +251,17 @@ export namespace AgentTransport {
         req: ThreeDGenerateRequest
       ): Promise<ThreeDGenerateResult> =>
         await this.postJson<ThreeDGenerateResult>("/three-d/generate", req),
+    } as const;
+
+    /** Explicit model-generation feature, with typed input variants. */
+    readonly modelGeneration = {
+      generate: async (
+        req: ModelGenerationGenerateRequest
+      ): Promise<ModelGenerationGenerateResult> =>
+        await this.postJson<ModelGenerationGenerateResult>(
+          "/model-generation/generate",
+          req
+        ),
     } as const;
 
     /**

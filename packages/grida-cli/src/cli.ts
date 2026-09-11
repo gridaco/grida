@@ -30,17 +30,17 @@ export namespace Cli {
     "models list":
       "Usage: grida models list [--provider <provider>] [--modality image|video|audio|3d] [--kind <kind>] [--local-image] [--available] [--org <slug> | --org-id <id>] [--json]\n\nLists executable operations, including staged models, with accepted local-image flags.\n--local-image filters to operations accepting --reference FILE or --image FILE.\nNo provider probes. --available requires --provider: BYOK checks key presence;\nGG checks cached organization eligibility online. Neither guarantees model access\nor generation.",
     "models inspect":
-      "Usage: grida models inspect --provider <provider> --model <id> [--kind <kind>] [--variant text|references|image] [--json]\n\nShow accepted inputs and a command example; --json prints the full schema.\nKinds: image, video, music, sound-effect, text-to-speech, three-d.\nThe kind is inferred when unambiguous; image/video default to text input.",
+      "Usage: grida models inspect --provider <provider> --model <id> [--kind <kind>] [--variant text|references|image|multiview] [--json]\n\nShow accepted inputs and a command example; --json prints the full schema.\nKinds: image, video, music, sound-effect, text-to-speech, three-d.\nThe kind is inferred when unambiguous; image/video default to text input.",
     providers:
       "Usage: grida providers <command>\n\nCommands:\n  list                    Show key presence and effective source\n  configure <provider>    Save a shared provider API key\n  remove <provider>       Remove a shared provider API key",
     "providers configure":
-      "Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]\n\nSave an API key in shared plaintext credentials.toml with private permissions.\nDesktop and CLI use the same stored keys. No Grida login required.\nValidate format, then check OpenRouter/Vercel/fal once before saving.\nA failed check leaves stored keys unchanged. ElevenLabs saves unverified.\nWithout --key-stdin, enter the key at a hidden terminal prompt.\nAutomation requires --key-stdin; keys are never accepted as arguments.",
+      "Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]\n\nSave an API key in shared plaintext credentials.toml with private permissions.\nDesktop and CLI use the same stored keys. No Grida login required.\nValidate format, then check OpenRouter/Vercel/fal/Tripo once before saving.\nA failed check leaves stored keys unchanged. ElevenLabs saves unverified.\nWithout --key-stdin, enter the key at a hidden terminal prompt.\nAutomation requires --key-stdin; keys are never accepted as arguments.",
     "providers remove":
       "Usage: grida providers remove <provider> [--json] [--no-input]\n\nRemove the stored key for Desktop and CLI. Environment keys remain effective.\nThis does not revoke the key at its provider or sign out of Grida.",
     "providers list":
-      "Usage: grida providers list [--json]\n\nShow key presence and source after static validation, never key contents.\nNo login or probes; configured does not mean provider-verified.\nStored keys use shared plaintext credentials.toml with private permissions.\nOPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY.\nGG uses a separate Grida login and organization; no provider key.",
+      "Usage: grida providers list [--json]\n\nShow key presence and source after static validation, never key contents.\nNo login or probes; configured does not mean provider-verified.\nStored keys use shared plaintext credentials.toml with private permissions.\nOPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY, TRIPO_API_KEY.\nGG uses a separate Grida login and organization; no provider key.",
     generate:
-      "Usage: grida generate --provider <provider> --model <id> --out <new-directory> [inputs] [--kind <kind>] [--variant text|references|image] [--key-stdin] [--org <slug> | --org-id <id>] [--json]\n\nInputs:\n  --prompt TEXT | --prompt-file FILE|-    Generation instructions\n  --text TEXT | --text-file FILE|-        Speech text (with --voice ID)\n  --reference FILE|HTTPS-URL              Image reference; repeat for more\n  --image FILE|HTTPS-URL                  Image input where supported\n  --param FIELD=VALUE                     Advertised scalar option; repeat\n  --input @file|-                         Full JSON instead of the flags above\n\nExample:\n  grida generate --provider openrouter --model openai/gpt-image-2 --prompt 'Restyle this image' --reference ./photo.png --out ./result\n\nFile flags read explicit paths relative to the working directory. PNG/JPEG/static WebP\nimages are limited to 8 MiB each; the assembled JSON input is limited to 16 MiB.\nSelected files are sent inline to the selected provider; no Grida upload storage.\nRun grida models inspect for supported inputs. No raw provider passthrough.\nJSON mode never expands paths and cannot mix with request-building flags.\nMedia flags select a compatible variant; a conflicting --variant is refused.\nProviders: openrouter, vercel, fal, elevenlabs, gg.\n--key-stdin cannot share stdin with JSON or text input. Key precedence: stdin,\nenvironment, shared credentials.toml. BYOK needs no Grida login. GG requires login.\n--out must name a new directory under an existing parent. Artifacts and\nreceipt.json are written locally without overwriting files.\nNo automatic generation retry. Interrupted requests may still be charged.",
+      "Usage: grida generate --provider <provider> --model <id> --out <new-directory> [inputs] [--kind <kind>] [--variant text|references|image|multiview] [--key-stdin] [--org <slug> | --org-id <id>] [--json]\n\nInputs:\n  --prompt TEXT | --prompt-file FILE|-    Generation instructions\n  --text TEXT | --text-file FILE|-        Speech text (with --voice ID)\n  --reference FILE|HTTPS-URL              Image reference; repeat for more\n  --image FILE|HTTPS-URL                  Image input where supported\n  --param FIELD=VALUE                     Advertised scalar option; repeat\n  --input @file|-                         Full JSON instead of the flags above\n\nExample:\n  grida generate --provider openrouter --model openai/gpt-image-2 --prompt 'Restyle this image' --reference ./photo.png --out ./result\n\nFile flags read explicit paths relative to the working directory. PNG/JPEG/static WebP\nimages are limited to 8 MiB each; the assembled JSON input is limited to 16 MiB.\nSelected files are sent inline to the selected provider; no Grida upload storage.\nRun grida models inspect for supported inputs. No raw provider passthrough.\nJSON mode never expands paths and cannot mix with request-building flags.\nMedia flags select a compatible variant; a conflicting --variant is refused.\nProviders: openrouter, vercel, fal, elevenlabs, tripo, gg.\n--key-stdin cannot share stdin with JSON or text input. Key precedence: stdin,\nenvironment, shared credentials.toml. BYOK needs no Grida login. GG requires login.\n--out must name a new directory under an existing parent. Artifacts and\nreceipt.json are written locally without overwriting files.\nNo automatic generation retry. Interrupted requests may still be charged.",
     voices:
       "Usage: grida voices list --provider elevenlabs [--key-stdin] [--json]",
     "voices list":
@@ -53,7 +53,13 @@ export namespace Cli {
     Object.keys(help) as Topic[]
   );
   type Options = { json: boolean; noInput: boolean };
-  export type Provider = "openrouter" | "vercel" | "fal" | "elevenlabs" | "gg";
+  export type Provider =
+    | "openrouter"
+    | "vercel"
+    | "fal"
+    | "elevenlabs"
+    | "tripo"
+    | "gg";
   export type Kind =
     | "image"
     | "video"
@@ -61,7 +67,7 @@ export namespace Cli {
     | "sound-effect"
     | "text-to-speech"
     | "three-d";
-  export type Variant = "text" | "references" | "image";
+  export type Variant = "text" | "references" | "image" | "multiview";
   export type Selector = { id: number } | { name: string };
   /** Request construction is local syntax, never a second model contract. */
   export type Request = {
@@ -283,6 +289,7 @@ export namespace Cli {
         "vercel",
         "fal",
         "elevenlabs",
+        "tripo",
       ] as const);
       if (positionals.length !== 3 || !provider) throw usage();
       if (configure) {
@@ -317,6 +324,7 @@ export namespace Cli {
         "vercel",
         "fal",
         "elevenlabs",
+        "tripo",
         "gg",
       ] as const);
       const kind = choice(values.kind, kinds);
@@ -370,6 +378,7 @@ export namespace Cli {
         "vercel",
         "fal",
         "elevenlabs",
+        "tripo",
         "gg",
       ] as const);
       const model = values.model;
@@ -378,6 +387,7 @@ export namespace Cli {
         "text",
         "references",
         "image",
+        "multiview",
       ] as const);
       if (
         !provider ||
@@ -616,7 +626,7 @@ export namespace Cli {
   }
   function known(value: string): Topic {
     const providerHelp =
-      /^(providers (?:configure|remove)) (?:openrouter|vercel|fal|elevenlabs)$/.exec(
+      /^(providers (?:configure|remove)) (?:openrouter|vercel|fal|elevenlabs|tripo)$/.exec(
         value
       );
     if (providerHelp) value = providerHelp[1]!;

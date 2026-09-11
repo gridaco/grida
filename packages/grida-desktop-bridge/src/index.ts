@@ -19,6 +19,8 @@ import type {
   ImageGenerateResult,
   VideoGenerateRequest,
   VideoGenerateResult,
+  ModelGenerationGenerateRequest,
+  ModelGenerationGenerateResult,
   ThreeDGenerateRequest,
   ThreeDGenerateResult,
   MusicGenerateRequest,
@@ -94,6 +96,11 @@ export type DesktopAgentCapabilities = {
 
 export type DesktopCapabilities = {
   native: DesktopNativeCapabilities;
+  /** Bundled media capabilities; omission means an older Desktop binary. */
+  media?: {
+    /** First-party Tripo credentials, generation and host-authorized egress. */
+    tripo?: boolean;
+  };
   /** Optional because protocol-1 hosts shipped before agent capabilities. */
   agent?: DesktopAgentCapabilities;
 };
@@ -468,6 +475,12 @@ export type DesktopBridge = {
    */
   video?: {
     generate: (req: VideoGenerateRequest) => Promise<VideoGenerateResult>;
+  };
+  /** Optional on older hosts; also requires caps.media.tripo. */
+  modelGeneration?: {
+    generate: (
+      req: ModelGenerationGenerateRequest
+    ) => Promise<ModelGenerationGenerateResult>;
   };
   /**
    * BYOK 3D generation. Optional because protocol-1 Desktop builds predate

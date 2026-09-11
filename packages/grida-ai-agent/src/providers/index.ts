@@ -338,6 +338,9 @@ function makeResolvedByok(
     case "elevenlabs":
       // ElevenLabs is audio-only and likewise cannot satisfy a text pick.
       throw new ProviderUnavailableError(providerId);
+    case "tripo":
+      // Tripo owns explicit model generation; it cannot satisfy text/chat.
+      throw new ProviderUnavailableError(providerId);
   }
   const _exhaustive: never = providerId;
   throw new ProviderUnavailableError(_exhaustive);

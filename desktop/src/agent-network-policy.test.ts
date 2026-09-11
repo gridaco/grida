@@ -144,6 +144,101 @@ describe("AgentNetworkPolicy", () => {
     ).toThrow(/not granted/);
   });
 
+  it("admits Tripo credentials only on its exact API origin", () => {
+    const url = "https://openapi.tripo3d.ai/v3/generation/text-to-model";
+    expect(
+      AgentNetworkPolicy.authorize(grants, {
+        grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+        method: "POST",
+        url,
+        headers: [["authorization", "Bearer synthetic-tripo"]],
+      }).url.origin
+    ).toBe("https://openapi.tripo3d.ai");
+    for (const denied of [
+      "https://evil.openapi.tripo3d.ai/v3/files",
+      "https://openapi.tripo3d.ai.attacker.example/v3/files",
+      "https://openapi.tripo3d.ai:444/v3/files",
+      "http://openapi.tripo3d.ai/v3/files",
+    ]) {
+      expect(() =>
+        AgentNetworkPolicy.authorize(grants, {
+          grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+          method: "POST",
+          url: denied,
+          headers: [],
+        })
+      ).toThrow(/not granted/);
+    }
+    expect(() =>
+      AgentNetworkPolicy.authorize(grants, {
+        grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+        method: "GET",
+        url,
+        headers: [],
+      })
+    ).toThrow(/not granted/);
+  });
+
+  it.each([
+    "https://cdn.tripo3d.ai",
+    "https://tripo-data.rg1.data.tripo3d.com",
+  ])("admits %s only as credential-free exact-origin downloads", (origin) => {
+    const url = `${origin}/tasks/id/model.glb?signature=x`;
+    expect(
+      AgentNetworkPolicy.authorize(grants, {
+        grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+        method: "GET",
+        url,
+        headers: [],
+      }).grant.lane
+    ).toBe("download");
+    for (const { error, ...metadata } of [
+      {
+        grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+        url,
+        headers: [["authorization", "Bearer synthetic"]],
+        error: "provider-network destination is not granted",
+      },
+      {
+        grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+        url,
+        headers: [["authorization", "Bearer synthetic"]],
+        error: "provider-asset header authorization is not allowed",
+      },
+      {
+        grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+        url: "https://other.data.tripo3d.com/model.glb",
+        headers: [],
+        error: "provider-network destination is not granted",
+      },
+      {
+        grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+        url: `${origin}.attacker.example/model.glb`,
+        headers: [],
+        error: "provider-network destination is not granted",
+      },
+      {
+        grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+        url: `${origin}:8443/model.glb`,
+        headers: [],
+        error: "provider-network destination is not granted",
+      },
+      {
+        grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+        url: url.replace("https:", "http:"),
+        headers: [],
+        error: "provider-network destination is not granted",
+      },
+    ])
+      expect(() =>
+        AgentNetworkPolicy.authorize(grants, {
+          ...metadata,
+          method: "GET",
+          headers: metadata.headers as [string, string][],
+        })
+      ).toThrow(error);
+  });
+
   it("rejects URL credentials and dangerous request headers", () => {
     expect(() =>
       AgentNetworkPolicy.canonicalOrigin("https://u:p@example.com/v1")

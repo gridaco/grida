@@ -115,6 +115,7 @@ describe("MediaOperations discovery", () => {
       expect(Object.keys(descriptor).sort()).toEqual(
         [
           "kind",
+          ...(descriptor.feature ? ["feature"] : []),
           "model_id",
           "provider_id",
           "binding_id",
@@ -169,7 +170,7 @@ describe("MediaOperations discovery", () => {
     expect(operations.inspect(speech).status).toBe("staged");
     expect(
       operations
-        .list({ kind: "three-d" })
+        .list({ kind: "three-d", provider: "fal" })
         .map((entry) => entry.model_id)
         .sort()
     ).toEqual(
@@ -233,7 +234,7 @@ describe("MediaOperations discovery", () => {
     rejects(() =>
       operations.inspect({
         ...music,
-        provider: "auto" as MediaOperations.Provider,
+        provider: "auto" as "fal",
       })
     );
     rejects(() =>
@@ -491,6 +492,7 @@ describe("MediaOperations JSON input", () => {
     ).toEqual({
       kind: "three-d",
       model_id: threeDText.model_id,
+      provider_id: "fal",
       selection: { model_id: threeDText.model_id, provider: "fal" },
       input: { prompt: "small chair" },
     });

@@ -50,12 +50,40 @@ export namespace MediaInput {
         );
       variant = inferred;
     }
-    return operations.inspect({
+    const selectedVariant =
+      variant ??
+      (kind === "three-d"
+        ? (candidates.find((entry) => entry.variant === "text")?.variant ??
+          candidates[0]!.variant)
+        : "text");
+    const selected = candidates.find(
+      (entry) => entry.variant === selectedVariant
+    );
+    if (!selected) throw new MediaOperations.Failure("operation_unavailable");
+    return operations.inspect(selector(selected));
+  }
+
+  /** Reconstruct the SDK's discriminated selection from its public descriptor. */
+  export function selector(
+    descriptor: MediaOperations.Descriptor
+  ): MediaOperations.Selector {
+    const {
       kind,
-      model_id: invocation.model,
-      provider: invocation.provider,
+      model_id,
+      provider_id: provider,
       variant,
-    });
+      feature,
+    } = descriptor;
+    if (provider === "tripo") {
+      if (
+        kind !== "three-d" ||
+        feature !== "model-generation" ||
+        variant === "references"
+      )
+        throw new MediaOperations.Failure("operation_unavailable");
+      return { kind, model_id, provider, feature, variant };
+    }
+    return { kind, model_id, provider, variant, feature };
   }
 
   export async function read(
@@ -286,7 +314,9 @@ export namespace MediaInput {
     ];
     if (descriptor.variant !== "text")
       example.push("--variant", quote(descriptor.variant));
-    if (properties.prompt)
+    if (descriptor.variant === "multiview")
+      example.push("--input", "@input.json");
+    else if (properties.prompt)
       example.push("--prompt", quote("Describe what to generate"));
     if (properties.text) example.push("--text", quote("Hello from Grida"));
     if (properties.voice_id) example.push("--voice", quote("YOUR_VOICE_ID"));
@@ -308,6 +338,11 @@ export namespace MediaInput {
       `  ${example.join(" ")}`,
       "",
       "--param FIELD=VALUE sets an advertised scalar input. Use --input @file|- for complex JSON.",
+      ...(descriptor.variant === "multiview"
+        ? [
+            "Multiview inputs use --input JSON with inline image data; JSON strings do not grant local file reads.",
+          ]
+        : []),
       ...(localFlags.length
         ? [
             "Local images: PNG/JPEG/static WebP, at most 8 MiB each (operation limits may be lower).",

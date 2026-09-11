@@ -185,6 +185,10 @@ describe("media command grammar", () => {
       );
   });
   it("keeps discovery credential-free and provider selection explicit", () => {
+    expect(Cli.parse(["models", "list", "--provider", "tripo"])).toMatchObject({
+      command: "models list",
+      provider: "tripo",
+    });
     expect(Cli.parse(["models", "list"])).toMatchObject({
       command: "models list",
       available: false,

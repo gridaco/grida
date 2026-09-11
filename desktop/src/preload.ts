@@ -300,6 +300,7 @@ const bridge: DesktopBridge = {
   protocol: DESKTOP_BRIDGE_PROTOCOL,
   app: { version: appVersion, platform: appPlatform },
   caps: {
+    media: { tripo: true },
     agent: {
       // This host accepts `{ path, base64 }` scratch seeds on agent runs.
       scratch_seed_base64: true,
@@ -595,6 +596,9 @@ const bridge: DesktopBridge = {
 
   threeD: {
     generate: (req) => agentClient.threeD.generate(req),
+  },
+  modelGeneration: {
+    generate: (req) => agentClient.modelGeneration.generate(req),
   },
 
   audio: {

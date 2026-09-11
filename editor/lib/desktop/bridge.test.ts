@@ -8,6 +8,7 @@ import {
   ai,
   getDesktopBridge,
   getDesktopBridgeStatus,
+  modelGeneration,
   secrets,
 } from "./bridge";
 
@@ -198,7 +199,87 @@ describe("desktop bridge client contract", () => {
       "vercel",
       "fal",
       "elevenlabs",
+      "tripo",
     ]);
+  });
+
+  it("requires both the Tripo native capability and model-generation method", () => {
+    const generate =
+      vi.fn<NonNullable<DesktopBridge["modelGeneration"]>["generate"]>();
+    const base = {
+      protocol: DESKTOP_BRIDGE_PROTOCOL,
+      app: { version: "999.0.0" },
+    };
+    for (const fields of [
+      {},
+      { modelGeneration: { generate } },
+      { caps: { media: { tripo: true } } },
+      { caps: { media: { tripo: false } }, modelGeneration: { generate } },
+    ]) {
+      installBridge({ grida: { ...base, ...fields } });
+      expect(modelGeneration.isSupported()).toBe(false);
+    }
+    installBridge({
+      grida: {
+        ...base,
+        caps: { media: { tripo: true } },
+        modelGeneration: { generate },
+      },
+    });
+    expect(modelGeneration.isSupported()).toBe(true);
+  });
+
+  it("refuses model generation on an old host before sending its new wire", async () => {
+    const generate =
+      vi.fn<NonNullable<DesktopBridge["modelGeneration"]>["generate"]>();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        modelGeneration: { generate },
+      },
+    });
+    await expect(
+      modelGeneration.generate({
+        model_id: "tripo/h3.1",
+        provider: "tripo",
+        variant: "text",
+        input: { prompt: "Chair" },
+      })
+    ).rejects.toBeInstanceOf(DesktopBridgeMissingError);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("forwards the feature request through a compatible native bridge", async () => {
+    const result = {
+      feature: "model-generation",
+      model_id: "tripo/h3.1",
+      provider_id: "tripo",
+      variant: "text",
+      glb: {
+        base64: "Z2xURg==",
+        media_type: "model/gltf-binary",
+        file_name: "model.glb",
+      },
+      task: { id: "test-task" },
+    } as const;
+    const generate = vi
+      .fn<NonNullable<DesktopBridge["modelGeneration"]>["generate"]>()
+      .mockResolvedValue(result);
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        caps: { media: { tripo: true } },
+        modelGeneration: { generate },
+      },
+    });
+    const request = {
+      model_id: "tripo/h3.1",
+      provider: "tripo",
+      variant: "text",
+      input: { prompt: "Chair" },
+    } as const;
+    await expect(modelGeneration.generate(request)).resolves.toEqual(result);
+    expect(generate).toHaveBeenCalledWith(request);
   });
 
   it("rejects empty keys before calling the bridge", async () => {

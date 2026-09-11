@@ -10,6 +10,7 @@ describe("DesktopMediaTool", () => {
     expect(DesktopMediaTool.list.map((tool) => tool.id)).toEqual([
       "image-generator",
       "video-generator",
+      "model-generation",
       "3d-generator",
       "text-to-music",
       "text-to-sound-effects",
@@ -58,6 +59,11 @@ describe("DesktopMediaTool", () => {
     for (const modelId of models.three_d.three_d_model_ids) {
       const selection = DesktopMediaTool.resolveSelection(null, modelId);
       expect(selection.tool.id).toBe("3d-generator");
+      expect(selection.initialModelId).toBe(modelId);
+    }
+    for (const modelId of models.three_d.model_generation.model_ids) {
+      const selection = DesktopMediaTool.resolveSelection(null, modelId);
+      expect(selection.tool.id).toBe("model-generation");
       expect(selection.initialModelId).toBe(modelId);
     }
 
@@ -118,6 +124,9 @@ describe("DesktopMediaTool", () => {
       DesktopMediaTool.resolveSelection("3d-generator", null).initialModelId
     ).toBe("fal-ai/hunyuan-3d/v3.1/pro/text-to-3d");
     expect(
+      DesktopMediaTool.resolveSelection("model-generation", null).initialModelId
+    ).toBe("tripo/h3.1");
+    expect(
       DesktopMediaTool.resolveSelection("text-to-music", null).initialModelId
     ).toBe("google/lyria-3");
   });
@@ -161,6 +170,9 @@ describe("DesktopMediaTool", () => {
     );
     expect(DesktopMediaTool.hrefForModel("fal-ai/trellis-2")).toBe(
       "/desktop/tools?tool=3d-generator&model=fal-ai%2Ftrellis-2"
+    );
+    expect(DesktopMediaTool.hrefForModel("tripo/p2")).toBe(
+      "/desktop/tools?tool=model-generation&model=tripo%2Fp2"
     );
     expect(DesktopMediaTool.hrefForModel("unknown-model")).toBe(
       "/desktop/tools"

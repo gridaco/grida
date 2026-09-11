@@ -28,7 +28,14 @@ export class MediaHttp {
 }
 
 type Lane = "provider" | "download";
-type Route = "openrouter" | "vercel" | "fal" | "elevenlabs" | "gg" | "download";
+type Route =
+  | "openrouter"
+  | "vercel"
+  | "fal"
+  | "elevenlabs"
+  | "tripo"
+  | "gg"
+  | "download";
 type Address = { address: string; family: 4 | 6 };
 type Request = {
   url: URL;
@@ -173,6 +180,19 @@ function route(
           /^\/v1\/text-to-speech\/[^/]+$/.test(path))))
   )
     return "elevenlabs";
+  if (
+    target.hostname === "openapi.tripo3d.ai" &&
+    !target.search &&
+    ((method === "POST" &&
+      (path === "/v3/files" ||
+        /^\/v3\/generation\/(?:text-to-model|image-to-model|multiview-to-model)$/.test(
+          path
+        ))) ||
+      (method === "GET" &&
+        (path === "/v3/account/balance" ||
+          /^\/v3\/tasks\/[A-Za-z0-9_-]+$/.test(path))))
+  )
+    return "tripo";
   return fail();
 }
 function snapshot(
@@ -239,9 +259,20 @@ function snapshot(
   const raw = init?.body;
   let body: Buffer | undefined;
   if (raw !== undefined && raw !== null) {
+    const multipart =
+      destination === "tripo" &&
+      target.pathname === "/v3/files" &&
+      /^multipart\/form-data; boundary=[A-Za-z0-9_-]{1,70}$/.test(
+        headers.get("content-type") ?? ""
+      ) &&
+      (raw instanceof Uint8Array || raw instanceof ArrayBuffer);
     if (
       method !== "POST" ||
-      !headers.get("content-type")?.startsWith("application/json")
+      (destination === "tripo" &&
+        target.pathname === "/v3/files" &&
+        !multipart) ||
+      (!multipart &&
+        !headers.get("content-type")?.startsWith("application/json"))
     )
       fail();
     if (typeof raw === "string") {

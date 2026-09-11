@@ -203,11 +203,18 @@ export class MediaRequest {
     });
     this.#cleanup.add(abort);
     this.signal.addEventListener("abort", abort, { once: true });
-    return new Response(stream, {
+    const bounded = new Response(stream, {
       status: response.status,
       statusText: response.statusText,
       headers: response.headers,
     });
+    // Preserve routing evidence for adapters that pin the exact authenticated URL.
+    Object.defineProperties(bounded, {
+      url: { value: response.url },
+      redirected: { value: response.redirected },
+      type: { value: response.type },
+    });
+    return bounded;
   }
 }
 

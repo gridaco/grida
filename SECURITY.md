@@ -287,7 +287,7 @@ become public the moment they're shipped. Always go through
 
 **What it protects.** The Grida Desktop V1 ships a local daemon
 sidecar (Node subprocess of the Electron app) that owns the user's BYOK
-keys (OpenRouter, Vercel AI Gateway, fal, ElevenLabs), native-provider
+keys (OpenRouter, Vercel AI Gateway, fal, ElevenLabs, Tripo), native-provider
 OAuth credentials (GRIDA-SEC-008), local file paths, chat sessions, and AI
 agent loops.
 Electron main listens on an ephemeral
@@ -858,6 +858,19 @@ descriptor/session ownership, claim-before-persistence, no-path-persistence,
 lazy reads, read-only mutation, and symlink escape refusal.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
+
+Direct Tripo model generation adds the [SDK client](packages/grida-ai/src/tripo-client.ts),
+[validated inputs](packages/grida-ai/src/tripo-inputs.ts), and
+[client tests](packages/grida-ai/src/tripo-client.test.ts), plus the
+[host route](packages/grida-ai-agent/src/http/routes/model-generation.ts),
+[wire contract](packages/grida-ai-agent/src/protocol/model-generation.ts),
+[route tests](packages/grida-ai-agent/src/http/routes/model-generation.test.ts), and
+[daemon integration tests](packages/grida-ai-agent/src/model-generation-daemon.test.ts).
+Only the fixed Tripo API origin receives its key; enumerated Tripo asset hosts
+use the credential-free download lane. The feature accepts bounded inline
+images, never caller-selected URLs, and persists downloaded GLB bytes rather
+than expiring provider URLs. Existing auth, Referer, preload and native transport
+controls apply to the new route.
 
 - [Windows credential compatibility tests](packages/grida-daemon/src/secrets-windows.test.ts) and [provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — platform-selected host-local custody, preserved OAuth records and GG/ChatGPT workspace setup, with strict provider failures. These simulate platform selection with disposable files; they do not certify native Windows ACLs.
 
@@ -2292,11 +2305,11 @@ generation receipts without a fixed projection.
    Ordinary listing/inspection needs no credential or network. An availability
    filter reports key presence or cached organization eligibility explicitly;
    neither establishes provider access or generation success.
-2. **Invocation-owned credentials.** `ProviderCredentials` reads the four
+2. **Invocation-owned credentials.** `ProviderCredentials` reads the five
    named process environment slots (`OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY`,
-   `FAL_KEY`, `ELEVENLABS_API_KEY`), an explicitly allocated stdin key, or the
+   `FAL_KEY`, `ELEVENLABS_API_KEY`, `TRIPO_API_KEY`), an explicitly allocated stdin key, or the
    shared provider owner under GRIDA-SEC-014. Execution
-   inspects only its selected provider; provider status may inspect all four.
+   inspects only its selected provider; provider status may inspect all five.
    There is no dotenv, repository, legacy Desktop file or account-store lookup.
    Stdin replaces the matching environment slot; successful explicit inputs bypass
    constructing or opening the stored-key owner for that provider. Missing inputs
@@ -2355,8 +2368,9 @@ generation receipts without a fixed projection.
 6. **Explicit credential checks before registration.** CLI `providers configure`
    validates the entered key through the shared AI owner, then invokes that owner's
    single authenticated GET before opening custody. The host permits only OpenRouter's
-   `/api/v1/key`, Vercel's `/v1/credits`, and fal's `/v1/models/pricing` with exactly
-   one fixed `endpoint_id=fal-ai/flux/dev`. This does not grant other platform APIs.
+   `/api/v1/key`, Vercel's `/v1/credits`, fal's `/v1/models/pricing` with exactly
+   one fixed `endpoint_id=fal-ai/flux/dev`, and Tripo's `/v3/account/balance`.
+   This does not grant other platform APIs.
    The shared owner rejects redirects, bounds the request/body lifecycle to ten seconds
    and 64 KiB of UTF-8 JSON, and discards account/key/pricing metadata. Rejected,
    denied, malformed, cancelled or unavailable checks never replace the stored key.

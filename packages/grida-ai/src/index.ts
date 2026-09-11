@@ -19,3 +19,5 @@ export {
   type GridaGatewayOrganization,
   type GgTokenSource,
 } from "./gg-session";
+
+export { TripoClient } from "./tripo-client";

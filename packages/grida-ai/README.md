@@ -4,7 +4,8 @@ Private, experimental SDK for shared model-driven operations. Catalogue-backed
 image and video generation use BYOK OpenRouter, Vercel, fal, or scoped Grida
 Gateway credentials. Music generation uses the existing GG-only Lyria route;
 sound effects and speech use their existing ElevenLabs BYOK operations. Three
-existing fal 3D endpoints return a primary GLB asset.
+existing fal 3D endpoints and direct Tripo H3.1/P1/P2 model generation return a
+primary GLB asset.
 
 ## Ownership
 
@@ -64,7 +65,8 @@ if (parsed.kind === "image") {
 }
 ```
 
-`list` optionally filters by `kind`, canonical `model_id`, and concrete `provider`.
+`list` optionally filters by `kind`, canonical `model_id`, concrete `provider`,
+and the explicit 3D `feature: "model-generation"`.
 The kinds are `image`, `video`, `music`, `sound-effect`, `text-to-speech`, and
 `three-d`. Discovery excludes `auto` and custom endpoints: each descriptor names
 one provider, binding, and input variant. Existing staged SFX, speech, and 3D
@@ -76,8 +78,9 @@ withholds that route.
 `inspect` takes those three selector fields and an optional `variant`. Image
 variants are `text` and, where supported, `references`; video variants are `text`
 and `image`. The default is `text`, so an image-only video binding requires
-`variant: "image"`. Each exact 3D model has one inferred variant and its own input
-signature. Other current operations use `text`. Unsupported combinations fail
+`variant: "image"`. Legacy fal 3D models have one inferred variant and their own input
+signatures. Tripo requires `feature: "model-generation"` and an explicit
+`text`, `image`, or `multiview` variant. Other current operations use `text`. Unsupported combinations fail
 with `operation_unavailable`; malformed options, selectors, and inputs fail with
 `invalid_input`. `MediaOperations.Failure` exposes only that code as its message
 and JSON representation.
@@ -688,3 +691,104 @@ no retry of failed submissions, bounded invocation/results, and scoped-token exp
 cover catalogue refresh and bounded downloads. No test calls a real provider,
 opens a real credential store, or starts a Grida host. Packaging and host consumers
 must use public exports; source aliases are not a substitute for that proof.
+
+## Direct Tripo model generation
+
+`TripoClient` is the built-in BYOK operation for H3.1, P1, and P2 Preview.
+Resolution and discovery use Grida's explicit bundled model-generation service
+membership from `@grida/ai-models/grida`; neutral facts remain in the root
+catalogue entry. Schema-1 text/image/video refreshes do not replace this family.
+The `three-d` discovery kind names the output family; `feature: "model-generation"`
+names the operation, `model_id` names the model, and `variant` selects its input.
+Remeshing and rigging have different inputs/results and are not enabled features.
+The existing `ThreeDClient` fal operations keep their exact contracts.
+
+```ts
+import { MediaOperations, TripoClient } from "@grida/ai";
+
+const selector = {
+  kind: "three-d",
+  feature: "model-generation",
+  model_id: "tripo/h3.1",
+  provider: "tripo",
+  variant: "text",
+} as const;
+const operations = new MediaOperations();
+const descriptor = operations.inspect(selector);
+const client = new TripoClient({ keys, http });
+const operation = await client.resolve({
+  feature: selector.feature,
+  model_id: selector.model_id,
+  provider: selector.provider,
+  variant: selector.variant,
+});
+const result = await operation.generate({
+  prompt: "A small wooden chair",
+  texture: true,
+  texture_quality: "detailed",
+  face_limit: 20_000,
+  seed: 0,
+});
+// result.glb: { data: Uint8Array, media_type: "model/gltf-binary" }
+// result.task: { id: string, credits_consumed?: number }
+```
+
+Required selectors use `feature: "model-generation"`, `provider: "tripo"`,
+`model_id: "tripo/h3.1" | "tripo/p1" | "tripo/p2"`, and
+`variant: "text" | "image" | "multiview"`. Literal selectors narrow the generated
+input type. Dynamically resolved operations are a discriminated union over model
+and variant. `MediaOperations.parseInput` returns a Tripo branch identified by
+`kind: "three-d"` and `provider_id: "tripo"`, with the same typed selection/input.
+
+Text input is a nonblank trimmed prompt of at most 1,024 Unicode code points.
+Image input is `{ image: { data, media_type } }`. Multiview input is
+`{ images: { front, left?, back?, right? } }`, with front and at least one other
+view required. Images are copied before the first await. Each image has a
+20,000,000-byte ceiling and accepts PNG or JPEG; JSON uses padded base64 for
+`data`. The SDK uploads these bytes to the fixed `/v3/files` endpoint before
+submission. Although generation also documents WebP sources, the
+[upload endpoint](https://developers.tripo3d.ai/en/docs/files) only documents PNG
+and JPEG. There are no file paths, arbitrary image URLs, upstream task/file tokens,
+or caller-supplied upload destinations in this operation.
+
+All three models accept `texture`, `pbr`, `texture_quality` (`standard`,
+`detailed`, `extreme`), `face_limit`, and safe-integer `seed` (geometry seed).
+Texture and PBR default to true; `texture: false` also defaults PBR to false.
+Explicit `pbr: true` or a texture-quality option alongside `texture: false`
+fails. Only H3.1 accepts `geometry_quality: "standard" | "detailed"`.
+Face limits are 1–1,500,000 for standard H3.1, up to 2,000,000 for detailed H3.1,
+50–20,000 for P1, and 48–50,000 for P2. Omitted face limits retain provider
+adaptive topology. The [H-series](https://developers.tripo3d.ai/en/docs/generation-text-to-model/standard)
+and [P-series](https://developers.tripo3d.ai/en/docs/generation-text-to-model/p)
+contracts ground these choices. Unsupported fields fail before key lookup or I/O.
+
+Generation resolves only the named Tripo key. The provider identity is absent
+from generic text/image/video resolver precedence. `ProviderCredentials` trims
+opaque printable keys and checks the fixed read-only
+[balance endpoint](https://developers.tripo3d.ai/en/docs/account); accepted decimal
+balances, including zero, prove credential acceptance, not affordability.
+
+One ten-minute deadline covers key lookup, uploads, the single paid submission,
+two-second status polling, and immediate result download. Submission is never
+retried; cancellation cannot undo an accepted task or its charge. Failure codes
+are `invalid_input`, `model_unavailable`, `provider_key_required`,
+`credential_rejected`, `access_denied`, `insufficient_credits`, `aborted`,
+`timeout`, `invalid_response`, and `generation_failed`. Messages/JSON are safe
+codes; failures after confirmed submission also carry `task_id` so hosts can
+identify the accepted job without guessing or resubmitting. Provider messages,
+response bodies, prompts, keys and signed URLs never leave in errors.
+
+All authenticated calls stay at `https://openapi.tripo3d.ai`, with redirects
+refused. GLB downloads use the credential-free transport and are capped at 64 MiB.
+The accepted result origins are `https://cdn.tripo3d.ai` and
+`https://tripo-data.rg1.data.tripo3d.com`; hosts authorize DNS and every redirect
+hop separately. The result validates GLB 2.0 framing and JSON (with a 4 MiB JSON-chunk cap), rejects known
+geometry/texture compression and external resources, and returns bytes immediately
+because provider URLs expire. It does not fully validate mesh semantics or render
+models. `task.credits_consumed`, when present, is a nonnegative finite provider
+credit amount; decimals are valid. It is not a billing or persistence receipt.
+
+There is deliberately no arbitrary provider-options object, upload-token API,
+quad/FBX output, compression option, processing registry, or speculative future
+feature. The narrow GLB result contract must be extended honestly before adding
+incompatible output modes.

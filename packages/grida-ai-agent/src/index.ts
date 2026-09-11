@@ -57,6 +57,10 @@ export type {
   ThreeDGeneratedGlb,
   ThreeDGenerateResult,
 } from "./protocol/three-d";
+export type {
+  ModelGenerationGenerateRequest,
+  ModelGenerationGenerateResult,
+} from "./protocol/model-generation";
 export type { GeneratedMp3 } from "./protocol/generated-mp3";
 export type {
   MusicGenerateRequest,

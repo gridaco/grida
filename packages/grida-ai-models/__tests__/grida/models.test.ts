@@ -8,6 +8,7 @@ describe("bundled model release metadata", () => {
     ...Object.values(models.audio.sound_effects.models),
     ...Object.values(models.audio.text_to_speech.models),
     ...Object.values(models.three_d.models),
+    ...Object.values(models.three_d.model_generation.models),
     ...Object.values(models.video.models).filter((card) => card !== undefined),
     ...Object.values(models.image_tools.models),
   ];

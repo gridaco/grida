@@ -4,6 +4,7 @@ export type DesktopMediaToolId =
   | "image-generator"
   | "video-generator"
   | "3d-generator"
+  | "model-generation"
   | "text-to-music"
   | "text-to-sound-effects"
   | "text-to-speech"
@@ -46,6 +47,17 @@ const TOOL_SPECS = Object.freeze([
     description: "Create a video from a written prompt.",
     modelIds: models.video.listed_models().map((card) => card.id),
     defaultModelId: models.video.default_id,
+  },
+  {
+    id: "model-generation",
+    group: "create",
+    label: "Model generation",
+    description:
+      "Generate a model with Tripo from text, an image, or multiple views.",
+    modelIds: models.three_d.model_generation
+      .ordered_models()
+      .map((card) => card.id),
+    defaultModelId: models.three_d.model_generation.default_id,
   },
   {
     id: "3d-generator",
@@ -190,6 +202,9 @@ export namespace DesktopMediaTool {
     }
     if (models.video.models[modelId]?.listed) {
       return resolve("video-generator");
+    }
+    if (resolve("model-generation").modelIds.includes(modelId)) {
+      return resolve("model-generation");
     }
     if (resolve("3d-generator").modelIds.includes(modelId)) {
       return resolve("3d-generator");

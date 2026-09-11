@@ -19,6 +19,12 @@ Desktop source files directly.
 resolves as `{ outcome: "cancelled" }`; every other failure rejects. Consumers
 must classify the result by `outcome`, never by matching Electron error text.
 
+`modelGeneration.generate()` exposes direct Tripo model generation only when
+both the optional method and `caps.media.tripo` are present. A hosted renderer
+must withhold Tripo key setup and generation choices from older native builds.
+The request identifies a model and input variant; the response contains inline
+GLB bytes, safe task metadata and an optional local media receipt.
+
 Desktop still owns Electron IPC channel names, preload implementation, native
 window/dialog/shell behavior, and AgentHost supervision.
 

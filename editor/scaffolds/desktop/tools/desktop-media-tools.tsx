@@ -29,8 +29,13 @@ import {
 } from "@app/ui/components/sidebar";
 import { cn } from "@app/ui/lib/utils";
 import type { catalog as models } from "@grida/ai-models/grida";
-import { mediaLibrary, type MediaItem } from "@/lib/desktop/bridge";
+import {
+  mediaLibrary,
+  modelGeneration,
+  type MediaItem,
+} from "@/lib/desktop/bridge";
 import { ThreeDPlayground } from "../3d-gen/three-d-playground";
+import { ModelGenerationPlayground } from "../3d-gen/model-generation-playground";
 import { MusicPlayground } from "../audio-gen/music-playground";
 import { SoundEffectPlayground } from "../audio-gen/sound-effect-playground";
 import { VoicePlayground } from "../audio-gen/voice-playground";
@@ -268,6 +273,11 @@ export function DesktopMediaTools({
                   <SidebarMenu className="gap-0.5">
                     {DesktopMediaTool.list
                       .filter((item) => item.group === group.id)
+                      .filter(
+                        (item) =>
+                          item.id !== "model-generation" ||
+                          modelGeneration.isSupported()
+                      )
                       .map((item) => {
                         const active = item.id === activeToolId;
                         const content = (
@@ -495,6 +505,19 @@ function DesktopMediaToolContent({
   }
 
   switch (tool.id) {
+    case "model-generation":
+      return (
+        <ModelGenerationPlayground
+          initialModelId={
+            (initialModelId as models.three_d.model_generation.ModelId | null) ??
+            undefined
+          }
+          generationDisabled={generationDisabled}
+          onGenerationBusyChange={onGenerationBusyChange}
+          onStoredMediaCreated={onStoredMediaCreated}
+          onRevealStoredMedia={onRevealStoredMedia}
+        />
+      );
     case "image-generator":
       return (
         <DesktopImagePlayground
@@ -644,6 +667,7 @@ function ToolIcon({ id }: { id: DesktopMediaToolId }) {
       return <Video className={className} aria-hidden />;
     case "3d-generator":
     case "3d-viewer":
+    case "model-generation":
       return <Box className={className} aria-hidden />;
     case "text-to-music":
       return <Music2 className={className} aria-hidden />;

@@ -99,6 +99,8 @@ export namespace AgentNetworkPolicy {
       // request itself. It is an exact provider origin and must never join the
       // credential-free provider-asset download lane.
       "https://api.elevenlabs.io",
+      // Tripo's credential belongs only to its exact first-party API origin.
+      "https://openapi.tripo3d.ai",
     ];
     return [
       {
@@ -113,9 +115,13 @@ export namespace AgentNetworkPolicy {
         // lane. Keep them inside namespaces already owned by the providers.
         // An output URL on another CDN is refused until that origin has its
         // own explicit host grant ceremony.
-        origins: providerAssetOrigins.filter((origin) =>
-          origin.startsWith("https:")
-        ),
+        origins: [
+          ...providerAssetOrigins,
+          // Tripo documents the CDN and returns the regional data origin in
+          // live results. Neither joins providerOrigins: no API keys go here.
+          "https://cdn.tripo3d.ai",
+          "https://tripo-data.rg1.data.tripo3d.com",
+        ].filter((origin) => origin.startsWith("https:")),
       },
     ];
   }
