@@ -40,6 +40,7 @@ import {
   ByteDanceLogo,
   ClaudeLogo,
   ElevenLabsLogo,
+  TripoLogo,
   FalLogo,
   GoogleLogo,
   MetaLogo,
@@ -428,6 +429,7 @@ const BYOK_PROVIDER_LOGOS: Partial<
   vercel: VercelLogo,
   fal: FalLogo,
   elevenlabs: ElevenLabsLogo,
+  tripo: TripoLogo,
 };
 
 const MODEL_VENDOR_LOGOS: Partial<
@@ -441,6 +443,7 @@ const MODEL_VENDOR_LOGOS: Partial<
   bytedance: ByteDanceLogo,
   meta: MetaLogo,
   elevenlabs: ElevenLabsLogo,
+  tripo: TripoLogo,
   microsoft: MicrosoftLogo,
   tencent: TencentLogo,
   xai: SpaceXAILogo,
@@ -1115,11 +1118,11 @@ function MediaModelsSection({
         )}
         {tripoSupported && (
           <MediaModelGroup
-            title="Model generation · Tripo"
+            title="3D · Tripo"
             models={tripoModels}
             readyForModel={() => tripoReady}
             hrefForModel={mediaToolHref}
-            actionLabel="Open model generation"
+            actionLabel="Open in 3D generator"
           />
         )}
         {musicSupported && (

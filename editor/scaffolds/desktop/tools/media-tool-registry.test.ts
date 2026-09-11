@@ -10,7 +10,6 @@ describe("DesktopMediaTool", () => {
     expect(DesktopMediaTool.list.map((tool) => tool.id)).toEqual([
       "image-generator",
       "video-generator",
-      "model-generation",
       "3d-generator",
       "text-to-music",
       "text-to-sound-effects",
@@ -26,7 +25,13 @@ describe("DesktopMediaTool", () => {
 
   it("keeps both staged and listed family members available in dedicated tools", () => {
     for (const [tool, cards] of [
-      ["3d-generator", models.three_d.ordered_models()],
+      [
+        "3d-generator",
+        [
+          ...models.three_d.ordered_models(),
+          ...models.three_d.model_generation.ordered_models(),
+        ],
+      ],
       ["text-to-sound-effects", models.audio.sound_effects.ordered_models()],
       ["text-to-speech", models.audio.text_to_speech.ordered_models()],
     ] as const) {
@@ -63,7 +68,7 @@ describe("DesktopMediaTool", () => {
     }
     for (const modelId of models.three_d.model_generation.model_ids) {
       const selection = DesktopMediaTool.resolveSelection(null, modelId);
-      expect(selection.tool.id).toBe("model-generation");
+      expect(selection.tool.id).toBe("3d-generator");
       expect(selection.initialModelId).toBe(modelId);
     }
 
@@ -159,6 +164,26 @@ describe("DesktopMediaTool", () => {
     });
   });
 
+  it("keeps Tripo aliases on the shared 3D page without changing their default", () => {
+    expect(DesktopMediaTool.resolveSelection("model-generation", null)).toEqual(
+      {
+        tool: DesktopMediaTool.resolve("3d-generator"),
+        initialModelId: "tripo/h3.1",
+      }
+    );
+    for (const model of models.three_d.model_generation.model_ids) {
+      expect(
+        DesktopMediaTool.resolveSelection("3d-generator", model).initialModelId
+      ).toBe(model);
+      expect(
+        DesktopMediaTool.resolveSelection("model-generation", model)
+      ).toEqual(DesktopMediaTool.resolveSelection("3d-generator", model));
+    }
+    expect(DesktopMediaTool.href("model-generation")).toBe(
+      "/desktop/tools?tool=3d-generator&model=tripo%2Fh3.1"
+    );
+  });
+
   it("builds a deep link that round-trips a model handoff", () => {
     const imageModelId = models.image.listed_models()[0]!.id;
     expect(DesktopMediaTool.hrefForModel(imageModelId)).toBe(
@@ -172,7 +197,7 @@ describe("DesktopMediaTool", () => {
       "/desktop/tools?tool=3d-generator&model=fal-ai%2Ftrellis-2"
     );
     expect(DesktopMediaTool.hrefForModel("tripo/p2")).toBe(
-      "/desktop/tools?tool=model-generation&model=tripo%2Fp2"
+      "/desktop/tools?tool=3d-generator&model=tripo%2Fp2"
     );
     expect(DesktopMediaTool.hrefForModel("unknown-model")).toBe(
       "/desktop/tools"

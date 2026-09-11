@@ -1,6 +1,7 @@
 import type { FC } from "react";
 import type { Metadata } from "next";
 import ai from "@/lib/ai";
+import { models as providerModels } from "@grida/ai-models";
 import { catalog as serviceCatalog } from "@grida/ai-models/grida";
 import {
   models as textModels,
@@ -33,6 +34,7 @@ import {
   BlackForestLabsLogo,
   ByteDanceLogo,
   ElevenLabsLogo,
+  TripoLogo,
   OpenAILogo,
   AnthropicLogo,
   GoogleLogo,
@@ -50,6 +52,14 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://grida.co/ai/models",
   },
+  openGraph: {
+    title: "AI Models & Pricing — Grida",
+    description:
+      "Compare AI models, release dates, and provider pricing, including Tripo H3.1, P1, and P2 Preview for 3D generation.",
+    url: "https://grida.co/ai/models",
+    type: "website",
+  },
+  twitter: { card: "summary" },
 };
 
 const Logos: Partial<Record<string, FC<{ className?: string }>>> = {
@@ -59,6 +69,7 @@ const Logos: Partial<Record<string, FC<{ className?: string }>>> = {
   openai: OpenAILogo,
   anthropic: AnthropicLogo,
   elevenlabs: ElevenLabsLogo,
+  tripo: TripoLogo,
   google: GoogleLogo,
   meta: MetaLogo,
   microsoft: MicrosoftLogo,
@@ -1309,10 +1320,11 @@ function ThreeDModelsSection() {
       <div className="mb-10">
         <h2 className="text-3xl font-bold tracking-tight mb-2">3D Models</h2>
         <p className="text-base text-muted-foreground max-w-2xl">
-          fal-hosted text-to-3D and image-to-3D endpoints supported by Grida.
-          GLB is the portable primary result; additional formats are endpoint
-          specific. Catalogue presence does not imply web generation
-          availability.
+          Generate 3D models with Tripo, Hunyuan, and TRELLIS. Tripo H3.1, P1,
+          and P2 Preview support text, image, and multiview inputs through a
+          direct provider integration. Tripo is available in Grida Desktop and
+          the CLI with your own Tripo API key; Grida-funded credits and browser
+          generation are not supported. GLB is the primary output.
         </p>
       </div>
 
@@ -1366,6 +1378,80 @@ function ThreeDModelsSection() {
                   </TableCell>
                   <TableCell>
                     <ThreeDPricing pricing={model.pricing} />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                    <ReleaseDate release={model.release} />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {providerModels.three_d.model_generation.model_ids.map((id) => {
+              const model: providerModels.three_d.model_generation.ModelCard =
+                providerModels.three_d.model_generation.models[id];
+              const pricing = model.pricing;
+              return (
+                <TableRow key={id} id={id.replace("/", "-")}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <MakerLogo vendor={model.vendor} className="size-4" />
+                      <div>
+                        <div>{model.label}</div>
+                        <code className="text-xs text-muted-foreground">
+                          {id}
+                        </code>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Direct Tripo · Desktop & CLI · BYOK only
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {model.short_description}
+                        </p>
+                        <ReleaseDate
+                          release={model.release}
+                          prefix
+                          className="block text-xs text-muted-foreground md:hidden"
+                        />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">
+                    Text, image, multiview
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                    GLB · Optional PBR textures
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1 text-xs">
+                      {model.inputs.map((input) => (
+                        <div key={input}>
+                          <span className="capitalize">{input}</span>:{" "}
+                          {pricing.base_credits[input]} credits
+                          <span className="text-muted-foreground">
+                            {" "}
+                            ($
+                            {(
+                              pricing.base_credits[input] *
+                              pricing.usd_per_credit
+                            ).toFixed(2)}
+                            )
+                          </span>
+                        </div>
+                      ))}
+                      <p className="text-muted-foreground">
+                        Base geometry; textures +
+                        {pricing.texture_credits.standard}–
+                        {pricing.texture_credits.extreme} credits.
+                        {pricing.detailed_geometry_credits !== undefined &&
+                          ` Detailed geometry +${pricing.detailed_geometry_credits} credits.`}
+                      </p>
+                      <a
+                        href={pricing.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-2"
+                      >
+                        Tripo API pricing
+                      </a>
+                    </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                     <ReleaseDate release={model.release} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ImagePlus } from "lucide-react";
 import { catalog as models } from "@grida/ai-models/grida";
 import {
@@ -44,6 +44,8 @@ type ThreeDGenerationControlsProps = Readonly<{
   onGenerated: (result: ThreeDGeneratedPreview) => void;
   onBusyChange?: (busy: boolean) => void;
   disabled?: boolean;
+  showModelPicker?: boolean;
+  modelPicker?: ReactNode;
 }>;
 
 export function ThreeDGenerationControls(props: ThreeDGenerationControlsProps) {
@@ -72,6 +74,8 @@ function AvailableThreeDGenerationControls({
   onGenerated,
   onBusyChange,
   disabled = false,
+  showModelPicker = true,
+  modelPicker,
   availableModels,
   fallbackModelId,
 }: ThreeDGenerationControlsProps & {
@@ -200,29 +204,32 @@ function AvailableThreeDGenerationControls({
             {!acceptsText && (
               <ReferenceImageButton disabled={busy || disabled} />
             )}
-            <PromptInputSelect
-              value={modelId}
-              onValueChange={(value) => {
-                if (activeInputMode === "text") {
-                  setTextModelId(value as models.three_d.ThreeDModelId);
-                } else {
-                  setImageModelId(value as models.three_d.ThreeDModelId);
-                }
-                setError(null);
-              }}
-              disabled={busy || disabled}
-            >
-              <MediaModelPickerTrigger className="max-w-48">
-                <PromptInputSelectValue placeholder="Model" />
-              </MediaModelPickerTrigger>
-              <PromptInputSelectContent>
-                {modelsForInput.map((model) => (
-                  <PromptInputSelectItem key={model.id} value={model.id}>
-                    {threeDModelLabel(model)}
-                  </PromptInputSelectItem>
-                ))}
-              </PromptInputSelectContent>
-            </PromptInputSelect>
+            {modelPicker}
+            {showModelPicker && (
+              <PromptInputSelect
+                value={modelId}
+                onValueChange={(value) => {
+                  if (activeInputMode === "text") {
+                    setTextModelId(value as models.three_d.ThreeDModelId);
+                  } else {
+                    setImageModelId(value as models.three_d.ThreeDModelId);
+                  }
+                  setError(null);
+                }}
+                disabled={busy || disabled}
+              >
+                <MediaModelPickerTrigger className="max-w-48">
+                  <PromptInputSelectValue placeholder="Model" />
+                </MediaModelPickerTrigger>
+                <PromptInputSelectContent>
+                  {modelsForInput.map((model) => (
+                    <PromptInputSelectItem key={model.id} value={model.id}>
+                      {threeDModelLabel(model)}
+                    </PromptInputSelectItem>
+                  ))}
+                </PromptInputSelectContent>
+              </PromptInputSelect>
+            )}
           </PromptInputTools>
           <PromptInputSubmit
             status={busy ? "submitted" : undefined}

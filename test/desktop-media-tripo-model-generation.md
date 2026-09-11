@@ -7,7 +7,7 @@ tags: [tripo, model-generation, multiview, media-library]
 status: verified
 severity: high
 date: 2026-09-11
-updated: 2026-09-11
+updated: 2026-09-12
 automatable: false
 covered_by:
   - editor/scaffolds/desktop/3d-gen/model-generation-form.test.ts
@@ -25,14 +25,17 @@ successful model stays usable while another request runs or fails.
 ## Steps
 
 1. Use a compatible Desktop build with a local media store. Connect a Tripo
-   API key in Settings and open **Model generation** in Tools.
+   API key in Settings and open **3D model** in Tools, then select a Tripo model
+   from the bottom composer. The preview stays wide, with input-mode tabs in
+   the header and advanced controls hidden behind **Generation options**.
 2. Select H3.1, P1, and P2 Preview in turn. Each appears once. H3.1 offers
-   geometry quality; P1/P2 omit it. P2's preview label remains visible.
+   geometry quality under **Generation options**; P1/P2 omit it. P2's preview
+   label remains visible. Switching Tripo models preserves the prompt.
 3. Select **Multiview** and add the front view only. Generate. An inline
    message asks for another view and no provider task starts.
 4. Add the right view, leaving left/back empty. Confirm the thumbnail is in
    the right slot. Remove and replace it; its filename and thumbnail update.
-5. Turn texture off. PBR and texture-quality controls disappear and the
+5. Open **Generation options** and turn texture off. PBR and texture-quality controls disappear and the
    displayed credit estimate decreases. Set a valid face limit and seed.
 6. With an approved live-test budget, generate once. Controls and navigation
    remain disabled during the request; the UI returns to an actionable state
@@ -58,3 +61,7 @@ native reveal, Recents, reload, and cold restart. Downloaded and saved bytes mat
 All nine model/input combinations also passed live SDK generation. Synthetic
 browser checks covered model-specific controls, failures with task IDs,
 preservation of previous results, and narrow layouts.
+
+Verified the revised composer locally on 2026-09-12 in Desktop using a previously
+generated GLB. Synthetic generation checks covered busy states, failure recovery,
+result retention, and narrow layouts without additional provider charges.

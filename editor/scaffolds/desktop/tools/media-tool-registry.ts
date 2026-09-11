@@ -49,22 +49,16 @@ const TOOL_SPECS = Object.freeze([
     defaultModelId: models.video.default_id,
   },
   {
-    id: "model-generation",
-    group: "create",
-    label: "Model generation",
-    description:
-      "Generate a model with Tripo from text, an image, or multiple views.",
-    modelIds: models.three_d.model_generation
-      .ordered_models()
-      .map((card) => card.id),
-    defaultModelId: models.three_d.model_generation.default_id,
-  },
-  {
     id: "3d-generator",
     group: "create",
     label: "3D model",
     description: "Create a 3D model from text or a reference image.",
-    modelIds: models.three_d.ordered_models().map((card) => card.id),
+    modelIds: [
+      ...models.three_d.ordered_models().map((card) => card.id),
+      ...models.three_d.model_generation
+        .ordered_models()
+        .map((card) => card.id),
+    ],
   },
   {
     id: "text-to-music",
@@ -157,7 +151,11 @@ export namespace DesktopMediaTool {
     value: string | null | undefined
   ): DesktopMediaToolSpec {
     if (!value) return TOOL_BY_ID.get(defaultId)!;
-    if (value === "text-to-3d" || value === "image-to-3d") {
+    if (
+      value === "text-to-3d" ||
+      value === "image-to-3d" ||
+      value === "model-generation"
+    ) {
       return TOOL_BY_ID.get("3d-generator")!;
     }
     return (
@@ -182,8 +180,13 @@ export namespace DesktopMediaTool {
   export function href(id: DesktopMediaToolId, modelId?: string): string {
     const tool = resolve(id);
     const query = `tool=${encodeURIComponent(tool.id)}`;
-    return modelId
-      ? `/desktop/tools?${query}&model=${encodeURIComponent(modelId)}`
+    const selectedModel =
+      modelId ??
+      (id === "model-generation"
+        ? models.three_d.model_generation.default_id
+        : undefined);
+    return selectedModel
+      ? `/desktop/tools?${query}&model=${encodeURIComponent(selectedModel)}`
       : `/desktop/tools?${query}`;
   }
 
@@ -202,9 +205,6 @@ export namespace DesktopMediaTool {
     }
     if (models.video.models[modelId]?.listed) {
       return resolve("video-generator");
-    }
-    if (resolve("model-generation").modelIds.includes(modelId)) {
-      return resolve("model-generation");
     }
     if (resolve("3d-generator").modelIds.includes(modelId)) {
       return resolve("3d-generator");
@@ -231,6 +231,13 @@ export namespace DesktopMediaTool {
       (tool.modelIds as readonly string[]).includes(modelValue)
     ) {
       return modelValue;
+    }
+    if (toolValue === "model-generation") {
+      return (
+        models.three_d.model_generation.default_id ??
+        models.three_d.model_generation.model_ids[0] ??
+        tool.modelIds[0]!
+      );
     }
     if (
       tool.id === "3d-generator" &&
