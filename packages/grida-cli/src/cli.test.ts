@@ -1,6 +1,6 @@
 // GRIDA-SEC-014 — shared provider custody retains explicit host authority.
 // GRIDA-SEC-010 / GRIDA-SEC-013 — command grammar and explicit authority regression checks.
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { Cli } from "./cli";
 
 describe("CLI grammar", () => {
@@ -87,6 +87,67 @@ describe("CLI grammar", () => {
 });
 
 describe("rigging command grammar", () => {
+  it("types model identity and mesh options according to the accepted command", () => {
+    const common = { provider: "tripo", json: false, noInput: false } as const;
+    const inspect = { ...common, command: "rigging inspect" } as const;
+    expectTypeOf({
+      ...inspect,
+      feature: "rig-check" as const,
+    }).toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...inspect,
+      feature: "rigging" as const,
+      model: "tripo/rig-v1.0",
+    }).toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...inspect,
+      feature: "rigging" as const,
+    }).not.toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...inspect,
+      feature: "rig-check" as const,
+      model: "tripo/rig-v1.0",
+    }).not.toExtend<Cli.RiggingInvocation>();
+
+    const run = {
+      ...common,
+      command: "rigging run",
+      model: "tripo/rig-v1.0",
+      out: "./rigged",
+      keyStdin: false,
+    } as const;
+    const mesh = { ...run, mesh: "./character.glb" };
+    expectTypeOf({
+      ...mesh,
+      rigType: "biped",
+      spec: "mixamo",
+    }).toExtend<Cli.RiggingInvocation>();
+    expectTypeOf(mesh).not.toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...mesh,
+      rigType: "biped",
+    }).not.toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...mesh,
+      spec: "mixamo",
+    }).not.toExtend<Cli.RiggingInvocation>();
+
+    const input = { ...run, input: "@input.json" };
+    expectTypeOf(input).toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...input,
+      rigType: "biped",
+    }).not.toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...input,
+      spec: "mixamo",
+    }).not.toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...input,
+      mesh: "./character.glb",
+    }).not.toExtend<Cli.RiggingInvocation>();
+  });
+
   const run = [
     "rigging",
     "run",

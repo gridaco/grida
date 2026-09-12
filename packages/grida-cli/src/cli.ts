@@ -106,12 +106,13 @@ export namespace Cli {
           provider?: "tripo" | "gg";
           feature?: "rig-check" | "rigging";
         }
-      | {
+      | ({
           command: "rigging inspect";
           provider: "tripo" | "gg";
-          feature: "rig-check" | "rigging";
-          model?: string;
-        }
+        } & (
+          | { feature: "rig-check"; model?: never }
+          | { feature: "rigging"; model: string }
+        ))
       | ({
           command: "rigging check";
           provider: "tripo" | "gg";
@@ -125,9 +126,10 @@ export namespace Cli {
           out: string;
           keyStdin: boolean;
           selector?: Selector;
-          rigType?: string;
-          spec?: string;
-        } & RiggingSource)
+        } & (
+          | { mesh: string; input?: never; rigType: string; spec: string }
+          | { input: string; mesh?: never; rigType?: never; spec?: never }
+        ))
     );
   type RiggingSource =
     | { mesh: string; input?: never }
@@ -319,14 +321,13 @@ export namespace Cli {
         (feature === "rig-check" && values.model !== undefined)
       )
         throw usage();
-      const model =
-        feature === "rigging" ? riggingValue(values.model) : undefined;
       return {
         ...options,
         command: topic,
         provider: values.provider,
-        feature,
-        ...(model ? { model } : {}),
+        ...(feature === "rigging"
+          ? { feature, model: riggingValue(values.model) }
+          : { feature }),
       };
     }
     if (topic === "rigging check" || topic === "rigging run") {
@@ -384,13 +385,13 @@ export namespace Cli {
         out: riggingValue(values.out),
         keyStdin,
         ...(selector ? { selector } : {}),
-        ...source,
         ...(mesh
           ? {
+              mesh,
               rigType: riggingValue(values["rig-type"]),
               spec: riggingValue(values.spec),
             }
-          : {}),
+          : { input: input! }),
       };
     }
     if (topic === "auth login") {

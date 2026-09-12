@@ -258,10 +258,17 @@ export class AgentSidecarNetwork {
       const reader = request.body.getReader();
       const chunks: Buffer[] = [];
       let size = 0;
+      // A pending read need not produce another chunk. Abort closes the reader
+      // immediately; an uncooperative source's cancel promise cannot hold it open.
+      const cancelBody = () => {
+        void reader.cancel().catch(() => undefined);
+      };
+      request.signal.addEventListener("abort", cancelBody, { once: true });
       try {
         for (;;) {
           if (request.signal.aborted) throw abortError(request.signal.reason);
           const { done, value } = await reader.read();
+          if (request.signal.aborted) throw abortError(request.signal.reason);
           if (done) break;
           size += value.byteLength;
           if (size > maximumBodyBytes)
@@ -270,9 +277,10 @@ export class AgentSidecarNetwork {
         }
         body = Buffer.concat(chunks, size);
       } catch (error) {
-        await reader.cancel().catch(() => undefined);
+        cancelBody();
         throw error;
       } finally {
+        request.signal.removeEventListener("abort", cancelBody);
         reader.releaseLock();
       }
     }

@@ -518,9 +518,9 @@ describe("AgentSidecarNetwork", () => {
     const body = new ReadableStream<Uint8Array>({
       start(stream) {
         setImmediate(() => {
-          controller.abort();
           stream.enqueue(new TextEncoder().encode("late"));
           stream.close();
+          controller.abort();
         });
       },
     });
@@ -540,6 +540,52 @@ describe("AgentSidecarNetwork", () => {
       false
     );
     harness.network.close();
+  });
+
+  it("aborts a nonproducing request body without awaiting source cancellation", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    const controller = new AbortController();
+    let reading!: () => void;
+    const started = new Promise<void>((resolve) => {
+      reading = resolve;
+    });
+    const cancel = vi.fn<() => Promise<void>>(() => new Promise(() => {}));
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull() {
+          reading();
+          return new Promise(() => {});
+        },
+        cancel,
+      },
+      { highWaterMark: 0 }
+    );
+    const init: RequestInit & { duplex: "half" } = {
+      method: "POST",
+      body,
+      signal: controller.signal,
+      duplex: "half",
+    };
+    let failure: unknown;
+    const pending = harness.network.providerHttp
+      .request("https://openrouter.ai/api/v1/chat/completions", init)
+      .catch((error: unknown) => {
+        failure = error;
+      });
+    await started;
+    controller.abort();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    try {
+      expect(failure).toMatchObject({ name: "AbortError" });
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(
+        harness.frames.some((frame) => frame.type === "request.start")
+      ).toBe(false);
+      await pending;
+    } finally {
+      harness.network.close();
+    }
   });
 
   it("ignores bounded late response frames after body cancellation", async () => {

@@ -258,7 +258,70 @@ describe("model-generation host adapter", () => {
     expect((await first).status).toBe(200);
     expect((await post(app, textInput)).status).toBe(200);
   });
-  it("refuses oversized wire bodies before key lookup", async () => {
+  it("reserves before decoding and refuses a busy request without reading its body", async () => {
+    const { app, get, request } = setup();
+    let firstBody!: ReadableStreamDefaultController<Uint8Array>;
+    let reading!: () => void;
+    const started = new Promise<void>((resolve) => {
+      reading = resolve;
+    });
+    const bytes = new TextEncoder().encode(JSON.stringify(textInput));
+    const firstInput = new ReadableStream<Uint8Array>(
+      {
+        start(controller) {
+          firstBody = controller;
+        },
+        pull() {
+          reading();
+          return new Promise(() => {});
+        },
+      },
+      { highWaterMark: 0 }
+    );
+    const init: RequestInit & { duplex: "half" } = {
+      method: "POST",
+      body: firstInput,
+      duplex: "half",
+      headers: { "content-type": "application/json" },
+    };
+    const first = app.fetch(
+      new Request("http://localhost/model-generation/generate", init)
+    );
+    await started;
+    const pull = vi.fn<
+      (controller: ReadableStreamDefaultController<Uint8Array>) => void
+    >((controller) => {
+      controller.enqueue(bytes);
+      controller.close();
+    });
+    const secondBody = new ReadableStream<Uint8Array>(
+      { pull },
+      { highWaterMark: 0 }
+    );
+    const second = new Request("http://localhost/model-generation/generate", {
+      ...init,
+      body: secondBody,
+    });
+    try {
+      const response = await app.fetch(second);
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({
+        code: "model_generation_busy",
+        error: "Another model generation is in progress.",
+      });
+      expect(second.bodyUsed).toBe(false);
+      expect(pull).not.toHaveBeenCalled();
+      expect(get).not.toHaveBeenCalled();
+      expect(request).not.toHaveBeenCalled();
+    } finally {
+      firstBody.enqueue(bytes);
+      firstBody.close();
+      await first;
+    }
+    expect((await post(app, textInput)).status).toBe(200);
+  });
+
+  it("refuses oversized wire bodies before key lookup and releases admission", async () => {
     const { app, get } = setup();
     const response = await app.request("/model-generation/generate", {
       method: "POST",
@@ -267,5 +330,6 @@ describe("model-generation host adapter", () => {
     });
     expect(response.status).toBe(413);
     expect(get).not.toHaveBeenCalled();
+    expect((await post(app, textInput)).status).toBe(200);
   });
 });

@@ -30,11 +30,28 @@ export function registerModelGenerationRoutes(
   let active = false;
   app.post(
     "/model-generation/generate",
+    // Reserve before bodyLimit buffers or the SDK decodes image data. This
+    // middleware belongs only to the generation POST, not the surrounding group.
+    async (c, next) => {
+      if (active)
+        return c.json(
+          {
+            error: "Another model generation is in progress.",
+            code: "model_generation_busy",
+          },
+          429
+        );
+      active = true;
+      try {
+        await next();
+      } finally {
+        active = false;
+      }
+    },
     bodyLimit({ maxSize: 48 * 1024 * 1024 }),
     async (c) => {
       let provider: TripoClient.Provider = "tripo";
       let completedTaskId: string | undefined;
-      let ownsGeneration = false;
       try {
         const raw: unknown = await c.req.json().catch(() => null);
         if (!raw || typeof raw !== "object" || Array.isArray(raw)) invalid();
@@ -62,15 +79,6 @@ export function registerModelGenerationRoutes(
         );
         if (parsed.kind !== "three-d" || parsed.provider_id === "fal")
           invalid();
-        if (active)
-          return c.json(
-            {
-              error: "Another model generation is in progress.",
-              code: "model_generation_busy",
-            },
-            429
-          );
-        active = ownsGeneration = true;
         const client = new TripoClient({
           keys: { get: (provider) => deps.secrets._getKey(provider) },
           http,
@@ -132,8 +140,6 @@ export function registerModelGenerationRoutes(
           default:
             return c.json(response, 502);
         }
-      } finally {
-        if (ownsGeneration) active = false;
       }
     }
   );

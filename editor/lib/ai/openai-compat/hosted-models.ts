@@ -154,7 +154,7 @@ function buildHostedModelList(): HostedModelEntry[] {
           feature,
           tier: null,
           label: card.label,
-          deprecated: false,
+          deprecated: card.deprecated,
         },
       });
     }
