@@ -1,6 +1,7 @@
 import type { FC } from "react";
 import type { Metadata } from "next";
 import ai from "@/lib/ai";
+import { models as providerModels } from "@grida/ai-models";
 import { catalog as serviceCatalog } from "@grida/ai-models/grida";
 import {
   models as textModels,
@@ -33,6 +34,7 @@ import {
   BlackForestLabsLogo,
   ByteDanceLogo,
   ElevenLabsLogo,
+  TripoLogo,
   OpenAILogo,
   AnthropicLogo,
   GoogleLogo,
@@ -46,10 +48,18 @@ import {
 export const metadata: Metadata = {
   title: "AI Models & Pricing — Grida",
   description:
-    "Compare release dates and provider-native pricing for text, image, video, music, sound effect, and 3D AI models on Grida.",
+    "Compare release dates and provider pricing for text, image, video, audio, 3D generation, and rigging models on Grida.",
   alternates: {
     canonical: "https://grida.co/ai/models",
   },
+  openGraph: {
+    title: "AI Models & Pricing — Grida",
+    description:
+      "Compare AI models, release dates, and provider pricing, including Tripo 3D generation and automatic character rigging.",
+    url: "https://grida.co/ai/models",
+    type: "website",
+  },
+  twitter: { card: "summary" },
 };
 
 const Logos: Partial<Record<string, FC<{ className?: string }>>> = {
@@ -59,6 +69,7 @@ const Logos: Partial<Record<string, FC<{ className?: string }>>> = {
   openai: OpenAILogo,
   anthropic: AnthropicLogo,
   elevenlabs: ElevenLabsLogo,
+  tripo: TripoLogo,
   google: GoogleLogo,
   meta: MetaLogo,
   microsoft: MicrosoftLogo,
@@ -822,6 +833,8 @@ export default function AIModelsCatalogPage() {
       <Separator />
 
       <ThreeDModelsSection />
+      <Separator />
+      <RiggingModelsSection />
 
       <div className="h-40" />
       <Footer />
@@ -1300,6 +1313,7 @@ function ThreeDPricing({
   }
 }
 
+// GRIDA-GG: desktop — funded Tripo availability alongside direct API pricing.
 function ThreeDModelsSection() {
   const models = ai.three_d.ordered_models();
   if (models.length === 0) return null;
@@ -1309,10 +1323,10 @@ function ThreeDModelsSection() {
       <div className="mb-10">
         <h2 className="text-3xl font-bold tracking-tight mb-2">3D Models</h2>
         <p className="text-base text-muted-foreground max-w-2xl">
-          fal-hosted text-to-3D and image-to-3D endpoints supported by Grida.
-          GLB is the portable primary result; additional formats are endpoint
-          specific. Catalogue presence does not imply web generation
-          availability.
+          Generate 3D models with Tripo, Hunyuan, and TRELLIS. Tripo H3.1, P1,
+          and P2 Preview support text, image, and multiview inputs. In Grida
+          Desktop, use Grida credits or connect your own Tripo API key. The CLI
+          supports your own Tripo API key. GLB is the primary output.
         </p>
       </div>
 
@@ -1373,8 +1387,139 @@ function ThreeDModelsSection() {
                 </TableRow>
               );
             })}
+            {providerModels.three_d.model_generation.model_ids.map((id) => {
+              const model: providerModels.three_d.model_generation.ModelCard =
+                providerModels.three_d.model_generation.models[id];
+              const pricing = model.pricing;
+              return (
+                <TableRow key={id} id={id.replace("/", "-")}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <MakerLogo vendor={model.vendor} className="size-4" />
+                      <div>
+                        <div>{model.label}</div>
+                        <code className="text-xs text-muted-foreground">
+                          {id}
+                        </code>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Desktop · Grida credits or your API key
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {model.short_description}
+                        </p>
+                        <ReleaseDate
+                          release={model.release}
+                          prefix
+                          className="block text-xs text-muted-foreground md:hidden"
+                        />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">
+                    Text, image, multiview
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                    GLB · Optional PBR textures
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1 text-xs">
+                      {model.inputs.map((input) => (
+                        <div key={input}>
+                          <span className="capitalize">{input}</span>:{" "}
+                          {pricing.base_credits[input]} credits
+                          <span className="text-muted-foreground">
+                            {" "}
+                            ($
+                            {(
+                              pricing.base_credits[input] *
+                              pricing.usd_per_credit
+                            ).toFixed(2)}
+                            )
+                          </span>
+                        </div>
+                      ))}
+                      <p className="text-muted-foreground">
+                        Base geometry; textures +
+                        {pricing.texture_credits.standard}–
+                        {pricing.texture_credits.extreme} credits.
+                        {pricing.detailed_geometry_credits !== undefined &&
+                          ` Detailed geometry +${pricing.detailed_geometry_credits} credits.`}
+                      </p>
+                      <a
+                        href={pricing.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-2"
+                      >
+                        Tripo API pricing
+                      </a>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                    <ReleaseDate release={model.release} />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
+      </div>
+    </section>
+  );
+}
+
+function RiggingModelsSection() {
+  const models = serviceCatalog.three_d.rigging.listed_models();
+  if (models.length === 0) return null;
+  return (
+    <section id="rigging" className="container mx-auto px-4 py-16">
+      <h2 className="mb-2 text-3xl font-bold tracking-tight">3D Rigging</h2>
+      <p className="mb-10 max-w-2xl text-base text-muted-foreground">
+        Add a skeleton to an existing GLB with Tripo auto rigging. Check
+        compatibility for free, then rig a humanoid or creature using Tripo or
+        Mixamo bone names. Use Grida credits or your own Tripo API key in Grida
+        Desktop. The CLI supports your own Tripo API key.
+      </p>
+      <div className="grid gap-6 md:grid-cols-2">
+        {models.map((model) => (
+          <Card key={model.id} id={model.id.replace("/", "-")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MakerLogo vendor={model.vendor} className="size-5" />
+                {model.label}
+              </CardTitle>
+              <CardDescription>
+                {model.rig_types.includes("biped")
+                  ? "Humanoid characters"
+                  : "Animals and other creatures"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Badge variant="secondary">Grida credits or your API key</Badge>
+              <p className="font-mono text-lg">
+                $
+                {(model.pricing.credits * model.pricing.usd_per_credit).toFixed(
+                  2
+                )}{" "}
+                / rig
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {model.pricing.credits} Tripo API credits · GLB input and output
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Supported body types: {model.rig_types.join(", ")}.
+              </p>
+              <a
+                className="text-sm underline underline-offset-2"
+                href={model.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Rigging model documentation
+              </a>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </section>
   );

@@ -4,6 +4,7 @@ import { ProviderHttp } from "./http";
 import { ProviderCredentials, type ByokProviderId } from "./providers";
 
 const keys = {
+  tripo: "synthetic-tripo-key",
   openrouter: "sk-or-synthetic-short",
   vercel: "vck_synthetic-short",
   fal: "synthetic-id:synthetic-secret",

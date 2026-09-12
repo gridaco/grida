@@ -1,6 +1,6 @@
 // GRIDA-SEC-014 — shared provider custody retains explicit host authority.
 // GRIDA-SEC-010 / GRIDA-SEC-013 — command grammar and explicit authority regression checks.
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { Cli } from "./cli";
 
 describe("CLI grammar", () => {
@@ -83,6 +83,164 @@ describe("CLI grammar", () => {
     expect(
       Cli.parse(["auth", "storage", "migrate", "keyring", "--no-input"])
     ).toMatchObject({ backend: "keyring", noInput: true });
+  });
+});
+
+describe("rigging command grammar", () => {
+  it("types model identity and mesh options according to the accepted command", () => {
+    const common = { provider: "tripo", json: false, noInput: false } as const;
+    const inspect = { ...common, command: "rigging inspect" } as const;
+    expectTypeOf({
+      ...inspect,
+      feature: "rig-check" as const,
+    }).toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...inspect,
+      feature: "rigging" as const,
+      model: "tripo/rig-v1.0",
+    }).toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...inspect,
+      feature: "rigging" as const,
+    }).not.toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...inspect,
+      feature: "rig-check" as const,
+      model: "tripo/rig-v1.0",
+    }).not.toExtend<Cli.RiggingInvocation>();
+
+    const run = {
+      ...common,
+      command: "rigging run",
+      model: "tripo/rig-v1.0",
+      out: "./rigged",
+      keyStdin: false,
+    } as const;
+    const mesh = { ...run, mesh: "./character.glb" };
+    expectTypeOf({
+      ...mesh,
+      rigType: "biped",
+      spec: "mixamo",
+    }).toExtend<Cli.RiggingInvocation>();
+    expectTypeOf(mesh).not.toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...mesh,
+      rigType: "biped",
+    }).not.toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...mesh,
+      spec: "mixamo",
+    }).not.toExtend<Cli.RiggingInvocation>();
+
+    const input = { ...run, input: "@input.json" };
+    expectTypeOf(input).toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...input,
+      rigType: "biped",
+    }).not.toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...input,
+      spec: "mixamo",
+    }).not.toExtend<Cli.RiggingInvocation>();
+    expectTypeOf({
+      ...input,
+      mesh: "./character.glb",
+    }).not.toExtend<Cli.RiggingInvocation>();
+  });
+
+  const run = [
+    "rigging",
+    "run",
+    "--provider",
+    "tripo",
+    "--model",
+    "tripo/rig-v1.0",
+    "--out",
+    "./rigged",
+  ];
+  it("keeps eligibility model-free and paid rigging explicit", () => {
+    expect(Cli.parse(["rigging"])).toMatchObject({
+      command: "help",
+      topic: "rigging",
+    });
+    expect(
+      Cli.parse([
+        "rigging",
+        "check",
+        "--provider",
+        "tripo",
+        "--mesh",
+        "./character.glb",
+      ])
+    ).toEqual({
+      command: "rigging check",
+      provider: "tripo",
+      mesh: "./character.glb",
+      keyStdin: false,
+      json: false,
+      noInput: false,
+    });
+    expect(
+      Cli.parse([
+        ...run,
+        "--mesh",
+        "./character.glb",
+        "--rig-type",
+        "biped",
+        "--spec",
+        "mixamo",
+      ])
+    ).toMatchObject({
+      command: "rigging run",
+      model: "tripo/rig-v1.0",
+      rigType: "biped",
+      spec: "mixamo",
+    });
+    expect(
+      Cli.parse([...run, "--input", "@input.json", "--key-stdin"])
+    ).toMatchObject({ input: "@input.json", keyStdin: true });
+    expect(
+      Cli.parse([
+        "rigging",
+        "inspect",
+        "--provider",
+        "tripo",
+        "--feature",
+        "rig-check",
+      ])
+    ).not.toHaveProperty("model");
+  });
+  it.each([
+    [
+      "rigging",
+      "check",
+      "--provider",
+      "tripo",
+      "--mesh",
+      "x.glb",
+      "--model",
+      "rig-check",
+    ],
+    [
+      "rigging",
+      "inspect",
+      "--provider",
+      "tripo",
+      "--feature",
+      "rig-check",
+      "--model",
+      "rig-check",
+    ],
+    ["rigging", "inspect", "--provider", "tripo", "--feature", "rigging"],
+    ["rigging", "check", "--provider", "fal", "--mesh", "x.glb"],
+    ["rigging", "check", "--provider", "tripo", "--mesh", "-"],
+    ["rigging", "check", "--provider", "tripo", "--input", "-", "--key-stdin"],
+    [...run, "--input", "-", "--mesh", "x.glb"],
+    [...run, "--input", "-", "--rig-type", "biped"],
+    [...run, "--mesh", "x.glb", "--spec", "tripo"],
+    [...run, "--input", "-", "--out", "./other"],
+  ])("rejects mixed or missing explicit authority: %j", (...args) => {
+    expect(() => Cli.parse(args)).toThrow(Cli.Failure);
   });
 });
 
@@ -185,6 +343,10 @@ describe("media command grammar", () => {
       );
   });
   it("keeps discovery credential-free and provider selection explicit", () => {
+    expect(Cli.parse(["models", "list", "--provider", "tripo"])).toMatchObject({
+      command: "models list",
+      provider: "tripo",
+    });
     expect(Cli.parse(["models", "list"])).toMatchObject({
       command: "models list",
       available: false,

@@ -5,7 +5,8 @@
 
 This proof builds and starts Next.js in **production mode**, then sends real
 HTTP requests to the current `/api/v1/auth/me`, `/api/v1/account/organizations`,
-`/api/v1/account/credits`, `/api/v1/auth/gg`, and `/api/v1/ai/models` implementations. It needs Node.js
+`/api/v1/account/credits`, `/api/v1/auth/gg`, `/api/v1/ai/models`, and the four
+`/api/v1/ai/3d/*` implementations. It needs Node.js
 24+ and the repository's installed dependencies. The command builds the model
 catalogue before starting the proof. It does not install packages, start Docker,
 use Supabase services, or read account credentials.
@@ -17,7 +18,8 @@ pnpm --filter editor test:api:http
 
 The proof copies the current API operation inventory, request policy, account
 adapters, account and cached-credit projections, RLS data adapters, shared credit
-gate, GG mint/signer/verifier, static model list, bearer verifier, OAuth HTTP client,
+gate, GG mint/signer/verifier, upload-ticket signer/verifier, fixed GG media
+binding, static model list, bearer verifier, OAuth HTTP client,
 routes, proxy, and Next configuration
 into a fresh private `.cache/api-local` directory. It records their source
 hashes. Existing installed dependencies are linked into the snapshot; dotenv
@@ -91,9 +93,30 @@ Mint cases cover its strict JSON shape and 1 KiB body bound, methods,
 query rejection, exact database counts and safe upstream failures. Separate
 server runs prove missing or short signing keys fail closed. Minting and model
 listing make no credit query or fixture billing change. Upstash and provider
-credentials are absent: quota behavior is covered by separate unit contracts;
-no generation endpoint or paid provider is invoked. A model-list result proves
-GG access, not credit eligibility or provider readiness.
+credentials are absent. The media quota adapter is replaced with an always-allow
+fixture; quota behavior is covered by separate unit contracts. A model-list
+result proves GG access, not credit eligibility or provider readiness.
+
+The four 3D routes exercise the real `ggMediaApi` binding, GG bearer verifier,
+and `ggUploads` signer/verifier. Only the fixed `GgThreeD` execution seam is
+replaced with recording synthetic results; no provider or billing dependency is
+imported through that replacement. Every route rejects missing, cookie, account,
+API-key, and tampered credentials and retains POST/OPTIONS method and no-store
+policy. Real signed upload tickets reach image/multiview generation,
+compatibility checks, and rigging only for their original user and organization.
+Text generation needs no upload. Another user or organization, a tampered or
+wrong-media ticket, an unsigned provider reference, and raw inline mesh bytes
+are refused before execution. An upload ticket cannot substitute for a GG bearer.
+Recorded execution inputs prove cookie and organization headers cannot change
+the authorized organization.
+
+Synthetic GLB results span base64 chunk boundaries; the actual Next HTTP stream
+must decode to identical bytes and retain its feature, model and task receipt.
+Finite requests above the binding's 64 KiB limit are rejected with both explicit
+length and chunked transfer encoding, alongside invalid content encodings and
+oversized upload metadata. These tests prove routing, authority, admission and
+response composition. They do not prove provider execution, billing, S3 uploads,
+entitlement, quota enforcement or a hosting-layer ingress limit.
 
 Next.js 16.2.6 clones POST bodies for proxy and waits for their original EOF
 before invoking the route. A finite delayed-upload case verifies no issuer or
@@ -110,7 +133,7 @@ does not certify a platform upload timeout.
 This proves the **Next request pipeline**, not Supabase token cryptography,
 OAuth consent, grant revocation, RLS, or hosted infrastructure. The separate
 [local OAuth proof](../auth-local/README.md) covers the real Supabase flow.
-The other legacy GG generation and public catalogue handlers are not built or
+The legacy GG generation and public catalogue handlers are not built or
 exercised here; their registered paths remain part of the copied inventory.
 
 ## Isolation and cleanup

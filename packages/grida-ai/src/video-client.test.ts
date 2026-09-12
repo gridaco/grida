@@ -245,7 +245,7 @@ describe("VideoClient bounded image input", () => {
         operations.parseInput(
           {
             kind: route.kind,
-            provider: route.provider_id,
+            provider: route.provider_id as VideoClient.Provider,
             model_id: route.model_id,
             variant: route.variant,
           },

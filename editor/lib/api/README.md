@@ -125,6 +125,83 @@ need their own lifecycle contract.
 
 ## Adding a route
 
+### Funded Tripo features
+
+The fixed `gg-media` binding serves four GG-only POST operations under
+`/api/v1/ai/3d`: `uploads`, `model-generation`, `rig-check`, and `rigging`.
+They accept only a verified `gg:ai` bearer. Cookies, account credentials,
+organization headers and body selectors cannot establish spending authority.
+Every response is `no-store`; OPTIONS is bodyless and other methods return 405.
+
+`uploads` accepts `{media_type, byte_length}`. The server gates the organization
+and obtains one Tripo presigned PUT URL using the infrastructure `GG_TRIPO_API_KEY`.
+It returns `{upload_url, upload}`; the latter is a 15-minute reference bound to
+the authenticated user, organization, provider file token, declared media type
+and declared size. Its signing key is derived with a separate domain from the
+GG key. Upload references cannot authenticate any route, and a new operation
+still needs its own live GG bearer. Rotation uses the existing current/previous
+GG key configuration.
+
+The native client PUTs bytes directly to the exact Tripo S3 host with no bearer,
+cookies or redirects. This keeps images and meshes out of the function's request
+body limit. The SDK enforces 20,000,000-byte images and 60,000,000-byte meshes;
+individual UI controls may impose narrower limits. The receipt records declared
+metadata, not a server inspection of the uploaded bytes. Tripo's presign API
+accepts a format but does not offer a verified size-binding parameter. Storage
+and provider validation remain upstream responsibilities; native validation does
+not make a malicious caller trustworthy.
+
+Generation accepts `{model_id, variant, input}`, where the variant is `text`,
+`image` or `multiview`. Image inputs use `{upload}` references in place of bytes.
+For example:
+
+```json
+{
+  "model_id": "tripo/h3.1",
+  "variant": "image",
+  "input": { "image": { "upload": "<signed-reference>" }, "texture": true }
+}
+```
+
+Rig checking accepts `{input: {mesh: {upload}}}` and returns structured
+eligibility. Rigging accepts `{model_id, input: {mesh: {upload}, rig_type, spec}}`.
+There is no implicit check or second paid operation. All parameters are
+validated by the same SDK contracts as BYOK. Arbitrary source URLs, raw provider
+file tokens and caller-supplied costs are not accepted.
+
+Successful model responses contain feature/model descriptors, `provider_id:
+"gg"`, a task receipt, and inline base64 GLB. Results are streamed in bounded
+chunks up to the existing 64 MiB decoded GLB limit. The Node routes allow 800
+seconds for the provider's 600-second execution bound plus metering/output;
+deployment must support that duration. Hosted upload/generation request JSON is
+limited to 64 KiB and one second after route entry. The existing pre-route
+ingress limitation described below still applies.
+
+The fixed adapter authenticates and passes only its verified org and resolved
+inputs to `GgThreeD`. The source audit recognizes that exact execution-seam
+import from `gg-media.ts`; it does not grant account adapters or other API files
+access to privileged billing/provider dependencies. The execution seam uses the
+existing entitlement and usage transaction owner. It bills actual provider
+credits at the catalog USD rate, including completed jobs whose later asset
+download fails. Missing usage is an error with reconciliation identifiers, not
+a free result or an invented estimate. See
+[the billing limitation](../../../docs/wg/platform/billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation).
+
+Configure server-only `GG_TRIPO_API_KEY`, GG signing, ordinary billing and request
+rate limiting before deploying. There is no fallback to a development BYOK key.
+The `GG_` prefix identifies Grida-funded infrastructure credentials. Tripo is
+the first provider adopting this convention. This unreleased integration uses
+a direct cutover from `TRIPO_API_KEY`, with no unprefixed or BYOK alias; update
+the infrastructure environment variable name before deployment. Native CLI
+`TRIPO_API_KEY` remains the user's direct-provider credential and is unchanged.
+Remaining provider adoption is tracked in
+[the GG credential naming follow-up](https://github.com/gridaco/grida/issues/1066).
+ElevenLabs is unchanged. Desktop advertises the funded paths separately through
+`tripo_gg` and `rigging_gg`, so older hosts continue to offer only their supported
+BYOK paths.
+
+### Binding a new operation
+
 1. Implement the domain operation and its authorization tests.
 2. Add its declaration and implementation to the credential-specific adapter.
 3. Add a thin route binding, with explicit method exports, using
@@ -195,7 +272,9 @@ and trust assumptions in GRIDA-SEC-012 in [SECURITY.md](../../../SECURITY.md).
 
 ## Check locally
 
-After installing dependencies, each command builds the model catalogue it needs:
+After installing dependencies, `test:api` builds the AI package and its workspace
+dependencies before running contracts. The isolated HTTP proof replaces provider
+execution, so `test:api:http` needs only the model catalogue build:
 
 ```sh
 pnpm --filter editor test:api

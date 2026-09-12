@@ -11,7 +11,7 @@
  * not the key itself.
  *
  * Allowed provider ids — a closed set:
- *   - the BYOK ids (`openrouter`, `vercel`)
+ *   - the shared first-party BYOK provider ids
  *   - ids of CONFIGURED endpoint providers (issue #806) — a self-hosted
  *     gateway may need a key; Ollama doesn't, but its slot still accepts
  *     one harmlessly.

@@ -107,6 +107,45 @@ afterEach(async () => {
 });
 
 describe("shared CLI provider credentials", () => {
+  it("checks and shares Tripo custody without exposing its key", async () => {
+    const f = await fixture();
+    f.request.mockImplementation(async (input, init) => {
+      expect(f.host.openStore).not.toHaveBeenCalled();
+      expect(input).toBe("https://openapi.tripo3d.ai/v3/account/balance");
+      expect(init?.method ?? "GET").toBe("GET");
+      expect(new Headers(init?.headers).get("authorization")).toBe(
+        `Bearer ${KEY}`
+      );
+      return Response.json({ code: 0, data: { balance: 100, frozen: 0 } });
+    });
+    expect(
+      await f.invoke([
+        "providers",
+        "configure",
+        "tripo",
+        "--key-stdin",
+        "--json",
+      ])
+    ).toBe(0);
+    expect(f.result()).toMatchObject({
+      provider: "tripo",
+      verification: { status: "accepted" },
+    });
+    expect(f.request).toHaveBeenCalledOnce();
+    const reader = await ProviderCredentials.open({
+      env: {},
+      provider: "tripo",
+      store: () => f.store,
+    });
+    expect(reader.get("tripo")).toBe(KEY);
+    expect(
+      reader.status().find((entry) => entry.provider === "tripo")
+    ).toMatchObject({ source: "file", configured: true });
+    reader.dispose();
+    expect(await f.invoke(["providers", "remove", "tripo", "--json"])).toBe(0);
+    expect(await f.store.read("tripo")).toBeNull();
+    f.safe();
+  });
   it("preserves invalid native-home configuration as input failure", async () => {
     await expect(ProviderStore.open({ GRIDA_HOME: "/" })).rejects.toMatchObject(
       {

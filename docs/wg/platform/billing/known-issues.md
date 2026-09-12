@@ -1,5 +1,8 @@
 ---
 title: Billing — Known Issues
+description: Known subscription and AI-credit billing limitations, mitigations and remaining reconciliation work.
+keywords: [billing, AI credits, reconciliation, metronome, Tripo]
+format: md
 tags:
   - internal
   - wg
@@ -18,12 +21,13 @@ status: living
 > move them to the **Resolved** section with the PR / commit that closed
 > them. The history is the audit trail for "why did we do it that way."
 
-| ID          | Area                       | Severity | Status    |
-| ----------- | -------------------------- | -------- | --------- |
-| KI-BILL-001 | AI credit · auto-reload    | Medium   | Mitigated |
-| KI-BILL-002 | Subscriptions              | Low      | Accepted  |
-| KI-BILL-003 | Subscriptions · plan grant | Medium   | Resolved  |
-| KI-BILL-004 | AI credit · image receipts | Medium   | Mitigated |
+| ID          | Area                                | Severity | Status    |
+| ----------- | ----------------------------------- | -------- | --------- |
+| KI-BILL-001 | AI credit · auto-reload             | Medium   | Mitigated |
+| KI-BILL-002 | Subscriptions                       | Low      | Accepted  |
+| KI-BILL-003 | Subscriptions · plan grant          | Medium   | Resolved  |
+| KI-BILL-004 | AI credit · image receipts          | Medium   | Mitigated |
+| KI-BILL-005 | AI credit · Tripo terminal receipts | Medium   | Mitigated |
 
 ---
 
@@ -182,6 +186,46 @@ with paid live generations in this change.
 
 **Implementation references.** [Image billing middleware](https://github.com/gridaco/grida/blob/main/editor/lib/ai/server.ts)
 and [fallback pricing](https://github.com/gridaco/grida/blob/main/editor/lib/ai/image-cost.ts).
+
+---
+
+## KI-BILL-005 — Tripo jobs without an observed terminal receipt need reconciliation
+
+**Area.** Hosted 3D generation and rigging · prepaid AI credit.
+
+**Discovered.** September 2026 while adding funded Tripo operations.
+
+**Cause.** Provider execution can outlive a synchronous gateway invocation.
+After accepting a job, the provider may finish after the gateway deadline or
+process termination. A successful response may also omit usage. Neither an
+accepted job identifier nor a catalog estimate proves the eventual charge.
+
+**Current behavior.** An observed successful task with valid usage is billed at
+the catalog USD-per-provider-credit rate. This includes later model download,
+validation and cancellation failures. A job without observed terminal usage
+fails without a fabricated charge; available organization, model, transaction
+and task identifiers are recorded for reconciliation. A hard process kill can
+prevent that diagnostic record. No durable background reconciliation is added
+by this synchronous integration.
+
+**Mitigation.** The service retains validated terminal receipts independently
+of asset delivery, gates before provider work, rate-limits submissions and never
+automatically submits a replacement paid task. Unknown usage cannot produce a
+successful free result. Existing transaction-ingest failures retain the shared
+AI seam's logging behavior.
+
+**Planned fix.** Persist accepted provider-job ownership before polling, observe
+terminal states independently of the requesting client, and reconcile usage
+with a stable idempotent transaction identifier. This is a separate durable-job
+and billing integration, including retry and restart proofs.
+
+**Why not resolved in this change.** The funded feature follows GG's current
+synchronous execution lifecycle. This mitigation covers known completed charges
+without inventing a second billing ledger or changing retry semantics. Until a
+durable observer exists, unobserved provider charges require operator review.
+
+**Files.** [Tripo billing seam](https://github.com/gridaco/grida/blob/main/editor/lib/ai/gg-three-d.ts)
+and [shared transaction owner](https://github.com/gridaco/grida/blob/main/editor/lib/ai/server.ts).
 
 ---
 

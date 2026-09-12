@@ -51,12 +51,7 @@ async function input(
   const request = invocation(flags, provider, model);
   const descriptor = MediaInput.inspect(operations, request);
   const value = await MediaInput.read(descriptor, request, signal(), stdin);
-  const selector = {
-    provider: descriptor.provider_id,
-    model_id: descriptor.model_id,
-    kind: descriptor.kind,
-    variant: descriptor.variant,
-  };
+  const selector = MediaInput.selector(descriptor);
   return { descriptor, value, parsed: operations.parseInput(selector, value) };
 }
 afterEach(async () => {
@@ -165,6 +160,68 @@ describe("MediaInput", () => {
       kind: "three-d",
       input: { image: { data: new Uint8Array(PNG), media_type: "image/png" } },
     });
+  });
+
+  it("lowers local Tripo images through its PNG/JPEG-only schema", async () => {
+    const local = await file("object.png", PNG);
+    const result = await input(["--image", local], "tripo", "tripo/h3.1");
+    expect(result.descriptor).toMatchObject({
+      kind: "three-d",
+      provider_id: "tripo",
+      feature: "model-generation",
+      variant: "image",
+    });
+    expect(result.parsed).toMatchObject({
+      provider_id: "tripo",
+      input: { image: { data: new Uint8Array(PNG), media_type: "image/png" } },
+    });
+    vi.spyOn(MediaFiles, "readImage").mockResolvedValue({
+      data: new Uint8Array(PNG),
+      media_type: "image/webp",
+    });
+    await expect(
+      input(["--image", local], "tripo", "tripo/h3.1")
+    ).rejects.toThrow(/media type this operation does not accept/);
+  });
+
+  it("accepts explicit Tripo multiview JSON without treating strings as file grants", async () => {
+    const views = {
+      front: { data: PNG.toString("base64"), media_type: "image/png" },
+      left: { data: PNG.toString("base64"), media_type: "image/png" },
+    };
+    const json = await file("views.json", JSON.stringify({ images: views }));
+    const readImage = vi.spyOn(MediaFiles, "readImage");
+    const result = await input(
+      ["--variant", "multiview", "--input", `@${json}`],
+      "tripo",
+      "tripo/p1"
+    );
+    expect(result.parsed).toMatchObject({
+      provider_id: "tripo",
+      variant: "multiview",
+      input: {
+        images: {
+          front: { data: new Uint8Array(PNG) },
+          left: { data: new Uint8Array(PNG) },
+        },
+      },
+    });
+    expect(MediaInput.describe(result.descriptor).join("\n")).toContain(
+      "--input @input.json"
+    );
+    expect(readImage).not.toHaveBeenCalled();
+    const paths = await file(
+      "paths.json",
+      JSON.stringify({ images: { front: "./front.png", left: "./left.png" } })
+    );
+    await expect(
+      input(
+        ["--variant", "multiview", "--input", `@${paths}`],
+        "tripo",
+        "tripo/p1"
+      )
+    ).rejects.toMatchObject({ code: "invalid_input" });
+    expect(readImage).not.toHaveBeenCalled();
   });
 
   it("uses the published inline video contract and the same native parser as JSON", async () => {

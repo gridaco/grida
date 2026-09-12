@@ -5,6 +5,8 @@ import Link from "next/link";
 import {
   AudioWaveform,
   Box,
+  Bone,
+  ChevronRight,
   FolderOpen,
   FolderSearch,
   ImageIcon,
@@ -25,11 +27,20 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
 } from "@app/ui/components/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@app/ui/components/collapsible";
 import { cn } from "@app/ui/lib/utils";
 import type { catalog as models } from "@grida/ai-models/grida";
 import { mediaLibrary, type MediaItem } from "@/lib/desktop/bridge";
+import { RiggingPlayground } from "../3d-rig/rigging-playground";
 import { ThreeDPlayground } from "../3d-gen/three-d-playground";
 import { MusicPlayground } from "../audio-gen/music-playground";
 import { SoundEffectPlayground } from "../audio-gen/sound-effect-playground";
@@ -104,9 +115,10 @@ export function DesktopMediaTools({
     storedSelection.mediaId === initialMediaId
       ? storedSelection.preview
       : null;
-  const viewerTool = storedPreview
-    ? DesktopMediaTool.resolve(StoredMedia.viewerToolId(storedPreview.mode))
-    : tool;
+  const viewerTool =
+    storedPreview && tool.id !== "rigging"
+      ? DesktopMediaTool.resolve(StoredMedia.viewerToolId(storedPreview.mode))
+      : tool;
   const activeToolId =
     viewerTool.id === "image-viewer"
       ? "image-generator"
@@ -267,8 +279,20 @@ export function DesktopMediaTools({
                 <SidebarGroupContent>
                   <SidebarMenu className="gap-0.5">
                     {DesktopMediaTool.list
-                      .filter((item) => item.group === group.id)
+                      .filter(
+                        (item) =>
+                          item.group === group.id && item.id !== "rigging"
+                      )
                       .map((item) => {
+                        if (item.id === "3d-generator") {
+                          return (
+                            <ThreeDMenu
+                              key={item.id}
+                              activeToolId={activeToolId}
+                              disabled={generationBusy}
+                            />
+                          );
+                        }
                         const active = item.id === activeToolId;
                         const content = (
                           <>
@@ -447,6 +471,65 @@ export function DesktopMediaTools({
   );
 }
 
+function ThreeDMenu({
+  activeToolId,
+  disabled,
+}: {
+  activeToolId: DesktopMediaToolId;
+  disabled: boolean;
+}) {
+  return (
+    <Collapsible defaultOpen className="group/three-d" asChild>
+      <SidebarMenuItem>
+        <CollapsibleTrigger asChild>
+          <SidebarMenuButton className="h-9 gap-2.5 px-2.5" disabled={disabled}>
+            <Box className="size-4" aria-hidden />
+            <span>3D</span>
+            <ChevronRight
+              className="ml-auto size-4 transition-transform group-data-[state=open]/three-d:rotate-90"
+              aria-hidden
+            />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            {(
+              [
+                { id: "3d-generator", label: "Generate" },
+                { id: "rigging", label: "Rigging" },
+              ] as const
+            ).map((item) => (
+              <SidebarMenuSubItem key={item.id}>
+                <SidebarMenuSubButton
+                  asChild
+                  isActive={activeToolId === item.id}
+                >
+                  <Link
+                    href={DesktopMediaTool.href(item.id)}
+                    prefetch={false}
+                    scroll={false}
+                    aria-current={activeToolId === item.id ? "page" : undefined}
+                    aria-disabled={disabled || undefined}
+                    tabIndex={disabled ? -1 : undefined}
+                    onClick={(event) => {
+                      if (disabled) event.preventDefault();
+                    }}
+                    className={
+                      disabled ? "pointer-events-none opacity-50" : undefined
+                    }
+                  >
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
+
 function DesktopMediaToolContent({
   tool,
   initialModelId,
@@ -466,7 +549,7 @@ function DesktopMediaToolContent({
   onStoredMediaCreated: (item: MediaItem) => void;
   onRevealStoredMedia: (item: MediaItem) => void;
 }) {
-  if (storedPreview) {
+  if (storedPreview && tool.id !== "rigging") {
     switch (storedPreview.mode) {
       case "image":
       case "video":
@@ -513,13 +596,25 @@ function DesktopMediaToolContent({
           onStoredMediaCreated={onStoredMediaCreated}
         />
       );
+    case "rigging":
+      return (
+        <RiggingPlayground
+          initialModelId={initialModelId ?? undefined}
+          initialSource={
+            storedPreview?.mode === "3d" ? storedPreview.file : undefined
+          }
+          generationDisabled={generationDisabled}
+          onGenerationBusyChange={onGenerationBusyChange}
+          onStoredMediaCreated={onStoredMediaCreated}
+          onRevealStoredMedia={onRevealStoredMedia}
+        />
+      );
+    case "model-generation":
     case "3d-generator":
       return (
         <ThreeDPlayground
-          initialModelId={
-            (initialModelId as models.three_d.ThreeDModelId | null) ?? undefined
-          }
-          modelIds={tool.modelIds as readonly models.three_d.ThreeDModelId[]}
+          initialModelId={initialModelId ?? undefined}
+          modelIds={tool.modelIds}
           generationDisabled={generationDisabled}
           onGenerationBusyChange={onGenerationBusyChange}
           onStoredMediaCreated={onStoredMediaCreated}
@@ -644,7 +739,10 @@ function ToolIcon({ id }: { id: DesktopMediaToolId }) {
       return <Video className={className} aria-hidden />;
     case "3d-generator":
     case "3d-viewer":
+    case "model-generation":
       return <Box className={className} aria-hidden />;
+    case "rigging":
+      return <Bone className={className} aria-hidden />;
     case "text-to-music":
       return <Music2 className={className} aria-hidden />;
     case "text-to-sound-effects":

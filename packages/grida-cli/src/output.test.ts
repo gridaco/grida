@@ -68,6 +68,23 @@ describe("CLI output", () => {
     expect(stdout).toEqual([]);
     expect(stderr).toEqual(["grida: Run grida auth login. (signed_out)\n"]);
   });
+
+  it("escapes a recovery task identifier in human output", () => {
+    const stderr: string[] = [];
+    const output = new Output(
+      false,
+      () => {},
+      (value) => stderr.push(value)
+    );
+    output.failure({
+      code: "generation_failed",
+      message: "Generation failed.",
+      task_id: "task_accepted\x1b[2J\nforged",
+    });
+    expect(stderr.join("")).toContain("Task: task_accepted�[2J�forged");
+    expect(stderr.join("")).not.toContain("\x1b");
+    expect(stderr).toHaveLength(2);
+  });
 });
 
 it("reports partial saves on stderr with escaped local paths", () => {

@@ -53,6 +53,7 @@ export class ProviderCredentials {
           throw new ProviderCredentials.Failure("invalid_input");
         break;
       }
+      case "tripo":
       case "elevenlabs":
         // Opaque by documented contract; no inferred prefix or suffix grammar.
         break;
@@ -82,6 +83,7 @@ export class ProviderCredentials {
     // Exhaustive and private: adding a provider cannot inherit another one's
     // authenticated destination merely by extending the identity vocabulary.
     const urls = {
+      tripo: "https://openapi.tripo3d.ai/v3/account/balance",
       openrouter: "https://openrouter.ai/api/v1/key",
       vercel: "https://ai-gateway.vercel.sh/v1/credits",
       fal: `https://api.fal.ai/v1/models/pricing?endpoint_id=${FAL_ENDPOINT}`,
@@ -238,6 +240,19 @@ export class ProviderCredentials {
   ) {
     if (!isObject(data)) throw new CheckFailure("invalid_response");
     switch (provider) {
+      case "tripo":
+        if (data.code === 1000 || data.code === 1001)
+          throw new CheckFailure("credential_rejected");
+        if (
+          data.code !== 0 ||
+          !isObject(data.data) ||
+          ![data.data.balance, data.data.frozen].every(
+            (value) =>
+              typeof value === "number" && Number.isFinite(value) && value >= 0
+          )
+        )
+          throw new CheckFailure("invalid_response");
+        return;
       case "openrouter":
         if (
           !isObject(data.data) ||

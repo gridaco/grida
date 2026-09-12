@@ -38,6 +38,19 @@ const image = discovery
 const hostedImage = discovery.list({ kind: "image", provider: "gg" })[0]!;
 const roots: string[] = [];
 
+function glbFixture() {
+  const json = JSON.stringify({ asset: { version: "2.0" } });
+  const chunk = Buffer.from(json.padEnd(Math.ceil(json.length / 4) * 4, " "));
+  const bytes = Buffer.alloc(20 + chunk.length);
+  bytes.writeUInt32LE(0x46546c67, 0);
+  bytes.writeUInt32LE(2, 4);
+  bytes.writeUInt32LE(bytes.length, 8);
+  bytes.writeUInt32LE(chunk.length, 12);
+  bytes.writeUInt32LE(0x4e4f534a, 16);
+  chunk.copy(bytes, 20);
+  return bytes;
+}
+
 async function temporary() {
   const root = await realpath(
     await mkdtemp(path.join(tmpdir(), "grida-media-command-"))
@@ -46,7 +59,7 @@ async function temporary() {
   return root;
 }
 
-function fixture(env: NodeJS.ProcessEnv = {}) {
+function fixture(env: NodeJS.ProcessEnv = {}, json = true) {
   const stdout: string[] = [],
     stderr: string[] = [];
   const request = vi.fn<typeof fetch>(async () => {
@@ -63,7 +76,7 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
     download,
   }));
   const output = new Output(
-    true,
+    json,
     (text) => stdout.push(text),
     (text) => stderr.push(text)
   );
@@ -92,7 +105,7 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
     async invoke(args: string[], input?: unknown) {
       if (input !== undefined)
         host.stdin = Readable.from([Buffer.from(JSON.stringify(input))]);
-      const invocation = Cli.parse([...args, "--json"]);
+      const invocation = Cli.parse([...args, ...(json ? ["--json"] : [])]);
       if (
         ![
           "models list",
@@ -111,7 +124,7 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
       expect(stdout.join("") + stderr.join("")).not.toMatch(
         /synthetic-private-|upstream-private|responseBody|access_token|refresh_token/
       );
-      expect(stderr).toEqual([]);
+      if (json) expect(stderr).toEqual([]);
     },
   };
 }
@@ -437,6 +450,183 @@ describe("MediaCommands offline discovery and access observations", () => {
 });
 
 describe("MediaCommands preflight and BYOK", () => {
+  it.each(
+    (["tripo/h3.1", "tripo/p1", "tripo/p2"] as const).flatMap((model) =>
+      (["text", "image", "multiview"] as const).map((variant) => ({
+        model,
+        variant,
+      }))
+    )
+  )(
+    "submits $model $variant once and saves the GLB without exposing task or provider data",
+    async ({ model, variant }) => {
+      const out = path.join(await temporary(), "model");
+      const test = fixture({ TRIPO_API_KEY: KEY });
+      const asset = glbFixture();
+      const url =
+        "https://tripo-data.rg1.data.tripo3d.com/task/model.glb?signature=upstream-private";
+      let uploads = 0;
+      test.request.mockImplementation(async (input, init) => {
+        const target = new URL(String(input));
+        expect(target.origin).toBe("https://openapi.tripo3d.ai");
+        expect(new Headers(init?.headers).get("authorization")).toBe(
+          `Bearer ${KEY}`
+        );
+        if (target.pathname === "/v3/files") {
+          return Response.json({
+            code: 0,
+            data: { file_token: `file_${++uploads}` },
+          });
+        }
+        if (target.pathname === `/v3/generation/${variant}-to-model`) {
+          return Response.json({ code: 0, data: { task_id: "task_test" } });
+        }
+        expect(target.pathname).toBe("/v3/tasks/task_test");
+        expect(init?.method).toBe("GET");
+        return Response.json({
+          code: 0,
+          data: {
+            task_id: "task_test",
+            type: `${variant}_to_model`,
+            status: "success",
+            progress: 100,
+            output: { model_url: url },
+            credits_consumed: 20,
+          },
+        });
+      });
+      test.download.mockImplementation(async (input, init) => {
+        expect(String(input)).toBe(url);
+        expect(new Headers(init?.headers).has("authorization")).toBe(false);
+        return new Response(new Uint8Array(asset), {
+          headers: { "content-type": "model/gltf-binary" },
+        });
+      });
+      const image = { data: PNG.toString("base64"), media_type: "image/png" };
+      const input =
+        variant === "text"
+          ? { prompt: PROMPT }
+          : variant === "image"
+            ? { image }
+            : { images: { front: image, left: image } };
+      expect(
+        await test.invoke(
+          [...generateArgs(out, "tripo", model), "--variant", variant],
+          input
+        )
+      ).toBe(0);
+      const generations = test.request.mock.calls.filter(([input]) =>
+        String(input).includes("/generation/")
+      );
+      expect(generations).toHaveLength(1);
+      expect(generations[0]?.[1]?.method).toBe("POST");
+      expect(JSON.parse(String(generations[0]?.[1]?.body))).toMatchObject({
+        model: {
+          "tripo/h3.1": "v3.1-20260211",
+          "tripo/p1": "P1-20260311",
+          "tripo/p2": "P2-20260801",
+        }[model],
+      });
+      const fileUploads = test.request.mock.calls.filter(
+        ([input]) => new URL(String(input)).pathname === "/v3/files"
+      );
+      expect(fileUploads).toHaveLength(uploads);
+      for (const [, init] of fileUploads) {
+        expect(init?.method).toBe("POST");
+        expect(init?.body).toBeInstanceOf(Uint8Array);
+      }
+      expect(uploads).toBe(
+        variant === "text" ? 0 : variant === "image" ? 1 : 2
+      );
+      expect(await readFile(test.result().artifacts[0].path)).toEqual(asset);
+      expect(test.result()).toMatchObject({
+        provider_id: "tripo",
+        model_id: model,
+        variant,
+      });
+      expect(test.result()).not.toHaveProperty("task");
+      expect(test.openStore).not.toHaveBeenCalled();
+      expect(test.openAuth).not.toHaveBeenCalled();
+      test.assertSafe();
+    }
+  );
+
+  it("does not substitute another configured provider for a missing Tripo key", async () => {
+    const root = await temporary();
+    const test = fixture({ FAL_KEY: "synthetic:fal-key" });
+    expect(
+      await test.invoke(
+        generateArgs(path.join(root, "result"), "tripo", "tripo/h3.1"),
+        { prompt: PROMPT }
+      )
+    ).toBe(1);
+    expect(test.result().error.code).toBe("provider_key_required");
+    expect(test.request).not.toHaveBeenCalled();
+    expect(test.openAuth).not.toHaveBeenCalled();
+    expect(await readdir(root)).toEqual([]);
+    test.assertSafe();
+  });
+
+  it.each([true, false])(
+    "retains only the accepted Tripo task ID after download failure (json=%s)",
+    async (json) => {
+      const root = await temporary();
+      const test = fixture({ TRIPO_API_KEY: KEY }, json);
+      const taskId = "task_accepted";
+      test.request.mockResolvedValueOnce(
+        Response.json({ code: 0, data: { task_id: taskId } })
+      );
+      test.request.mockResolvedValueOnce(
+        Response.json({
+          code: 0,
+          data: {
+            task_id: taskId,
+            type: "text_to_model",
+            status: "success",
+            progress: 100,
+            output: {
+              model_url:
+                "https://tripo-data.rg1.data.tripo3d.com/model.glb?signature=upstream-private",
+            },
+            private_metadata: KEY,
+          },
+        })
+      );
+      test.download.mockRejectedValueOnce(
+        new Error(`upstream-private download details ${KEY}`)
+      );
+      expect(
+        await test.invoke(
+          generateArgs(path.join(root, "result"), "tripo", "tripo/h3.1"),
+          { prompt: PROMPT }
+        )
+      ).toBe(1);
+      expect(
+        test.request.mock.calls.filter(([url]) =>
+          String(url).includes("/generation/")
+        )
+      ).toHaveLength(1);
+      expect(test.request).toHaveBeenCalledTimes(2);
+      expect(test.download).toHaveBeenCalledOnce();
+      const error = {
+        code: "generation_failed",
+        task_id: taskId,
+        message:
+          "Media operation failed. An accepted request may still be charged; no automatic retry was made.",
+      };
+      expect(test.stdout).toEqual(
+        json ? [JSON.stringify({ error }) + "\n"] : []
+      );
+      expect(test.stderr).toEqual(
+        json
+          ? []
+          : [`grida: ${error.message} (${error.code})\n`, `  Task: ${taskId}\n`]
+      );
+      expect(await readdir(root)).toEqual([]);
+      expect(test.openAuth).not.toHaveBeenCalled();
+      test.assertSafe();
+    }
+  );
   it.each([
     "invalid-json",
     "invalid-schema",
@@ -831,4 +1021,66 @@ describe("MediaCommands failure and signal lifetime", () => {
     expect(test.request).toHaveBeenCalledOnce();
     test.assertSafe();
   });
+});
+
+describe("CLI funded Tripo generation", () => {
+  it.each(["text", "image", "multiview"])(
+    "runs %s through GG with portable files and explicit account authority",
+    async (variant) => {
+      const out = path.join(await temporary(), "hosted-tripo");
+      const test = fixture();
+      attachAccount(test);
+      const glb = glbFixture();
+      test.request.mockImplementation(async (url, init) => {
+        expect(new Headers(init?.headers).has("authorization")).toBe(
+          init?.method !== "PUT"
+        );
+        if (init?.method === "PUT") {
+          return new Response(null);
+        }
+        if (String(url).endsWith("/uploads"))
+          return Response.json({
+            upload: "signed-reference",
+            upload_url:
+              "https://tripo-data.s3.us-west-2.amazonaws.com/image.png?signature=synthetic",
+          });
+        expect(String(url)).toBe(
+          "https://grida.example/api/v1/ai/3d/model-generation"
+        );
+        return Response.json({
+          feature: "model-generation",
+          provider_id: "gg",
+          model_id: "tripo/p2",
+          variant,
+          glb: {
+            base64: glb.toString("base64"),
+            media_type: "model/gltf-binary",
+          },
+          task: { id: "task_cli_gg", credits_consumed: 100 },
+        });
+      });
+      const image = { data: PNG.toString("base64"), media_type: "image/png" };
+      expect(
+        await test.invoke(
+          [
+            ...generateArgs(out, "gg", "tripo/p2"),
+            "--kind",
+            "three-d",
+            "--variant",
+            variant,
+          ],
+          variant === "text"
+            ? { prompt: PROMPT }
+            : variant === "image"
+              ? { image }
+              : { images: { front: image, left: image } }
+        )
+      ).toBe(0);
+      expect(test.result().provider_id).toBe("gg");
+      expect(await readFile(test.result().artifacts[0].path)).toEqual(glb);
+      expect(test.openStore).not.toHaveBeenCalled();
+      expect(test.download).not.toHaveBeenCalled();
+      test.assertSafe();
+    }
+  );
 });

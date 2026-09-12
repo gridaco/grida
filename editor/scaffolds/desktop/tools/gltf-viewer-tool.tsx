@@ -1,7 +1,10 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
-import { Box, FileUp, FolderSearch, X } from "lucide-react";
+import Link from "next/link";
+import { DesktopMediaTool } from "./media-tool-registry";
+import { rigging } from "@/lib/desktop/bridge";
+import { Box, Bone, FileUp, FolderSearch, X } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import {
   Empty,
@@ -78,6 +81,17 @@ export function GltfViewerTool({
         <div className="ml-auto flex items-center gap-2">
           {source === "stored" && files[0] && (
             <FileDownloadButton file={files[0]} />
+          )}
+          {storedMedia && rigging.isSupported() && (
+            <Button asChild size="sm" variant="outline">
+              <Link
+                href={`${DesktopMediaTool.href("rigging")}&item=${encodeURIComponent(storedMedia.id)}`}
+                prefetch={false}
+              >
+                <Bone aria-hidden />
+                Rig model
+              </Link>
+            </Button>
           )}
           {storedMedia && onRevealStoredMedia && (
             <Button

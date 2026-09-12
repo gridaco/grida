@@ -4,6 +4,16 @@ type ProviderBoundModel = Readonly<{
 
 /** Settings readiness for models resolved through BYOK or Grida hosted media. */
 export namespace MediaModelReadiness {
+  // GRIDA-GG: desktop — native feature support alone does not admit org credits.
+  export function tripo(
+    byok: boolean | null,
+    hosted: boolean | null,
+    hostedSupported: boolean
+  ): boolean | null {
+    if (byok === true || (hostedSupported && hosted === true)) return true;
+    if (byok === null || (hostedSupported && hosted === null)) return null;
+    return false;
+  }
   /**
    * Hosted image/video resolution follows the catalogue's Vercel binding,
    * while BYOK resolution intersects every connected provider with the exact

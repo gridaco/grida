@@ -12,6 +12,7 @@ export async function run(
   invocation: Exclude<
     Cli.Invocation,
     | Cli.MediaInvocation
+    | Cli.RiggingInvocation
     | Cli.ProviderInvocation
     | { command: "help" | "version" | "docs" }
   >,

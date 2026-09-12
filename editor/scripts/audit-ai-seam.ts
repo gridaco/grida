@@ -37,6 +37,9 @@ const EDITOR_ROOT = path.resolve(__filename, "..", "..");
 const ALLOWLIST = [
   "lib/ai/server.ts",
   "lib/ai/models.ts",
+  "lib/ai/gg-three-d.ts",
+  "lib/ai/gg-three-d-http.ts",
+  "lib/ai/__tests__/gg-three-d.test.ts",
   "grida-canvas-hosted/ai/agent/server-agent.ts",
   "app/(api)/private/ai/models/openai/route.ts",
   // Contract tests for the hosted OpenAI-compat endpoint (GRIDA-SEC-006):
@@ -51,6 +54,8 @@ const ALLOWLIST = [
  * Mirrors the lint rule's `paths` + `patterns.group`.
  */
 const FORBIDDEN_PACKAGES = [
+  "@grida/ai",
+  "@grida/ai/providers",
   "replicate",
   "openai",
   "@anthropic-ai/sdk",

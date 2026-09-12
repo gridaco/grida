@@ -107,6 +107,67 @@ describe("MediaOperations discovery", () => {
     expect(network).not.toHaveBeenCalled();
   });
 
+  it("limits explicit model-generation discovery to Tripo's BYOK and GG descriptors", () => {
+    const operations = new MediaOperations();
+    const descriptors = operations.list({
+      kind: "three-d",
+      feature: "model-generation",
+    });
+    expect(descriptors).toHaveLength(18);
+    expect(new Set(descriptors.map((entry) => entry.provider_id))).toEqual(
+      new Set(["tripo", "gg"])
+    );
+    expect(
+      operations.list({ provider: "fal", feature: "model-generation" })
+    ).toEqual([]);
+    for (const descriptor of descriptors) {
+      if (
+        descriptor.feature !== "model-generation" ||
+        descriptor.variant === "references"
+      )
+        throw new Error("Expected an explicit model-generation descriptor");
+      expect(descriptor.feature).toBe("model-generation");
+      expect(
+        operations.inspect({
+          kind: "three-d",
+          feature: descriptor.feature,
+          model_id: descriptor.model_id,
+          provider: descriptor.provider_id,
+          variant: descriptor.variant,
+        })
+      ).toEqual(descriptor);
+    }
+  });
+
+  it("preserves legacy fal descriptors and selectors reconstructed from them", () => {
+    const operations = new MediaOperations();
+    const descriptors = operations.list({ kind: "three-d", provider: "fal" });
+    expect(descriptors).toHaveLength(3);
+    for (const descriptor of descriptors) {
+      expect(descriptor).not.toHaveProperty("feature");
+      const selector: MediaOperations.Selector = {
+        kind: descriptor.kind,
+        model_id: descriptor.model_id,
+        provider: "fal",
+        variant: descriptor.variant,
+        ...(descriptor.feature ? { feature: descriptor.feature } : {}),
+      };
+      expect(operations.inspect(selector)).toEqual(descriptor);
+      const parsed = operations.parseInput(
+        selector,
+        descriptor.variant === "text"
+          ? { prompt: "robot" }
+          : { image: { data: "iVBORw0KGgo=", media_type: "image/png" } }
+      );
+      expect(parsed).toMatchObject({
+        kind: "three-d",
+        model_id: descriptor.model_id,
+        provider_id: "fal",
+      });
+      expect(parsed).not.toHaveProperty("feature");
+    }
+  });
+
   it("returns deeply immutable schemas and honest native byte output descriptions", () => {
     const operations = new MediaOperations();
     const descriptors = operations.list();
@@ -115,6 +176,7 @@ describe("MediaOperations discovery", () => {
       expect(Object.keys(descriptor).sort()).toEqual(
         [
           "kind",
+          ...(descriptor.feature ? ["feature"] : []),
           "model_id",
           "provider_id",
           "binding_id",
@@ -169,7 +231,7 @@ describe("MediaOperations discovery", () => {
     expect(operations.inspect(speech).status).toBe("staged");
     expect(
       operations
-        .list({ kind: "three-d" })
+        .list({ kind: "three-d", provider: "fal" })
         .map((entry) => entry.model_id)
         .sort()
     ).toEqual(
@@ -233,7 +295,7 @@ describe("MediaOperations discovery", () => {
     rejects(() =>
       operations.inspect({
         ...music,
-        provider: "auto" as MediaOperations.Provider,
+        provider: "auto" as "fal",
       })
     );
     rejects(() =>
@@ -491,6 +553,7 @@ describe("MediaOperations JSON input", () => {
     ).toEqual({
       kind: "three-d",
       model_id: threeDText.model_id,
+      provider_id: "fal",
       selection: { model_id: threeDText.model_id, provider: "fal" },
       input: { prompt: "small chair" },
     });

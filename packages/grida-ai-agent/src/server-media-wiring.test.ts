@@ -21,12 +21,14 @@ import type { MusicRoutesDeps } from "./http/routes/music";
 import type { SoundEffectsRoutesDeps } from "./http/routes/sound-effects";
 import type { TextToSpeechRoutesDeps } from "./http/routes/text-to-speech";
 import type { ThreeDRoutesDeps } from "./http/routes/three-d";
+import type { RiggingRoutesDeps } from "./http/routes/rigging";
 import type { VideoRoutesDeps } from "./http/routes/video";
 
 const registrations = vi.hoisted(() => ({
   images: vi.fn<(app: Hono, deps: ImagesRoutesDeps) => void>(),
   video: vi.fn<(app: Hono, deps: VideoRoutesDeps) => void>(),
   threeD: vi.fn<(app: Hono, deps: ThreeDRoutesDeps) => void>(),
+  rigging: vi.fn<(app: Hono, deps: RiggingRoutesDeps) => void>(),
   music: vi.fn<(app: Hono, deps: MusicRoutesDeps) => void>(),
   soundEffects: vi.fn<(app: Hono, deps: SoundEffectsRoutesDeps) => void>(),
   textToSpeech: vi.fn<(app: Hono, deps: TextToSpeechRoutesDeps) => void>(),
@@ -41,6 +43,9 @@ vi.mock("./http/routes/video", () => ({
 }));
 vi.mock("./http/routes/three-d", () => ({
   registerThreeDRoutes: registrations.threeD,
+}));
+vi.mock("./http/routes/rigging", () => ({
+  registerRiggingRoutes: registrations.rigging,
 }));
 vi.mock("./http/routes/music", () => ({
   registerMusicRoutes: registrations.music,
@@ -169,6 +174,14 @@ describe("agent tenant generated-media wiring", () => {
       );
       expect(runtime.provider_http).toBe(image.provider_http);
       expect(video.provider_http).toBe(runtime.provider_http);
+      expect(registrations.rigging).toHaveBeenCalledOnce();
+      expect(registrations.rigging.mock.calls[0][1].secrets).toBe(
+        services.secrets
+      );
+      expect(registrations.rigging.mock.calls[0][1].media).toBe(services.media);
+      expect(registrations.rigging.mock.calls[0][1].provider_http).toBe(
+        runtime.provider_http
+      );
       expect(music.provider_http).toBe(runtime.provider_http);
       expect(started).toHaveBeenCalledOnce();
       const set = await app.request("/auth/gg/set", {
@@ -248,6 +261,7 @@ describe("agent tenant generated-media wiring", () => {
       text_to_speech: false,
     });
     expect(registrations.music).toHaveBeenCalledOnce();
+    expect(registrations.rigging).not.toHaveBeenCalled();
     expect(registrations.soundEffects).not.toHaveBeenCalled();
 
     vi.clearAllMocks();
