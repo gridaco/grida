@@ -6,7 +6,7 @@
 The `grida` command composes Grida's account services and tools for people and
 their own harnesses. It runs independently of Desktop.
 
-This README describes the Grida CLI 0.1 release line. Commands cover auth,
+This README describes the Grida CLI 0.2 release line. Commands cover auth,
 credential storage, identity, organization membership, cached credits, help/version
 and docs.
 Media commands discover models/schemas, inspect provider key presence, list speech
