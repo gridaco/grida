@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useId, useState, type ReactNode } from "react";
-import Link from "next/link";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { ImagePlus, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
@@ -30,9 +36,10 @@ import {
 } from "@app/ui/ai-elements/prompt-input";
 import {
   modelGeneration,
-  secrets,
   type ModelGenerationGenerateResult,
 } from "@/lib/desktop/bridge";
+import { GridaGatewayTripo } from "@/lib/desktop/gg-tripo";
+import { TripoFunding, TripoConnection } from "../shared/gg-tripo-funding";
 import { ModelGenerationForm } from "./model-generation-form";
 
 const VIEW_LABELS: Record<ModelGenerationForm.View, string> = {
@@ -72,9 +79,22 @@ export function ModelGenerationControls({
   });
   const [settingsModel, setSettingsModel] = useState(modelId);
   const [busy, setBusy] = useState(false);
-  const [connection, setConnection] = useState<
-    "checking" | "ready" | "missing" | "error"
-  >("checking");
+  // GRIDA-GG: desktop — funding choice stays explicit for every submission.
+  const hostedSupported = modelGeneration.isGgSupported();
+  const [provider, setProvider] = useState<GridaGatewayTripo.Provider>(
+    hostedSupported ? "gg" : "tripo"
+  );
+  const access = useMemo(
+    () => new GridaGatewayTripo.Access(hostedSupported),
+    [hostedSupported]
+  );
+  const accessState = useSyncExternalStore(
+    access.subscribe,
+    access.getSnapshot,
+    access.getSnapshot
+  );
+  useEffect(() => access.connect(), [access]);
+  const connection = GridaGatewayTripo.connection(provider, accessState);
   const [error, setError] = useState<string | null>(null);
   const card = ModelGenerationForm.card(modelId);
   const locked = disabled || busy;
@@ -94,35 +114,6 @@ export function ModelGenerationControls({
     }));
     setError(null);
   }
-  useEffect(() => {
-    let active = true;
-    let revision = 0;
-    const refresh = () => {
-      const requestRevision = ++revision;
-      void secrets.hasKey("tripo").then(
-        (present) => {
-          if (active && requestRevision === revision) {
-            setConnection(present ? "ready" : "missing");
-          }
-        },
-        () => {
-          if (active && requestRevision === revision) setConnection("error");
-        }
-      );
-    };
-    const whenVisible = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-    // Settings can open in another native window; refresh when users return.
-    refresh();
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", whenVisible);
-    return () => {
-      active = false;
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", whenVisible);
-    };
-  }, []);
 
   const changeSetting = <K extends keyof ModelGenerationForm.Settings>(
     key: K,
@@ -133,7 +124,7 @@ export function ModelGenerationControls({
   };
 
   const submit = async () => {
-    if (locked || connection !== "ready") return;
+    if (locked || !connection.ready) return;
     setBusy(true);
     onBusyChange(true);
     setError(null);
@@ -144,8 +135,13 @@ export function ModelGenerationControls({
         prompt,
         images,
         settings,
+        provider,
       });
-      onGenerated(await modelGeneration.generate(request));
+      onGenerated(
+        await GridaGatewayTripo.execute(provider, () =>
+          modelGeneration.generate(request)
+        )
+      );
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Model generation failed."
@@ -249,6 +245,12 @@ export function ModelGenerationControls({
                   {card.short_description}
                 </p>
                 <div className="mt-4 space-y-4">
+                  <TripoFunding
+                    value={provider}
+                    onChange={setProvider}
+                    hostedSupported={hostedSupported}
+                    disabled={locked}
+                  />
                   <div className="flex items-center justify-between gap-3">
                     <Label htmlFor={`${id}-texture`}>Texture</Label>
                     <Switch
@@ -374,7 +376,7 @@ export function ModelGenerationControls({
           </PromptInputTools>
           <PromptInputSubmit
             status={busy ? "submitted" : undefined}
-            disabled={locked || connection !== "ready"}
+            disabled={locked || !connection.ready}
             aria-label="Generate 3D model"
           />
         </PromptInputFooter>
@@ -383,26 +385,15 @@ export function ModelGenerationControls({
         className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 pt-2 text-xs text-muted-foreground"
         aria-live="polite"
       >
+        <TripoConnection
+          connection={connection}
+          onRefresh={() => void access.refresh()}
+        />
         <span>
-          {connection === "checking" ? (
-            "Checking connection…"
-          ) : connection === "missing" || connection === "error" ? (
-            <>
-              <Link
-                href="/desktop/settings#provider-tripo"
-                className="underline underline-offset-4"
-              >
-                Connect your Tripo API key
-              </Link>
-              {connection === "error" && " · Connection unavailable"}
-            </>
-          ) : (
-            "Tripo · Your API key"
-          )}
-        </span>
-        <span>
-          Estimated {credits} credits · $
-          {(credits * card.pricing.usd_per_credit).toFixed(2)}
+          Estimated ${(credits * card.pricing.usd_per_credit).toFixed(2)}
+          {provider === "gg"
+            ? " · Grida credits"
+            : ` · ${credits} Tripo credits`}
         </span>
       </div>
       {error && (

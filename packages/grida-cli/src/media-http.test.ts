@@ -244,6 +244,17 @@ describe("MediaHttp provider authority", () => {
           },
         ] as const
     ),
+    ...["rig-check", "rig"].map(
+      (operation) =>
+        [
+          `https://openapi.tripo3d.ai/v3/animations/${operation}`,
+          "POST",
+          {
+            authorization: "Bearer synthetic-tripo",
+            "content-type": "application/json",
+          },
+        ] as const
+    ),
     [
       "https://ai-gateway.vercel.sh/v3/ai/image-model",
       "POST",
@@ -443,6 +454,9 @@ describe("MediaHttp provider authority", () => {
     "https://openapi.tripo3d.ai.attacker.example/v3/generation/text-to-model",
     "https://extra.openapi.tripo3d.ai/v3/generation/text-to-model",
     "https://openapi.tripo3d.ai/v3/generation/other",
+    "https://openapi.tripo3d.ai/v3/animations/retarget",
+    "https://openapi.tripo3d.ai/v3/animations/rig?extra=1",
+    "https://openapi.tripo3d.ai/v3/animations/rig-check?extra=1",
     "https://openapi.tripo3d.ai/v3/generation/text-to-model?extra=1",
   ])("refuses ungranted credential destination %s before DNS", async (url) => {
     await refused(url, json);
@@ -919,5 +933,64 @@ describe("MediaHttp cancellation and bounded streams", () => {
     });
     await refused(openrouter, json);
     expect(sockets).toHaveLength(0);
+  });
+});
+
+// GRIDA-SEC-006 / GRIDA-GG: provider — fixed GG routes and credential-free signed uploads.
+describe("MediaHttp hosted Tripo authority", () => {
+  const upload =
+    "https://tripo-data.s3.us-west-2.amazonaws.com/input.glb?signature=synthetic";
+  const binary = {
+    method: "PUT",
+    headers: { "content-type": "application/octet-stream" },
+    body: new Uint8Array([1, 2, 3]),
+    redirect: "error" as const,
+  };
+  it.each(["uploads", "model-generation", "rig-check", "rigging"])(
+    "authorizes the fixed GG %s route",
+    async (route) => {
+      host = new MediaHttp({ ggOrigin: oauthClientRegistration.apiOrigin });
+      const response = await host.transport.request(
+        `${oauthClientRegistration.apiOrigin}/api/v1/ai/3d/${route}`,
+        json
+      );
+      expect(await response.text()).toBe("ok");
+      expect(sockets).toHaveLength(1);
+    }
+  );
+  it("sends a binary upload with no account or provider credential", async () => {
+    const response = await host.transport.request(upload, binary);
+    expect(await response.text()).toBe("ok");
+    expect(sockets[0]!.options.method).toBe("PUT");
+    expect(sockets[0]!.options.headers).not.toHaveProperty("authorization");
+    expect(sockets[0]!.body).toEqual(Buffer.from([1, 2, 3]));
+  });
+  it.each([
+    { method: "POST" },
+    { headers: { "content-type": "application/json" } },
+    {
+      headers: {
+        "content-type": "application/octet-stream",
+        authorization: "Bearer secret",
+      },
+    },
+    {
+      headers: {
+        "content-type": "application/octet-stream",
+        "xi-api-key": "secret",
+      },
+    },
+    { body: "raw-string" },
+    { body: new Uint8Array() },
+    { body: new Uint8Array(60_000_001) },
+  ])("refuses unsafe signed-upload metadata before DNS", async (override) => {
+    await refused(upload, { ...binary, ...override });
+    expect(lookup).not.toHaveBeenCalled();
+    expect(sockets).toHaveLength(0);
+  });
+  it("does not follow or replay a signed upload redirect", async () => {
+    fixtures.push({ status: 307, headers: { location: "/different-object" } });
+    await refused(upload, binary);
+    expect(sockets).toHaveLength(1);
   });
 });

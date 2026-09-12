@@ -37,6 +37,13 @@ export namespace apiAudit {
     "lib/auth/oauth-server.ts",
     "lib/gg/config.ts",
   ]);
+  // New funded media routes use a fixed GG binding, not another legacy exception.
+  const GG_MEDIA = {
+    "gg.3d.uploads": "/api/v1/ai/3d/uploads",
+    "gg.3d.model-generation": "/api/v1/ai/3d/model-generation",
+    "gg.3d.rig-check": "/api/v1/ai/3d/rig-check",
+    "gg.3d.rigging": "/api/v1/ai/3d/rigging",
+  } as const;
   const slash = (value: string) => value.split(path.sep).join("/");
   const inside = (root: string, file: string) => {
     const relative = path.relative(root, file);
@@ -140,16 +147,26 @@ export namespace apiAudit {
     // remain free; extra logic, aliases, swapped methods, and extra imports do
     // not. In particular, a matching bind() call somewhere in a file is not
     // sufficient evidence that its exported handlers use that boundary.
+    const owner =
+      binding === "gg-media"
+        ? "ggMediaApi"
+        : binding === "gg"
+          ? "ggApi"
+          : "accountApi";
+    const bindingModule =
+      binding === "gg-media" ? "gg-media" : binding === "gg" ? "gg" : "account";
     const expected = source(
       "route.ts",
-      `import { ${binding === "gg" ? "ggApi" : "accountApi"} } from "@/lib/api/${binding === "gg" ? "gg" : "account"}";
+      `import { ${owner} } from "@/lib/api/${bindingModule}";
        export const runtime = "nodejs";
        export const dynamic = "force-dynamic";
-       const handlers = ${binding === "gg" ? "ggApi" : "accountApi"}.bind(${JSON.stringify(id)});
+       ${binding === "gg-media" ? "export const maxDuration = 800;" : ""}
+       const handlers = ${owner}.bind(${JSON.stringify(id)});
        ${METHODS.map((method) => `export const ${method} = handlers.${method};`).join("\n")}`
     );
     function shape(node: ts.Node): unknown {
       if (ts.isStringLiteral(node)) return [node.kind, node.text];
+      if (ts.isNumericLiteral(node)) return [node.kind, node.text];
       if (ts.isIdentifier(node)) return [node.kind, node.text];
       const children: unknown[] = [];
       node.forEachChild((child) => {
@@ -364,6 +381,19 @@ export namespace apiAudit {
             "legacy-exception",
             registryFile,
             `${id}: legacy exceptions are fixed to six existing operations.`
+          );
+        }
+      } else if (definition.binding === "gg-media") {
+        if (
+          GG_MEDIA[id as keyof typeof GG_MEDIA] !== definition.path ||
+          definition.authority !== "gg" ||
+          definition.cache !== "no-store" ||
+          definition.methods.join(",") !== "POST,OPTIONS"
+        ) {
+          report(
+            "registry",
+            registryFile,
+            `${id}: funded media requires its fixed GG binding, path, methods and no-store policy.`
           );
         }
       } else if (
@@ -691,6 +721,15 @@ export namespace apiAudit {
             (value): value is string => !!value
           )
         )) {
+          // The fixed GG binding hands a verified org to the existing paid-AI
+          // seam. That seam owns privileged billing/provider dependencies and
+          // is reviewed/tested separately under GRIDA-SEC-003/006. No account
+          // binding or arbitrary API module acquires this import exception.
+          if (
+            relative === "lib/api/gg-media.ts" &&
+            slash(path.relative(root, target)) === "lib/ai/gg-three-d.ts"
+          )
+            continue;
           if (EXTENSIONS.test(target)) await visit(target);
         }
       }

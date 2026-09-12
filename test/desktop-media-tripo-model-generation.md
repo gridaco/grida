@@ -24,8 +24,9 @@ successful model stays usable while another request runs or fails.
 
 ## Steps
 
-1. Use a compatible Desktop build with a local media store. Connect a Tripo
-   API key in Settings and open **3D model** in Tools, then select a Tripo model
+1. Use a compatible Desktop build with a local media store. Sign in to an
+   organization with Grida credits, leave the Tripo key unset, and open
+   **3D → Generate** in Tools, then select a Tripo model
    from the bottom composer. The preview stays wide, with input-mode tabs in
    the header and advanced controls hidden behind **Generation options**.
 2. Select H3.1, P1, and P2 Preview in turn. Each appears once. H3.1 offers
@@ -48,6 +49,16 @@ successful model stays usable while another request runs or fails.
    the task can be checked in Tripo without submitting a replacement.
 9. Narrow the window. Inputs, options, errors, and the generation button remain
    reachable without horizontal overflow.
+10. The global footer shows **Grida credits** and the selected organization.
+    **Generation options → Pay with** offers Grida credits and your Tripo key.
+    Select the key path without a key: generation is disabled and the footer
+    links to Tripo Settings. Connect the key, return and verify readiness.
+    Switch back to credits and remove the key: generation remains available.
+    Switching funding preserves the prompt, views, options and existing result.
+11. An insufficient-credit response preserves the composer and result and
+    never switches to BYOK. Sign out and confirm the footer offers sign-in.
+    Funding changes are disabled while generating. An accepted-task error
+    never automatically resubmits, including during token refresh.
 
 ## Notes
 
@@ -65,3 +76,13 @@ preservation of previous results, and narrow layouts.
 Verified the revised composer locally on 2026-09-12 in Desktop using a previously
 generated GLB. Synthetic generation checks covered busy states, failure recovery,
 result retention, and narrow layouts without additional provider charges.
+
+Verified GG-funded H3.1 text generation on 2026-09-12 through the real token
+verifier, HTTP binding, SDK, Tripo provider and sandbox billing seam. The client
+had no provider credentials and submitted exactly once. The resulting GLB
+contained one mesh and 520 vertices; Tripo reported 10 credits ($0.10).
+Metronome accepted the 100-mill usage event, and both the cached and external
+credit balances decreased from 1,000 to 990 cents before cleanup. All created
+local and sandbox fixtures were cleaned up. This provider/billing proof used
+the SDK over local HTTP; the renderer funding controls were verified separately
+with an isolated Desktop bridge.

@@ -16,7 +16,7 @@ export class MediaRequest {
   constructor(
     http: ProviderHttp,
     signal?: AbortSignal,
-    timeoutMs: 300_000 | 600_000 = 300_000
+    timeoutMs: 300_000 | 600_000 | 780_000 = 300_000
   ) {
     this.#http = http;
     this.#source = signal;

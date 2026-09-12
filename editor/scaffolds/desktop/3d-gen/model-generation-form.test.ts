@@ -12,6 +12,23 @@ const draft = () => ({
 });
 
 describe("ModelGenerationForm", () => {
+  // GRIDA-GG: desktop — selecting credits changes funding, not model/input semantics.
+  it.each(["text", "image", "multiview"] as const)(
+    "preserves %s input across explicit funding lanes",
+    async (variant) => {
+      const input = {
+        ...draft(),
+        variant,
+        images: { front: image(), right: image() },
+      };
+      const direct = await ModelGenerationForm.request(input);
+      const hosted = await ModelGenerationForm.request({
+        ...input,
+        provider: "gg",
+      });
+      expect(hosted).toEqual({ ...direct, provider: "gg" });
+    }
+  );
   it("makes one explicit model-generation request with normalized text", async () => {
     expect(await ModelGenerationForm.request(draft())).toEqual({
       model_id: "tripo/h3.1",

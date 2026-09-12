@@ -5,6 +5,7 @@ export type DesktopMediaToolId =
   | "video-generator"
   | "3d-generator"
   | "model-generation"
+  | "rigging"
   | "text-to-music"
   | "text-to-sound-effects"
   | "text-to-speech"
@@ -59,6 +60,13 @@ const TOOL_SPECS = Object.freeze([
         .ordered_models()
         .map((card) => card.id),
     ],
+  },
+  {
+    id: "rigging",
+    group: "create",
+    label: "Rigging",
+    description: "Add a skeleton to an existing 3D model.",
+    modelIds: models.three_d.rigging.listed_models().map((card) => card.id),
   },
   {
     id: "text-to-music",
@@ -208,6 +216,9 @@ export namespace DesktopMediaTool {
     }
     if (resolve("3d-generator").modelIds.includes(modelId)) {
       return resolve("3d-generator");
+    }
+    if (resolve("rigging").modelIds.includes(modelId)) {
+      return resolve("rigging");
     }
     if (resolve("text-to-music").modelIds.includes(modelId)) {
       return resolve("text-to-music");

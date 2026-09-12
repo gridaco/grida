@@ -1,6 +1,7 @@
 // GRIDA-SEC-012 — production Next pipeline proof with private, synthetic inputs.
 // GRIDA-SEC-006 — see /SECURITY.md
 // GRIDA-GG: token — fresh fixture authority proves mint and credential isolation.
+// GRIDA-GG: gateway — real 3D route/upload authority around synthetic execution.
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createServer, request as httpRequest } from "node:http";
@@ -34,6 +35,8 @@ const copiedFiles = [
   "lib/api/native.ts",
   "lib/api/account.ts",
   "lib/api/gg.ts",
+  "lib/api/gg-media.ts",
+  "lib/gg/uploads.ts",
   "lib/account/account.ts",
   "lib/supabase/native-data.ts",
   "lib/supabase/account-data.ts",
@@ -50,7 +53,6 @@ const copiedFiles = [
   "lib/ai/openai-compat/codec.ts",
   "lib/ai/openai-compat/errors.ts",
   "lib/ai/openai-compat/hosted-models.ts",
-  "lib/ai/openai-compat/limits.ts",
   "lib/ai/openai-compat/wire.ts",
   "lib/desktop/csp.ts",
   "lib/domains/index.ts",
@@ -58,6 +60,10 @@ const copiedFiles = [
   "app/(api)/(public)/api/v1/auth/me/route.ts",
   "app/(api)/(public)/api/v1/auth/gg/route.ts",
   "app/(api)/(public)/api/v1/ai/models/route.ts",
+  "app/(api)/(public)/api/v1/ai/3d/uploads/route.ts",
+  "app/(api)/(public)/api/v1/ai/3d/model-generation/route.ts",
+  "app/(api)/(public)/api/v1/ai/3d/rig-check/route.ts",
+  "app/(api)/(public)/api/v1/ai/3d/rigging/route.ts",
   "app/(api)/(public)/api/v1/account/organizations/route.ts",
   "app/(api)/(public)/api/v1/account/credits/route.ts",
 ];
@@ -570,6 +576,45 @@ export const TenantMiddleware = { async routeProxyRequest(_request: unknown, res
 function forbidden() { appendFileSync(process.env.GRIDA_API_TEST_TRIPWIRE!, 'insiders\\n'); return new Response('Unexpected insiders handler', {status: 500}); }
 export const GET = forbidden;
 export const POST = forbidden;\n`
+  );
+  // The fixed execution seam is synthetic; authentication, upload signing,
+  // input admission, response streaming, routes and the Next pipeline stay real.
+  await put(
+    path.join(editor, "lib/ai/gg-three-d.ts"),
+    `import { appendFileSync } from 'node:fs';
+export namespace GgThreeD {
+  export class Failure extends Error {
+    constructor(readonly code: 'invalid_request' | 'model_unavailable' | 'provider_unavailable' | 'usage_unavailable' | 'invalid_response' | 'generation_failed' | 'aborted' | 'timeout', readonly task_id?: string) { super(code); }
+  }
+  function record(operation: string, org: number, fields: Record<string, unknown> = {}) {
+    appendFileSync(process.env.GRIDA_API_TEST_MEDIA!, JSON.stringify({operation, org, ...fields}) + '\\n');
+  }
+  function result() {
+    const data = Uint8Array.from({length: 200003}, (_, index) => index % 251);
+    return {glb: {data, media_type: 'model/gltf-binary' as const}, task: {id: 'fixture-task', credits_consumed: 25}};
+  }
+  export async function preparePresign(org: number, media_type: string) {
+    record('upload', org, {media_type});
+    return {upload_url: 'https://tripo-data.s3.us-west-2.amazonaws.com/fixture-object?X-Amz-Signature=synthetic', file_token: media_type === 'model/gltf-binary' ? 'file_fixture_mesh' : 'file_fixture_image', expires_in: 900};
+  }
+  export async function modelGenerate(org: number, model_id: string, variant: string, input: unknown) {
+    const refs = input as {image?: {file_token: string}; images?: Record<string, {file_token: string}>};
+    record('model-generation', org, {model_id, variant, image: refs.image?.file_token, images: refs.images && Object.fromEntries(Object.entries(refs.images).map(([view, value]) => [view, value.file_token]))});
+    return result();
+  }
+  export async function check(org: number, input: unknown) {
+    record('rig-check', org, {mesh: (input as {mesh: {file_token: string}}).mesh.file_token});
+    return {riggable: true, rig_type: 'biped' as const, task: {id: 'fixture-check', credits_consumed: 0}};
+  }
+  export async function rig(org: number, model_id: string, input: unknown) {
+    record('rigging', org, {model_id, mesh: (input as {mesh: {file_token: string}}).mesh.file_token});
+    return result();
+  }
+}\n`
+  );
+  await put(
+    path.join(editor, "lib/ai/openai-compat/limits.ts"),
+    `export async function allowAiRequest(_scope: string, _subject: string): Promise<{success: boolean; retryAfterSeconds?: number}> { return {success: true}; }\n`
   );
   await dependencies(editor, workspace);
   return hashes;
@@ -1192,7 +1237,335 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
   );
 }
 
-async function ggAssertions(port, issuer, safe, alpha, beta, signingSecret) {
+/** Real bearer/upload authority and HTTP policy around one fixed synthetic execution seam. */
+async function ggMediaAssertions(port, issuer, safe, tokens, mediaTripwire) {
+  const base = "/api/v1/ai/3d/";
+  const routes = ["uploads", "model-generation", "rig-check", "rigging"];
+  const auth = (token) => ({ authorization: `Bearer ${token}` });
+  const post = (route, token, value, options = {}) =>
+    request(port, `${base}${route}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(token) },
+      body: JSON.stringify(value),
+      ...options,
+    });
+  const calls = async () =>
+    (await readFile(mediaTripwire, "utf8"))
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  const initialAuth = issuer.calls;
+  const initialData = issuer.databaseCalls;
+  const tampered = tokens.alphaGrant.split(".");
+  tampered[2] = `${tampered[2][0] === "a" ? "b" : "a"}${tampered[2].slice(1)}`;
+
+  for (const route of routes) {
+    for (const headers of [
+      {},
+      { cookie: "sb-session=synthetic-web-cookie" },
+      auth(tokens.alpha),
+      auth(tokens.beta),
+      auth("synthetic-api-key"),
+      auth(tampered.join(".")),
+    ]) {
+      const body = safe(
+        await post(
+          route,
+          undefined,
+          {},
+          {
+            headers: { "content-type": "application/json", ...headers },
+          }
+        ),
+        401,
+        `3D ${route} credential rejection`
+      );
+      check(
+        body.error?.code === "invalid_token",
+        `3D ${route} accepted wrong credential family`
+      );
+    }
+    for (const method of ["GET", "HEAD", "PUT", "PATCH", "DELETE"]) {
+      const response = await request(port, `${base}${route}`, { method });
+      safe(response, 405, `3D ${route} ${method} rejection`, method !== "HEAD");
+      check(
+        response.headers.allow === "POST, OPTIONS",
+        `3D ${route} Allow mismatch`
+      );
+    }
+    const options = await request(port, `${base}${route}`, {
+      method: "OPTIONS",
+    });
+    safe(options, 204, `3D ${route} OPTIONS`, false);
+    check(
+      options.headers.allow === "POST, OPTIONS",
+      `3D ${route} OPTIONS Allow mismatch`
+    );
+    safe(
+      await post(`${route}?organization_id=1`, tokens.alphaGrant, {}),
+      400,
+      `3D ${route} query rejected`
+    );
+  }
+  check(
+    (await calls()).length === 0,
+    "Rejected 3D credentials/method/input reached execution"
+  );
+
+  const presign = async (type, bytes) => {
+    const response = safe(
+      await post("uploads", tokens.alphaGrant, {
+        media_type: type,
+        byte_length: bytes,
+      }),
+      200,
+      `3D ${type} presign`
+    );
+    check(
+      Object.keys(response).sort().join(",") === "upload,upload_url",
+      "Presign leaked additional fields"
+    );
+    const url = new URL(response.upload_url);
+    check(
+      url.hostname === "tripo-data.s3.us-west-2.amazonaws.com" &&
+        url.searchParams.get("X-Amz-Signature") === "synthetic",
+      "Unexpected presign destination"
+    );
+    const upload = response.upload.split(".");
+    const claims = JSON.parse(Buffer.from(upload[1], "base64url").toString());
+    check(
+      claims.aud === "gg:tripo-upload" &&
+        claims.org === 1 &&
+        claims.sub === issuer.users[0].id &&
+        claims.exp - claims.iat === 900 &&
+        claims.byte_length === bytes &&
+        claims.media_type === type,
+      "Upload ticket scope mismatch"
+    );
+    return { upload: response.upload };
+  };
+  const image = await presign("image/png", 100);
+  const mesh = await presign("model/gltf-binary", 200);
+  const textInput = {
+    model_id: "tripo/h3.1",
+    variant: "text",
+    input: { prompt: "A fixture chair" },
+  };
+  const imageInput = {
+    model_id: "tripo/h3.1",
+    variant: "image",
+    input: { image },
+  };
+  const multiInput = {
+    model_id: "tripo/h3.1",
+    variant: "multiview",
+    input: { images: { front: image, right: image } },
+  };
+  const checkInput = { input: { mesh } };
+  const rigInput = {
+    model_id: "tripo/rig-v1.0",
+    input: { mesh, rig_type: "biped", spec: "mixamo" },
+  };
+  for (const [route, input, feature] of [
+    ["model-generation", textInput, "model-generation"],
+    ["model-generation", imageInput, "model-generation"],
+    ["model-generation", multiInput, "model-generation"],
+    ["rigging", rigInput, "rigging"],
+  ]) {
+    const response = await post(route, tokens.alphaGrant, input, {
+      headers: {
+        "content-type": "application/json",
+        ...auth(tokens.alphaGrant),
+        cookie: "organization=1001",
+        "x-grida-organization-id": "1001",
+      },
+    });
+    const result = safe(
+      response,
+      200,
+      `3D owner ${route} ${input.variant ?? "mesh"}`
+    );
+    check(
+      result.feature === feature &&
+        result.provider_id === "gg" &&
+        result.model_id === input.model_id &&
+        result.task.id === "fixture-task",
+      "3D result descriptor or task lost"
+    );
+    const bytes = Buffer.from(result.glb.base64, "base64");
+    check(
+      result.glb.media_type === "model/gltf-binary" &&
+        bytes.length === 200003 &&
+        bytes.every((value, index) => value === index % 251),
+      "Streamed GLB corrupted at base64 chunk boundaries"
+    );
+    check(
+      response.headers["transfer-encoding"] === "chunked",
+      "Model response was not streamed through Next"
+    );
+  }
+  const checked = safe(
+    await post("rig-check", tokens.alphaGrant, checkInput),
+    200,
+    "3D owner compatibility check"
+  );
+  check(
+    checked.feature === "rig-check" &&
+      checked.provider_id === "gg" &&
+      checked.riggable === true &&
+      checked.rig_type === "biped" &&
+      checked.task.credits_consumed === 0 &&
+      !Object.hasOwn(checked, "glb"),
+    "Compatibility check became generation"
+  );
+  const executed = await calls();
+  check(
+    executed.length === 7 && executed.every((call) => call.org === 1),
+    "Execution used cookie/header org or wrong operation count"
+  );
+  check(
+    executed.some((call) => call.image === "file_fixture_image") &&
+      executed.some(
+        (call) =>
+          call.images?.front === "file_fixture_image" &&
+          call.images?.right === "file_fixture_image"
+      ) &&
+      executed.filter((call) => call.mesh === "file_fixture_mesh").length === 2,
+    "Verified upload references did not reach the fixed execution seam"
+  );
+
+  for (const token of [tokens.betaGrant, tokens.alphaOtherOrgGrant]) {
+    for (const [route, input] of [
+      ["model-generation", imageInput],
+      ["model-generation", multiInput],
+      ["rig-check", checkInput],
+      ["rigging", rigInput],
+    ]) {
+      safe(
+        await post(route, token, input),
+        400,
+        `3D cross-owner ${route} upload rejected`
+      );
+    }
+  }
+  for (const route of routes) {
+    safe(
+      await post(route, image.upload, {}),
+      401,
+      `3D ${route} upload ticket cannot authorize AI`
+    );
+  }
+  const corrupted = `${image.upload.slice(0, -8)}aaaaaaaa`;
+  safe(
+    await post("model-generation", tokens.alphaGrant, {
+      ...imageInput,
+      input: { image: { upload: corrupted } },
+    }),
+    400,
+    "3D tampered upload rejected"
+  );
+  safe(
+    await post("rig-check", tokens.alphaGrant, { input: { mesh: image } }),
+    400,
+    "Image ticket cannot be used as a mesh"
+  );
+  safe(
+    await post("model-generation", tokens.alphaGrant, {
+      ...imageInput,
+      input: { image: mesh },
+    }),
+    400,
+    "Mesh ticket cannot be used as an image"
+  );
+  safe(
+    await post("model-generation", tokens.alphaGrant, {
+      ...imageInput,
+      input: {
+        image: { file_token: "file_fixture_image", media_type: "image/png" },
+      },
+    }),
+    400,
+    "Unsigned provider reference rejected"
+  );
+  safe(
+    await post("rig-check", tokens.alphaGrant, {
+      input: { mesh: { data: "AAAA", media_type: "model/gltf-binary" } },
+    }),
+    400,
+    "Raw mesh body rejected by reference-only gateway"
+  );
+
+  for (const [route, input] of [
+    ["uploads", { media_type: "image/png", byte_length: 8 * 1024 * 1024 + 1 }],
+    ["uploads", { media_type: "model/gltf-binary", byte_length: 60_000_001 }],
+  ]) {
+    safe(
+      await post(route, tokens.alphaGrant, input),
+      400,
+      "Oversized 3D upload metadata rejected"
+    );
+  }
+  for (const route of routes) {
+    for (const headers of [
+      { "content-type": "text/plain" },
+      { "content-type": "application/json", "content-encoding": "gzip" },
+    ])
+      safe(
+        await post(
+          route,
+          tokens.alphaGrant,
+          {},
+          { headers: { ...auth(tokens.alphaGrant), ...headers } }
+        ),
+        400,
+        `3D ${route} unsupported encoding rejected`
+      );
+    for (const declared of [false, true]) {
+      const body = JSON.stringify({
+        ...textInput,
+        input: { prompt: "x".repeat(65_536) },
+      });
+      safe(
+        await post(
+          route,
+          tokens.alphaGrant,
+          {},
+          {
+            body,
+            headers: {
+              ...auth(tokens.alphaGrant),
+              "content-type": "application/json",
+              ...(declared
+                ? { "content-length": String(Buffer.byteLength(body)) }
+                : { "transfer-encoding": "chunked" }),
+            },
+          }
+        ),
+        400,
+        `3D ${route} ${declared ? "declared" : "streamed"} oversized body rejected`
+      );
+    }
+  }
+  check(
+    (await calls()).length === executed.length,
+    "Rejected upload ownership or request bounds reached execution"
+  );
+  check(
+    issuer.calls === initialAuth && issuer.databaseCalls === initialData,
+    "3D bearer/upload flow contacted account issuer or database"
+  );
+}
+
+async function ggAssertions(
+  port,
+  issuer,
+  safe,
+  alpha,
+  beta,
+  signingSecret,
+  mediaTripwire
+) {
   const endpoint = "/api/v1/auth/gg";
   const models = "/api/v1/ai/models";
   const auth = (token) => ({ authorization: `Bearer ${token}` });
@@ -1260,6 +1633,18 @@ async function ggAssertions(port, issuer, safe, alpha, beta, signingSecret) {
     "x-grida-organization-id": String(betaOrg.id),
   });
   const betaGrant = await grant(beta, issuer.users[1], betaOrg);
+  const alphaOtherOrgGrant = await grant(
+    alpha,
+    issuer.users[0],
+    issuer.organizations[0][1]
+  );
+  await ggMediaAssertions(
+    port,
+    issuer,
+    safe,
+    { alpha, beta, alphaGrant, betaGrant, alphaOtherOrgGrant },
+    mediaTripwire
+  );
   const tampered = alphaGrant.split(".");
   tampered[2] = `${tampered[2][0] === "a" ? "b" : "a"}${tampered[2].slice(1)}`;
   const beforeModelsAuth = issuer.calls;
@@ -1571,7 +1956,13 @@ async function ggAssertions(port, issuer, safe, alpha, beta, signingSecret) {
   );
 }
 
-async function assertions(port, issuer, tripwire, signingSecret) {
+async function assertions(
+  port,
+  issuer,
+  tripwire,
+  signingSecret,
+  mediaTripwire
+) {
   let count = 0;
   const alpha = issuer.token(0);
   const beta = issuer.token(1);
@@ -1679,7 +2070,15 @@ async function assertions(port, issuer, tripwire, signingSecret) {
   issuer.mode = "ok";
   await organizationAssertions(port, issuer, safe, alpha, beta);
   await creditsAssertions(port, issuer, safe, alpha, beta);
-  await ggAssertions(port, issuer, safe, alpha, beta, signingSecret);
+  await ggAssertions(
+    port,
+    issuer,
+    safe,
+    alpha,
+    beta,
+    signingSecret,
+    mediaTripwire
+  );
   safe(
     await request(port, "/api/v1/auth/me", {
       method: "HEAD",
@@ -1924,6 +2323,8 @@ async function main() {
     await mkdir(home, { mode: 0o700 });
     const tripwire = path.join(workspace, "tripwire.log");
     await put(tripwire, "");
+    const mediaTripwire = path.join(workspace, "media-tripwire.log");
+    await put(mediaTripwire, "");
     const issuerPort = await listen(issuer.authServer);
     issuer.authOrigin = `http://127.0.0.1:${issuerPort}`;
     const dataPort = await listen(issuer.dataServer);
@@ -1958,6 +2359,7 @@ async function main() {
       GG_TOKEN_SECRET: signingSecret,
       GRIDA_API_TEST_PORTS: `${port},${issuerPort},${dataPort}`,
       GRIDA_API_TEST_TRIPWIRE: tripwire,
+      GRIDA_API_TEST_MEDIA: mediaTripwire,
       NODE_OPTIONS: `--require=${JSON.stringify(path.join(scripts, "network.cjs"))}`,
     };
     check(!interrupted, "API proof interrupted");
@@ -2003,7 +2405,13 @@ async function main() {
       );
       await ready(active, port);
       if (mode === "normal")
-        report.cases += await assertions(port, issuer, tripwire, signingSecret);
+        report.cases += await assertions(
+          port,
+          issuer,
+          tripwire,
+          signingSecret,
+          mediaTripwire
+        );
       else if (mode.startsWith("gg-")) {
         for (const [endpoint, options] of [
           [

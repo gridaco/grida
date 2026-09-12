@@ -144,8 +144,13 @@ describe("AgentNetworkPolicy", () => {
     ).toThrow(/not granted/);
   });
 
-  it("admits Tripo credentials only on its exact API origin", () => {
-    const url = "https://openapi.tripo3d.ai/v3/generation/text-to-model";
+  it.each([
+    "/v3/generation/text-to-model",
+    "/v3/files",
+    "/v3/animations/rig-check",
+    "/v3/animations/rig",
+  ])("admits Tripo %s credentials only on its exact API origin", (route) => {
+    const url = `https://openapi.tripo3d.ai${route}`;
     expect(
       AgentNetworkPolicy.authorize(grants, {
         grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
@@ -177,6 +182,31 @@ describe("AgentNetworkPolicy", () => {
         headers: [],
       })
     ).toThrow(/not granted/);
+  });
+
+  it("reserves the larger body bound only for first-party multipart file uploads", () => {
+    const request = AgentNetworkPolicy.authorize(grants, {
+      grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+      method: "POST",
+      url: "https://openapi.tripo3d.ai/v3/files",
+      headers: [["content-type", "multipart/form-data; boundary=grida-upload"]],
+    });
+    expect(AgentNetworkPolicy.maxRequestBodyBytes(request)).toBe(
+      64 * 1024 * 1024
+    );
+    for (const change of [
+      { method: "PUT" },
+      { url: new URL("https://openapi.tripo3d.ai/v3/animations/rig") },
+      { url: new URL("https://openapi.tripo3d.ai/v3/files?other=1") },
+      { url: new URL("https://openrouter.ai/v3/files") },
+      { headers: new Headers({ "content-type": "application/json" }) },
+      { grant: { ...request.grant, id: "custom-endpoint" } },
+      { grant: { ...request.grant, lane: "download" as const } },
+    ])
+      expect(
+        AgentNetworkPolicy.maxRequestBodyBytes({ ...request, ...change })
+      ).toBe(32 * 1024 * 1024);
+    expect(AgentNetworkPolicy.maxRequestBodyBytes(null)).toBe(32 * 1024 * 1024);
   });
 
   it.each([
@@ -314,5 +344,73 @@ describe("AgentNetworkPolicy", () => {
         new URL("https://example.com/v1")
       )
     ).toBe(false);
+  });
+});
+
+// GRIDA-SEC-004 / GRIDA-SEC-006 / GRIDA-GG: provider — signed uploads are not credential destinations.
+describe("Tripo hosted upload grant", () => {
+  const upload = {
+    grant_id: AgentNetworkPolicy.TRIPO_UPLOAD_GRANT_ID,
+    method: "PUT",
+    url: "https://tripo-data.s3.us-west-2.amazonaws.com/input.glb?signature=synthetic",
+    headers: [["content-type", "application/octet-stream"]] as [
+      string,
+      string,
+    ][],
+  };
+  it("authorizes bounded binary PUT only on the exact signed-upload origin", () => {
+    const request = AgentNetworkPolicy.authorize(grants, upload);
+    expect(AgentNetworkPolicy.maxRequestBodyBytes(request)).toBe(60_000_000);
+    expect(
+      AgentNetworkPolicy.maxRequestBodyBytes({ ...request, method: "POST" })
+    ).toBe(32 * 1024 * 1024);
+    expect(() =>
+      AgentNetworkPolicy.authorize(grants, {
+        ...upload,
+        grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+      })
+    ).toThrow(/not granted|not allowed|forbidden/);
+    expect(() =>
+      AgentNetworkPolicy.authorize(grants, {
+        ...upload,
+        grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+        method: "GET",
+        headers: [],
+      })
+    ).toThrow(/not granted|not allowed|forbidden/);
+  });
+  it.each([
+    { method: "POST" },
+    { method: "GET" },
+    { url: "https://tripo-data.s3.us-west-2.amazonaws.com:444/input" },
+    { url: "https://sub.tripo-data.s3.us-west-2.amazonaws.com/input" },
+    { url: "http://tripo-data.s3.us-west-2.amazonaws.com/input" },
+    { url: "https://tripo-data.s3.us-west-2.amazonaws.com/" },
+    { headers: [["content-type", "application/json"]] },
+    {
+      headers: [
+        ["content-type", "application/octet-stream"],
+        ["authorization", "Bearer secret"],
+      ],
+    },
+    {
+      headers: [
+        ["content-type", "application/octet-stream"],
+        ["xi-api-key", "secret"],
+      ],
+    },
+    {
+      headers: [
+        ["content-type", "application/octet-stream"],
+        ["cookie", "secret"],
+      ],
+    },
+  ])("rejects upload authority widening", (override) => {
+    expect(() =>
+      AgentNetworkPolicy.authorize(grants, {
+        ...upload,
+        ...override,
+      } as AgentNetworkPolicy.RequestMetadata)
+    ).toThrow(/not granted|not allowed|forbidden/);
   });
 });

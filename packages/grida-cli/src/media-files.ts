@@ -26,6 +26,8 @@ export namespace MediaFiles {
     provider_id: string;
     binding_id: string;
     variant: string;
+    feature?: "model-generation" | "rigging";
+    task?: { id: string; credits_consumed?: number };
   };
   export type Saved = {
     path: string;
@@ -127,6 +129,31 @@ export namespace MediaFiles {
   function checkFileSource(source: string): void {
     if (!source || /^(?:[a-z][a-z\d+.-]*:\/\/|data:|file:)/i.test(source))
       throw new Failure("invalid_input");
+  }
+
+  /** Read one explicitly selected GLB; the SDK validates the complete mesh contract. */
+  export async function readMesh(
+    source: string,
+    signal: AbortSignal,
+    maximumBytes: number
+  ): Promise<Artifact> {
+    if (
+      source === "-" ||
+      !Number.isSafeInteger(maximumBytes) ||
+      maximumBytes <= 0 ||
+      maximumBytes > 64 * 1024 * 1024
+    )
+      throw new Failure("invalid_input");
+    checkFileSource(source);
+    const data = await readBytes(source, signal, maximumBytes);
+    if (
+      data.length < 20 ||
+      data.readUInt32LE(0) !== 0x46546c67 ||
+      data.readUInt32LE(4) !== 2 ||
+      data.readUInt32LE(8) !== data.length
+    )
+      throw new Failure("invalid_input");
+    return { data, media_type: "model/gltf-binary" };
   }
 
   async function readBytes(
@@ -434,6 +461,19 @@ export namespace MediaFiles {
           provider_id: metadata.provider_id,
           binding_id: metadata.binding_id,
           variant: metadata.variant,
+          ...(metadata.feature === "rigging"
+            ? { feature: metadata.feature }
+            : {}),
+          ...(metadata.task
+            ? {
+                task: {
+                  id: metadata.task.id,
+                  ...(metadata.task.credits_consumed === undefined
+                    ? {}
+                    : { credits_consumed: metadata.task.credits_consumed }),
+                },
+              }
+            : {}),
           directory: this.path,
           artifacts: saved,
         };

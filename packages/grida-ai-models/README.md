@@ -261,3 +261,27 @@ P Series tab, is the source. These are catalogue prices, not reservations,
 affordability checks, or observed usage. Release provenance records the public
 model announcements, including P2's public preview date, rather than interpreting
 snapshot ID suffixes as release dates.
+
+### Rig eligibility and rigging
+
+`models.three_d.rig_check.operation` records the model-less eligibility endpoint,
+its supported rig types, GLB input, and published free price. It is an operation
+fact rather than a fabricated model card. `models.three_d.rigging.models` contains
+`tripo/rig-v1.0` and `tripo/rig-v2.5`, bound to the exact upstream versions
+`v1.0-20240301` and `v2.5-20260210`.
+
+The [rigging compatibility table](https://developers.tripo3d.ai/en/docs/animations-rig)
+limits v1.0 to humanoid bipeds and v2.5 to the six creature rig types. Both list
+Tripo and Mixamo naming specs and GLB/FBX output. These are provider facts, not
+proof of support for every file format in Grida. The SDK independently admits
+bounded self-contained GLB bytes and returns GLB only. Rigging rates come from
+the [pricing table](https://developers.tripo3d.ai/en/pricing): 25 credits at $0.01
+per credit. The table takes precedence over the older 30-credit response sample.
+Release days remain unknown with endpoint provenance; snapshot suffixes are not
+assumed to be first-public-release dates.
+
+`catalog.three_d.rigging` separately lists the implemented models, with explicit
+order and no default model: the source mesh determines compatible rig choices.
+`catalog.three_d.rig_check.operation` separately adds the check service status.
+These families remain bundled and do not change the schema-1 distribution
+protocol. Checks remain structured findings, distinct from generated media.

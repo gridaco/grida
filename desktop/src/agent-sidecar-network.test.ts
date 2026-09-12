@@ -4,6 +4,53 @@ import { AgentSidecarChannel } from "./agent-sidecar-channel";
 import { AgentSidecarNetwork } from "./agent-sidecar-network";
 
 describe("AgentSidecarNetwork", () => {
+  it("admits a bounded multipart mesh upload above the ordinary provider limit", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    const result = harness.network.providerHttp.request(
+      "https://openapi.tripo3d.ai/v3/files",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "multipart/form-data; boundary=grida-upload",
+        },
+        body: new Uint8Array(33 * 1024 * 1024),
+      }
+    );
+    const request = await harness.untilFrame("request.start");
+    const rejection = result.catch((error: unknown) => error);
+    await harness.host.write({
+      v: 1,
+      type: "response.error",
+      requestId: request.requestId,
+      code: "denied",
+      message: "synthetic stop before provider access",
+    });
+    expect(await rejection).toMatchObject({
+      message: expect.stringContaining("synthetic stop"),
+    });
+    harness.network.close();
+  });
+
+  it("rejects ordinary provider bodies above 32 MiB before framing a request", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    await expect(
+      harness.network.providerHttp.request(
+        "https://openapi.tripo3d.ai/v3/animations/rig",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: new Uint8Array(33 * 1024 * 1024),
+        }
+      )
+    ).rejects.toThrow("exceeds the Desktop limit");
+    expect(harness.frames.some((frame) => frame.type === "request.start")).toBe(
+      false
+    );
+    harness.network.close();
+  });
+
   it("executes a host command and reconstructs the daemon shell result", async () => {
     const harness = createHarness();
     await harness.bootstrap();
@@ -564,7 +611,7 @@ describe("AgentSidecarNetwork", () => {
         {
           id: "provider:built-in",
           lane: "provider",
-          origins: ["https://openrouter.ai"],
+          origins: ["https://openrouter.ai", "https://openapi.tripo3d.ai"],
         },
         {
           id: "download:provider-assets",
@@ -622,7 +669,7 @@ function createHarness(sidecarOutput: Transform = new PassThrough()) {
           {
             id: "provider:built-in",
             lane: "provider",
-            origins: ["https://openrouter.ai"],
+            origins: ["https://openrouter.ai", "https://openapi.tripo3d.ai"],
           },
           {
             id: "download:provider-assets",

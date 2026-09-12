@@ -9,6 +9,7 @@ import {
   getDesktopBridge,
   getDesktopBridgeStatus,
   modelGeneration,
+  rigging,
   secrets,
 } from "./bridge";
 
@@ -203,6 +204,57 @@ describe("desktop bridge client contract", () => {
     ]);
   });
 
+  it("requires rigging readiness and both methods before emitting either request", async () => {
+    const check = vi.fn<NonNullable<DesktopBridge["rigging"]>["check"]>();
+    const generate = vi.fn<NonNullable<DesktopBridge["rigging"]>["generate"]>();
+    const request = {
+      provider: "tripo",
+      input: { mesh: { data: "AQID", media_type: "model/gltf-binary" } },
+    } as const;
+    for (const fields of [
+      {},
+      { caps: { media: { tripo: true } }, rigging: { check, generate } },
+      { caps: { media: { rigging: true } }, rigging: { check } },
+      { caps: { media: { rigging: true } }, rigging: { generate } },
+      { caps: { media: { rigging: false } }, rigging: { check, generate } },
+    ]) {
+      installBridge({
+        grida: { protocol: DESKTOP_BRIDGE_PROTOCOL, ...fields },
+      });
+      expect(rigging.isSupported()).toBe(false);
+      await expect(rigging.check(request)).rejects.toBeInstanceOf(
+        DesktopBridgeMissingError
+      );
+      await expect(
+        rigging.generate({
+          ...request,
+          model_id: "tripo/rig-v1.0",
+          input: { ...request.input, rig_type: "biped", spec: "mixamo" },
+        })
+      ).rejects.toBeInstanceOf(DesktopBridgeMissingError);
+    }
+    expect(check).not.toHaveBeenCalled();
+    expect(generate).not.toHaveBeenCalled();
+    const findings = {
+      feature: "rig-check",
+      provider_id: "tripo",
+      riggable: false,
+      rig_type: "biped",
+      task: { id: "task_check" },
+    } as const;
+    check.mockResolvedValue(findings);
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        caps: { media: { rigging: true } },
+        rigging: { check, generate },
+      },
+    });
+    expect(rigging.isSupported()).toBe(true);
+    await expect(rigging.check(request)).resolves.toEqual(findings);
+    expect(check).toHaveBeenCalledWith(request);
+  });
+
   it("requires both the Tripo native capability and model-generation method", () => {
     const generate =
       vi.fn<NonNullable<DesktopBridge["modelGeneration"]>["generate"]>();
@@ -280,6 +332,96 @@ describe("desktop bridge client contract", () => {
     } as const;
     await expect(modelGeneration.generate(request)).resolves.toEqual(result);
     expect(generate).toHaveBeenCalledWith(request);
+  });
+
+  // GRIDA-GG: desktop — generic GG plus BYOK methods is not funded Tripo support.
+  it("refuses funded Tripo requests on old hosts and requires each explicit capability", async () => {
+    const generate =
+      vi.fn<NonNullable<DesktopBridge["modelGeneration"]>["generate"]>();
+    const check = vi.fn<NonNullable<DesktopBridge["rigging"]>["check"]>();
+    const rig = vi.fn<NonNullable<DesktopBridge["rigging"]>["generate"]>();
+    const generationRequest = {
+      provider: "gg",
+      model_id: "tripo/h3.1",
+      variant: "text",
+      input: { prompt: "Chair" },
+    } as const;
+    const checkRequest = {
+      provider: "gg",
+      input: { mesh: { data: "AAAA", media_type: "model/gltf-binary" } },
+    } as const;
+    const rigRequest = {
+      ...checkRequest,
+      model_id: "tripo/rig-v1.0",
+      input: { ...checkRequest.input, rig_type: "biped", spec: "mixamo" },
+    } as const;
+    const base = {
+      protocol: DESKTOP_BRIDGE_PROTOCOL,
+      modelGeneration: { generate },
+      rigging: { check, generate: rig },
+    };
+    for (const fields of [
+      { gg: {}, caps: { media: { tripo: true, rigging: true } } },
+      {
+        gg: {},
+        caps: {
+          media: {
+            tripo: true,
+            rigging: true,
+            tripo_gg: false,
+            rigging_gg: false,
+          },
+        },
+      },
+      {
+        caps: {
+          media: {
+            tripo: true,
+            rigging: true,
+            tripo_gg: true,
+            rigging_gg: true,
+          },
+        },
+      },
+    ]) {
+      installBridge({ grida: { ...base, ...fields } });
+      expect(modelGeneration.isGgSupported()).toBe(false);
+      expect(rigging.isGgSupported()).toBe(false);
+      await expect(
+        modelGeneration.generate(generationRequest)
+      ).rejects.toBeInstanceOf(DesktopBridgeMissingError);
+      await expect(rigging.check(checkRequest)).rejects.toBeInstanceOf(
+        DesktopBridgeMissingError
+      );
+      await expect(rigging.generate(rigRequest)).rejects.toBeInstanceOf(
+        DesktopBridgeMissingError
+      );
+    }
+    expect(generate).not.toHaveBeenCalled();
+    expect(check).not.toHaveBeenCalled();
+    expect(rig).not.toHaveBeenCalled();
+    installBridge({
+      grida: {
+        ...base,
+        gg: {},
+        caps: {
+          media: {
+            tripo: true,
+            rigging: true,
+            tripo_gg: true,
+            rigging_gg: true,
+          },
+        },
+      },
+    });
+    expect(modelGeneration.isGgSupported()).toBe(true);
+    expect(rigging.isGgSupported()).toBe(true);
+    await modelGeneration.generate(generationRequest);
+    await rigging.check(checkRequest);
+    await rigging.generate(rigRequest);
+    expect(generate).toHaveBeenCalledWith(generationRequest);
+    expect(check).toHaveBeenCalledWith(checkRequest);
+    expect(rig).toHaveBeenCalledWith(rigRequest);
   });
 
   it("rejects empty keys before calling the bridge", async () => {

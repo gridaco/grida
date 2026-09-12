@@ -136,10 +136,31 @@ describe("hosted catalog", () => {
       ]);
       expect(Object.keys(entry.grida)).toEqual([
         "modality",
+        ...(entry.grida.modality === "three-d" ? ["feature"] : []),
         "tier",
         "label",
         "deprecated",
       ]);
     }
+  });
+  it("advertises listed Tripo models by explicit feature without exposing provider credentials or pricing", () => {
+    const threeD = hostedModelList().filter(
+      (entry) => entry.grida.modality === "three-d"
+    );
+    for (const [feature, cards] of [
+      ["model-generation", models.three_d.model_generation.listed_models()],
+      ["rigging", models.three_d.rigging.listed_models()],
+    ] as const) {
+      expect(
+        threeD
+          .filter((entry) => entry.grida.feature === feature)
+          .map((entry) => entry.id)
+      ).toEqual(cards.map((card) => card.id));
+    }
+    expect(threeD).toHaveLength(5);
+    expect(threeD.every((entry) => entry.owned_by === "tripo")).toBe(true);
+    expect(
+      hostedModelList().some((entry) => entry.id === "tripo/rig-check")
+    ).toBe(false);
   });
 });

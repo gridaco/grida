@@ -154,14 +154,57 @@ shows inputs and an example; `--json` keeps the full descriptor.
 The fal Veo 3.1 Lite route accepts `--param generate_audio=false` for silent video;
 omission retains the provider's audio-enabled default. Unadvertised routes refuse it.
 
-Tripo model generation uses the `tripo` provider independently of fal's 3D routes.
+Tripo model generation uses `--provider tripo` for BYOK or `--provider gg` for
+Grida credits, independently of fal's 3D routes.
 `models list --provider tripo` lists its executable models and variants. Text uses
 `--prompt`; a supported single-image variant uses `--image` with a local PNG/JPEG.
 Multiview uses `--variant multiview --input @input.json` with the advertised inline
-image schema. JSON does not expand paths or read referenced local files. Uploaded
-images and generation requests go to Tripo's fixed API; result downloads use the
-SDK's reviewed Tripo data origin. The CLI saves returned GLB bytes with its usual
+image schema. JSON does not expand paths or read referenced local files. With
+BYOK, uploaded images and generation requests go to Tripo's fixed API; result
+downloads use the SDK's reviewed Tripo data origin. The CLI saves returned GLB bytes with its usual
 safe local receipt and never performs an automatic generation retry.
+
+Mesh eligibility and rigging use a separate command group:
+
+```sh
+grida rigging list --provider tripo
+grida rigging inspect --provider tripo --feature rig-check --json
+grida rigging inspect --provider tripo --feature rigging --model tripo/rig-v1.0 --json
+grida rigging check --provider tripo --mesh ./character.glb --json
+grida rigging run --provider tripo --model tripo/rig-v1.0 --mesh ./character.glb --rig-type biped --spec mixamo --out ./rigged --json
+```
+
+Listing and inspection are offline. Eligibility has no model identity and returns
+`riggable`, `rig_type` and a provider task receipt; a negative eligibility result
+is a successful check (exit 0). Checking never starts rigging. `rigging run`
+explicitly submits paid rigging and saves the returned GLB with feature, model,
+binding, hashes and safe task ID/consumed-credit metadata in `receipt.json`.
+The model's SDK schema determines accepted rig types and specifications. These
+operations use the existing Tripo environment, stdin and shared-store key resolver
+when `--provider tripo` is selected. With `--provider gg`, they use the existing
+Grida login and `--org` / `--org-id` organization selector. GG does not inspect
+BYOK keys, accept `--key-stdin`, or fall back to the Tripo account.
+
+```sh
+grida rigging check --provider gg --org studio --mesh ./character.glb --json
+grida rigging run --provider gg --org studio --model tripo/rig-v1.0 --mesh ./character.glb --rig-type biped --spec mixamo --out ./funded-rigged --json
+```
+
+GG obtains a signed upload receipt using the selected organization, uploads
+actual bounded bytes to the exact Tripo S3 origin with no credential headers,
+and submits one hosted operation. Hosted output is decoded from bounded JSON
+into the same GLB files and receipts. Scoped-token expiry and insufficient
+credits stop execution without automatic retries. GG Tripo requests allow up
+to thirteen minutes for upload and provider completion.
+
+`--mesh` snapshots one regular GLB file up to 60,000,000 bytes, with the same
+bounded input lifetime as other media files. The SDK validates its complete
+self-contained GLB contract. Alternatively, `--input @file|-` accepts the public
+JSON schema with base64 mesh bytes, under the existing 16 MiB JSON bound; it cannot
+mix with `--mesh`, `--rig-type` or `--spec`. No input URL or path inside JSON grants
+a local read or fetch. The paid command validates its input and probes the fresh
+output directory before credentials or submission. Accepted task IDs survive safe
+failure output, including a failed local save. Neither command retries submission.
 
 Explicit file paths resolve from the working directory. Text uses UTF-8; local
 PNG/JPEG/static WebP images use content-based header admission, without pixel

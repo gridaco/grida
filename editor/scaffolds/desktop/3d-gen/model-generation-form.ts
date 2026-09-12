@@ -72,12 +72,14 @@ export namespace ModelGenerationForm {
     prompt,
     images,
     settings,
+    provider = "tripo",
   }: {
     modelId: ModelId;
     variant: Variant;
     prompt: string;
     images: Partial<Record<View, File>>;
     settings: Settings;
+    provider?: ModelGenerationGenerateRequest["provider"];
   }): Promise<ModelGenerationGenerateRequest> {
     const model = card(modelId);
     const faceLimit = optionalInteger(settings.face_limit, "Face limit");
@@ -103,7 +105,8 @@ export namespace ModelGenerationForm {
       ...(faceLimit === undefined ? {} : { face_limit: faceLimit }),
       ...(seed === undefined ? {} : { seed }),
     };
-    const selection = { model_id: modelId, provider: "tripo" as const };
+    // GRIDA-GG: desktop — funding is explicit; model/input semantics are shared.
+    const selection = { model_id: modelId, provider };
     if (variant === "text") {
       const text = prompt.trim();
       if (!text) throw new Error("Describe the model to generate.");

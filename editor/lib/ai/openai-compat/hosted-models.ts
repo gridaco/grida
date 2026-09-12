@@ -34,7 +34,9 @@ export type HostedModelEntry = {
   created: number;
   owned_by: string;
   grida: {
-    modality: "text" | "image" | "video";
+    modality: "text" | "image" | "video" | "three-d";
+    /** 3D capabilities remain distinct operations within the same family. */
+    feature?: "model-generation" | "rigging";
     tier: ModelTier | null;
     label: string;
     deprecated: boolean;
@@ -137,5 +139,25 @@ function buildHostedModelList(): HostedModelEntry[] {
     });
   }
 
+  for (const [feature, cards] of [
+    ["model-generation", models.three_d.model_generation.listed_models()],
+    ["rigging", models.three_d.rigging.listed_models()],
+  ] as const) {
+    for (const card of cards) {
+      entries.push({
+        id: card.id,
+        object: "model",
+        created: 0,
+        owned_by: "tripo",
+        grida: {
+          modality: "three-d",
+          feature,
+          tier: null,
+          label: card.label,
+          deprecated: false,
+        },
+      });
+    }
+  }
   return entries;
 }

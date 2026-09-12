@@ -21,3 +21,6 @@ export {
 } from "./gg-session";
 
 export { TripoClient } from "./tripo-client";
+
+export { RiggingClient } from "./rigging-client";
+export { RiggingOperations } from "./rigging-operations";

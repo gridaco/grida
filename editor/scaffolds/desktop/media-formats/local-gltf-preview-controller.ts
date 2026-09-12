@@ -1,5 +1,6 @@
 import {
   ACESFilmicToneMapping,
+  AnimationClip,
   AnimationMixer,
   Box3,
   Clock,
@@ -26,6 +27,8 @@ import {
   type GLTF,
 } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { LocalGltfBundle } from "./local-gltf-bundle";
+import { RiggingMotion } from "./rigging-motion";
+import { RiggingSkeletonOverlay } from "./rigging-skeleton-overlay";
 
 /** Imperative Three.js host for the local 3D-format preview. */
 export class LocalGltfPreviewController {
@@ -39,7 +42,20 @@ export class LocalGltfPreviewController {
     status: LocalGltfPreviewController.Status
   ) => void;
   private gltf: GLTF | null = null;
+  private skeleton: RiggingSkeletonOverlay | null = null;
+  private showSkeleton = false;
   private mixer: AnimationMixer | null = null;
+  private previewMotion: LocalGltfPreviewController.PreviewMotion | undefined;
+  private motionPlaying = true;
+  private readonly motionClips = new Map<
+    RiggingMotion.PresetId,
+    AnimationClip
+  >();
+  private motionGeneration = 0;
+  private motionAbort: AbortController | null = null;
+  private readonly onMotionStatusChange: (
+    status: LocalGltfPreviewController.MotionStatus
+  ) => void;
   private loadGeneration = 0;
   private active = false;
   private disposed = false;
@@ -48,6 +64,11 @@ export class LocalGltfPreviewController {
     private readonly container: HTMLElement,
     options: LocalGltfPreviewController.Options = {}
   ) {
+    this.showSkeleton = options.showSkeleton ?? false;
+    this.previewMotion = options.previewMotion;
+    this.motionPlaying = options.motionPlaying ?? true;
+    this.onMotionStatusChange =
+      options.onMotionStatusChange ?? (() => undefined);
     this.onStatusChange = options.onStatusChange ?? (() => undefined);
     this.scene.background = new Color(0x111318);
     this.scene.add(new HemisphereLight(0xffffff, 0x3f4654, 2.4));
@@ -103,8 +124,15 @@ export class LocalGltfPreviewController {
 
       this.gltf = gltf;
       this.scene.add(gltf.scene);
+      this.skeleton = new RiggingSkeletonOverlay(gltf.scene);
+      this.skeleton.setSize(
+        this.container.clientWidth,
+        this.container.clientHeight
+      );
+      this.skeleton.visible = this.showSkeleton;
+      this.scene.add(this.skeleton);
       this.fit(gltf.scene);
-      if (gltf.animations.length > 0) {
+      if (this.previewMotion === undefined && gltf.animations.length > 0) {
         this.mixer = new AnimationMixer(gltf.scene);
         this.mixer.clipAction(gltf.animations[0]).play();
       }
@@ -117,7 +145,11 @@ export class LocalGltfPreviewController {
         animationCount: gltf.animations.length,
         objectCount: statistics.objects,
         triangleCount: statistics.triangles,
+        jointCount: statistics.joints,
+        skinnedMeshCount: statistics.skinnedMeshes,
+        humanoidRig: RiggingMotion.supports(gltf.scene),
       });
+      if (this.previewMotion !== undefined) void this.configureMotion();
     } catch (error) {
       if (!this.isCurrent(generation)) return;
       this.clearAsset();
@@ -139,6 +171,97 @@ export class LocalGltfPreviewController {
     } else {
       this.renderer.setAnimationLoop(null);
       this.clock.stop();
+    }
+  }
+
+  setShowSkeleton(visible: boolean): void {
+    this.showSkeleton = visible;
+    if (this.skeleton) this.skeleton.visible = visible;
+  }
+
+  setPreviewMotion(
+    motion: LocalGltfPreviewController.PreviewMotion | undefined
+  ): void {
+    if (this.disposed || this.previewMotion === motion) return;
+    this.previewMotion = motion;
+    void this.configureMotion();
+  }
+
+  setMotionPlaying(playing: boolean): void {
+    this.motionPlaying = playing;
+  }
+
+  private async configureMotion(): Promise<void> {
+    const generation = ++this.motionGeneration;
+    this.motionAbort?.abort();
+    this.motionAbort = null;
+    if (this.mixer && this.gltf) {
+      this.mixer.stopAllAction();
+      this.mixer.uncacheRoot(this.gltf.scene);
+    }
+    this.mixer = null;
+    const gltf = this.gltf;
+    if (!gltf || this.disposed) return;
+    const preset = RiggingMotion.presets.find(
+      ({ id }) => id === this.previewMotion
+    );
+    if (!preset) {
+      this.onMotionStatusChange({ phase: "idle" });
+      if (this.previewMotion === undefined && gltf.animations[0]) {
+        this.mixer = new AnimationMixer(gltf.scene);
+        this.mixer.clipAction(gltf.animations[0]).play();
+      }
+      return;
+    }
+    if (!RiggingMotion.supports(gltf.scene)) {
+      this.onMotionStatusChange({ phase: "unsupported" });
+      return;
+    }
+    this.onMotionStatusChange({ phase: "loading" });
+    let source: GLTF | null = null;
+    try {
+      let motionClip = this.motionClips.get(preset.id);
+      if (!motionClip) {
+        const abort = new AbortController();
+        this.motionAbort = abort;
+        // Only fixed application assets are fetched; user meshes stay local.
+        const response = await fetch(preset.src, {
+          signal: abort.signal,
+          credentials: "omit",
+        });
+        if (!response.ok) throw new Error("Motion asset is unavailable.");
+        const bytes = await response.arrayBuffer();
+        if (bytes.byteLength > 8 * 1024 * 1024)
+          throw new Error("Motion asset is too large.");
+        source = await localOnlyGltfLoader().parseAsync(bytes, "");
+        if (this.disposed || generation !== this.motionGeneration) return;
+        const clip = source.animations[0];
+        const retargeted =
+          clip && RiggingMotion.retarget(source.scene, clip, gltf.scene);
+        if (!retargeted) {
+          this.onMotionStatusChange({ phase: "unsupported" });
+          return;
+        }
+        motionClip = retargeted;
+        this.motionClips.set(preset.id, motionClip);
+      }
+      if (this.disposed || generation !== this.motionGeneration) return;
+      this.mixer = new AnimationMixer(gltf.scene);
+      this.mixer.clipAction(motionClip).play();
+      this.mixer.update(0);
+      this.onMotionStatusChange({
+        phase: "ready",
+        duration: motionClip.duration,
+      });
+    } catch {
+      if (!this.disposed && generation === this.motionGeneration)
+        this.onMotionStatusChange({
+          phase: "error",
+          message: `Could not load the ${preset.label} preview. Select Rest pose and try again.`,
+        });
+    } finally {
+      if (source) disposeGltf(source);
+      if (generation === this.motionGeneration) this.motionAbort = null;
     }
   }
 
@@ -164,12 +287,18 @@ export class LocalGltfPreviewController {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+    this.skeleton?.setSize(width, height);
   };
 
   private readonly render = (): void => {
     if (!this.active || this.disposed) return;
     const delta = this.clock.getDelta();
-    this.mixer?.update(delta);
+    if (this.previewMotion === undefined || this.motionPlaying)
+      this.mixer?.update(delta);
+    if (this.skeleton?.visible) {
+      this.scene.updateMatrixWorld(true);
+      this.skeleton.update();
+    }
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   };
@@ -201,6 +330,16 @@ export class LocalGltfPreviewController {
   }
 
   private clearAsset(): void {
+    this.motionGeneration += 1;
+    this.motionAbort?.abort();
+    this.motionAbort = null;
+    this.motionClips.clear();
+    if (!this.disposed) this.onMotionStatusChange({ phase: "idle" });
+    if (this.skeleton) {
+      this.scene.remove(this.skeleton);
+      this.skeleton.dispose();
+      this.skeleton = null;
+    }
     if (this.mixer && this.gltf) {
       this.mixer.stopAllAction();
       this.mixer.uncacheRoot(this.gltf.scene);
@@ -240,8 +379,17 @@ function localOnlyGltfLoader(): GLTFLoader {
 }
 
 export namespace LocalGltfPreviewController {
+  export type PreviewMotion = "rest" | RiggingMotion.PresetId;
+  export type MotionStatus =
+    | Readonly<{ phase: "idle" | "loading" | "unsupported" }>
+    | Readonly<{ phase: "ready"; duration: number }>
+    | Readonly<{ phase: "error"; message: string }>;
   export type Options = Readonly<{
     active?: boolean;
+    showSkeleton?: boolean;
+    previewMotion?: PreviewMotion;
+    motionPlaying?: boolean;
+    onMotionStatusChange?: (status: MotionStatus) => void;
     onStatusChange?: (status: Status) => void;
   }>;
 
@@ -256,6 +404,9 @@ export namespace LocalGltfPreviewController {
         animationCount: number;
         objectCount: number;
         triangleCount: number;
+        jointCount: number;
+        skinnedMeshCount: number;
+        humanoidRig: boolean;
       }>
     | Readonly<{ phase: "error"; message: string }>;
 }
@@ -263,18 +414,31 @@ export namespace LocalGltfPreviewController {
 function sceneStatistics(root: Object3D): Readonly<{
   objects: number;
   triangles: number;
+  joints: number;
+  skinnedMeshes: number;
 }> {
   let objects = 0;
   let triangles = 0;
+  let skinnedMeshes = 0;
+  const joints = new Set<Object3D>();
   root.traverse((object) => {
     objects += 1;
+    if (object instanceof SkinnedMesh) {
+      skinnedMeshes += 1;
+      for (const bone of object.skeleton.bones) joints.add(bone);
+    }
     if (!(object instanceof Mesh)) return;
     const geometry = object.geometry;
     const count =
       geometry.index?.count ?? geometry.attributes.position?.count ?? 0;
     triangles += count / 3;
   });
-  return { objects, triangles: Math.floor(triangles) };
+  return {
+    objects,
+    triangles: Math.floor(triangles),
+    joints: joints.size,
+    skinnedMeshes,
+  };
 }
 
 function disposeGltf(gltf: GLTF): void {

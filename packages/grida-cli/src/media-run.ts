@@ -338,7 +338,7 @@ async function generate(
       return [(await operation.generate({ ...parsed.input, signal })).audio];
     }
     case "three-d": {
-      if (parsed.provider_id === "tripo")
+      if (parsed.provider_id === "tripo" || parsed.provider_id === "gg")
         return generateTripo(parsed, host, signal);
       const client = new ThreeDClient({ keys: host.keys, http: host.http });
       // Exact endpoint contracts keep future 3D capabilities from inheriting an
@@ -365,11 +365,21 @@ async function generate(
 }
 
 async function generateTripo(
-  parsed: Extract<MediaOperations.Parsed, { provider_id: "tripo" }>,
-  host: { keys: ProviderCredentials; http: ProviderHttp },
+  parsed: Extract<MediaOperations.Parsed, { feature: "model-generation" }>,
+  host: {
+    keys: ProviderCredentials;
+    http: ProviderHttp;
+    gg: GridaGatewaySessionStore;
+    ggOrigin?: string;
+  },
   signal: AbortSignal
 ): Promise<readonly MediaFiles.Artifact[]> {
-  const client = new TripoClient({ keys: host.keys, http: host.http });
+  const client = new TripoClient({
+    keys: host.keys,
+    http: host.http,
+    gg: host.gg,
+    gg_base_url: host.ggOrigin,
+  });
   const check = () => {
     if (signal.aborted) throw new MediaFiles.Failure("cancelled");
   };
@@ -489,9 +499,7 @@ function failure(error: unknown, output: Output) {
         error.code === "provider_key_required"
           ? "Configure the selected provider with grida providers configure, or supply its environment key or --key-stdin."
           : error.code === "insufficient_credits"
-            ? error instanceof TripoClient.Failure
-              ? "Tripo credits are insufficient for this operation."
-              : "Grida credits are insufficient for this operation."
+            ? "Credits are insufficient for the selected funding account."
             : "Media operation failed. An accepted request may still be charged; no automatic retry was made.",
     });
   } else {

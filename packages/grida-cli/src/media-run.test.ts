@@ -1022,3 +1022,65 @@ describe("MediaCommands failure and signal lifetime", () => {
     test.assertSafe();
   });
 });
+
+describe("CLI funded Tripo generation", () => {
+  it.each(["text", "image", "multiview"])(
+    "runs %s through GG with portable files and explicit account authority",
+    async (variant) => {
+      const out = path.join(await temporary(), "hosted-tripo");
+      const test = fixture();
+      attachAccount(test);
+      const glb = glbFixture();
+      test.request.mockImplementation(async (url, init) => {
+        expect(new Headers(init?.headers).has("authorization")).toBe(
+          init?.method !== "PUT"
+        );
+        if (init?.method === "PUT") {
+          return new Response(null);
+        }
+        if (String(url).endsWith("/uploads"))
+          return Response.json({
+            upload: "signed-reference",
+            upload_url:
+              "https://tripo-data.s3.us-west-2.amazonaws.com/image.png?signature=synthetic",
+          });
+        expect(String(url)).toBe(
+          "https://grida.example/api/v1/ai/3d/model-generation"
+        );
+        return Response.json({
+          feature: "model-generation",
+          provider_id: "gg",
+          model_id: "tripo/p2",
+          variant,
+          glb: {
+            base64: glb.toString("base64"),
+            media_type: "model/gltf-binary",
+          },
+          task: { id: "task_cli_gg", credits_consumed: 100 },
+        });
+      });
+      const image = { data: PNG.toString("base64"), media_type: "image/png" };
+      expect(
+        await test.invoke(
+          [
+            ...generateArgs(out, "gg", "tripo/p2"),
+            "--kind",
+            "three-d",
+            "--variant",
+            variant,
+          ],
+          variant === "text"
+            ? { prompt: PROMPT }
+            : variant === "image"
+              ? { image }
+              : { images: { front: image, left: image } }
+        )
+      ).toBe(0);
+      expect(test.result().provider_id).toBe("gg");
+      expect(await readFile(test.result().artifacts[0].path)).toEqual(glb);
+      expect(test.openStore).not.toHaveBeenCalled();
+      expect(test.download).not.toHaveBeenCalled();
+      test.assertSafe();
+    }
+  );
+});

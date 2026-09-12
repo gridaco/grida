@@ -2,6 +2,7 @@
 import { models } from "@grida/ai-models";
 import { InputSchema } from "./input-schema";
 import type { TripoClient } from "./tripo-client";
+import { TripoTransport } from "./tripo-transport";
 
 /** Private schema owner shared by native execution and JSON discovery. */
 export namespace TripoInputs {
@@ -10,31 +11,61 @@ export namespace TripoInputs {
     data: InputSchema.bytes(maxImageBytes),
     media_type: InputSchema.enumeration(["image/png", "image/jpeg"]),
   });
-  const views = InputSchema.object({
-    front: image,
-    left: InputSchema.optional(image),
-    back: InputSchema.optional(image),
-    right: InputSchema.optional(image),
-  });
-  const multiview: InputSchema.Rule<TripoClient.Views> = {
-    schema: InputSchema.freeze({
-      ...views.schema,
-      anyOf: [
-        { required: ["left"] },
-        { required: ["back"] },
-        { required: ["right"] },
-      ],
-    }),
-    parse(value, json) {
-      const parsed = views.parse(value, json);
-      if (!parsed.left && !parsed.back && !parsed.right) throw 0;
-      return parsed as TripoClient.Views;
+  const uploadedImage = InputSchema.object({
+    file_token: {
+      schema: { type: "string" },
+      parse(value: unknown) {
+        return TripoTransport.identifier(value, "file");
+      },
     },
-  };
+    media_type: InputSchema.enumeration(["image/png", "image/jpeg"]),
+  });
   export function rule<
     M extends TripoClient.ModelId,
     V extends TripoClient.Variant,
   >(model: M, variant: V): InputSchema.Rule<TripoClient.Input<M, V>> {
+    return build(model, variant, image) as InputSchema.Rule<
+      TripoClient.Input<M, V>
+    >;
+  }
+  export function uploadedRule<
+    M extends TripoClient.ModelId,
+    V extends TripoClient.Variant,
+  >(model: M, variant: V): InputSchema.Rule<TripoClient.UploadedInput<M, V>> {
+    return build(model, variant, uploadedImage) as InputSchema.Rule<
+      TripoClient.UploadedInput<M, V>
+    >;
+  }
+  function build<
+    M extends TripoClient.ModelId,
+    V extends TripoClient.Variant,
+    I,
+  >(
+    model: M,
+    variant: V,
+    image: InputSchema.Rule<I>
+  ): InputSchema.Rule<unknown> {
+    const views = InputSchema.object({
+      front: image,
+      left: InputSchema.optional(image),
+      back: InputSchema.optional(image),
+      right: InputSchema.optional(image),
+    });
+    const multiview: InputSchema.Rule<unknown> = {
+      schema: InputSchema.freeze({
+        ...views.schema,
+        anyOf: [
+          { required: ["left"] },
+          { required: ["back"] },
+          { required: ["right"] },
+        ],
+      }),
+      parse(value, json) {
+        const parsed = views.parse(value, json);
+        if (!parsed.left && !parsed.back && !parsed.right) throw 0;
+        return parsed;
+      },
+    };
     const card: models.three_d.model_generation.ModelCard =
       models.three_d.model_generation.models[model];
     const fields = {

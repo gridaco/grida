@@ -1,3 +1,4 @@
+// GRIDA-SEC-006 / GRIDA-GG: provider — fixed gateway paths and credential-free Tripo uploads.
 // GRIDA-SEC-013 — credential destinations, public DNS pinning and bounded media egress.
 import type { ProviderHttpTransport } from "@grida/ai";
 import { lookup } from "node:dns/promises";
@@ -33,16 +34,18 @@ type Route =
   | "vercel"
   | "fal"
   | "elevenlabs"
+  | "tripo-upload"
   | "tripo"
   | "gg"
   | "download";
 type Address = { address: string; family: 4 | 6 };
 type Request = {
   url: URL;
-  method: "GET" | "HEAD" | "POST";
+  method: "GET" | "HEAD" | "POST" | "PUT";
   headers: Headers;
   body?: Buffer;
   signal?: AbortSignal;
+  timeoutMs: number;
 };
 const MAX_BODY = 128 * 1024 * 1024;
 const MAX_RESPONSE = 256 * 1024 * 1024;
@@ -132,12 +135,20 @@ function route(
     if (
       method !== "POST" ||
       target.search ||
-      !/^\/api\/v1\/ai\/(?:images|videos|music)\/generations$/.test(path)
+      !/^\/api\/v1\/ai\/(?:(?:images|videos|music)\/generations|3d\/(?:uploads|model-generation|rig-check|rigging))$/.test(
+        path
+      )
     )
       fail();
     return "gg";
   }
   if (target.protocol !== "https:" || target.port) fail();
+  if (
+    target.hostname === "tripo-data.s3.us-west-2.amazonaws.com" &&
+    method === "PUT" &&
+    path !== "/"
+  )
+    return "tripo-upload";
   if (target.hostname === "openrouter.ai") {
     if (
       (method === "POST" &&
@@ -185,6 +196,8 @@ function route(
     !target.search &&
     ((method === "POST" &&
       (path === "/v3/files" ||
+        path === "/v3/animations/rig-check" ||
+        path === "/v3/animations/rig" ||
         /^\/v3\/generation\/(?:text-to-model|image-to-model|multiview-to-model)$/.test(
           path
         ))) ||
@@ -225,7 +238,9 @@ function snapshot(
     const credential =
       destination === "elevenlabs"
         ? name === "xi-api-key"
-        : destination !== "download" && name === "authorization";
+        : destination !== "download" &&
+          destination !== "tripo-upload" &&
+          name === "authorization";
     const gateway =
       destination === "vercel" &&
       (name === "ai-gateway-protocol-version" ||
@@ -241,6 +256,8 @@ function snapshot(
       )
     )
       fail();
+  } else if (destination === "tripo-upload") {
+    if (headers.get("content-type") !== "application/octet-stream") fail();
   } else if (destination === "elevenlabs") {
     if (!headers.get("xi-api-key")) fail();
   } else {
@@ -259,6 +276,12 @@ function snapshot(
   const raw = init?.body;
   let body: Buffer | undefined;
   if (raw !== undefined && raw !== null) {
+    const upload =
+      destination === "tripo-upload" &&
+      method === "PUT" &&
+      (raw instanceof Uint8Array || raw instanceof ArrayBuffer) &&
+      raw.byteLength > 0 &&
+      raw.byteLength <= 60_000_000;
     const multipart =
       destination === "tripo" &&
       target.pathname === "/v3/files" &&
@@ -267,11 +290,13 @@ function snapshot(
       ) &&
       (raw instanceof Uint8Array || raw instanceof ArrayBuffer);
     if (
-      method !== "POST" ||
+      (!upload && method !== "POST") ||
+      (destination === "tripo-upload" && !upload) ||
       (destination === "tripo" &&
         target.pathname === "/v3/files" &&
         !multipart) ||
       (!multipart &&
+        !upload &&
         !headers.get("content-type")?.startsWith("application/json"))
     )
       fail();
@@ -285,10 +310,15 @@ function snapshot(
       );
     } else fail();
   }
+  if (destination === "tripo-upload" && !body) fail();
   const signal = init?.signal ?? undefined;
   check(signal);
   return {
     url: target,
+    timeoutMs:
+      destination === "gg" && target.pathname.startsWith("/api/v1/ai/3d/")
+        ? 780_000
+        : 600_000,
     method: method as Request["method"],
     headers,
     body,
@@ -361,7 +391,7 @@ async function execute(
     request.signal?.addEventListener("abort", aborted, { once: true });
     remove = () => request.signal?.removeEventListener("abort", aborted);
     if (request.signal?.aborted) aborted();
-    timer = setTimeout(aborted, 600_000);
+    timer = setTimeout(aborted, request.timeoutMs);
     const cleanup = () => {
       clearTimeout(timer);
       remove();
@@ -567,7 +597,7 @@ function open(
     });
     // Synchronous media jobs may legitimately hold the response for minutes.
     // Connect/TLS has its own short bound; the invocation retains the total cap.
-    client.setTimeout(600_000, failed);
+    client.setTimeout(request.timeoutMs, failed);
     client.end(request.body);
   });
 }

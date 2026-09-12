@@ -96,7 +96,9 @@ describe("E2E — AI credit top-up post-Checkout handler", () => {
     expect(topup!.amountCents).toBe(CENTS);
     expect(topup!.at).not.toBeNull();
     const ageMs = Date.now() - Date.parse(topup!.at!);
-    expect(ageMs).toBeGreaterThanOrEqual(0);
+    // Metronome timestamps use its own clock; tolerate small clock skew while
+    // still rejecting an implausible future timestamp or stale transaction.
+    expect(ageMs).toBeGreaterThanOrEqual(-5_000);
     expect(ageMs).toBeLessThan(5 * 60_000); // < 5 min (covers any test slowness)
   }, 60_000);
 });

@@ -31,6 +31,7 @@ export namespace AgentNetworkPolicy {
   }>;
 
   export const BUILTIN_PROVIDER_GRANT_ID = "provider:built-in";
+  export const TRIPO_UPLOAD_GRANT_ID = "provider:tripo-upload";
   export const PROVIDER_ASSET_GRANT_ID = "download:provider-assets";
 
   const MAX_HEADER_COUNT = 128;
@@ -103,6 +104,11 @@ export namespace AgentNetworkPolicy {
       "https://openapi.tripo3d.ai",
     ];
     return [
+      {
+        id: TRIPO_UPLOAD_GRANT_ID,
+        lane: "provider",
+        origins: ["https://tripo-data.s3.us-west-2.amazonaws.com"],
+      },
       {
         id: BUILTIN_PROVIDER_GRANT_ID,
         lane: "provider",
@@ -181,7 +187,51 @@ export namespace AgentNetworkPolicy {
     }
 
     const headers = authorizeHeaders(grant.lane, metadata.headers);
+    // GRIDA-SEC-006 / GRIDA-GG: provider — the signed object URL is the sole
+    // upload authority. Never forward an API key or replay through redirects.
+    if (
+      grant.id === TRIPO_UPLOAD_GRANT_ID &&
+      (method !== "PUT" ||
+        url.pathname === "/" ||
+        headers.get("content-type") !== "application/octet-stream" ||
+        [...headers.keys()].some(
+          (name) =>
+            ![
+              "content-type",
+              "accept",
+              "accept-encoding",
+              "user-agent",
+            ].includes(name)
+        ))
+    )
+      throw new Error("Tripo upload request is not allowed");
     return { grant, method, url, headers };
+  }
+
+  /** Larger uploads are confined to the reviewed first-party GLB/file endpoint. */
+  export function maxRequestBodyBytes(
+    request: AuthorizedRequest | null
+  ): number {
+    if (
+      request?.grant.id === TRIPO_UPLOAD_GRANT_ID &&
+      request.method === "PUT" &&
+      request.url.origin === "https://tripo-data.s3.us-west-2.amazonaws.com" &&
+      request.headers.get("content-type") === "application/octet-stream"
+    )
+      return 60_000_000;
+    if (
+      request?.grant.id === BUILTIN_PROVIDER_GRANT_ID &&
+      request.grant.lane === "provider" &&
+      request.method === "POST" &&
+      request.url.origin === "https://openapi.tripo3d.ai" &&
+      request.url.pathname === "/v3/files" &&
+      !request.url.search &&
+      /^multipart\/form-data; boundary=[A-Za-z0-9_-]{1,70}$/.test(
+        request.headers.get("content-type") ?? ""
+      )
+    )
+      return 64 * 1024 * 1024;
+    return 32 * 1024 * 1024;
   }
 
   export function grantAllowsUrl(grant: Grant, url: URL): boolean {

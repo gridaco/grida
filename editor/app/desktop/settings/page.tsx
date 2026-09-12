@@ -62,6 +62,7 @@ import {
   images,
   threeD,
   modelGeneration,
+  rigging,
   video,
   mergeProbedModels,
   providers,
@@ -529,7 +530,9 @@ function ProviderListCard({
     .byokProviderMetadata()
     .filter(
       (provider) =>
-        (provider.id !== "tripo" || modelGeneration.isSupported()) &&
+        (provider.id !== "tripo" ||
+          modelGeneration.isSupported() ||
+          rigging.isSupported()) &&
         (providerIds
           ? providerIds.includes(provider.id)
           : providerServesAny(provider, modalities ?? [])) &&
@@ -974,12 +977,19 @@ function MediaModelsSection({
   );
   const [threeDReady, setThreeDReady] = useState<boolean | null>(null);
   const [tripoReady, setTripoReady] = useState<boolean | null>(null);
+  // GRIDA-GG: desktop — Tripo can use org credits on explicitly capable hosts.
+  const [tripoHostedReady, setTripoHostedReady] = useState<boolean | null>(
+    null
+  );
   const [musicReady, setMusicReady] = useState<boolean | null>(null);
   const [elevenLabsReady, setElevenLabsReady] = useState<boolean | null>(null);
   const imageSupported = images.isSupported();
   const videoSupported = video.isSupported();
   const threeDSupported = threeD.isSupported();
   const tripoSupported = modelGeneration.isSupported();
+  const riggingSupported = rigging.isSupported();
+  const tripoHostedSupported = modelGeneration.isGgSupported();
+  const riggingHostedSupported = rigging.isGgSupported();
   const musicSupported = audio.music.isSupported();
   const soundEffectSupported = audio.soundEffects.isSupported();
   const voiceSupported = audio.textToSpeech.isSupported();
@@ -988,6 +998,9 @@ function MediaModelsSection({
   const threeDModels = threeDSupported ? models.three_d.ordered_models() : [];
   const tripoModels = tripoSupported
     ? models.three_d.model_generation.ordered_models()
+    : [];
+  const riggingModels = riggingSupported
+    ? models.three_d.rigging.listed_models()
     : [];
   const musicModels = musicSupported ? models.audio.music.listed_models() : [];
   const soundEffectModels = soundEffectSupported
@@ -1021,7 +1034,7 @@ function MediaModelsSection({
         () => live && setThreeDReady(false)
       );
     }
-    if (tripoSupported) {
+    if (tripoSupported || riggingSupported) {
       void secrets.hasKey("tripo").then(
         (present) => live && setTripoReady(present),
         () => live && setTripoReady(false)
@@ -1033,12 +1046,20 @@ function MediaModelsSection({
         () => live && setElevenLabsReady(false)
       );
     }
-    if (imageSupported || videoSupported || musicSupported) {
+    if (
+      imageSupported ||
+      videoSupported ||
+      musicSupported ||
+      tripoHostedSupported ||
+      riggingHostedSupported
+    ) {
       void gridaGateway.ensureFresh().then((state) => {
         if (!live) return;
         const active = state.kind === "active";
         if (imageSupported || videoSupported) setHostedMediaReady(active);
         if (musicSupported) setMusicReady(active);
+        if (tripoHostedSupported || riggingHostedSupported)
+          setTripoHostedReady(active);
       });
     }
     return () => {
@@ -1051,6 +1072,9 @@ function MediaModelsSection({
     soundEffectSupported,
     threeDSupported,
     tripoSupported,
+    riggingSupported,
+    tripoHostedSupported,
+    riggingHostedSupported,
     videoSupported,
     voiceSupported,
   ]);
@@ -1060,6 +1084,7 @@ function MediaModelsSection({
     !videoSupported &&
     !threeDSupported &&
     !tripoSupported &&
+    !riggingSupported &&
     !musicSupported &&
     !soundEffectSupported &&
     !voiceSupported
@@ -1120,9 +1145,30 @@ function MediaModelsSection({
           <MediaModelGroup
             title="3D · Tripo"
             models={tripoModels}
-            readyForModel={() => tripoReady}
+            readyForModel={() =>
+              MediaModelReadiness.tripo(
+                tripoReady,
+                tripoHostedReady,
+                tripoHostedSupported
+              )
+            }
             hrefForModel={mediaToolHref}
             actionLabel="Open in 3D generator"
+          />
+        )}
+        {riggingSupported && (
+          <MediaModelGroup
+            title="3D · Rigging"
+            models={riggingModels}
+            readyForModel={() =>
+              MediaModelReadiness.tripo(
+                tripoReady,
+                tripoHostedReady,
+                riggingHostedSupported
+              )
+            }
+            hrefForModel={mediaToolHref}
+            actionLabel="Open rigging"
           />
         )}
         {musicSupported && (

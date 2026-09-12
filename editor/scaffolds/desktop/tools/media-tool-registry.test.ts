@@ -11,6 +11,7 @@ describe("DesktopMediaTool", () => {
       "image-generator",
       "video-generator",
       "3d-generator",
+      "rigging",
       "text-to-music",
       "text-to-sound-effects",
       "text-to-speech",
@@ -134,6 +135,16 @@ describe("DesktopMediaTool", () => {
     expect(
       DesktopMediaTool.resolveSelection("text-to-music", null).initialModelId
     ).toBe("google/lyria-3");
+  });
+
+  it("routes rigging separately from generation", () => {
+    expect(DesktopMediaTool.resolve("rigging").id).toBe("rigging");
+    expect(DesktopMediaTool.href("rigging")).toBe(
+      "/desktop/tools?tool=rigging"
+    );
+    expect(DesktopMediaTool.resolve("model-generation").id).toBe(
+      "3d-generator"
+    );
   });
 
   it("keeps viewer selections generation-free", () => {

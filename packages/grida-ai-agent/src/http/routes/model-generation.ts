@@ -3,6 +3,8 @@
  * The SDK owns the exact feature/model/input contract, uploads and job lifecycle.
  * This adapter owns wire bounds, concurrency, encoding and local persistence.
  */
+// GRIDA-SEC-006 / GRIDA-GG: provider — explicit hosted or BYOK authority.
+import type { GridaGatewaySessionStore } from "../../providers/gg-session";
 import type { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { MediaOperations, ProviderHttp, TripoClient } from "@grida/ai";
@@ -13,9 +15,11 @@ export type ModelGenerationRoutesDeps = {
   secrets: SecretsStore;
   media?: MediaPersistence | null;
   provider_http?: ProviderHttp;
+  gg?: GridaGatewaySessionStore;
+  gg_base_url?: string;
 };
 
-type Parsed = Extract<MediaOperations.Parsed, { provider_id: "tripo" }>;
+type Parsed = Extract<MediaOperations.Parsed, { feature: "model-generation" }>;
 
 export function registerModelGenerationRoutes(
   app: Hono,
@@ -28,6 +32,7 @@ export function registerModelGenerationRoutes(
     "/model-generation/generate",
     bodyLimit({ maxSize: 48 * 1024 * 1024 }),
     async (c) => {
+      let provider: TripoClient.Provider = "tripo";
       let ownsGeneration = false;
       try {
         const raw: unknown = await c.req.json().catch(() => null);
@@ -38,22 +43,23 @@ export function registerModelGenerationRoutes(
             (key) => !["model_id", "provider", "variant", "input"].includes(key)
           ) ||
           typeof value.model_id !== "string" ||
-          value.provider !== "tripo" ||
+          (value.provider !== "tripo" && value.provider !== "gg") ||
           !["text", "image", "multiview"].includes(String(value.variant))
         )
           invalid();
+        provider = value.provider;
         // One normative JSON parser validates and bounds decoded bytes before keys or uploads.
         const parsed = operations.parseInput(
           {
             kind: "three-d",
             feature: "model-generation",
             model_id: value.model_id,
-            provider: "tripo",
+            provider: value.provider,
             variant: value.variant as TripoClient.Variant,
           },
           value.input
         );
-        if (parsed.kind !== "three-d" || parsed.provider_id !== "tripo")
+        if (parsed.kind !== "three-d" || parsed.provider_id === "fal")
           invalid();
         if (active)
           return c.json(
@@ -67,6 +73,8 @@ export function registerModelGenerationRoutes(
         const client = new TripoClient({
           keys: { get: (provider) => deps.secrets._getKey(provider) },
           http,
+          gg: deps.gg,
+          gg_base_url: deps.gg_base_url,
         });
         const result = await generate(client, parsed, c.req.raw.signal);
         const glb = {
@@ -78,7 +86,7 @@ export function registerModelGenerationRoutes(
         return c.json({
           feature: "model-generation",
           model_id: parsed.model_id,
-          provider_id: "tripo",
+          provider_id: parsed.provider_id,
           variant: parsed.variant,
           glb,
           task: result.task,
@@ -97,10 +105,10 @@ export function registerModelGenerationRoutes(
           // The generic daemon error transport preserves messages, not extra
           // fields. Keep the validated task identity visible across that seam.
           error:
-            message(failure.code) +
+            message(failure.code, provider) +
             (failure.task_id ? ` Tripo task: ${failure.task_id}.` : ""),
           code: failure.code,
-          provider_id: "tripo",
+          provider_id: provider,
           ...(failure.task_id ? { task_id: failure.task_id } : {}),
         };
         switch (failure.code) {
@@ -108,6 +116,7 @@ export function registerModelGenerationRoutes(
           case "model_unavailable":
           case "provider_key_required":
             return c.json(response, 400);
+          case "gg_token_expired":
           case "credential_rejected":
             return c.json(response, 401);
           case "access_denied":
@@ -196,8 +205,13 @@ async function generate(
 function invalid(): never {
   throw new TripoClient.Failure("invalid_input");
 }
-function message(code: TripoClient.FailureCode): string {
+function message(
+  code: TripoClient.FailureCode,
+  provider: TripoClient.Provider
+): string {
   switch (code) {
+    case "gg_token_expired":
+      return "Sign in to Grida again to use Grida credits.";
     case "provider_key_required":
       return "Connect a Tripo API key in Settings.";
     case "credential_rejected":
@@ -205,7 +219,9 @@ function message(code: TripoClient.FailureCode): string {
     case "access_denied":
       return "The Tripo API key does not have access to this operation.";
     case "insufficient_credits":
-      return "The Tripo account has insufficient API credits.";
+      return provider === "gg"
+        ? "The Grida organization has insufficient credits."
+        : "The Tripo account has insufficient API credits.";
     case "invalid_input":
       return "Invalid model-generation input.";
     case "model_unavailable":

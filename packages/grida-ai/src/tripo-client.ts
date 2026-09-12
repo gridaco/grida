@@ -1,4 +1,6 @@
 // GRIDA-SEC-004 — exact Tripo operations, private credentials, bounded uploads and GLB result.
+// GRIDA-SEC-006 — scoped GG tokens remain on the fixed gateway request lane.
+// GRIDA-GG: provider — explicit funded operation; never falls back between accounts.
 import { catalog as models } from "@grida/ai-models/grida";
 import { InputSchema } from "./input-schema";
 import { TripoInputs } from "./tripo-inputs";
@@ -7,8 +9,20 @@ import { ProviderHttp } from "./http";
 import { MediaRequest } from "./media-request";
 import { MediaInputs } from "./media-inputs";
 import { delay } from "./fetch-helpers";
+import { TripoTransport } from "./tripo-transport";
+import type { GgTokenSource } from "./gg-session";
+import { GgTripo } from "./gg-tripo";
 
-const API = "https://openapi.tripo3d.ai/v3";
+const {
+  codes,
+  validIdentifier,
+  identifier,
+  json,
+  upload,
+  assetUrl,
+  validateGlb,
+} = TripoTransport;
+const LocalFailure = TripoTransport.Failure;
 const catalogue = models.three_d.model_generation;
 const variants = ["text", "image", "multiview"] as const;
 const taskTypes = {
@@ -21,9 +35,10 @@ const taskTypes = {
 export class TripoClient {
   readonly #http: ProviderHttp;
   readonly #getKey: TripoClient.Keys["get"];
+  readonly #gg?: GgTripo;
   constructor(options: TripoClient.Options) {
     try {
-      InputSchema.exact(options, ["http", "keys"]);
+      InputSchema.exact(options, ["http", "keys", "gg", "gg_base_url"]);
       if (
         !(options.http instanceof ProviderHttp) ||
         typeof options.keys.get !== "function"
@@ -31,6 +46,13 @@ export class TripoClient {
         throw 0;
       this.#http = options.http;
       this.#getKey = options.keys.get.bind(options.keys);
+      if (
+        options.gg !== undefined &&
+        typeof options.gg.getAccessToken !== "function"
+      )
+        throw 0;
+      if (options.gg && options.gg_base_url)
+        this.#gg = new GgTripo(options.gg, options.gg_base_url);
     } catch {
       throw new TripoClient.Failure("invalid_input");
     }
@@ -53,17 +75,22 @@ export class TripoClient {
         throw new LocalFailure("invalid_input");
       }
       request = new MediaRequest(this.#http);
-      await this.#key(request);
+      if (selected.provider === "gg") {
+        if (!this.#gg) throw new LocalFailure("gg_token_expired");
+        this.#gg.ready();
+      } else await this.#key(request);
       const descriptor = Object.freeze({
         feature: "model-generation" as const,
         model_id: selected.model_id,
         binding_id: catalogue.models[selected.model_id].binding_id,
-        provider_id: "tripo" as const,
+        provider_id: selected.provider,
         variant: selected.variant,
       });
       return Object.freeze({
         ...descriptor,
         generate: (args: TripoClient.Input) => this.#generate(descriptor, args),
+        generateUploaded: (args: TripoClient.UploadedInput) =>
+          this.#generate(descriptor, args, true),
       }) as TripoClient.Resolved;
     } catch (error) {
       throw failure(error, request);
@@ -87,22 +114,49 @@ export class TripoClient {
 
   async #generate(
     descriptor: TripoClient.Descriptor,
-    input: TripoClient.Input
+    input: TripoClient.Input | TripoClient.UploadedInput,
+    uploaded = false
   ): Promise<TripoClient.Result> {
     let request: MediaRequest | undefined;
     let taskId: string | undefined;
+    let completedTask: TripoClient.Task | undefined;
     try {
-      let normalized: TripoClient.Input;
+      let normalized: TripoClient.Input | TripoClient.UploadedInput;
       try {
-        normalized = InputSchema.native(
-          TripoInputs.rule(descriptor.model_id, descriptor.variant),
+        normalized = InputSchema.native<
+          TripoClient.Input | TripoClient.UploadedInput
+        >(
+          uploaded
+            ? TripoInputs.uploadedRule(descriptor.model_id, descriptor.variant)
+            : TripoInputs.rule(descriptor.model_id, descriptor.variant),
           input
         );
       } catch {
         throw new LocalFailure("invalid_input");
       }
-      request = new MediaRequest(this.#http, normalized.signal, 600_000);
+      request = new MediaRequest(
+        this.#http,
+        normalized.signal,
+        descriptor.provider_id === "gg" ? 780_000 : 600_000
+      );
+      if (descriptor.provider_id === "gg") {
+        if (uploaded) throw new LocalFailure("invalid_input");
+        if (!this.#gg) throw new LocalFailure("gg_token_expired");
+        return await this.#gg.generate(
+          request,
+          descriptor,
+          normalized as TripoClient.Input
+        );
+      }
       const key = await this.#key(request);
+      const imageToken = (
+        image: TripoClient.Image | TripoClient.UploadedImage
+      ) => {
+        if ("data" in image) return upload(request!, key, image);
+        if (image.file_token.includes(key))
+          throw new LocalFailure("invalid_input");
+        return Promise.resolve(image.file_token);
+      };
       const body: Record<string, unknown> = {
         model: descriptor.binding_id,
         texture: normalized.texture ?? true,
@@ -123,12 +177,12 @@ export class TripoClient {
       };
       if ("prompt" in normalized) body.prompt = normalized.prompt;
       else if ("image" in normalized)
-        body.input = await upload(request, key, normalized.image);
+        body.input = await imageToken(normalized.image);
       else {
         const inputs: Record<string, string>[] = [];
         for (const view of ["front", "left", "back", "right"] as const) {
           const image = normalized.images[view];
-          if (image) inputs.push({ [view]: await upload(request, key, image) });
+          if (image) inputs.push({ [view]: await imageToken(image) });
         }
         body.inputs = inputs;
       }
@@ -141,7 +195,7 @@ export class TripoClient {
         JSON.stringify(body)
       );
       const acceptedId = identifier(submitted.task_id);
-      if (acceptedId.includes(key)) invalid();
+      if (acceptedId.includes(key)) TripoTransport.invalid();
       taskId = acceptedId;
       for (;;) {
         const task = await json(request, key, `/tasks/${taskId}`, "GET");
@@ -150,9 +204,10 @@ export class TripoClient {
           task.type !== taskTypes[descriptor.variant] ||
           typeof task.status !== "string"
         )
-          invalid();
+          TripoTransport.invalid();
         if (task.status === "success") {
-          if (!record(task.output)) invalid();
+          completedTask = TripoTransport.task(taskId, task.credits_consumed);
+          if (!TripoTransport.record(task.output)) TripoTransport.invalid();
           const url = assetUrl(task.output.model_url);
           const downloaded = await request.download(
             url,
@@ -160,37 +215,25 @@ export class TripoClient {
           );
           validateGlb(downloaded.data);
           request.check();
-          const consumed = task.credits_consumed;
-          if (
-            consumed !== undefined &&
-            (typeof consumed !== "number" ||
-              !Number.isFinite(consumed) ||
-              consumed < 0)
-          )
-            invalid();
           return {
             glb: { data: downloaded.data, media_type: "model/gltf-binary" },
-            task: {
-              id: taskId,
-              ...(consumed === undefined
-                ? {}
-                : { credits_consumed: consumed as number }),
-            },
+            task: completedTask,
           };
         }
         if (["failed", "cancelled", "banned", "expired"].includes(task.status))
           throw new LocalFailure("generation_failed");
-        if (task.status !== "queued" && task.status !== "running") invalid();
+        if (task.status !== "queued" && task.status !== "running")
+          TripoTransport.invalid();
         if (
           !Number.isInteger(task.progress) ||
           (task.progress as number) < 0 ||
           (task.progress as number) > 100
         )
-          invalid();
+          TripoTransport.invalid();
         await request.wait(delay(2_000, request.signal));
       }
     } catch (error) {
-      throw failure(error, request, taskId);
+      throw failure(error, request, taskId, completedTask);
     } finally {
       request?.dispose();
     }
@@ -203,11 +246,26 @@ export namespace TripoClient {
   export type Keys = {
     get(provider: "tripo"): string | null | Promise<string | null>;
   };
-  export type Options = { keys: Keys; http: ProviderHttp };
+  export type Provider = "tripo" | "gg";
+  export type Options = {
+    keys: Keys;
+    http: ProviderHttp;
+    gg?: GgTokenSource;
+    gg_base_url?: string;
+  };
   export type Image = {
     data: Uint8Array;
     media_type: "image/png" | "image/jpeg";
   };
+  export type UploadedImage = {
+    file_token: string;
+    media_type: "image/png" | "image/jpeg";
+  };
+  export type UploadedViews = { front: UploadedImage } & (
+    | { left: UploadedImage; back?: UploadedImage; right?: UploadedImage }
+    | { left?: UploadedImage; back: UploadedImage; right?: UploadedImage }
+    | { left?: UploadedImage; back?: UploadedImage; right: UploadedImage }
+  );
   export type Views = { front: Image } & (
     | { left: Image; back?: Image; right?: Image }
     | { left?: Image; back: Image; right?: Image }
@@ -234,20 +292,30 @@ export namespace TripoClient {
     M extends ModelId = ModelId,
     V extends Variant = Variant,
   > = Controls & Geometry<M> & Inputs[V];
+  export type UploadedInput<
+    M extends ModelId = ModelId,
+    V extends Variant = Variant,
+  > = Controls &
+    Geometry<M> &
+    {
+      text: { prompt: string };
+      image: { image: UploadedImage };
+      multiview: { images: UploadedViews };
+    }[V];
   export type Selection<
     M extends string = ModelId,
     V extends Variant = Variant,
   > = {
     feature: "model-generation";
     model_id: M;
-    provider: "tripo";
+    provider: Provider;
     variant: V;
   };
   export type Descriptor = Readonly<{
     feature: "model-generation";
     model_id: ModelId;
     binding_id: models.three_d.model_generation.ModelCard["binding_id"];
-    provider_id: "tripo";
+    provider_id: Provider;
     variant: Variant;
   }>;
   export type Resolved<
@@ -260,14 +328,17 @@ export namespace TripoClient {
           model_id: K;
           variant: W;
           generate(input: Input<K, W>): Promise<Result>;
+          /** Direct-provider execution of previously authorized uploads; never accepts URLs. */
+          generateUploaded(input: UploadedInput<K, W>): Promise<Result>;
         }
       >;
     }[V];
   }[M];
   export type Result = {
     glb: { data: Uint8Array; media_type: "model/gltf-binary" };
-    task: { id: string; credits_consumed?: number };
+    task: Task;
   };
+  export type Task = TripoTransport.Task;
   export type FailureCode =
     | "invalid_input"
     | "model_unavailable"
@@ -275,6 +346,7 @@ export namespace TripoClient {
     | "credential_rejected"
     | "access_denied"
     | "insufficient_credits"
+    | "gg_token_expired"
     | "aborted"
     | "timeout"
     | "invalid_response"
@@ -282,60 +354,54 @@ export namespace TripoClient {
   export class Failure extends Error {
     readonly code: FailureCode;
     readonly task_id?: string;
-    constructor(code: FailureCode, task_id?: string) {
+    readonly completed_task?: Task;
+    constructor(code: FailureCode, task_id?: string, completed_task?: Task) {
       const safe = codes.includes(code) ? code : "generation_failed";
       super(safe);
       this.name = "TripoFailure";
       this.code = safe;
       if (typeof task_id === "string" && validIdentifier(task_id))
         this.task_id = task_id;
+      this.completed_task = TripoTransport.completedTask(
+        completed_task,
+        this.task_id
+      );
     }
     toJSON() {
       return {
         code: this.code,
         message: this.code,
         ...(this.task_id ? { task_id: this.task_id } : {}),
+        ...(this.completed_task ? { completed_task: this.completed_task } : {}),
       };
     }
   }
 }
-const codes: readonly TripoClient.FailureCode[] = [
-  "invalid_input",
-  "model_unavailable",
-  "provider_key_required",
-  "credential_rejected",
-  "access_denied",
-  "insufficient_credits",
-  "aborted",
-  "timeout",
-  "invalid_response",
-  "generation_failed",
-];
-class LocalFailure extends Error {
-  constructor(readonly code: TripoClient.FailureCode) {
-    super(code);
-  }
-}
-function failure(error: unknown, request?: MediaRequest, task_id?: string) {
+function failure(
+  error: unknown,
+  request?: MediaRequest,
+  task_id?: string,
+  completed_task?: TripoClient.Task
+) {
   try {
-    request?.check();
-  } catch (abort) {
-    error = abort;
-  }
-  let code: TripoClient.FailureCode = "generation_failed";
-  try {
-    if (error instanceof LocalFailure || error instanceof MediaRequest.Failure)
-      code = error.code;
+    if (error instanceof TripoTransport.Failure) {
+      task_id ??= error.task_id;
+      completed_task ??= error.completed_task;
+    }
   } catch {
-    // Host failures may even throw while their prototype is inspected.
+    /* Untrusted host exceptions may trap prototype/property reads. */
   }
-  return new TripoClient.Failure(code, task_id);
+  return new TripoClient.Failure(
+    TripoTransport.failureCode(error, request),
+    task_id,
+    completed_task
+  );
 }
 function selection(value: TripoClient.Selection<string>) {
   InputSchema.exact(value, ["model_id", "provider", "feature", "variant"]);
   const { model_id, provider, feature, variant } = value;
   if (
-    provider !== "tripo" ||
+    (provider !== "tripo" && provider !== "gg") ||
     feature !== "model-generation" ||
     typeof model_id !== "string" ||
     !model_id ||
@@ -345,198 +411,5 @@ function selection(value: TripoClient.Selection<string>) {
     throw 0;
   if (!catalogue.is_model_id(model_id))
     throw new LocalFailure("model_unavailable");
-  return { model_id, variant };
-}
-function record(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function invalid(): never {
-  throw new LocalFailure("invalid_response");
-}
-function validIdentifier(value: string, prefix: "task" | "file" = "task") {
-  return (
-    /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
-      value
-    ) || new RegExp(`^${prefix}_[A-Za-z0-9_-]{1,100}$`).test(value)
-  );
-}
-function identifier(value: unknown, prefix: "task" | "file" = "task"): string {
-  if (typeof value !== "string" || !validIdentifier(value, prefix)) invalid();
-  return value;
-}
-async function json(
-  request: MediaRequest,
-  key: string,
-  path: string,
-  method: "GET" | "POST",
-  body?: string | Uint8Array<ArrayBuffer>,
-  contentType = "application/json"
-) {
-  const url = API + path;
-  const response = await request.request(
-    url,
-    {
-      method,
-      headers: {
-        authorization: `Bearer ${key}`,
-        accept: "application/json",
-        ...(body === undefined ? {} : { "content-type": contentType }),
-      },
-      body,
-      credentials: "omit",
-      redirect: "error",
-      cache: "no-store",
-      referrerPolicy: "no-referrer",
-    },
-    1024 * 1024
-  );
-  if (
-    response.redirected ||
-    response.type === "opaqueredirect" ||
-    (response.url && response.url !== url) ||
-    (response.status >= 300 && response.status < 400)
-  )
-    invalid();
-  if (response.status === 401) throw new LocalFailure("credential_rejected");
-  let payload: unknown;
-  try {
-    payload = JSON.parse(await request.wait(response.text()));
-  } catch (error) {
-    if (response.status === 403) throw new LocalFailure("access_denied");
-    if (error instanceof MediaRequest.Failure) throw error;
-    invalid();
-  }
-  if (response.status === 403 && (!record(payload) || payload.code !== 2010))
-    throw new LocalFailure("access_denied");
-  if (!record(payload) || !Number.isInteger(payload.code)) invalid();
-  if (payload.code === 1000 || payload.code === 1001)
-    throw new LocalFailure("credential_rejected");
-  if (payload.code === 2010) throw new LocalFailure("insufficient_credits");
-  if (response.status === 403) throw new LocalFailure("access_denied");
-  if (!response.ok || payload.code !== 0)
-    throw new LocalFailure("generation_failed");
-  if (!record(payload.data)) invalid();
-  return payload.data;
-}
-async function upload(
-  request: MediaRequest,
-  key: string,
-  image: TripoClient.Image
-) {
-  // A browser-compatible bounded multipart body; no FormData/stream escape hatch is required from hosts.
-  const boundary = `grida-tripo-${crypto.randomUUID()}`;
-  const extension = image.media_type === "image/png" ? "png" : "jpg";
-  const encoder = new TextEncoder();
-  const start = encoder.encode(
-    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="image.${extension}"\r\nContent-Type: ${image.media_type}\r\n\r\n`
-  );
-  const end = encoder.encode(`\r\n--${boundary}--\r\n`);
-  const body = new Uint8Array(start.length + image.data.length + end.length);
-  body.set(start);
-  body.set(image.data, start.length);
-  body.set(end, start.length + image.data.length);
-  const result = await json(
-    request,
-    key,
-    "/files",
-    "POST",
-    body,
-    `multipart/form-data; boundary=${boundary}`
-  );
-  return identifier(result.file_token, "file");
-}
-function assetUrl(value: unknown): URL {
-  if (typeof value !== "string") invalid();
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    invalid();
-  }
-  if (
-    url.protocol !== "https:" ||
-    url.username ||
-    url.password ||
-    url.port ||
-    url.hash ||
-    !["cdn.tripo3d.ai", "tripo-data.rg1.data.tripo3d.com"].includes(
-      url.hostname
-    )
-  )
-    invalid();
-  return url;
-}
-function validateGlb(data: Uint8Array) {
-  if (data.byteLength < 20 || data.byteLength > MediaInputs.limits.glb)
-    invalid();
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  if (
-    view.getUint32(0, true) !== 0x46546c67 ||
-    view.getUint32(4, true) !== 2 ||
-    view.getUint32(8, true) !== data.byteLength
-  )
-    invalid();
-  const jsonSize = view.getUint32(12, true);
-  if (
-    view.getUint32(16, true) !== 0x4e4f534a ||
-    jsonSize % 4 !== 0 ||
-    jsonSize > 4 * 1024 * 1024 ||
-    jsonSize > data.byteLength - 20
-  )
-    invalid();
-  let document: unknown;
-  try {
-    document = JSON.parse(
-      new TextDecoder("utf-8", { fatal: true }).decode(
-        data.subarray(20, 20 + jsonSize)
-      )
-    );
-  } catch {
-    invalid();
-  }
-  if (
-    !record(document) ||
-    !record(document.asset) ||
-    document.asset.version !== "2.0"
-  )
-    invalid();
-  for (const key of ["extensionsUsed", "extensionsRequired"] as const) {
-    if (
-      document[key] !== undefined &&
-      (!Array.isArray(document[key]) ||
-        document[key].some(
-          (extension: unknown) =>
-            typeof extension !== "string" ||
-            [
-              "EXT_meshopt_compression",
-              "KHR_draco_mesh_compression",
-              "KHR_texture_basisu",
-            ].includes(extension)
-        ))
-    )
-      invalid();
-  }
-  // A single returned GLB must not smuggle expiring external resources into the result.
-  for (const key of ["buffers", "images"] as const) {
-    if (
-      document[key] !== undefined &&
-      (!Array.isArray(document[key]) ||
-        document[key].some(
-          (item: unknown) => !record(item) || item.uri !== undefined
-        ))
-    )
-      invalid();
-  }
-  let offset = 20 + jsonSize;
-  if (offset < data.byteLength) {
-    if (
-      data.byteLength - offset < 8 ||
-      view.getUint32(offset + 4, true) !== 0x004e4942
-    )
-      invalid();
-    const size = view.getUint32(offset, true);
-    if (size % 4 !== 0 || offset + 8 + size !== data.byteLength) invalid();
-    offset += 8 + size;
-  }
-  if (offset !== data.byteLength) invalid();
+  return { model_id, variant, provider };
 }

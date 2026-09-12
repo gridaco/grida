@@ -24,6 +24,7 @@ export const preferences = {
     default_id: "tripo/h3.1",
     order: ["tripo/p1", "tripo/p2"],
   },
+  "three_d.rigging": { order: ["tripo/rig-v1.0", "tripo/rig-v2.5"] },
   image_tools: { order: ["recraft-ai/recraft-remove-background"] },
 } as const satisfies {
   text: catalog.policy.Preferences<models.text.CatalogId>;
@@ -34,5 +35,6 @@ export const preferences = {
   "audio.text_to_speech": catalog.policy.Preferences<models.audio.text_to_speech.ModelId>;
   three_d: catalog.policy.Preferences<models.three_d.ThreeDModelId>;
   "three_d.model_generation": catalog.policy.Preferences<models.three_d.model_generation.ModelId>;
+  "three_d.rigging": catalog.policy.Preferences<models.three_d.rigging.ModelId>;
   image_tools: catalog.policy.Preferences<models.image_tools.ImageToolModelId>;
 };

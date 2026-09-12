@@ -12,7 +12,6 @@ import { AgentNetworkPolicy } from "./agent-network-policy";
 import { AgentSidecarChannel } from "./agent-sidecar-channel";
 
 const BOOTSTRAP_TIMEOUT_MS = 5_000;
-const MAX_REQUEST_BODY_BYTES = 32 * 1024 * 1024;
 const REQUEST_CHUNK_BYTES = 48 * 1024;
 const RESPONSE_CREDIT_BYTES = 128 * 1024;
 const MAX_CANCELLED_TOMBSTONES = 128;
@@ -244,15 +243,37 @@ export class AgentSidecarNetwork {
     }
     if (request.signal.aborted) throw abortError(request.signal.reason);
 
+    const maximumBodyBytes = AgentNetworkPolicy.maxRequestBodyBytes({
+      grant,
+      method: request.method,
+      url: new URL(request.url),
+      headers: request.headers,
+    });
     let body = Buffer.alloc(0);
     if (request.body) {
       const declared = Number(request.headers.get("content-length"));
-      if (Number.isFinite(declared) && declared > MAX_REQUEST_BODY_BYTES) {
+      if (Number.isFinite(declared) && declared > maximumBodyBytes) {
         throw new Error("provider request body exceeds the Desktop limit");
       }
-      body = Buffer.from(await request.arrayBuffer());
-      if (body.length > MAX_REQUEST_BODY_BYTES) {
-        throw new Error("provider request body exceeds the Desktop limit");
+      const reader = request.body.getReader();
+      const chunks: Buffer[] = [];
+      let size = 0;
+      try {
+        for (;;) {
+          if (request.signal.aborted) throw abortError(request.signal.reason);
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > maximumBodyBytes)
+            throw new Error("provider request body exceeds the Desktop limit");
+          chunks.push(Buffer.from(value));
+        }
+        body = Buffer.concat(chunks, size);
+      } catch (error) {
+        await reader.cancel().catch(() => undefined);
+        throw error;
+      } finally {
+        reader.releaseLock();
       }
     }
     // An AbortSignal does not replay an event to a listener installed after it

@@ -61,6 +61,12 @@ export type {
   ModelGenerationGenerateRequest,
   ModelGenerationGenerateResult,
 } from "./protocol/model-generation";
+export type {
+  RigCheckRequest,
+  RigCheckResult,
+  RiggingGenerateRequest,
+  RiggingGenerateResult,
+} from "./protocol/rigging";
 export type { GeneratedMp3 } from "./protocol/generated-mp3";
 export type {
   MusicGenerateRequest,

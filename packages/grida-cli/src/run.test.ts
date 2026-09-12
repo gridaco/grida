@@ -67,7 +67,11 @@ function setup(json = true) {
       invocation.command === "providers configure" ||
       invocation.command === "providers remove" ||
       invocation.command === "generate" ||
-      invocation.command === "voices list"
+      invocation.command === "voices list" ||
+      invocation.command === "rigging list" ||
+      invocation.command === "rigging inspect" ||
+      invocation.command === "rigging check" ||
+      invocation.command === "rigging run"
     )
       throw new Error("Fixture requires a runtime command");
     return run(invocation, output);

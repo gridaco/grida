@@ -17,7 +17,7 @@ export type ModelGenerationGenerateRequest = {
   [M in TripoClient.ModelId]: {
     [V in TripoClient.Variant]: {
       model_id: M;
-      provider: "tripo";
+      provider: TripoClient.Provider;
       variant: V;
       /** SDK JSON input: image.data contains base64 without a data: prefix. */
       input: Encoded<Omit<TripoClient.Input<M, V>, "signal">>;
@@ -28,7 +28,7 @@ export type ModelGenerationGenerateRequest = {
 export type ModelGenerationGenerateResult = {
   feature: "model-generation";
   model_id: TripoClient.ModelId;
-  provider_id: "tripo";
+  provider_id: TripoClient.Provider;
   variant: TripoClient.Variant;
   glb: ThreeDGeneratedGlb;
   /** Safe provider task identity and actual charged credits, when reported. */

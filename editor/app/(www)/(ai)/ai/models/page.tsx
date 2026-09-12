@@ -48,14 +48,14 @@ import {
 export const metadata: Metadata = {
   title: "AI Models & Pricing — Grida",
   description:
-    "Compare release dates and provider-native pricing for text, image, video, music, sound effect, and 3D AI models on Grida.",
+    "Compare release dates and provider pricing for text, image, video, audio, 3D generation, and rigging models on Grida.",
   alternates: {
     canonical: "https://grida.co/ai/models",
   },
   openGraph: {
     title: "AI Models & Pricing — Grida",
     description:
-      "Compare AI models, release dates, and provider pricing, including Tripo H3.1, P1, and P2 Preview for 3D generation.",
+      "Compare AI models, release dates, and provider pricing, including Tripo 3D generation and automatic character rigging.",
     url: "https://grida.co/ai/models",
     type: "website",
   },
@@ -833,6 +833,8 @@ export default function AIModelsCatalogPage() {
       <Separator />
 
       <ThreeDModelsSection />
+      <Separator />
+      <RiggingModelsSection />
 
       <div className="h-40" />
       <Footer />
@@ -1311,6 +1313,7 @@ function ThreeDPricing({
   }
 }
 
+// GRIDA-GG: desktop — funded Tripo availability alongside direct API pricing.
 function ThreeDModelsSection() {
   const models = ai.three_d.ordered_models();
   if (models.length === 0) return null;
@@ -1321,10 +1324,9 @@ function ThreeDModelsSection() {
         <h2 className="text-3xl font-bold tracking-tight mb-2">3D Models</h2>
         <p className="text-base text-muted-foreground max-w-2xl">
           Generate 3D models with Tripo, Hunyuan, and TRELLIS. Tripo H3.1, P1,
-          and P2 Preview support text, image, and multiview inputs through a
-          direct provider integration. Tripo is available in Grida Desktop and
-          the CLI with your own Tripo API key; Grida-funded credits and browser
-          generation are not supported. GLB is the primary output.
+          and P2 Preview support text, image, and multiview inputs. In Grida
+          Desktop, use Grida credits or connect your own Tripo API key. The CLI
+          supports your own Tripo API key. GLB is the primary output.
         </p>
       </div>
 
@@ -1400,7 +1402,7 @@ function ThreeDModelsSection() {
                           {id}
                         </code>
                         <div className="mt-1 text-xs text-muted-foreground">
-                          Direct Tripo · Desktop & CLI · BYOK only
+                          Desktop · Grida credits or your API key
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {model.short_description}
@@ -1461,6 +1463,63 @@ function ThreeDModelsSection() {
             })}
           </TableBody>
         </Table>
+      </div>
+    </section>
+  );
+}
+
+function RiggingModelsSection() {
+  const models = serviceCatalog.three_d.rigging.listed_models();
+  if (models.length === 0) return null;
+  return (
+    <section id="rigging" className="container mx-auto px-4 py-16">
+      <h2 className="mb-2 text-3xl font-bold tracking-tight">3D Rigging</h2>
+      <p className="mb-10 max-w-2xl text-base text-muted-foreground">
+        Add a skeleton to an existing GLB with Tripo auto rigging. Check
+        compatibility for free, then rig a humanoid or creature using Tripo or
+        Mixamo bone names. Use Grida credits or your own Tripo API key in Grida
+        Desktop. The CLI supports your own Tripo API key.
+      </p>
+      <div className="grid gap-6 md:grid-cols-2">
+        {models.map((model) => (
+          <Card key={model.id} id={model.id.replace("/", "-")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MakerLogo vendor={model.vendor} className="size-5" />
+                {model.label}
+              </CardTitle>
+              <CardDescription>
+                {model.rig_types.includes("biped")
+                  ? "Humanoid characters"
+                  : "Animals and other creatures"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Badge variant="secondary">Grida credits or your API key</Badge>
+              <p className="font-mono text-lg">
+                $
+                {(model.pricing.credits * model.pricing.usd_per_credit).toFixed(
+                  2
+                )}{" "}
+                / rig
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {model.pricing.credits} Tripo API credits · GLB input and output
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Supported body types: {model.rig_types.join(", ")}.
+              </p>
+              <a
+                className="text-sm underline underline-offset-2"
+                href={model.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Rigging model documentation
+              </a>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </section>
   );

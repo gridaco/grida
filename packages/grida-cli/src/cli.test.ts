@@ -86,6 +86,103 @@ describe("CLI grammar", () => {
   });
 });
 
+describe("rigging command grammar", () => {
+  const run = [
+    "rigging",
+    "run",
+    "--provider",
+    "tripo",
+    "--model",
+    "tripo/rig-v1.0",
+    "--out",
+    "./rigged",
+  ];
+  it("keeps eligibility model-free and paid rigging explicit", () => {
+    expect(Cli.parse(["rigging"])).toMatchObject({
+      command: "help",
+      topic: "rigging",
+    });
+    expect(
+      Cli.parse([
+        "rigging",
+        "check",
+        "--provider",
+        "tripo",
+        "--mesh",
+        "./character.glb",
+      ])
+    ).toEqual({
+      command: "rigging check",
+      provider: "tripo",
+      mesh: "./character.glb",
+      keyStdin: false,
+      json: false,
+      noInput: false,
+    });
+    expect(
+      Cli.parse([
+        ...run,
+        "--mesh",
+        "./character.glb",
+        "--rig-type",
+        "biped",
+        "--spec",
+        "mixamo",
+      ])
+    ).toMatchObject({
+      command: "rigging run",
+      model: "tripo/rig-v1.0",
+      rigType: "biped",
+      spec: "mixamo",
+    });
+    expect(
+      Cli.parse([...run, "--input", "@input.json", "--key-stdin"])
+    ).toMatchObject({ input: "@input.json", keyStdin: true });
+    expect(
+      Cli.parse([
+        "rigging",
+        "inspect",
+        "--provider",
+        "tripo",
+        "--feature",
+        "rig-check",
+      ])
+    ).not.toHaveProperty("model");
+  });
+  it.each([
+    [
+      "rigging",
+      "check",
+      "--provider",
+      "tripo",
+      "--mesh",
+      "x.glb",
+      "--model",
+      "rig-check",
+    ],
+    [
+      "rigging",
+      "inspect",
+      "--provider",
+      "tripo",
+      "--feature",
+      "rig-check",
+      "--model",
+      "rig-check",
+    ],
+    ["rigging", "inspect", "--provider", "tripo", "--feature", "rigging"],
+    ["rigging", "check", "--provider", "fal", "--mesh", "x.glb"],
+    ["rigging", "check", "--provider", "tripo", "--mesh", "-"],
+    ["rigging", "check", "--provider", "tripo", "--input", "-", "--key-stdin"],
+    [...run, "--input", "-", "--mesh", "x.glb"],
+    [...run, "--input", "-", "--rig-type", "biped"],
+    [...run, "--mesh", "x.glb", "--spec", "tripo"],
+    [...run, "--input", "-", "--out", "./other"],
+  ])("rejects mixed or missing explicit authority: %j", (...args) => {
+    expect(() => Cli.parse(args)).toThrow(Cli.Failure);
+  });
+});
+
 describe("media command grammar", () => {
   const friendly = [
     "generate",

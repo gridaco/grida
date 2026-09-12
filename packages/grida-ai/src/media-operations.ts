@@ -12,9 +12,12 @@ import type { TextToSpeechClient } from "./text-to-speech-client";
 import type { ThreeDClient } from "./three-d-client";
 import type { TripoClient } from "./tripo-client";
 import { TripoInputs } from "./tripo-inputs";
+import { RiggingOperations } from "./rigging-operations";
 
 /** Immutable bundled/pinned operation facts and the explicit JSON input contract. */
 export class MediaOperations {
+  /** Mesh eligibility and rigging have distinct structured/media results. */
+  readonly rigging = Object.freeze(new RiggingOperations());
   readonly #descriptors: readonly MediaOperations.Descriptor[];
   constructor(options: { snapshot?: models.snapshot.Snapshot } = {}) {
     try {
@@ -80,7 +83,7 @@ export class MediaOperations {
         !provider ||
         (variant !== undefined &&
           !["text", "references", "image", "multiview"].includes(variant)) ||
-        (provider === "tripo" &&
+        ((provider === "tripo" || (provider === "gg" && kind === "three-d")) &&
           (feature !== "model-generation" ||
             kind !== "three-d" ||
             variant === undefined))
@@ -172,7 +175,7 @@ export class MediaOperations {
           };
         }
         case "three-d": {
-          if (provider_id === "tripo") {
+          if (provider_id === "tripo" || provider_id === "gg") {
             if (
               !models.three_d.model_generation.is_model_id(model_id) ||
               variant === "references"
@@ -186,7 +189,7 @@ export class MediaOperations {
               variant,
               selection: {
                 model_id,
-                provider: "tripo",
+                provider: provider_id,
                 feature: "model-generation",
                 variant,
               },
@@ -326,14 +329,16 @@ export namespace MediaOperations {
     | {
         [M in TripoClient.ModelId]: {
           [V in TripoClient.Variant]: {
-            kind: "three-d";
-            provider_id: "tripo";
-            feature: "model-generation";
-            model_id: M;
-            variant: V;
-            selection: TripoClient.Selection<M, V>;
-            input: TripoClient.Input<M, V>;
-          };
+            [P in TripoClient.Provider]: {
+              kind: "three-d";
+              provider_id: P;
+              feature: "model-generation";
+              model_id: M;
+              variant: V;
+              selection: TripoClient.Selection<M, V> & { provider: P };
+              input: TripoClient.Input<M, V>;
+            };
+          }[TripoClient.Provider];
         }[TripoClient.Variant];
       }[TripoClient.ModelId];
   export class Failure extends Error {
@@ -502,17 +507,19 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
   }
   for (const card of Object.values(models.three_d.model_generation.models)) {
     for (const variant of card.inputs) {
-      add(
-        "three-d",
-        {
-          model_id: card.id,
-          binding_id: card.binding_id,
-          provider_id: card.provider,
-        },
-        variant,
-        card.status,
-        TripoInputs.rule(card.id, variant)
-      );
+      for (const provider_id of ["tripo", "gg"] as const) {
+        add(
+          "three-d",
+          {
+            model_id: card.id,
+            binding_id: card.binding_id,
+            provider_id,
+          },
+          variant,
+          card.status,
+          TripoInputs.rule(card.id, variant)
+        );
+      }
     }
   }
   return result.sort((a, b) => {

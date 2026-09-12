@@ -58,6 +58,12 @@ import type {
   ModelGenerationGenerateRequest,
   ModelGenerationGenerateResult,
 } from "./protocol/model-generation";
+import type {
+  RigCheckRequest,
+  RigCheckResult,
+  RiggingGenerateRequest,
+  RiggingGenerateResult,
+} from "./protocol/rigging";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type { DirectoryScopeDescriptor } from "./protocol/context";
 import type {
@@ -262,6 +268,16 @@ export namespace AgentTransport {
           "/model-generation/generate",
           req
         ),
+    } as const;
+
+    /** Eligibility is structured; explicit rigging returns portable GLB bytes. */
+    readonly rigging = {
+      check: async (req: RigCheckRequest): Promise<RigCheckResult> =>
+        await this.postJson<RigCheckResult>("/rigging/check", req),
+      generate: async (
+        req: RiggingGenerateRequest
+      ): Promise<RiggingGenerateResult> =>
+        await this.postJson<RiggingGenerateResult>("/rigging/generate", req),
     } as const;
 
     /**

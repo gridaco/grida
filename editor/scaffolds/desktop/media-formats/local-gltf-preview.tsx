@@ -6,19 +6,47 @@ import { LocalGltfPreviewController } from "./local-gltf-preview-controller";
 export function LocalGltfPreview({
   files,
   active = true,
+  showSkeleton = false,
+  previewMotion,
+  motionPlaying = true,
+  onMotionStatusChange,
   onStatusChange,
 }: {
   files: readonly File[];
   active?: boolean;
+  showSkeleton?: boolean;
+  previewMotion?: LocalGltfPreviewController.PreviewMotion;
+  motionPlaying?: boolean;
+  onMotionStatusChange?: (
+    status: LocalGltfPreviewController.MotionStatus
+  ) => void;
   onStatusChange?: (status: LocalGltfPreviewController.Status) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<LocalGltfPreviewController>(null);
   const activeRef = useRef(active);
+  const skeletonRef = useRef(showSkeleton);
+  const motionRef = useRef({ previewMotion, motionPlaying });
+  const onMotionStatusChangeRef = useRef(onMotionStatusChange);
   const onStatusChangeRef = useRef(onStatusChange);
   const [status, setStatus] = useState<LocalGltfPreviewController.Status>({
     phase: "idle",
   });
+
+  useEffect(() => {
+    skeletonRef.current = showSkeleton;
+    controllerRef.current?.setShowSkeleton(showSkeleton);
+  }, [showSkeleton]);
+
+  useEffect(() => {
+    motionRef.current = { previewMotion, motionPlaying };
+    controllerRef.current?.setPreviewMotion(previewMotion);
+    controllerRef.current?.setMotionPlaying(motionPlaying);
+  }, [previewMotion, motionPlaying]);
+
+  useEffect(() => {
+    onMotionStatusChangeRef.current = onMotionStatusChange;
+  }, [onMotionStatusChange]);
 
   useEffect(() => {
     activeRef.current = active;
@@ -39,6 +67,9 @@ export function LocalGltfPreview({
     try {
       const controller = new LocalGltfPreviewController(host, {
         active: activeRef.current,
+        showSkeleton: skeletonRef.current,
+        ...motionRef.current,
+        onMotionStatusChange: (next) => onMotionStatusChangeRef.current?.(next),
         onStatusChange: reportStatus,
       });
       controllerRef.current = controller;

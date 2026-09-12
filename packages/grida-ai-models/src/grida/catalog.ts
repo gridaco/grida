@@ -82,6 +82,8 @@ function listedOver<
 }
 
 /** Grida's service choices joined to canonical model facts. No I/O or credentials. */
+type FactualRiggingModels = typeof facts.three_d.rigging.models;
+
 export namespace catalog {
   export type Provider = facts.Provider;
   export type Vendor = facts.Vendor;
@@ -485,6 +487,13 @@ export namespace catalog {
       },
       ...preferences["three_d"],
     },
+    "three_d.rigging": {
+      members: {
+        "tripo/rig-v1.0": { status: "listed" },
+        "tripo/rig-v2.5": { status: "listed" },
+      },
+      ...preferences["three_d.rigging"],
+    },
     "three_d.model_generation": {
       members: {
         "tripo/h3.1": { status: "listed" },
@@ -586,6 +595,7 @@ export namespace catalog {
     "audio.sound_effects": policy.Definition<facts.audio.sound_effects.ModelId>;
     "audio.text_to_speech": policy.Definition<facts.audio.text_to_speech.ModelId>;
     three_d: policy.Definition<facts.three_d.ThreeDModelId>;
+    "three_d.rigging": policy.Definition<facts.three_d.rigging.ModelId>;
     "three_d.model_generation": policy.Definition<facts.three_d.model_generation.ModelId>;
     image_tools: policy.Definition<facts.image_tools.ImageToolModelId>;
   });
@@ -988,6 +998,62 @@ export namespace catalog {
     }
   }
   export namespace three_d {
+    export namespace rig_check {
+      export const operation = own({
+        ...facts.three_d.rig_check.operation,
+        status: "listed" as const,
+      });
+    }
+    export namespace rigging {
+      export type ModelId =
+        keyof (typeof definitions)["three_d.rigging"]["members"];
+      export type RigType = facts.three_d.rigging.RigType;
+      export type Spec = facts.three_d.rigging.Spec;
+      export type ModelCard = facts.three_d.rigging.ModelCard & {
+        deprecated: boolean;
+        status: CatalogueStatus;
+      };
+      type CatalogModels = {
+        [Id in ModelId]: FactualRiggingModels[Id] & {
+          deprecated: boolean;
+          status: CatalogueStatus;
+        };
+      };
+      const resolved = policy.resolve(
+        facts.three_d.rigging.models,
+        definitions["three_d.rigging"]
+      );
+      export const models: CatalogModels = own(
+        Object.fromEntries(
+          resolved.all().map((card) => {
+            const { legacy, reason: _reason, ...fact } = card;
+            return [card.id, { ...fact, deprecated: !!legacy }];
+          })
+        )
+      ) as unknown as CatalogModels;
+      export const model_ids = Object.freeze(Object.keys(models) as ModelId[]);
+      export const default_id = (
+        preferences["three_d.rigging"] as policy.Preferences<ModelId>
+      ).default_id;
+      export function is_model_id(id: string): id is ModelId {
+        return Object.hasOwn(models, id);
+      }
+      export function listed_models(): readonly ModelCard[] {
+        return Object.freeze(
+          resolved.listed().map((card) => models[card.id as ModelId])
+        );
+      }
+      export function ordered_models(): readonly ModelCard[] {
+        return Object.freeze(
+          resolved.all().map((card) => models[card.id as ModelId])
+        );
+      }
+      export function staged_models(): readonly ModelCard[] {
+        return Object.freeze(
+          resolved.staged().map((card) => models[card.id as ModelId])
+        );
+      }
+    }
     export namespace model_generation {
       export type ModelId =
         keyof (typeof definitions)["three_d.model_generation"]["members"];

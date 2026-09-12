@@ -53,6 +53,10 @@ import {
   type ThreeDGenerateRequest,
   type ThreeDGenerateResult,
   type ThreeDInputImage,
+  type RigCheckRequest,
+  type RigCheckResult,
+  type RiggingGenerateRequest,
+  type RiggingGenerateResult,
   type ModelGenerationGenerateRequest,
   type ModelGenerationGenerateResult,
   type VideoGenerateRequest,
@@ -114,6 +118,10 @@ export {
   type ThreeDGenerateRequest,
   type ThreeDGenerateResult,
   type ThreeDInputImage,
+  type RigCheckRequest,
+  type RigCheckResult,
+  type RiggingGenerateRequest,
+  type RiggingGenerateResult,
   type ModelGenerationGenerateRequest,
   type ModelGenerationGenerateResult,
   type VideoGenProvider,
@@ -620,6 +628,43 @@ export namespace threeD {
   }
 }
 
+/** Eligibility and explicit rigging require a compatible native host. */
+export namespace rigging {
+  export function isSupported(bridge = getDesktopBridge()): boolean {
+    return (
+      bridge?.caps?.media?.rigging === true &&
+      typeof bridge.rigging?.check === "function" &&
+      typeof bridge.rigging?.generate === "function"
+    );
+  }
+  // GRIDA-GG: desktop — older hosts can have GG sessions without funded rigging.
+  export function isGgSupported(bridge = getDesktopBridge()): boolean {
+    return (
+      isSupported(bridge) &&
+      bridge?.caps.media?.rigging_gg === true &&
+      bridge.gg != null
+    );
+  }
+  export async function check(
+    request: RigCheckRequest
+  ): Promise<RigCheckResult> {
+    const bridge = bridgeOrThrow();
+    if (!isSupported(bridge)) throw new DesktopBridgeMissingError();
+    if (request.provider === "gg" && !isGgSupported(bridge))
+      throw new DesktopBridgeMissingError();
+    return await bridge.rigging!.check(request);
+  }
+  export async function generate(
+    request: RiggingGenerateRequest
+  ): Promise<RiggingGenerateResult> {
+    const bridge = bridgeOrThrow();
+    if (!isSupported(bridge)) throw new DesktopBridgeMissingError();
+    if (request.provider === "gg" && !isGgSupported(bridge))
+      throw new DesktopBridgeMissingError();
+    return await bridge.rigging!.generate(request);
+  }
+}
+
 /** Explicit model-generation feature, available only on compatible native hosts. */
 export namespace modelGeneration {
   export function isSupported(bridge = getDesktopBridge()): boolean {
@@ -629,11 +674,22 @@ export namespace modelGeneration {
     );
   }
 
+  // GRIDA-GG: desktop — require explicit support for the funded Tripo lane.
+  export function isGgSupported(bridge = getDesktopBridge()): boolean {
+    return (
+      isSupported(bridge) &&
+      bridge?.caps.media?.tripo_gg === true &&
+      bridge.gg != null
+    );
+  }
+
   export async function generate(
     request: ModelGenerationGenerateRequest
   ): Promise<ModelGenerationGenerateResult> {
     const bridge = bridgeOrThrow();
     if (!isSupported(bridge)) throw new DesktopBridgeMissingError();
+    if (request.provider === "gg" && !isGgSupported(bridge))
+      throw new DesktopBridgeMissingError();
     return await bridge.modelGeneration!.generate(request);
   }
 }

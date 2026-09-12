@@ -692,15 +692,16 @@ cover catalogue refresh and bounded downloads. No test calls a real provider,
 opens a real credential store, or starts a Grida host. Packaging and host consumers
 must use public exports; source aliases are not a substitute for that proof.
 
-## Direct Tripo model generation
+## Tripo model generation
 
-`TripoClient` is the built-in BYOK operation for H3.1, P1, and P2 Preview.
+`TripoClient` supports H3.1, P1, and P2 Preview with either a Tripo BYOK key
+(`provider: "tripo"`) or Grida credits (`provider: "gg"`).
 Resolution and discovery use Grida's explicit bundled model-generation service
 membership from `@grida/ai-models/grida`; neutral facts remain in the root
 catalogue entry. Schema-1 text/image/video refreshes do not replace this family.
 The `three-d` discovery kind names the output family; `feature: "model-generation"`
 names the operation, `model_id` names the model, and `variant` selects its input.
-Remeshing and rigging have different inputs/results and are not enabled features.
+Rigging has its own feature contract below; remeshing is not enabled.
 The existing `ThreeDClient` fal operations keep their exact contracts.
 
 ```ts
@@ -733,23 +734,24 @@ const result = await operation.generate({
 // result.task: { id: string, credits_consumed?: number }
 ```
 
-Required selectors use `feature: "model-generation"`, `provider: "tripo"`,
+Required selectors use `feature: "model-generation"`, `provider: "tripo" | "gg"`,
 `model_id: "tripo/h3.1" | "tripo/p1" | "tripo/p2"`, and
 `variant: "text" | "image" | "multiview"`. Literal selectors narrow the generated
 input type. Dynamically resolved operations are a discriminated union over model
 and variant. `MediaOperations.parseInput` returns a Tripo branch identified by
-`kind: "three-d"` and `provider_id: "tripo"`, with the same typed selection/input.
+`kind: "three-d"`, `feature: "model-generation"`, and the selected `provider_id`,
+with the same typed selection/input.
 
 Text input is a nonblank trimmed prompt of at most 1,024 Unicode code points.
 Image input is `{ image: { data, media_type } }`. Multiview input is
 `{ images: { front, left?, back?, right? } }`, with front and at least one other
 view required. Images are copied before the first await. Each image has a
 20,000,000-byte ceiling and accepts PNG or JPEG; JSON uses padded base64 for
-`data`. The SDK uploads these bytes to the fixed `/v3/files` endpoint before
-submission. Although generation also documents WebP sources, the
+`data`. BYOK uploads these bytes to the fixed `/v3/files` endpoint before
+submission; the hosted upload flow is described below. Although generation also documents WebP sources, the
 [upload endpoint](https://developers.tripo3d.ai/en/docs/files) only documents PNG
-and JPEG. There are no file paths, arbitrary image URLs, upstream task/file tokens,
-or caller-supplied upload destinations in this operation.
+and JPEG. Normal `generate` and JSON discovery accept no file paths, arbitrary
+image URLs, upstream task/file tokens, or caller-supplied upload destinations.
 
 All three models accept `texture`, `pbr`, `texture_quality` (`standard`,
 `detailed`, `extreme`), `face_limit`, and safe-integer `seed` (geometry seed).
@@ -762,23 +764,27 @@ adaptive topology. The [H-series](https://developers.tripo3d.ai/en/docs/generati
 and [P-series](https://developers.tripo3d.ai/en/docs/generation-text-to-model/p)
 contracts ground these choices. Unsupported fields fail before key lookup or I/O.
 
-Generation resolves only the named Tripo key. The provider identity is absent
+BYOK generation resolves only the named Tripo key. The provider identity is absent
 from generic text/image/video resolver precedence. `ProviderCredentials` trims
 opaque printable keys and checks the fixed read-only
 [balance endpoint](https://developers.tripo3d.ai/en/docs/account); accepted decimal
 balances, including zero, prove credential acceptance, not affordability.
 
-One ten-minute deadline covers key lookup, uploads, the single paid submission,
+A BYOK ten-minute deadline covers key lookup, uploads, the single paid submission,
 two-second status polling, and immediate result download. Submission is never
 retried; cancellation cannot undo an accepted task or its charge. Failure codes
 are `invalid_input`, `model_unavailable`, `provider_key_required`,
-`credential_rejected`, `access_denied`, `insufficient_credits`, `aborted`,
+`credential_rejected`, `access_denied`, `insufficient_credits`, `gg_token_expired`, `aborted`,
 `timeout`, `invalid_response`, and `generation_failed`. Messages/JSON are safe
 codes; failures after confirmed submission also carry `task_id` so hosts can
-identify the accepted job without guessing or resubmitting. Provider messages,
+identify the accepted job without guessing or resubmitting. A validated successful
+provider task is additionally retained as `completed_task` on failures occurring
+after completion, including output download or GLB validation failures. This
+receipt allows a hosted billing owner to meter observed work despite a lost
+output; an accepted task ID alone does not establish success. Provider messages,
 response bodies, prompts, keys and signed URLs never leave in errors.
 
-All authenticated calls stay at `https://openapi.tripo3d.ai`, with redirects
+All BYOK authenticated calls stay at `https://openapi.tripo3d.ai`, with redirects
 refused. GLB downloads use the credential-free transport and are capped at 64 MiB.
 The accepted result origins are `https://cdn.tripo3d.ai` and
 `https://tripo-data.rg1.data.tripo3d.com`; hosts authorize DNS and every redirect
@@ -788,7 +794,132 @@ because provider URLs expire. It does not fully validate mesh semantics or rende
 models. `task.credits_consumed`, when present, is a nonnegative finite provider
 credit amount; decimals are valid. It is not a billing or persistence receipt.
 
-There is deliberately no arbitrary provider-options object, upload-token API,
+There is deliberately no arbitrary provider-options object,
 quad/FBX output, compression option, processing registry, or speculative future
 feature. The narrow GLB result contract must be extended honestly before adding
 incompatible output modes.
+
+## Mesh rig eligibility and rigging
+
+`RiggingClient` performs two explicit operations on supplied GLB bytes. The
+`rig-check` selection has no model identity and returns structured findings.
+`rigging` selects a real rig model and returns a portable GLB plus its provider
+task receipt. They work independently with `ProviderHttp` and a Tripo BYOK key
+or a host-issued GG scoped token;
+no host runtime, filesystem, generated-asset ancestry, or prior SDK call is
+required. Running a check never starts paid rigging automatically.
+
+```ts
+import { RiggingClient, MediaOperations } from "@grida/ai";
+
+const discovery = new MediaOperations().rigging;
+// Also available as new RiggingOperations() from the root entry.
+const checkChoice = { feature: "rig-check", provider: "tripo" } as const;
+const description = discovery.inspect(checkChoice);
+const client = new RiggingClient({ keys, http });
+const check = await client.resolve(checkChoice);
+const findings = await check.check({ mesh, signal });
+// findings: { riggable, rig_type, task: { id, credits_consumed? } }
+
+const operation = await client.resolve({
+  feature: "rigging",
+  provider: "tripo",
+  model_id: "tripo/rig-v1.0",
+});
+const result = await operation.generate({
+  mesh,
+  rig_type: "biped",
+  spec: "mixamo",
+  signal,
+});
+// result: { glb: { data: Uint8Array, media_type: "model/gltf-binary" }, task }
+```
+
+`mesh` is `{ data: Uint8Array, media_type: "model/gltf-binary" }`. Native input is
+copied before awaiting credentials and capped at `RiggingClient.max_mesh_bytes`
+(**60,000,000 bytes**). This is a conservative simple-upload ceiling below the
+provider's 150 MB model limit; large-file uploads are outside this contract.
+Input must contain an uncompressed, self-contained GLB 2 document. JSON discovery
+accepts the same shape with base64 `data`, bounded before decoding. Its
+`x-grida-portable-glb` rule additionally validates the GLB structure and rejects
+external resources and unsupported mesh/texture compression. Paths, URLs,
+provider task IDs, and arbitrary provider options are not input alternatives.
+
+`RiggingOperations.list`, `.inspect`, and `.parseInput` are immutable, offline
+counterparts of the existing media discovery surface. Selectors require
+`feature` and `provider`; only `rigging` requires `model_id`. They optionally take
+`kind: "three-d"` and `variant: "mesh"`. Descriptors discriminate `feature` and
+`output.representation`: checks carry a structured JSON result schema; rigging
+carries the existing native GLB byte contract. Check descriptors omit `model_id`.
+The `MediaOperations.rigging` entry exposes the same discovery owner without
+changing existing media result or descriptor unions.
+
+Both `rig_type` and `spec` are explicit rigging inputs. `tripo/rig-v1.0` binds
+`v1.0-20240301` and accepts only `biped`; `tripo/rig-v2.5` binds
+`v2.5-20260210` and accepts `quadruped`, `hexapod`, `octopod`, `avian`,
+`serpentine`, or `aquatic`. Both expose `tripo` and `mixamo` naming specs. The
+[official compatibility table](https://developers.tripo3d.ai/en/docs/animations-rig)
+is followed where its sample contradicts that table. There is no implicit model
+or skeleton choice. Checks require a boolean `riggable` and a documented
+`rig_type` even for negative findings, as specified by the
+[check response contract](https://developers.tripo3d.ai/en/docs/animations-rig-check).
+Malformed or unknown findings fail as `invalid_response`.
+
+BYOK execution uploads the source once through [POST /v3/files](https://developers.tripo3d.ai/en/docs/files)
+as multipart field `file`, then submits exactly one `/v3/animations/rig-check` or
+`/v3/animations/rig` job and polls `/v3/tasks/{id}`. Rigging requests GLB explicitly;
+output is capped at `RiggingClient.max_glb_bytes` (**64 MiB**) and validated by
+the same portable GLB contract used by direct model generation. Only fixed Tripo
+API requests receive the credential; approved Tripo asset downloads use the
+credential-free lane. No upload, submission, or failed operation is retried.
+Cancellation/timeout stops local work; it cannot undo an accepted provider job.
+
+`RiggingClient.Failure` uses the existing stable Tripo failure codes and a
+code-only message/JSON shape, adding the accepted `task_id` when known. Successful
+results retain only that task ID and optional observed `credits_consumed`, never
+provider URLs, bodies, or credentials. Inputs are validated before the execution
+key lookup, and a lost key fails without choosing another provider. Published
+prices are separate from observed usage: the [pricing page](https://developers.tripo3d.ai/en/pricing)
+lists checks as free and auto rigging as 25 credits ($0.25), despite the stale
+30-credit response example. GG execution uses the hosted billing route described below.
+
+Mesh operations do not perform remeshing, texturing, animation retargeting, or
+host persistence. Those are separate outcomes and remain outside this surface.
+
+## Grida-funded Tripo execution
+
+Construct either client with `{ keys, http, gg, gg_base_url }` and explicitly
+select `provider: "gg"`. `gg` is the trusted host's `GgTokenSource`; it contains
+only a live scoped organization token. `keys` can be an empty reader in this
+lane. GG never reads the Tripo key, and explicit BYOK never reads the GG token.
+Neither lane falls back to the other. Offline discovery lists each lane
+separately but does not establish an available token or sufficient credits.
+
+Normal `generate` / `check` inputs remain copied bytes with the same limits and
+controls. The SDK requests a signed upload receipt through fixed
+`POST /api/v1/ai/3d/uploads` metadata, PUTs those bytes only to
+`https://tripo-data.s3.us-west-2.amazonaws.com` with no credentials or redirects,
+and submits the opaque receipt to `/api/v1/ai/3d/model-generation`, `/rig-check`,
+or `/rigging`. The host must authorize that exact binary PUT destination; a
+provider key or GG bearer token must never be forwarded there. No uploaded URL
+or receipt appears in results or failures. The server validates its signed
+receipt's organization, subject, media type, declared length and expiry; actual
+uploaded-object storage is owned by Tripo, while the SDK bounds actual input bytes.
+
+A thirteen-minute GG invocation deadline covers uploads, one operation and its
+streamed JSON result. The hosted result contains bounded base64 GLB data, decoded
+back into the ordinary portable byte result, or structured check findings.
+Successful GG responses require observed finite nonnegative `credits_consumed`;
+missing usage is never invented as zero. The server owns credit admission and
+metering. Scoped-token expiry and insufficient credits are actionable failures;
+no upload, operation or failed submission is automatically retried.
+
+Server composition can use native-only `generateUploaded` or `checkUploaded`
+after authenticating an upload receipt and resolving its provider file token.
+These take `UploadedInput` / `UploadedCheckInput` with image or mesh
+`{ file_token, media_type }` and the same model controls. They validate token,
+media type, variant and controls before submission, share the normal single-job
+lifecycle, and avoid re-uploading the file. They accept no URLs and are refused
+on the GG lane. These explicitly named methods are not part of the ordinary
+byte-input JSON schema; possession and authorization of the uploaded provider
+file remain the composing server's responsibility.
