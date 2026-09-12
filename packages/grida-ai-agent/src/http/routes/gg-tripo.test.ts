@@ -2,7 +2,8 @@
 import { Hono } from "hono";
 import { GridaGatewaySessionStore, ProviderHttp } from "@grida/ai";
 import type { SecretsStore } from "@grida/daemon/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { GeneratedMediaPersistence } from "./generated-media-persistence";
 import { registerModelGenerationRoutes } from "./model-generation";
 import { registerRiggingRoutes } from "./rigging";
 
@@ -132,6 +133,8 @@ const cases = [
     },
   ],
 ] as const;
+afterEach(() => vi.restoreAllMocks());
+
 describe("hosted Tripo native adapters", () => {
   it.each(cases)(
     "%s preserves SDK inputs, funding identity and portable output",
@@ -183,6 +186,31 @@ describe("hosted Tripo native adapters", () => {
     expect(JSON.stringify(error)).not.toContain("private");
     expect(state.request).toHaveBeenCalledTimes(1);
   });
+  it.each([cases[0], cases[4]])(
+    "%s retains funded task identity after an unexpected persistence-adapter failure",
+    async (route, input) => {
+      vi.spyOn(GeneratedMediaPersistence, "save").mockRejectedValueOnce(
+        new Error("private-store-path-or-key")
+      );
+      const state = fixture();
+      const response = await post(state.app, route, input);
+      expect(response.status).toBe(502);
+      const error = await response.json();
+      expect(error).toMatchObject({
+        provider_id: "gg",
+        task_id: task.id,
+        code: "generation_failed",
+      });
+      expect(error.error).toContain(`Tripo task: ${task.id}.`);
+      expect(JSON.stringify(error)).not.toContain("private-store-path-or-key");
+      expect(state.get).not.toHaveBeenCalled();
+      expect(
+        state.request.mock.calls.filter(([url]) =>
+          /\/(model-generation|rigging)$/.test(String(url))
+        )
+      ).toHaveLength(1);
+    }
+  );
   it("attributes credit denial to the Grida organization", async () => {
     const state = fixture();
     state.request.mockResolvedValueOnce(new Response(null, { status: 402 }));

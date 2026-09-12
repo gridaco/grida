@@ -50,6 +50,7 @@ export function registerRiggingRoutes(app: Hono, deps: RiggingRoutesDeps) {
       }),
       async (c) => {
         let provider: RiggingClient.Provider = "tripo";
+        let completedTaskId: string | undefined;
         try {
           const raw: unknown = await c.req.json().catch(() => null);
           if (!raw || typeof raw !== "object" || Array.isArray(raw)) invalid();
@@ -87,6 +88,7 @@ export function registerRiggingRoutes(app: Hono, deps: RiggingRoutesDeps) {
               ...parsed.input,
               signal: c.req.raw.signal,
             });
+            completedTaskId = result.task.id;
             return c.json({
               feature: "rig-check",
               provider_id: parsed.provider_id,
@@ -102,6 +104,7 @@ export function registerRiggingRoutes(app: Hono, deps: RiggingRoutesDeps) {
               : await (
                   await client.resolve(parsed.selection)
                 ).generate({ ...parsed.input, signal: c.req.raw.signal });
+          completedTaskId = result.task.id;
           const glb = {
             base64: Buffer.from(result.glb.data).toString("base64"),
             media_type: result.glb.media_type,
@@ -127,13 +130,15 @@ export function registerRiggingRoutes(app: Hono, deps: RiggingRoutesDeps) {
                       : "invalid_input"
                     : "generation_failed"
                 );
+          // SDK success remains accepted even if later encoding or host persistence fails.
+          const taskId = completedTaskId ?? failure.task_id;
           const response = {
             error:
               message(failure.code, provider) +
-              (failure.task_id ? ` Tripo task: ${failure.task_id}.` : ""),
+              (taskId ? ` Tripo task: ${taskId}.` : ""),
             code: failure.code,
             provider_id: provider,
-            ...(failure.task_id ? { task_id: failure.task_id } : {}),
+            ...(taskId ? { task_id: taskId } : {}),
           };
           switch (failure.code) {
             case "invalid_input":

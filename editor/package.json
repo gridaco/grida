@@ -14,7 +14,7 @@
     "start": "next start",
     "sync:public": "pnpm --filter @grida/public build",
     "test": "vitest run",
-    "test:api": "pnpm --filter @grida/ai-models build && pnpm audit:api && node --test ../scripts/api-local/network.test.mjs && vitest run --config vitest.api.config.ts",
+    "test:api": "pnpm --filter @grida/ai... build && pnpm audit:api && node --test ../scripts/api-local/network.test.mjs && vitest run --config vitest.api.config.ts",
     "test:api:http": "pnpm --filter @grida/ai-models build && node ../scripts/api-local/proof.mjs",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",

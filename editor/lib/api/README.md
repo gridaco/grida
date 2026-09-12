@@ -272,7 +272,9 @@ and trust assumptions in GRIDA-SEC-012 in [SECURITY.md](../../../SECURITY.md).
 
 ## Check locally
 
-After installing dependencies, each command builds the model catalogue it needs:
+After installing dependencies, `test:api` builds the AI package and its workspace
+dependencies before running contracts. The isolated HTTP proof replaces provider
+execution, so `test:api:http` needs only the model catalogue build:
 
 ```sh
 pnpm --filter editor test:api

@@ -63,7 +63,10 @@ const selected = {
   model_id: "tripo/h3.1",
   variant: "text",
 } as const;
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("Tripo model generation contract", () => {
   it("locks exact model and variant inputs while permitting dynamic model discovery", async () => {
@@ -569,6 +572,10 @@ describe("Tripo lifecycle bounds", () => {
     }
   });
   it("snapshots all image bytes before waiting on the generation credential", async () => {
+    // Multipart framing may contain the same bytes as the caller's mutation.
+    vi.spyOn(crypto, "randomUUID").mockReturnValueOnce(
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    );
     const { client, get, request } = setup("image");
     const operation = await client.resolve({ ...selected, variant: "image" });
     const callerBytes = new Uint8Array([11, 22, 33]);
@@ -585,10 +592,16 @@ describe("Tripo lifecycle bounds", () => {
     callerBytes.fill(99);
     resume(key);
     await pending;
-    const bytes = request.mock.calls[0]![1]!.body as Uint8Array;
-    const text = new TextDecoder().decode(bytes);
-    expect(text).toContain(String.fromCharCode(11, 22, 33));
-    expect(text).not.toContain("ccc");
+    const upload = request.mock.calls[0]![1]!;
+    const bytes = upload.body as Uint8Array;
+    const form = await new Response(bytes.slice().buffer, {
+      headers: upload.headers,
+    }).formData();
+    const file = form.get("file");
+    expect(file).toBeInstanceOf(File);
+    expect(new Uint8Array(await (file as File).arrayBuffer())).toEqual(
+      new Uint8Array([11, 22, 33])
+    );
   });
   it("refuses a missing key, oversized image and unsupported MIME without network requests", async () => {
     const { client, get, request } = setup("image");

@@ -33,6 +33,7 @@ export function registerModelGenerationRoutes(
     bodyLimit({ maxSize: 48 * 1024 * 1024 }),
     async (c) => {
       let provider: TripoClient.Provider = "tripo";
+      let completedTaskId: string | undefined;
       let ownsGeneration = false;
       try {
         const raw: unknown = await c.req.json().catch(() => null);
@@ -77,6 +78,7 @@ export function registerModelGenerationRoutes(
           gg_base_url: deps.gg_base_url,
         });
         const result = await generate(client, parsed, c.req.raw.signal);
+        completedTaskId = result.task.id;
         const glb = {
           base64: Buffer.from(result.glb.data).toString("base64"),
           media_type: result.glb.media_type,
@@ -101,15 +103,17 @@ export function registerModelGenerationRoutes(
                   ? "invalid_input"
                   : "generation_failed"
               );
+        // SDK success remains accepted even if later encoding or host persistence fails.
+        const taskId = completedTaskId ?? failure.task_id;
         const response = {
           // The generic daemon error transport preserves messages, not extra
           // fields. Keep the validated task identity visible across that seam.
           error:
             message(failure.code, provider) +
-            (failure.task_id ? ` Tripo task: ${failure.task_id}.` : ""),
+            (taskId ? ` Tripo task: ${taskId}.` : ""),
           code: failure.code,
           provider_id: provider,
-          ...(failure.task_id ? { task_id: failure.task_id } : {}),
+          ...(taskId ? { task_id: taskId } : {}),
         };
         switch (failure.code) {
           case "invalid_input":

@@ -1345,8 +1345,10 @@ async function ggMediaAssertions(port, issuer, safe, tokens, mediaTripwire) {
     );
     return { upload: response.upload };
   };
-  const image = await presign("image/png", 100);
-  const mesh = await presign("model/gltf-binary", 200);
+  // Exact supported metadata limits must pass; max + 1 is refused below.
+  // These tickets declare sizes; the synthetic seam uploads no asset bytes.
+  const image = await presign("image/png", 20_000_000);
+  const mesh = await presign("model/gltf-binary", 60_000_000);
   const textInput = {
     model_id: "tripo/h3.1",
     variant: "text",
@@ -1497,7 +1499,7 @@ async function ggMediaAssertions(port, issuer, safe, tokens, mediaTripwire) {
   );
 
   for (const [route, input] of [
-    ["uploads", { media_type: "image/png", byte_length: 8 * 1024 * 1024 + 1 }],
+    ["uploads", { media_type: "image/png", byte_length: 20_000_001 }],
     ["uploads", { media_type: "model/gltf-binary", byte_length: 60_000_001 }],
   ]) {
     safe(

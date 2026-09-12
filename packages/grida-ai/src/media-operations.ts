@@ -395,6 +395,7 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
       model_id: string;
       provider_id: MediaOperations.Provider;
       binding_id: string;
+      feature?: "model-generation";
       references_max?: number;
       native_background?: true;
       deprecated?: true;
@@ -405,7 +406,7 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
   ) {
     result.push({
       kind,
-      ...(kind === "three-d" ? { feature: "model-generation" as const } : {}),
+      ...(metadata.feature ? { feature: metadata.feature } : {}),
       model_id: metadata.model_id,
       provider_id: metadata.provider_id,
       binding_id: metadata.binding_id,
@@ -514,6 +515,7 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
             model_id: card.id,
             binding_id: card.binding_id,
             provider_id,
+            feature: "model-generation",
           },
           variant,
           card.status,
