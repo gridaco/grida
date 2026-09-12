@@ -232,6 +232,56 @@ describe("funded Tripo model generation", () => {
       expect(request).toHaveBeenCalledTimes(1);
     }
   );
+  it.each(["model-generation", "rig-check", "rigging"] as const)(
+    "preserves provider_unavailable for %s without retry or credential leakage",
+    async (feature) => {
+      const state = setup();
+      const normal = state.request.getMockImplementation()!;
+      state.request.mockImplementation(async (url, init) => {
+        if (String(url).endsWith(`/${feature}`))
+          return Response.json(
+            {
+              error: {
+                code: "provider_unavailable",
+                message: "private-provider-details",
+                task_id: task.id,
+                completed_task: task,
+              },
+            },
+            { status: 503 }
+          );
+        return normal(url, init);
+      });
+      const pending =
+        feature === "model-generation"
+          ? (await state.tripo.resolve(selection)).generate({ prompt: "robot" })
+          : feature === "rig-check"
+            ? (await state.rigging.resolve({ feature, provider: "gg" })).check({
+                mesh,
+              })
+            : (
+                await state.rigging.resolve({
+                  feature,
+                  provider: "gg",
+                  model_id: "tripo/rig-v1.0",
+                })
+              ).generate({ mesh, rig_type: "biped", spec: "mixamo" });
+      const error = await pending.catch((error) => error);
+      expect(error.code).toBe("provider_unavailable");
+      expect(error.toJSON()).toEqual({
+        code: "provider_unavailable",
+        message: "provider_unavailable",
+        task_id: task.id,
+        completed_task: task,
+      });
+      expect(state.get).not.toHaveBeenCalled();
+      expect(
+        state.request.mock.calls.filter(([url]) =>
+          String(url).endsWith(`/${feature}`)
+        )
+      ).toHaveLength(1);
+    }
+  );
   it.each([undefined, -1, null])(
     "preserves accepted identity when GG usage is invalid: %s",
     async (credits) => {

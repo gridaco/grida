@@ -63,6 +63,10 @@ describe("GridaGatewayTripo.execute", () => {
       task_id: "already-accepted",
     }),
     new Error("insufficient_credits"),
+    new Error("provider_unavailable"),
+    new Error(
+      "The Tripo service is currently unavailable. Tripo task: already-accepted."
+    ),
     new Error("network unavailable"),
   ])(
     "preserves failed or accepted requests without a paid retry: %s",

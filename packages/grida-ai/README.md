@@ -773,7 +773,7 @@ balances, including zero, prove credential acceptance, not affordability.
 A BYOK ten-minute deadline covers key lookup, uploads, the single paid submission,
 two-second status polling, and immediate result download. Submission is never
 retried; cancellation cannot undo an accepted task or its charge. Failure codes
-are `invalid_input`, `model_unavailable`, `provider_key_required`,
+are `invalid_input`, `model_unavailable`, `provider_unavailable`, `provider_key_required`,
 `credential_rejected`, `access_denied`, `insufficient_credits`, `gg_token_expired`, `aborted`,
 `timeout`, `invalid_response`, and `generation_failed`. Messages/JSON are safe
 codes; failures after confirmed submission also carry `task_id` so hosts can

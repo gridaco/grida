@@ -229,9 +229,7 @@ export class GgTripo {
           ? (failure.code as TripoTransport.FailureCode)
           : failure.code === "invalid_request"
             ? "invalid_input"
-            : failure.code === "provider_unavailable"
-              ? "model_unavailable"
-              : "generation_failed";
+            : "generation_failed";
       throw new TripoTransport.Failure(code, id, completed);
     }
     return result;

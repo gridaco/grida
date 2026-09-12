@@ -35,6 +35,7 @@ export namespace TripoTransport {
   export type FailureCode =
     | "invalid_input"
     | "model_unavailable"
+    | "provider_unavailable"
     | "provider_key_required"
     | "credential_rejected"
     | "access_denied"
@@ -47,6 +48,7 @@ export namespace TripoTransport {
   export const codes: readonly FailureCode[] = [
     "invalid_input",
     "model_unavailable",
+    "provider_unavailable",
     "provider_key_required",
     "credential_rejected",
     "access_denied",

@@ -342,6 +342,7 @@ export namespace TripoClient {
   export type FailureCode =
     | "invalid_input"
     | "model_unavailable"
+    | "provider_unavailable"
     | "provider_key_required"
     | "credential_rejected"
     | "access_denied"

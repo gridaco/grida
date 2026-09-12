@@ -186,6 +186,42 @@ describe("hosted Tripo native adapters", () => {
     expect(JSON.stringify(error)).not.toContain("private");
     expect(state.request).toHaveBeenCalledTimes(1);
   });
+  it.each(cases)(
+    "%s preserves provider outages as 503 without leaking details or resubmitting",
+    async (route, input) => {
+      const state = fixture();
+      const normal = state.request.getMockImplementation()!;
+      state.request.mockImplementation(async (url, init) => {
+        if (/\/(model-generation|rigging|rig-check)$/.test(String(url)))
+          return Response.json(
+            {
+              error: {
+                code: "provider_unavailable",
+                message: "private-provider-details",
+                task_id: task.id,
+              },
+            },
+            { status: 503 }
+          );
+        return normal(url, init);
+      });
+      const response = await post(state.app, route, input);
+      expect(response.status).toBe(503);
+      const error = await response.json();
+      expect(error).toEqual({
+        provider_id: "gg",
+        code: "provider_unavailable",
+        task_id: task.id,
+        error: `The Tripo service is currently unavailable. Tripo task: ${task.id}.`,
+      });
+      expect(state.get).not.toHaveBeenCalled();
+      expect(
+        state.request.mock.calls.filter(([url]) =>
+          /\/(model-generation|rigging|rig-check)$/.test(String(url))
+        )
+      ).toHaveLength(1);
+    }
+  );
   it.each([cases[0], cases[4]])(
     "%s retains funded task identity after an unexpected persistence-adapter failure",
     async (route, input) => {

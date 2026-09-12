@@ -154,6 +154,8 @@ export function registerRiggingRoutes(app: Hono, deps: RiggingRoutesDeps) {
               return c.json(response, 402);
             case "timeout":
               return c.json(response, 504);
+            case "provider_unavailable":
+              return c.json(response, 503);
             default:
               return c.json(response, 502);
           }
@@ -186,6 +188,8 @@ function message(
       return "Invalid mesh or rigging options.";
     case "model_unavailable":
       return "The selected rigging model is unavailable.";
+    case "provider_unavailable":
+      return "The Tripo service is currently unavailable.";
     case "timeout":
       return "The rigging operation timed out. An accepted task may still complete.";
     case "aborted":
