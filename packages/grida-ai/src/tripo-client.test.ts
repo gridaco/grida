@@ -271,6 +271,46 @@ describe("Tripo model generation contract", () => {
       });
     }
   );
+  it.each([
+    ["submission", "json"],
+    ["submission", "html"],
+    ["polling", "json"],
+    ["polling", "html"],
+  ] as const)(
+    "preserves HTTP 503 during %s with a %s body without resubmitting",
+    async (phase, format) => {
+      const { client, request, download } = setup();
+      if (phase === "polling")
+        request.mockResolvedValueOnce(
+          Response.json({ code: 0, data: { task_id: taskId } })
+        );
+      request.mockResolvedValueOnce(
+        format === "json"
+          ? Response.json(
+              { code: 1, message: `${key} ${asset}` },
+              { status: 503 }
+            )
+          : new Response(`<html>${key} ${asset}</html>`, { status: 503 })
+      );
+      const failure = await (
+        await client.resolve(selected)
+      )
+        .generate({ prompt: "chair" })
+        .catch((error) => error);
+      expect(failure).toBeInstanceOf(TripoClient.Failure);
+      expect(failure.toJSON()).toEqual({
+        code: "provider_unavailable",
+        message: "provider_unavailable",
+        ...(phase === "polling" ? { task_id: taskId } : {}),
+      });
+      expect(failure).not.toHaveProperty("cause");
+      expect(request).toHaveBeenCalledTimes(phase === "polling" ? 2 : 1);
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
+      expect(download).not.toHaveBeenCalled();
+    }
+  );
   it("preserves redirect evidence and rejects changed authenticated destinations", async () => {
     const { client, request, download } = setup();
     const redirected = Response.json({ code: 0, data: { task_id: taskId } });

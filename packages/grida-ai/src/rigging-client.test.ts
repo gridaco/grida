@@ -439,7 +439,7 @@ describe("rigging admission and bounded failure behavior", () => {
     ).rejects.toMatchObject({ code: "provider_key_required" });
     expect(request).not.toHaveBeenCalled();
   });
-  it.each([401, 403, 429, 500])(
+  it.each([401, 403, 429, 500, 503])(
     "does not retry a rejected submission (%i)",
     async (status) => {
       const { client, request } = setup();
@@ -460,7 +460,9 @@ describe("rigging admission and bounded failure behavior", () => {
           ? "credential_rejected"
           : status === 403
             ? "access_denied"
-            : "generation_failed"
+            : status === 503
+              ? "provider_unavailable"
+              : "generation_failed"
       );
       expect(JSON.stringify(failure)).not.toContain(key);
       expect(request.mock.calls).toHaveLength(2);

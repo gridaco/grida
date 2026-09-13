@@ -145,6 +145,7 @@ export namespace TripoTransport {
     )
       invalid();
     if (response.status === 401) throw new Failure("credential_rejected");
+    if (response.status === 503) throw new Failure("provider_unavailable");
     let payload: unknown;
     try {
       payload = JSON.parse(await request.wait(response.text()));
