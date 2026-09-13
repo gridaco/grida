@@ -19,7 +19,7 @@ export type AgentMessageMetadata = {
    * model saw, which is the correct proxy for context window consumption.
    */
   lastStepUsage?: LanguageModelUsage;
-  /** The model ID that produced this response (gateway format). */
+  /** The catalog model ID, or the upstream response ID when unrecognized. */
   modelId?: string;
   /** Maximum context window in tokens for this model. */
   contextWindow?: number;

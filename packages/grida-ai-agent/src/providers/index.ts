@@ -13,7 +13,7 @@
  *
  *   - `chatgpt` — a native ChatGPT subscription credential whose model
  *     adapter still runs inside Grida's agent loop.
- *   - `byok` — the hardcoded third-party slots (OpenRouter, Vercel),
+ *   - `byok` — the hardcoded third-party slots (OpenRouter, Vercel AI Gateway),
  *     keyed by a stored secret.
  *   - `gg` — Grida's hosted, included provider.
  *   - `endpoint` — ONE generalized OpenAI-compatible endpoint type
@@ -53,7 +53,7 @@ import type { EndpointProvidersStore } from "./endpoints";
 import {
   makeEndpointFactory,
   makeOpenRouterFactory,
-  makeVercelFactory,
+  makeVercelAiGatewayFactory,
 } from "./byok";
 import type { ProviderHttp } from "./http";
 import { ChatGptProvider, type ChatGptProviderRuntime } from "./chatgpt";
@@ -324,7 +324,7 @@ function makeResolvedByok(
       return {
         provider_id: providerId,
         kind: "byok",
-        model_factory: makeVercelFactory(
+        model_factory: makeVercelAiGatewayFactory(
           key.trim(),
           providerHttp,
           tierModelIds

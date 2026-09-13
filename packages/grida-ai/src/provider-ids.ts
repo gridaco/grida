@@ -1,7 +1,7 @@
 // GRIDA-GG: provider — shared provider identities and explicit legacy precedence.
 /**
  * Which generation modalities a BYOK provider serves. A provider may serve
- * several: OpenRouter does text + image; Vercel does text + image + video; fal
+ * several: OpenRouter does text + image; Vercel AI Gateway does text + image + video; fal
  * does image + video. This vocabulary is intentionally limited to the generic
  * model resolvers that consume {@link byokProvidersFor}. Provider-shaped
  * endpoints such as fal 3D generation and ElevenLabs Sound Effects/Text to
@@ -18,7 +18,7 @@ export const BYOK_PROVIDER_METADATA = [
   },
   {
     id: "vercel",
-    label: "Vercel",
+    label: "Vercel AI Gateway",
     modalities: ["text", "image", "video"],
   },
   {

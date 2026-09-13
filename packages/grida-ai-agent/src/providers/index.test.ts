@@ -30,7 +30,7 @@ const OLLAMA: EndpointProviderConfig = {
 };
 
 describe("resolveProvider", () => {
-  it("prefers OpenRouter over Vercel when both BYOK keys exist", async () => {
+  it("prefers OpenRouter over Vercel AI Gateway when both BYOK keys exist", async () => {
     const provider = await resolveProvider(
       deps({
         openrouter: " sk-or ",
@@ -43,7 +43,7 @@ describe("resolveProvider", () => {
     expect(provider.model_factory).toBeTypeOf("function");
   });
 
-  it("falls back to Vercel when OpenRouter is absent", async () => {
+  it("falls back to Vercel AI Gateway when OpenRouter is absent", async () => {
     const provider = await resolveProvider(deps({ vercel: "vercel-key" }));
 
     expect(provider.provider_id).toBe("vercel");

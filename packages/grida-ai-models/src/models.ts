@@ -353,8 +353,8 @@ export namespace models {
         },
       },
       // OpenAI's September 3 introduction remained a limited rollout. The
-      // September 4 date below is the exact Vercel route's broad availability,
-      // which is the release fact relevant to this gateway-shaped card.
+      // September 4 date below is the exact Vercel AI Gateway route's broad availability,
+      // which is the release fact relevant to this route card.
       // https://openai.com/products/release-notes/
       // https://vercel.com/ai-gateway/models/gpt-6-astra
       "openai/gpt-6-astra": {
@@ -855,7 +855,7 @@ export namespace models {
     /**
      * A provider that can serve an image model. Distinct from the top-level
      * {@link models.Provider} because the same flagship proprietary model is
-     * now multi-homed: fal, OpenRouter, and the Vercel gateway each serve it
+     * now multi-homed: fal, OpenRouter, and the Vercel AI Gateway each serve it
      * under a different id (and sometimes a different meter). Mirrors
      * {@link video.VideoProvider}.
      */
@@ -870,7 +870,7 @@ export namespace models {
     export type ImageProviderBinding = {
       provider: ImageProvider;
       /**
-       * Provider-specific call id, e.g. `openai/gpt-image-2` (Vercel) or
+       * Provider-specific call id, e.g. `openai/gpt-image-2` (Vercel AI Gateway) or
        * `openai/gpt-image-2.5/flare/text-to-image` (fal).
        */
       id: string;
@@ -1026,7 +1026,7 @@ export namespace models {
     // Each serving provider publishes its own meter; do not copy fal's extra
     // image-cache/text-output rates into providers that do not advertise them.
     // https://ai-gateway.vercel.sh/v1/models (verified 2026-09-09 KST)
-    const GPT_IMAGE_2_5_VERCEL_PRICING: PerTokenPricing = {
+    const GPT_IMAGE_2_5_VERCEL_AI_GATEWAY_PRICING: PerTokenPricing = {
       type: "per_token",
       input: 5,
       cached_input: 1.25,
@@ -1164,10 +1164,10 @@ export namespace models {
           vercel: {
             provider: "vercel",
             id: "openai/gpt-image-2.5-flare",
-            pricing: GPT_IMAGE_2_5_VERCEL_PRICING,
+            pricing: GPT_IMAGE_2_5_VERCEL_AI_GATEWAY_PRICING,
             avg_cost_usd: 0.055,
             // The model page exposes background=transparent; reference input
-            // is not established by the gateway feed (2026-09-09 KST).
+            // is not established by the Vercel AI Gateway feed (2026-09-09 KST).
             url: "https://vercel.com/ai-gateway/models/gpt-image-2.5-flare",
           },
           openrouter: {
@@ -1211,7 +1211,7 @@ export namespace models {
           options: ["auto", "low", "medium", "high", "xhigh", "max"],
           default: "high",
         },
-        pricing: GPT_IMAGE_2_5_VERCEL_PRICING,
+        pricing: GPT_IMAGE_2_5_VERCEL_AI_GATEWAY_PRICING,
         // High 1024² output estimate is $0.05268, plus a small input allowance.
         // Not a fixed per-image price: actual cost depends on all billed tokens.
         // https://developers.openai.com/api/docs/guides/image-generation
@@ -1237,10 +1237,10 @@ export namespace models {
           vercel: {
             provider: "vercel",
             id: "openai/gpt-image-2.5-sunburst",
-            pricing: GPT_IMAGE_2_5_VERCEL_PRICING,
+            pricing: GPT_IMAGE_2_5_VERCEL_AI_GATEWAY_PRICING,
             avg_cost_usd: 0.055,
             // The model page exposes background=transparent; reference input
-            // is not established by the gateway feed (2026-09-09 KST).
+            // is not established by the Vercel AI Gateway feed (2026-09-09 KST).
             url: "https://vercel.com/ai-gateway/models/gpt-image-2.5-sunburst",
           },
           openrouter: {
@@ -1282,7 +1282,7 @@ export namespace models {
           options: ["auto", "low", "medium", "high", "xhigh", "max"],
           default: "high",
         },
-        pricing: GPT_IMAGE_2_5_VERCEL_PRICING,
+        pricing: GPT_IMAGE_2_5_VERCEL_AI_GATEWAY_PRICING,
         avg_cost_usd: 0.055,
       },
       // https://developers.openai.com/api/docs/models/gpt-image-1.5
@@ -1396,7 +1396,7 @@ export namespace models {
       // Google (multimodal LLMs with native image output)
       // -----------------------------------------------------------------
       // python .tools/model_info.py --image gemini-3.1-flash-image
-      // Vercel gateway pricing: $0.50/MTok input, $3.00/MTok output
+      // Vercel AI Gateway pricing: $0.50/MTok input, $3.00/MTok output
       "google/gemini-3.1-flash-image-preview": {
         id: "google/gemini-3.1-flash-image-preview",
         label: "Gemini 3.1 Flash Image",
@@ -1410,7 +1410,7 @@ export namespace models {
         vendor: "google",
         // "Nano Banana 2"; ids/prices verified 2026-06-29, see issues/908
         providers: {
-          // The gateway serves the graduated `google/gemini-3.1-flash-image`
+          // Vercel AI Gateway serves the graduated `google/gemini-3.1-flash-image`
           // and the `-preview` alias at identical rates (feed, 2026-09-02).
           // Bindings call the graduated id; the canonical key above stays
           // `-preview` because it is persisted in selections and published
@@ -1449,7 +1449,7 @@ export namespace models {
         avg_cost_usd: 0.004,
       },
       // python .tools/model_info.py --image gemini-3-pro-image
-      // Vercel gateway pricing: $2.00/MTok input, $12.00/MTok output
+      // Vercel AI Gateway pricing: $2.00/MTok input, $12.00/MTok output
       "google/gemini-3-pro-image": {
         id: "google/gemini-3-pro-image",
         label: "Gemini 3 Pro Image",
@@ -1497,7 +1497,7 @@ export namespace models {
       },
       // "Nano Banana 2 Lite" — GA 2026-06-30. The cost/speed tier of the 3.1
       // Flash family: ~half of Nano Banana 2's meter, and 1K-only output
-      // (2K/4K unsupported — the differentiator). Vercel + OpenRouter both
+      // (2K/4K unsupported — the differentiator). Vercel AI Gateway + OpenRouter both
       // meter it at $0.25/$1.50 (verified 2026-07-01); fal id not verified,
       // so left out. OpenRouter doesn't advertise input_references for the
       // Lite (t2i only per its model page), so no `references` (TOOL-DESIGN:
@@ -1535,7 +1535,7 @@ export namespace models {
         constraints: { max_edge: 1024 },
         pricing: { type: "per_token", input: 0.25, output: 1.5 },
         // Published 1K per-image cost (the card default): $0.034 = 1120 tokens
-        // × $30/1M image-output (Google/Vercel changelog, 2026-07-01). The
+        // × $30/1M image-output (Google/Vercel AI Gateway changelog, 2026-07-01). The
         // budget meter charges this per image, so it must be the real cost.
         avg_cost_usd: 0.034,
       },
@@ -1555,11 +1555,11 @@ export namespace models {
         short_description:
           "Latest Flux model with best-in-class image quality and prompt adherence",
         vendor: "black-forest-labs",
-        // All three providers meter $0.03 per megapixel (Vercel model page,
+        // All three providers meter $0.03 per megapixel (Vercel AI Gateway model page,
         // OpenRouter endpoint `cost_usd`/megapixel, fal "first megapixel");
-        // represented as flat at the 1MP baseline. The Vercel binding shipped
+        // represented as flat at the 1MP baseline. The Vercel AI Gateway binding shipped
         // at $0.06 — a 2x hosted over-billing — corrected 2026-09-02. The
-        // gateway feed carries no `pricing` for BFL cards, so the page is the
+        // Vercel AI Gateway feed carries no `pricing` for BFL cards, so the page is the
         // source.
         providers: {
           vercel: {
@@ -1597,7 +1597,7 @@ export namespace models {
       // Black Forest Labs — Flux 2 Max
       // -----------------------------------------------------------------
       // BFL's top Flux 2 line (2025-12-16). $0.07 per megapixel on all three
-      // (Vercel model page — the feed carries no BFL pricing; OpenRouter
+      // (Vercel AI Gateway model page — the feed carries no BFL pricing; OpenRouter
       // `cost_usd`/megapixel; fal "first megapixel", +$0.03 each additional).
       // Represented as flat at the 1MP baseline. Verified 2026-09-02.
       "bfl/flux-2-max": {
@@ -1689,7 +1689,7 @@ export namespace models {
         },
         short_description: "Fast context-aware image generation and editing",
         vendor: "black-forest-labs",
-        // $0.04 on both providers: gateway feed `pricing.image` + fal's model
+        // $0.04 on both providers: Vercel AI Gateway feed `pricing.image` + fal's model
         // page ("Fixed $0.04 cost per image edit"), verified 2026-09-02.
         providers: {
           vercel: {
@@ -1744,7 +1744,7 @@ export namespace models {
       // -----------------------------------------------------------------
       // ByteDance — Seedream 5.0 Pro
       // -----------------------------------------------------------------
-      // Vercel feed `pricing.image` $0.035 (the model page's rate table shows
+      // Vercel AI Gateway feed `pricing.image` $0.035 (the model page's rate table shows
       // $0.04 while its copy says $0.035 — the feed is the billing contract);
       // OpenRouter `cost_usd` $0.045 at 1K ($0.09 high-res, +$0.003 per
       // input image, not modelled); fal $0.0675 for ≤1536² area, $0.135 up
@@ -1804,7 +1804,7 @@ export namespace models {
       // -----------------------------------------------------------------
       // ByteDance — Seedream 5.0 Lite
       // -----------------------------------------------------------------
-      // Universal: $0.035/img on all three (Vercel feed `pricing.image`,
+      // Universal: $0.035/img on all three (Vercel AI Gateway feed `pricing.image`,
       // OpenRouter `cost_usd`, fal page payload), verified 2026-09-02. A
       // 2K–4K model: fal scales requests below 2560x1440 up to its floor.
       "bytedance/seedream-5.0-lite": {
@@ -1849,7 +1849,7 @@ export namespace models {
         styles: null,
         sizes: null,
         // fal: total pixels between 2560x1440 and 4096x4096 (requests below
-        // the floor are scaled up to it); Vercel and OpenRouter serve 2K/4K
+        // the floor are scaled up to it); Vercel AI Gateway and OpenRouter serve 2K/4K
         // only. An area envelope, so the default is a 2K request.
         constraints: { min_pixels: 3_686_400, max_pixels: 16_777_216 },
         pricing: { type: "per_image_flat", usd: 0.035 },
@@ -1909,7 +1909,7 @@ export namespace models {
       // SpaceXAI — Grok Imagine Image 2.0
       // -----------------------------------------------------------------
       // Tiered by quality (low/medium) × resolution (1K/2K); the same four
-      // rates on all three providers (Vercel feed
+      // rates on all three providers (Vercel AI Gateway feed
       // `image_dimension_quality_pricing`, OpenRouter `cost_usd` variants,
       // fal page). OpenRouter also bills $0.01 per input image (not
       // modelled). Verified 2026-09-02.
@@ -1992,7 +1992,7 @@ export namespace models {
       // -----------------------------------------------------------------
       // Meta — Muse Image 1.0
       // -----------------------------------------------------------------
-      // Meta's agentic image model (2026-08-26): $0.01/img on Vercel (feed
+      // Meta's agentic image model (2026-08-26): $0.01/img on Vercel AI Gateway (feed
       // `pricing.image`) and fal (page payload). OpenRouter lists it but
       // exposes no serving endpoint.
       // fal exposes aspect ratio only (no size control). Verified 2026-09-02.
@@ -2036,7 +2036,7 @@ export namespace models {
       // -----------------------------------------------------------------
       // Recraft — V4.1
       // -----------------------------------------------------------------
-      // Universal: $0.035/img raster on every provider (Vercel feed
+      // Universal: $0.035/img raster on every provider (Vercel AI Gateway feed
       // `pricing.image`, OpenRouter endpoint `cost_usd`, fal page payload),
       // verified 2026-09-02. Vector styles are $0.08 and a separate route on
       // fal/OpenRouter (`.../text-to-vector`, `recraft-v4.1-vector`) — not
@@ -2140,7 +2140,7 @@ export namespace models {
      * Resolve a model identifier to its cost card (data only).
      *
      * Accepts:
-     * - Full gateway id (`"bfl/flux-pro-1.1"`)
+     * - Full provider model id (`"bfl/flux-pro-1.1"`)
      * - The deprecated `ProviderModel` wrapper
      * - Bare provider id (`"flux-pro-1.1"`) — exact match against the
      *   segment after the `vendor/` prefix. Unlike
@@ -2940,7 +2940,7 @@ export namespace models {
     /**
      * A provider that can serve a video model. Distinct from the top-level
      * {@link models.Provider} because video routes through more than the
-     * Vercel gateway. Each provider uses its own id format and meter.
+     * Vercel AI Gateway. Each provider uses its own id format and meter.
      */
     export type VideoProvider = (typeof providers)[number];
 
@@ -2965,7 +2965,7 @@ export namespace models {
 
     /**
      * Whether a clip is generated with synchronized audio. A real pricing axis:
-     * both fal and the Vercel gateway meter `silent` at roughly half of
+     * both fal and the Vercel AI Gateway meter `silent` at roughly half of
      * `audio`; Seedance bundles audio into its single rate.
      */
     export type AudioMode = "audio" | "silent";
@@ -2979,7 +2979,7 @@ export namespace models {
      * A binding lists only the `(resolution, mode)` combinations its provider
      * actually serves and meters, so the keys double as that provider's
      * resolution/audio support: Seedance lists only `audio` because it bundles
-     * audio into one rate, and Veo 3.1 Lite omits `"4k"` because the gateway
+     * audio into one rate, and Veo 3.1 Lite omits `"4k"` because Vercel AI Gateway
      * does not sell it at that line. Each value is the real
      * USD-per-output-second rate for that exact config.
      *
@@ -3018,7 +3018,7 @@ export namespace models {
       provider: VideoProvider;
       /**
        * Provider-specific call id. Format varies —
-       * `google/veo-3.1-generate-001` (Vercel), `fal-ai/veo3.1/image-to-video`
+       * `google/veo-3.1-generate-001` (Vercel AI Gateway), `fal-ai/veo3.1/image-to-video`
        * (fal, where the capability is keyed into the endpoint id).
        */
       id: string;
@@ -3097,9 +3097,9 @@ export namespace models {
         speed_label: "slow",
         url: "https://deepmind.google/models/veo/",
         providers: {
-          // Vercel AI Gateway — gateway.video(id), image-to-video. The
-          // gateway meters both audio modes and sells 4K; the matrix is
-          // identical to fal's. Verified against the gateway's own
+          // Vercel AI Gateway — vercelAiGateway.videoModel(id), image-to-video. The
+          // Vercel AI Gateway meters both audio modes and sells 4K; the matrix is
+          // identical to fal's. Verified against Vercel AI Gateway's own
           // /v1/models feed (`video_duration_pricing`) on 2026-09-02 — the
           // previous card claimed "audio-on only, ≤1080p", which the feed
           // contradicts.
@@ -3128,7 +3128,7 @@ export namespace models {
           },
           // fal.ai — image-to-video endpoint (capability is keyed into the id;
           // t2v is a separate `fal-ai/veo3.1` endpoint, not catalogued). Rate
-          // matrix is identical to the Vercel gateway's: $0.40/s audio and
+          // matrix is identical to the Vercel AI Gateway's: $0.40/s audio and
           // $0.20/s silent at 720p/1080p, $0.60/$0.40 at 4K.
           // https://fal.ai/models/fal-ai/veo3.1/image-to-video
           fal: {
@@ -3169,8 +3169,8 @@ export namespace models {
       // Google — Veo 3.1 Fast
       // -----------------------------------------------------------------
       // Same envelope as Veo 3.1 (16:9/9:16, 4/6/8s, native audio, ≤4K) at
-      // ~2.7x lower cost. Rate matrix is identical on Vercel and fal —
-      // gateway feed `video_duration_pricing` and fal's stated per-second
+      // ~2.7x lower cost. Rate matrix is identical on Vercel AI Gateway and fal —
+      // Vercel AI Gateway feed `video_duration_pricing` and fal's stated per-second
       // rates, verified 2026-09-02.
       "google/veo-3.1-fast": {
         id: "google/veo-3.1-fast",
@@ -3228,8 +3228,8 @@ export namespace models {
       // Google — Veo 3.1 Lite
       // -----------------------------------------------------------------
       // The budget Veo: 720p/1080p only, 4/6/8s, native audio. Rates
-      // identical on Vercel and fal (verified 2026-09-02). Vercel supports
-      // both text and image input (FAQ verified 2026-09-07); the fal binding
+      // identical on Vercel AI Gateway and fal (verified 2026-09-02). Vercel AI Gateway
+      // supports both text and image input (FAQ verified 2026-09-07); the fal binding
       // below requires an image. Hosted GG's narrower wire is a host concern.
       "google/veo-3.1-lite": {
         id: "google/veo-3.1-lite",
@@ -3285,9 +3285,9 @@ export namespace models {
       // -----------------------------------------------------------------
       // Alibaba — Wan 3.0
       // -----------------------------------------------------------------
-      // Per-second by resolution, audio bundled into the rate (the gateway
+      // Per-second by resolution, audio bundled into the rate (Vercel AI Gateway
       // feed has no audio axis; fal exposes an `audio` toggle but bills the
-      // same). Identical on Vercel and fal, verified 2026-09-02. 2–30s.
+      // same). Identical on Vercel AI Gateway and fal, verified 2026-09-02. 2–30s.
       "alibaba/wan-3.0": {
         id: "alibaba/wan-3.0",
         label: "Wan 3.0",
@@ -3361,14 +3361,14 @@ export namespace models {
         audio: true,
         speed_label: "slow",
         url: "https://seed.bytedance.com/en/seedance2_0",
-        // NO Vercel binding, deliberately. The gateway serves
+        // NO Vercel AI Gateway binding, deliberately. Vercel AI Gateway serves
         // `bytedance/seedance-2.0` but meters it PER TOKEN
         // (`video_token_pricing`: $7.00/MTok at 480p/720p, $7.70 at 1080p,
         // $4.00 at 4K; reduced with video input; "minimum token floors based
         // on output duration"). `PerSecondPricing` cannot express that, the
         // hosted route pre-prices rate×duration, and ByteDance publishes no
         // tokens-per-second figure — so there is no honest per-second rate,
-        // and the per-second Vercel binding this card shipped with was
+        // and the per-second Vercel AI Gateway binding this card shipped with was
         // invented. Withheld until the hosted path can meter post-flight;
         // hosted requests fail with "not available on the hosted provider".
         // See gridaco/grida#1019 (Blocker A). Feed checked 2026-09-02.
@@ -3394,7 +3394,7 @@ export namespace models {
           },
           // OpenRouter — async `/api/v1/videos`. Flat $0.06726/s (verified
           // 2026-06-29, https://openrouter.ai/bytedance/seedance-2.0) — far
-          // below Vercel's per-resolution rate (the proprietary-pricing-
+          // below Vercel AI Gateway's per-resolution rate (the proprietary-pricing-
           // diverges finding, #908). No separate silent meter surfaced.
           openrouter: {
             provider: "openrouter",
@@ -3416,11 +3416,11 @@ export namespace models {
       // ByteDance — Seedance 2.5
       // -----------------------------------------------------------------
       // Newer generation (2026-07-31), NOT a drop-in successor: ~55% more
-      // per token on the gateway ($10.70/MTok at 480p/720p, $11.70 at 1080p
+      // per token on Vercel AI Gateway ($10.70/MTok at 480p/720p, $11.70 at 1080p
       // vs 2.0's $7.00/$7.70), ~56–71% more per second on fal, and no 4K.
       // It buys 4–30s clips, video-editing and extend-video. 2.0 is cheaper
-      // and serves 4K. The gateway bills tokens, so there is no comparable
-      // per-second Vercel meter here. fal states per-second prices, audio bundled.
+      // and serves 4K. Vercel AI Gateway bills tokens, so there is no comparable
+      // per-second Vercel AI Gateway meter here. fal states per-second prices, audio bundled.
       "bytedance/seedance-2.5": {
         id: "bytedance/seedance-2.5",
         label: "Seedance 2.5",
@@ -3464,7 +3464,7 @@ export namespace models {
       // SpaceXAI — Grok Imagine Video 1.5
       // -----------------------------------------------------------------
       // Image-to-video only (no t2v, per SpaceXAI docs); native lip-synced audio
-      // bundled into the rate. Per-second by resolution, identical on Vercel
+      // bundled into the rate. Per-second by resolution, identical on Vercel AI Gateway
       // (no markup) and fal: $0.08/s @480p, $0.14/s @720p, $0.25/s @1080p.
       // Both also bill $0.01 per input image, captured separately from the
       // output meter.
@@ -3487,7 +3487,7 @@ export namespace models {
         url: "https://docs.x.ai/developers/models/grok-imagine-video-1.5",
         providers: {
           // Vercel AI Gateway — image-to-video; mirrors SpaceXAI's list price (no markup).
-          // The gateway namespaces every SpaceXAI model under `spacexai/`, so the
+          // Vercel AI Gateway namespaces every SpaceXAI model under `spacexai/`, so the
           // call id deliberately differs from this card's canonical `xai/` id.
           // https://vercel.com/changelog/grok-imagine-video-1-5-on-ai-gateway
           vercel: {

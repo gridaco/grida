@@ -268,7 +268,7 @@ inputOrgId })`. It resolves from: route param slug → request
 
 **BYOK carve-out (intentional).** When a contributor sets a `BYOK_*`
 key ([editor/lib/ai/models.ts](editor/lib/ai/models.ts) —
-`BYOK_OPENROUTER_API_KEY`, `BYOK_AI_GATEWAY_API_KEY`), `grida`/`model`
+`BYOK_OPENROUTER_API_KEY`, `BYOK_VERCEL_AI_GATEWAY_API_KEY`), `grida`/`model`
 return a **bare** provider so the **AI-SDK text/chat path** bypasses
 the billing seam: no gate, no Metronome ingest, **and** the
 `MissingOrgIdError` runtime contract above does not fire (a bare
@@ -284,8 +284,8 @@ actions still read the real balance and cannot silently drain credit
 while reporting `0`. **BYOK bypasses billing only — never auth.** `requireOrganizationId` and
 route/action auth always run, so a logged-in user with no resolvable
 org is still rejected. Gated solely by server-only, non-`NEXT_PUBLIC_`
-env vars never set in the hosted product (same trust model as
-`OPENAI_API_KEY` / `REPLICATE_API_TOKEN`). Fail-closed: `byok` is
+env vars never set in the hosted product (same trust model as other
+server-only credentials). Fail-closed: `byok` is
 `null` unless a key env var is a non-empty string, so any ambiguity
 falls back to the billed path. **Residual risk:** `byok` is resolved
 once at module load with no per-request guard — an accidental `BYOK_*`
@@ -293,12 +293,26 @@ on a hosted/preview deploy would make every org bypass billing and the
 org-id sanity gate (auth still holds). Acceptable only because it is a
 contributor/self-host switch under the existing server-env trust model.
 
+**Funded provider authority.** The shared Vercel AI Gateway provider reads only
+`GG_VERCEL_AI_GATEWAY_API_KEY` for an explicit API key. An absent or blank value
+retains the SDK's per-request platform OIDC resolution; an explicit empty SDK
+setting prevents its ambient `AI_GATEWAY_API_KEY` lookup. Replicate predictions
+require a nonblank `GG_REPLICATE_API_TOKEN` at execution, with no legacy token
+fallback. Contributor overrides never supply these funded clients. Library query
+embeddings still use the shared provider without user billing (or the contributor
+override locally), and OpenAI model listing keeps its separate `OPENAI_API_KEY`.
+Native CLI/Desktop credential names and stored provider IDs are independent of
+this server configuration.
+
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-003 .` to enumerate.
 Today:
 
 - [editor/lib/auth/organization.ts](editor/lib/auth/organization.ts) — `requireOrganizationId`.
 - [editor/lib/ai/server.ts](editor/lib/ai/server.ts) — single seam entry; unconditional runtime gate; BYOK layer switch.
-- [editor/lib/ai/models.ts](editor/lib/ai/models.ts) — BYOK layer (bare provider, bypasses billing).
+- [editor/lib/ai/models.ts](editor/lib/ai/models.ts) — contributor BYOK and explicit funded Vercel AI Gateway/OIDC authority.
+- [Provider credential tests](editor/lib/ai/__tests__/models.test.ts) and
+  [Replicate credential tests](editor/lib/ai/__tests__/replicate-credentials.test.ts) —
+  funding-role separation, per-request OIDC, missing credentials and preserved billing.
 - [GG Tripo execution](editor/lib/ai/gg-three-d.ts) and
   [billing contract tests](editor/lib/ai/__tests__/gg-three-d.test.ts) — verified
   org input, unconditional gate, infrastructure-key-only execution and actual receipts.
@@ -2507,7 +2521,7 @@ generation receipts without a fixed projection.
    All selected file/environment/stdin keys use the shared AI provider admission
    policy: bounded to 4 KiB, normalized, header-safe, free of known template values,
    and checked against documented first-party formats without guessed suffix lengths.
-   Vercel legacy keys remain opaque where upstream specifies no retirement contract.
+   Vercel AI Gateway legacy keys remain opaque where upstream specifies no retirement contract.
    Stdin has a cancellable 30-second bound. Only the
    trusted SDK key reader receives secret strings. Status projects presence and
    source and plaintext storage mode; disposal drops private references. Explicit
@@ -2566,7 +2580,7 @@ generation receipts without a fixed projection.
 6. **Explicit credential checks before registration.** CLI `providers configure`
    validates the entered key through the shared AI owner, then invokes that owner's
    single authenticated GET before opening custody. The host permits only OpenRouter's
-   `/api/v1/key`, Vercel's `/v1/credits`, fal's `/v1/models/pricing` with exactly
+   `/api/v1/key`, Vercel AI Gateway's `/v1/credits`, fal's `/v1/models/pricing` with exactly
    one fixed `endpoint_id=fal-ai/flux/dev`, and Tripo's `/v3/account/balance`.
    This does not grant other platform APIs.
    The shared owner rejects redirects, bounds the request/body lifecycle to ten seconds

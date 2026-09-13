@@ -24,7 +24,7 @@ describe("ProviderCredentials environment", () => {
   it("reads only the exact supported environment names", async () => {
     const env = {
       OPENROUTER_API_KEY: " sk-or-openrouter-synthetic \n",
-      AI_GATEWAY_API_KEY: "vck_gateway-synthetic",
+      AI_GATEWAY_API_KEY: "vck_vercel-ai-gateway-synthetic",
       FAL_KEY: "fal:synthetic",
       ELEVENLABS_API_KEY: "elevenlabs-synthetic",
       TRIPO_API_KEY: "tsk_synthetic-tripo",
@@ -72,7 +72,7 @@ describe("ProviderCredentials environment", () => {
       },
     ]);
     expect(owner.get("openrouter")).toBe("sk-or-openrouter-synthetic");
-    expect(owner.get("vercel")).toBe("vck_gateway-synthetic");
+    expect(owner.get("vercel")).toBe("vck_vercel-ai-gateway-synthetic");
     expect(owner.get("fal")).toBe("fal:synthetic");
     expect(owner.get("elevenlabs")).toBe("elevenlabs-synthetic");
     expect(owner.get("tripo")).toBe("tsk_synthetic-tripo");

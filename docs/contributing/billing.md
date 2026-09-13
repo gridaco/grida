@@ -1,4 +1,7 @@
 ---
+title: Contributing to Grida billing
+description: Configure local billing sandboxes, contributor BYOK, and server provider credentials for Grida Gateway.
+keywords: [grida, contributing, billing, credentials, byok, grida gateway]
 format: md
 ---
 
@@ -21,15 +24,77 @@ If you are **not** working on the billing surface and only need the **AI chat / 
 # editor/.env.local  (gitignored)
 BYOK_OPENROUTER_API_KEY=sk-or-v1-...      # https://openrouter.ai/keys
 # …or, if you have one, a dedicated Vercel AI Gateway key:
-# BYOK_AI_GATEWAY_API_KEY=...
+# BYOK_VERCEL_AI_GATEWAY_API_KEY=...
 ```
 
 - Bypasses **billing only — never auth.** Still sign in (`insider@grida.co` / `password`); a resolvable org is still required (an unauthenticated request still 401s).
-- **Text/chat only** — BYOK swaps the AI-SDK provider, so only the text path is unbilled. Image/audio go through Replicate (`withTransaction`) and **still gate + bill even under BYOK** — those features need the full billing setup. (OpenRouter also exposes no image/audio models.) Catalog model IDs are unchanged; use IDs your provider accepts (edit `editor/lib/ai/models.ts` locally if one 404s).
-- Precedence if both are set: OpenRouter, then Vercel. Fail-closed — an empty/unset (or whitespace-only) key falls back to the billed path.
+- **Text/chat only** — the contributor override swaps the text provider. Hosted image, video, audio, and 3D operations **still gate + bill even under contributor BYOK** and need the full billing setup. Catalog model IDs are unchanged; use IDs your provider accepts.
+- Precedence if both are set: OpenRouter, then Vercel AI Gateway. An empty/unset (or whitespace-only) contributor key does not select BYOK; without another contributor key, text uses the billed path.
 - **Never set `BYOK_*` on a hosted or preview deploy.** It disables billing **and** the org-id sanity gate for every org. Contributor / self-host / local only. See [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md) (`GRIDA-SEC-003`, BYOK carve-out).
 
 Working on billing itself? Ignore BYOK and continue with the full setup below.
+
+---
+
+## Server provider credentials
+
+`GG_` identifies Grida-managed provider credentials used by the funded server
+path. `BYOK_` identifies a contributor's server override. Neither prefix
+identifies a deployment environment: scope secrets separately for Production,
+Preview, and Development.
+
+| Consumer                                        | Configuration                                                    | Selection                                                                                                                                                                     |
+| ----------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Funded Vercel AI Gateway text, image, and video | `GG_VERCEL_AI_GATEWAY_API_KEY` or platform `VERCEL_OIDC_TOKEN`   | Use a nonblank GG key when configured; an unset or whitespace-only value selects platform OIDC. No fallback to `AI_GATEWAY_API_KEY` or contributor keys for funded authority. |
+| Funded Replicate operations                     | `GG_REPLICATE_API_TOKEN`                                         | Required and nonblank when a Replicate operation runs; no fallback to `REPLICATE_API_TOKEN` or BYOK.                                                                          |
+| Funded Tripo operations                         | `GG_TRIPO_API_KEY`                                               | Unchanged; no generic or BYOK fallback.                                                                                                                                       |
+| Contributor text override                       | `BYOK_OPENROUTER_API_KEY`, then `BYOK_VERCEL_AI_GATEWAY_API_KEY` | Nonblank keys select the contributor's provider, bypassing billing only.                                                                                                      |
+| Library query embeddings                        | Shared contributor or Vercel AI Gateway provider                 | Remain unbilled internal operations with the existing contributor precedence. Sharing a funded provider credential does not add customer metering.                            |
+| OpenAI model discovery                          | `OPENAI_API_KEY`                                                 | Unchanged; the model-list operation is nonbillable.                                                                                                                           |
+
+Vercel supplies `VERCEL_OIDC_TOKEN` through its platform authentication lifecycle.
+Keep that variable and its lifecycle intact; an OIDC deployment does not need a
+new static Vercel AI Gateway key for the naming convention. Never copy an OIDC
+token into a static secret. Missing provider configuration must fail at the
+affected operation without preventing unrelated routes from loading.
+
+These server names are separate from installed CLI/Desktop provider credentials.
+The native provider ID remains `vercel`, and the CLI environment override remains
+`AI_GATEWAY_API_KEY`. See [CLI provider keys](../cli/providers.md). The contributor
+rename is a direct cutover: replace `BYOK_AI_GATEWAY_API_KEY` with
+`BYOK_VERCEL_AI_GATEWAY_API_KEY` in local server configuration; the old name has
+no compatibility alias.
+
+### Deploying the credential rename
+
+Code review and infrastructure changes are separate steps. The naming change
+does not require rotating provider keys.
+
+1. **A — code and draft PR.** Review the reader/consumer mapping, environment
+   examples, build environment forwarding, and synthetic credential-selection
+   tests. Record the infrastructure prerequisite in the draft PR; local work
+   does not authorize deployment or secret changes.
+2. **B1 — before merge, after explicit operator GO.** Inventory environment scopes,
+   shared variables, and branch overrides. Add `GG_REPLICATE_API_TOKEN` in each
+   scope that runs funded Replicate operations, retaining `REPLICATE_API_TOKEN`
+   for the running deployment and rollback. If a deployment already uses a
+   Grida-managed `AI_GATEWAY_API_KEY`, add its value as
+   `GG_VERCEL_AI_GATEWAY_API_KEY` before deploying the new reader. OIDC deployments
+   need no Vercel AI Gateway API-key addition. Verify the candidate's affected provider
+   execution, billing, and shared Library embeddings before merge.
+3. **B2 — after merge, after explicit operator GO.** Verify the intended deployed
+   revision and its effective configuration. After the agreed rollback window,
+   check for remaining consumers and remove obsolete server variables only from
+   migrated scopes. Retain any old key still needed by a rollback deployment or
+   another consumer. Removing an environment entry does not revoke the provider
+   key; revocation needs its own consumer check.
+
+Treat secrets as values to transfer directly between approved stores, never as
+review evidence. Record names and scopes without printing values. For write-only
+secrets, an operator must enter the original value or issue a replacement while
+retaining the old key through deployment verification. Validate the configuration
+on a new deployment; editing project variables does not update an already
+running deployment.
 
 ---
 
@@ -215,4 +280,4 @@ User-facing billing copy: [`docs/platform/billing.mdx`](../platform/billing.mdx)
 | `WEBHOOK_TUNNEL_HOSTNAME`                     | `editor/.env.test.local`       |
 | `BILLING_E2E`, `BILLING_TEST_MODE`, `APP_URL` | `editor/.env.test` (committed) |
 
-**Contributor BYOK (alternative — not required):** `BYOK_OPENROUTER_API_KEY` or `BYOK_AI_GATEWAY_API_KEY` in `editor/.env.local`. When set, the AI seam bypasses billing entirely and **none** of the Metronome rows above are needed. Auth is still required. See [Just need AI to work?](#just-need-ai-to-work-byok-instead-no-billing-setup).
+**Contributor BYOK (alternative — not required):** `BYOK_OPENROUTER_API_KEY` or `BYOK_VERCEL_AI_GATEWAY_API_KEY` in `editor/.env.local`. When set, text/chat bypasses billing and **none** of the Metronome rows above are needed for that path. Auth is still required. See [Just need AI to work?](#just-need-ai-to-work-byok-instead-no-billing-setup).

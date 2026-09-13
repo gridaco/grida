@@ -1,7 +1,7 @@
 /**
  * Editor-side AI provider seam — `GRIDA-SEC-003` carve-out.
  *
- * Owns the attributed AI Gateway provider ({@link gateway}) and the
+ * Owns the attributed Vercel AI Gateway provider ({@link vercelAiGateway}) and the
  * BYOK branch ({@link byok}). All catalogue data (text-model specs,
  * tier→spec map, lookup helpers) lives in `@grida/ai-models/grida` under
  * its `catalog.text.*` namespace and is re-exported here under its
@@ -17,7 +17,7 @@
  * @module
  */
 
-import { createGateway } from "ai";
+import { createGateway as createVercelAiGateway } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { catalog as _catalog, TIER_MODEL_IDS } from "@grida/ai-models/grida";
 
@@ -51,24 +51,24 @@ export const models = _catalog.text.byTier;
 export const tiers = TIER_MODEL_IDS;
 
 // ---------------------------------------------------------------------------
-// AI Gateway instance — with app attribution headers
+// Vercel AI Gateway instance — with app attribution headers
 //
 // @see https://vercel.com/docs/ai-gateway/ecosystem/app-attribution
 // ---------------------------------------------------------------------------
 
 /**
  * Vercel AI Gateway app-attribution headers — lowercase per the `ai`
- * SDK convention. Shared by the billed `gateway` and the BYOK
- * AI-Gateway branch. (OpenRouter uses its own `HTTP-Referer`/`X-Title`
+ * SDK convention. Shared by the billed `vercelAiGateway` and the BYOK
+ * Vercel AI Gateway branch. (OpenRouter uses its own `HTTP-Referer`/`X-Title`
  * casing — see `resolveByokProvider`.)
  */
-const GATEWAY_ATTRIBUTION_HEADERS = {
+const VERCEL_AI_GATEWAY_ATTRIBUTION_HEADERS = {
   "http-referer": "https://grida.co",
   "x-title": "Grida",
 } as const;
 
 /**
- * Attributed AI Gateway instance.
+ * Attributed Vercel AI Gateway instance.
  *
  * **Internal — seam consumers only.** This is the raw Vercel AI Gateway
  * provider; it does NOT go through the billing seam. Any code outside
@@ -76,21 +76,26 @@ const GATEWAY_ATTRIBUTION_HEADERS = {
  * [editor/lib/ai/server.ts](./server.ts) instead, which wraps every model
  * with gate + ingest middleware.
  *
- * Lint blocks direct imports of this export from non-seam files (see
- * [editor/.oxlintrc.jsonc](../../.oxlintrc.jsonc)).
+ * Keep raw-provider imports inside the seam. The SDK package restrictions in
+ * [editor/.oxlintrc.jsonc](../../.oxlintrc.jsonc) do not enforce named exports.
  */
-export const gateway = createGateway({
-  headers: GATEWAY_ATTRIBUTION_HEADERS,
+// GRIDA-GG: gateway — explicit Grida key or Vercel's platform OIDC authority.
+export const vercelAiGateway = createVercelAiGateway({
+  // The SDK treats an explicit empty string as no API key and resolves OIDC
+  // per request. `undefined` would instead read ambient AI_GATEWAY_API_KEY,
+  // which belongs to the vendor/native-user contract, not funded authority.
+  apiKey: process.env.GG_VERCEL_AI_GATEWAY_API_KEY?.trim() ?? "",
+  headers: VERCEL_AI_GATEWAY_ATTRIBUTION_HEADERS,
 });
 
 // ---------------------------------------------------------------------------
 // BYOK layer — GRIDA-SEC-003 carve-out (see /SECURITY.md).
 //
 // **Internal — seam consumers only.** `byok` holds a live provider API
-// key; like `gateway`, consume only from `lib/ai/server.ts`. (No lint
+// key; like `vercelAiGateway`, consume only from `lib/ai/server.ts`. (No lint
 // rule enforces this for the named export — `.oxlintrc.jsonc` restricts
-// SDK *packages*, not `gateway`/`byok` imports — convention only,
-// mirroring `gateway`.)
+// SDK *packages*, not `vercelAiGateway`/`byok` imports — convention only,
+// mirroring `vercelAiGateway`.)
 //
 // When a contributor sets a BYOK key, calls route through a BARE
 // provider that bypasses the billing seam entirely (no gate, no
@@ -98,11 +103,11 @@ export const gateway = createGateway({
 // provider directly — no Grida balance to meter/drain. BYOK bypasses
 // billing ONLY, never auth (requireOrganizationId still runs). Gated
 // solely by server-only env vars NEVER set in the hosted product (same
-// trust model as OPENAI_API_KEY / REPLICATE_API_TOKEN). Fail-closed:
+// trust model as other server-only credentials). Fail-closed:
 // active only when a key env var is a non-empty string after trim
 // (whitespace-only secrets fall back to the billed path).
 //
-// Implementations (precedence: OpenRouter first, then Vercel). A
+// Implementations (precedence: OpenRouter first, then Vercel AI Gateway). A
 // third BYOK key is a new branch here — no registry.
 // ---------------------------------------------------------------------------
 function resolveByokProvider() {
@@ -115,11 +120,11 @@ function resolveByokProvider() {
       headers: { "HTTP-Referer": "https://grida.co", "X-Title": "Grida" },
     });
   }
-  const aiGatewayKey = process.env.BYOK_AI_GATEWAY_API_KEY?.trim();
-  if (aiGatewayKey) {
-    return createGateway({
-      apiKey: aiGatewayKey,
-      headers: GATEWAY_ATTRIBUTION_HEADERS,
+  const vercelAiGatewayKey = process.env.BYOK_VERCEL_AI_GATEWAY_API_KEY?.trim();
+  if (vercelAiGatewayKey) {
+    return createVercelAiGateway({
+      apiKey: vercelAiGatewayKey,
+      headers: VERCEL_AI_GATEWAY_ATTRIBUTION_HEADERS,
     });
   }
   return null;

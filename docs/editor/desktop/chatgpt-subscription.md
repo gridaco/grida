@@ -57,7 +57,7 @@ The model picker organizes other text models by provider:
 
 - **Grida** is always shown. Its hosted models are metered against your
   organization's prepaid Grida AI credit.
-- **OpenRouter** and **Vercel** appear after their keys are configured.
+- **OpenRouter** and **Vercel AI Gateway** appear after their keys are configured.
 - **Ollama** appears after it is configured with at least one model.
 
 Other provider groups appear when they are configured and available.

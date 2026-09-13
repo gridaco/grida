@@ -120,7 +120,7 @@ without Grida login. `providers configure <provider>` stores a key using hidden 
 or `--key-stdin`; `providers remove <provider>` removes the shared stored key.
 All selected keys (file, environment or stdin) pass cheap static validation through
 [the shared provider policy](https://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md).
-`configure` additionally checks OpenRouter, Vercel, fal and Tripo once before saving;
+`configure` additionally checks OpenRouter, Vercel AI Gateway, fal and Tripo once before saving;
 rejection, denial or an unavailable check leaves the old key unchanged. ElevenLabs
 has no suitable permission-neutral check and saves with `verification.status` set
 to `not_supported`. Successful supported checks report `accepted`, which proves

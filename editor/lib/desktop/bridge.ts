@@ -837,7 +837,7 @@ export namespace app {
 
 /**
  * The Grida agent runs behind the AgentHost,
- * against BYOK (OpenRouter / AI Gateway) directly. The renderer sends a
+ * against BYOK (OpenRouter / Vercel AI Gateway) directly. The renderer sends a
  * `messages` payload (plus optional `workspaceId` / `skills`),
  * receives an AI SDK UI-message stream, and either resolves fs
  * tool calls locally (standalone document window: live `SvgEditor`

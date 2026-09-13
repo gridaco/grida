@@ -23,7 +23,7 @@ grida providers list
 ```
 
 Enter your key at the hidden prompt. Every selected key passes static validation.
-Configuration additionally checks OpenRouter, Vercel, and fal once before saving.
+Configuration additionally checks OpenRouter, Vercel AI Gateway, and fal once before saving.
 A rejected or unavailable check leaves existing credentials unchanged.
 ElevenLabs has no suitable permission-neutral check and saves with verification
 marked `not_supported`.

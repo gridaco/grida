@@ -479,7 +479,7 @@ the highest-capability compatible model (`GPT-5.6 Sol`). This default is derived
 from live readiness and MUST NOT be persisted as a global preference. The
 provider group order is ChatGPT Subscription when ready, Grida, configured text
 BYOK providers, then configured compatible endpoints. The Grida, OpenRouter,
-and Vercel groups may repeat catalog model ids because each tuple names a
+and Vercel AI Gateway groups may repeat catalog model ids because each tuple names a
 different cost and privacy boundary. OpenAI-shaped model ids outside the closed
 ChatGPT set never gain ChatGPT eligibility from their name alone.
 

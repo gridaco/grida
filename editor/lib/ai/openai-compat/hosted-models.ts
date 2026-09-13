@@ -11,7 +11,7 @@
  *   stay callable and are flagged on `/models`; removing a model from the
  *   listed set withdraws its hosted availability.
  * - image/video: listed cards carrying a `vercel` binding (what the
- *   seam can serve through the gateway).
+ *   seam can serve through Vercel AI Gateway).
  *
  * Deliberately NO pricing in the payload — pricing is a billing-page
  * concern; exposing per-token USD here invites client-side cost math

@@ -1633,7 +1633,7 @@ export namespace catalog {
      * UNKNOWN PROVIDER KEYS ARE DROPPED rather than rejecting the card.
      * A provider this client has no adapter for is not an error — it is a
      * route it cannot take — and rejecting would make adding a provider a
-     * breaking publish. (The AI SDK gateway learned this the hard way: it
+     * breaking publish. (Vercel AI Gateway learned this the hard way: it
      * validated its model-kind field as a hard enum, so the day a new kind
      * shipped the whole listing failed to parse; it now accepts loosely
      * and filters unknown rows.)
@@ -1847,7 +1847,7 @@ export namespace catalog {
       if (!providers) return undefined;
       // A listed model can launch on one provider first. Its primary route
       // must be known and bound; runtime selection intersects the available
-      // bindings with connected keys, and hosted calls still require Vercel.
+      // bindings with connected keys, and hosted calls still require Vercel AI Gateway.
       if (!image.providers.includes(v.provider as image.ImageProvider)) {
         return undefined;
       }

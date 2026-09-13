@@ -70,7 +70,7 @@ omitted declaration inherits the model. Missing bindings never grant support.
 Image pricing may be tiered, flat, or per-token. Published model-level prices
 remain distinct from provider-binding prices. GPT Image 2's model-level table,
 for example, includes rectangular image tiers and token components absent from
-its Vercel binding. No primary-provider preference is stored on factual cards.
+its Vercel AI Gateway binding. No primary-provider preference is stored on factual cards.
 
 Video cards identify canonical models and exact image-to-video provider routes.
 Each binding has its own resolution/audio price matrix and any input-image

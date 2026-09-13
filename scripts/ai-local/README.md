@@ -34,7 +34,7 @@ agent, daemon, auth, account, CLI, Desktop and framework packages are unavailabl
 The factual `@grida/ai-models` root and service `@grida/ai-models/grida` entry
 must both load in ESM and CommonJS. Snapshot codecs and types come from the
 service entry; the SDK retains its bundled service defaults.
-Synthetic transports exercise OpenRouter, Vercel, fal and scoped GG image
+Synthetic transports exercise OpenRouter, Vercel AI Gateway, fal and scoped GG image
 generation and video submit/poll/result chains, input capability discovery, credential-free result downloads,
 explicit provider selection, missing credentials, single submission on failure,
 safe error projection, cleared GG authority, and video cancellation during a

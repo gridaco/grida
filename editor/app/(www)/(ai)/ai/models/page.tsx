@@ -859,7 +859,7 @@ function VideoModelOutput({ model }: { model: AITypes.video.VideoModelCard }) {
 }
 
 const VideoProviderLabels: Record<AITypes.video.VideoProvider, string> = {
-  vercel: "Vercel",
+  vercel: "Vercel AI Gateway",
   fal: "fal",
   openrouter: "OpenRouter",
 };

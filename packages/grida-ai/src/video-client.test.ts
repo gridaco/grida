@@ -427,7 +427,7 @@ describe("VideoClient bounded image input", () => {
 });
 
 describe("VideoClient public operation", () => {
-  it("freezes explicit selection without a credential/model access surface and uses Vercel's video wire", async () => {
+  it("freezes explicit selection without a credential/model access surface and uses Vercel AI Gateway's video wire", async () => {
     const { client, request, get, download } = setup();
     const operation = await client.resolve({
       model_id: ID,
@@ -728,7 +728,7 @@ describe("VideoClient public operation", () => {
     "https://other.example/result.mp4",
     "https://ai-gateway.vercel.sh.evil.example/result.mp4",
     "https://ai-gateway.vercel.sh:8443/result.mp4",
-  ])("refuses an untrusted Vercel result origin %s", async (url) => {
+  ])("refuses an untrusted Vercel AI Gateway result origin %s", async (url) => {
     const { client, request, download } = setup();
     request.mockImplementation(async () =>
       sse([{ type: "url", url, mediaType: "video/mp4" }])
@@ -747,7 +747,7 @@ describe("VideoClient public operation", () => {
   it.each([
     "https://ai-gateway.vercel.sh/result.mp4",
     "data:video/mp4;base64,AQID",
-  ])("accepts allowed Vercel results %s", async (url) => {
+  ])("accepts allowed Vercel AI Gateway results %s", async (url) => {
     const { client, request, download } = setup();
     request.mockImplementation(async () =>
       sse([{ type: "url", url, mediaType: "video/mp4" }])
@@ -843,7 +843,7 @@ describe("VideoClient public operation", () => {
     expect(request).toHaveBeenCalledOnce();
   });
 
-  it("refuses the pinned Vercel adapter's unrepresentable zero seed before key lookup", async () => {
+  it("refuses the pinned Vercel AI Gateway adapter's unrepresentable zero seed before key lookup", async () => {
     const { client, request, get } = setup();
     const operation = await client.resolve({
       model_id: ID,
@@ -1051,7 +1051,7 @@ describe("video execution and result bounds", () => {
     expect(response.body!.locked).toBe(false);
   });
 
-  it("cancels a Vercel SSE connection after its first result even when the server leaves it open", async () => {
+  it("cancels a Vercel AI Gateway SSE connection after its first result even when the server leaves it open", async () => {
     const { client, request } = setup();
     const cancel = vi.fn<() => void>();
     request.mockImplementation(

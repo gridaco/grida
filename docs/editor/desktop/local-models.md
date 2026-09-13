@@ -20,7 +20,7 @@ machine, served by [Ollama](https://ollama.com). There is no account to
 create and no API key to paste — your prompts, files, and the model's
 responses never leave your computer.
 
-You can use local models alongside provider keys (OpenRouter, Vercel), or
+You can use local models alongside provider keys (OpenRouter, Vercel AI Gateway), or
 as your only setup.
 
 ## Requirements

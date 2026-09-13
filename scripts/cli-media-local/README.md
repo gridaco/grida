@@ -59,7 +59,7 @@ cases verify file admission and wire serialization; provider codec acceptance
 remains a separate check.
 
 Provider configuration uses distinct synthetic keys and the real SDK credential
-policy. OpenRouter, Vercel and fal each make exactly one authenticated registration
+policy. OpenRouter, Vercel AI Gateway and fal each make exactly one authenticated registration
 read against their fixed synthetic key/credits/pricing response. ElevenLabs makes
 no registration request and reports `not_supported`. Accepted checks report only
 safe verification metadata; they do not establish remaining credits or future

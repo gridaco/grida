@@ -160,7 +160,7 @@ costs. A single average invocation estimate cannot represent every request;
 aggregate input/output token counts also cannot distinguish differently priced
 text and image tokens.
 
-**Current behavior.** When Gateway supplies a valid response cost, hosted image
+**Current behavior.** When Vercel AI Gateway supplies a valid response cost, hosted image
 usage is metered from that USD receipt, including a legitimate zero. Otherwise,
 the existing catalog estimate is used. For GPT Image 2.5 that fallback is
 $0.055 per requested image, regardless of quality and dimensions, and can

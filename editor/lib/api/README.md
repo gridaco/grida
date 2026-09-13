@@ -189,13 +189,11 @@ a free result or an invented estimate. See
 
 Configure server-only `GG_TRIPO_API_KEY`, GG signing, ordinary billing and request
 rate limiting before deploying. There is no fallback to a development BYOK key.
-The `GG_` prefix identifies Grida-funded infrastructure credentials. Tripo is
-the first provider adopting this convention. This unreleased integration uses
-a direct cutover from `TRIPO_API_KEY`, with no unprefixed or BYOK alias; update
-the infrastructure environment variable name before deployment. Native CLI
-`TRIPO_API_KEY` remains the user's direct-provider credential and is unchanged.
-Remaining provider adoption is tracked in
-[the GG credential naming follow-up](https://github.com/gridaco/grida/issues/1066).
+The `GG_` prefix identifies Grida-funded infrastructure credentials. Tripo uses
+only `GG_TRIPO_API_KEY`, with no unprefixed or BYOK alias. Native CLI
+`TRIPO_API_KEY` remains the user's direct-provider credential. See the
+[funded credential mapping and deployment migration](https://grida.co/docs/contributing/billing#server-provider-credentials)
+for other providers and the Vercel platform OIDC exception.
 ElevenLabs is unchanged. Desktop advertises the funded paths separately through
 `tripo_gg` and `rigging_gg`, so older hosts continue to offer only their supported
 BYOK paths.

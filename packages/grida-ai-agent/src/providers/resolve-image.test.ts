@@ -18,7 +18,7 @@ function fakeSecrets(keys: Record<string, string>): SecretsStore {
   } as unknown as SecretsStore;
 }
 
-// A universal listed card (binds vercel + fal + openrouter).
+// A universal listed card (binds Vercel AI Gateway + fal + OpenRouter).
 const LISTED = "openai/gpt-image-2";
 // A kept-but-unlisted card (bfl/flux-kontext-max — not on OpenRouter).
 const UNLISTED = "bfl/flux-kontext-max";
@@ -57,7 +57,7 @@ describe("defaultImageModelId", () => {
 describe("resolveImageModel", () => {
   describe("native background requirements", () => {
     it.each(["opaque", "transparent"] as const)(
-      "selects verified FAL for %s before OpenRouter or Vercel",
+      "selects verified FAL for %s before OpenRouter or Vercel AI Gateway",
       async (background) => {
         const readKey = vi.fn<SecretsStore["_getKey"]>(
           async (id) => `key-${id}`
@@ -338,7 +338,7 @@ describe("resolveImageModel", () => {
       }
     );
 
-    it("selects Vercel for transparency before FAL while skipping OpenRouter", async () => {
+    it("selects Vercel AI Gateway for transparency before FAL while skipping OpenRouter", async () => {
       const r = await resolveImageModel(
         {
           secrets: fakeSecrets({
@@ -425,7 +425,7 @@ describe("resolveImageModel", () => {
       }
     );
 
-    it("withholds unverified Vercel and GG edit routes", async () => {
+    it("withholds unverified Vercel AI Gateway and GG edit routes", async () => {
       await expect(
         resolveImageModel({ secrets: fakeSecrets({ vercel: "sk-v" }) }, id, {
           references: true,

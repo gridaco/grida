@@ -43,7 +43,7 @@ vi.mock("@/lib/auth/organization", () => ({
   requireOrganizationId: vi.fn<(...args: never[]) => unknown>(),
 }));
 
-// Partial passthrough: keep real `catalog`/`gateway`/`modelSpecById`/
+// Partial passthrough: keep real `catalog`/`vercelAiGateway`/`modelSpecById`/
 // `tiers`/`byok` (the cost + gate suites depend on them); only stub
 // `isByokActive` so a test can flip the BYOK carve-out without setting
 // a module-load env var.
@@ -79,7 +79,7 @@ const mockedIsByokActive = vi.mocked(isByokActive);
 
 beforeEach(() => {
   delete process.env.BYOK_OPENROUTER_API_KEY;
-  delete process.env.BYOK_AI_GATEWAY_API_KEY;
+  delete process.env.BYOK_VERCEL_AI_GATEWAY_API_KEY;
   mockedGetEntitlement.mockReset();
   mockedIngestUsageEvent.mockReset();
   mockedRefreshBalance.mockReset();
@@ -101,13 +101,13 @@ function stubAuthed(orgId = 7) {
 }
 
 afterEach(() => {
-  delete process.env.REPLICATE_API_TOKEN;
+  delete process.env.GG_REPLICATE_API_TOKEN;
   vi.clearAllMocks();
 });
 
 describe("methods.generateMusic", () => {
   it("sends only fields accepted by the current Replicate Lyria schema", async () => {
-    process.env.REPLICATE_API_TOKEN = "test-replicate-token";
+    process.env.GG_REPLICATE_API_TOKEN = "test-replicate-token";
     mockedGetEntitlement.mockResolvedValueOnce({
       allowed: true,
       cachedBalanceCents: 1000,

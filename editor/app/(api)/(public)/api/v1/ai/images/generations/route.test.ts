@@ -2,7 +2,7 @@
 // GRIDA-GG: gateway — see docs/wg/platform/hosted-ai.md
 /**
  * POST /api/v1/ai/images/generations — token-gated hosted image
- * generation through the REAL image billing middleware (fake gateway
+ * generation through the REAL image billing middleware (fake Vercel AI Gateway
  * model): pre-priced mills reach ingest, blocked orgs 402 before the
  * provider, unknown/unbound models 404, base64 results in the shared
  * protocol shape, and NO library upload (the daemon owns persistence).
@@ -70,13 +70,13 @@ vi.mock("@/lib/ai/models", async (orig) => {
     ...real,
     byok: null,
     isByokActive: () => false,
-    gateway: {
+    vercelAiGateway: {
       languageModel: () => {
         throw new Error("unused");
       },
       imageModel: (modelId: string) => ({
         specificationVersion: "v3" as const,
-        provider: "fake-gateway",
+        provider: "fake-vercel-ai-gateway",
         modelId,
         maxImagesPerCall: 4,
         doGenerate: async (options: unknown) => {
@@ -112,7 +112,7 @@ const mockedIngest = vi.mocked(ingestUsageEvent);
 
 const SECRET = "images-secret-0123456789abcdef0123456789abcdef";
 
-// A real listed card with a vercel binding — resolved dynamically so
+// A real listed card with a Vercel AI Gateway binding — resolved dynamically so
 // catalog churn doesn't rot the test.
 const CARD = ai.image
   .listed_models()
@@ -384,7 +384,7 @@ describe("POST /api/v1/ai/images/generations", () => {
     expect(mockedIngest).not.toHaveBeenCalled();
   });
 
-  it("refuses a model without a Vercel binding before billing", async () => {
+  it("refuses a model without a Vercel AI Gateway binding before billing", async () => {
     vi.mocked(ai.image.binding).mockReturnValueOnce(null);
     const { token } = await signGgToken("user-1", 7);
     const res = await POST(request({ model_id: CARD.id, prompt: "x" }, token));

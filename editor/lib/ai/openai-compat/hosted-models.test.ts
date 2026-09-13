@@ -125,7 +125,7 @@ describe("hosted catalog", () => {
     }
   });
 
-  it("preserves image/video Vercel availability and the pricing-free public shape", () => {
+  it("preserves image/video Vercel AI Gateway availability and the pricing-free public shape", () => {
     const list = hostedModelList();
     expect(
       list

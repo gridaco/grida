@@ -3,7 +3,7 @@
 /**
  * GET /api/v1/ai/models — token-gated allowlist composed from the ONE
  * catalog: all text entries (deprecated flagged), image/video cards
- * with vercel bindings and listed Tripo generation/rigging models;
+ * with Vercel AI Gateway bindings and listed Tripo generation/rigging models;
  * tier annotation from the reverse tier map; no
  * pricing fields anywhere in the payload.
  */
@@ -46,7 +46,7 @@ describe("GET /api/v1/ai/models", () => {
     expect((await GET(request("junk"))).status).toBe(401);
   });
 
-  it("includes both verified GPT Image 2.5 Gateway bindings", async () => {
+  it("includes both verified GPT Image 2.5 Vercel AI Gateway bindings", async () => {
     const { token } = await signGgToken("user-1", 7);
     const res = await GET(request(token));
     expect(res.status).toBe(200);

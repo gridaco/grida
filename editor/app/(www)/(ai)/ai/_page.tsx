@@ -75,7 +75,8 @@ const markdown = {
 // for specific call sites.
 //
 // `@grida/ai-models/grida` is a pure data entry; `@/lib/ai/models` is NOT
-// imported here because it carries the server-only gateway/BYOK seam.
+// imported here because it carries the server-only Vercel AI Gateway/BYOK
+// provider seam.
 // ---------------------------------------------------------------------------
 type ModelOption = {
   id: string;

@@ -22,7 +22,7 @@ const QUALITY_TIERS = new Set(["high", "medium", "low"]);
  *   `avg_cost_usd` — the documented pricing-anchor behavior for
  *   in-envelope but off-preset sizes.
  * - `per_token` — fallback to the card's documented average approximation.
- *   The billing middleware prefers Gateway's actual response cost when present.
+ *   The billing middleware prefers Vercel AI Gateway's actual response cost when present.
  */
 export function computeImageCostMills(
   card: ai.image.ImageModelCard,

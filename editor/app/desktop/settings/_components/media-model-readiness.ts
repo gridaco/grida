@@ -15,8 +15,8 @@ export namespace MediaModelReadiness {
     return false;
   }
   /**
-   * Hosted image/video resolution follows the catalogue's Vercel binding,
-   * while BYOK resolution intersects every connected provider with the exact
+   * Hosted image/video resolution follows the catalogue's Vercel AI Gateway
+   * binding, while BYOK resolution intersects every connected provider with the exact
    * bindings on this card. A pending source keeps the result pending unless
    * the other source has already proved the model runnable.
    */

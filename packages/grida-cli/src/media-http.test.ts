@@ -259,7 +259,7 @@ describe("MediaHttp provider authority", () => {
       "https://ai-gateway.vercel.sh/v3/ai/image-model",
       "POST",
       {
-        authorization: "Bearer synthetic-gateway",
+        authorization: "Bearer synthetic-vercel-ai-gateway",
         "content-type": "application/json",
         "ai-model-id": "fixture",
         "ai-image-model-specification-version": "3",
@@ -272,7 +272,7 @@ describe("MediaHttp provider authority", () => {
       "https://ai-gateway.vercel.sh/v3/ai/video-model",
       "POST",
       {
-        authorization: "Bearer synthetic-gateway",
+        authorization: "Bearer synthetic-vercel-ai-gateway",
         "content-type": "application/json",
         "ai-video-model-specification-version": "3",
       },

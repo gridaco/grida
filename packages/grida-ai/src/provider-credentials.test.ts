@@ -126,7 +126,7 @@ describe("ProviderCredentials.normalize", () => {
     }
   );
 
-  it("admits current and opaque legacy Vercel keys without declaring them authenticated", () => {
+  it("admits current and opaque legacy Vercel AI Gateway keys without declaring them authenticated", () => {
     for (const value of [
       "vck_x",
       "vck_nonstandard!suffix",
@@ -216,7 +216,7 @@ describe("ProviderCredentials.check", () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it("accepts a Vercel legacy key only when the explicit check succeeds", async () => {
+  it("accepts a Vercel AI Gateway legacy key only when the explicit check succeeds", async () => {
     const { client } = setup(async () => Response.json(successes.vercel));
     await expect(
       client.check({ provider: "vercel", key: "opaque-legacy-key" })

@@ -66,7 +66,7 @@ describe("bundled model release metadata", () => {
 });
 
 describe("models.image.findImageModelCard", () => {
-  it("resolves a full vercel id", () => {
+  it("resolves a full Vercel AI Gateway id", () => {
     const card = models.image.findImageModelCard("bfl/flux-pro-1.1");
     expect(card?.id).toBe("bfl/flux-pro-1.1");
     expect(card?.label).toBe("Flux Pro 1.1");
@@ -186,16 +186,16 @@ describe("models.image provider-binding invariants", () => {
         "openrouter",
         "vercel",
       ]);
-      const vercel = models.image.binding(card, "vercel")!;
-      expect(vercel.id).toBe(card.id);
-      expect(vercel.pricing).toEqual({
+      const vercelAiGatewayBinding = models.image.binding(card, "vercel")!;
+      expect(vercelAiGatewayBinding.id).toBe(card.id);
+      expect(vercelAiGatewayBinding.pricing).toEqual({
         type: "per_token",
         input: 5,
         cached_input: 1.25,
         output: 30,
       });
-      expect(card.pricing).toEqual(vercel.pricing);
-      expect(vercel.references).toBeUndefined();
+      expect(card.pricing).toEqual(vercelAiGatewayBinding.pricing);
+      expect(vercelAiGatewayBinding.references).toBeUndefined();
       expect(models.image.supportsTransparentBackground(card, "vercel")).toBe(
         true
       );
@@ -240,7 +240,7 @@ describe("models.image provider-binding invariants", () => {
   });
 
   it("prices Recraft V4.1 at the raster rate every provider publishes", () => {
-    // Written from the providers, not the card: Vercel feed `pricing.image`,
+    // Written from the providers, not the card: Vercel AI Gateway feed `pricing.image`,
     // OpenRouter `/images/models/.../endpoints` `cost_usd`, and fal's model
     // page payload all say $0.035 (checked 2026-09-02). V3 is $0.04 on the
     // same three, which is why V4.1 is listed and V3 is not.
@@ -260,9 +260,9 @@ describe("models.image provider-binding invariants", () => {
   });
 
   it("prices Flux Kontext Pro at $0.04 and binds fal", () => {
-    // The card shipped at $0.05 while the gateway feed's `pricing.image` is
+    // The card shipped at $0.05 while the Vercel AI Gateway feed's `pricing.image` is
     // $0.04 — reachable over-deduction, since the hosted route gates on a
-    // vercel binding rather than `listed`. fal's page states the same $0.04.
+    // Vercel AI Gateway binding rather than `listed`. fal's page states the same $0.04.
     const kontext = models.image.models["bfl/flux-kontext-pro"]!;
     expect(kontext.pricing).toEqual({ type: "per_image_flat", usd: 0.04 });
     expect(models.image.binding(kontext, "vercel")?.pricing).toEqual({
@@ -276,8 +276,8 @@ describe("models.image provider-binding invariants", () => {
   });
 
   it("prices Flux 2 Pro and Max at the per-megapixel baseline every provider publishes", () => {
-    // Vercel model page, OpenRouter `cost_usd`/megapixel, fal "first megapixel"
-    // — all $0.03 (Pro) and $0.07 (Max), 2026-09-02. Pro's Vercel binding had
+    // Vercel AI Gateway model page, OpenRouter `cost_usd`/megapixel, fal "first megapixel"
+    // — all $0.03 (Pro) and $0.07 (Max), 2026-09-02. Pro's Vercel AI Gateway binding had
     // shipped at $0.06: a 2x hosted over-billing.
     for (const [id, usd] of [
       ["bfl/flux-2-pro", 0.03],
@@ -296,9 +296,9 @@ describe("models.image provider-binding invariants", () => {
   });
 
   it("lists Seedream 5.0 and deprecates 4.5", () => {
-    // Vercel feed `pricing.image` $0.035 for both 5.0 cards; fal $0.035 (Lite);
+    // Vercel AI Gateway feed `pricing.image` $0.035 for both 5.0 cards; fal $0.035 (Lite);
     // OpenRouter `cost_usd` $0.035 (Lite) / $0.045 (Pro 1K). 4.5 is $0.04 on
-    // Vercel and fal — dominated by Lite on price and generation.
+    // Vercel AI Gateway and fal — dominated by Lite on price and generation.
     const lite = models.image.models["bytedance/seedream-5.0-lite"]!;
     expect(lite.listed).toBe(true);
     for (const p of ["vercel", "fal", "openrouter"] as const) {
@@ -457,7 +457,7 @@ describe("models.image.supportsTransparentBackground", () => {
 
   it("declares only verified native transparency and provider exposure", () => {
     // Published fal schemas expose transparent backgrounds for GPT Image 2
-    // and both 2.5 variants. OpenRouter's enums exclude it. Vercel publishes
+    // and both 2.5 variants. OpenRouter's enums exclude it. Vercel AI Gateway publishes
     // support for 2.5 but not GPT Image 2 (verified 2026-09-09 KST).
     for (const id of [
       "openai/gpt-image-2",
@@ -725,12 +725,12 @@ describe("models.video catalogue invariants", () => {
     }
   });
 
-  it("prices Veo 3.1 with the gateway's full audio/resolution matrix", () => {
+  it("prices Veo 3.1 with Vercel AI Gateway's full audio/resolution matrix", () => {
     // Written from the provider, not from the card: these are the exact
-    // `video_duration_pricing` rows the Vercel gateway's /v1/models feed
+    // `video_duration_pricing` rows the Vercel AI Gateway's /v1/models feed
     // returns for `google/veo-3.1-generate-001` (checked 2026-09-02).
     // The card previously claimed audio-on-only at <=1080p, so a 4K request
-    // was rejected for want of a rate. The gateway meters both modes, and
+    // was rejected for want of a rate. Vercel AI Gateway meters both modes, and
     // fal meters the same matrix.
     // https://vercel.com/ai-gateway/models/veo-3.1-generate-001
     const matrix = {
@@ -746,7 +746,7 @@ describe("models.video catalogue invariants", () => {
     }
   });
 
-  it("prices Veo 3.1 Fast and Lite with the matrices Vercel and fal both publish", () => {
+  it("prices Veo 3.1 Fast and Lite with the matrices Vercel AI Gateway and fal both publish", () => {
     const fast = {
       "720p": { audio: 0.15, silent: 0.1 },
       "1080p": { audio: 0.15, silent: 0.1 },
@@ -769,7 +769,7 @@ describe("models.video catalogue invariants", () => {
     }
   });
 
-  it("prices Wan 3.0 per resolution, audio bundled, identically on Vercel and fal", () => {
+  it("prices Wan 3.0 per resolution, audio bundled, identically on Vercel AI Gateway and fal", () => {
     const wan = models.video.models["alibaba/wan-3.0"]!;
     expect(wan).toMatchObject({ min_duration: 2, max_duration: 30 });
     for (const p of ["vercel", "fal"] as const) {
@@ -781,10 +781,10 @@ describe("models.video catalogue invariants", () => {
     }
   });
 
-  it("withholds a Vercel binding from token-metered Seedance", () => {
-    // The gateway serves both Seedance cards but bills `video_token_pricing`,
+  it("withholds a Vercel AI Gateway binding from token-metered Seedance", () => {
+    // Vercel AI Gateway serves both Seedance cards but bills `video_token_pricing`,
     // which `PerSecondPricing` cannot express and the hosted route cannot
-    // pre-price. A per-second Vercel binding here would be invented — and
+    // pre-price. A per-second Vercel AI Gateway binding here would be invented — and
     // was, on 2.0, until 2026-09-02. fal states per-second rates.
     for (const id of ["bytedance/seedance-2.0", "bytedance/seedance-2.5"]) {
       const card = models.video.models[id]!;
@@ -811,7 +811,7 @@ describe("models.video catalogue invariants", () => {
 
     const grok = models.video.models["xai/grok-imagine-video-1.5"]!;
     expect(grok).toMatchObject({ min_duration: 1, max_duration: 15 });
-    // Vercel serves every SpaceXAI model under `spacexai/`, so the call id is not
+    // Vercel AI Gateway serves every SpaceXAI model under `spacexai/`, so the call id is not
     // this card's canonical `xai/` id. Reusing the canonical id here is a 404
     // at call time — which is how the binding was first shipped.
     // https://vercel.com/ai-gateway/models/grok-imagine-video-1.5

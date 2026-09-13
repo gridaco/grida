@@ -8,8 +8,8 @@ function fakeSecrets(keys: Record<string, string>): SecretsStore {
   } as unknown as SecretsStore;
 }
 
-// Veo 3.1 binds vercel + fal; Seedance 2.0 binds fal + openrouter but NOT
-// vercel — the gateway meters it per token, which the catalogue cannot price.
+// Veo 3.1 binds Vercel AI Gateway + fal; Seedance 2.0 binds fal + OpenRouter.
+// Vercel AI Gateway meters Seedance per token, which the catalogue cannot price.
 const VEO = "google/veo-3.1";
 const SEEDANCE = "bytedance/seedance-2.0";
 
@@ -27,7 +27,7 @@ describe("resolveVideoModel", () => {
     expect(Object.isFrozen(r)).toBe(true);
   });
 
-  it("prefers Vercel over fal when both keys exist", async () => {
+  it("prefers Vercel AI Gateway over fal when both keys exist", async () => {
     const r = await resolveVideoModel(
       { secrets: fakeSecrets({ vercel: "sk-v", fal: "sk-fal" }) },
       VEO
@@ -37,7 +37,7 @@ describe("resolveVideoModel", () => {
   });
 
   it("falls through when the only key's provider does not serve the model", async () => {
-    // Seedance has no vercel binding — a Vercel-only user can't run it.
+    // Seedance has no Vercel AI Gateway binding — a Vercel AI Gateway-only user can't run it.
     await expect(
       resolveVideoModel({ secrets: fakeSecrets({ vercel: "sk-v" }) }, SEEDANCE)
     ).rejects.toBeInstanceOf(VideoModelUnavailableError);

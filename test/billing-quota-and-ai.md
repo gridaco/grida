@@ -212,7 +212,7 @@ A contributor sets a `BYOK_*` key (e.g. `BYOK_OPENROUTER_API_KEY`). AI call goes
 ### TC-BILLING-AI-036 — BYOK key accidentally set on a hosted deploy
 
 Bug: a `BYOK_*` secret leaks into a hosted/preview deploy.
-**Expected:** There is **no code-level production guard** (by design — same server-env trust model as `OPENAI_API_KEY` / `REPLICATE_API_TOKEN`). With the key set, every org's calls bypass billing and the org-id sanity gate (auth still holds). This is a documented residual risk (see `SECURITY.md` GRIDA-SEC-003), mitigated operationally by never setting the secret in the hosted product — not by code. There is no "production check" to fail.
+**Expected:** There is **no code-level production guard** (by design — same trust model as other server-only credentials). With the key set, every org's calls bypass billing and the org-id sanity gate (auth still holds). This is a documented residual risk (see `SECURITY.md` GRIDA-SEC-003), mitigated operationally by never setting the secret in the hosted product — not by code. There is no "production check" to fail.
 
 ### TC-BILLING-AI-037 — Disabled model attempted
 

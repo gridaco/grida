@@ -119,7 +119,7 @@ describe("MediaModelAvailability.image", () => {
     ).toBe(true);
   });
 
-  it("only offers hosted readiness on models with a Vercel binding", () => {
+  it("only offers hosted readiness on models with a Vercel AI Gateway binding", () => {
     const hosted = { ...ready, configured: [], hosted: true };
     expect(MediaModelAvailability.image(gpt2, hosted).available).toBe(true);
     expect(MediaModelAvailability.image(flare, hosted).available).toBe(false);
@@ -150,7 +150,7 @@ describe("MediaModelAvailability.image", () => {
     ).toBe(true);
   });
 
-  it("permits hosted transparency only when the Vercel binding verifies it", () => {
+  it("permits hosted transparency only when the Vercel AI Gateway binding verifies it", () => {
     const hosted = { ...ready, configured: [], hosted: true };
     const verified: models.image.ImageModelCard = {
       ...gpt2,

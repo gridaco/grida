@@ -65,9 +65,11 @@ vi.mock("@/lib/ai/models", async (orig) => {
     // BYOK active: the seam's language provider is the BARE provider.
     byok: { languageModel: bareModel },
     isByokActive: () => true,
-    gateway: {
+    vercelAiGateway: {
       languageModel: () => {
-        throw new Error("gateway must not be used under BYOK text path");
+        throw new Error(
+          "Vercel AI Gateway must not be used under BYOK text path"
+        );
       },
       imageModel: () => {
         throw new Error("unused");
