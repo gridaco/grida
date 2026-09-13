@@ -2,7 +2,7 @@
 name: "Desktop: Bug report"
 about: Report a bug specific to the Grida Desktop app (Electron)
 title: "[Desktop] "
-labels: desktop
+labels: "bug, desktop"
 assignees: softmarshmallow
 ---
 
