@@ -8,6 +8,7 @@ const tables = [
   models.audio.sound_effects.models,
   models.audio.text_to_speech.models,
   models.three_d.models,
+  models.three_d.model_generation.models,
   models.image_tools.models,
 ];
 

@@ -19,6 +19,7 @@ export class Output {
     if (this.json) this.stdout(JSON.stringify({ error }) + "\n");
     else {
       this.stderr(`grida: ${Output.text(error.message)} (${error.code})\n`);
+      if (error.task_id) this.stderr(`  Task: ${Output.text(error.task_id)}\n`);
       if (error.directory)
         this.stderr(`  Output: ${Output.text(error.directory)}\n`);
       for (const saved of error.saved ?? [])
@@ -48,6 +49,8 @@ export namespace Output {
   export type Failure = {
     code: string;
     message: string;
+    /** Validated provider task identifier for accepted work that did not return bytes. */
+    task_id?: string;
     choices?: readonly { id: number; name: string; display_name: string }[];
     choices_truncated?: boolean;
     directory?: string;

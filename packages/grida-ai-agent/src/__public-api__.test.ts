@@ -134,12 +134,14 @@ describe("@grida/agent public API", () => {
         "vercel",
         "fal",
         "elevenlabs",
+        "tripo",
       ]);
       expect(BYOK_PROVIDER_METADATA.map((provider) => provider.label)).toEqual([
         "OpenRouter",
         "Vercel",
         "fal",
         "ElevenLabs",
+        "Tripo",
       ]);
       // The modality matrix drives image/video resolver routing (via
       // byokProvidersFor) — pin it so a bad metadata edit can't silently
@@ -151,6 +153,7 @@ describe("@grida/agent public API", () => {
         { id: "vercel", modalities: ["text", "image", "video"] },
         { id: "fal", modalities: ["image", "video"] },
         { id: "elevenlabs", modalities: [] },
+        { id: "tripo", modalities: [] },
       ]);
       const byok: ByokProviderId = "vercel";
       const metadata: ByokProviderMetadata = BYOK_PROVIDER_METADATA[0];
@@ -383,6 +386,11 @@ describe("@grida/agent public API", () => {
         gg_host: "grida.co",
       });
       expect(policy.network.allowed_domains).toContain("openrouter.ai");
+      expect(policy.network.allowed_domains).toContain("openapi.tripo3d.ai");
+      expect(policy.network.allowed_domains).toContain("cdn.tripo3d.ai");
+      expect(policy.network.allowed_domains).toContain(
+        "tripo-data.rg1.data.tripo3d.com"
+      );
       expect(policy.network.allowed_domains).toEqual(
         expect.arrayContaining(["grida.co", "*.grida.co"])
       );
@@ -425,6 +433,10 @@ describe("@grida/agent public API", () => {
         "*.fal.run",
         "fal.media",
         "*.fal.media",
+        "api.elevenlabs.io",
+        "openapi.tripo3d.ai",
+        "cdn.tripo3d.ai",
+        "tripo-data.rg1.data.tripo3d.com",
         "grida.co",
         "*.grida.co",
       ]) {

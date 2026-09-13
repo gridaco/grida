@@ -35,6 +35,8 @@ export const BYOK_PROVIDER_METADATA = [
     // the owning audio surfaces.
     modalities: [],
   },
+  // Tripo exposes named 3D features, not a generic text/image/video resolver.
+  { id: "tripo", label: "Tripo", modalities: [] },
 ] as const;
 
 export type ByokProviderMetadata = (typeof BYOK_PROVIDER_METADATA)[number];

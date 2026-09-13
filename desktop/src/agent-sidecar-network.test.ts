@@ -4,6 +4,53 @@ import { AgentSidecarChannel } from "./agent-sidecar-channel";
 import { AgentSidecarNetwork } from "./agent-sidecar-network";
 
 describe("AgentSidecarNetwork", () => {
+  it("admits a bounded multipart mesh upload above the ordinary provider limit", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    const result = harness.network.providerHttp.request(
+      "https://openapi.tripo3d.ai/v3/files",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "multipart/form-data; boundary=grida-upload",
+        },
+        body: new Uint8Array(33 * 1024 * 1024),
+      }
+    );
+    const request = await harness.untilFrame("request.start");
+    const rejection = result.catch((error: unknown) => error);
+    await harness.host.write({
+      v: 1,
+      type: "response.error",
+      requestId: request.requestId,
+      code: "denied",
+      message: "synthetic stop before provider access",
+    });
+    expect(await rejection).toMatchObject({
+      message: expect.stringContaining("synthetic stop"),
+    });
+    harness.network.close();
+  });
+
+  it("rejects ordinary provider bodies above 32 MiB before framing a request", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    await expect(
+      harness.network.providerHttp.request(
+        "https://openapi.tripo3d.ai/v3/animations/rig",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: new Uint8Array(33 * 1024 * 1024),
+        }
+      )
+    ).rejects.toThrow("exceeds the Desktop limit");
+    expect(harness.frames.some((frame) => frame.type === "request.start")).toBe(
+      false
+    );
+    harness.network.close();
+  });
+
   it("executes a host command and reconstructs the daemon shell result", async () => {
     const harness = createHarness();
     await harness.bootstrap();
@@ -471,9 +518,9 @@ describe("AgentSidecarNetwork", () => {
     const body = new ReadableStream<Uint8Array>({
       start(stream) {
         setImmediate(() => {
-          controller.abort();
           stream.enqueue(new TextEncoder().encode("late"));
           stream.close();
+          controller.abort();
         });
       },
     });
@@ -493,6 +540,52 @@ describe("AgentSidecarNetwork", () => {
       false
     );
     harness.network.close();
+  });
+
+  it("aborts a nonproducing request body without awaiting source cancellation", async () => {
+    const harness = createHarness();
+    await harness.bootstrap();
+    const controller = new AbortController();
+    let reading!: () => void;
+    const started = new Promise<void>((resolve) => {
+      reading = resolve;
+    });
+    const cancel = vi.fn<() => Promise<void>>(() => new Promise(() => {}));
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull() {
+          reading();
+          return new Promise(() => {});
+        },
+        cancel,
+      },
+      { highWaterMark: 0 }
+    );
+    const init: RequestInit & { duplex: "half" } = {
+      method: "POST",
+      body,
+      signal: controller.signal,
+      duplex: "half",
+    };
+    let failure: unknown;
+    const pending = harness.network.providerHttp
+      .request("https://openrouter.ai/api/v1/chat/completions", init)
+      .catch((error: unknown) => {
+        failure = error;
+      });
+    await started;
+    controller.abort();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    try {
+      expect(failure).toMatchObject({ name: "AbortError" });
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(
+        harness.frames.some((frame) => frame.type === "request.start")
+      ).toBe(false);
+      await pending;
+    } finally {
+      harness.network.close();
+    }
   });
 
   it("ignores bounded late response frames after body cancellation", async () => {
@@ -564,7 +657,7 @@ describe("AgentSidecarNetwork", () => {
         {
           id: "provider:built-in",
           lane: "provider",
-          origins: ["https://openrouter.ai"],
+          origins: ["https://openrouter.ai", "https://openapi.tripo3d.ai"],
         },
         {
           id: "download:provider-assets",
@@ -622,7 +715,7 @@ function createHarness(sidecarOutput: Transform = new PassThrough()) {
           {
             id: "provider:built-in",
             lane: "provider",
-            origins: ["https://openrouter.ai"],
+            origins: ["https://openrouter.ai", "https://openapi.tripo3d.ai"],
           },
           {
             id: "download:provider-assets",

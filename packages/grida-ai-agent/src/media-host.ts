@@ -14,6 +14,8 @@ import { registerSecretsRoutes } from "./http/routes/secrets";
 import { registerGridaAuthRoutes } from "./http/routes/gg-auth";
 import { registerImagesRoutes } from "./http/routes/images";
 import { registerVideoRoutes } from "./http/routes/video";
+import { registerModelGenerationRoutes } from "./http/routes/model-generation";
+import { registerRiggingRoutes } from "./http/routes/rigging";
 import { registerThreeDRoutes } from "./http/routes/three-d";
 import { registerMusicRoutes } from "./http/routes/music";
 import { registerSoundEffectsRoutes } from "./http/routes/sound-effects";
@@ -105,6 +107,20 @@ export class MediaHost {
       });
     }
     if (caps.three_d) {
+      registerRiggingRoutes(app, {
+        gg: gridaSession,
+        gg_base_url: gridaGatewayBaseUrl,
+        secrets: services.secrets,
+        media: services.media,
+        provider_http: providerHttp,
+      });
+      registerModelGenerationRoutes(app, {
+        gg: gridaSession,
+        gg_base_url: gridaGatewayBaseUrl,
+        secrets: services.secrets,
+        media: services.media,
+        provider_http: providerHttp,
+      });
       registerThreeDRoutes(app, {
         secrets: services.secrets,
         media: services.media,

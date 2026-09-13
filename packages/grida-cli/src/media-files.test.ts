@@ -380,6 +380,38 @@ describe("MediaFiles.readImage", () => {
   );
 });
 
+describe("MediaFiles.readMesh", () => {
+  it("admits GLB by header with the caller's byte bound, not by extension", async () => {
+    const file = path.join(await temporary(), "mesh.bin");
+    const bytes = Buffer.alloc(20);
+    bytes.writeUInt32LE(0x46546c67, 0);
+    bytes.writeUInt32LE(2, 4);
+    bytes.writeUInt32LE(bytes.length, 8);
+    await writeFile(file, bytes);
+    expect(await MediaFiles.readMesh(file, signal(), 20)).toEqual({
+      data: bytes,
+      media_type: "model/gltf-binary",
+    });
+    await expect(MediaFiles.readMesh(file, signal(), 19)).rejects.toMatchObject(
+      { code: "input_unavailable" }
+    );
+    bytes.writeUInt32LE(3, 4);
+    await writeFile(file, bytes);
+    await expect(MediaFiles.readMesh(file, signal(), 20)).rejects.toMatchObject(
+      { code: "invalid_input" }
+    );
+  });
+  it.each(["-", "https://example.com/model.glb", "file:///tmp/model.glb"])(
+    "does not read ambient source %s",
+    async (source) => {
+      await expect(
+        MediaFiles.readMesh(source, signal(), 100)
+      ).rejects.toMatchObject({ code: "invalid_input" });
+      expect(open).not.toHaveBeenCalled();
+    }
+  );
+});
+
 describe("generation artifacts", () => {
   it("reserves a fresh directory before submission and refuses existing output", async () => {
     const root = await temporary();

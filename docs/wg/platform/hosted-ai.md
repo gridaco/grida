@@ -21,14 +21,14 @@ tags:
   - ai
 ---
 
-| feature id | status                 | description                                                                                               |
-| ---------- | ---------------------- | --------------------------------------------------------------------------------------------------------- |
-| `gg`       | implemented (text/i/v) | No-BYOK AI for the desktop app: scoped-token federation → first-party metered gateway → org-credit spend. |
+| feature id | status      | description                                                                           |
+| ---------- | ----------- | ------------------------------------------------------------------------------------- |
+| `gg`       | implemented | No-BYOK AI: scoped-token federation → first-party metered gateway → org-credit spend. |
 
 # Grida Gateway (GG)
 
 **Grida Gateway** — **GG** — is the path by which a signed-in user runs AI
-— chat, image, and video — **without supplying their own model key** (no
+— chat, image, video, music, and supported 3D features — **without supplying their own model key** (no
 "bring your own key"), billed to their organization's prepaid credit. This
 doc is the canonical spec for _how an untrusted native client is allowed to
 spend credits_ and _why the design is shaped the way it is_. It sits on top
@@ -132,6 +132,28 @@ blast radius, upstream keys never exposed). For a product that bills per
 use, that is the correct trade, and it is the one every shipping peer made.
 
 ## Architecture
+
+### 3D feature funding
+
+Model generation, compatibility checking and rigging are separate features
+within the 3D family. Funding is independent of that feature identity: choosing
+organization credits preserves the same model version and supported controls
+as a direct provider-key operation. A compatibility check never implicitly
+starts a rigging job. ElevenLabs remains outside this funded expansion.
+
+Large input files may travel directly to provider storage under a narrowly
+scoped upload capability. That capability authorizes a storage-object upload; it is
+not an upstream inference key and cannot spend credits. A separate short-lived
+content reference binds the uploaded input to its user and organization. Every
+feature invocation must independently authenticate, verify that ownership and
+pass the credit gate. A client cannot transfer another tenant's input reference
+or supply an arbitrary URL for the gateway to fetch.
+
+The gateway meters provider-reported terminal usage, including a completed paid
+job whose model download subsequently fails. It never trusts a client-reported
+cost. An absent usage receipt remains unknown and requires reconciliation; it
+must not be relabeled as zero-cost usage. The outstanding reconciliation
+limitation is recorded in the [billing register](./billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation).
 
 ```mermaid
 sequenceDiagram

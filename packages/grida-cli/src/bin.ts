@@ -45,6 +45,14 @@ try {
       process.exitCode = await ProviderCommands.run(invocation, output);
       break;
     }
+    case "rigging list":
+    case "rigging inspect":
+    case "rigging check":
+    case "rigging run": {
+      const { RiggingCommands } = await import("./rigging-run");
+      process.exitCode = await RiggingCommands.run(invocation, output);
+      break;
+    }
     default: {
       const { run } = await import("./run");
       process.exitCode = await run(invocation, output);

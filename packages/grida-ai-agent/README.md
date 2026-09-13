@@ -18,8 +18,8 @@ It owns three agent-system concerns:
 
 - **The agent tenant.** `createAgentTenant` registers the AI route
   groups (`/agent`, `/events`, `/sessions`, `/secrets`, `/providers`,
-  `/images`, `/video`, `/three-d`, `/audio/music`, `/audio/sound-effects`,
-  `/audio/text-to-speech`, and optional native-provider auth)
+  `/images`, `/video`, `/three-d`, `/model-generation`, `/audio/music`, `/audio/sound-effects`,
+  `/audio/text-to-speech`, `/rigging`, and optional native-provider auth)
   through the daemon's `DaemonTenant` seam, and
   owns their state — the run loop, chat sessions (SQLite), BYOK
   and native-provider resolution, endpoint configs. `createAgentDaemon` is the
@@ -112,6 +112,32 @@ structural request admission, bounded base64 decoding, `model.glb`, wire encodin
 optional root-level receipts and its one-generation-at-a-time memory budget.
 Catalogue options beyond the implemented single-image/text paths are not exposed
 by this route. Future 3D workflows need their own reviewed host wire adaptations.
+
+The model-generation route uses `TripoClient` for explicit Tripo BYOK or Grida credits. Model
+identity (H3.1, P1 or P2 Preview) is separate from the explicit model-generation
+feature and its text, image or named multiview input. `AgentTransport.Client`'s
+`modelGeneration.generate` accepts the SDK JSON input, with base64 in image
+`data` fields, under a 48 MiB total request limit. The SDK validates inputs
+before credential access and returns an uncompressed, self-contained GLB.
+The host returns GLB bytes, a safe task ID and reported Tripo credits, plus
+an optional media receipt. Tripo account credit failures remain attributed to
+Tripo. Accepted work is never resubmitted after a timeout or download failure.
+Remeshing and other processing operations need distinct feature contracts;
+they are not advertised by this generation route. The existing `three_d` host
+capability gates the 3D generation and mesh-processing route groups.
+
+The rigging routes independently use the neutral SDK `RiggingClient` and
+`RiggingOperations`. `AgentTransport.Client.rigging.check` returns structured
+eligibility and a safe task receipt without creating media or inventing a model
+identity. `rigging.generate` accepts an explicit rig model, rig type and spec,
+then returns portable GLB bytes and an optional media receipt. Both requests
+carry inline base64 GLB mesh data, bounded by the SDK's 60,000,000-byte limit;
+no source paths or provider URLs are accepted. One check or rig operation holds
+the group's memory reservation from body admission through result persistence.
+Input bytes and existing saved media remain unchanged; rigged output is a new
+media item. The routes use explicit Tripo BYOK or GG through the host transport, never
+switch funding accounts, and never resubmit accepted work after failure. They are mounted in
+both the media-only and full-agent compositions.
 
 ## Independent media startup
 
@@ -378,3 +404,13 @@ backend I/O and revalidates pending or cached directory grants. An ancestor such
 as the entire Grida home is refused too; ordinary workspace symlinks continue to
 use the daemon filesystem's containment checks. These are application authority
 checks, not protection against a hostile local process racing path mutations.
+
+Tripo generation and rigging requests preserve their byte/base64 input schemas
+and explicitly select `provider: "tripo" | "gg"`. Both native host compositions
+pass their existing memory-only GG session store and configured gateway origin
+to the SDK. GG uploads use the SDK's exact signed Tripo S3 PUT authority and
+hosted JSON result; no key, signed upload reference, or expiring output URL is
+returned to the renderer. An expired scoped grant or insufficient credits
+returns the existing actionable code without falling back to BYOK. Accepted
+task identities remain visible in safe errors, including failures after the
+provider accepted a task. Neither adapter retries a paid operation.

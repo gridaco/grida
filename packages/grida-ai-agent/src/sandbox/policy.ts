@@ -28,6 +28,12 @@ const BYOK_PROVIDER_NETWORK_HOSTS = {
   // directly from the API; voice discovery uses the same origin. There is no
   // separate provider-asset download origin to admit.
   elevenlabs: ["api.elevenlabs.io"],
+  // Tripo's own API is independent from its fal-hosted model bindings.
+  tripo: [
+    "openapi.tripo3d.ai",
+    "cdn.tripo3d.ai",
+    "tripo-data.rg1.data.tripo3d.com",
+  ],
 } as const satisfies Record<ByokProviderId, readonly string[]>;
 
 /**

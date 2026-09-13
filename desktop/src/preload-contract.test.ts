@@ -33,6 +33,13 @@ describe("Desktop preload agent seam", () => {
   });
 
   it("delegates media generation through the agent transport", () => {
+    expect(preloadSource).toContain("rigging: true");
+    expect(preloadSource).toContain(
+      "check: (req) => agentClient.rigging.check(req)"
+    );
+    expect(preloadSource).toContain(
+      "generate: (req) => agentClient.rigging.generate(req)"
+    );
     expect(preloadSource).toContain(
       "generate: (req) => agentClient.threeD.generate(req)"
     );

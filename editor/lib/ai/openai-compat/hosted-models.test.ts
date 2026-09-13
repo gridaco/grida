@@ -43,6 +43,27 @@ vi.mock("@grida/ai-models/grida", async (importOriginal) => {
         catalog: members,
         listed_models: () => view.listed(),
       },
+      three_d: {
+        ...actual.catalog.three_d,
+        model_generation: {
+          ...actual.catalog.three_d.model_generation,
+          listed_models: () =>
+            actual.catalog.three_d.model_generation
+              .listed_models()
+              .map((card) => ({
+                ...card,
+                deprecated: card.id === "tripo/h3.1",
+              })),
+        },
+        rigging: {
+          ...actual.catalog.three_d.rigging,
+          listed_models: () =>
+            actual.catalog.three_d.rigging.listed_models().map((card) => ({
+              ...card,
+              deprecated: card.id === "tripo/rig-v1.0",
+            })),
+        },
+      },
     },
   };
 });
@@ -136,10 +157,50 @@ describe("hosted catalog", () => {
       ]);
       expect(Object.keys(entry.grida)).toEqual([
         "modality",
+        ...(entry.grida.modality === "three-d" ? ["feature"] : []),
         "tier",
         "label",
         "deprecated",
       ]);
     }
   });
+  it("advertises listed Tripo models by explicit feature without exposing provider credentials or pricing", () => {
+    const threeD = hostedModelList().filter(
+      (entry) => entry.grida.modality === "three-d"
+    );
+    for (const [feature, cards] of [
+      ["model-generation", models.three_d.model_generation.listed_models()],
+      ["rigging", models.three_d.rigging.listed_models()],
+    ] as const) {
+      expect(
+        threeD
+          .filter((entry) => entry.grida.feature === feature)
+          .map((entry) => entry.id)
+      ).toEqual(cards.map((card) => card.id));
+    }
+    expect(threeD).toHaveLength(5);
+    expect(threeD.every((entry) => entry.owned_by === "tripo")).toBe(true);
+    expect(
+      hostedModelList().some((entry) => entry.id === "tripo/rig-check")
+    ).toBe(false);
+  });
+
+  it.each([
+    ["model-generation", "tripo/h3.1", "tripo/p1"],
+    ["rigging", "tripo/rig-v1.0", "tripo/rig-v2.5"],
+  ] as const)(
+    "preserves listed %s deprecation without removing the model",
+    (feature, legacy, active) => {
+      const entries = hostedModelList().filter(
+        (entry) =>
+          entry.grida.modality === "three-d" && entry.grida.feature === feature
+      );
+      expect(
+        entries.find((entry) => entry.id === legacy)?.grida.deprecated
+      ).toBe(true);
+      expect(
+        entries.find((entry) => entry.id === active)?.grida.deprecated
+      ).toBe(false);
+    }
+  );
 });

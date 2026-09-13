@@ -12,6 +12,7 @@ import {
   SoundEffectClient,
   TextToSpeechClient,
   ThreeDClient,
+  TripoClient,
   VideoClient,
   type ProviderHttpTransport,
 } from "@grida/ai";
@@ -176,12 +177,7 @@ export namespace MediaCommands {
       const parsed =
         invocation.command === "generate"
           ? operations.parseInput(
-              {
-                kind: descriptor!.kind,
-                model_id: descriptor!.model_id,
-                provider: descriptor!.provider_id,
-                variant: descriptor!.variant,
-              },
+              MediaInput.selector(descriptor!),
               await MediaInput.read(descriptor!, invocation, signal, host.stdin)
             )
           : undefined;
@@ -342,6 +338,8 @@ async function generate(
       return [(await operation.generate({ ...parsed.input, signal })).audio];
     }
     case "three-d": {
+      if (parsed.provider_id === "tripo" || parsed.provider_id === "gg")
+        return generateTripo(parsed, host, signal);
       const client = new ThreeDClient({ keys: host.keys, http: host.http });
       // Exact endpoint contracts keep future 3D capabilities from inheriting an
       // accidental universal shape. Each new contract earns an explicit branch.
@@ -363,6 +361,69 @@ async function generate(
         }
       }
     }
+  }
+}
+
+async function generateTripo(
+  parsed: Extract<MediaOperations.Parsed, { feature: "model-generation" }>,
+  host: {
+    keys: ProviderCredentials;
+    http: ProviderHttp;
+    gg: GridaGatewaySessionStore;
+    ggOrigin?: string;
+  },
+  signal: AbortSignal
+): Promise<readonly MediaFiles.Artifact[]> {
+  const client = new TripoClient({
+    keys: host.keys,
+    http: host.http,
+    gg: host.gg,
+    gg_base_url: host.ggOrigin,
+  });
+  const check = () => {
+    if (signal.aborted) throw new MediaFiles.Failure("cancelled");
+  };
+  // Preserve the SDK's correlation between model controls and input variant.
+  // H3.1 owns geometry_quality; P1/P2 share the narrower controls.
+  switch (parsed.model_id) {
+    case "tripo/h3.1":
+      switch (parsed.variant) {
+        case "text": {
+          const operation = await client.resolve(parsed.selection);
+          check();
+          return [(await operation.generate({ ...parsed.input, signal })).glb];
+        }
+        case "image": {
+          const operation = await client.resolve(parsed.selection);
+          check();
+          return [(await operation.generate({ ...parsed.input, signal })).glb];
+        }
+        case "multiview": {
+          const operation = await client.resolve(parsed.selection);
+          check();
+          return [(await operation.generate({ ...parsed.input, signal })).glb];
+        }
+      }
+      break;
+    case "tripo/p1":
+    case "tripo/p2":
+      switch (parsed.variant) {
+        case "text": {
+          const operation = await client.resolve(parsed.selection);
+          check();
+          return [(await operation.generate({ ...parsed.input, signal })).glb];
+        }
+        case "image": {
+          const operation = await client.resolve(parsed.selection);
+          check();
+          return [(await operation.generate({ ...parsed.input, signal })).glb];
+        }
+        case "multiview": {
+          const operation = await client.resolve(parsed.selection);
+          check();
+          return [(await operation.generate({ ...parsed.input, signal })).glb];
+        }
+      }
   }
 }
 
@@ -426,15 +487,19 @@ function failure(error: unknown, output: Output) {
     error instanceof MusicClient.Failure ||
     error instanceof SoundEffectClient.Failure ||
     error instanceof TextToSpeechClient.Failure ||
-    error instanceof ThreeDClient.Failure
+    error instanceof ThreeDClient.Failure ||
+    error instanceof TripoClient.Failure
   ) {
     output.failure({
       code: error.code,
+      ...(error instanceof TripoClient.Failure && error.task_id
+        ? { task_id: error.task_id }
+        : {}),
       message:
         error.code === "provider_key_required"
           ? "Configure the selected provider with grida providers configure, or supply its environment key or --key-stdin."
           : error.code === "insufficient_credits"
-            ? "Grida credits are insufficient for this operation."
+            ? "Credits are insufficient for the selected funding account."
             : "Media operation failed. An accepted request may still be charged; no automatic retry was made.",
     });
   } else {

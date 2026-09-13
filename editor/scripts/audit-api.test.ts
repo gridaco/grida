@@ -28,6 +28,31 @@ const DEFINITIONS = {
     cache: "no-store",
   },
 } as const;
+const GG_MEDIA_ROUTE = "app/(api)/(public)/api/v1/ai/3d/rigging/route.ts";
+const GG_MEDIA_DEFINITIONS = {
+  ...DEFINITIONS,
+  "gg.3d.rigging": {
+    path: "/api/v1/ai/3d/rigging",
+    methods: ["POST", "OPTIONS"],
+    authority: "gg",
+    binding: "gg-media",
+    cache: "no-store",
+  },
+} as const;
+const GG_MEDIA_TEMPLATE = `
+import { ggMediaApi } from "@/lib/api/gg-media";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 800;
+const handlers = ggMediaApi.bind("gg.3d.rigging");
+export const GET = handlers.GET;
+export const HEAD = handlers.HEAD;
+export const OPTIONS = handlers.OPTIONS;
+export const POST = handlers.POST;
+export const PUT = handlers.PUT;
+export const PATCH = handlers.PATCH;
+export const DELETE = handlers.DELETE;
+`;
 const roots: string[] = [];
 
 async function fixture(
@@ -65,6 +90,102 @@ afterEach(async () => {
   await Promise.all(
     roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))
   );
+});
+
+describe("GG funded media source binding", () => {
+  it("admits the fixed binding and its one explicitly reviewed execution seam", async () => {
+    expect(
+      await fixture(
+        {
+          [GG_MEDIA_ROUTE]: GG_MEDIA_TEMPLATE,
+          "lib/api/gg-media.ts":
+            'import { GgThreeD } from "../ai/gg-three-d"; export namespace ggMediaApi {}',
+          "lib/ai/gg-three-d.ts":
+            'import "../supabase/server"; export namespace GgThreeD {}',
+          "lib/supabase/server.ts": 'import "next/headers";',
+        },
+        GG_MEDIA_DEFINITIONS
+      )
+    ).toEqual([]);
+  });
+
+  it("does not let an account owner use the paid execution import exception", async () => {
+    expect(
+      await fixture({
+        "lib/api/account.ts": 'import "../ai/gg-three-d";',
+        "lib/ai/gg-three-d.ts": 'import "../supabase/server";',
+        "lib/supabase/server.ts": 'import "next/headers";',
+      })
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "forbidden-source" }),
+      ])
+    );
+  });
+
+  it("does not permit browser dependencies directly in the fixed GG adapter", async () => {
+    expect(
+      await fixture(
+        {
+          [GG_MEDIA_ROUTE]: GG_MEDIA_TEMPLATE,
+          "lib/api/gg-media.ts":
+            'import "next/headers"; export namespace ggMediaApi {}',
+        },
+        GG_MEDIA_DEFINITIONS
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "forbidden-import" }),
+      ])
+    );
+  });
+
+  it.each([
+    GG_MEDIA_TEMPLATE.replace("handlers.POST", "handlers.GET"),
+    GG_MEDIA_TEMPLATE + '\nexport const extra = "bypass";',
+    GG_MEDIA_TEMPLATE.replace("maxDuration = 800", "maxDuration = 900"),
+  ])("rejects altered funded binding exports", async (template) => {
+    expect(
+      await fixture(
+        {
+          [GG_MEDIA_ROUTE]: template,
+          "lib/api/gg-media.ts": "export namespace ggMediaApi {}",
+        },
+        GG_MEDIA_DEFINITIONS
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "route-binding" }),
+      ])
+    );
+  });
+
+  it("rejects a new legacy exception or a different credential family", async () => {
+    for (const change of [
+      { binding: "legacy" },
+      { authority: "native-account" },
+    ]) {
+      const definitions = {
+        ...GG_MEDIA_DEFINITIONS,
+        "gg.3d.rigging": {
+          ...GG_MEDIA_DEFINITIONS["gg.3d.rigging"],
+          ...change,
+        },
+      };
+      const diagnostics = await fixture(
+        {
+          [GG_MEDIA_ROUTE]: GG_MEDIA_TEMPLATE,
+          "lib/api/gg-media.ts": "export namespace ggMediaApi {}",
+        },
+        definitions
+      );
+      expect(
+        diagnostics.some(
+          (d) => d.code === "registry" || d.code === "legacy-exception"
+        )
+      ).toBe(true);
+    }
+  });
 });
 
 describe("apiAudit.check route inventory", () => {

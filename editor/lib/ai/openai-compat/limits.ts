@@ -11,12 +11,21 @@
  * same posture as the library search limiter.
  */
 import "server-only";
+import { ggConfig } from "../../gg/config";
 
 type Limiter = {
   limit(key: string): Promise<{ success: boolean; reset: number }>;
 };
 
-type LimiterName = "chat" | "models" | "images" | "video" | "music";
+type LimiterName =
+  | "chat"
+  | "models"
+  | "images"
+  | "video"
+  | "music"
+  | "three-d"
+  | "three-d-upload"
+  | "three-d-check";
 
 const CONFIG: Record<LimiterName, { tokens: number; window: `${number} s` }> = {
   chat: { tokens: 60, window: "60 s" },
@@ -24,15 +33,17 @@ const CONFIG: Record<LimiterName, { tokens: number; window: `${number} s` }> = {
   images: { tokens: 12, window: "60 s" },
   video: { tokens: 4, window: "600 s" },
   music: { tokens: 6, window: "600 s" },
+  "three-d": { tokens: 4, window: "600 s" },
+  "three-d-upload": { tokens: 16, window: "60 s" },
+  "three-d-check": { tokens: 12, window: "60 s" },
 };
 
 const _limiters = new Map<LimiterName, Limiter | null>();
 
 async function limiterFor(name: LimiterName): Promise<Limiter | null> {
   if (_limiters.has(name)) return _limiters.get(name)!;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) {
+  const config = ggConfig.limiter();
+  if (!config) {
     _limiters.set(name, null);
     return null;
   }
@@ -42,7 +53,7 @@ async function limiterFor(name: LimiterName): Promise<Limiter | null> {
   ]);
   const { tokens, window } = CONFIG[name];
   const limiter = new Ratelimit({
-    redis: new Redis({ url, token }),
+    redis: new Redis(config),
     limiter: Ratelimit.slidingWindow(tokens, window),
     prefix: `rl:v1-ai:${name}`,
   });

@@ -64,6 +64,24 @@ describe("resolveProvider", () => {
     ).rejects.toMatchObject({ provider_id: "vercel" });
   });
 
+  it("never treats a configured Tripo key as text/chat authority", async () => {
+    await expect(
+      resolveProvider(deps({ tripo: "synthetic-tripo" }), {
+        explicit: "tripo",
+      })
+    ).rejects.toMatchObject({ provider_id: "tripo" });
+    await expect(
+      resolveProvider(deps({ tripo: "synthetic-tripo" }))
+    ).rejects.toBeInstanceOf(ProviderUnavailableError);
+    expect(
+      (
+        await resolveProvider(
+          deps({ tripo: "synthetic-tripo", openrouter: "sk-or-synthetic" })
+        )
+      ).provider_id
+    ).toBe("openrouter");
+  });
+
   it("BYOK factory honors an explicit modelId over the tier model", async () => {
     const provider = await resolveProvider(deps({ openrouter: "sk-or" }));
     expect(

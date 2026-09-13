@@ -40,6 +40,7 @@ import {
   ByteDanceLogo,
   ClaudeLogo,
   ElevenLabsLogo,
+  TripoLogo,
   FalLogo,
   GoogleLogo,
   MetaLogo,
@@ -60,6 +61,8 @@ import {
   app,
   images,
   threeD,
+  modelGeneration,
+  rigging,
   video,
   mergeProbedModels,
   providers,
@@ -98,6 +101,10 @@ import { MediaModelReadiness } from "./_components/media-model-readiness";
  */
 
 export default function DesktopSettingsPage() {
+  const [providerKeysRevision, setProviderKeysRevision] = useState(0);
+  const onProviderKeyChanged = () => {
+    setProviderKeysRevision((revision) => revision + 1);
+  };
   return (
     <DesktopPageShell>
       <DesktopPageContent className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-8">
@@ -124,6 +131,7 @@ export default function DesktopSettingsPage() {
               </>
             }
             modalities={["text"]}
+            onKeyChanged={onProviderKeyChanged}
             leading={<ChatGptProviderRow />}
           >
             <OllamaProviderRow />
@@ -135,10 +143,11 @@ export default function DesktopSettingsPage() {
         >
           <ProviderListCard
             title="Media Provider Keys"
-            description="Provider keys for image, video, fal 3D, and ElevenLabs audio workflows. Providers that also serve LLMs may appear in both sections."
+            description="Provider keys for image, video, 3D, and audio workflows. Providers that also serve LLMs may appear in both sections."
             providerIds={MEDIA_PROVIDER_IDS}
+            onKeyChanged={onProviderKeyChanged}
           />
-          <MediaModelsSection />
+          <MediaModelsSection providerKeysRevision={providerKeysRevision} />
         </SettingsSection>
         <AcpSection />
         <AboutSection />
@@ -421,6 +430,7 @@ const BYOK_PROVIDER_LOGOS: Partial<
   vercel: VercelLogo,
   fal: FalLogo,
   elevenlabs: ElevenLabsLogo,
+  tripo: TripoLogo,
 };
 
 const MODEL_VENDOR_LOGOS: Partial<
@@ -434,6 +444,7 @@ const MODEL_VENDOR_LOGOS: Partial<
   bytedance: ByteDanceLogo,
   meta: MetaLogo,
   elevenlabs: ElevenLabsLogo,
+  tripo: TripoLogo,
   microsoft: MicrosoftLogo,
   tencent: TencentLogo,
   xai: SpaceXAILogo,
@@ -477,6 +488,13 @@ const BYOK_PROVIDER_SETUP: Record<
     consoleHref: "https://elevenlabs.io/app/developers/api-keys",
     placeholder: "sk_00000000000000000000000000000000",
   },
+  tripo: {
+    label: "Tripo",
+    article: "an",
+    consoleLabel: "Tripo API dashboard",
+    consoleHref: "https://platform.tripo3d.ai/",
+    placeholder: "tsk_…",
+  },
 };
 
 function providerServesAny(
@@ -494,6 +512,7 @@ function ProviderListCard({
   modalities,
   providerIds,
   excludeModalities = [],
+  onKeyChanged,
   leading,
   children,
 }: {
@@ -503,6 +522,7 @@ function ProviderListCard({
   /** Exact provider identities for provider-shaped, non-resolver surfaces. */
   providerIds?: readonly ByokProviderId[];
   excludeModalities?: readonly ProviderModality[];
+  onKeyChanged?: () => void;
   leading?: ReactNode;
   children?: ReactNode;
 }) {
@@ -510,6 +530,9 @@ function ProviderListCard({
     .byokProviderMetadata()
     .filter(
       (provider) =>
+        (provider.id !== "tripo" ||
+          modelGeneration.isSupported() ||
+          rigging.isSupported()) &&
         (providerIds
           ? providerIds.includes(provider.id)
           : providerServesAny(provider, modalities ?? [])) &&
@@ -525,7 +548,11 @@ function ProviderListCard({
         <div className="divide-y">
           {leading}
           {byokProviders.map((provider) => (
-            <ByokRow key={provider.id} provider={provider} />
+            <ByokRow
+              key={provider.id}
+              provider={provider}
+              onKeyChanged={onKeyChanged}
+            />
           ))}
           {children}
         </div>
@@ -542,13 +569,21 @@ type RowState =
   | { kind: "removing" }
   | { kind: "error"; message: string; previous: "empty" | "configured" };
 
-function ByokRow({ provider }: { provider: ByokProviderMetadata }) {
+function ByokRow({
+  provider,
+  onKeyChanged,
+}: {
+  provider: ByokProviderMetadata;
+  onKeyChanged?: () => void;
+}) {
   const providerId = provider.id;
   // Several providers appear in both the LLM and media cards, so assigning an
-  // id to every row would create duplicate hash targets. ElevenLabs has one
-  // canonical media row and is the audio tools' dedicated setup destination.
+  // id to every row would create duplicate hash targets. ElevenLabs and Tripo
+  // each have one media row and their own feature setup destination.
   const deepLinkId =
-    providerId === "elevenlabs" ? "provider-elevenlabs" : undefined;
+    providerId === "elevenlabs" || providerId === "tripo"
+      ? `provider-${providerId}`
+      : undefined;
   const setup = BYOK_PROVIDER_SETUP[providerId];
   const label = setup.label;
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -599,6 +634,7 @@ function ByokRow({ provider }: { provider: ByokProviderMetadata }) {
     setState({ kind: "saving" });
     try {
       await secrets.setKey(providerId, value);
+      onKeyChanged?.();
       setValue("");
       await refresh();
     } catch (err) {
@@ -609,7 +645,7 @@ function ByokRow({ provider }: { provider: ByokProviderMetadata }) {
         previous: "empty",
       });
     }
-  }, [providerId, value, refresh]);
+  }, [providerId, value, refresh, onKeyChanged]);
 
   const handleRemove = useCallback(async () => {
     let confirmed = false;
@@ -628,6 +664,7 @@ function ByokRow({ provider }: { provider: ByokProviderMetadata }) {
     setState({ kind: "removing" });
     try {
       await secrets.deleteKey(providerId);
+      onKeyChanged?.();
       await refresh();
     } catch (err) {
       setState({
@@ -636,7 +673,7 @@ function ByokRow({ provider }: { provider: ByokProviderMetadata }) {
         previous: "configured",
       });
     }
-  }, [providerId, refresh]);
+  }, [providerId, refresh, onKeyChanged]);
 
   const handleErrorDismiss = useCallback(() => {
     void refresh();
@@ -914,6 +951,7 @@ const MEDIA_PROVIDER_IDS = [
   "vercel",
   "fal",
   "elevenlabs",
+  "tripo",
 ] as const satisfies readonly ByokProviderId[];
 
 const VISUAL_BYOK_PROVIDER_IDS = [
@@ -927,24 +965,43 @@ const VISUAL_BYOK_PROVIDER_IDS = [
  * than inferred from one unrelated provider key: fal for 3D, ElevenLabs for
  * SFX/Voice, and an active hosted Grida session for music.
  */
-function MediaModelsSection() {
+function MediaModelsSection({
+  providerKeysRevision,
+}: {
+  providerKeysRevision: number;
+}) {
   const [connectedVisualProviders, setConnectedVisualProviders] =
     useState<ReadonlySet<ByokProviderId> | null>(null);
   const [hostedMediaReady, setHostedMediaReady] = useState<boolean | null>(
     null
   );
   const [threeDReady, setThreeDReady] = useState<boolean | null>(null);
+  const [tripoReady, setTripoReady] = useState<boolean | null>(null);
+  // GRIDA-GG: desktop — Tripo can use org credits on explicitly capable hosts.
+  const [tripoHostedReady, setTripoHostedReady] = useState<boolean | null>(
+    null
+  );
   const [musicReady, setMusicReady] = useState<boolean | null>(null);
   const [elevenLabsReady, setElevenLabsReady] = useState<boolean | null>(null);
   const imageSupported = images.isSupported();
   const videoSupported = video.isSupported();
   const threeDSupported = threeD.isSupported();
+  const tripoSupported = modelGeneration.isSupported();
+  const riggingSupported = rigging.isSupported();
+  const tripoHostedSupported = modelGeneration.isGgSupported();
+  const riggingHostedSupported = rigging.isGgSupported();
   const musicSupported = audio.music.isSupported();
   const soundEffectSupported = audio.soundEffects.isSupported();
   const voiceSupported = audio.textToSpeech.isSupported();
   const imageModels = imageSupported ? models.image.listed_models() : [];
   const videoModels = videoSupported ? models.video.listed_models() : [];
   const threeDModels = threeDSupported ? models.three_d.ordered_models() : [];
+  const tripoModels = tripoSupported
+    ? models.three_d.model_generation.ordered_models()
+    : [];
+  const riggingModels = riggingSupported
+    ? models.three_d.rigging.listed_models()
+    : [];
   const musicModels = musicSupported ? models.audio.music.listed_models() : [];
   const soundEffectModels = soundEffectSupported
     ? models.audio.sound_effects.ordered_models()
@@ -977,28 +1034,47 @@ function MediaModelsSection() {
         () => live && setThreeDReady(false)
       );
     }
+    if (tripoSupported || riggingSupported) {
+      void secrets.hasKey("tripo").then(
+        (present) => live && setTripoReady(present),
+        () => live && setTripoReady(false)
+      );
+    }
     if (soundEffectSupported || voiceSupported) {
       void secrets.hasKey("elevenlabs").then(
         (present) => live && setElevenLabsReady(present),
         () => live && setElevenLabsReady(false)
       );
     }
-    if (imageSupported || videoSupported || musicSupported) {
+    if (
+      imageSupported ||
+      videoSupported ||
+      musicSupported ||
+      tripoHostedSupported ||
+      riggingHostedSupported
+    ) {
       void gridaGateway.ensureFresh().then((state) => {
         if (!live) return;
         const active = state.kind === "active";
         if (imageSupported || videoSupported) setHostedMediaReady(active);
         if (musicSupported) setMusicReady(active);
+        if (tripoHostedSupported || riggingHostedSupported)
+          setTripoHostedReady(active);
       });
     }
     return () => {
       live = false;
     };
   }, [
+    providerKeysRevision,
     imageSupported,
     musicSupported,
     soundEffectSupported,
     threeDSupported,
+    tripoSupported,
+    riggingSupported,
+    tripoHostedSupported,
+    riggingHostedSupported,
     videoSupported,
     voiceSupported,
   ]);
@@ -1007,6 +1083,8 @@ function MediaModelsSection() {
     !imageSupported &&
     !videoSupported &&
     !threeDSupported &&
+    !tripoSupported &&
+    !riggingSupported &&
     !musicSupported &&
     !soundEffectSupported &&
     !voiceSupported
@@ -1061,6 +1139,36 @@ function MediaModelsSection() {
             readyForModel={() => threeDReady}
             hrefForModel={mediaToolHref}
             actionLabel="Open in 3D generator"
+          />
+        )}
+        {tripoSupported && (
+          <MediaModelGroup
+            title="3D · Tripo"
+            models={tripoModels}
+            readyForModel={() =>
+              MediaModelReadiness.tripo(
+                tripoReady,
+                tripoHostedReady,
+                tripoHostedSupported
+              )
+            }
+            hrefForModel={mediaToolHref}
+            actionLabel="Open in 3D generator"
+          />
+        )}
+        {riggingSupported && (
+          <MediaModelGroup
+            title="3D · Rigging"
+            models={riggingModels}
+            readyForModel={() =>
+              MediaModelReadiness.tripo(
+                tripoReady,
+                tripoHostedReady,
+                riggingHostedSupported
+              )
+            }
+            hrefForModel={mediaToolHref}
+            actionLabel="Open rigging"
           />
         )}
         {musicSupported && (

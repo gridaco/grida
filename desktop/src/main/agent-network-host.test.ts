@@ -889,6 +889,55 @@ describe("AgentNetworkHost", () => {
     harness.host.close();
   });
 
+  it("carries a full bounded Tripo mesh upload through main without widening other requests", async () => {
+    const fetch = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(
+      async (_url, init) => {
+        expect((init.body as Buffer).byteLength).toBe(60_000_512);
+        return new Response(null, { status: 204 });
+      }
+    );
+    const harness = createHarness({ fetch });
+    await harness.start();
+    try {
+      await harness.sidecar.write({
+        v: 1,
+        type: "request.start",
+        requestId: "mesh_upload",
+        grantId: "provider:built-in",
+        method: "POST",
+        url: "https://openapi.tripo3d.ai/v3/files",
+        headers: [
+          ["content-type", "multipart/form-data; boundary=grida-upload"],
+        ],
+        hasBody: true,
+      });
+      const chunk = Buffer.alloc(48 * 1024);
+      let sequence = 0;
+      for (let offset = 0; offset < 60_000_512; offset += chunk.length) {
+        await harness.sidecar.write({
+          v: 1,
+          type: "request.chunk",
+          requestId: "mesh_upload",
+          sequence: sequence++,
+          data: chunk
+            .subarray(0, Math.min(chunk.length, 60_000_512 - offset))
+            .toString("base64"),
+        });
+      }
+      await harness.sidecar.write({
+        v: 1,
+        type: "request.end",
+        requestId: "mesh_upload",
+        sequence,
+      });
+      await harness.untilFrame("response.end");
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(harness.fatal).not.toHaveBeenCalled();
+    } finally {
+      harness.host.close();
+    }
+  });
+
   it("bounds aggregate buffered uploads in Electron main", async () => {
     let resolveFirst!: (response: Response) => void;
     const fetch = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(
@@ -1204,3 +1253,41 @@ class FirstWriteBlockedWritable extends Writable {
     callback?.();
   }
 }
+
+// GRIDA-SEC-004 / GRIDA-SEC-006 / GRIDA-GG: provider — no signed upload replay.
+it("refuses even same-origin signed Tripo upload redirects without replaying bytes", async () => {
+  const fetch = vi.fn<() => Promise<Response>>(async () =>
+    Response.redirect(
+      "https://tripo-data.s3.us-west-2.amazonaws.com/another-object",
+      307
+    )
+  );
+  const harness = createHarness({ fetch });
+  await harness.start();
+  await harness.sidecar.write({
+    v: 1,
+    type: "request.start",
+    requestId: "req_tripo_signed_put",
+    grantId: "provider:tripo-upload",
+    method: "PUT",
+    url: "https://tripo-data.s3.us-west-2.amazonaws.com/mesh.glb?signature=synthetic",
+    headers: [["content-type", "application/octet-stream"]],
+    hasBody: true,
+  });
+  await harness.sidecar.write({
+    v: 1,
+    type: "request.chunk",
+    requestId: "req_tripo_signed_put",
+    sequence: 0,
+    data: Buffer.from("mesh-bytes").toString("base64"),
+  });
+  await harness.sidecar.write({
+    v: 1,
+    type: "request.end",
+    requestId: "req_tripo_signed_put",
+    sequence: 1,
+  });
+  expect((await harness.untilFrame("response.error")).code).toBe("denied");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  harness.host.close();
+});

@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 /** Static command grammar. Parsing never opens storage, browsers or connections. */
 export namespace Cli {
   const help = {
-    "": "Grida — account access and tools\n\nUsage: grida <command>\n\nCommands:\n  auth       Sign in and manage this CLI's session\n  account    Read your identity, organizations and credits\n  models     Discover executable models and input schemas\n  providers  Manage shared provider API keys\n  generate   Generate media into a new local directory\n  voices     List available speech voices\n  docs       Print canonical documentation URLs\n\nOptions: --help, --version\nUse grida <command> --help for details.",
+    "": "Grida — account access and tools\n\nUsage: grida <command>\n\nCommands:\n  auth       Sign in and manage this CLI's session\n  account    Read your identity, organizations and credits\n  models     Discover executable models and input schemas\n  providers  Manage shared provider API keys\n  generate   Generate media into a new local directory\n  voices     List available speech voices\n  rigging    Check mesh eligibility and create a rigged GLB\n  docs       Print canonical documentation URLs\n\nOptions: --help, --version\nUse grida <command> --help for details.",
     auth: "Usage: grida auth <command>\n\nCommands:\n  login      Sign in using the system browser\n  status     Inspect the local session (no server verification)\n  logout     Clear local credentials and request session revocation\n  storage    Inspect or explicitly migrate credential storage",
     "auth login":
       "Usage: grida auth login [--storage keyring|file] [--no-browser]\n\nSign in using the system browser. New profiles use the OS keyring.\nFile storage is an explicit alternative; the choice is saved per profile.\nUse auth storage migrate to change an existing profile's backend.\n--no-browser prints the sign-in URL for you to open on this machine.\nRequires interaction; --json and --no-input cannot start login.",
@@ -30,21 +30,31 @@ export namespace Cli {
     "models list":
       "Usage: grida models list [--provider <provider>] [--modality image|video|audio|3d] [--kind <kind>] [--local-image] [--available] [--org <slug> | --org-id <id>] [--json]\n\nLists executable operations, including staged models, with accepted local-image flags.\n--local-image filters to operations accepting --reference FILE or --image FILE.\nNo provider probes. --available requires --provider: BYOK checks key presence;\nGG checks cached organization eligibility online. Neither guarantees model access\nor generation.",
     "models inspect":
-      "Usage: grida models inspect --provider <provider> --model <id> [--kind <kind>] [--variant text|references|image] [--json]\n\nShow accepted inputs and a command example; --json prints the full schema.\nKinds: image, video, music, sound-effect, text-to-speech, three-d.\nThe kind is inferred when unambiguous; image/video default to text input.",
+      "Usage: grida models inspect --provider <provider> --model <id> [--kind <kind>] [--variant text|references|image|multiview] [--json]\n\nShow accepted inputs and a command example; --json prints the full schema.\nKinds: image, video, music, sound-effect, text-to-speech, three-d.\nThe kind is inferred when unambiguous; image/video default to text input.",
     providers:
       "Usage: grida providers <command>\n\nCommands:\n  list                    Show key presence and effective source\n  configure <provider>    Save a shared provider API key\n  remove <provider>       Remove a shared provider API key",
     "providers configure":
-      "Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]\n\nSave an API key in shared plaintext credentials.toml with private permissions.\nDesktop and CLI use the same stored keys. No Grida login required.\nValidate format, then check OpenRouter/Vercel/fal once before saving.\nA failed check leaves stored keys unchanged. ElevenLabs saves unverified.\nWithout --key-stdin, enter the key at a hidden terminal prompt.\nAutomation requires --key-stdin; keys are never accepted as arguments.",
+      "Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]\n\nSave an API key in shared plaintext credentials.toml with private permissions.\nDesktop and CLI use the same stored keys. No Grida login required.\nValidate format, then check OpenRouter/Vercel/fal/Tripo once before saving.\nA failed check leaves stored keys unchanged. ElevenLabs saves unverified.\nWithout --key-stdin, enter the key at a hidden terminal prompt.\nAutomation requires --key-stdin; keys are never accepted as arguments.",
     "providers remove":
       "Usage: grida providers remove <provider> [--json] [--no-input]\n\nRemove the stored key for Desktop and CLI. Environment keys remain effective.\nThis does not revoke the key at its provider or sign out of Grida.",
     "providers list":
-      "Usage: grida providers list [--json]\n\nShow key presence and source after static validation, never key contents.\nNo login or probes; configured does not mean provider-verified.\nStored keys use shared plaintext credentials.toml with private permissions.\nOPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY.\nGG uses a separate Grida login and organization; no provider key.",
+      "Usage: grida providers list [--json]\n\nShow key presence and source after static validation, never key contents.\nNo login or probes; configured does not mean provider-verified.\nStored keys use shared plaintext credentials.toml with private permissions.\nOPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY, TRIPO_API_KEY.\nGG uses a separate Grida login and organization; no provider key.",
     generate:
-      "Usage: grida generate --provider <provider> --model <id> --out <new-directory> [inputs] [--kind <kind>] [--variant text|references|image] [--key-stdin] [--org <slug> | --org-id <id>] [--json]\n\nInputs:\n  --prompt TEXT | --prompt-file FILE|-    Generation instructions\n  --text TEXT | --text-file FILE|-        Speech text (with --voice ID)\n  --reference FILE|HTTPS-URL              Image reference; repeat for more\n  --image FILE|HTTPS-URL                  Image input where supported\n  --param FIELD=VALUE                     Advertised scalar option; repeat\n  --input @file|-                         Full JSON instead of the flags above\n\nExample:\n  grida generate --provider openrouter --model openai/gpt-image-2 --prompt 'Restyle this image' --reference ./photo.png --out ./result\n\nFile flags read explicit paths relative to the working directory. PNG/JPEG/static WebP\nimages are limited to 8 MiB each; the assembled JSON input is limited to 16 MiB.\nSelected files are sent inline to the selected provider; no Grida upload storage.\nRun grida models inspect for supported inputs. No raw provider passthrough.\nJSON mode never expands paths and cannot mix with request-building flags.\nMedia flags select a compatible variant; a conflicting --variant is refused.\nProviders: openrouter, vercel, fal, elevenlabs, gg.\n--key-stdin cannot share stdin with JSON or text input. Key precedence: stdin,\nenvironment, shared credentials.toml. BYOK needs no Grida login. GG requires login.\n--out must name a new directory under an existing parent. Artifacts and\nreceipt.json are written locally without overwriting files.\nNo automatic generation retry. Interrupted requests may still be charged.",
+      "Usage: grida generate --provider <provider> --model <id> --out <new-directory> [inputs] [--kind <kind>] [--variant text|references|image|multiview] [--key-stdin] [--org <slug> | --org-id <id>] [--json]\n\nInputs:\n  --prompt TEXT | --prompt-file FILE|-    Generation instructions\n  --text TEXT | --text-file FILE|-        Speech text (with --voice ID)\n  --reference FILE|HTTPS-URL              Image reference; repeat for more\n  --image FILE|HTTPS-URL                  Image input where supported\n  --param FIELD=VALUE                     Advertised scalar option; repeat\n  --input @file|-                         Full JSON instead of the flags above\n\nExample:\n  grida generate --provider openrouter --model openai/gpt-image-2 --prompt 'Restyle this image' --reference ./photo.png --out ./result\n\nFile flags read explicit paths relative to the working directory. PNG/JPEG/static WebP\nimages are limited to 8 MiB each; the assembled JSON input is limited to 16 MiB.\nSelected files are sent to the selected provider; GG Tripo uses signed uploads.\nRun grida models inspect for supported inputs. No raw provider passthrough.\nJSON mode never expands paths and cannot mix with request-building flags.\nMedia flags select a compatible variant; a conflicting --variant is refused.\nProviders: openrouter, vercel, fal, elevenlabs, tripo, gg.\n--key-stdin cannot share stdin with JSON or text input. Key precedence: stdin,\nenvironment, shared credentials.toml. BYOK needs no Grida login. GG requires login.\n--out must name a new directory under an existing parent. Artifacts and\nreceipt.json are written locally without overwriting files.\nNo automatic generation retry. Interrupted requests may still be charged.",
     voices:
       "Usage: grida voices list --provider elevenlabs [--key-stdin] [--json]",
     "voices list":
       "Usage: grida voices list --provider elevenlabs [--key-stdin] [--json]\n\nList speech voices using the ElevenLabs credential. No Grida login.",
+    rigging:
+      "Usage: grida rigging <list|inspect|check|run>\n\nDiscover mesh operations, check eligibility, or explicitly create a rigged GLB.\nChecking never starts rigging. Select Tripo BYOK or Grida credits explicitly.",
+    "rigging list":
+      "Usage: grida rigging list [--provider tripo|gg] [--feature rig-check|rigging] [--json]\n\nDiscover supported mesh operations without credentials or network access.",
+    "rigging inspect":
+      "Usage: grida rigging inspect --provider tripo|gg --feature rig-check|rigging [--model <id>] [--json]\n\nPrint the selected operation's input and output schema.\nRigging requires a model; rig-check has no model identity.",
+    "rigging check":
+      "Usage: grida rigging check --provider tripo|gg (--mesh FILE | --input @file|-) [--key-stdin] [--json]\n\nUpload a GLB and return riggable, rig_type and a task receipt.\nThis never starts paid rigging or writes a generated artifact.\nLocal GLBs: at most 60,000,000 bytes; JSON input: at most 16 MiB.\nInput URLs and paths inside JSON are not fetched. Stdin has one reader.\nBYOK key precedence: stdin, TRIPO_API_KEY, shared credentials.toml.\nGG uses Grida login and --org or --org-id; --key-stdin is BYOK only.",
+    "rigging run":
+      "Usage: grida rigging run --provider tripo|gg --model <id> --out <new-directory> (--mesh FILE --rig-type <type> --spec tripo|mixamo | --input @file|-) [--key-stdin] [--json]\n\nExplicitly submit a paid rigging operation and save its GLB and task receipt.\nRun rigging check first to inspect eligibility; check and run are separate commands.\nRun rigging inspect for the model's supported rig types and specification.\nLocal GLBs: at most 60,000,000 bytes; JSON input: at most 16 MiB.\nJSON mode cannot mix with mesh, rig-type or spec flags.\n--out must be a new directory under an existing parent. No files are overwritten.\nBYOK key precedence: stdin, TRIPO_API_KEY, shared credentials.toml.\nGG uses Grida login and --org or --org-id; --key-stdin is BYOK only.\nNo automatic retry. An interrupted request may still be charged.",
     docs: "Usage: grida docs [command...]\n\nPrint the canonical documentation URL. Does not open a browser or fetch it.\nExamples: grida docs, grida docs account credits, grida docs auth storage",
   } as const;
   export type Topic = keyof typeof help;
@@ -53,7 +63,13 @@ export namespace Cli {
     Object.keys(help) as Topic[]
   );
   type Options = { json: boolean; noInput: boolean };
-  export type Provider = "openrouter" | "vercel" | "fal" | "elevenlabs" | "gg";
+  export type Provider =
+    | "openrouter"
+    | "vercel"
+    | "fal"
+    | "elevenlabs"
+    | "tripo"
+    | "gg";
   export type Kind =
     | "image"
     | "video"
@@ -61,7 +77,7 @@ export namespace Cli {
     | "sound-effect"
     | "text-to-speech"
     | "three-d";
-  export type Variant = "text" | "references" | "image";
+  export type Variant = "text" | "references" | "image" | "multiview";
   export type Selector = { id: number } | { name: string };
   /** Request construction is local syntax, never a second model contract. */
   export type Request = {
@@ -83,6 +99,41 @@ export namespace Cli {
         }
       | { command: "providers remove"; provider: Exclude<Provider, "gg"> }
     );
+  export type RiggingInvocation = Options &
+    (
+      | {
+          command: "rigging list";
+          provider?: "tripo" | "gg";
+          feature?: "rig-check" | "rigging";
+        }
+      | ({
+          command: "rigging inspect";
+          provider: "tripo" | "gg";
+        } & (
+          | { feature: "rig-check"; model?: never }
+          | { feature: "rigging"; model: string }
+        ))
+      | ({
+          command: "rigging check";
+          provider: "tripo" | "gg";
+          keyStdin: boolean;
+          selector?: Selector;
+        } & RiggingSource)
+      | ({
+          command: "rigging run";
+          provider: "tripo" | "gg";
+          model: string;
+          out: string;
+          keyStdin: boolean;
+          selector?: Selector;
+        } & (
+          | { mesh: string; input?: never; rigType: string; spec: string }
+          | { input: string; mesh?: never; rigType?: never; spec?: never }
+        ))
+    );
+  type RiggingSource =
+    | { mesh: string; input?: never }
+    | { input: string; mesh?: never };
   export type MediaInvocation = Options &
     (
       | {
@@ -119,6 +170,7 @@ export namespace Cli {
     );
   export type Invocation =
     | ProviderInvocation
+    | RiggingInvocation
     | MediaInvocation
     | (Options &
         (
@@ -172,6 +224,10 @@ export namespace Cli {
           "org-id": { type: "string" },
           provider: { type: "string" },
           model: { type: "string" },
+          feature: { type: "string" },
+          mesh: { type: "string" },
+          "rig-type": { type: "string" },
+          spec: { type: "string" },
           kind: { type: "string" },
           modality: { type: "string" },
           variant: { type: "string" },
@@ -240,12 +296,104 @@ export namespace Cli {
       topic === "auth storage" ||
       topic === "models" ||
       topic === "providers" ||
-      topic === "voices"
+      topic === "voices" ||
+      topic === "rigging"
     ) {
       allowed();
       return { ...options, command: "help", topic };
     }
     const common = ["json", "no-input"];
+    if (topic === "rigging list") {
+      allowed(...common, "provider", "feature");
+      return {
+        ...options,
+        command: topic,
+        provider: choice(values.provider, ["tripo", "gg"]),
+        feature: choice(values.feature, ["rig-check", "rigging"]),
+      };
+    }
+    if (topic === "rigging inspect") {
+      allowed(...common, "provider", "feature", "model");
+      const feature = choice(values.feature, ["rig-check", "rigging"]);
+      if (
+        (values.provider !== "tripo" && values.provider !== "gg") ||
+        !feature ||
+        (feature === "rig-check" && values.model !== undefined)
+      )
+        throw usage();
+      return {
+        ...options,
+        command: topic,
+        provider: values.provider,
+        ...(feature === "rigging"
+          ? { feature, model: riggingValue(values.model) }
+          : { feature }),
+      };
+    }
+    if (topic === "rigging check" || topic === "rigging run") {
+      allowed(
+        ...common,
+        "provider",
+        "mesh",
+        "input",
+        "key-stdin",
+        "org",
+        "org-id",
+        ...(topic === "rigging run" ? ["model", "out", "rig-type", "spec"] : [])
+      );
+      if (values.provider !== "tripo" && values.provider !== "gg")
+        throw usage();
+      const mesh =
+        values.mesh === undefined ? undefined : riggingValue(values.mesh);
+      const input =
+        values.input === undefined ? undefined : riggingValue(values.input);
+      const keyStdin = values["key-stdin"] === true;
+      const selector = organization(values);
+      if (
+        (keyStdin && values.provider === "gg") ||
+        (selector && values.provider !== "gg")
+      )
+        throw usage();
+      if (
+        (mesh === undefined) === (input === undefined) ||
+        mesh === "-" ||
+        (input !== undefined &&
+          !(input === "-" || (input.startsWith("@") && input.length > 1))) ||
+        (input === "-" && keyStdin)
+      )
+        throw usage();
+      const source = mesh ? { mesh } : { input: input! };
+      if (topic === "rigging check")
+        return {
+          ...options,
+          command: topic,
+          provider: values.provider,
+          keyStdin,
+          ...(selector ? { selector } : {}),
+          ...source,
+        };
+      if (
+        input !== undefined &&
+        (values["rig-type"] !== undefined || values.spec !== undefined)
+      )
+        throw usage();
+      return {
+        ...options,
+        command: topic,
+        provider: values.provider,
+        model: riggingValue(values.model),
+        out: riggingValue(values.out),
+        keyStdin,
+        ...(selector ? { selector } : {}),
+        ...(mesh
+          ? {
+              mesh,
+              rigType: riggingValue(values["rig-type"]),
+              spec: riggingValue(values.spec),
+            }
+          : { input: input! }),
+      };
+    }
     if (topic === "auth login") {
       allowed(...common, "storage", "no-browser");
       if (options.json || options.noInput)
@@ -283,6 +431,7 @@ export namespace Cli {
         "vercel",
         "fal",
         "elevenlabs",
+        "tripo",
       ] as const);
       if (positionals.length !== 3 || !provider) throw usage();
       if (configure) {
@@ -317,6 +466,7 @@ export namespace Cli {
         "vercel",
         "fal",
         "elevenlabs",
+        "tripo",
         "gg",
       ] as const);
       const kind = choice(values.kind, kinds);
@@ -370,6 +520,7 @@ export namespace Cli {
         "vercel",
         "fal",
         "elevenlabs",
+        "tripo",
         "gg",
       ] as const);
       const model = values.model;
@@ -378,6 +529,7 @@ export namespace Cli {
         "text",
         "references",
         "image",
+        "multiview",
       ] as const);
       if (
         !provider ||
@@ -466,6 +618,11 @@ export namespace Cli {
     "voice",
     "param",
   ];
+  function riggingValue(value: unknown): string {
+    if (typeof value !== "string" || !value || /[\p{Cc}\p{Cf}]/u.test(value))
+      throw usage();
+    return value;
+  }
   function requestValues(
     values: ReturnType<typeof parseArgs>["values"]
   ): Request {
@@ -573,6 +730,11 @@ export namespace Cli {
     generate: "/generate",
     voices: "/models",
     "voices list": "/models",
+    rigging: "/generate",
+    "rigging list": "/models",
+    "rigging inspect": "/models",
+    "rigging check": "/generate",
+    "rigging run": "/generate",
     docs: "",
   };
 
@@ -616,7 +778,7 @@ export namespace Cli {
   }
   function known(value: string): Topic {
     const providerHelp =
-      /^(providers (?:configure|remove)) (?:openrouter|vercel|fal|elevenlabs)$/.exec(
+      /^(providers (?:configure|remove)) (?:openrouter|vercel|fal|elevenlabs|tripo)$/.exec(
         value
       );
     if (providerHelp) value = providerHelp[1]!;

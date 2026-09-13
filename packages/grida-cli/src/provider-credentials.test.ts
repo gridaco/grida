@@ -21,12 +21,14 @@ afterEach(() => {
 });
 
 describe("ProviderCredentials environment", () => {
-  it("reads only the four exact supported environment names", async () => {
+  it("reads only the exact supported environment names", async () => {
     const env = {
       OPENROUTER_API_KEY: " sk-or-openrouter-synthetic \n",
       AI_GATEWAY_API_KEY: "vck_gateway-synthetic",
       FAL_KEY: "fal:synthetic",
       ELEVENLABS_API_KEY: "elevenlabs-synthetic",
+      TRIPO_API_KEY: "tsk_synthetic-tripo",
+      BYOK_TRIPO_API_KEY: "smoke-only-ignored",
       BYOK_OPENROUTER_API_KEY: "legacy-ignored",
       GRIDA_BYOK_KEY: "legacy-ignored",
       GG_TOKEN: "wrong-authority",
@@ -62,17 +64,25 @@ describe("ProviderCredentials environment", () => {
         configured: true,
         source: "environment",
       },
+      {
+        provider: "tripo",
+        environment: "TRIPO_API_KEY",
+        configured: true,
+        source: "environment",
+      },
     ]);
     expect(owner.get("openrouter")).toBe("sk-or-openrouter-synthetic");
     expect(owner.get("vercel")).toBe("vck_gateway-synthetic");
     expect(owner.get("fal")).toBe("fal:synthetic");
     expect(owner.get("elevenlabs")).toBe("elevenlabs-synthetic");
+    expect(owner.get("tripo")).toBe("tsk_synthetic-tripo");
   });
 
   it("does not adopt inherited environment values or legacy aliases", async () => {
     const env = Object.create({ OPENROUTER_API_KEY: secret });
     env.GRIDA_BYOK_KEY = secret;
     env.BYOK_OPENROUTER_API_KEY = secret;
+    env.BYOK_TRIPO_API_KEY = secret;
     const owner = await ProviderCredentials.open({ env });
     expect(owner.status().every((value) => !value.configured)).toBe(true);
   });

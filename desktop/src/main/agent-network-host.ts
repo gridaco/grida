@@ -1,3 +1,4 @@
+// GRIDA-SEC-006 / GRIDA-GG: provider — signed Tripo uploads never follow redirects.
 // GRIDA-SEC-006 — transient scoped-GG transport, never account-session custody.
 // GRIDA-GG: token — destination-authorized requests through the private Chromium session.
 import { isIP } from "node:net";
@@ -17,7 +18,6 @@ const GRANT_ACK_TIMEOUT_MS = 5_000;
 const MAX_CONCURRENT_REQUESTS = 32;
 const MAX_DISCARDED_UPLOADS = 32;
 const REQUEST_UPLOAD_TIMEOUT_MS = 30_000;
-const MAX_REQUEST_BODY_BYTES = 32 * 1024 * 1024;
 const MAX_BUFFERED_REQUEST_BODY_BYTES = 64 * 1024 * 1024;
 const MAX_RESPONSE_BODY_BYTES = 512 * 1024 * 1024;
 const RESPONSE_CHUNK_BYTES = 48 * 1024;
@@ -550,7 +550,9 @@ export class AgentNetworkHost {
     const chunk = Buffer.from(frame.data, "base64");
     request.bytes += chunk.length;
     request.sequence += 1;
-    if (request.bytes > MAX_REQUEST_BODY_BYTES) {
+    if (
+      request.bytes > AgentNetworkPolicy.maxRequestBodyBytes(request.authorized)
+    ) {
       throw new Error("provider request body exceeds host limit");
     }
     if (!request.discarded) {
@@ -796,7 +798,11 @@ export class AgentNetworkHost {
       const location = response.headers.get("location");
       if (!isRedirect(response.status) || !location) return response;
       await response.body?.cancel().catch(() => undefined);
-      if (redirects >= MAX_REDIRECTS) throw deniedError();
+      if (
+        current.grant.id === AgentNetworkPolicy.TRIPO_UPLOAD_GRANT_ID ||
+        redirects >= MAX_REDIRECTS
+      )
+        throw deniedError();
 
       const target = new URL(location, current.url);
       const sameOrigin = target.origin === current.url.origin;

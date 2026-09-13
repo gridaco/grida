@@ -3,7 +3,8 @@
 /**
  * GET /api/v1/ai/models — token-gated allowlist composed from the ONE
  * catalog: all text entries (deprecated flagged), image/video cards
- * with vercel bindings; tier annotation from the reverse tier map; no
+ * with vercel bindings and listed Tripo generation/rigging models;
+ * tier annotation from the reverse tier map; no
  * pricing fields anywhere in the payload.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -31,7 +32,12 @@ beforeEach(() => {
 
 type Entry = {
   id: string;
-  grida: { modality: string; tier: string | null; deprecated: boolean };
+  grida: {
+    modality: string;
+    feature?: "model-generation" | "rigging";
+    tier: string | null;
+    deprecated: boolean;
+  };
 };
 
 describe("GET /api/v1/ai/models", () => {
@@ -80,7 +86,7 @@ describe("GET /api/v1/ai/models", () => {
     expect(images.at(-1)?.grida.deprecated).toBe(true);
   });
 
-  it("lists text+image+video with tiers, deprecation flags, and no pricing", async () => {
+  it("lists hosted modalities with tiers, deprecation flags, and no pricing", async () => {
     const { token } = await signGgToken("user-1", 7);
     const res = await GET(request(token));
     expect(res.status).toBe(200);
@@ -123,7 +129,20 @@ describe("GET /api/v1/ai/models", () => {
     }
     // Every modality is represented.
     const modalities = new Set(body.data.map((e) => e.grida.modality));
-    expect(modalities).toEqual(new Set(["text", "image", "video"]));
+    expect(modalities).toEqual(new Set(["text", "image", "video", "three-d"]));
+    // Generation and rigging stay distinct; eligibility is not a model.
+    expect(
+      body.data
+        .filter((entry) => entry.grida.modality === "three-d")
+        .map((entry) => ({ id: entry.id, feature: entry.grida.feature }))
+    ).toEqual([
+      { id: "tripo/h3.1", feature: "model-generation" },
+      { id: "tripo/p1", feature: "model-generation" },
+      { id: "tripo/p2", feature: "model-generation" },
+      { id: "tripo/rig-v1.0", feature: "rigging" },
+      { id: "tripo/rig-v2.5", feature: "rigging" },
+    ]);
+    expect(byId.has("tripo/rig-check")).toBe(false);
     // No pricing leaks into the payload.
     expect(JSON.stringify(body)).not.toMatch(/cost|price|usd|mills/i);
   });

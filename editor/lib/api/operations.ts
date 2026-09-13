@@ -4,7 +4,7 @@ export namespace apiOperations {
     path: string;
     methods: readonly string[];
     authority: "native-account" | "gg" | "public";
-    binding: "account" | "gg" | "legacy";
+    binding: "account" | "gg" | "gg-media" | "legacy";
     cache: "no-store" | "owner" | "public";
   }>;
 
@@ -76,6 +76,35 @@ export namespace apiOperations {
       authority: "gg",
       binding: "legacy",
       cache: "owner",
+    },
+    // GRIDA-GG: gateway — scoped, funded feature operations under the 3D family.
+    "gg.3d.uploads": {
+      path: "/api/v1/ai/3d/uploads",
+      methods: ["POST", "OPTIONS"],
+      authority: "gg",
+      binding: "gg-media",
+      cache: "no-store",
+    },
+    "gg.3d.model-generation": {
+      path: "/api/v1/ai/3d/model-generation",
+      methods: ["POST", "OPTIONS"],
+      authority: "gg",
+      binding: "gg-media",
+      cache: "no-store",
+    },
+    "gg.3d.rig-check": {
+      path: "/api/v1/ai/3d/rig-check",
+      methods: ["POST", "OPTIONS"],
+      authority: "gg",
+      binding: "gg-media",
+      cache: "no-store",
+    },
+    "gg.3d.rigging": {
+      path: "/api/v1/ai/3d/rigging",
+      methods: ["POST", "OPTIONS"],
+      authority: "gg",
+      binding: "gg-media",
+      cache: "no-store",
     },
     "models.catalog": {
       path: "/api/v1/models/catalog",

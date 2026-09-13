@@ -19,6 +19,12 @@ import type {
   ImageGenerateResult,
   VideoGenerateRequest,
   VideoGenerateResult,
+  RigCheckRequest,
+  RigCheckResult,
+  RiggingGenerateRequest,
+  RiggingGenerateResult,
+  ModelGenerationGenerateRequest,
+  ModelGenerationGenerateResult,
   ThreeDGenerateRequest,
   ThreeDGenerateResult,
   MusicGenerateRequest,
@@ -94,6 +100,17 @@ export type DesktopAgentCapabilities = {
 
 export type DesktopCapabilities = {
   native: DesktopNativeCapabilities;
+  /** Bundled media capabilities; omission means an older Desktop binary. */
+  media?: {
+    /** First-party Tripo credentials, generation and host-authorized egress. */
+    tripo?: boolean;
+    /** Explicit eligibility and rigging plus bounded native GLB upload. */
+    rigging?: boolean;
+    /** Grida credits for Tripo generation, including native signed uploads. */
+    tripo_gg?: boolean;
+    /** Grida credits for eligibility and rigging, including native signed uploads. */
+    rigging_gg?: boolean;
+  };
   /** Optional because protocol-1 hosts shipped before agent capabilities. */
   agent?: DesktopAgentCapabilities;
 };
@@ -468,6 +485,17 @@ export type DesktopBridge = {
    */
   video?: {
     generate: (req: VideoGenerateRequest) => Promise<VideoGenerateResult>;
+  };
+  /** Optional on older hosts; requires caps.media.rigging and both methods. */
+  rigging?: {
+    check: (req: RigCheckRequest) => Promise<RigCheckResult>;
+    generate: (req: RiggingGenerateRequest) => Promise<RiggingGenerateResult>;
+  };
+  /** Optional on older hosts; also requires caps.media.tripo. */
+  modelGeneration?: {
+    generate: (
+      req: ModelGenerationGenerateRequest
+    ) => Promise<ModelGenerationGenerateResult>;
   };
   /**
    * BYOK 3D generation. Optional because protocol-1 Desktop builds predate

@@ -357,6 +357,9 @@ importers:
       '@grida/agent':
         specifier: workspace:*
         version: link:../packages/grida-ai-agent
+      '@grida/ai':
+        specifier: workspace:*
+        version: link:../packages/grida-ai
       '@grida/ai-models':
         specifier: workspace:*
         version: link:../packages/grida-ai-models

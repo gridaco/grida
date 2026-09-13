@@ -187,7 +187,7 @@ harness, move it to `(site)/...` (with proper auth) or `(api)/...`
 ### `GRIDA-SEC-003` — AI seam org-id trust boundary
 
 **What it protects.** Every call into the AI provider SDKs (Vercel AI
-SDK, Replicate, OpenAI, Anthropic) is gated and billed against an
+SDK, Replicate, OpenAI, Anthropic, and funded Tripo) is gated and billed against an
 `organizationId`. If that id reaches the seam unverified, an attacker
 who can choose the id drains another org's credit balance. The
 boundary is the rule that **every `organizationId` reaching
@@ -214,13 +214,18 @@ endpoint is a fresh chance to forget the membership check.
 
 **How the code prevents it.**
 
-1. **One verified producer** —
+1. **Verified organization producers** —
    [editor/lib/auth/organization.ts](editor/lib/auth/organization.ts)
    exports `requireOrganizationId({ user_id, request, routeParams,
 inputOrgId })`. It resolves from: route param slug → request
    header `X-Grida-Organization-Id` → explicit input. Every resolved
    id is verified via `assertOrgMember(user_id, org_id)` before
    return. No "current org" is read from session blob / cookie.
+   GG execution instead consumes the `org` claim from the exclusively verified
+   GRIDA-SEC-006 bearer. That grant was minted after authenticated membership
+   verification; the documented token lifetime bounds this authority. Neither
+   the GG 3D binding nor its execution seam reads an org from input, cookies,
+   account headers or a provider upload reference.
 2. **Runtime contract in the seam** —
    [editor/lib/ai/server.ts](editor/lib/ai/server.ts)
    `withTransaction` (and the AI SDK middleware that wraps it) throw
@@ -230,14 +235,36 @@ inputOrgId })`. It resolves from: route param slug → request
    `organizationId:0`, gate/ingest/auth skip) has been **removed** —
    no code path skips this check while billing. The only intentional
    bypass is the BYOK carve-out below, and it does not bill.
-3. **Single seam entry point** —
-   [editor/lib/ai/server.ts](editor/lib/ai/server.ts) is the ONLY
-   file allowed to import `replicate`, `openai`, `@ai-sdk/*`,
-   `@anthropic-ai/sdk`. Enforced by oxlint
+3. **One billing seam, explicit provider-import owners** —
+   [editor/lib/ai/server.ts](editor/lib/ai/server.ts) owns shared billing;
+   value imports of `replicate`, `openai`, `@ai-sdk/*`, `@anthropic-ai/sdk`
+   and the portable `@grida/ai` SDK are restricted to the reviewed seam allowlist.
+   Enforced by oxlint
    `no-restricted-imports` ([editor/.oxlintrc.jsonc](editor/.oxlintrc.jsonc))
    and the CI audit script
    ([editor/scripts/audit-ai-seam.ts](editor/scripts/audit-ai-seam.ts)).
    A new file that bypasses the seam fails at lint or CI.
+   The named [GG Tripo adapter](editor/lib/ai/gg-three-d.ts) consumes the shared
+   `@grida/ai` SDK and calls the same `checkGate`/`withTransaction`; it adds no
+   raw provider factory or independent ledger. Its exact allowlist additions
+   are that adapter, [its fixed egress owner](editor/lib/ai/gg-three-d-http.ts)
+   and the synthetic SDK/billing contract test. The audit covers `@grida/ai`
+   and `@grida/ai/providers`; lint also denies other `@grida/ai/**` value imports
+   outside the allowlist. Type-only imports grant no execution authority.
+4. **Observed Tripo usage, independent of asset delivery** — upload preparation
+   gates before the free provider request; generation, rig-check and rigging gate
+   before execution. Only server-owned `GG_TRIPO_API_KEY` supplies provider authority,
+   with no BYOK or unprefixed-key fallback. Valid terminal `credits_consumed` is converted at the
+   catalog's USD-per-credit rate, including a reported zero for rig-check.
+   The SDK captures a validated successful task receipt before downloading its
+   model. A later download, GLB validation or cancellation failure returns an
+   internal outcome through `withTransaction`, so ingestion precedes the safe
+   error. No error resubmits a paid job. Missing terminal usage produces no
+   fabricated zero-cost success or estimate: available org/model/transaction/task
+   identifiers are logged for reconciliation. Process death and unobserved terminal
+   states remain [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation),
+   not a durable reconciliation guarantee. Existing ingestion-failure semantics
+   remain owned by the shared seam.
 
 **BYOK carve-out (intentional).** When a contributor sets a `BYOK_*`
 key ([editor/lib/ai/models.ts](editor/lib/ai/models.ts) —
@@ -272,6 +299,12 @@ Today:
 - [editor/lib/auth/organization.ts](editor/lib/auth/organization.ts) — `requireOrganizationId`.
 - [editor/lib/ai/server.ts](editor/lib/ai/server.ts) — single seam entry; unconditional runtime gate; BYOK layer switch.
 - [editor/lib/ai/models.ts](editor/lib/ai/models.ts) — BYOK layer (bare provider, bypasses billing).
+- [GG Tripo execution](editor/lib/ai/gg-three-d.ts) and
+  [billing contract tests](editor/lib/ai/__tests__/gg-three-d.test.ts) — verified
+  org input, unconditional gate, infrastructure-key-only execution and actual receipts.
+- [GG Tripo egress](editor/lib/ai/gg-three-d-http.ts) and
+  [transport tests](editor/lib/ai/__tests__/gg-three-d-http.test.ts) — fixed
+  API/asset authority, public DNS pinning, verified TLS and no credential-bearing redirects.
 - [editor/.oxlintrc.jsonc](editor/.oxlintrc.jsonc) — import lint rule.
 - [editor/scripts/audit-ai-seam.ts](editor/scripts/audit-ai-seam.ts) — CI audit.
 
@@ -279,7 +312,8 @@ Today:
 request body in any AI-adjacent code. Even if you think you "trust"
 the body — Next.js server-action hashes ship in the client bundle and
 become public the moment they're shipped. Always go through
-`requireOrganizationId`.
+`requireOrganizationId` or the exclusively verified, membership-derived GG
+claims described above. An upload ticket is never organization authority.
 
 ---
 
@@ -287,7 +321,7 @@ become public the moment they're shipped. Always go through
 
 **What it protects.** The Grida Desktop V1 ships a local daemon
 sidecar (Node subprocess of the Electron app) that owns the user's BYOK
-keys (OpenRouter, Vercel AI Gateway, fal, ElevenLabs), native-provider
+keys (OpenRouter, Vercel AI Gateway, fal, ElevenLabs, Tripo), native-provider
 OAuth credentials (GRIDA-SEC-008), local file paths, chat sessions, and AI
 agent loops.
 Electron main listens on an ephemeral
@@ -859,6 +893,72 @@ lazy reads, read-only mutation, and symlink escape refusal.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
+Direct Tripo model generation adds the [SDK client](packages/grida-ai/src/tripo-client.ts),
+[validated inputs](packages/grida-ai/src/tripo-inputs.ts), and
+[client tests](packages/grida-ai/src/tripo-client.test.ts), plus the
+[host route](packages/grida-ai-agent/src/http/routes/model-generation.ts),
+[wire contract](packages/grida-ai-agent/src/protocol/model-generation.ts),
+[route tests](packages/grida-ai-agent/src/http/routes/model-generation.test.ts), and
+[daemon integration tests](packages/grida-ai-agent/src/model-generation-daemon.test.ts).
+Only the fixed Tripo API origin receives its key; enumerated Tripo asset hosts
+use the credential-free download lane. The feature accepts bounded inline
+images, never caller-selected URLs, and persists downloaded GLB bytes rather
+than expiring provider URLs. Existing auth, Referer, preload and native transport
+controls apply to the new route.
+
+The shared SDK rigging boundary additionally binds
+[rigging-client.ts](packages/grida-ai/src/rigging-client.ts),
+[rigging-inputs.ts](packages/grida-ai/src/rigging-inputs.ts),
+[rigging-operations.ts](packages/grida-ai/src/rigging-operations.ts),
+[producer tests](packages/grida-ai/src/rigging-client.test.ts), and
+[tripo-transport.ts](packages/grida-ai/src/tripo-transport.ts), the internal
+upload/task/GLB validation transport shared with model generation.
+
+Mesh rigging keeps structured eligibility separate from media output through
+[rigging routes](packages/grida-ai-agent/src/http/routes/rigging.ts),
+[wire contracts](packages/grida-ai-agent/src/protocol/rigging.ts),
+[route tests](packages/grida-ai-agent/src/http/routes/rigging.test.ts), and
+[daemon integration tests](packages/grida-ai-agent/src/rigging-daemon.test.ts).
+The existing `three_d` capability admits both operations in media-only and full
+agent compositions. One operation holds the upload/decode memory reservation
+until its result is encoded and saved. No input path or URL grants filesystem or
+network access; source GLB bytes are uploaded without mutating saved media.
+Native `caps.media.rigging` and both optional bridge methods gate older builds.
+Authorized multipart POSTs to the exact Tripo `/v3/files` endpoint receive
+a 64 MiB native request allowance (covering the SDK's 60,000,000-byte mesh plus
+multipart framing). The separate `provider:tripo-upload` grant admits only
+HTTPS PUT to `tripo-data.s3.us-west-2.amazonaws.com`, with an
+`application/octet-stream` body of at most 60,000,000 bytes. No Authorization,
+cookie or API-key header is permitted, and main refuses every upload redirect.
+Other requests keep their 32 MiB cap. Electron main's
+64 MiB aggregate upload budget, per-frame bounds and credential-free result
+download grants remain enforced.
+
+Funded Tripo uses the same feature routes with explicit `provider: "gg"` and the
+composition's existing in-memory GG store, never a BYOK fallback. The SDK owns
+the bounded native inputs (20,000,000 bytes per image, 60,000,000 bytes per mesh),
+reference preparation, fixed signed PUT and 64 MiB self-contained GLB output.
+The hosted server admits already-uploaded file tokens only after verifying its
+owner-bound ticket; renderer/native input remains bytes, not provider tokens or
+URLs. The direct SDK's separate uploaded-input methods validate exact token/media
+type shapes and are unavailable on the GG lane.
+`caps.media.tripo_gg` and `caps.media.rigging_gg` distinguish funded-capable builds
+from earlier BYOK-capable builds. Bridge dispatch refuses unsupported funding
+without switching providers. These additions bind the
+[GG SDK adapter](packages/grida-ai/src/gg-tripo.ts),
+[adapter tests](packages/grida-ai/src/gg-tripo.test.ts),
+[uploaded-input and receipt tests](packages/grida-ai/src/tripo-uploaded.test.ts),
+[native funding tests](packages/grida-ai-agent/src/http/routes/gg-tripo.test.ts),
+[bridge contract](packages/grida-desktop-bridge/src/index.ts) and
+[contract tests](packages/grida-desktop-bridge/src/index.test.ts), plus the
+[preload](desktop/src/preload.ts) and [preload tests](desktop/src/preload-contract.test.ts).
+The [network policy](desktop/src/agent-network-policy.ts),
+[sidecar transport](desktop/src/agent-sidecar-network.ts),
+[main network host](desktop/src/main/agent-network-host.ts) and their respective
+[policy](desktop/src/agent-network-policy.test.ts),
+[sidecar](desktop/src/agent-sidecar-network.test.ts), and
+[main](desktop/src/main/agent-network-host.test.ts) tests pin the separate upload grant.
+
 - [Windows credential compatibility tests](packages/grida-daemon/src/secrets-windows.test.ts) and [provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — platform-selected host-local custody, preserved OAuth records and GG/ChatGPT workspace setup, with strict provider failures. These simulate platform selection with disposable files; they do not certify native Windows ACLs.
 
 - [Public SDK exports](packages/grida-ai/src/index.ts), [operation discovery](packages/grida-ai/src/media-operations.ts), [shared route eligibility](packages/grida-ai/src/media-routes.ts), [input rules](packages/grida-ai/src/media-inputs.ts), and [schema primitives](packages/grida-ai/src/input-schema.ts) — credential-free descriptors and JSON parsing share execution's route and input policy. Discovery neither constructs authority nor promises access. Image count is bounded before key reads or paid submission. [Public discovery tests](packages/grida-ai/src/media-operations.test.ts) and [native parser parity tests](packages/grida-ai/src/media-input-parity.test.ts) pin those boundaries.
@@ -1292,7 +1392,7 @@ levels into one.
    before it prevents handoff, while later logout cannot recall a grant. A sink
    failure cannot undo a token it already retained. The initial native auth consumer
    uses one fixed model-list request and discards the grant. Reusable memory
-   custody and image/video/music execution live in `@grida/ai`; native command composition
+   custody and image/video/music/Tripo feature execution live in `@grida/ai`; native command composition
    remains separate from the account exchange.
    The CLI obtains one scoped grant per generation command through that fixed
    exchange and puts it in the same SDK memory store. Only the construction-time
@@ -1307,7 +1407,7 @@ levels into one.
    reuse the existing BYOK file but requires a newly pushed GG grant; switching
    startup modes neither copies nor persists that grant.
    Shared GG URL admission requires HTTPS except URL-parsed loopback hosts
-   `localhost`, `127.0.0.1` and `[::1]`. Image/video/music constructors, text URL
+   `localhost`, `127.0.0.1` and `[::1]`. Media constructors, text URL
    construction, liveness checks and hosted POST helpers use the same policy
    before reading custody. Userinfo, query and fragment are refused; API path
    joining cannot switch origins. Hosts still own destination grants, DNS/address
@@ -1321,6 +1421,41 @@ levels into one.
    hosts return a safe 503; actual quota exhaustion remains 429. The deadline
    bounds the quota decision, not Redis work, which may finish later and consume
    quota. Late completion cannot resume minting, and no automatic remint occurs.
+8. **Funded 3D input references have separate authority** — the four fixed POST
+   routes under `/api/v1/ai/3d/` are `uploads`, `model-generation`, `rig-check`
+   and `rigging`. Each authenticates the current GG bearer and applies its user
+   quota before bounded JSON processing and verified-org execution. Upload
+   preparation gates credit eligibility before using server-only `GG_TRIPO_API_KEY`
+   at Tripo's fixed `/v3/files/presign` endpoint. It returns a signed object PUT
+   URL and a 900-second upload ticket, never the provider key. The ticket uses
+   `aud: "gg:tripo-upload"`, HS256 and a domain-separated HMAC-derived key; signing
+   uses the current GG configuration and previous-key verification supports
+   rotation. A ticket cannot authenticate an AI call, and a GG bearer cannot
+   replace a ticket. Execution independently verifies the ticket's signature,
+   lifetime, subject, organization and image/mesh type against the live bearer.
+   Raw file tokens, input URLs and extra reference fields are refused.
+   The ticket binds declared media type and byte length (20,000,000 bytes per
+   image; 60,000,000 bytes per mesh). This is not server verification of the actual
+   S3 object: the provider's presign API accepts format, not an enforced size or
+   content hash. The native SDK bounds the bytes it uploads, while direct hostile
+   HTTP clients remain subject to Tripo's storage/input validation. The only
+   upload destination is HTTPS `tripo-data.s3.us-west-2.amazonaws.com`; PUT carries
+   no GG/account/provider credential, and redirects are refused. Tickets and
+   signed upload URLs are transient and do not enter generated-media receipts.
+   Server generation consumes only the verified refs, with actual usage metered
+   under GRIDA-SEC-003. Self-contained GLBs are bounded to 64 MiB and returned as
+   aligned base64 chunks in streamed JSON; provider URLs never become result
+   authority. Server execution has a 600-second deadline, hosted native calls a
+   780-second deadline, and the Node route's configured maximum is 800 seconds.
+   These limits do not make accepted provider jobs durable or cancel them.
+9. **Funding choice and recovery do not cross accounts** — Desktop explicitly
+   selects organization credit or Tripo BYOK and checks the matching native
+   `tripo_gg`/`rigging_gg` capability. Expired GG authority can be refreshed once
+   only when no accepted task identity is present; known task IDs fence that
+   retry, including Electron's safe message projection. Other errors do not
+   switch funding or resubmit. Native GG execution uses the shared memory store
+   and does not read BYOK credentials; the CLI obtains a scoped grant through
+   its existing explicit-organization exchange and clears it after the command.
 
 **Residual risks (accepted, documented).** Org-membership revocation is
 not re-checked within a token's 900-second window plus clock tolerance. The mint rate
@@ -1329,10 +1464,46 @@ complete on their token rather than being aborted — expiry is the
 revocation mechanism. Electron main and any OS-trusted TLS-inspection proxy can
 observe the short-lived bearer while transporting a request; neither is a
 durable account-credential holder.
+Upload tickets are reusable by their original subject and organization during
+their short lifetime; they identify content and grant no credit or one-shot job
+reservation. Unobserved Tripo terminal usage is the accepted synchronous billing
+limitation tracked in [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation).
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-006 .` to enumerate.
 
 - [Windows provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — optional BYOK discovery preserves existing GG eligibility without swallowing custody errors.
+
+- [Funded 3D HTTP owner](editor/lib/api/gg-media.ts) and
+  [binding tests](editor/lib/api/gg-media.test.ts),
+  [upload-ticket owner](editor/lib/gg/uploads.ts) and
+  [custody tests](editor/lib/gg/uploads.test.ts) — exclusive live GG auth,
+  subject/org/type-bound references and bounded request/streaming responses;
+  also GRIDA-SEC-012.
+- [Tripo execution seam](editor/lib/ai/gg-three-d.ts),
+  [billing tests](editor/lib/ai/__tests__/gg-three-d.test.ts),
+  [server transport](editor/lib/ai/gg-three-d-http.ts), and
+  [egress tests](editor/lib/ai/__tests__/gg-three-d-http.test.ts) — fixed provider
+  key authority, public DNS pinning, terminal receipts and billing; also GRIDA-SEC-003.
+- [Tripo generation client](packages/grida-ai/src/tripo-client.ts),
+  [rigging client](packages/grida-ai/src/rigging-client.ts),
+  [rigging discovery](packages/grida-ai/src/rigging-operations.ts),
+  [task transport](packages/grida-ai/src/tripo-transport.ts),
+  [GG adapter](packages/grida-ai/src/gg-tripo.ts) and
+  [adapter tests](packages/grida-ai/src/gg-tripo.test.ts), with the existing
+  [bounded invocation](packages/grida-ai/src/media-request.ts) — explicit funding,
+  credential-free signed uploads, validated receipts and no paid resubmission;
+  also GRIDA-SEC-004.
+- [Model-generation route](packages/grida-ai-agent/src/http/routes/model-generation.ts),
+  [rigging routes](packages/grida-ai-agent/src/http/routes/rigging.ts) and
+  [funding tests](packages/grida-ai-agent/src/http/routes/gg-tripo.test.ts) —
+  the same composition-owned GG store behind native admission, safe task IDs,
+  and no BYOK fallback; also GRIDA-SEC-004.
+- [Desktop funding/session adapter](editor/lib/desktop/gg-tripo.ts) and
+  [recovery tests](editor/lib/desktop/gg-tripo.test.ts) — explicit funding,
+  capability-aware readiness and one pre-acceptance token refresh.
+- [CLI rigging composition](packages/grida-cli/src/rigging-run.ts) and
+  [funding tests](packages/grida-cli/src/rigging-run.test.ts) — explicit org
+  selection, scoped memory-only authority and cleanup; also GRIDA-SEC-013.
 
 - [Public SDK exports](packages/grida-ai/src/index.ts), [operation discovery](packages/grida-ai/src/media-operations.ts), [shared route eligibility](packages/grida-ai/src/media-routes.ts), and [discovery tests](packages/grida-ai/src/media-operations.test.ts), and [native parser parity tests](packages/grida-ai/src/media-input-parity.test.ts) — GG route facts grant no scoped token, organization authority or credits.
 
@@ -1391,7 +1562,7 @@ governs the surface, this record governs its security half.
   authority and bounded, memory-only access verification. Their infrastructure
   isolation remains GRIDA-SEC-011/012; no generation or provider call is required.
 - [editor/app/desktop/auth/token/route.ts](editor/app/desktop/auth/token/route.ts) — the mint route (pinned by its `route.test.ts`).
-- `editor/app/(api)/(public)/api/v1/ai/**` — the hosted GG endpoints: OpenAI-compat chat/completions + models, Grida-native image/video/music generation. Verify with `verifyGgToken` EXCLUSIVELY; billed through the seam (pinned by route and seam contract tests).
+- `editor/app/(api)/(public)/api/v1/ai/**` — the hosted GG endpoints: OpenAI-compat chat/completions + models, Grida-native image/video/music generation and the four 3D feature routes. Verify with `verifyGgToken` EXCLUSIVELY; provider work is gated through the seam, and metered operations use actual receipts (pinned by route and seam contract tests).
 - `editor/app/(api)/(public)/api/v1/models/catalog/route.ts` — deliberately OUTSIDE the glob above, and deliberately unauthenticated: an agent host fetches the published model catalogue at boot, before any session token exists. It accepts NO credential (strictly stronger than accepting the wrong one), spends nothing, and returns only catalogue data already public on the models page. Listed here so it is not "fixed" into the token-gated family, which would break the boot fetch. See [catalogue distribution](docs/wg/platform/hosted-ai.md).
 - [editor/lib/ai/openai-compat/](editor/lib/ai/openai-compat/codec.ts) — the wire codec + error envelope + allowlist + rate limits.
   The [allowlist test](editor/lib/ai/openai-compat/hosted-models.test.ts) pins direct
@@ -2127,7 +2298,7 @@ the system browser launcher, or OS keyring availability.
 
 **What it protects.** `/api/v1` requests cannot acquire browser authority or be
 handled as tenant pages through the shared Next.js web pipeline. Newly bound
-account routes select an operation whose adapter supplies authentication and
+account and funded 3D routes select an operation whose adapter supplies authentication and
 HTTP policy; declaring a route does not let its author silently omit those rules.
 Native account credentials remain GRIDA-SEC-010; GG credentials remain GRIDA-SEC-006.
 
@@ -2173,6 +2344,17 @@ browser cookies, UI code or request-global state into account operations.
    the mint's member query filters that user and organization together before
    the GG owner signs. Authentication,
    parsing, membership and signing failures keep the native no-store envelope.
+   The separate `gg-media` binding admits exactly the four `/api/v1/ai/3d/`
+   operations under GRIDA-SEC-006; it does not use native account authentication.
+   Routes export only its fixed seven-method template, Node runtime, dynamic
+   execution and `maxDuration = 800`. Only POST executes; bodyless OPTIONS
+   advertises methods, and all other methods return 405. GG verification precedes
+   per-user quota and the 64 KiB/one-second JSON body reader. Query arguments,
+   content encodings, malformed UTF-8, invalid length declarations, unknown
+   fields and unauthorized upload refs fail without provider execution. The
+   native SDK validates operation-specific controls after reference substitution.
+   Results are no-store JSON with no-referrer/nosniff headers; 64 MiB GLB bytes
+   are encoded in aligned chunks rather than one buffered base64 response.
 4. **Source checks reject drift.** `audit-api.ts` compares real App/Pages route
    placements with the inventory and verifies the complete native binding AST.
    New handlers cannot use the six pinned legacy GG/catalogue exceptions.
@@ -2180,6 +2362,15 @@ browser cookies, UI code or request-global state into account operations.
    re-exports and installed package runtime entries, for Next/React, browser/UI,
    dynamic-loader and environment-ownership violations. Invalid fixture trees
    prove the checks fail. The API workflow runs on every PR without path filters.
+   The GG extension pins its four paths, credential family, POST/OPTIONS policy
+   and complete binding AST. Exactly one reviewed dependency edge is exempted
+   from the browser-free API traversal:
+   `lib/api/gg-media.ts` → `lib/ai/gg-three-d.ts`. That named execution owner passes
+   the verified org into the existing GRIDA-SEC-003 billing seam, whose privileged
+   billing/provider graph is reviewed separately. This is not a generic graph
+   exemption: direct browser imports in the GG adapter and account/API imports
+   of the execution seam still fail the audit. The AI seam's independent import
+   audit and lint rules restrict portable SDK execution to its exact owners.
 5. **Runtime proof stays local.** `scripts/api-local` builds a private production
    Next snapshot from the real API, proxy and config sources. Its synthetic
    loopback Auth and Data servers reject crossed service requests; web tripwires
@@ -2199,8 +2390,11 @@ browser cookies, UI code or request-global state into account operations.
 checks are not a sandbox against malicious repository authors. Existing GG and
 catalogue handlers remain explicit legacy bindings with their own credential,
 streaming, error and cache contracts. Fixed native operations currently cover
-identity, organization listing, cached credits and GG access; billing mutations
-and generation lifecycle are outside this contract. Next may normalize malformed repeated
+identity, organization listing, cached credits and GG access. The separate funded
+3D binding owns its described HTTP/authentication/input policy; provider execution
+and billing remain GRIDA-SEC-003/006, including the synchronous limitation in
+[KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation).
+Next may normalize malformed repeated
 slashes or backslashes with a redirect before proxy; the machine response
 contract applies to paths admitted by that framework parsing layer.
 Next.js 16.2.6's Node proxy clones POST bodies in `next-server.js` and awaits
@@ -2229,6 +2423,15 @@ release requirement.
 
 - [API guide](editor/lib/api/README.md), [inventory](editor/lib/api/operations.ts),
   [policy](editor/lib/api/policy.ts), and [policy tests](editor/lib/api/policy.test.ts).
+- [Funded 3D binding](editor/lib/api/gg-media.ts),
+  [HTTP contract tests](editor/lib/api/gg-media.test.ts),
+  [upload references](editor/lib/gg/uploads.ts) and
+  [reference tests](editor/lib/gg/uploads.test.ts) — scoped GG auth, subject/org
+  custody, bounded inputs and streamed output; also GRIDA-SEC-006. The four routes
+  are [uploads](<editor/app/(api)/(public)/api/v1/ai/3d/uploads/route.ts>),
+  [model-generation](<editor/app/(api)/(public)/api/v1/ai/3d/model-generation/route.ts>),
+  [rig-check](<editor/app/(api)/(public)/api/v1/ai/3d/rig-check/route.ts>) and
+  [rigging](<editor/app/(api)/(public)/api/v1/ai/3d/rigging/route.ts>).
 - [Account adapter](editor/lib/api/account.ts), [adapter tests](editor/lib/api/account.test.ts),
   and [identity binding](<editor/app/(api)/(public)/api/v1/auth/me/route.ts>) — also GRIDA-SEC-010.
 - [Shared native HTTP owner](editor/lib/api/native.ts) and
@@ -2292,11 +2495,11 @@ generation receipts without a fixed projection.
    Ordinary listing/inspection needs no credential or network. An availability
    filter reports key presence or cached organization eligibility explicitly;
    neither establishes provider access or generation success.
-2. **Invocation-owned credentials.** `ProviderCredentials` reads the four
+2. **Invocation-owned credentials.** `ProviderCredentials` reads the five
    named process environment slots (`OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY`,
-   `FAL_KEY`, `ELEVENLABS_API_KEY`), an explicitly allocated stdin key, or the
+   `FAL_KEY`, `ELEVENLABS_API_KEY`, `TRIPO_API_KEY`), an explicitly allocated stdin key, or the
    shared provider owner under GRIDA-SEC-014. Execution
-   inspects only its selected provider; provider status may inspect all four.
+   inspects only its selected provider; provider status may inspect all five.
    There is no dotenv, repository, legacy Desktop file or account-store lookup.
    Stdin replaces the matching environment slot; successful explicit inputs bypass
    constructing or opening the stored-key owner for that provider. Missing inputs
@@ -2316,7 +2519,9 @@ generation receipts without a fixed projection.
    only on its reviewed provider host/path/method allowlist, with provider-specific
    header families. GG permits only the invocation's selected origin: the shipped
    public registration's HTTPS API origin or the fixed local fixture, with only
-   image/video/music POST paths and no query parameters. Provider redirects are rejected without
+   image/video/music generation POST paths and the four exact
+   `/api/v1/ai/3d/{uploads,model-generation,rig-check,rigging}` POST paths, with no
+   query parameters. Provider redirects are rejected without
    replay. The download lane is HTTPS GET/HEAD with no credential, cookie, body or
    caller-selected Host header. Each connection and download redirect resolves
    fresh DNS, rejects the entire answer if any address is non-public, and pins one
@@ -2325,7 +2530,13 @@ generation receipts without a fixed projection.
    private-address exception. Direct requests use no ambient fetch, proxy agent,
    cookie jar or pooled connection. Header/body sizes, DNS/connect time, total
    request lifetime and streamed responses are bounded; SDK-specific limits may
-   be lower. No failed paid request is automatically resubmitted.
+   be lower. The hosted 3D request alone receives a 780-second lifecycle allowance.
+   The separate signed-upload branch permits only HTTPS PUT to
+   `tripo-data.s3.us-west-2.amazonaws.com`, an `application/octet-stream` byte
+   body of at most 60,000,000 bytes, and harmless content headers. It accepts no
+   Authorization, cookie or provider-key header and follows no redirect; GG
+   authority remains on the selected GG origin. No failed paid request is
+   automatically resubmitted.
 4. **Input and output preflight; publication.** Explicit UTF-8 JSON/text file/stdin
    input is bounded to 16 MiB. Selected local images have an 8 MiB per-file bound,
    a 16 MiB aggregate read bound, and structural PNG/JPEG/static WebP header checks.
@@ -2355,8 +2566,9 @@ generation receipts without a fixed projection.
 6. **Explicit credential checks before registration.** CLI `providers configure`
    validates the entered key through the shared AI owner, then invokes that owner's
    single authenticated GET before opening custody. The host permits only OpenRouter's
-   `/api/v1/key`, Vercel's `/v1/credits`, and fal's `/v1/models/pricing` with exactly
-   one fixed `endpoint_id=fal-ai/flux/dev`. This does not grant other platform APIs.
+   `/api/v1/key`, Vercel's `/v1/credits`, fal's `/v1/models/pricing` with exactly
+   one fixed `endpoint_id=fal-ai/flux/dev`, and Tripo's `/v3/account/balance`.
+   This does not grant other platform APIs.
    The shared owner rejects redirects, bounds the request/body lifecycle to ten seconds
    and 64 KiB of UTF-8 JSON, and discards account/key/pricing metadata. Rejected,
    denied, malformed, cancelled or unavailable checks never replace the stored key.
@@ -2422,6 +2634,24 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
   [base process/module guard](scripts/cli-local/network.cjs) and
   [its tests](scripts/cli-local/network.test.mjs) are shared with the
   GRIDA-SEC-011 fixture proof.
+
+The CLI rigging entry and its boundary tests are
+[rigging-run.ts](packages/grida-cli/src/rigging-run.ts) and
+[rigging-run.test.ts](packages/grida-cli/src/rigging-run.test.ts).
+They consume the neutral rigging SDK with explicit CLI file grants and a chosen
+BYOK or GG funding source. GG requires explicit organization selection and the
+existing native account exchange into an invocation-only scoped store; it never
+inspects BYOK keys or falls back to them. `rigging check` returns structured
+eligibility; `rigging run` is the explicit paid submission and publishes GLB bytes through the existing safe
+output directory. `--mesh` snapshots one regular file under the SDK's
+60,000,000-byte bound; JSON input retains its 16 MiB limit. Syntax, mesh/options
+and output publication preflight run before key access. Direct Tripo rigging
+adds POST `/v3/animations/rig-check` and `/v3/animations/rig`;
+retargeting and arbitrary query/destination variants remain denied. Rigging
+receipts add the feature and safe task ID/reported credits; existing generation
+receipts retain their shape. Provider or save failure preserves an accepted
+task's identity without retrying it. These files also bind GRIDA-SEC-006 for GG
+grant custody and cleanup.
 
 ---
 
@@ -2625,7 +2855,7 @@ interchangeable. Public application registration/API keys are not user identity.
 
 **How the code prevents it.**
 
-1. **Explicit CLI composition.** `MediaCommands` resolves the selected provider
+1. **Explicit CLI composition.** `MediaCommands` and `RiggingCommands` resolve the selected provider
    and validates generation input/output admission before account authority. Its
    GG branch opens native auth with one captured in-memory grant sink; the media
    HTTP owner receives a GG store and an empty BYOK reader. Its BYOK branch opens
@@ -2660,6 +2890,10 @@ incident investigations out of the architectural guarantee.
 - [CLI media composition](packages/grida-cli/src/media-run.ts) and
   [tests](packages/grida-cli/src/media-run.test.ts) — real SDK handoff, BYOK/account
   independence, missing-key failure, no stale grant reuse or credential output.
+- [CLI rigging composition](packages/grida-cli/src/rigging-run.ts) and
+  [tests](packages/grida-cli/src/rigging-run.test.ts) — eligibility and rigging
+  use the same explicit-organization scoped handoff, never account tokens as
+  provider credentials; also GRIDA-SEC-006/013.
 - [Native bearer verifier](editor/lib/auth/bearer.ts) and
   [tests](editor/lib/auth/__tests__/oauth-bearer.test.ts) — accepted account family
   and live issuer verification, including rejection of other credential classes.

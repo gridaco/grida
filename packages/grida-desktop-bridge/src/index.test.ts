@@ -1,6 +1,10 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — renderer-safe bridge contract pins.
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type {
+  RigCheckRequest,
+  RigCheckResult,
+  RiggingGenerateRequest,
+  RiggingGenerateResult,
   MusicGenerateRequest,
   MusicGenerateResult,
   SoundEffectGenerateRequest,
@@ -47,6 +51,31 @@ describe("DesktopBridge ChatGPT connect result", () => {
 });
 
 describe("DesktopBridge media generation", () => {
+  it("keeps rigging optional and preserves structured versus media result contracts", () => {
+    type Rigging = NonNullable<DesktopBridge["rigging"]>;
+    type Media = NonNullable<DesktopBridge["caps"]["media"]>;
+    expectTypeOf<Media["rigging"]>().toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<
+      Parameters<Rigging["check"]>[0]
+    >().toEqualTypeOf<RigCheckRequest>();
+    expectTypeOf<
+      Awaited<ReturnType<Rigging["check"]>>
+    >().toEqualTypeOf<RigCheckResult>();
+    expectTypeOf<
+      Parameters<Rigging["generate"]>[0]
+    >().toEqualTypeOf<RiggingGenerateRequest>();
+    expectTypeOf<
+      Awaited<ReturnType<Rigging["generate"]>>
+    >().toEqualTypeOf<RiggingGenerateResult>();
+  });
+  it("keeps Tripo native readiness optional for older Desktop binaries", () => {
+    type Media = NonNullable<DesktopBridge["caps"]["media"]>;
+    expectTypeOf<Media["tripo"]>().toEqualTypeOf<boolean | undefined>();
+    const older: Media = {};
+    const supported: Media = { tripo: true };
+    expect(older.tripo === true).toBe(false);
+    expect(supported.tripo).toBe(true);
+  });
   it("keeps the optional 3D and nested audio namespaces aligned with the agent transport", () => {
     type ThreeDGenerate = NonNullable<DesktopBridge["threeD"]>["generate"];
     type Audio = NonNullable<DesktopBridge["audio"]>;

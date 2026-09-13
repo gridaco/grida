@@ -85,6 +85,7 @@ export namespace models {
    * `Provider`, not `Vendor`.
    */
   export type Vendor =
+    | "tripo"
     | "openai"
     | "recraft-ai"
     | "black-forest-labs"
@@ -2485,9 +2486,235 @@ export namespace models {
    * 3D-generation endpoint catalogue.
    *
    * Exact ids, IO contracts, and provider meters. Application integration and
-   * lifecycle are independent of these facts. These endpoints are served by fal.
+   * lifecycle are independent of these facts. Legacy endpoints are served by fal.
+   * Direct feature-based models
+   * live under model_generation and keep input variants out of model identity.
    */
   export namespace three_d {
+    /** Rig eligibility is an operation, not a model identity. */
+    export namespace rig_check {
+      export const operation = {
+        feature: "rig-check",
+        provider: "tripo",
+        binding_id: "rig-check",
+        input: { formats: ["glb"], max_bytes: 150_000_000 },
+        rig_types: [
+          "biped",
+          "quadruped",
+          "hexapod",
+          "octopod",
+          "avian",
+          "serpentine",
+          "aquatic",
+        ],
+        pricing: {
+          type: "per_operation_credits",
+          credits: 0,
+          usd_per_credit: 0.01,
+          source_url: "https://developers.tripo3d.ai/en/pricing",
+        },
+        url: "https://developers.tripo3d.ai/en/docs/animations-rig-check",
+      } as const;
+    }
+
+    /** Actual rigging model versions, independent of model generation. */
+    export namespace rigging {
+      export type ModelId = "tripo/rig-v1.0" | "tripo/rig-v2.5";
+      export type RigType = (typeof rig_check.operation.rig_types)[number];
+      export type Spec = "tripo" | "mixamo";
+      export type ModelCard = {
+        id: ModelId;
+        label: string;
+        vendor: "tripo";
+        provider: "tripo";
+        feature: "rigging";
+        binding_id: "v1.0-20240301" | "v2.5-20260210";
+        release: ModelRelease;
+        short_description: string;
+        rig_types: readonly RigType[];
+        specs: readonly Spec[];
+        input: { formats: readonly string[]; max_bytes: number };
+        output: { formats: readonly ["glb", "fbx"] };
+        pricing: {
+          type: "per_operation_credits";
+          credits: number;
+          usd_per_credit: number;
+          source_url: string;
+        };
+        url: string;
+      };
+      const common = {
+        vendor: "tripo",
+        provider: "tripo",
+        feature: "rigging",
+        specs: ["tripo", "mixamo"],
+        input: {
+          formats: ["glb", "gltf", "fbx", "obj", "stl"],
+          max_bytes: 150_000_000,
+        },
+        output: { formats: ["glb", "fbx"] },
+        // The pricing table is authoritative over the stale 30-credit response example.
+        pricing: {
+          type: "per_operation_credits",
+          credits: 25,
+          usd_per_credit: 0.01,
+          source_url: "https://developers.tripo3d.ai/en/pricing",
+        },
+        // Snapshot suffixes are not evidence of the first public release day.
+        release: {
+          date: null,
+          basis: "provider_endpoint",
+          source_url: "https://developers.tripo3d.ai/en/docs/animations-rig",
+        },
+        url: "https://developers.tripo3d.ai/en/docs/animations-rig",
+      } as const;
+      export const models = {
+        "tripo/rig-v1.0": {
+          ...common,
+          id: "tripo/rig-v1.0",
+          label: "Tripo Rig v1.0",
+          binding_id: "v1.0-20240301",
+          short_description:
+            "Automatic skeleton rigging for humanoid characters.",
+          rig_types: ["biped"],
+        },
+        // Follow the documented compatibility table, not its contradictory biped example.
+        "tripo/rig-v2.5": {
+          ...common,
+          id: "tripo/rig-v2.5",
+          label: "Tripo Rig v2.5",
+          binding_id: "v2.5-20260210",
+          short_description:
+            "Automatic skeleton rigging for animals and other creatures.",
+          rig_types: [
+            "quadruped",
+            "hexapod",
+            "octopod",
+            "avian",
+            "serpentine",
+            "aquatic",
+          ],
+        },
+      } as const satisfies Record<ModelId, ModelCard>;
+      export const model_ids = Object.freeze(Object.keys(models) as ModelId[]);
+      export function is_model_id(value: string): value is ModelId {
+        return (model_ids as readonly string[]).includes(value);
+      }
+    }
+
+    /** Model generation is a feature; its text/image/multiview inputs are variants. */
+    export namespace model_generation {
+      export type ModelId = "tripo/h3.1" | "tripo/p1" | "tripo/p2";
+      export type InputVariant = "text" | "image" | "multiview";
+      export type TextureQuality = "standard" | "detailed" | "extreme";
+      export type GeometryQuality = "standard" | "detailed";
+      export type ModelCard = {
+        id: ModelId;
+        label: string;
+        vendor: "tripo";
+        provider: "tripo";
+        feature: "model-generation";
+        binding_id: "v3.1-20260211" | "P1-20260311" | "P2-20260801";
+        preview: boolean;
+        release: ModelRelease;
+        short_description: string;
+        inputs: readonly InputVariant[];
+        output: { primary: "glb"; compression: "none" };
+        face_limit: { min: number; max: number; detailed_max?: number };
+        texture_quality: readonly TextureQuality[];
+        geometry_quality?: readonly GeometryQuality[];
+        pricing: {
+          type: "per_generation_credits";
+          usd_per_credit: number;
+          base_credits: Record<InputVariant, number>;
+          texture_credits: Record<TextureQuality, number>;
+          detailed_geometry_credits?: number;
+          source_url: string;
+        };
+        url: string;
+      };
+      const common = {
+        vendor: "tripo",
+        provider: "tripo",
+        feature: "model-generation",
+        inputs: ["text", "image", "multiview"],
+        output: { primary: "glb", compression: "none" },
+        texture_quality: ["standard", "detailed", "extreme"],
+      } as const;
+      const pricing = {
+        type: "per_generation_credits",
+        usd_per_credit: 0.01,
+        texture_credits: { standard: 10, detailed: 20, extreme: 30 },
+        source_url: "https://developers.tripo3d.ai/en/pricing",
+      } as const;
+      export const models = {
+        "tripo/h3.1": {
+          ...common,
+          id: "tripo/h3.1",
+          label: "Tripo H3.1",
+          binding_id: "v3.1-20260211",
+          preview: false,
+          release: {
+            date: "2026-03-06",
+            basis: "model",
+            source_url: "https://www.tripo3d.ai/blog/introducing-hd-model-v3-1",
+          },
+          short_description: "High-detail geometry with optional PBR textures.",
+          face_limit: { min: 1, max: 1_500_000, detailed_max: 2_000_000 },
+          geometry_quality: ["standard", "detailed"],
+          pricing: {
+            ...pricing,
+            base_credits: { text: 10, image: 20, multiview: 20 },
+            detailed_geometry_credits: 20,
+          },
+          url: "https://developers.tripo3d.ai/en/docs/generation-text-to-model/standard",
+        },
+        "tripo/p1": {
+          ...common,
+          id: "tripo/p1",
+          label: "Tripo P1",
+          binding_id: "P1-20260311",
+          preview: false,
+          release: {
+            date: "2026-03-11",
+            basis: "model",
+            source_url: "https://www.tripo3d.ai/blog/introducing-smart-mesh-v1",
+          },
+          short_description: "Low-poly generation with clean mesh topology.",
+          face_limit: { min: 50, max: 20_000 },
+          pricing: {
+            ...pricing,
+            base_credits: { text: 30, image: 40, multiview: 40 },
+          },
+          url: "https://developers.tripo3d.ai/en/docs/generation-text-to-model/p",
+        },
+        "tripo/p2": {
+          ...common,
+          id: "tripo/p2",
+          label: "Tripo P2 Preview",
+          binding_id: "P2-20260801",
+          preview: true,
+          release: {
+            date: "2026-08-19",
+            basis: "model",
+            source_url: "https://www.tripo3d.ai/blog/tripo-p2-0-preview",
+          },
+          short_description:
+            "Preview of next-generation low-poly mesh generation.",
+          face_limit: { min: 48, max: 50_000 },
+          pricing: {
+            ...pricing,
+            base_credits: { text: 100, image: 100, multiview: 100 },
+          },
+          url: "https://developers.tripo3d.ai/en/docs/generation-text-to-model/p",
+        },
+      } as const satisfies Record<ModelId, ModelCard>;
+      export const model_ids = Object.freeze(Object.keys(models) as ModelId[]);
+      export function is_model_id(value: string): value is ModelId {
+        return (model_ids as readonly string[]).includes(value);
+      }
+    }
+
     export type TextToThreeDModelId = "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d";
 
     export type ImageToThreeDModelId =

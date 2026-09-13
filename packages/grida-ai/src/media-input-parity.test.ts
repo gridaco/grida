@@ -206,6 +206,8 @@ describe("MediaOperations and native operation validation", () => {
           ).generate;
           break;
         case "three-d":
+          if (prepared.provider_id !== "fal")
+            throw new Error("Expected the legacy fal case");
           generate = (
             await new ThreeDClient({ keys: { get }, http }).resolve(
               prepared.selection

@@ -632,4 +632,25 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
       400
     );
   });
+
+  it("exposes only Tripo key presence and mutations through native secrets routes", async () => {
+    const key = "synthetic-tripo-key";
+    expect(
+      await (await post("/secrets/has", { provider_id: "tripo" })).json()
+    ).toEqual({ has: false });
+    const set = await post("/secrets/set", { provider_id: "tripo", key });
+    expect(set.status).toBe(200);
+    expect(await set.json()).toEqual({ ok: true });
+    expect(await secrets._getKey("tripo")).toBe(key);
+    expect(
+      await (await post("/secrets/has", { provider_id: "tripo" })).json()
+    ).toEqual({ has: true });
+    expect((await post("/secrets/get", { provider_id: "tripo" })).status).toBe(
+      404
+    );
+    expect(
+      (await post("/secrets/delete", { provider_id: "tripo" })).status
+    ).toBe(200);
+    expect(await secrets.has("tripo")).toBe(false);
+  });
 });

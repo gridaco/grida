@@ -147,6 +147,7 @@ const environment = {
   vercel: "AI_GATEWAY_API_KEY",
   fal: "FAL_KEY",
   elevenlabs: "ELEVENLABS_API_KEY",
+  tripo: "TRIPO_API_KEY",
 } as const satisfies Record<ByokProviderId, string>;
 const providers = Object.keys(environment) as ProviderCredentials.Provider[];
 const maxBytes = 4096;
