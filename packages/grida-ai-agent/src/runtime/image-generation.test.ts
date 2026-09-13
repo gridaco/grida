@@ -99,7 +99,7 @@ describe("workspace image operation consumer", () => {
 
   it("resolves reference support before any workspace bytes are read", async () => {
     const { bindings, generate, request } = await build({
-      // The default's fal route now supports references; Vercel's does not.
+      // The default's fal route now supports references; Vercel AI Gateway's does not.
       keys: { vercel: "synthetic-key" },
     });
     const read = vi.spyOn(bindings.fs, "readBytes");

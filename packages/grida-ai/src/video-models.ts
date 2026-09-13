@@ -1,6 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — fixed provider video wires and scoped GG submission.
 // GRIDA-GG: token — hosted video is text-only and uses the shared live-token contract.
-import { createGateway } from "@ai-sdk/gateway";
+import { createGateway as createVercelAiGateway } from "@ai-sdk/gateway";
 import { assertAllowedUrl, falQueueOutcome, pollQueue } from "./fetch-helpers";
 import { postHosted } from "./gg";
 import type { GgTokenSource } from "./gg-session";
@@ -12,7 +12,8 @@ import type { VideoClient } from "./video-client";
 export namespace videoModels {
   export const maxBytes = MediaInputs.limits.video;
   export const maxEnvelopeBytes = Math.ceil(maxBytes / 3) * 4 + 64 * 1024;
-  export const vercelBase = "https://ai-gateway.vercel.sh/v3/ai";
+  export const vercelAiGatewayVideoBaseUrl =
+    "https://ai-gateway.vercel.sh/v3/ai";
   const falHosts = ["fal.run", "*.fal.run", "fal.media", "*.fal.media"];
   const openRouterBase = "https://openrouter.ai/api/v1/videos";
   export type Input = {
@@ -41,9 +42,9 @@ export namespace videoModels {
     request.check();
     if (provider === "fal") return fal(key, id, input, request);
     if (provider === "openrouter") return openRouter(key, id, input, request);
-    const model = createGateway({
+    const model = createVercelAiGateway({
       apiKey: key,
-      baseURL: vercelBase,
+      baseURL: vercelAiGatewayVideoBaseUrl,
       fetch: request.transport(videoModels.maxEnvelopeBytes).request,
     }).videoModel(id);
     // Call the model directly: the high-level SDK adds retries and automatic URL downloads.

@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
           return {
             totalUsage: part.totalUsage,
             lastStepUsage,
-            // Send the gateway model ID (e.g. "openai/gpt-5-mini") so
+            // Send the catalog model ID (e.g. "openai/gpt-5-mini") so
             // tokenlens in <Context> can resolve cost. Fall back to the
             // raw provider ID if the spec isn't found.
             modelId: spec?.id ?? lastModelId,

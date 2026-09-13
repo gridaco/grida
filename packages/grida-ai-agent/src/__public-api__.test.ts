@@ -138,7 +138,7 @@ describe("@grida/agent public API", () => {
       ]);
       expect(BYOK_PROVIDER_METADATA.map((provider) => provider.label)).toEqual([
         "OpenRouter",
-        "Vercel",
+        "Vercel AI Gateway",
         "fal",
         "ElevenLabs",
         "Tripo",

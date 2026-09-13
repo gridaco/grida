@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     if (!p.ok) return p.res;
     const req = p.data;
 
-    // Allowlist BEFORE any provider call — the gateway accepts arbitrary
+    // Allowlist BEFORE any provider call — Vercel AI Gateway accepts arbitrary
     // ids; an unlisted one must 404 here, not 500 at cost-card lookup.
     if (!isHostedTextModel(req.model)) return modelNotFound(req.model);
 

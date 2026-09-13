@@ -681,11 +681,11 @@ describe("makeImageModelFor", () => {
     expect(m.provider).toBe("openrouter");
   });
 
-  it("builds a vercel image model without throwing", () => {
+  it("builds a Vercel AI Gateway image model without throwing", () => {
     expect(makeImageModelFor("vercel", "sk", "bfl/flux-2-pro")).toBeTruthy();
   });
 
-  it("keeps Vercel Gateway image results on the provider request lane", async () => {
+  it("keeps Vercel AI Gateway image results on the provider request lane", async () => {
     const request = vi.fn<
       (input: string | URL | Request, init?: MockInit) => Promise<Response>
     >(async (input: string | URL | Request, init: MockInit = {}) => {
@@ -702,7 +702,9 @@ describe("makeImageModelFor", () => {
       );
     });
     const download = vi.fn<typeof globalThis.fetch>(async () => {
-      throw new Error("Vercel image results must never open a download lane");
+      throw new Error(
+        "Vercel AI Gateway image results must never open a download lane"
+      );
     });
     const model = makeImageModelFor(
       "vercel",

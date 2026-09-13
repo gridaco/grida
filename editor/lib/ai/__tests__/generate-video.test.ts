@@ -76,7 +76,7 @@ beforeEach(() => {
 });
 
 describe("methods.generateVideo", () => {
-  it("happy path: gates, generates via the vercel binding, ingests rate×duration", async () => {
+  it("happy path: gates, generates via the Vercel AI Gateway binding, ingests rate×duration", async () => {
     const duration = CARD.default.duration;
     const result = await methods.generateVideo(ORG, {
       model_id: MODEL_ID,

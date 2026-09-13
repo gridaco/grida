@@ -6,7 +6,7 @@
  */
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { createGateway } from "@ai-sdk/gateway";
+import { createGateway as createVercelAiGateway } from "@ai-sdk/gateway";
 import { TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models/grida";
 import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
@@ -47,18 +47,21 @@ export function makeOpenRouterFactory(
     includeUsage: true,
     fetch: providerHttp.request,
   });
-  // Both OpenRouter and the catalog use Vercel-style `creator/model`
+  // Both OpenRouter and the catalog use the `creator/model` format for
   // ids, so an explicit pick hands straight through; otherwise fall
   // back to the tier's canonical model.
   return (tier, modelId) => provider(modelId ?? tierModelIds()[tier]);
 }
 
-export function makeVercelFactory(
+export function makeVercelAiGatewayFactory(
   apiKey: string,
   providerHttp: ProviderHttp = new ProviderHttp(),
   tierModelIds: TierModelIds = BUNDLED_TIER_MODEL_IDS
 ): ModelFactory {
-  const provider = createGateway({ apiKey, fetch: providerHttp.request });
+  const provider = createVercelAiGateway({
+    apiKey,
+    fetch: providerHttp.request,
+  });
   return (tier, modelId) => provider(modelId ?? tierModelIds()[tier]);
 }
 

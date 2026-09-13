@@ -10,8 +10,8 @@
  * protocol carries no reference images; the sidecar resolver routes
  * i2i to BYOK providers).
  *
- * Auth: scoped AI token only (GRIDA-SEC-006). Billing: Gateway response
- * receipt when available, otherwise the shared `computeImageCostMills`
+ * Auth: scoped AI token only (GRIDA-SEC-006). Billing: Vercel AI Gateway
+ * response receipt when available, otherwise the shared `computeImageCostMills`
  * fallback (`providerOptions.grida.costMills`). NO library
  * upload — the daemon owns persistence.
  */
@@ -66,8 +66,8 @@ export async function POST(request: Request) {
 
     const card = ai.image.findImageModelCard(req.model_id);
     if (!card) return modelNotFound(req.model_id);
-    // Hosted serving goes through the gateway — a card without a
-    // vercel binding is not servable here (the sidecar's BYOK
+    // Hosted serving goes through Vercel AI Gateway — a card without a
+    // matching binding is not servable here (the sidecar's BYOK
     // adapters cover the rest).
     const binding = ai.image.binding(card, "vercel");
     if (!binding) return modelNotFound(req.model_id);
@@ -80,7 +80,8 @@ export async function POST(request: Request) {
     }
 
     // An explicit mode must never become an opaque, billed success when the
-    // gateway has not exposed the native control. Auto is the legacy default.
+    // Vercel AI Gateway binding has not exposed the native control.
+    // Auto is the legacy default.
     const background = req.background === "auto" ? undefined : req.background;
     if (background && !ai.image.supportsTransparentBackground(card, "vercel")) {
       return invalidRequest(

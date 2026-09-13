@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   makeEndpointFactory,
   makeOpenRouterFactory,
-  makeVercelFactory,
+  makeVercelAiGatewayFactory,
 } from "./byok";
 import { ProviderHttp } from "./http";
 import { probeEndpointModels } from "./probe";
@@ -22,7 +22,7 @@ async function attemptModelRequest(model: unknown): Promise<void> {
 describe("ProviderHttp", () => {
   it("every in-process text provider uses request, never download", async () => {
     // The thrown sentinel stops each real SDK immediately after it crosses the
-    // transport seam; URL assertions prove OpenRouter, Vercel Gateway, and the
+    // transport seam; URL assertions prove OpenRouter, Vercel AI Gateway, and the
     // generalized OpenAI-compatible endpoint all reached the supplied request.
     const urls: string[] = [];
     const request: typeof globalThis.fetch = async (input) => {
@@ -35,7 +35,7 @@ describe("ProviderHttp", () => {
     const http = new ProviderHttp({ request, download });
 
     await attemptModelRequest(makeOpenRouterFactory("sk-or", http)("pro"));
-    await attemptModelRequest(makeVercelFactory("sk-v", http)("pro"));
+    await attemptModelRequest(makeVercelAiGatewayFactory("sk-v", http)("pro"));
     await attemptModelRequest(
       makeEndpointFactory(
         {
@@ -186,7 +186,7 @@ describe("ProviderHttp", () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it("OpenRouter and Vercel media SDK calls use request", async () => {
+  it("OpenRouter and Vercel AI Gateway media SDK calls use request", async () => {
     const urls: string[] = [];
     const request: typeof globalThis.fetch = async (input) => {
       urls.push(String(input));

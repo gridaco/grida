@@ -154,7 +154,7 @@ than applying GPT Image 2's per-image table. Its estimate excludes input
 charges; use actual provider usage when comparing total costs. fal rounds
 the total charge up to the nearest $0.0001.
 
-[Vercel AI Gateway](https://vercel.com/ai-gateway/models/gpt-image-2.5-flare) publishes $5/M input tokens, $1.25/M cached input tokens, and $30/M output tokens. [OpenRouter](https://openrouter.ai/api/v1/images/models/openai/gpt-image-2.5-flare/endpoints) publishes $5/M text input, $8/M image input, and $30/M image output tokens. Grida keeps each provider's published meter separately. Hosted image billing uses Gateway's reported response cost when available. Without that receipt, it falls back to the catalog's coarse per-image estimate ($0.055 for these variants), which can differ from actual token cost across quality levels and dimensions.
+[Vercel AI Gateway](https://vercel.com/ai-gateway/models/gpt-image-2.5-flare) publishes $5/M input tokens, $1.25/M cached input tokens, and $30/M output tokens. [OpenRouter](https://openrouter.ai/api/v1/images/models/openai/gpt-image-2.5-flare/endpoints) publishes $5/M text input, $8/M image input, and $30/M image output tokens. Grida keeps each provider's published meter separately. Hosted image billing uses Vercel AI Gateway's reported response cost when available. Without that receipt, it falls back to the catalog's coarse per-image estimate ($0.055 for these variants), which can differ from actual token cost across quality levels and dimensions.
 
 **GPT Image 2** (`openai/gpt-image-2`) — _deprecated in Grida, superseded by GPT Image 2.5_
 
@@ -187,7 +187,7 @@ Provider support is checked separately from the model's native capability.
 OpenAI added GPT Image 2 transparency in its [August 20 update](https://developers.openai.com/api/docs/changelog),
 and fal exposes it. OpenRouter's [GPT Image 2 endpoint](https://openrouter.ai/api/v1/images/models/openai/gpt-image-2/endpoints)
 and current GPT Image 2.5 endpoints still accept only `auto` or `opaque`.
-Vercel transparency for GPT Image 2 remains unverified, although its
+Vercel AI Gateway transparency for GPT Image 2 remains unverified, although its
 [Flare](https://vercel.com/ai-gateway/models/gpt-image-2.5-flare) and
 [Sunburst](https://vercel.com/ai-gateway/models/gpt-image-2.5-sunburst) pages
 explicitly support it. Grida only offers transparency on verified routes.
@@ -305,8 +305,8 @@ which is cheaper on every provider; this is not an upstream Recraft retirement.
 ## Video Generation Models
 
 Video models are billed per second of generated output, by resolution and
-whether audio is generated. The rates below are the Grida-hosted (Vercel
-gateway) rates; the hosted route always generates the model's default audio
+whether audio is generated. The rates below are the Grida-hosted (Vercel AI
+Gateway) rates; the hosted route always generates the model's default audio
 mode, so the silent rates are informational until the request can carry an
 audio mode.
 
@@ -323,7 +323,7 @@ provider meters one. Wan and Grok bundle audio into a single rate.
 
 `Seedance 2.0` and `Seedance 2.5` (`bytedance/seedance-2.0`, `-2.5`) are
 catalogued for bring-your-own-key use through fal, but are **not available on
-the hosted route**: the gateway meters them per video token rather than per
+the hosted route**: Vercel AI Gateway meters them per video token rather than per
 second, and there is no honest per-second conversion, so Grida cannot
 pre-price a hosted request. This will change when hosted video is metered
 after generation. `Seedance 2.5` is the newer generation but not a cheaper

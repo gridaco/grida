@@ -241,13 +241,13 @@ function snapshot(
         : destination !== "download" &&
           destination !== "tripo-upload" &&
           name === "authorization";
-    const gateway =
+    const isVercelAiGatewayHeader =
       destination === "vercel" &&
       (name === "ai-gateway-protocol-version" ||
         name === "ai-gateway-auth-method" ||
         name === "ai-model-id" ||
         /^ai-(?:image|video)-model-specification-version$/.test(name));
-    if (!common && !credential && !gateway) fail();
+    if (!common && !credential && !isVercelAiGatewayHeader) fail();
   }
   if (destination === "download") {
     if (

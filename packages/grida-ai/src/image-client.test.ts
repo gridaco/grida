@@ -103,7 +103,7 @@ describe("ImageClient public operations", () => {
     );
   });
 
-  it("uses Vercel's declared image protocol with the supplied key", async () => {
+  it("uses Vercel AI Gateway's declared image protocol with the supplied key", async () => {
     const { client, request, download } = setup();
     request.mockImplementation(async () => Response.json({ images: [BASE64] }));
     const operation = await client.resolve({

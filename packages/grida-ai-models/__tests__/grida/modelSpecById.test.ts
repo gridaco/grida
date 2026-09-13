@@ -26,7 +26,7 @@ describe("models.text.modelSpecById", () => {
       id: "google/gemini-3.8-flash",
       label: "Gemini 3.8 Flash",
     },
-  ])("resolves the exact $id gateway id", ({ id, label }) => {
+  ])("resolves the exact $id provider model id", ({ id, label }) => {
     const spec = models.text.modelSpecById(id);
     expect(spec?.id).toBe(id);
     expect(spec?.label).toBe(label);

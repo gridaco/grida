@@ -246,7 +246,7 @@ export namespace VideoClient {
     fps?: number;
     /** Explicit audio control only where the selected route's schema advertises it. */
     generate_audio?: boolean;
-    /** Safe integer. The pinned Vercel adapter cannot honor zero and rejects it. */
+    /** Safe integer. The pinned Vercel AI Gateway adapter cannot honor zero and rejects it. */
     seed?: number;
     /** An already authorized HTTPS start frame. Mutually exclusive with image. */
     image_url?: string;
@@ -333,7 +333,7 @@ function resultUrl(value: string, provider: VideoClient.Provider): URL {
     throw new VideoClient.Failure("invalid_response");
   if (
     provider === "vercel" &&
-    url.origin !== new URL(videoModels.vercelBase).origin
+    url.origin !== new URL(videoModels.vercelAiGatewayVideoBaseUrl).origin
   )
     throw new VideoClient.Failure("unsupported_untrusted_result_origin");
   return url;

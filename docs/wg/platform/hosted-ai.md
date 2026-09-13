@@ -403,8 +403,8 @@ speed label, and the like are closed unions in TypeScript but are accepted
 as plain strings when parsed, and an unknown _provider_ binding is dropped
 rather than rejecting its card. Otherwise publishing a model from a new
 vendor, or adding a provider, would be a breaking publish requiring a
-client release — the exact failure this system exists to remove. (Vercel's
-AI Gateway learned this in public: it validated its model-kind field as a
+client release — the exact failure this system exists to remove. (Vercel AI
+Gateway learned this in public: it validated its model-kind field as a
 hard enum, so the day a new kind shipped the entire listing failed to
 parse for every client. It now accepts loosely and filters unknown rows.)
 

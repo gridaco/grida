@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 — provider-owned submissions and credential-free result downloads.
 /** Internal AI SDK adapters; ImageClient owns the safe public operation boundary. */
 
-import { createGateway } from "@ai-sdk/gateway";
+import { createGateway as createVercelAiGateway } from "@ai-sdk/gateway";
 import type { ImageModelV3, ImageModelV3CallOptions } from "@ai-sdk/provider";
 import type { models } from "@grida/ai-models";
 import type { ImageClient } from "./image-client";
@@ -24,12 +24,15 @@ function makeOpenRouterImageModel(
   return new OpenRouterImageModel(apiKey, id, providerHttp);
 }
 
-function makeVercelImageModel(
+function makeVercelAiGatewayImageModel(
   apiKey: string,
   id: string,
   providerHttp: ProviderHttp
 ): ImageModelV3 {
-  return createGateway({ apiKey, fetch: providerHttp.request }).imageModel(id);
+  return createVercelAiGateway({
+    apiKey,
+    fetch: providerHttp.request,
+  }).imageModel(id);
 }
 
 function makeFalImageModel(
@@ -57,7 +60,7 @@ export function makeImageModelFor(
       model = makeOpenRouterImageModel(apiKey, id, providerHttp);
       break;
     case "vercel":
-      model = makeVercelImageModel(apiKey, id, providerHttp);
+      model = makeVercelAiGatewayImageModel(apiKey, id, providerHttp);
       break;
     case "fal":
       model = makeFalImageModel(apiKey, id, providerHttp);
@@ -94,8 +97,8 @@ class BackgroundImageModel implements ImageModelV3 {
   }
 
   doGenerate(options: ImageModelV3CallOptions) {
-    // Gateway forwards providerOptions unchanged; native OpenAI settings live
-    // under openai, not vercel. Catalogue admission is checked independently.
+    // Vercel AI Gateway forwards providerOptions unchanged; native OpenAI settings live
+    // under the native openai namespace. Catalogue admission is checked independently.
     const namespace =
       this.routeProvider === "vercel" ? "openai" : this.routeProvider;
     return this.model.doGenerate({

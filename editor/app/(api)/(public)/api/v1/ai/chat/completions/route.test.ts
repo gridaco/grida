@@ -57,13 +57,13 @@ vi.mock("@/lib/auth/organization", () => ({
   requireOrganizationId: vi.fn<(...args: never[]) => unknown>(),
 }));
 
-// Fake gateway: scripted V3 model behind the REAL billing middleware
-// (server.ts wraps whatever `gateway` this module exports).
+// Fake Vercel AI Gateway: scripted V3 model behind the REAL billing middleware
+// (server.ts wraps whatever `vercelAiGateway` this module exports).
 vi.mock("@/lib/ai/models", async (orig) => {
   const real = await orig<typeof import("@/lib/ai/models")>();
   const fakeLanguageModel = (modelId: string) => ({
     specificationVersion: "v3" as const,
-    provider: "fake-gateway",
+    provider: "fake-vercel-ai-gateway",
     modelId,
     supportedUrls: {},
     doGenerate: async (options: unknown) => {
@@ -87,7 +87,7 @@ vi.mock("@/lib/ai/models", async (orig) => {
     ...real,
     byok: null,
     isByokActive: () => false,
-    gateway: {
+    vercelAiGateway: {
       languageModel: fakeLanguageModel,
       imageModel: () => {
         throw new Error("unused in this suite");

@@ -1,7 +1,7 @@
 # @grida/ai
 
 Private, experimental SDK for shared model-driven operations. Catalogue-backed
-image and video generation use BYOK OpenRouter, Vercel, fal, or scoped Grida
+image and video generation use BYOK OpenRouter, Vercel AI Gateway, fal, or scoped Grida
 Gateway credentials. Music generation uses the existing GG-only Lyria route;
 sound effects and speech use their existing ElevenLabs BYOK operations. Three
 existing fal 3D endpoints and direct Tripo H3.1/P1/P2 model generation return a
@@ -112,7 +112,7 @@ Objects reject extra fields. Optional fields may be omitted; explicit `null` and
 is capped at 16 before generation can acquire authority or submit batches. Text
 normalization remains operation-specific: music uses trimmed UTF-16 length;
 SFX and 3D use trimmed code-point length; image, video, and speech preserve input
-text. Direct Vercel video rejects `seed: 0` because its pinned upstream serializer
+text. Direct Vercel AI Gateway video rejects `seed: 0` because its pinned upstream serializer
 drops zero. The inspected schema describes accepted SDK fields, not every option
 or value advertised by a provider's model card.
 
@@ -161,7 +161,7 @@ const { images: generated } = await operation.generate({
 ```
 
 `resolve` requires both a catalogue model ID and a provider. `provider: "auto"`
-explicitly adopts the existing order: connected OpenRouter, Vercel, fal, then GG.
+explicitly adopts the existing order: connected OpenRouter, Vercel AI Gateway, fal, then GG.
 Explicit choices check only that provider. The operation freezes the selected
 model, binding, provider, and reference cap. Generation reads the selected
 provider's key again; losing that credential fails without switching providers.
@@ -187,7 +187,7 @@ numeric `aspect_ratio`, integer `seed`, optional `quality`, and `signal`, subjec
 to the selected endpoint's input schema. GPT Image 2.5's OpenRouter and fal routes
 do not accept seed; fal also rejects aspect ratio and uses explicit dimensions or
 auto size. fal edits use the distinct catalogue edit binding with 1–16 references.
-Explicit quality values, including `auto`, are forwarded; Vercel's OpenAI models
+Explicit quality values, including `auto`, are forwarded; Vercel AI Gateway's OpenAI models
 use the `openai` namespace. Provider batch limits remain authoritative: a requested count may
 require multiple submissions. Every batch sets **`maxRetries: 0`**. Failed
 generation is never automatically resubmitted; fal status polling is separate.
@@ -230,8 +230,8 @@ where that exact operation's input schema declares `image`. A text selection rej
 image inputs. Capability facts are owned by `@grida/ai-models`; absent facts in old
 snapshots use only exact canonical/provider/binding matches to bundled facts.
 Changed, removed, or explicitly unknown bindings do not inherit capabilities.
-GG remains text-only and requires a text-eligible Vercel binding. The current fal
-bindings and Vercel Grok require a start frame. OpenRouter uses `frame_images` with
+GG remains text-only and requires a text-eligible Vercel AI Gateway binding. The current fal
+bindings and Vercel AI Gateway Grok require a start frame. OpenRouter uses `frame_images` with
 `first_frame`; the exact fal Wan binding uses `start_image_url`.
 
 The exact fal `fal-ai/veo3.1/lite/image-to-video` binding (bundled as
@@ -250,7 +250,7 @@ The [fal API documents inline file inputs and an 8 MB image limit](https://fal.a
 and the [model input form lists the admitted formats](https://fal.ai/models/fal-ai/veo3.1/lite/image-to-video).
 The SDK uses this conservative format subset and decimal byte ceiling; it does
 not decode image pixels, resize frames, or promise upstream content acceptance.
-Other video bindings remain HTTPS-only, including OpenRouter and Vercel.
+Other video bindings remain HTTPS-only, including OpenRouter and Vercel AI Gateway.
 
 `MediaOperations.inspect(...).input_schema.properties.image` is present only
 when bytes are supported. Its nested `data` schema states the base64 and decoded
@@ -269,15 +269,15 @@ the same native/JSON parser that owns serialization eligibility.
 
 Other routes accept `aspect_ratio` as positive integer `W:H`, `resolution` as
 positive integer `WxH` (not a catalogue price label such as `720p`), positive finite
-`duration`/`fps`, and a safe-integer `seed`. The pinned Vercel adapter silently omits
-zero upstream, so direct Vercel `seed: 0` is rejected as `invalid_input` before key
+`duration`/`fps`, and a safe-integer `seed`. The pinned Vercel AI Gateway adapter silently omits
+zero upstream, so direct Vercel AI Gateway `seed: 0` is rejected as `invalid_input` before key
 lookup or submission; the other adapters preserve zero. It requests **one video once**. There
 is no arbitrary provider-options object, raw SDK model, or retry setting. Queue
 status reads do not resubmit the job. Multiple returned videos remain supported
 within a 16-item, 64 MiB decoded aggregate bound. Submission/poll JSON, GG/SSE
 encoded envelopes, inline data, authenticated OpenRouter content, and result
-download streams are bounded before retention or decoding. Vercel result URLs
-must use its exact gateway origin or inline data; fal queue/result URLs stay on
+download streams are bounded before retention or decoding. Vercel AI Gateway result URLs
+must use its exact Vercel AI Gateway origin or inline data; fal queue/result URLs stay on
 its allowed hosts. OpenRouter's authenticated content endpoint is used instead of
 provider-advertised unsigned URLs. Hosts still authorize DNS and redirect hops.
 

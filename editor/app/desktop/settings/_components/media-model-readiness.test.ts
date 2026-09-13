@@ -32,7 +32,7 @@ describe("MediaModelReadiness.visual", () => {
     ).toBe(false);
   });
 
-  it("admits hosted media only for a Vercel-backed model", () => {
+  it("admits hosted media only for a model served by Vercel AI Gateway", () => {
     expect(MediaModelReadiness.visual({ providers }, new Set(), true)).toBe(
       true
     );

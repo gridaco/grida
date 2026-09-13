@@ -95,7 +95,7 @@ export namespace MediaModelAvailability {
     ) {
       return { available: true };
     }
-    // GRIDA-GG: desktop — hosted readiness follows the served Vercel binding.
+    // GRIDA-GG: desktop — hosted readiness follows the served Vercel AI Gateway binding.
     if (
       state.hosted &&
       models.image.binding(card, "vercel") &&

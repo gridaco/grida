@@ -53,7 +53,7 @@ import {
 import {
   byok,
   catalog,
-  gateway,
+  vercelAiGateway,
   isByokActive,
   modelSpecById,
   tiers,
@@ -431,7 +431,7 @@ const languageModelMiddleware: LanguageModelMiddleware = {
 const imageModelMiddleware: ImageModelMiddleware = {
   specificationVersion: "v3",
 
-  // Prefer Gateway's response receipt (USD), which accounts for actual quality,
+  // Prefer Vercel AI Gateway's response receipt (USD), which accounts for actual quality,
   // dimensions and cache use. Caller pricing remains a fallback for responses
   // without a receipt; aggregate image token counts cannot price mixed inputs.
   // https://vercel.com/academy/ai-gateway/ai-gateway-pricing
@@ -444,12 +444,12 @@ const imageModelMiddleware: ImageModelMiddleware = {
     }
     return withTransaction(ctx, async () => {
       const result = await doGenerate();
-      const gatewayMetadata = result.providerMetadata?.gateway;
+      const vercelAiGatewayMetadata = result.providerMetadata?.gateway;
       const rawCost =
-        gatewayMetadata &&
-        typeof gatewayMetadata === "object" &&
-        "cost" in gatewayMetadata
-          ? gatewayMetadata.cost
+        vercelAiGatewayMetadata &&
+        typeof vercelAiGatewayMetadata === "object" &&
+        "cost" in vercelAiGatewayMetadata
+          ? vercelAiGatewayMetadata.cost
           : undefined;
       const reportedUsd =
         typeof rawCost === "number"
@@ -470,7 +470,7 @@ const imageModelMiddleware: ImageModelMiddleware = {
 };
 
 const wrappedProvider = wrapProvider({
-  provider: gateway,
+  provider: vercelAiGateway,
   languageModelMiddleware,
   imageModelMiddleware,
 });
@@ -524,7 +524,7 @@ export function model(tier: ModelTier) {
 // Library composes its query embedding in `@/lib/library/embedding`, which
 // owns the model id + 1536-d truncation + cache and calls this primitive.
 
-const embeddingProvider = byok ?? gateway;
+const embeddingProvider = byok ?? vercelAiGateway;
 
 /**
  * UNBILLED text embedding through the attributed provider (BYOK precedence:
@@ -556,10 +556,10 @@ let _replicateClient: Replicate | null = null;
 
 function getReplicateClient(): Replicate {
   if (_replicateClient) return _replicateClient;
-  const token = process.env.REPLICATE_API_TOKEN;
+  const token = process.env.GG_REPLICATE_API_TOKEN?.trim();
   if (!token) {
     throw new Error(
-      "REPLICATE_API_TOKEN is not set; cannot run Replicate predictions."
+      "GG_REPLICATE_API_TOKEN is not set; cannot run Replicate predictions."
     );
   }
   _replicateClient = new Replicate({ auth: token, useFileOutput: false });
@@ -791,9 +791,9 @@ export namespace methods {
   } | null {
     const card = ai.image.findImageModelCard(model);
     if (!card) return null;
-    // Call the gateway by the vercel BINDING id, never the canonical card
+    // Call Vercel AI Gateway by its binding id, never the canonical card
     // id. They usually coincide, but not always — the Gemini card's
-    // canonical key is the `-preview` alias while the gateway's current id
+    // canonical key is the `-preview` alias while Vercel AI Gateway's current id
     // is the graduated one. Video already resolves this way.
     const binding = ai.image.binding(card, "vercel");
     if (!binding) return null;
@@ -802,10 +802,10 @@ export namespace methods {
 
   /**
    * Hosted video generation — gate → `experimental_generateVideo` via
-   * the RAW gateway → ingest. Explicit `withTransaction` because
+   * the raw Vercel AI Gateway provider → ingest. Explicit `withTransaction` because
    * `wrapProvider` has no video middleware (unlike text/image).
    *
-   * Billing is **pre-priced by requested duration** against the vercel
+   * Billing is **pre-priced by requested duration** against the Vercel AI Gateway
    * binding's `(resolution-label, audio-mode)` per-second rate — the
    * same pre-computed-cost pattern as every Replicate/image call.
    * Actual output duration may differ slightly (bounded by the card's
@@ -894,7 +894,7 @@ export namespace methods {
       { organizationId, feature: "v1/ai/video", model_id: card.id },
       async () => {
         const generation = await experimental_generateVideo({
-          model: gateway.videoModel(binding.id),
+          model: vercelAiGateway.videoModel(binding.id),
           prompt: req.prompt,
           aspectRatio: aspect_ratio as `${number}:${number}`,
           resolution: req.resolution as `${number}x${number}` | undefined,

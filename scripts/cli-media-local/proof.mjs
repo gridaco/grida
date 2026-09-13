@@ -32,7 +32,7 @@ const prompt = "A synthetic media fixture";
 const keys = {
   openrouter: "sk-or-synthetic-openrouter-key-no-authority",
   vercel:
-    "vck_syntheticVercelKeyNoAuthority0123456789abcdefghijklmnopqrstuvwxyz",
+    "vck_syntheticVercelAiGatewayKeyNoAuthority0123456789abcdefghijklmnopqrstuvwxyz",
   fal: "synthetic-fal-id:synthetic-fal-secret-no-authority",
   elevenlabs: "synthetic-elevenlabs-key-no-authority",
 };
@@ -1015,34 +1015,37 @@ async function main() {
         );
       }
     );
-    await check("Vercel image uses the pinned SDK protocol", async () => {
-      await generate({
-        name: "vercel-image",
-        model: "openai/gpt-image-2",
-        provider: "vercel",
-        value: { prompt },
-        extraEnv: { AI_GATEWAY_API_KEY: keys.vercel },
-        wire: fixture([
-          {
-            hostname: "ai-gateway.vercel.sh",
-            path: "/v3/ai/image-model",
-            method: "POST",
-            headers: {
-              authorization: `Bearer ${keys.vercel}`,
-              "ai-model-id": "openai/gpt-image-2",
-              "ai-image-model-specification-version": "3",
+    await check(
+      "Vercel AI Gateway image uses the pinned SDK protocol",
+      async () => {
+        await generate({
+          name: "vercel-ai-gateway-image",
+          model: "openai/gpt-image-2",
+          provider: "vercel",
+          value: { prompt },
+          extraEnv: { AI_GATEWAY_API_KEY: keys.vercel },
+          wire: fixture([
+            {
+              hostname: "ai-gateway.vercel.sh",
+              path: "/v3/ai/image-model",
+              method: "POST",
+              headers: {
+                authorization: `Bearer ${keys.vercel}`,
+                "ai-model-id": "openai/gpt-image-2",
+                "ai-image-model-specification-version": "3",
+              },
+              json: { prompt, n: 1, providerOptions: {} },
+              response: jsonBody({
+                images: [png.toString("base64")],
+                warnings: [],
+              }),
             },
-            json: { prompt, n: 1, providerOptions: {} },
-            response: jsonBody({
-              images: [png.toString("base64")],
-              warnings: [],
-            }),
-          },
-        ]),
-        data: png,
-        type: "image/png",
-      });
-    });
+          ]),
+          data: png,
+          type: "image/png",
+        });
+      }
+    );
     await check("ElevenLabs SFX accepts explicit stdin key", async () => {
       await generate({
         name: "sfx",

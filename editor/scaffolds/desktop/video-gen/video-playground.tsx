@@ -120,8 +120,8 @@ type Tile = {
  * floating prompt composer. Each submit prepends a shimmering cell that fills in
  * with a playable clip when the video resolves. Generation runs in the agent
  * sidecar against the user's connected provider key; the key never reaches this
- * renderer (GRIDA-SEC-004). v1 is text-to-video (served by a connected Vercel
- * key for every listed model).
+ * renderer (GRIDA-SEC-004). v1 is text-to-video (served by a connected
+ * Vercel AI Gateway key for every listed model).
  */
 export function DesktopVideoPlayground({
   initialModelId,

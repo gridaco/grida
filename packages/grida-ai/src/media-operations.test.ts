@@ -435,7 +435,7 @@ describe("MediaOperations JSON input", () => {
     );
   });
 
-  it("requires the video frame only in its selected variant and preserves the Vercel zero-seed restriction", () => {
+  it("requires the video frame only in its selected variant and preserves the Vercel AI Gateway zero-seed restriction", () => {
     expect(properties(operations.inspect(video)).seed).toMatchObject({
       not: { const: 0 },
     });

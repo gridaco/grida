@@ -40,13 +40,13 @@ function post(app: Hono, payload: unknown, signal?: AbortSignal) {
   });
 }
 
-// Veo binds vercel + fal; fal is a plain-fetch adapter we can drive end-to-end.
+// Veo binds Vercel AI Gateway + fal; fal uses the plain-fetch adapter.
 const VEO = "google/veo-3.1";
 
 /** Shape of the `init` arg our `fetch` mock reads. */
 type MockInit = { method?: string; body?: string };
 
-function vercelVideoResults(urls: string[]): Response {
+function vercelAiGatewayVideoResults(urls: string[]): Response {
   return new Response(
     `data: ${JSON.stringify({
       type: "result",
@@ -64,8 +64,8 @@ function vercelVideoResults(urls: string[]): Response {
   );
 }
 
-function vercelVideoResult(url: string): Response {
-  return vercelVideoResults([url]);
+function vercelAiGatewayVideoResult(url: string): Response {
+  return vercelAiGatewayVideoResults([url]);
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -150,12 +150,14 @@ describe("POST /video/generate", () => {
     expect(download).toHaveBeenCalledOnce();
   });
 
-  it("rejects an arbitrary Vercel result origin before host download", async () => {
+  it("rejects an arbitrary Vercel AI Gateway result origin before host download", async () => {
     const request = vi.fn<typeof globalThis.fetch>(async (input) => {
       expect(String(input)).toBe(
         "https://ai-gateway.vercel.sh/v3/ai/video-model"
       );
-      return vercelVideoResult("https://vendor-cdn.example/video.mp4?token=x");
+      return vercelAiGatewayVideoResult(
+        "https://vendor-cdn.example/video.mp4?token=x"
+      );
     });
     const download = vi.fn<typeof globalThis.fetch>();
     const providerHttp = new ProviderHttp({ request, download });
@@ -175,9 +177,9 @@ describe("POST /video/generate", () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it("decodes an inline Vercel data result without host download", async () => {
+  it("decodes an inline Vercel AI Gateway data result without host download", async () => {
     const request = vi.fn<typeof globalThis.fetch>(async () =>
-      vercelVideoResult("data:video/mp4;base64,AAAY")
+      vercelAiGatewayVideoResult("data:video/mp4;base64,AAAY")
     );
     const download = vi.fn<typeof globalThis.fetch>();
     const providerHttp = new ProviderHttp({ request, download });
@@ -196,11 +198,11 @@ describe("POST /video/generate", () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it("permits an exact Vercel Gateway result origin through host download", async () => {
+  it("permits an exact Vercel AI Gateway result origin through host download", async () => {
     const MP4 = new Uint8Array([0, 0, 0, 24]);
     const resultUrl = "https://ai-gateway.vercel.sh/results/video.mp4";
     const request = vi.fn<typeof globalThis.fetch>(async () =>
-      vercelVideoResult(resultUrl)
+      vercelAiGatewayVideoResult(resultUrl)
     );
     const download = vi.fn<typeof globalThis.fetch>(async (input) => {
       expect(String(input)).toBe(resultUrl);
@@ -234,7 +236,7 @@ describe("POST /video/generate", () => {
     const token = "opaque-signed-capability";
     const resultUrl = `https://ai-gateway.vercel.sh/results/video.mp4?X-Amz-Signature=${token}`;
     const request = vi.fn<typeof globalThis.fetch>(async () =>
-      vercelVideoResult(resultUrl)
+      vercelAiGatewayVideoResult(resultUrl)
     );
     const download = vi.fn<typeof globalThis.fetch>(
       async () =>
@@ -256,10 +258,10 @@ describe("POST /video/generate", () => {
     expect(download).toHaveBeenCalledOnce();
   });
 
-  it("fails closed on a remote Vercel result without host download authority", async () => {
+  it("fails closed on a remote Vercel AI Gateway result without host download authority", async () => {
     const resultUrl = "https://ai-gateway.vercel.sh/v3/ai/video-result.mp4";
     const ambient = vi.fn<(input: string | URL | Request) => Promise<Response>>(
-      async () => vercelVideoResult(resultUrl)
+      async () => vercelAiGatewayVideoResult(resultUrl)
     );
     vi.stubGlobal("fetch", ambient);
 
@@ -338,7 +340,7 @@ describe("POST /video/generate", () => {
   );
 
   it.each([{ duration: -1 }, { seed: 0 }])(
-    "rejects unsupported Vercel options before provider I/O or receipts: %j",
+    "rejects unsupported Vercel AI Gateway options before provider I/O or receipts: %j",
     async (options) => {
       const request = vi.fn<typeof globalThis.fetch>();
       const save = vi.fn<MediaPersistence["save"]>();
@@ -526,7 +528,7 @@ describe("POST /video/generate", () => {
   });
 
   it("400 when the connected provider does not serve the model", async () => {
-    // Seedance has no vercel binding (token-metered on the gateway; the
+    // Seedance has no Vercel AI Gateway binding (token-metered there; the
     // catalogue withholds an unpriceable route). fal DOES serve it — which
     // is why this case must not use a fal key: it would reach fal for real.
     const res = await post(appWith({ vercel: "sk-v" }), {
@@ -553,7 +555,7 @@ describe("POST /video/generate", () => {
 
   it("offers every output to the host store and correlates only accepted descriptors", async () => {
     const request = vi.fn<typeof globalThis.fetch>(async () =>
-      vercelVideoResults([
+      vercelAiGatewayVideoResults([
         "data:video/mp4;base64,AAAY",
         "data:video/mp4;base64,AQID",
       ])

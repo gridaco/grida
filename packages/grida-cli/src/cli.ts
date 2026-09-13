@@ -34,7 +34,7 @@ export namespace Cli {
     providers:
       "Usage: grida providers <command>\n\nCommands:\n  list                    Show key presence and effective source\n  configure <provider>    Save a shared provider API key\n  remove <provider>       Remove a shared provider API key",
     "providers configure":
-      "Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]\n\nSave an API key in shared plaintext credentials.toml with private permissions.\nDesktop and CLI use the same stored keys. No Grida login required.\nValidate format, then check OpenRouter/Vercel/fal/Tripo once before saving.\nA failed check leaves stored keys unchanged. ElevenLabs saves unverified.\nWithout --key-stdin, enter the key at a hidden terminal prompt.\nAutomation requires --key-stdin; keys are never accepted as arguments.",
+      "Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]\n\nSave an API key in shared plaintext credentials.toml with private permissions.\nDesktop and CLI use the same stored keys. No Grida login required.\nValidate format, then check OpenRouter/Vercel AI Gateway/fal/Tripo once before saving.\nA failed check leaves stored keys unchanged. ElevenLabs saves unverified.\nWithout --key-stdin, enter the key at a hidden terminal prompt.\nAutomation requires --key-stdin; keys are never accepted as arguments.",
     "providers remove":
       "Usage: grida providers remove <provider> [--json] [--no-input]\n\nRemove the stored key for Desktop and CLI. Environment keys remain effective.\nThis does not revoke the key at its provider or sign out of Grida.",
     "providers list":
