@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@app/ui/components/button";
 import { AppleLogo, WindowsLogo, LinuxLogo } from "@grida/react-icons/logos";
 import { DownloadIcon } from "@radix-ui/react-icons";
+import { macarch } from "./mac-arch";
 
 type OS = "mac" | "windows" | "linux";
 
@@ -28,14 +29,18 @@ interface PrimaryDownloadButtonProps {
   os: OS | null;
   defaultUrl: string | null;
   fallbackUrl: string;
+  /** Intel DMG; ignored unless client-side detection reports x64 (issue #954). */
+  macX64Url: string | null;
 }
 
 export function PrimaryDownloadButton({
   os,
   defaultUrl,
   fallbackUrl,
+  macX64Url,
 }: PrimaryDownloadButtonProps) {
   const anchorRef = useRef<HTMLAnchorElement>(null);
+  const [macArch, setMacArch] = useState<macarch.Arch | null>(null);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -56,7 +61,18 @@ export function PrimaryDownloadButton({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const href = os ? (defaultUrl ?? fallbackUrl) : fallbackUrl;
+  useEffect(() => {
+    if (os !== "mac") return;
+    setMacArch(macarch.classifyRenderer(macarch.readWebGLRenderer()));
+  }, [os]);
+
+  const href = macarch.pickHeroUrl({
+    os,
+    defaultUrl,
+    fallbackUrl,
+    macX64Url,
+    arch: macArch,
+  });
 
   return (
     <a ref={anchorRef} href={href}>
