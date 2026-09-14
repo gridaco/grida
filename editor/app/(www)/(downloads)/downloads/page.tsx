@@ -40,6 +40,7 @@ export default async function DownloadsPage() {
                 <PrimaryDownloadButton
                   os={os}
                   defaultUrl={links.default?.url ?? null}
+                  macX64Url={links.mac_dmg_x64}
                   fallbackUrl={sitemap.links.releases_latest}
                 />
               </div>
