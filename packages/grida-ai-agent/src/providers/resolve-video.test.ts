@@ -91,12 +91,16 @@ describe("resolveVideoModel", () => {
     expect(resolved.input).toBe("text-or-image");
   });
 
-  it("rejects text input on an image-only binding", async () => {
+  it("selects the distinct text binding without changing the image binding", async () => {
     await expect(
       resolveVideoModel({ secrets: fakeSecrets({ fal: "key" }) }, VEO, {
         explicit: "fal",
       })
-    ).rejects.toBeInstanceOf(VideoModelUnavailableError);
+    ).resolves.toMatchObject({
+      provider_id: "fal",
+      binding_id: "fal-ai/veo3.1",
+      input: "text",
+    });
   });
 
   it("throws with no key", async () => {

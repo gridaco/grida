@@ -119,7 +119,7 @@ describe("MediaModelAvailability.image", () => {
     ).toBe(true);
   });
 
-  it("only offers hosted readiness on models with a Vercel AI Gateway binding", () => {
+  it("keeps old native clients on their original Vercel-compatible request gate", () => {
     const hosted = { ...ready, configured: [], hosted: true };
     expect(MediaModelAvailability.image(gpt2, hosted).available).toBe(true);
     expect(MediaModelAvailability.image(flare, hosted).available).toBe(false);
@@ -398,5 +398,193 @@ describe("MediaModelAvailability.requiresImageUpdate", () => {
     expect(MediaModelAvailability.requiresImageUpdate(partial, "0.0.21")).toBe(
       true
     );
+  });
+});
+
+describe("MediaModelAvailability hosted media compatibility", () => {
+  const ready = {
+    loaded: true,
+    images: true,
+    video: true,
+    desktopVersion: "0.0.25",
+    configured: [],
+    hosted: true,
+  } as const;
+
+  it("offers a fal-only hosted image only on a compatible native runtime", () => {
+    const base = models.image.models["openai/gpt-image-2.5-flare"]!;
+    const falOnly: models.image.ImageModelCard = {
+      ...base,
+      provider: "fal",
+      providers: { fal: base.providers.fal },
+      hosted: base.providers.fal!,
+    };
+    expect(MediaModelAvailability.image(falOnly, ready).available).toBe(true);
+    expect(
+      MediaModelAvailability.image(falOnly, {
+        ...ready,
+        desktopVersion: "0.0.24",
+      })
+    ).toEqual({
+      available: false,
+      reason: MediaModelAvailability.imageUpdateMessage,
+    });
+    expect(
+      MediaModelAvailability.image(falOnly, {
+        ...ready,
+        desktopVersion: "0.0.24",
+        configured: ["fal"],
+      }).available
+    ).toBe(true);
+  });
+
+  it("keeps existing image requests usable on old clients after a server route change", () => {
+    const card = models.image.models["openai/gpt-image-2"]!;
+    expect(
+      MediaModelAvailability.image(card, { ...ready, desktopVersion: "0.0.24" })
+        .available
+    ).toBe(true);
+  });
+
+  it("does not derive hosted admission from the presence of a BYOK binding", () => {
+    const card = models.image.models["openai/gpt-image-2"]!;
+    expect(
+      MediaModelAvailability.image({ ...card, hosted: null }, ready).available
+    ).toBe(false);
+    expect(
+      MediaModelAvailability.image(
+        { ...card, hosted: null },
+        { ...ready, configured: ["fal"] }
+      ).available
+    ).toBe(true);
+  });
+
+  it.each([
+    "bytedance/seedance-2.0",
+    "bytedance/seedance-2.5",
+    "google/gemini-omni-1.1-flash",
+  ])("offers hosted %s only when the installed runtime can submit it", (id) => {
+    const card = models.video.models[id]!;
+    expect(MediaModelAvailability.video(card, ready).available).toBe(true);
+    expect(
+      MediaModelAvailability.video(card, { ...ready, desktopVersion: "0.0.24" })
+    ).toEqual({
+      available: false,
+      reason: MediaModelAvailability.imageUpdateMessage,
+    });
+  });
+
+  it("keeps an existing Vercel-compatible video usable on the previous client", () => {
+    const card = models.video.models["google/veo-3.1"]!;
+    expect(
+      MediaModelAvailability.video(card, { ...ready, desktopVersion: "0.0.24" })
+        .available
+    ).toBe(true);
+  });
+
+  it("requires the new runtime for an operation-specific fal text endpoint", () => {
+    const card = models.video.models["bytedance/seedance-2.0"]!;
+    const byok = { ...ready, hosted: false, configured: ["fal"] as const };
+    expect(MediaModelAvailability.video(card, byok).available).toBe(true);
+    expect(
+      MediaModelAvailability.video(card, { ...byok, desktopVersion: "0.0.24" })
+        .available
+    ).toBe(false);
+  });
+
+  it("does not submit new model mappings through an old BYOK runtime", () => {
+    const card = models.video.models["google/gemini-omni-1.1-flash"]!;
+    expect(
+      MediaModelAvailability.video(card, {
+        ...ready,
+        configured: ["fal"],
+        desktopVersion: "0.0.24",
+      })
+    ).toEqual({
+      available: false,
+      reason: MediaModelAvailability.imageUpdateMessage,
+    });
+  });
+
+  it("requires both loaded credentials and an available video bridge", () => {
+    const card = models.video.models["google/veo-3.1"]!;
+    expect(
+      MediaModelAvailability.video(card, { ...ready, loaded: false }).available
+    ).toBe(false);
+    expect(
+      MediaModelAvailability.video(card, { ...ready, video: false }).available
+    ).toBe(false);
+    expect(
+      MediaModelAvailability.video(card, { ...ready, hosted: false }).available
+    ).toBe(false);
+  });
+
+  it.each([undefined, "unknown", "0.0.24"])(
+    "fails closed for an incompatible client version %s",
+    (version) => {
+      expect(MediaModelAvailability.supportsHostedMedia(version)).toBe(false);
+    }
+  );
+
+  it.each(["0.0.25", "0.0.25-insiders.1", "0.1.0", "1.0.0"])(
+    "accepts compatible version %s",
+    (version) => {
+      expect(MediaModelAvailability.supportsHostedMedia(version)).toBe(true);
+    }
+  );
+});
+
+describe("MediaModelAvailability.VideoProviders", () => {
+  function bridge(has: (id: string) => Promise<boolean>): DesktopBridge {
+    return {
+      app: { version: "0.0.25" },
+      video: {
+        generate: vi.fn<NonNullable<DesktopBridge["video"]>["generate"]>(),
+      },
+      secrets: { has },
+    } as unknown as DesktopBridge;
+  }
+
+  it("refreshes a media-only video bridge and rechecks a removed key", async () => {
+    let connected = true;
+    const store = new MediaModelAvailability.VideoProviders(
+      bridge(async (id) => id === "fal" && connected),
+      async () => false
+    );
+    const card = models.video.models["bytedance/seedance-2.0"]!;
+    expect(
+      MediaModelAvailability.video(card, await store.refresh(card)).available
+    ).toBe(true);
+    connected = false;
+    expect(
+      MediaModelAvailability.video(card, await store.refresh(card)).available
+    ).toBe(false);
+  });
+
+  it("waits for hosted readiness without an image bridge", async () => {
+    const store = new MediaModelAvailability.VideoProviders(
+      bridge(async () => false),
+      async () => true
+    );
+    const card = models.video.models["google/gemini-omni-1.1-flash"]!;
+    expect(await store.refresh(card)).toMatchObject({
+      loaded: true,
+      video: true,
+      hosted: true,
+    });
+    expect(
+      MediaModelAvailability.video(card, store.getSnapshot()).available
+    ).toBe(true);
+  });
+
+  it("does not probe or mint without a video bridge", async () => {
+    const hosted = vi.fn<() => Promise<boolean>>(async () => true);
+    const store = new MediaModelAvailability.VideoProviders(null, hosted);
+    expect(await store.refresh()).toMatchObject({
+      loaded: true,
+      video: false,
+      hosted: false,
+    });
+    expect(hosted).not.toHaveBeenCalled();
   });
 });

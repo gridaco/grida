@@ -269,9 +269,8 @@ describe("MediaOperations discovery", () => {
     expect(operations.inspect({ ...video, variant: "image" }).variant).toBe(
       "image"
     );
-    rejects(
-      () => operations.inspect({ ...video, provider: "fal" }),
-      "operation_unavailable"
+    expect(operations.inspect({ ...video, provider: "fal" }).variant).toBe(
+      "text"
     );
     expect(
       operations.inspect({ ...video, provider: "fal", variant: "image" })
@@ -317,6 +316,7 @@ describe("MediaOperations discovery", () => {
     const snapshot = JSON.parse(JSON.stringify(models.snapshot.seed()));
     delete snapshot.image.models[image.model_id];
     delete snapshot.video.models[video.model_id].providers.vercel;
+    delete snapshot.video.models[video.model_id].hosted;
     const operations = new MediaOperations({ snapshot });
     snapshot.image = models.snapshot.seed().image;
     snapshot.video = models.snapshot.seed().video;
@@ -335,6 +335,7 @@ describe("MediaOperations discovery", () => {
 
   it("inherits only exact legacy video facts and refuses changed or explicitly unknown bindings", () => {
     const snapshot = JSON.parse(JSON.stringify(models.snapshot.seed()));
+    delete snapshot.video.models[video.model_id].hosted;
     const binding = snapshot.video.models[video.model_id].providers.vercel;
     delete binding.input;
     expect(new MediaOperations({ snapshot }).inspect(video).variant).toBe(

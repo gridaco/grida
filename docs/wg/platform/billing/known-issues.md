@@ -28,6 +28,7 @@ status: living
 | KI-BILL-003 | Subscriptions · plan grant          | Medium   | Resolved  |
 | KI-BILL-004 | AI credit · image receipts          | Medium   | Mitigated |
 | KI-BILL-005 | AI credit · Tripo terminal receipts | Medium   | Mitigated |
+| KI-BILL-006 | AI credit · fal billing receipts    | Medium   | Mitigated |
 
 ---
 
@@ -226,6 +227,46 @@ durable observer exists, unobserved provider charges require operator review.
 
 **Files.** [Tripo billing seam](https://github.com/gridaco/grida/blob/main/editor/lib/ai/gg-three-d.ts)
 and [shared transaction owner](https://github.com/gridaco/grida/blob/main/editor/lib/ai/server.ts).
+
+---
+
+## KI-BILL-006 — fal receipts outside the gateway lifetime need reconciliation
+
+**Area.** Hosted image/video generation · prepaid AI credit.
+
+**Discovered.** September 2026 during the fal media migration.
+
+**Cause.** Provider queue work and billing-event publication can outlive a
+synchronous gateway request. Per-image, per-second and megapixel display prices
+are estimates for some models; they cannot substitute for the final charge.
+
+**Current behavior.** The gateway checks billing access before submission and
+looks up the actual charge by the selected endpoint and accepted request ID.
+Completed batches remain billable if a later download or batch fails. Accepted
+job IDs from other failures are also checked. Exact known charges are aggregated
+and rounded once to the existing mill ledger denomination. An absent, malformed
+or mismatched receipt is unknown usage; it never yields a successful free result.
+Available organization, model, transaction and request identifiers are logged for
+operator reconciliation. A hard process termination can lose those identifiers.
+
+**Mitigation.** Bounded receipt polling, isolated inference and billing credentials,
+no automatic resubmission or provider fallback after submission, and settlement
+of known partial results. Existing shared ledger ingestion failure semantics
+remain unchanged. Release verification must confirm that both keys belong to
+the same fal account and that real billing events arrive within the gateway's
+observation window. See [fal's request billing-event contract](https://fal.ai/docs/platform-apis/v1/models/billing-events).
+
+**Planned fix.** Durable accepted-job ownership, asynchronous terminal observation,
+and idempotent charge reconciliation across process restarts. Estimate: 3–5
+engineering days including failure/restart tests and operator reconciliation.
+
+**Why not resolved in this change.** This migration follows the existing
+synchronous GG media lifecycle. Durable execution changes job storage, ownership
+and recovery contracts and needs its own rollout.
+
+**Files.** [fal execution](https://github.com/gridaco/grida/blob/main/editor/lib/ai/gg-fal-media.ts),
+[receipt validation](https://github.com/gridaco/grida/blob/main/editor/lib/ai/gg-fal-billing.ts),
+and [the shared ledger seam](https://github.com/gridaco/grida/blob/main/editor/lib/ai/server.ts).
 
 ---
 

@@ -17,6 +17,8 @@
         "BIRD_WORKSPACE_ID",
         "EDGE_CONFIG",
         "ENABLE_EXPERIMENTAL_COREPACK",
+        "GG_FAL_KEY",
+        "GG_FAL_ADMIN_KEY",
         "GG_REPLICATE_API_TOKEN",
         "GG_VERCEL_AI_GATEWAY_API_KEY",
         "GRIDA_S2S_PRIVATE_API_KEY",
@@ -52,6 +54,9 @@
         "VERCEL_TEAM_ID",
         "VERCEL_URL"
       ]
+    },
+    "dev": {
+      "passThroughEnv": ["GG_FAL_KEY", "GG_FAL_ADMIN_KEY"]
     }
   }
 }

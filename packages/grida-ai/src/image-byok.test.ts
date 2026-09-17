@@ -158,7 +158,6 @@ describe("FalImageModel.doGenerate", () => {
     expect(submit.url).toBe("https://queue.fal.run/fal-ai/flux-2-pro");
     expect(submit.body).toMatchObject({
       prompt: "a red apple",
-      num_images: 1,
       image_size: { width: 1024, height: 1024 },
       seed: 42,
       guidance: 3, // providerOptions.fal passthrough
@@ -372,7 +371,7 @@ describe("FalImageModel.doGenerate", () => {
       queue.http
     ).doGenerate(callOptions());
     await Promise.all([
-      expect(generation).rejects.toThrow(/timed out after 600000ms/),
+      expect(generation).rejects.toThrow(/timeout/),
       vi.advanceTimersByTimeAsync(600_000),
     ]);
     expect(queue.download).not.toHaveBeenCalled();

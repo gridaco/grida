@@ -1108,9 +1108,11 @@ function MediaModelsSection({
             models={imageModels}
             readyForModel={(card) =>
               MediaModelReadiness.visual(
-                card,
+                "image",
+                card.id,
                 connectedVisualProviders,
-                hostedMediaReady
+                hostedMediaReady,
+                app.getAppInfo().version
               )
             }
             hrefForModel={mediaToolHref}
@@ -1123,9 +1125,11 @@ function MediaModelsSection({
             models={videoModels}
             readyForModel={(card) =>
               MediaModelReadiness.visual(
-                card,
+                "video",
+                card.id,
                 connectedVisualProviders,
-                hostedMediaReady
+                hostedMediaReady,
+                app.getAppInfo().version
               )
             }
             hrefForModel={mediaToolHref}

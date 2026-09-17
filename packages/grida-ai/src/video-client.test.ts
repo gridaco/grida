@@ -482,13 +482,12 @@ describe("VideoClient public operation", () => {
   });
 
   it.each(["google/veo-3.1", "bytedance/seedance-2.0", "alibaba/wan-3.0"])(
-    "requires the grounded fal frame and maps the exact binding: %s",
+    "preserves the grounded fal image binding alongside its text route: %s",
     async (model_id) => {
       const { client, request, download } = setup();
       falMock(request);
-      await failure(
-        client.resolve({ model_id, provider: "fal" }),
-        "input_unsupported"
+      expect((await client.resolve({ model_id, provider: "fal" })).input).toBe(
+        "text"
       );
       const operation = await client.resolve({
         model_id,

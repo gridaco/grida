@@ -64,10 +64,11 @@ const cases: {
   },
   {
     selector: { kind: "video", model_id: "google/veo-3.1", provider: "vercel" },
-    valid: { prompt: " x ", seed: 1, duration: 0.5, resolution: "640x480" },
+    valid: { prompt: " x ", seed: 1, duration: 4, resolution: "1280x720" },
     invalid: [
       { prompt: "x", seed: 0 },
       { prompt: "x", duration: 0 },
+      { prompt: "x", duration: 0.5 },
       { prompt: "x", resolution: "720p" },
     ],
   },

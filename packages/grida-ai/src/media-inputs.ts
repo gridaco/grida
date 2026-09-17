@@ -1,4 +1,5 @@
 // GRIDA-SEC-004 — effective operation inputs and output limits, shared with discovery.
+import { FalInputs } from "./fal-inputs";
 import { models } from "@grida/ai-models";
 import { InputSchema as S } from "./input-schema";
 import type { ImageClient } from "./image-client";
@@ -46,18 +47,41 @@ export namespace MediaInputs {
     const openrouter25 =
       descriptor.provider_id === "openrouter" &&
       /^openai\/gpt-image-2\.5-(?:flare|sunburst)$/.test(descriptor.binding_id);
-    return S.object({
+    const vercelGpt =
+      descriptor.provider_id === "vercel" &&
+      /^openai\/gpt-image-2(?:\.5-(?:flare|sunburst))?$/.test(
+        descriptor.binding_id
+      );
+    const fal =
+      descriptor.provider_id === "fal"
+        ? FalInputs.imageSettings(descriptor.binding_id)
+        : null;
+    const rule = S.object({
       prompt: S.string({ nonblank: true }),
       n: S.optional(
         S.number({ integer: true, min: 1, max: limits.image_items }),
         1
       ),
-      size: S.optional(S.pair("x")),
-      ...(fal25 ? {} : { aspect_ratio: S.optional(S.pair(":", false)) }),
-      ...(fal25 || openrouter25
+      size: S.optional(
+        fal && "sizes" in fal && fal.sizes
+          ? S.enumeration(fal.sizes)
+          : S.pair("x")
+      ),
+      ...(fal
+        ? "aspects" in fal && fal.aspects
+          ? { aspect_ratio: S.optional(S.enumeration(fal.aspects)) }
+          : {}
+        : fal25
+          ? {}
+          : { aspect_ratio: S.optional(S.pair(":", false)) }),
+      ...((fal && !fal.seed) || fal25 || openrouter25
         ? {}
         : { seed: S.optional(S.number({ integer: true })) }),
-      quality: S.optional(S.string({ max: 128, unit: "utf16" })),
+      ...(fal
+        ? "qualities" in fal && fal.qualities
+          ? { quality: S.optional(S.enumeration(fal.qualities)) }
+          : {}
+        : { quality: S.optional(S.string({ max: 128, unit: "utf16" })) }),
       background: S.optional(
         S.enumeration(
           descriptor.native_background
@@ -76,6 +100,20 @@ export namespace MediaInputs {
         references?: string[];
       }
     >;
+    if (!fal && !vercelGpt) return rule;
+    return {
+      schema: rule.schema,
+      parse(value, json) {
+        const input = rule.parse(value, json);
+        if (fal) FalInputs.image(descriptor.binding_id, input);
+        else if (vercelGpt)
+          FalInputs.image("fal-ai/gpt-image-2", {
+            prompt: input.prompt,
+            size: input.size,
+          });
+        return input;
+      },
+    };
   }
   // Exact serving contract, not a provider-wide capability or catalogue price label.
   // https://fal.ai/models/fal-ai/veo3.1/lite/image-to-video/api
@@ -92,6 +130,16 @@ export namespace MediaInputs {
     image: boolean,
     descriptor: Pick<VideoClient.Descriptor, "provider_id" | "binding_id">
   ): S.Rule<VideoClient.Input> {
+    const falRule =
+      !image && descriptor.provider_id === "fal"
+        ? FalInputs.videoRule(descriptor.binding_id)
+        : null;
+    if (falRule) return falRule;
+    const vercelVeo =
+      descriptor.provider_id === "vercel" &&
+      /^google\/veo-3\.1(?:-fast|-lite)?-generate-001$/.test(
+        descriptor.binding_id
+      );
     const lite =
       descriptor.provider_id === "fal" &&
       descriptor.binding_id === falVeoLite.binding_id;
@@ -104,7 +152,9 @@ export namespace MediaInputs {
         lite ? S.enumeration(Object.keys(falVeoLite.resolutions)) : S.pair("x")
       ),
       duration: S.optional(
-        lite ? S.enumeration([4, 6, 8]) : S.number({ exclusiveMin: 0 })
+        lite || vercelVeo
+          ? S.enumeration([4, 6, 8])
+          : S.number({ exclusiveMin: 0 })
       ),
       ...(lite ? {} : { fps: S.optional(S.number({ exclusiveMin: 0 })) }),
       // The serving route defaults to audio; absence still delegates to that default.

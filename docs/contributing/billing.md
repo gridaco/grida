@@ -43,14 +43,15 @@ path. `BYOK_` identifies a contributor's server override. Neither prefix
 identifies a deployment environment: scope secrets separately for Production,
 Preview, and Development.
 
-| Consumer                                        | Configuration                                                    | Selection                                                                                                                                                                     |
-| ----------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Funded Vercel AI Gateway text, image, and video | `GG_VERCEL_AI_GATEWAY_API_KEY` or platform `VERCEL_OIDC_TOKEN`   | Use a nonblank GG key when configured; an unset or whitespace-only value selects platform OIDC. No fallback to `AI_GATEWAY_API_KEY` or contributor keys for funded authority. |
-| Funded Replicate operations                     | `GG_REPLICATE_API_TOKEN`                                         | Required and nonblank when a Replicate operation runs; no fallback to `REPLICATE_API_TOKEN` or BYOK.                                                                          |
-| Funded Tripo operations                         | `GG_TRIPO_API_KEY`                                               | Unchanged; no generic or BYOK fallback.                                                                                                                                       |
-| Contributor text override                       | `BYOK_OPENROUTER_API_KEY`, then `BYOK_VERCEL_AI_GATEWAY_API_KEY` | Nonblank keys select the contributor's provider, bypassing billing only.                                                                                                      |
-| Library query embeddings                        | Shared contributor or Vercel AI Gateway provider                 | Remain unbilled internal operations with the existing contributor precedence. Sharing a funded provider credential does not add customer metering.                            |
-| OpenAI model discovery                          | `OPENAI_API_KEY`                                                 | Unchanged; the model-list operation is nonbillable.                                                                                                                           |
+| Consumer                                                    | Configuration                                                    | Selection                                                                                                                                                                        |
+| ----------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Funded fal image and video                                  | `GG_FAL_KEY` and `GG_FAL_ADMIN_KEY`                              | Separate inference and billing-event credentials are required. Both belong to the same fal account. No fallback to `FAL_KEY`, contributor keys, or installed-client credentials. |
+| Funded Vercel AI Gateway text and explicit media exceptions | `GG_VERCEL_AI_GATEWAY_API_KEY` or platform `VERCEL_OIDC_TOKEN`   | Use a nonblank GG key when configured; an unset or whitespace-only value selects platform OIDC. No fallback to `AI_GATEWAY_API_KEY` or contributor keys for funded authority.    |
+| Funded Replicate operations                                 | `GG_REPLICATE_API_TOKEN`                                         | Required and nonblank when a Replicate operation runs; no fallback to `REPLICATE_API_TOKEN` or BYOK.                                                                             |
+| Funded Tripo operations                                     | `GG_TRIPO_API_KEY`                                               | Unchanged; no generic or BYOK fallback.                                                                                                                                          |
+| Contributor text override                                   | `BYOK_OPENROUTER_API_KEY`, then `BYOK_VERCEL_AI_GATEWAY_API_KEY` | Nonblank keys select the contributor's provider, bypassing billing only.                                                                                                         |
+| Library query embeddings                                    | Shared contributor or Vercel AI Gateway provider                 | Remain unbilled internal operations with the existing contributor precedence. Sharing a funded provider credential does not add customer metering.                               |
+| OpenAI model discovery                                      | `OPENAI_API_KEY`                                                 | Unchanged; the model-list operation is nonbillable.                                                                                                                              |
 
 Vercel supplies `VERCEL_OIDC_TOKEN` through its platform authentication lifecycle.
 Keep that variable and its lifecycle intact; an OIDC deployment does not need a
@@ -64,6 +65,41 @@ The native provider ID remains `vercel`, and the CLI environment override remain
 rename is a direct cutover: replace `BYOK_AI_GATEWAY_API_KEY` with
 `BYOK_VERCEL_AI_GATEWAY_API_KEY` in local server configuration; the old name has
 no compatibility alias.
+
+### Hosted fal media
+
+fal is the default server provider for admitted GG image and video routes.
+The service catalogue selects the exact operation endpoint; a BYOK binding
+alone does not grant hosted access. These routes accept text-to-image and
+text-to-video. Hosted references and image-to-video require a separate input
+contract and remain unavailable.
+
+Configure both `GG_FAL_KEY` for inference and `GG_FAL_ADMIN_KEY` for fal's
+[request billing events](https://fal.ai/docs/platform-apis/v1/models/billing-events).
+They are server-only credentials, scoped independently for each deployment
+environment. The admin key must be able to read the inference account's
+request charges. Neither credential is sent to Desktop, CLI, or the browser.
+Contributor text BYOK does not bypass these requirements or media billing.
+
+Hosted fal execution has a 240-second generation/download deadline, followed by
+a bounded 20-second receipt wait. This leaves settlement headroom inside the
+native client’s 300-second request budget. Longer jobs require reconciliation;
+client cancellation does not recall accepted provider work.
+
+Generation checks organization credit before submission. The billing seam
+uses the exact provider request's `cost_total`; catalogue prices remain
+estimates. A bounded wait cannot prove an absent receipt means zero cost.
+Delayed or missing receipts and interrupted jobs require reconciliation using
+their request identifiers. Never substitute an average price or retry a
+generation merely to obtain a receipt. See the
+[billing issue register](../wg/platform/billing/known-issues.md) for the
+remaining recovery limits.
+
+Server configuration must be deployed before publishing compatible native
+clients. Verify a hosted image and video, their request-specific costs, failed
+jobs, and any retained Vercel capability exception against the intended
+deployment. Synthetic tests do not prove deployed credentials or provider
+acceptance. Keep deployment and release approval separate from code review.
 
 ### Deploying the credential rename
 

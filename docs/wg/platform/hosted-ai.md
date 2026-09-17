@@ -350,14 +350,14 @@ deployment. It works by handing the store the seed as its snapshot, which
 is the same mechanism that pins it to any supplied catalogue, so there is
 one code path rather than a family of overrides.
 
-**Schema.** Additive changes do not bump the schema major — clients ignore
-fields they do not know, so a new optional field is safe to publish. A
-breaking change publishes at a NEW path and bumps the major, leaving old
-clients on the old path or falling back to their seed. One rule follows
-from that: a model requiring new CLIENT CODE (a new provider kind) must
-never be published into an existing schema, because old clients will
-accept its data and then fail to drive it. Ordinary models are pure data
-and need no accompanying release.
+**Schema.** Additive changes do not bump the schema major when older clients
+retain a valid interpretation of the fields they understand. A breaking change
+publishes at a new path and bumps the major, leaving old clients on the old
+path or falling back to their seed. A route requiring new client code must
+remain unavailable to installed clients lacking that capability. Refreshing
+data cannot update an adapter or parser. Ordinary model additions need no
+accompanying release only when the installed runtime already supports their
+operation and request mapping.
 
 **Sections are independently fallible.** `text`, `image`, and `video` are
 validated separately: an unusable media section is dropped on its own and
@@ -370,10 +370,25 @@ catalogue must never cost a host its ability to answer.
 default and order fields; their existing membership and lifecycle fields must
 retain their meanings. Newer readers resolve recommendations against the same
 effective section as its model bindings. When a media section is dropped, its
-remote recommendations are dropped with it. The schema does not distinguish
-independent GG and BYOK service membership; server-side provider and request
-gates remain authoritative. Catalog data cannot add adapter code to an
-installed client.
+remote recommendations are dropped with it.
+
+**Hosted media admission is explicit.** Image and video offerings distinguish
+the route served by GG from the provider bindings available through BYOK.
+The default GG provider is fal; verified capability exceptions may retain a
+different provider. The hosted route names a concrete operation, including
+text-to-video separately from image-to-video. A listed model or connected key
+does not establish hosted availability. An explicitly denied route remains
+unavailable. Older snapshots that omit hosted admission retain their former
+Vercel-only meaning; readers must not fill that omission from a newer bundled
+policy. Server provider and input gates remain authoritative.
+
+**Native compatibility is separate from catalogue convergence.** A hosted
+renderer can run against an older Desktop binary. It must keep newly supported
+routes unavailable until the installed version implements them, while retaining
+existing compatible requests. Publishing a native release or waiting one
+catalogue refresh interval does not update an installed client. The standalone
+CLI uses its bundled catalogue, so a catalogue or routing change requires a CLI
+release until that host supports catalogue refresh.
 
 **Not every modality is published yet.** `text`, `image`, and `video` are.
 Music, sound effects, and 3D are still gated against the host's BUNDLED

@@ -1,5 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — fixed provider video wires and scoped GG submission.
 // GRIDA-GG: token — hosted video is text-only and uses the shared live-token contract.
+import { FalInputs } from "./fal-inputs";
+import { FalGeneration } from "./fal-generation";
 import { createGateway as createVercelAiGateway } from "@ai-sdk/gateway";
 import { assertAllowedUrl, falQueueOutcome, pollQueue } from "./fetch-helpers";
 import { postHosted } from "./gg";
@@ -37,10 +39,11 @@ export namespace videoModels {
     key: string,
     id: string,
     input: Input,
-    request: MediaRequest
+    request: MediaRequest,
+    completion?: FalGeneration
   ): Promise<Video[]> {
     request.check();
-    if (provider === "fal") return fal(key, id, input, request);
+    if (provider === "fal") return fal(key, id, input, request, completion);
     if (provider === "openrouter") return openRouter(key, id, input, request);
     const model = createVercelAiGateway({
       apiKey: key,
@@ -103,7 +106,8 @@ export namespace videoModels {
     key: string,
     id: string,
     input: Input,
-    request: MediaRequest
+    request: MediaRequest,
+    completion?: FalGeneration
   ): Promise<Video[]> {
     const headers = {
       authorization: `Key ${key}`,
@@ -113,7 +117,7 @@ export namespace videoModels {
     // https://fal.ai/models/alibaba/wan-3.0/image-to-video/api
     const frame =
       id === "alibaba/wan-3.0/image-to-video" ? "start_image_url" : "image_url";
-    const body = wire(input);
+    const body = FalInputs.video(id, input) ?? wire(input);
     const lite = id === MediaInputs.falVeoLite.binding_id;
     const resolution =
       lite && input.resolution
@@ -124,6 +128,7 @@ export namespace videoModels {
     const imageUrl = input.image ? imageDataUrl(input.image) : input.image_url;
     request.check();
     const submit = await request.json<{
+      request_id?: string;
       status_url: string;
       response_url: string;
     }>(`https://queue.fal.run/${id}`, {
@@ -141,6 +146,7 @@ export namespace videoModels {
         ...(imageUrl ? { [frame]: imageUrl } : {}),
       }),
     });
+    completion?.accepted(submit.request_id);
     allowed(submit.status_url, falHosts);
     allowed(submit.response_url, falHosts);
     await request.wait(
@@ -164,6 +170,7 @@ export namespace videoModels {
     const videos = result.videos ?? (result.video ? [result.video] : []);
     if (!Array.isArray(videos) || !videos.length || videos.length > 16)
       invalid();
+    completion?.completed(videos.length);
     return videos.map((item) => {
       allowed(item.url, falHosts);
       return {

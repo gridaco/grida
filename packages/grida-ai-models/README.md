@@ -72,9 +72,14 @@ remain distinct from provider-binding prices. GPT Image 2's model-level table,
 for example, includes rectangular image tiers and token components absent from
 its Vercel AI Gateway binding. No primary-provider preference is stored on factual cards.
 
-Video cards identify canonical models and exact image-to-video provider routes.
-Each binding has its own resolution/audio price matrix and any input-image
-surcharge. Music, sound effects, and speech retain separate IDs, IO, and meters;
+Video cards identify canonical models and exact provider routes. The established
+`providers` bindings retain their input mode and identity. Additional verified
+text-to-video endpoints live in `text_to_video`, resolved with
+`video.textToVideoBinding(card, provider)`. A missing operation never causes an
+endpoint ID to be rewritten. Each binding has its own resolution/audio price
+matrix and any input-image surcharge. Published approximate prices (currently
+Seedance's fal per-second examples over token billing) are display estimates;
+settlement must use observed provider cost rather than treating them as exact. Music, sound effects, and speech retain separate IDs, IO, and meters;
 provider credits are not converted to USD without an account plan. 3D uses exact
 endpoint IDs, distinct text/image inputs, guaranteed outputs, surcharges, and
 resolution price tiers. Provider-native output/default-resolution declarations
@@ -111,13 +116,13 @@ exposing ordered service views and the compatible schema-1 distribution protocol
 
 ### Authoring homes
 
-| Decision                                                                          | Authoring file                                |
-| --------------------------------------------------------------------------------- | --------------------------------------------- |
-| Identity, capability, provenance, bindings, published prices                      | `src/models.ts`                               |
-| Membership, listed/staged status, legacy, primary image binding, request defaults | `src/grida/catalog.ts`, `catalog.definitions` |
-| Independent optional default model and partial order per family                   | `src/grida/preferences.ts`                    |
-| Text tier assignments                                                             | `src/grida/tiers.ts`                          |
-| Schema-1 projection, parser, resolved snapshot views                              | `src/grida/catalog.ts`, `catalog.snapshot`    |
+| Decision                                                                                           | Authoring file                                |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Identity, capability, provenance, bindings, published prices                                       | `src/models.ts`                               |
+| Membership, listed/staged status, legacy, primary image binding, hosted provider, request defaults | `src/grida/catalog.ts`, `catalog.definitions` |
+| Independent optional default model and partial order per family                                    | `src/grida/preferences.ts`                    |
+| Text tier assignments                                                                              | `src/grida/tiers.ts`                          |
+| Schema-1 projection, parser, resolved snapshot views                                               | `src/grida/catalog.ts`, `catalog.snapshot`    |
 
 Adding a factual model does not add it to the service. Removing a service member
 does not delete its factual record. Legacy is a product decision, not upstream
@@ -133,6 +138,7 @@ import { catalog, TIER_MODEL_IDS } from "@grida/ai-models/grida";
 const candidates = catalog.image.listed_models();
 const recommendation = catalog.image.default_id;
 const completeReference = catalog.image.ordered_models();
+const hosted = candidates[0] && catalog.image.hostedBinding(candidates[0]);
 const pro = catalog.text.byTier.pro;
 const serialized = JSON.stringify(
   catalog.snapshot.seed({ version: "deploy-sha" })
@@ -162,6 +168,54 @@ explicit order without making staged models listed defaults. Text's service
 recommendation is Terra; callers with an explicit tier choice, such as `pro`,
 keep that choice. Recommendations and sorting never replace saved user choices
 or grant permission to execute a model.
+
+### Hosted media operations
+
+`catalog.image.hostedBinding(card)` and `catalog.video.hostedBinding(card)`
+return the explicitly admitted hosted binding or `null`. The corresponding
+snapshot media views expose the same helpers. The image operation is
+text-to-image; video is text-to-video. This is service routing policy, not proof
+that an installed runtime implements that endpoint, has credentials, or can
+serve every documented input.
+
+Members author `hosted_provider` separately from image `primary_provider`.
+The joined card projects `hosted` from factual bindings, including its exact
+endpoint, input and prices. The accessor resolves its provider and ID against
+that card's current factual bindings; a removed or replaced route cannot be
+restored by stale projected data. Read the returned binding for current facts,
+not the projected copy. Retired routes are unavailable.
+
+An absent `hosted` property is a legacy schema-1 card: image retains its
+surviving Vercel binding and video retains only a Vercel binding known to accept
+text. It never borrows the bundled fal selection. Explicit `null` denies
+hosted execution. Malformed or unknown hosted metadata becomes `null` during
+parsing, preserving unrelated cards and sections. Additional `text_to_video`
+facts are independently fallible and unknown providers are omitted. Existing
+schema-1 parsers ignore both additive fields; their runtime eligibility rules
+remain unchanged until the installed software is updated.
+
+The current service chooses fal for all listed image models and for the
+verified Omni, Veo, Wan and Seedance text operations. Staged image choices
+retain their existing Vercel route. Grok Imagine Video 1.5 remains listed for
+its image operation but has no hosted text route. Image primary providers,
+existing explicit bindings, recommendations and request defaults retain their
+previous meaning.
+
+Operation endpoints and prices were checked against first-party fal pages on
+2026-09-17:
+
+- [Omni Flash 1.1 text](https://fal.ai/models/google/gemini-omni-flash/v1.1/text-to-video)
+  and [image](https://fal.ai/models/google/gemini-omni-flash/v1.1/image-to-video).
+  [Google's model card](https://ai.google.dev/gemini-api/docs/models/gemini-omni-flash)
+  documents 3–10-second output; its [release notes](https://ai.google.dev/gemini-api/docs/changelog)
+  date the exact `gemini-omni-1.1-flash` release to 2026-08-27.
+- [Veo 3.1](https://fal.ai/models/fal-ai/veo3.1),
+  [Fast](https://fal.ai/models/fal-ai/veo3.1/fast), and
+  [Lite](https://fal.ai/models/fal-ai/veo3.1/lite).
+- [Wan 3.0 text](https://fal.ai/models/alibaba/wan-3.0/text-to-video).
+- [Seedance 2.0 text](https://fal.ai/models/bytedance/seedance-2.0/text-to-video)
+  and [2.5 text](https://fal.ai/models/bytedance/seedance-2.5/text-to-video).
+  Their displayed seconds-based examples do not replace token settlement.
 
 ### Independent policy resolution
 
@@ -196,8 +250,8 @@ Membership comes from explicit service definitions, never the full factual
 registry. Text/video publish listed members; image retains its existing broad
 GG/BYOK member coverage, including unlisted legacy choices. Listing does not
 prove adapter support; legacy does not withdraw execution. Withdrawing a broad
-image gate member requires an explicit membership removal. Provider bindings
-and prices are unchanged.
+image gate member requires an explicit membership removal. Existing provider bindings and prices retain their meaning; new operation
+bindings and hosted selection are additive.
 
 Text and tiers replace their section wholesale. Media remains independently
 fallible for installed-client compatibility. Invalid media sections and their

@@ -2,8 +2,8 @@
 // GRIDA-GG: gateway — see docs/wg/platform/hosted-ai.md
 /**
  * POST /api/v1/ai/images/generations — token-gated hosted image
- * generation through the REAL image billing middleware (fake Vercel AI Gateway
- * model): pre-priced mills reach ingest, blocked orgs 402 before the
+ * generation through the REAL image billing middleware using the explicitly
+ * retained seed-control compatibility route (fake Vercel AI Gateway model): pre-priced mills reach ingest, blocked orgs 402 before the
  * provider, unknown/unbound models 404, base64 results in the shared
  * protocol shape, and NO library upload (the daemon owns persistence).
  */
@@ -54,6 +54,9 @@ vi.mock("@/lib/ai", async (orig) => {
         ...real.default.image,
         binding: vi.fn<typeof real.default.image.binding>(
           real.default.image.binding
+        ),
+        hostedBinding: vi.fn<typeof real.default.image.hostedBinding>(
+          real.default.image.hostedBinding
         ),
       },
     },
@@ -125,7 +128,9 @@ function request(body: unknown, token?: string): Request {
       "content-type": "application/json",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify(body),
+    // Existing seed semantics choose the compatibility provider before any
+    // request is submitted. Normal fal dispatch is covered at the media seam.
+    body: JSON.stringify({ ...(body as Record<string, unknown>), seed: 123 }),
   });
 }
 
@@ -135,6 +140,7 @@ beforeEach(() => {
   h.lastOptions = null;
   h.reportedCost = undefined;
   vi.mocked(ai.image.binding).mockReset();
+  vi.mocked(ai.image.hostedBinding).mockReset();
   mockedGetEntitlement.mockReset();
   mockedIngest.mockReset();
   mockedGetEntitlement.mockResolvedValue({
@@ -384,14 +390,24 @@ describe("POST /api/v1/ai/images/generations", () => {
     expect(mockedIngest).not.toHaveBeenCalled();
   });
 
-  it("refuses a model without a Vercel AI Gateway binding before billing", async () => {
-    vi.mocked(ai.image.binding).mockReturnValueOnce(null);
+  it("refuses explicit hosted unavailability before billing", async () => {
+    vi.mocked(ai.image.hostedBinding).mockReturnValue(null);
     const { token } = await signGgToken("user-1", 7);
     const res = await POST(request({ model_id: CARD.id, prompt: "x" }, token));
     expect(res.status).toBe(404);
     expect(h.imageCalls).toBe(0);
     expect(mockedGetEntitlement).not.toHaveBeenCalled();
     expect(mockedIngest).not.toHaveBeenCalled();
+  });
+
+  it("preserves explicit legacy image selections outside the curated list", async () => {
+    const model_id = "openai/gpt-image-1-mini";
+    expect(ai.image.findImageModelCard(model_id)!.listed).toBe(false);
+    const { token } = await signGgToken("user-1", 7);
+    const res = await POST(request({ model_id, prompt: "an icon" }, token));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ model_id, provider_id: "vercel" });
+    expect(mockedIngest).toHaveBeenCalledTimes(1);
   });
 
   it("402 for blocked orgs, before the provider call", async () => {

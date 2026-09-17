@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 — explicit video provider authority, bounded execution/results, safe failures.
 // GRIDA-SEC-006 — scoped GG is checked at submission; accepted work cannot be recalled.
 // GRIDA-GG: token — no account credentials, mint, persistence, or implicit provider switching.
+import { FalGeneration } from "./fal-generation";
 import { models } from "@grida/ai-models";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
@@ -24,6 +25,7 @@ export class VideoClient {
   readonly #catalog?: ModelCatalogStore;
   readonly #gg?: GgTokenSource;
   readonly #ggBaseUrl?: string;
+  readonly #onFalCompleted?: (receipt: VideoClient.FalCompletion) => void;
 
   constructor(options: VideoClient.Options) {
     try {
@@ -32,6 +34,12 @@ export class VideoClient {
       if (!(http instanceof ProviderHttp) || typeof get !== "function") throw 0;
       this.#getKey = get.bind(keys);
       this.#http = http;
+      if (
+        options.on_fal_completed !== undefined &&
+        typeof options.on_fal_completed !== "function"
+      )
+        throw 0;
+      this.#onFalCompleted = options.on_fal_completed;
       this.#catalog = catalog;
       if (gg !== undefined)
         this.#gg = { getAccessToken: gg.getAccessToken.bind(gg) };
@@ -129,6 +137,10 @@ export class VideoClient {
     input: VideoClient.Input
   ): Promise<VideoClient.Result> {
     let request: MediaRequest | undefined;
+    const fal =
+      descriptor.provider_id === "fal"
+        ? new FalGeneration(descriptor.binding_id, this.#onFalCompleted)
+        : undefined;
     try {
       const args = generationInput(input, image, descriptor);
       request = new MediaRequest(this.#http, args.signal);
@@ -156,7 +168,8 @@ export class VideoClient {
             key,
             descriptor.binding_id,
             args,
-            request
+            request,
+            fal
           )
         );
       }
@@ -202,9 +215,9 @@ export class VideoClient {
       try {
         request?.check();
       } catch (abort) {
-        throw safeFailure(abort);
+        throw new VideoClient.Failure(safeFailure(abort).code, fal?.task_id);
       }
-      throw safeFailure(error);
+      throw new VideoClient.Failure(safeFailure(error).code, fal?.task_id);
     } finally {
       request?.dispose();
     }
@@ -223,7 +236,10 @@ export namespace VideoClient {
     catalog?: ModelCatalogStore;
     gg?: GgTokenSource;
     gg_base_url?: string;
+    /** Trusted synchronous completion sink. Runs before downloads for a successful fal result. */
+    on_fal_completed?: (receipt: FalCompletion) => void;
   };
+  export type FalCompletion = FalGeneration.Completion;
   export type Selection = {
     model_id: string;
     provider: Provider | "auto";
@@ -273,13 +289,20 @@ export namespace VideoClient {
     | "unsupported_untrusted_result_origin";
   export class Failure extends Error {
     readonly code: FailureCode;
-    constructor(code: FailureCode) {
+    readonly task_id?: string;
+    constructor(code: FailureCode, task_id?: string) {
       super(failureCode(code));
       this.name = "VideoFailure";
       this.code = failureCode(code);
+      const accepted = FalGeneration.taskId(task_id);
+      if (accepted) this.task_id = accepted;
     }
-    toJSON(): { code: FailureCode; message: string } {
-      return { code: this.code, message: this.code };
+    toJSON(): { code: FailureCode; message: string; task_id?: string } {
+      return {
+        code: this.code,
+        message: this.code,
+        ...(this.task_id ? { task_id: this.task_id } : {}),
+      };
     }
   }
 }
@@ -312,7 +335,7 @@ function generationInput(
     return InputSchema.native(
       rule,
       value,
-      ["image_url", "image", "fps"].filter(
+      ["image_url", "image", "fps", "seed"].filter(
         (field) => !Object.hasOwn(rule.schema.properties as object, field)
       )
     );
