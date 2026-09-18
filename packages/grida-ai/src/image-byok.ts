@@ -1,6 +1,9 @@
 // GRIDA-SEC-004 — provider-owned submissions and credential-free result downloads.
 /** Internal AI SDK adapters; ImageClient owns the safe public operation boundary. */
 
+import { MediaRequest } from "./media-request";
+import { FalInputs } from "./fal-inputs";
+import { FalGeneration } from "./fal-generation";
 import { createGateway as createVercelAiGateway } from "@ai-sdk/gateway";
 import type { ImageModelV3, ImageModelV3CallOptions } from "@ai-sdk/provider";
 import type { models } from "@grida/ai-models";
@@ -35,14 +38,6 @@ function makeVercelAiGatewayImageModel(
   }).imageModel(id);
 }
 
-function makeFalImageModel(
-  apiKey: string,
-  id: string,
-  providerHttp: ProviderHttp
-): ImageModelV3 {
-  return new FalImageModel(apiKey, id, providerHttp);
-}
-
 /**
  * Build the `ImageModelV3` for a resolved (provider, binding-id) pair using the
  * user's key. The single switch the image resolver calls.
@@ -52,7 +47,8 @@ export function makeImageModelFor(
   apiKey: string,
   id: string,
   providerHttp: ProviderHttp = new ProviderHttp(),
-  background?: ImageClient.Background
+  background?: ImageClient.Background,
+  completion?: FalGeneration
 ): ImageModelV3 {
   let model: ImageModelV3;
   switch (provider) {
@@ -63,7 +59,7 @@ export function makeImageModelFor(
       model = makeVercelAiGatewayImageModel(apiKey, id, providerHttp);
       break;
     case "fal":
-      model = makeFalImageModel(apiKey, id, providerHttp);
+      model = new FalImageModel(apiKey, id, providerHttp, completion);
       break;
   }
   // Resolution has already checked the exact route's catalogue declaration.
@@ -258,12 +254,15 @@ type FalStatus = "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | (string & {});
 export class FalImageModel implements ImageModelV3 {
   readonly specificationVersion = "v3" as const;
   readonly provider = "fal";
-  readonly maxImagesPerCall = 4;
+  get maxImagesPerCall() {
+    return FalInputs.imageSettings(this.modelId)?.batch ?? 4;
+  }
 
   constructor(
     private readonly apiKey: string,
     readonly modelId: string,
-    private readonly providerHttp: ProviderHttp = new ProviderHttp()
+    private readonly providerHttp: ProviderHttp = new ProviderHttp(),
+    private readonly completion?: FalGeneration
   ) {}
 
   private headers(): Record<string, string> {
@@ -276,8 +275,24 @@ export class FalImageModel implements ImageModelV3 {
   async doGenerate(
     options: ImageModelV3CallOptions
   ): Promise<Awaited<ReturnType<ImageModelV3["doGenerate"]>>> {
-    const { prompt, n, size, aspectRatio, seed, providerOptions, abortSignal } =
-      options;
+    const request = new MediaRequest(
+      this.providerHttp,
+      options.abortSignal,
+      600_000
+    );
+    try {
+      return await request.wait(this.generate(options, request));
+    } finally {
+      request.dispose();
+    }
+  }
+
+  private async generate(
+    options: ImageModelV3CallOptions,
+    request: MediaRequest
+  ): Promise<Awaited<ReturnType<ImageModelV3["doGenerate"]>>> {
+    const { prompt, n, size, aspectRatio, seed, providerOptions } = options;
+    const abortSignal = request.signal;
 
     const isGptImage25 = FAL_GPT_IMAGE_2_5_ROUTE.test(this.modelId);
     // These routes expose image_size, not aspect_ratio or seed. A typed SDK
@@ -319,19 +334,33 @@ export class FalImageModel implements ImageModelV3 {
       );
     }
 
+    const mapped = FalInputs.image(this.modelId, {
+      prompt: prompt ?? "",
+      n,
+      size,
+      aspect_ratio: aspectRatio,
+      seed,
+      quality:
+        typeof falExtra.quality === "string" ? falExtra.quality : undefined,
+      background: falExtra.background as ImageClient.Background | undefined,
+    });
+
     // 1. submit
-    const submitRes = await this.providerHttp.request(
+    const submitRes = await request.request(
       `${FAL_QUEUE_BASE}/${this.modelId}`,
       {
         method: "POST",
         headers: this.headers(),
         signal: abortSignal,
         body: JSON.stringify({
-          prompt,
-          num_images: n,
-          ...(image_size ? { image_size } : {}),
-          ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
-          ...(seed !== undefined ? { seed } : {}),
+          ...(mapped ?? {
+            prompt,
+            num_images: n,
+            ...(image_size ? { image_size } : {}),
+            ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
+            ...(seed !== undefined ? { seed } : {}),
+            ...falExtra,
+          }),
           ...falExtra,
           ...(refs ? { image_urls: refs } : {}),
         }),
@@ -343,6 +372,7 @@ export class FalImageModel implements ImageModelV3 {
       );
     }
     const submit = (await submitRes.json()) as FalSubmitResponse;
+    this.completion?.accepted(submit.request_id);
 
     // GRIDA-SEC-004: the key-bearing poll/result fetches use URLs from the
     // response body — pin them to fal hosts so a hostile response can't exfil
@@ -361,13 +391,13 @@ export class FalImageModel implements ImageModelV3 {
         intervalMs: FAL_POLL_INTERVAL_MS,
         label: "[fal]",
         classify: falQueueOutcome,
-        fetch: this.providerHttp.request,
+        fetch: request.transport().request,
       },
       abortSignal
     );
 
     // 3. fetch the result, download each image to bytes
-    const resultRes = await this.providerHttp.request(submit.response_url, {
+    const resultRes = await request.request(submit.response_url, {
       headers: this.headers(),
       signal: abortSignal,
     });
@@ -380,9 +410,10 @@ export class FalImageModel implements ImageModelV3 {
       images?: Array<{ url?: string; content_type?: string }>;
     };
     const entries = result.images ?? [];
-    if (entries.length === 0) {
+    if (!Array.isArray(entries) || entries.length === 0 || entries.length > n) {
       throw new Error("[fal] response contained no image");
     }
+    this.completion?.completed(entries.length);
     // Keep every provider-result URL in one credential-free bounded batch; the
     // batch refuses excessive count/aggregate bytes and consumes sequentially.
     const urls = entries.map((img) => {
@@ -390,9 +421,11 @@ export class FalImageModel implements ImageModelV3 {
       assertAllowedUrl(value, FAL_HOSTS, "[fal] image url");
       return new URL(value);
     });
-    const downloaded = await this.providerHttp.downloadProviderAssets(urls, {
-      signal: abortSignal,
-    });
+    const downloaded = await request.wait(
+      this.providerHttp.downloadProviderAssets(urls, {
+        signal: abortSignal,
+      })
+    );
     const images = downloaded.map((image) => image.data);
 
     return {

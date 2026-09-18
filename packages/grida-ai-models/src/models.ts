@@ -2951,6 +2951,7 @@ export namespace models {
      * Open union (`string & {}`) keeps unrecognized ids assignable.
      */
     export type VideoModelId =
+      | "google/gemini-omni-1.1-flash"
       | "google/veo-3.1"
       | "google/veo-3.1-fast"
       | "google/veo-3.1-lite"
@@ -3066,6 +3067,12 @@ export namespace models {
        * Non-empty; keying makes providers unique by construction.
        */
       providers: Partial<Record<VideoProvider, VideoProviderBinding>>;
+      /**
+       * Additional verified text-to-video routes where the provider uses a
+       * separate endpoint. The established `providers` binding stays unchanged.
+       * An absent map never implies an endpoint by rewriting a provider ID.
+       */
+      text_to_video?: Partial<Record<VideoProvider, VideoProviderBinding>>;
     };
 
     type CatalogCard = VideoModelCard & {
@@ -3076,6 +3083,62 @@ export namespace models {
     };
 
     export const models: Partial<Record<VideoModelId, CatalogCard>> = {
+      "google/gemini-omni-1.1-flash": {
+        id: "google/gemini-omni-1.1-flash",
+        label: "Gemini Omni Flash 1.1",
+        release: {
+          date: "2026-08-27",
+          basis: "model",
+          source_url: "https://ai.google.dev/gemini-api/docs/changelog",
+        },
+        short_description:
+          "Google's video model with synchronized native audio and outputs from 360p to 4K.",
+        vendor: "google",
+        aspect_ratios: ["16:9", "9:16"],
+        min_duration: 3,
+        max_duration: 10,
+        audio: true,
+        speed_label: "fast",
+        url: "https://ai.google.dev/gemini-api/docs/models/gemini-omni-flash",
+        providers: {
+          // Exact fal endpoint, input schema and output-second prices checked 2026-09-17.
+          // https://fal.ai/models/google/gemini-omni-flash/v1.1/image-to-video
+          fal: {
+            provider: "fal",
+            id: "google/gemini-omni-flash/v1.1/image-to-video",
+            input: "image",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "360p": { audio: 0.03 },
+                "720p": { audio: 0.1 },
+                "1080p": { audio: 0.15 },
+                "4k": { audio: 0.3 },
+              },
+            },
+            avg_cost_usd: 0.8,
+            url: "https://fal.ai/models/google/gemini-omni-flash/v1.1/image-to-video",
+          },
+        },
+        text_to_video: {
+          fal: {
+            provider: "fal",
+            id: "google/gemini-omni-flash/v1.1/text-to-video",
+            input: "text",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "360p": { audio: 0.03 },
+                "720p": { audio: 0.1 },
+                "1080p": { audio: 0.15 },
+                "4k": { audio: 0.3 },
+              },
+            },
+            avg_cost_usd: 0.8,
+            url: "https://fal.ai/models/google/gemini-omni-flash/v1.1/text-to-video",
+          },
+        },
+      },
       // -----------------------------------------------------------------
       // Google — Veo 3.1
       // -----------------------------------------------------------------
@@ -3096,6 +3159,25 @@ export namespace models {
         audio: true,
         speed_label: "slow",
         url: "https://deepmind.google/models/veo/",
+        // Text operation verified independently; never inferred from the image route.
+        // https://fal.ai/models/fal-ai/veo3.1 (checked 2026-09-17).
+        text_to_video: {
+          fal: {
+            provider: "fal",
+            id: "fal-ai/veo3.1",
+            input: "text",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.4, silent: 0.2 },
+                "1080p": { audio: 0.4, silent: 0.2 },
+                "4k": { audio: 0.6, silent: 0.4 },
+              },
+            },
+            avg_cost_usd: 3.2,
+            url: "https://fal.ai/models/fal-ai/veo3.1",
+          },
+        },
         providers: {
           // Vercel AI Gateway — vercelAiGateway.videoModel(id), image-to-video. The
           // Vercel AI Gateway meters both audio modes and sells 4K; the matrix is
@@ -3126,8 +3208,8 @@ export namespace models {
             avg_cost_usd: 3.2, // 1080p audio × 8s default
             url: "https://vercel.com/ai-gateway/models/veo-3.1-generate-001",
           },
-          // fal.ai — image-to-video endpoint (capability is keyed into the id;
-          // t2v is a separate `fal-ai/veo3.1` endpoint, not catalogued). Rate
+          // fal.ai — established image-to-video endpoint. Text-to-video has
+          // its own separately verified `text_to_video` binding above. Rate
           // matrix is identical to the Vercel AI Gateway's: $0.40/s audio and
           // $0.20/s silent at 720p/1080p, $0.60/$0.40 at 4K.
           // https://fal.ai/models/fal-ai/veo3.1/image-to-video
@@ -3189,6 +3271,25 @@ export namespace models {
         audio: true,
         speed_label: "medium",
         url: "https://deepmind.google/models/veo/",
+        // Text operation verified independently; never inferred from the image route.
+        // https://fal.ai/models/fal-ai/veo3.1/fast (checked 2026-09-17).
+        text_to_video: {
+          fal: {
+            provider: "fal",
+            id: "fal-ai/veo3.1/fast",
+            input: "text",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.15, silent: 0.1 },
+                "1080p": { audio: 0.15, silent: 0.1 },
+                "4k": { audio: 0.35, silent: 0.3 },
+              },
+            },
+            avg_cost_usd: 1.2,
+            url: "https://fal.ai/models/fal-ai/veo3.1/fast",
+          },
+        },
         providers: {
           // https://vercel.com/ai-gateway/models/veo-3.1-fast-generate-001
           vercel: {
@@ -3249,6 +3350,24 @@ export namespace models {
         audio: true,
         speed_label: "fast",
         url: "https://deepmind.google/models/veo/",
+        // Text operation verified independently; never inferred from the image route.
+        // https://fal.ai/models/fal-ai/veo3.1/lite (checked 2026-09-17).
+        text_to_video: {
+          fal: {
+            provider: "fal",
+            id: "fal-ai/veo3.1/lite",
+            input: "text",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.05, silent: 0.03 },
+                "1080p": { audio: 0.08, silent: 0.05 },
+              },
+            },
+            avg_cost_usd: 0.64,
+            url: "https://fal.ai/models/fal-ai/veo3.1/lite",
+          },
+        },
         providers: {
           // https://vercel.com/ai-gateway/models/veo-3.1-lite-generate-001
           vercel: {
@@ -3306,6 +3425,25 @@ export namespace models {
         audio: true,
         speed_label: "medium",
         url: "https://wan.video/",
+        // Text operation verified independently; never inferred from the image route.
+        // https://fal.ai/models/alibaba/wan-3.0/text-to-video (checked 2026-09-17).
+        text_to_video: {
+          fal: {
+            provider: "fal",
+            id: "alibaba/wan-3.0/text-to-video",
+            input: "text",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "480p": { audio: 0.05 },
+                "720p": { audio: 0.1 },
+                "1080p": { audio: 0.2 },
+              },
+            },
+            avg_cost_usd: 1.0,
+            url: "https://fal.ai/models/alibaba/wan-3.0/text-to-video",
+          },
+        },
         providers: {
           // https://vercel.com/ai-gateway/models/wan-v3.0-video
           vercel: {
@@ -3355,8 +3493,8 @@ export namespace models {
         short_description:
           "ByteDance's video model — image-to-video with reference modes, up to 4K, at roughly two-thirds the price of Seedance 2.5.",
         vendor: "bytedance",
-        aspect_ratios: ["16:9", "9:16", "1:1"],
-        min_duration: 5,
+        aspect_ratios: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"],
+        min_duration: 4,
         max_duration: 15,
         audio: true,
         speed_label: "slow",
@@ -3369,9 +3507,30 @@ export namespace models {
         // hosted route pre-prices rate×duration, and ByteDance publishes no
         // tokens-per-second figure — so there is no honest per-second rate,
         // and the per-second Vercel AI Gateway binding this card shipped with was
-        // invented. Withheld until the hosted path can meter post-flight;
-        // hosted requests fail with "not available on the hosted provider".
+        // invented. Keep this provider unbound until its actual token meter is
+        // supported. The independent fal text route does not require Vercel.
         // See gridaco/grida#1019 (Blocker A). Feed checked 2026-09-02.
+        // Text operation verified independently; never inferred from the image route.
+        // https://fal.ai/models/bytedance/seedance-2.0/text-to-video (checked 2026-09-17).
+        text_to_video: {
+          // fal publishes approximate per-second examples but charges tokens.
+          // These are display estimates; use the provider's actual billing event
+          // for settlement, never rate × requested duration.
+          fal: {
+            provider: "fal",
+            id: "bytedance/seedance-2.0/text-to-video",
+            input: "text",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.3034 },
+                "1080p": { audio: 0.682 },
+              },
+            },
+            avg_cost_usd: 1.52,
+            url: "https://fal.ai/models/bytedance/seedance-2.0/text-to-video",
+          },
+        },
         providers: {
           // fal — image-to-video. fal also meters tokens underneath
           // ($0.014/1K), but states a per-second price for the two
@@ -3439,6 +3598,28 @@ export namespace models {
         audio: true,
         speed_label: "slow",
         url: "https://seed.bytedance.com/en/seedance",
+        // Text operation verified independently; never inferred from the image route.
+        // https://fal.ai/models/bytedance/seedance-2.5/text-to-video (checked 2026-09-17).
+        text_to_video: {
+          // fal publishes approximate per-second examples but charges tokens.
+          // These are display estimates; use the provider's actual billing event
+          // for settlement, never rate × requested duration.
+          fal: {
+            provider: "fal",
+            id: "bytedance/seedance-2.5/text-to-video",
+            input: "text",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "480p": { audio: 0.2205 },
+                "720p": { audio: 0.473 },
+                "1080p": { audio: 1.164 },
+              },
+            },
+            avg_cost_usd: 2.37,
+            url: "https://fal.ai/models/bytedance/seedance-2.5/text-to-video",
+          },
+        },
         providers: {
           // fal's stated rates: $0.2205/s @480p, $0.4730/s @720p, $1.164/s
           // @1080p (fal meters $0.0214/1K tokens underneath). 2026-09-02.
@@ -3539,6 +3720,30 @@ export namespace models {
       provider: VideoProvider
     ): VideoProviderBinding | null {
       return card.providers[provider] ?? null;
+    }
+
+    /**
+     * A verified text-to-video route. Dedicated operation facts take precedence;
+     * otherwise the primary binding must explicitly accept text. Unknown or
+     * removed facts never restore a bundled endpoint.
+     */
+    export function textToVideoBinding(
+      card: VideoModelCard,
+      provider: VideoProvider
+    ): VideoProviderBinding | null {
+      if (Object.hasOwn(card, "text_to_video")) {
+        const route = card.text_to_video?.[provider];
+        if (route) {
+          return route.provider === provider &&
+            (route.input === "text" || route.input === "text-or-image")
+            ? route
+            : null;
+        }
+      }
+      const mode = input(card, provider);
+      return mode === "text" || mode === "text-or-image"
+        ? binding(card, provider)
+        : null;
     }
 
     /**

@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MediaModelReadiness } from "./media-model-readiness";
 
-const providers = {
-  vercel: { id: "vercel-model" },
-  openrouter: { id: "openrouter-model" },
-};
-
 // GRIDA-GG: desktop — funded Tripo readiness is feature-capability gated.
 describe("MediaModelReadiness.tripo", () => {
   it("admits either ready lane and keeps unresolved lanes pending", () => {
@@ -23,33 +18,79 @@ describe("MediaModelReadiness.tripo", () => {
 });
 
 describe("MediaModelReadiness.visual", () => {
-  it("requires a connected BYOK provider bound to the exact model", () => {
-    expect(
-      MediaModelReadiness.visual({ providers }, new Set(["openrouter"]), false)
-    ).toBe(true);
-    expect(
-      MediaModelReadiness.visual({ providers }, new Set(["fal"]), false)
-    ).toBe(false);
-  });
+  const imageId = "openai/gpt-image-2";
+  const videoId = "google/gemini-omni-1.1-flash";
+  const current = "0.0.25";
 
-  it("admits hosted media only for a model served by Vercel AI Gateway", () => {
-    expect(MediaModelReadiness.visual({ providers }, new Set(), true)).toBe(
-      true
-    );
+  it("requires a connected BYOK provider with the exact operation", () => {
     expect(
       MediaModelReadiness.visual(
-        { providers: { fal: { id: "fal-model" } } },
+        "image",
+        imageId,
+        new Set(["openrouter"]),
+        false,
+        current
+      )
+    ).toBe(true);
+    expect(
+      MediaModelReadiness.visual(
+        "video",
+        videoId,
+        new Set(["openrouter"]),
+        false,
+        current
+      )
+    ).toBe(false);
+    expect(
+      MediaModelReadiness.visual(
+        "video",
+        videoId,
+        new Set(["fal"]),
+        false,
+        current
+      )
+    ).toBe(true);
+  });
+
+  it("admits fal-hosted media only on a compatible native client", () => {
+    expect(
+      MediaModelReadiness.visual("video", videoId, new Set(), true, current)
+    ).toBe(true);
+    expect(
+      MediaModelReadiness.visual("video", videoId, new Set(), true, "0.0.24")
+    ).toBe(false);
+    expect(
+      MediaModelReadiness.visual("image", imageId, new Set(), true, "0.0.24")
+    ).toBe(true);
+  });
+
+  it("does not mistake a BYOK binding for hosted admission", () => {
+    expect(
+      MediaModelReadiness.visual(
+        "video",
+        "xai/grok-imagine-video-1.5",
         new Set(),
-        true
+        true,
+        current
       )
     ).toBe(false);
   });
 
-  it("stays pending until both unresolved sources have settled", () => {
-    expect(MediaModelReadiness.visual({ providers }, null, false)).toBeNull();
+  it("stays pending only when an unresolved source can make the route available", () => {
     expect(
-      MediaModelReadiness.visual({ providers }, new Set(), null)
+      MediaModelReadiness.visual("image", imageId, null, false, current)
     ).toBeNull();
-    expect(MediaModelReadiness.visual({ providers }, null, true)).toBe(true);
+    expect(
+      MediaModelReadiness.visual("image", imageId, new Set(), null, current)
+    ).toBeNull();
+    expect(
+      MediaModelReadiness.visual("image", imageId, null, true, current)
+    ).toBe(true);
+    expect(
+      MediaModelReadiness.visual("video", videoId, null, null, "0.0.24")
+    ).toBe(false);
+    expect(
+      MediaModelReadiness.visual("video", "unknown", null, null, current)
+    ).toBe(false);
   });
 });

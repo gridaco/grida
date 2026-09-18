@@ -311,7 +311,6 @@ describe("POST /video/generate", () => {
   });
 
   it.each([
-    { provider: "fal", model_id: VEO },
     { provider: "vercel", model_id: "xai/grok-imagine-video-1.5" },
     {
       provider: "gg",
@@ -447,48 +446,59 @@ describe("POST /video/generate", () => {
     }
   });
 
-  it("uses scoped GG request authority and returns no hosted metadata", async () => {
-    const gg = new GridaGatewaySessionStore();
-    gg.set({ access_token: "synthetic-gg", expires_at: Date.now() + 900_000 });
-    const request = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-      expect(String(input)).toBe(
-        "https://grida.test/api/v1/ai/videos/generations"
-      );
-      expect(new Headers(init?.headers).get("authorization")).toBe(
-        "Bearer synthetic-gg"
-      );
-      expect(JSON.parse(String(init?.body))).toEqual({
-        model_id: VEO,
-        prompt: "a wave",
-        duration: 8,
+  it.each([
+    VEO,
+    "google/gemini-omni-1.1-flash",
+    "bytedance/seedance-2.0",
+    "bytedance/seedance-2.5",
+  ])(
+    "uses scoped GG authority for %s and preserves the canonical wire",
+    async (model_id) => {
+      const gg = new GridaGatewaySessionStore();
+      gg.set({
+        access_token: "synthetic-gg",
+        expires_at: Date.now() + 900_000,
       });
-      return Response.json({
+      const request = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+        expect(String(input)).toBe(
+          "https://grida.test/api/v1/ai/videos/generations"
+        );
+        expect(new Headers(init?.headers).get("authorization")).toBe(
+          "Bearer synthetic-gg"
+        );
+        expect(JSON.parse(String(init?.body))).toEqual({
+          model_id,
+          prompt: "a wave",
+          duration: 8,
+        });
+        return Response.json({
+          videos: [{ base64: "YmFy", media_type: "video/mp4" }],
+          metadata: "private-hosted-field",
+        });
+      });
+      const download = vi.fn<typeof globalThis.fetch>();
+      const res = await post(
+        appWith({}, new ProviderHttp({ request, download }), null, {
+          gg,
+          gg_base_url: "https://grida.test",
+        }),
+        {
+          model_id,
+          prompt: "a wave",
+          provider: "gg",
+          duration: 8,
+        }
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        model_id,
+        provider_id: "gg",
         videos: [{ base64: "YmFy", media_type: "video/mp4" }],
-        metadata: "private-hosted-field",
       });
-    });
-    const download = vi.fn<typeof globalThis.fetch>();
-    const res = await post(
-      appWith({}, new ProviderHttp({ request, download }), null, {
-        gg,
-        gg_base_url: "https://grida.test",
-      }),
-      {
-        model_id: VEO,
-        prompt: "a wave",
-        provider: "gg",
-        duration: 8,
-      }
-    );
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      model_id: VEO,
-      provider_id: "gg",
-      videos: [{ base64: "YmFy", media_type: "video/mp4" }],
-    });
-    expect(request).toHaveBeenCalledOnce();
-    expect(download).not.toHaveBeenCalled();
-  });
+      expect(request).toHaveBeenCalledOnce();
+      expect(download).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     [401, "gg_token_expired"],

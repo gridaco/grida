@@ -11,6 +11,7 @@ type FactualImageBinding = typeof facts.image.binding;
 type FactualImageBackground = typeof facts.image.supportsTransparentBackground;
 type FactualVideoInput = typeof facts.video.input;
 type FactualVideoBinding = typeof facts.video.binding;
+type FactualTextToVideoBinding = typeof facts.video.textToVideoBinding;
 
 /** Copy the input before freezing so no caller or producer loses ownership. */
 function own<T>(value: T): T {
@@ -247,6 +248,7 @@ export namespace catalog {
       members: {
         "openai/gpt-image-2": {
           status: "listed",
+          hosted_provider: "fal",
           legacy: true,
           primary_provider: "vercel",
           request_defaults: {
@@ -257,6 +259,7 @@ export namespace catalog {
         },
         "openai/gpt-image-2.5-flare": {
           status: "listed",
+          hosted_provider: "fal",
           primary_provider: "vercel",
           request_defaults: {
             width: 1024,
@@ -266,6 +269,7 @@ export namespace catalog {
         },
         "openai/gpt-image-2.5-sunburst": {
           status: "listed",
+          hosted_provider: "fal",
           primary_provider: "vercel",
           request_defaults: {
             width: 1024,
@@ -275,6 +279,7 @@ export namespace catalog {
         },
         "openai/gpt-image-1.5": {
           status: "staged",
+          hosted_provider: "vercel",
           legacy: true,
           reason: "Previous-generation model, superseded by GPT Image 2.",
           primary_provider: "vercel",
@@ -286,6 +291,7 @@ export namespace catalog {
         },
         "openai/gpt-image-1-mini": {
           status: "staged",
+          hosted_provider: "vercel",
           reason:
             "Cost-tier model, not part of the curated flagship/SOTA list.",
           primary_provider: "vercel",
@@ -297,6 +303,7 @@ export namespace catalog {
         },
         "google/gemini-3.1-flash-image-preview": {
           status: "listed",
+          hosted_provider: "fal",
           primary_provider: "vercel",
           request_defaults: {
             width: 1024,
@@ -306,6 +313,7 @@ export namespace catalog {
         },
         "google/gemini-3-pro-image": {
           status: "listed",
+          hosted_provider: "fal",
           primary_provider: "vercel",
           request_defaults: {
             width: 1024,
@@ -315,6 +323,7 @@ export namespace catalog {
         },
         "google/gemini-3.1-flash-lite-image": {
           status: "staged",
+          hosted_provider: "vercel",
           reason:
             "Cost-tier model, not part of the curated flagship/SOTA list.",
           primary_provider: "vercel",
@@ -326,6 +335,7 @@ export namespace catalog {
         },
         "bfl/flux-2-pro": {
           status: "listed",
+          hosted_provider: "fal",
           primary_provider: "vercel",
           request_defaults: {
             width: 1024,
@@ -335,6 +345,7 @@ export namespace catalog {
         },
         "bfl/flux-2-max": {
           status: "listed",
+          hosted_provider: "fal",
           primary_provider: "vercel",
           request_defaults: {
             width: 1024,
@@ -344,6 +355,7 @@ export namespace catalog {
         },
         "bfl/flux-kontext-max": {
           status: "staged",
+          hosted_provider: "vercel",
           reason:
             "Image-editing model; not on OpenRouter, so not universal (one-key) coverage.",
           primary_provider: "vercel",
@@ -355,6 +367,7 @@ export namespace catalog {
         },
         "bfl/flux-kontext-pro": {
           status: "staged",
+          hosted_provider: "vercel",
           reason:
             "Image-editing model; superseded by Flux 2 and not on OpenRouter, so not universal.",
           primary_provider: "vercel",
@@ -366,6 +379,7 @@ export namespace catalog {
         },
         "bfl/flux-pro-1.1": {
           status: "staged",
+          hosted_provider: "vercel",
           reason: "Superseded by Flux 2 Pro; not universal.",
           primary_provider: "vercel",
           request_defaults: {
@@ -376,6 +390,7 @@ export namespace catalog {
         },
         "bytedance/seedream-5.0-pro": {
           status: "listed",
+          hosted_provider: "fal",
           primary_provider: "vercel",
           request_defaults: {
             width: 1024,
@@ -385,6 +400,7 @@ export namespace catalog {
         },
         "bytedance/seedream-5.0-lite": {
           status: "listed",
+          hosted_provider: "fal",
           primary_provider: "vercel",
           request_defaults: {
             width: 2048,
@@ -394,6 +410,7 @@ export namespace catalog {
         },
         "bytedance/seedream-4.5": {
           status: "staged",
+          hosted_provider: "vercel",
           legacy: true,
           reason: "Previous-generation model, superseded by Seedream 5.0.",
           primary_provider: "vercel",
@@ -405,6 +422,7 @@ export namespace catalog {
         },
         "xai/grok-imagine-image-2.0": {
           status: "listed",
+          hosted_provider: "fal",
           primary_provider: "vercel",
           request_defaults: {
             width: 1024,
@@ -414,6 +432,7 @@ export namespace catalog {
         },
         "meta/muse-image-1.0": {
           status: "staged",
+          hosted_provider: "vercel",
           reason:
             "OpenRouter lists it without a serving endpoint, so not universal (one-key) coverage.",
           primary_provider: "vercel",
@@ -425,6 +444,7 @@ export namespace catalog {
         },
         "recraft/recraft-v4.1": {
           status: "listed",
+          hosted_provider: "fal",
           primary_provider: "vercel",
           request_defaults: {
             width: 1024,
@@ -434,6 +454,7 @@ export namespace catalog {
         },
         "recraft/recraft-v3": {
           status: "staged",
+          hosted_provider: "vercel",
           legacy: true,
           reason: "Previous-generation model, superseded by Recraft V4.1.",
           primary_provider: "vercel",
@@ -504,8 +525,19 @@ export namespace catalog {
     },
     video: {
       members: {
+        "google/gemini-omni-1.1-flash": {
+          status: "listed",
+          hosted_provider: "fal",
+          request_defaults: {
+            resolution: "720p",
+            aspect_ratio: "16:9",
+            duration: 8,
+            audio: true,
+          },
+        },
         "google/veo-3.1": {
           status: "listed",
+          hosted_provider: "fal",
           request_defaults: {
             resolution: "1080p",
             aspect_ratio: "16:9",
@@ -515,6 +547,7 @@ export namespace catalog {
         },
         "google/veo-3.1-fast": {
           status: "listed",
+          hosted_provider: "fal",
           request_defaults: {
             resolution: "1080p",
             aspect_ratio: "16:9",
@@ -524,6 +557,7 @@ export namespace catalog {
         },
         "google/veo-3.1-lite": {
           status: "listed",
+          hosted_provider: "fal",
           request_defaults: {
             resolution: "1080p",
             aspect_ratio: "16:9",
@@ -533,6 +567,7 @@ export namespace catalog {
         },
         "alibaba/wan-3.0": {
           status: "listed",
+          hosted_provider: "fal",
           request_defaults: {
             resolution: "1080p",
             aspect_ratio: "16:9",
@@ -542,6 +577,7 @@ export namespace catalog {
         },
         "bytedance/seedance-2.0": {
           status: "listed",
+          hosted_provider: "fal",
           request_defaults: {
             resolution: "720p",
             aspect_ratio: "16:9",
@@ -551,6 +587,7 @@ export namespace catalog {
         },
         "bytedance/seedance-2.5": {
           status: "listed",
+          hosted_provider: "fal",
           request_defaults: {
             resolution: "720p",
             aspect_ratio: "16:9",
@@ -560,6 +597,7 @@ export namespace catalog {
         },
         "xai/grok-imagine-video-1.5": {
           status: "listed",
+          hosted_provider: null,
           request_defaults: {
             resolution: "720p",
             aspect_ratio: "16:9",
@@ -692,6 +730,8 @@ export namespace catalog {
     };
     export interface Member extends policy.Member {
       readonly primary_provider: ImageProvider;
+      /** Explicit hosted admission. Separate from the legacy primary provider. */
+      readonly hosted_provider: ImageProvider | null;
       readonly request_defaults: RequestDefaults;
     }
     export type ImageModelCard = facts.image.ImageModelCard & {
@@ -699,6 +739,8 @@ export namespace catalog {
       listed: boolean;
       listed_reason?: string;
       provider: ImageProvider;
+      /** Selected hosted binding; absent only on older snapshots, null denies. */
+      hosted?: ImageProviderBinding | null;
       pricing: ImageModelPricing;
       avg_cost_usd: number;
       default: RequestDefaults;
@@ -728,6 +770,14 @@ export namespace catalog {
             throw new Error(
               "Primary provider has no factual binding: " + card.id
             );
+          const hosted =
+            member.hosted_provider === null
+              ? null
+              : facts.image.binding(card, member.hosted_provider);
+          if (member.hosted_provider !== null && !hosted)
+            throw new Error(
+              "Hosted provider has no factual binding: " + card.id
+            );
           const { status, legacy, reason, ...fact } = card;
           return [
             card.id,
@@ -737,6 +787,7 @@ export namespace catalog {
               listed: status === "listed",
               ...(reason ? { listed_reason: reason } : {}),
               provider: member.primary_provider,
+              hosted,
               default: member.request_defaults,
             },
           ];
@@ -771,6 +822,22 @@ export namespace catalog {
         ) ?? null
       );
     }
+    /**
+     * Resolve hosted admission against this card's facts. Explicit denial,
+     * a removed/replaced binding, and a retired route stay unavailable. Older
+     * snapshots retain their Vercel-only meaning, never the bundled fal choice.
+     */
+    export function hostedBinding(
+      card: ImageModelCard
+    ): ImageProviderBinding | null {
+      const selected = Object.hasOwn(card, "hosted")
+        ? card.hosted
+        : binding(card, "vercel");
+      if (!selected || selected.deprecated) return null;
+      const route = binding(card, selected.provider);
+      return route?.id === selected.id && !route.deprecated ? route : null;
+    }
+
     export function toCompact(card: ImageModelCard): ImageModelCardCompact {
       const {
         id,
@@ -805,6 +872,8 @@ export namespace catalog {
     export const input: FactualVideoInput = facts.video.input;
 
     export const binding: FactualVideoBinding = facts.video.binding;
+    export const textToVideoBinding: FactualTextToVideoBinding =
+      facts.video.textToVideoBinding;
     export type RequestDefaults = {
       resolution: ResolutionLabel;
       aspect_ratio: image.AspectRatioString;
@@ -813,11 +882,15 @@ export namespace catalog {
     };
     export interface Member extends policy.Member {
       readonly request_defaults: RequestDefaults;
+      /** Hosted text-to-video admission; null explicitly disables it. */
+      readonly hosted_provider: VideoProvider | null;
     }
     export type VideoModelCard = facts.video.VideoModelCard & {
       deprecated: boolean;
       listed: boolean;
       default: RequestDefaults;
+      /** Selected text-to-video binding; absent on old snapshots, null denies. */
+      hosted?: VideoProviderBinding | null;
     };
     const resolved = policy.resolve(facts.video.models, definitions.video);
     export const models: Partial<
@@ -830,6 +903,14 @@ export namespace catalog {
             definitions.video.members[
               card.id as keyof typeof definitions.video.members
             ];
+          const hosted =
+            member.hosted_provider === null
+              ? null
+              : facts.video.textToVideoBinding(card, member.hosted_provider);
+          if (member.hosted_provider !== null && !hosted)
+            throw new Error(
+              "Hosted provider has no factual text route: " + card.id
+            );
           return [
             card.id,
             {
@@ -837,11 +918,27 @@ export namespace catalog {
               deprecated: !!legacy,
               listed: status === "listed",
               default: member.request_defaults,
+              hosted,
             },
           ];
         })
       )
     );
+    /**
+     * Resolve the hosted text operation without replacing explicit provider
+     * bindings. Old snapshots may use only their surviving Vercel text route.
+     */
+    export function hostedBinding(
+      card: VideoModelCard
+    ): VideoProviderBinding | null {
+      const selected = Object.hasOwn(card, "hosted")
+        ? card.hosted
+        : textToVideoBinding(card, "vercel");
+      if (!selected || selected.deprecated) return null;
+      const route = textToVideoBinding(card, selected.provider);
+      return route?.id === selected.id && !route.deprecated ? route : null;
+    }
+
     export const video_model_ids = Object.freeze(
       Object.keys(models) as VideoModelId[]
     );
@@ -1294,6 +1391,8 @@ export namespace catalog {
       cardById(modelId: string): Card | undefined;
       /** That provider's binding, or `null` if it does not serve the model. */
       binding(card: Card, provider: Provider): Binding | null;
+      /** The admitted hosted operation; does not imply installed adapter support. */
+      hostedBinding(card: Card): Binding | null;
     }
 
     export type ImageView = MediaView<
@@ -1846,8 +1945,8 @@ export namespace catalog {
       );
       if (!providers) return undefined;
       // A listed model can launch on one provider first. Its primary route
-      // must be known and bound; runtime selection intersects the available
-      // bindings with connected keys, and hosted calls still require Vercel AI Gateway.
+      // must be known and bound. Hosted admission is carried independently;
+      // primary provider remains the legacy single-provider projection.
       if (!image.providers.includes(v.provider as image.ImageProvider)) {
         return undefined;
       }
@@ -1904,6 +2003,18 @@ export namespace catalog {
           options: [...quality.options],
           default: quality.default,
         };
+      }
+      if (Object.hasOwn(v, "hosted")) {
+        const hosted =
+          isRecord(v.hosted) &&
+          image.providers.includes(v.hosted.provider as image.ImageProvider)
+            ? parseImageBinding(
+                v.hosted.provider as image.ImageProvider,
+                v.hosted
+              )
+            : undefined;
+        card.hosted = hosted ?? null;
+        if (!image.hostedBinding(card)) card.hosted = null;
       }
       if (release) card.release = release;
       if (!optional(card, v, "listed_reason", isText)) return undefined;
@@ -1988,6 +2099,41 @@ export namespace catalog {
         url: v.url,
         providers,
       };
+      if (Object.hasOwn(v, "text_to_video")) {
+        // New operation facts are independently fallible; a malformed route
+        // cannot restore a bundled operation or discard unrelated media.
+        card.text_to_video = {};
+        if (isRecord(v.text_to_video)) {
+          for (const provider of video.providers) {
+            if (!Object.hasOwn(v.text_to_video, provider)) continue;
+            const route = parseVideoBinding(
+              provider,
+              v.text_to_video[provider]
+            );
+            if (
+              route &&
+              (route.input === "text" || route.input === "text-or-image")
+            )
+              card.text_to_video[provider] = route;
+          }
+        }
+      }
+      if (Object.hasOwn(v, "hosted")) {
+        const hosted =
+          isRecord(v.hosted) &&
+          video.providers.includes(v.hosted.provider as video.VideoProvider)
+            ? parseVideoBinding(
+                v.hosted.provider as video.VideoProvider,
+                v.hosted
+              )
+            : undefined;
+        card.hosted =
+          hosted &&
+          (hosted.input === "text" || hosted.input === "text-or-image")
+            ? hosted
+            : null;
+        if (!video.hostedBinding(card)) card.hosted = null;
+      }
       if (release) card.release = release;
       return card;
     }
@@ -2203,6 +2349,7 @@ export namespace catalog {
       Binding,
     >(
       models: Record<string, Card>,
+      hostedBinding: (card: Card) => Binding | null,
       preferences?: policy.Preferences
     ): MediaView<Card, Provider, Binding> {
       let listed: readonly Card[] | undefined;
@@ -2215,6 +2362,7 @@ export namespace catalog {
         cardById: (modelId) => cardByIdOver(models, modelId),
         binding: (card, provider) =>
           (card.providers as Record<string, Binding>)[provider] ?? null,
+        hostedBinding,
       });
     }
 
@@ -2250,11 +2398,13 @@ export namespace catalog {
         image: buildMediaView(
           s.image?.models ??
             (image.models as Record<string, image.ImageModelCard>),
+          image.hostedBinding,
           s.preferences?.image
         ),
         video: buildMediaView(
           s.video?.models ??
             (video.models as Record<string, video.VideoModelCard>),
+          video.hostedBinding,
           s.preferences?.video
         ),
       });

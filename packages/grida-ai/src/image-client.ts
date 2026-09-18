@@ -2,6 +2,7 @@
 // GRIDA-SEC-006 — scoped GG credential is re-read at use; no mint or persistent custody.
 // GRIDA-GG: token — explicit GG selection never falls back to BYOK.
 import { models } from "@grida/ai-models";
+import { FalGeneration } from "./fal-generation";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
@@ -26,6 +27,7 @@ export class ImageClient {
   readonly #catalog?: ModelCatalogStore;
   readonly #gg?: GgTokenSource;
   readonly #ggBaseUrl?: string;
+  readonly #onFalCompleted?: (receipt: ImageClient.FalCompletion) => void;
 
   constructor(options: ImageClient.Options) {
     try {
@@ -36,6 +38,12 @@ export class ImageClient {
       }
       this.#getKey = get.bind(keys);
       this.#http = http;
+      if (
+        options.on_fal_completed !== undefined &&
+        typeof options.on_fal_completed !== "function"
+      )
+        throw 0;
+      this.#onFalCompleted = options.on_fal_completed;
       this.#catalog = catalog;
       if (gg !== undefined) {
         const read = gg.getAccessToken.bind(gg);
@@ -145,6 +153,10 @@ export class ImageClient {
     capturedBackground?: "opaque" | "transparent"
   ): Promise<ImageClient.Result> {
     let signal: AbortSignal | undefined;
+    const fal =
+      descriptor.provider_id === "fal"
+        ? new FalGeneration(descriptor.binding_id, this.#onFalCompleted)
+        : undefined;
     try {
       const args = generationInput(input, descriptor);
       if (
@@ -177,21 +189,31 @@ export class ImageClient {
           key,
           descriptor.binding_id,
           this.#http,
-          background
+          background,
+          fal
         );
       }
       if (signal?.aborted) throw new ImageClient.Failure("aborted");
       // The AI SDK logs warnings after generation. Provider warning text is
       // untrusted output, so remove it before that logger sees the result.
+      let previousBatch: Promise<unknown> = Promise.resolve();
       const safeModel: ImageModelV3 = {
         specificationVersion: model.specificationVersion,
         provider: model.provider,
         modelId: model.modelId,
         maxImagesPerCall: model.maxImagesPerCall,
-        doGenerate: async (options) => ({
-          ...(await model.doGenerate(options)),
-          warnings: [],
-        }),
+        doGenerate: (options) => {
+          // fal's single-image endpoints require multiple jobs for n>1. Sequence
+          // paid batches so a failed batch cannot leave unobserved parallel jobs.
+          const generate = async () => {
+            if (fal) fal.task_id = undefined;
+            return { ...(await model.doGenerate(options)), warnings: [] };
+          };
+          if (!fal) return generate();
+          const pending = previousBatch.then(generate);
+          previousBatch = pending;
+          return pending;
+        },
       };
       const qualityNamespace =
         provider === "vercel" && descriptor.binding_id.startsWith("openai/")
@@ -234,8 +256,8 @@ export class ImageClient {
       });
       return { images };
     } catch (error) {
-      if (isAborted(signal)) throw new ImageClient.Failure("aborted");
-      throw safeFailure(error);
+      const code = isAborted(signal) ? "aborted" : safeFailure(error).code;
+      throw new ImageClient.Failure(code, fal?.task_id);
     }
   }
 }
@@ -255,7 +277,10 @@ export namespace ImageClient {
     catalog?: ModelCatalogStore;
     gg?: GgTokenSource;
     gg_base_url?: string;
+    /** Trusted synchronous completion sink. Runs before downloads, once per successful fal batch. */
+    on_fal_completed?: (receipt: FalCompletion) => void;
   };
+  export type FalCompletion = FalGeneration.Completion;
   export type Selection = {
     model_id: string;
     provider: Provider | "auto";
@@ -302,13 +327,20 @@ export namespace ImageClient {
   /** Safe for display/serialization: no upstream cause, input, response, or credentials. */
   export class Failure extends Error {
     readonly code: FailureCode;
-    constructor(code: FailureCode) {
+    readonly task_id?: string;
+    constructor(code: FailureCode, task_id?: string) {
       super(failureCode(code));
       this.name = "ImageFailure";
       this.code = failureCode(code);
+      const accepted = FalGeneration.taskId(task_id);
+      if (accepted) this.task_id = accepted;
     }
-    toJSON(): { code: FailureCode; message: string } {
-      return { code: this.code, message: this.code };
+    toJSON(): { code: FailureCode; message: string; task_id?: string } {
+      return {
+        code: this.code,
+        message: this.code,
+        ...(this.task_id ? { task_id: this.task_id } : {}),
+      };
     }
   }
 }
@@ -351,7 +383,7 @@ function generationInput(
     return InputSchema.native(
       rule,
       value,
-      ["references", "seed", "aspect_ratio"].filter(
+      ["references", "seed", "aspect_ratio", "quality"].filter(
         (key) => !(key in properties)
       )
     );

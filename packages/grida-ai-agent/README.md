@@ -86,6 +86,11 @@ deadline and the caller's abort signal. A BYOK credential stays fixed for that
 job; changing credentials cannot move accepted work to another account. Clearing
 GG custody blocks subsequent invocations but cannot recall an accepted request.
 The route retains its wire protocol, GG status mapping and media receipts.
+GG eligibility comes from explicit hosted catalogue metadata, so fal-only Omni
+and Seedance can be selected without a Vercel binding. Old snapshots without
+that metadata retain legacy Vercel admission. Explicit BYOK image-to-video
+selections continue to use their existing endpoint; fal text selections use the
+separate verified text endpoint. These SDK changes require a new native binary.
 
 The music HTTP route uses `MusicClient` with GG authority and provider transport;
 it does not receive BYOK keys. The SDK validates the two bundled Lyria models,

@@ -36,10 +36,22 @@ import type {
   ImageModelMiddleware,
   ImageModel,
 } from "ai";
-import { embed, experimental_generateVideo, wrapProvider } from "ai";
+import {
+  embed,
+  generateImage as generateImageSdk,
+  experimental_generateVideo,
+  wrapProvider,
+} from "ai";
+import { GgFalMedia } from "./gg-fal-media";
+import { computeImageCostMills } from "./image-cost";
 import { catalog as ai_models } from "@grida/ai-models/grida";
 import type { GridaCallProviderOptions } from "@grida/ai-models";
-import type { VideoGenerateRequest, VideoGenerateResult } from "@grida/agent";
+import type {
+  ImageGenerateRequest,
+  ImageGenerateResult,
+  VideoGenerateRequest,
+  VideoGenerateResult,
+} from "@grida/agent";
 import Replicate from "replicate";
 import OpenAI from "openai";
 import { createLibraryClient } from "@/lib/supabase/server";
@@ -777,42 +789,152 @@ export namespace methods {
     return { data: result.data };
   }
 
-  /**
-   * Resolve a model identifier to a billing-wrapped `ImageModel` plus
-   * its cost card. The returned `model` carries the seam middleware;
-   * callers MUST pass `providerOptions.grida = { organizationId,
-   * feature, costMills }` when invoking `generateImage`.
-   */
-  export function getSDKImageModel(
-    model: ai.image.ProviderModel | ai.image.ImageModelId | string
-  ): {
-    card: ai.image.ImageModelCard;
-    model: ImageModel;
-  } | null {
-    const card = ai.image.findImageModelCard(model);
-    if (!card) return null;
-    // Call Vercel AI Gateway by its binding id, never the canonical card
-    // id. They usually coincide, but not always — the Gemini card's
-    // canonical key is the `-preview` alias while Vercel AI Gateway's current id
-    // is the graduated one. Video already resolves this way.
-    const binding = ai.image.binding(card, "vercel");
-    if (!binding) return null;
-    return { model: grida.imageModel(binding.id), card };
+  /** Hosted image policy is shared by the API and Library action. Selection completes before spending. */
+  export async function generateImage(
+    organizationId: number,
+    req: ImageGenerateRequest
+  ): Promise<ImageGenerateResult> {
+    const card = ai_models.image.findImageModelCard(req.model_id);
+    if (!card) throw new InvalidAiRequestError("unknown image model");
+    if (
+      !Number.isSafeInteger(req.n ?? 1) ||
+      (req.n ?? 1) < 1 ||
+      (req.n ?? 1) > 4 ||
+      [req.width, req.height].some(
+        (value) =>
+          value !== undefined && (!Number.isSafeInteger(value) || value <= 0)
+      )
+    )
+      throw new InvalidAiRequestError("invalid image count or dimensions");
+    const hosted = ai_models.image.hostedBinding(card);
+    if (!hosted)
+      throw new InvalidAiRequestError(
+        "model is not available on the hosted provider"
+      );
+    if ((req.width === undefined) !== (req.height === undefined))
+      throw new InvalidAiRequestError(
+        "width and height must be supplied together"
+      );
+    if (
+      req.quality &&
+      card.quality &&
+      !card.quality.options.includes(req.quality)
+    )
+      throw new InvalidAiRequestError("unsupported quality for this model");
+    // A redundant ratio carries no additional control once exact dimensions are given.
+    const ratio = req.aspect_ratio?.split(":").map(Number);
+    if (ratio) {
+      const bounds = card.constraints?.aspect_ratio;
+      const value = Math.max(ratio[0]! / ratio[1]!, ratio[1]! / ratio[0]!);
+      if (
+        ratio.length !== 2 ||
+        !ratio.every((value) => Number.isSafeInteger(value) && value > 0) ||
+        (bounds?.min !== undefined && value < bounds.min) ||
+        (bounds?.max !== undefined && value > bounds.max) ||
+        (req.width &&
+          req.height &&
+          Math.abs(req.width / req.height - ratio[0]! / ratio[1]!) >= 0.000001)
+      )
+        throw new InvalidAiRequestError(
+          "unsupported or contradictory aspect ratio"
+        );
+    }
+    const aspect_ratio =
+      req.width &&
+      req.height &&
+      ratio &&
+      Math.abs(req.width / req.height - ratio[0]! / ratio[1]!) < 0.000001
+        ? undefined
+        : req.aspect_ratio;
+    const input = {
+      prompt: req.prompt,
+      n: req.n ?? 1,
+      size:
+        req.width && req.height
+          ? (`${req.width}x${req.height}` as `${number}x${number}`)
+          : undefined,
+      aspect_ratio: aspect_ratio as `${number}:${number}` | undefined,
+      seed: req.seed,
+      quality: req.quality,
+      background: req.background,
+    };
+    if (
+      hosted.provider === "fal" &&
+      GgFalMedia.accepts("image", card.id, input)
+    ) {
+      const result = await GgFalMedia.image(
+        organizationId,
+        card.id,
+        hosted.id,
+        input
+      );
+      return {
+        model_id: card.id,
+        provider_id: "fal",
+        images: result.images.map((file) => ({
+          base64: Buffer.from(file.data).toString("base64"),
+          media_type: file.media_type,
+        })),
+      };
+    }
+    // A verified legacy Vercel binding preserves controls the fal schema cannot honor.
+    // No provider exception is attempted after a job has been submitted.
+    if (
+      hosted.provider === "fal" &&
+      !GgFalMedia.vercelException("image", card.id, input)
+    )
+      throw new InvalidAiRequestError(
+        "unsupported controls for this hosted model"
+      );
+    const binding = ai_models.image.binding(card, "vercel");
+    if (!binding)
+      throw new InvalidAiRequestError(
+        "unsupported controls for this hosted model"
+      );
+    const background = req.background === "auto" ? undefined : req.background;
+    if (
+      background &&
+      !ai_models.image.supportsTransparentBackground(card, "vercel")
+    )
+      throw new InvalidAiRequestError(
+        "background control is unavailable for this hosted model"
+      );
+    const origin = binding.id.split("/")[0]!;
+    const imageOptions = {
+      ...(req.quality ? { quality: req.quality } : {}),
+      ...(background ? { background } : {}),
+      ...(background === "transparent" ? { output_format: "png" } : {}),
+    };
+    const generation = await generateImageSdk({
+      model: grida.imageModel(binding.id),
+      prompt: input.prompt,
+      n: input.n,
+      size: input.size,
+      aspectRatio: input.aspect_ratio,
+      seed: input.seed,
+      maxRetries: 0,
+      providerOptions: {
+        grida: {
+          organizationId,
+          feature: "v1/ai/image",
+          costMills: computeImageCostMills(card, req),
+        },
+        ...(Object.keys(imageOptions).length ? { [origin]: imageOptions } : {}),
+      },
+    });
+    return {
+      model_id: card.id,
+      provider_id: "vercel",
+      images: generation.images.map((file) => ({
+        base64: file.base64,
+        media_type: file.mediaType,
+      })),
+    };
   }
 
-  /**
-   * Hosted video generation — gate → `experimental_generateVideo` via
-   * the raw Vercel AI Gateway provider → ingest. Explicit `withTransaction` because
-   * `wrapProvider` has no video middleware (unlike text/image).
-   *
-   * Billing is **pre-priced by requested duration** against the Vercel AI Gateway
-   * binding's `(resolution-label, audio-mode)` per-second rate — the
-   * same pre-computed-cost pattern as every Replicate/image call.
-   * Actual output duration may differ slightly (bounded by the card's
-   * max); documented approximation, reconcilable later. The pricing
-   * keys double as the provider's support matrix: an unpriced
-   * `(label, mode)` pair is an invalid request, not a $0 call.
-   */
+  /** Hosted t2v uses fal's exact billing receipts. Legacy fps/seed controls may
+   * select a verified Vercel binding before submission, retaining its existing
+   * duration-based billing. Neither path retries a submitted paid operation. */
   export async function generateVideo(
     organizationId: number,
     req: VideoGenerateRequest
@@ -821,7 +943,72 @@ export namespace methods {
     if (!card || !card.listed) {
       throw new InvalidAiRequestError(`unknown video model "${req.model_id}"`);
     }
-    const binding = ai_models.video.binding(card, "vercel");
+    const hosted = ai_models.video.hostedBinding(card);
+    if (!hosted)
+      throw new InvalidAiRequestError(
+        "model is not available on the hosted provider"
+      );
+    if (req.image_url)
+      throw new InvalidAiRequestError(
+        "image-to-video is not supported on the hosted provider"
+      );
+    const shortEdgeByLabel: Record<string, number> = {
+      "360p": 360,
+      "480p": 480,
+      "720p": 720,
+      "1080p": 1080,
+      "4k": 2160,
+    };
+    const defaultEdge = shortEdgeByLabel[card.default.resolution];
+    const [aspectWidth, aspectHeight] = (
+      req.aspect_ratio ?? card.default.aspect_ratio
+    )
+      .split(":")
+      .map(Number);
+    const defaultResolution =
+      defaultEdge && aspectWidth && aspectHeight
+        ? aspectWidth >= aspectHeight
+          ? `${Math.round((defaultEdge * aspectWidth) / aspectHeight)}x${defaultEdge}`
+          : `${defaultEdge}x${Math.round((defaultEdge * aspectHeight) / aspectWidth)}`
+        : undefined;
+    const falInput = {
+      prompt: req.prompt,
+      aspect_ratio: (req.aspect_ratio ??
+        card.default.aspect_ratio) as `${number}:${number}`,
+      resolution: (req.resolution ?? defaultResolution) as
+        | `${number}x${number}`
+        | undefined,
+      duration: req.duration ?? card.default.duration,
+      fps: req.fps,
+      seed: req.seed,
+    };
+    if (
+      hosted.provider === "fal" &&
+      GgFalMedia.accepts("video", card.id, falInput)
+    ) {
+      const result = await GgFalMedia.video(
+        organizationId,
+        card.id,
+        hosted.id,
+        falInput
+      );
+      return {
+        model_id: card.id,
+        provider_id: "fal",
+        videos: result.videos.map((file) => ({
+          base64: Buffer.from(file.data).toString("base64"),
+          media_type: file.media_type,
+        })),
+      };
+    }
+    if (
+      hosted.provider === "fal" &&
+      !GgFalMedia.vercelException("video", card.id, falInput)
+    )
+      throw new InvalidAiRequestError(
+        "unsupported controls for this hosted model"
+      );
+    const binding = ai_models.video.textToVideoBinding(card, "vercel");
     if (!binding) {
       throw new InvalidAiRequestError(
         `model "${card.id}" is not available on the hosted provider`
@@ -895,6 +1082,7 @@ export namespace methods {
       async () => {
         const generation = await experimental_generateVideo({
           model: vercelAiGateway.videoModel(binding.id),
+          maxRetries: 0,
           prompt: req.prompt,
           aspectRatio: aspect_ratio as `${number}:${number}`,
           resolution: req.resolution as `${number}x${number}` | undefined,
@@ -917,6 +1105,7 @@ export namespace methods {
 }
 
 const VIDEO_RESOLUTION_LABEL_BY_SHORT_EDGE: Record<number, string> = {
+  360: "360p",
   480: "480p",
   720: "720p",
   1080: "1080p",

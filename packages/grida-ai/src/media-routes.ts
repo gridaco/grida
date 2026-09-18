@@ -24,16 +24,18 @@ export namespace MediaRoutes {
     background?: ImageClient.Background
   ): ImageClient.Descriptor | null {
     if (!imageModel(card)) return null;
-    const native_background = models.image.supportsTransparentBackground(
-      card,
-      provider === "gg" ? "vercel" : provider
-    );
+    const hosted = provider === "gg" ? models.image.hostedBinding(card) : null;
+    const native_background =
+      provider === "gg"
+        ? !!hosted &&
+          models.image.supportsTransparentBackground(card, hosted.provider)
+        : models.image.supportsTransparentBackground(card, provider);
     if (background && background !== "auto" && !native_background) return null;
     const capability = native_background
       ? { native_background: true as const }
       : {};
     if (provider === "gg")
-      return !references && models.image.binding(card, "vercel")
+      return !references && hosted
         ? {
             model_id: card.id,
             binding_id: card.id,
@@ -57,9 +59,18 @@ export namespace MediaRoutes {
     image: boolean
   ): VideoClient.Descriptor | null {
     if (!videoModel(card)) return null;
-    const byok = provider === "gg" ? "vercel" : provider;
-    const binding = models.video.binding(card, byok);
-    const mode = models.video.input(card, byok);
+    const binding =
+      provider === "gg"
+        ? models.video.hostedBinding(card)
+        : image
+          ? models.video.binding(card, provider)
+          : models.video.textToVideoBinding(card, provider);
+    const mode =
+      provider === "gg"
+        ? "text"
+        : image
+          ? models.video.input(card, provider)
+          : (binding?.input ?? models.video.input(card, provider));
     if (
       !binding ||
       (provider === "gg" && image) ||

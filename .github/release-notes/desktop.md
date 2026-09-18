@@ -2,6 +2,14 @@
 
 [Downloads](https://grida.co/downloads) · [Join Slack](https://grida.co/join-slack) to learn more.
 
+## Changes
+
+- Generate videos with Gemini Omni 1.1 Flash and Seedance 2.0/2.5 using your organization's AI credits.
+- Grida Gateway now uses fal as its default image and video provider, with verified routes selected for each model and operation.
+- Image and video pickers check connected providers and installed-app compatibility before generation. Existing model selections and BYOK credentials are preserved.
+
+Hosted image and video generation accepts text prompts. Reference images and image-to-video remain available only through supported BYOK routes.
+
 ## Downloads
 
 | Platform | Arch  | Format | Signed | Download                                                                                                                          |
