@@ -70,11 +70,14 @@ export async function proveVideo({ load, require, check }) {
       if (url.origin === "https://queue.fal.run") {
         assert.equal(authorization, `Key ${key}`);
         if (request.method === "POST") {
-          assert.equal(
-            url.pathname,
-            `/${models.video.models[model].providers.fal.id}`
-          );
-          assert.equal(body.image_url, frame);
+          if (
+            url.pathname === `/${models.video.models[model].providers.fal.id}`
+          ) {
+            assert.equal(body.image_url, frame);
+          } else {
+            assert.equal(url.pathname, "/fal-ai/veo3.1");
+            assert.equal(Object.hasOwn(body, "image_url"), false);
+          }
           return Response.json({
             status_url: "https://queue.fal.run/job/status",
             response_url: "https://queue.fal.run/job/result",
@@ -126,38 +129,62 @@ export async function proveVideo({ load, require, check }) {
     for (const name of ["video-models", "video-client", "video-request"])
       assert.throws(() => require.resolve(`@grida/ai/${name}`));
   });
-  for (const provider of ["openrouter", "vercel", "fal", "gg"]) {
-    await check(`${provider} video through explicit transport`, async () => {
-      const before = requests.length;
-      const operation = await client.resolve({
-        model_id: model,
-        provider,
-        image: provider !== "gg",
-      });
-      assert.equal(requests.length, before);
-      assert.equal(operation.provider_id, provider);
-      assert.equal(operation.model_id, model);
-      assert(Object.isFrozen(operation));
-      assert(!JSON.stringify(operation).includes(key));
-      const result = await operation.generate({
-        prompt,
-        ...(provider !== "gg" ? { image_url: frame } : {}),
-      });
-      assert.deepEqual(result, { videos: [{ data, media_type: "video/mp4" }] });
-      assert.equal(result.videos[0].data.constructor, Uint8Array);
-      assert.equal(
-        requests.slice(before).filter((request) => request.method === "POST")
-          .length,
-        1
-      );
-    });
+  for (const [provider, image] of [
+    ["openrouter", true],
+    ["vercel", true],
+    ["fal", true],
+    ["fal", false],
+    ["gg", false],
+  ]) {
+    await check(
+      `${provider} ${image ? "image-to-video" : "text-to-video"} through explicit transport`,
+      async () => {
+        const before = requests.length;
+        const operation = await client.resolve({
+          model_id: model,
+          provider,
+          image,
+        });
+        assert.equal(requests.length, before);
+        assert.equal(operation.provider_id, provider);
+        assert.equal(operation.model_id, model);
+        if (provider === "fal") {
+          assert.equal(operation.input, image ? "image" : "text");
+        }
+        assert(Object.isFrozen(operation));
+        assert(!JSON.stringify(operation).includes(key));
+        const result = await operation.generate({
+          prompt,
+          ...(image ? { image_url: frame } : {}),
+        });
+        assert.deepEqual(result, {
+          videos: [{ data, media_type: "video/mp4" }],
+        });
+        assert.equal(result.videos[0].data.constructor, Uint8Array);
+        const submits = requests
+          .slice(before)
+          .filter((request) => request.method === "POST");
+        assert.equal(submits.length, 1);
+        if (provider === "fal") {
+          assert.equal(
+            submits[0].url,
+            image
+              ? "https://queue.fal.run/fal-ai/veo3.1/image-to-video"
+              : "https://queue.fal.run/fal-ai/veo3.1"
+          );
+        }
+      }
+    );
   }
   await check(
     "video input capability refuses unsupported modes before I/O",
     async () => {
       const before = requests.length;
       await assert.rejects(
-        client.resolve({ model_id: model, provider: "fal" }),
+        client.resolve({
+          model_id: "xai/grok-imagine-video-1.5",
+          provider: "fal",
+        }),
         failure("input_unsupported")
       );
       await assert.rejects(
@@ -264,6 +291,6 @@ export async function proveVideo({ load, require, check }) {
       assert.equal(requests.length, before);
     }
   );
-  assert.equal(downloads.length, 1);
+  assert.equal(downloads.length, 2);
   return { requests: requests.length, downloads: downloads.length };
 }
