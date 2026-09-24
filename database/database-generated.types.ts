@@ -927,6 +927,11 @@ export type Database = {
           variant_id: number
         }[]
       }
+      rls_store: { Args: { p_store_id: number }; Returns: boolean }
+      rls_store_in_project: {
+        Args: { p_project_id: number; p_store_id: number }
+        Returns: boolean
+      }
     }
     Enums: {
       currency:

@@ -2934,7 +2934,7 @@ incident investigations out of the architectural guarantee.
 
 ## Reporting a vulnerability
 
-Please email security@grida.co. We respond within 48 hours.
+Please email security@grida.co or universe@grida.co. We respond within 48 hours.
 
 If you find a way to reach a non-webhook route via the cloudflared
 tunnel, that is in scope and considered a real bug — the tunnel filter
