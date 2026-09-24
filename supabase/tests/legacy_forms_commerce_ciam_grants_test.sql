@@ -1,5 +1,6 @@
 -- pgTAP regression: role contracts repaired by
--- 20260924045429_grida_ciam_forms_commerce_grants.
+-- 20260924045429_grida_ciam_forms_commerce_grants and
+-- 20260924083849_grida_forms_store_connection_same_project.
 --
 -- 1. CIAM OTP/portal-session minting RPCs are service-only: effective
 --    EXECUTE (including PUBLIC's default ACL), every overload, and real calls
@@ -7,7 +8,8 @@
 -- 2. Editor-owned grida_forms tables are visible/writable only to members of
 --    the owning project; anon has no table access; a member cannot attach
 --    rows to another tenant's form, field, optgroup, page, document, store
---    or x-supabase project/table.
+--    or x-supabase project/table, nor pair a form with a store from another
+--    of their own projects.
 -- 3. Inventory is readable only by members of the store's project; writes
 --    stay service-only.
 --
@@ -17,7 +19,7 @@
 
 BEGIN;
 
-SELECT plan(140);
+SELECT plan(143);
 
 ---------------------------------------------------------------------
 -- [1] CIAM RPC ACLs
@@ -125,6 +127,7 @@ CREATE TEMP TABLE fx (
   conn_sb_id bigint,
   store_id bigint,
   conn_store_id bigint,
+  other_store_id bigint,
   item_id bigint,
   level_id bigint,
   commit_id bigint
@@ -135,6 +138,7 @@ DO $$
 DECLARE
   t record;
   r fx%ROWTYPE;
+  v_other_project bigint;
 BEGIN
   FOR t IN
     SELECT * FROM (VALUES ('insider', 'dev'), ('alice', 'acme-project')) v(tenant, project)
@@ -195,6 +199,13 @@ BEGIN
     VALUES (r.project_id, t.tenant || ' store') RETURNING id INTO r.store_id;
     INSERT INTO grida_forms.connection_commerce_store (form_id, project_id, store_id)
     VALUES (r.form_id, r.project_id, r.store_id) RETURNING id INTO r.conn_store_id;
+
+    -- A store in a second project of the same organization.
+    INSERT INTO public.project (organization_id, name)
+    SELECT organization_id, t.project || '-2' FROM public.project WHERE id = r.project_id
+    RETURNING id INTO v_other_project;
+    INSERT INTO grida_commerce.store (project_id, name)
+    VALUES (v_other_project, t.tenant || ' other store') RETURNING id INTO r.other_store_id;
 
     -- Triggers initialize the level and its first commit.
     INSERT INTO grida_commerce.inventory_item (store_id, sku)
@@ -327,6 +338,21 @@ SELECT ok(
        AND acl.grantee = 0 AND acl.privilege_type = 'EXECUTE'
   ),
   'PUBLIC has no EXECUTE ACL on grida_commerce.rls_store(bigint)'
+);
+SELECT ok(
+  NOT has_function_privilege('anon',
+    to_regprocedure('grida_commerce.rls_store_in_project(bigint, bigint)'), 'EXECUTE'),
+  'anon cannot execute grida_commerce.rls_store_in_project(bigint, bigint)'
+);
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+      FROM pg_proc p
+      CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) acl
+     WHERE p.oid = to_regprocedure('grida_commerce.rls_store_in_project(bigint, bigint)')
+       AND acl.grantee = 0 AND acl.privilege_type = 'EXECUTE'
+  ),
+  'PUBLIC has no EXECUTE ACL on grida_commerce.rls_store_in_project(bigint, bigint)'
 );
 
 SELECT pg_temp.as_user('insider@grida.co');
@@ -540,6 +566,18 @@ SELECT throws_ok(
          (SELECT conn_store_id FROM fx WHERE tenant = 'alice')),
   '42501', NULL,
   'member cannot connect another tenant''s commerce store'
+);
+SELECT pg_temp.as_nobody();
+
+-- Membership in both projects is not enough: the link would outlive it, and
+-- public submissions to this form would keep moving the other store's stock.
+SELECT pg_temp.as_user('insider@grida.co');
+SELECT throws_ok(
+  format($q$UPDATE grida_forms.connection_commerce_store SET store_id = %s WHERE id = %s$q$,
+         (SELECT other_store_id FROM fx WHERE tenant = 'insider'),
+         (SELECT conn_store_id FROM fx WHERE tenant = 'insider')),
+  '42501', NULL,
+  'member cannot connect a store from another of their own projects'
 );
 SELECT pg_temp.as_nobody();
 
