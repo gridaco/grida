@@ -843,63 +843,66 @@ export default function documentReducer<S extends editor.state.IEditorState>(
         );
       }
 
-      const box = getPackedSubtreeBoundingRect(sub);
+      if (action.placement !== "none") {
+        const box = getPackedSubtreeBoundingRect(sub);
 
-      // [root rect for calculating next placement]
-      // if the insertion parent is null (root), use viewport rect (canvas space)
-      // otherwise, use the parent's bounding rect (canvas space) (TODO:)
-      const { width, height } = context.viewport;
+        // [root rect for calculating next placement]
+        // if the insertion parent is null (root), use viewport rect (canvas space)
+        // otherwise, use the parent's bounding rect (canvas space) (TODO:)
+        const { width, height } = context.viewport;
 
-      // apply the inset before convering to canvas space
-      const _inset_rect = cmath.rect.inset(
-        {
-          x: 0,
-          y: 0,
-          width,
-          height,
-        },
-        PLACEMENT_VIEWPORT_INSET
-      );
+        // apply the inset before convering to canvas space
+        const _inset_rect = cmath.rect.inset(
+          {
+            x: 0,
+            y: 0,
+            width,
+            height,
+          },
+          PLACEMENT_VIEWPORT_INSET
+        );
 
-      const viewport_rect = cmath.rect.transform(
-        _inset_rect,
-        cmath.transform.invert(state.transform)
-      );
+        const viewport_rect = cmath.rect.transform(
+          _inset_rect,
+          cmath.transform.invert(state.transform)
+        );
 
-      // use target's children as siblings (if null, root children) // TODO: parent siblings are not supported
-      assert(state.scene_id, "scene_id is required for insertion");
-      const siblings = state.document.links[state.scene_id] || [];
-      const anchors = siblings
-        .map((node_id) => {
-          const r = context.geometry.getNodeAbsoluteBoundingRect(node_id);
-          if (!r) return null;
-          return cmath.rect.pad(
-            { x: r.x, y: r.y, width: r.width, height: r.height },
-            PLACEMENT_ANCHORS_PADDING
-          );
-        })
-        .filter((r) => r !== null) as cmath.Rectangle[];
+        // use target's children as siblings (if null, root children) // TODO: parent siblings are not supported
+        assert(state.scene_id, "scene_id is required for insertion");
+        const siblings = state.document.links[state.scene_id] || [];
+        const anchors = siblings
+          .map((node_id) => {
+            const r = context.geometry.getNodeAbsoluteBoundingRect(node_id);
+            if (!r) return null;
+            return cmath.rect.pad(
+              { x: r.x, y: r.y, width: r.width, height: r.height },
+              PLACEMENT_ANCHORS_PADDING
+            );
+          })
+          .filter((r) => r !== null) as cmath.Rectangle[];
 
-      const placement = cmath.packing.ext.walk_to_fit(
-        viewport_rect,
-        box,
-        anchors
-      );
+        const placement = cmath.packing.ext.walk_to_fit(
+          viewport_rect,
+          box,
+          anchors
+        );
 
-      assert(placement); // placement is always expected since allowOverflow is true
+        assert(placement); // placement is always expected since allowOverflow is true
 
-      sub.scene.children_refs.forEach((node_id) => {
-        const node = sub.nodes[node_id];
-        if (
-          "layout_positioning" in node &&
-          node.layout_positioning === "absolute" &&
-          "layout_inset_left" in node &&
-          "layout_inset_top" in node
-        ) {
-          node.layout_inset_left = (node.layout_inset_left ?? 0) + placement.x;
-          node.layout_inset_top = (node.layout_inset_top ?? 0) + placement.y;
-        }
-      });
+        sub.scene.children_refs.forEach((node_id) => {
+          const node = sub.nodes[node_id];
+          if (
+            "layout_positioning" in node &&
+            node.layout_positioning === "absolute" &&
+            "layout_inset_left" in node &&
+            "layout_inset_top" in node
+          ) {
+            node.layout_inset_left =
+              (node.layout_inset_left ?? 0) + placement.x;
+            node.layout_inset_top = (node.layout_inset_top ?? 0) + placement.y;
+          }
+        });
+      }
 
       const parent: string | null = action.target;
 
