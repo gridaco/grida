@@ -251,7 +251,22 @@ inputOrgId })`. It resolves from: route param slug → request
    and the synthetic SDK/billing contract test. The audit covers `@grida/ai`
    and `@grida/ai/providers`; lint also denies other `@grida/ai/**` value imports
    outside the allowlist. Type-only imports grant no execution authority.
-4. **Observed Tripo usage, independent of asset delivery** — upload preparation
+4. **Hosted fal media keeps provider and billing authority separate** —
+   image/video policy selects an exact catalog operation before submission.
+   The named fal adapter calls the same `withTransaction` gate and ledger;
+   only `GG_FAL_KEY` and `GG_FAL_ADMIN_KEY` can fund it. The latter reaches
+   only the request-specific billing-events endpoint, and its authority is
+   checked before inference. A bounded actual `cost_total` receipt is matched
+   to both endpoint and request ID; display-price estimates never become fal
+   charges. Successful batches are retained before downloads, and accepted
+   failure IDs are also queried. Known costs are ingested even when delivery
+   or a later batch fails. Missing receipts log identifiers for reconciliation
+   and cannot become successful zero-cost results. Fixed queue/API destinations,
+   public-DNS pinning, TLS, redirect rejection and a separate credential-free
+   fal CDN lane constrain server egress. Both client resubmission and fal's
+   internal retry/fallback behavior are disabled for hosted submissions.
+   Process death still requires reconciliation; no durable job observer is claimed.
+5. **Observed Tripo usage, independent of asset delivery** — upload preparation
    gates before the free provider request; generation, rig-check and rigging gate
    before execution. Only server-owned `GG_TRIPO_API_KEY` supplies provider authority,
    with no BYOK or unprefixed-key fallback. Valid terminal `credits_consumed` is converted at the
@@ -313,6 +328,11 @@ Today:
 - [Provider credential tests](editor/lib/ai/__tests__/models.test.ts) and
   [Replicate credential tests](editor/lib/ai/__tests__/replicate-credentials.test.ts) —
   funding-role separation, per-request OIDC, missing credentials and preserved billing.
+- [GG fal execution](editor/lib/ai/gg-fal-media.ts), [billing receipt reader](editor/lib/ai/gg-fal-billing.ts),
+  [fixed egress](editor/lib/ai/gg-fal-http.ts), [execution tests](editor/lib/ai/__tests__/gg-fal-media.test.ts),
+  [receipt tests](editor/lib/ai/__tests__/gg-fal-billing.test.ts), and
+  [egress tests](editor/lib/ai/__tests__/gg-fal-http.test.ts) — verified-org gating,
+  request-bound actual billing and isolated inference/admin/asset authority.
 - [GG Tripo execution](editor/lib/ai/gg-three-d.ts) and
   [billing contract tests](editor/lib/ai/__tests__/gg-three-d.test.ts) — verified
   org input, unconditional gate, infrastructure-key-only execution and actual receipts.
@@ -997,6 +1017,12 @@ Today:
   codes. They never store credentials or run implicitly before generation. The
   [SDK contract](packages/grida-ai/README.md) records official format evidence,
   permission limits and the separate authority required for future custom endpoints.
+- [fal operation lifecycle](packages/grida-ai/src/fal-generation.ts), [exact input mappings](packages/grida-ai/src/fal-inputs.ts),
+  and [input tests](packages/grida-ai/src/fal-inputs.test.ts), and [lifecycle tests](packages/grida-ai/src/fal-generation.test.ts) — trusted
+  synchronous completion facts before asset reads, safe accepted job IDs, exact
+  schema validation and mapping. Completion facts confer no transport authority;
+  host callback failures never resubmit work. GG eligibility follows explicit
+  hosted catalog policy while BYOK bindings retain their own input modes.
 - [Shared image operation](packages/grida-ai/src/image-client.ts), [provider HTTP](packages/grida-ai/src/http.ts), [BYOK image adapters](packages/grida-ai/src/image-byok.ts), [GG request helpers](packages/grida-ai/src/gg.ts), [URL admission tests](packages/grida-ai/src/gg.test.ts), [GG image adapter](packages/grida-ai/src/image-gg.ts), and [provider entry](packages/grida-ai/src/providers.ts) — caller-selected provider authority, live credential reads, distinct request/download lanes, and safe image outcomes. The operation never retries a failed paid batch; requested multiple images may require multiple provider-sized batches. Existing agent imports delegate to these owners. The [SDK contract](packages/grida-ai/README.md) defines host responsibilities. [Image operation tests](packages/grida-ai/src/image-client.test.ts) and [download tests](packages/grida-ai/src/http.test.ts) pin credential isolation, safe failures and bounded asset reads. The [queue and URL helpers](packages/grida-ai/src/fetch-helpers.ts), [their tests](packages/grida-ai/src/fetch-helpers.test.ts), and [BYOK adapter tests](packages/grida-ai/src/image-byok.test.ts) preserve provider-owned polling and credential-free result downloads.
 - [HTTP image adapter tests](packages/grida-ai-agent/src/http/routes/images.test.ts) and [workspace image adapter tests](packages/grida-ai-agent/src/runtime/image-generation.test.ts) — existing admission and host persistence around the shared operation, reference capability before file reads, safe host failures, and no paid retry.
 - [Shared video operation](packages/grida-ai/src/video-client.ts), [provider adapters](packages/grida-ai/src/video-models.ts), and [bounded invocation](packages/grida-ai/src/media-request.ts) — video resolution and execution without host types. One submission uses the selected provider and a private invocation credential; a changed key cannot retarget an accepted job. The exact fal `fal-ai/veo3.1/lite/image-to-video` binding admits one HTTPS frame or PNG/JPEG/WebP bytes up to 8,000,000 bytes. Shared native/JSON rules expose that exact capability, bound base64 before decoding, snapshot bytes before credential lookup, and reject unsupported representations/options before generation authority. Its private adapter creates a bounded inline data URL and maps accepted numeric duration/dimensions to the documented fal wire. Other bindings retain HTTPS-only frame inputs; no filesystem read, upload route or new host grant is added. Submission, polling and result reads share a deadline and cancellation. Provider-owned URL restrictions and separate request/download lanes remain enforced; all result representations are bounded before bytes reach the host. HTTP admission, base64 wire responses and media persistence remain in the [video route](packages/grida-ai-agent/src/http/routes/video.ts), with a thin [resolver adapter](packages/grida-ai-agent/src/providers/resolve-video.ts). This replaces the former agent `video-byok.ts` owner. [Operation tests](packages/grida-ai/src/video-client.test.ts) pin provider wires, image input bounds/snapshots, credentials, cancellation, deadlines, hostile results and safe failures; [route tests](packages/grida-ai-agent/src/http/routes/video.test.ts) pin the host contract.
@@ -1493,6 +1519,11 @@ limitation tracked in [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-
   [custody tests](editor/lib/gg/uploads.test.ts) — exclusive live GG auth,
   subject/org/type-bound references and bounded request/streaming responses;
   also GRIDA-SEC-012.
+- [GG fal execution](editor/lib/ai/gg-fal-media.ts), [billing receipt reader](editor/lib/ai/gg-fal-billing.ts),
+  [fixed egress](editor/lib/ai/gg-fal-http.ts), [execution tests](editor/lib/ai/__tests__/gg-fal-media.test.ts),
+  [receipt tests](editor/lib/ai/__tests__/gg-fal-billing.test.ts), and
+  [egress tests](editor/lib/ai/__tests__/gg-fal-http.test.ts) — verified-org gating,
+  request-bound actual billing and isolated inference/admin/asset authority.
 - [Tripo execution seam](editor/lib/ai/gg-three-d.ts),
   [billing tests](editor/lib/ai/__tests__/gg-three-d.test.ts),
   [server transport](editor/lib/ai/gg-three-d-http.ts), and

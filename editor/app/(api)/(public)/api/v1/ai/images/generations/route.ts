@@ -10,21 +10,16 @@
  * protocol carries no reference images; the sidecar resolver routes
  * i2i to BYOK providers).
  *
- * Auth: scoped AI token only (GRIDA-SEC-006). Billing: Vercel AI Gateway
- * response receipt when available, otherwise the shared `computeImageCostMills`
- * fallback (`providerOptions.grida.costMills`). NO library
+ * Auth: scoped AI token only (GRIDA-SEC-006). Billing: hosted media policy selects fal by default with actual request receipts,
+ * or a Vercel control-compatibility exception. NO library
  * upload — the daemon owns persistence.
  */
-import { generateImage } from "ai";
 import { z } from "zod";
-import type { ImageGenerateResult } from "@grida/agent";
 import { verifyGgToken } from "@/lib/auth/gg-token";
 import ai from "@/lib/ai";
-import { computeImageCostMills } from "@/lib/ai/image-cost";
-import { methods, gridaProviderOptions } from "@/lib/ai/server";
+import { methods } from "@/lib/ai/server";
 import {
   fromUnknownError,
-  invalidRequest,
   modelNotFound,
   parseJsonRequest,
   rateLimited,
@@ -65,88 +60,19 @@ export async function POST(request: Request) {
     const req = p.data;
 
     const card = ai.image.findImageModelCard(req.model_id);
-    if (!card) return modelNotFound(req.model_id);
-    // Hosted serving goes through Vercel AI Gateway — a card without a
-    // matching binding is not servable here (the sidecar's BYOK
-    // adapters cover the rest).
-    const binding = ai.image.binding(card, "vercel");
-    if (!binding) return modelNotFound(req.model_id);
-    if (
-      req.quality &&
-      card.quality &&
-      !card.quality.options.includes(req.quality)
-    ) {
-      return invalidRequest("Unsupported quality for this model.");
-    }
-
-    // An explicit mode must never become an opaque, billed success when the
-    // Vercel AI Gateway binding has not exposed the native control.
-    // Auto is the legacy default.
-    const background = req.background === "auto" ? undefined : req.background;
-    if (background && !ai.image.supportsTransparentBackground(card, "vercel")) {
-      return invalidRequest(
-        "This model does not have verified background control through Grida Gateway. Use a supported provider key or omit background."
-      );
-    }
-
-    const resolved = methods.getSDKImageModel(card.id);
-    if (!resolved) return modelNotFound(req.model_id);
-
-    const n = req.n ?? 1;
-    const costMills = computeImageCostMills(card, {
-      n,
+    if (!card || !ai.image.hostedBinding(card))
+      return modelNotFound(req.model_id);
+    const result = await methods.generateImage(claims.org, {
+      model_id: card.id,
+      prompt: req.prompt,
       width: req.width ?? undefined,
       height: req.height ?? undefined,
-      quality: req.quality ?? undefined,
-    });
-
-    const size =
-      req.width && req.height
-        ? (`${req.width}x${req.height}` as `${number}x${number}`)
-        : undefined;
-
-    // Forward the requested quality tier to the ORIGIN provider so the
-    // tier we just billed (`computeImageCostMills`) is the tier actually
-    // delivered — otherwise a `per_image_tiered` card (e.g. gpt-image-*)
-    // charges "high" while the provider renders its default. The Vercel
-    // AI Gateway keys providerOptions by origin provider (`openai` for
-    // `openai/gpt-image-2`).
-    const slash = binding.id.indexOf("/");
-    const originProvider = slash > 0 ? binding.id.slice(0, slash) : undefined;
-    const quality = req.quality || undefined;
-    const imageOptions = {
-      ...(quality ? { quality } : {}),
-      ...(background ? { background } : {}),
-      ...(background === "transparent" ? { output_format: "png" } : {}),
-    };
-
-    const generation = await generateImage({
-      model: resolved.model,
-      prompt: req.prompt,
-      n,
-      size,
-      aspectRatio: req.aspect_ratio as `${number}:${number}` | undefined,
+      aspect_ratio: req.aspect_ratio ?? undefined,
+      n: req.n ?? undefined,
       seed: req.seed ?? undefined,
-      providerOptions: {
-        ...gridaProviderOptions({
-          organizationId: claims.org,
-          feature: "v1/ai/images",
-          costMills,
-        }),
-        ...(originProvider && Object.keys(imageOptions).length
-          ? { [originProvider]: imageOptions }
-          : {}),
-      },
+      quality: req.quality ?? undefined,
+      background: req.background,
     });
-
-    const result: ImageGenerateResult = {
-      model_id: card.id,
-      provider_id: "vercel",
-      images: generation.images.map((file) => ({
-        base64: file.base64,
-        media_type: file.mediaType,
-      })),
-    };
     return Response.json(result, { headers: NO_STORE });
   } catch (err) {
     return fromUnknownError(err, "v1/ai/images");

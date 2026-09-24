@@ -1,9 +1,10 @@
 "use client";
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-006 — renderer readiness never replaces fresh scoped-token admission.
 
 import * as gridaGateway from "@/lib/desktop/gg-session";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
 import { catalog as models } from "@grida/ai-models/grida";
 import { Skeleton } from "@app/ui/components/skeleton";
@@ -29,7 +30,7 @@ import {
   usePromptInputController,
   type PromptInputMessage,
 } from "@app/ui/ai-elements/prompt-input";
-import { video, type MediaItem } from "@/lib/desktop/bridge";
+import { video, useDesktopBridge, type MediaItem } from "@/lib/desktop/bridge";
 import { VideoModelPicker } from "./video-model-picker";
 import { MediaModelAvailability } from "../shared/media-model-availability";
 
@@ -120,8 +121,8 @@ type Tile = {
  * floating prompt composer. Each submit prepends a shimmering cell that fills in
  * with a playable clip when the video resolves. Generation runs in the agent
  * sidecar against the user's connected provider key; the key never reaches this
- * renderer (GRIDA-SEC-004). v1 is text-to-video (served by a connected
- * Vercel AI Gateway key for every listed model).
+ * renderer (GRIDA-SEC-004). The composer serves verified text-to-video routes
+ * through connected provider keys or Grida Gateway.
  */
 export function DesktopVideoPlayground({
   initialModelId,
@@ -134,6 +135,21 @@ export function DesktopVideoPlayground({
   onGenerationBusyChange?: (busy: boolean) => void;
   onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
+  const bridge = useDesktopBridge();
+  const providerStore = useMemo(
+    () =>
+      new MediaModelAvailability.VideoProviders(
+        bridge,
+        async () => (await gridaGateway.ensureFresh()).kind === "active"
+      ),
+    [bridge]
+  );
+  const providers = useSyncExternalStore(
+    providerStore.subscribe,
+    providerStore.getSnapshot,
+    providerStore.getSnapshot
+  );
+  useEffect(() => providerStore.connect(), [providerStore]);
   const [modelId, setModelId] = useState(
     () =>
       MediaModelAvailability.select(
@@ -150,6 +166,7 @@ export function DesktopVideoPlayground({
   });
 
   const card = models.video.models[modelId];
+  const access = MediaModelAvailability.video(card, providers);
   const active = tiles.find((t) => t.id === activeId && t.status === "done");
 
   const remove = (id: string) =>
@@ -162,9 +179,10 @@ export function DesktopVideoPlayground({
   const runGenerate = async (rawPrompt: string) => {
     const prompt = rawPrompt.trim();
     if (!prompt) return;
-    // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh so a
-    // signed-in keyless user generates through the included provider.
-    // Never throws; BYOK runs are unaffected when it degrades.
+    // Recheck installed-client capability and current credentials before
+    // submitting a potentially billable generation.
+    const refreshed = await providerStore.refresh(card);
+    if (!MediaModelAvailability.video(card, refreshed).available) return;
     const id = crypto.randomUUID();
     const model_id = modelId;
     setTiles((prev) => [
@@ -173,7 +191,6 @@ export function DesktopVideoPlayground({
     ]);
     onGenerationBusyChange?.(true);
     try {
-      await gridaGateway.ensureFresh();
       const res = await video.generate({
         model_id,
         prompt,
@@ -214,6 +231,11 @@ export function DesktopVideoPlayground({
     <div className="relative flex min-h-0 flex-1 flex-col">
       <header className="flex shrink-0 items-center justify-between px-6 py-4">
         <h1 className="text-2xl font-bold tracking-tight">Video</h1>
+        {!access.available && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {access.reason}
+          </p>
+        )}
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-40">
@@ -263,6 +285,7 @@ export function DesktopVideoPlayground({
                 />
                 <VideoModelPicker
                   value={modelId}
+                  providers={providers}
                   onValueChange={(next) => {
                     // Model-scoped options don't carry over — a stale aspect
                     // ratio / duration the new model doesn't offer would fail.
@@ -272,7 +295,7 @@ export function DesktopVideoPlayground({
                   }}
                 />
               </PromptInputTools>
-              <PromptInputSubmit />
+              <PromptInputSubmit disabled={!access.available} />
             </PromptInputFooter>
           </PromptInput>
         </PromptInputProvider>

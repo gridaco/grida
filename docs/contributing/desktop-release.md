@@ -1,4 +1,7 @@
 ---
+title: Releasing Grida Desktop
+description: Prepare and publish Grida Desktop releases and coordinate hosted renderer compatibility with installed native clients.
+keywords: [grida, desktop, release, renderer, compatibility]
 format: md
 ---
 
@@ -45,6 +48,28 @@ Runbook for cutting desktop releases — macOS / Windows / Linux signed, notariz
 Same as above but with `-f prerelease=true`. The release shows up on GitHub Releases marked as a prerelease and `update.electronjs.org` **skips it for installed users** — prereleases are for manual download / testing only. Useful when you want a build out for QA without auto-shipping it to everyone.
 
 To promote a prerelease to stable: edit the GitHub Release in the UI and uncheck "Set as a pre-release." The feed will pick it up on the next poll (~6h default).
+
+## Hosted renderer and media compatibility
+
+Desktop loads the hosted renderer independently of its bundled sidecar. A
+server deployment can change the provider of an existing GG request without
+changing that request's wire contract. It cannot teach installed clients a new
+provider-selection rule or operation mapping.
+
+Desktop 0.0.25 includes GG image/video admission independent of Vercel BYOK
+bindings and the new fal text-to-video mappings. The renderer gates these
+capabilities on the installed version. Desktop 0.0.24 and earlier retain
+existing Vercel-compatible requests; fal-only GG routes and Gemini Omni 1.1
+require the compatible native release. An update notification or catalogue
+refresh does not satisfy this gate.
+
+For this migration, deploy and verify the server's fal credentials, exact
+request billing and compatible catalogue first. Then publish Desktop 0.0.25
+and CLI 0.2.1 through their independent release workflows. Keep the renderer's
+version gate while older Desktop installations remain in use. CLI 0.2.1 bundles
+the new catalogue and SDK; the CLI currently has no catalogue-refresh path.
+See [billing setup](./billing.md) and the
+[CLI release runbook](https://github.com/gridaco/grida/tree/main/scripts/cli-release).
 
 ---
 

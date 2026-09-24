@@ -141,6 +141,34 @@ export function fromUnknownError(err: unknown, scope: string): Response {
   ) {
     return invalidRequest(err.message);
   }
+  if (err instanceof Error && err.name === "GgFalMediaFailure") {
+    const failure = err as Error & { code: string; task_id?: string };
+    const statuses: Record<string, number> = {
+      model_unavailable: 400,
+      provider_unavailable: 503,
+      usage_unavailable: 502,
+      generation_failed: 502,
+      invalid_response: 502,
+      aborted: 499,
+      timeout: 504,
+    };
+    const status = statuses[failure.code];
+    if (status)
+      return Response.json(
+        {
+          error: {
+            code: failure.code,
+            type: "server_error",
+            message: failure.code,
+            ...(typeof failure.task_id === "string" &&
+            /^[A-Za-z0-9_-]{1,128}$/.test(failure.task_id)
+              ? { task_id: failure.task_id }
+              : {}),
+          },
+        },
+        { status, headers: NO_STORE }
+      );
+  }
   // Billing gate — `BillingMetronomeError` code "blocked" (duck-typed to
   // keep this module's import surface minimal). The message is curated
   // for end-user display; pass it through.

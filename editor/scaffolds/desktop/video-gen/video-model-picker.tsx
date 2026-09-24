@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@app/ui/components/select";
 import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 
 /**
  * Provider-hidden video-model picker (#908). Lists only the curated
@@ -17,10 +18,12 @@ import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
 export function VideoModelPicker({
   value,
   onValueChange,
+  providers,
   disabled,
 }: {
   value: string;
   onValueChange: (id: string) => void;
+  providers: MediaModelAvailability.VideoProviderState;
   disabled?: boolean;
 }) {
   const listed = models.video.listed_models();
@@ -30,14 +33,27 @@ export function VideoModelPicker({
         <SelectValue placeholder="Choose a model" />
       </MediaModelPickerTrigger>
       <SelectContent>
-        {listed.map((card) => (
-          <SelectItem key={card.id} value={card.id}>
-            {card.label}
-            {card.deprecated && (
-              <span className="text-muted-foreground"> · Legacy</span>
-            )}
-          </SelectItem>
-        ))}
+        {listed.map((card) => {
+          const access = MediaModelAvailability.video(card, providers);
+          return (
+            <SelectItem
+              key={card.id}
+              value={card.id}
+              disabled={!access.available}
+            >
+              {card.label}
+              {card.deprecated && (
+                <span className="text-muted-foreground"> · Legacy</span>
+              )}
+              {!access.available && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {access.reason}
+                </span>
+              )}
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

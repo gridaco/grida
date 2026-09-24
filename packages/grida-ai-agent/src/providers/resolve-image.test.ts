@@ -72,7 +72,7 @@ describe("resolveImageModel", () => {
       }
     );
 
-    it.each(["vercel", "openrouter", "gg"] as const)(
+    it.each(["vercel", "openrouter"] as const)(
       "explicit unsupported %s fails before I/O without fallback",
       async (explicit) => {
         const gg = new GridaGatewaySessionStore();
@@ -102,7 +102,7 @@ describe("resolveImageModel", () => {
       }
     );
 
-    it("cannot fall back to hosted GG for an unsupported explicit background", async () => {
+    it("uses hosted fal background capability when no BYOK key is connected", async () => {
       const gg = new GridaGatewaySessionStore();
       gg.set({ access_token: "test-token", expires_at: Date.now() + 900_000 });
       await expect(
@@ -111,7 +111,7 @@ describe("resolveImageModel", () => {
           LISTED,
           { background: "transparent" }
         )
-      ).rejects.toMatchObject({ background: "transparent" });
+      ).resolves.toMatchObject({ provider_id: "gg", native_background: true });
     });
 
     it("auto preserves ordinary provider precedence", async () => {

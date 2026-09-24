@@ -45,6 +45,12 @@ for discovery and execution. The CLI does not refresh this catalogue or choose
 a model/provider implicitly. A command does not move its product's implementation
 into this package.
 
+CLI 0.2.1 adds GG video access to Gemini Omni 1.1 Flash and Seedance 2.0/2.5.
+GG image/video admission follows Grida's hosted operation catalogue, with fal as
+the default server provider. An explicit BYOK provider still uses the caller's
+key. Updating the server alone does not update an installed CLI's catalogue or
+operation mappings; install the compatible CLI release to use these additions.
+
 Do not import agent, daemon, Electron, Next.js or browser application state.
 Do not add generic authenticated fetch, token getters, duplicated domain policy,
 implicit login, silent provider fallback, or a plugin framework for hypothetical

@@ -1,17 +1,11 @@
+// GRIDA-GG: gateway — web generation shares hosted media execution and billing.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { catalog as models } from "@grida/ai-models/grida";
 import { generateAiImage } from "./image-generate";
 
 const mocks = vi.hoisted(() => ({
-  generate: vi.fn<(input: unknown) => Promise<unknown>>(),
-  model:
-    vi.fn<
-      (
-        id: string
-      ) =>
-        | { card: models.image.ImageModelCard; model: { modelId: string } }
-        | undefined
-    >(),
+  generate:
+    vi.fn<(organizationId: number, input: unknown) => Promise<unknown>>(),
   auth: vi.fn<
     (
       feature: string,
@@ -19,14 +13,6 @@ const mocks = vi.hoisted(() => ({
       run: (organizationId: number) => Promise<unknown>
     ) => Promise<unknown>
   >(),
-  options:
-    vi.fn<
-      (input: {
-        organizationId: number;
-        feature: string;
-        costMills: number;
-      }) => { grida: Record<string, string | number> }
-    >(),
   upload: vi.fn<
     (
       path: string,
@@ -40,16 +26,14 @@ const mocks = vi.hoisted(() => ({
   single: vi.fn<() => Promise<{ data: { id: string }; error: null }>>(),
 }));
 
-vi.mock("ai", () => ({ generateImage: mocks.generate }));
 // These action tests verify option forwarding, not raster parsing. Deliberate
 // sentinel bytes avoid adding a duplicate image fixture or invoking a provider.
 vi.mock("image-size", () => ({
   default: () => ({ width: 1024, height: 1024 }),
 }));
 vi.mock("@/lib/ai/server", () => ({
-  methods: { getSDKImageModel: mocks.model },
+  methods: { generateImage: mocks.generate },
   withAiAuth: mocks.auth,
-  gridaProviderOptions: mocks.options,
 }));
 vi.mock("@/lib/supabase/server", () => ({
   service_role: {
@@ -77,31 +61,27 @@ const bytes = Uint8Array.of(1, 2, 3);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.model.mockImplementation((id) => {
-    const card = models.image.models[id];
-    return card ? { card, model: { modelId: id } } : undefined;
-  });
   mocks.auth.mockImplementation(async (_feature, _organizationId, run) => ({
     success: true,
     data: await run(42),
   }));
-  mocks.options.mockImplementation((input) => ({ grida: input }));
-  mocks.generate.mockResolvedValue({
-    image: { uint8Array: bytes, mediaType: "image/png" },
-    responses: [
+  mocks.generate.mockImplementation(async (_organizationId, input) => ({
+    model_id: (input as { model_id: string }).model_id,
+    provider_id: "fal",
+    images: [
       {
-        modelId: "provider-result",
-        timestamp: new Date("2026-09-09T00:00:00Z"),
+        base64: Buffer.from(bytes).toString("base64"),
+        media_type: "image/png",
       },
     ],
-  });
+  }));
   mocks.upload.mockResolvedValue({ data: { id: "stored-image" }, error: null });
   mocks.single.mockResolvedValue({ data: { id: "stored-image" }, error: null });
 });
 
 describe.each(variants)("generateAiImage (%s)", (model) => {
   it.each(["xhigh", "max", "auto"])(
-    "forwards %s explicitly to OpenAI while retaining the fallback cost meter",
+    "forwards %s to the shared hosted execution seam before persisting bytes",
     async (quality) => {
       const result = await generateAiImage({
         model,
@@ -111,19 +91,17 @@ describe.each(variants)("generateAiImage (%s)", (model) => {
         quality,
         organizationId: 42,
       });
-      const billing = {
-        organizationId: 42,
-        feature: "ai/image/generate",
-        costMills: Math.ceil(models.image.models[model]!.avg_cost_usd * 1000),
-      };
-      expect(mocks.options).toHaveBeenCalledWith(billing);
-      expect(mocks.generate).toHaveBeenCalledWith(
+      expect(mocks.generate).toHaveBeenCalledExactlyOnceWith(
+        42,
         expect.objectContaining({
-          size: "1024x1024",
-          providerOptions: { grida: billing, openai: { quality } },
+          model_id: model,
+          prompt: "A geometric icon",
+          width: 1024,
+          height: 1024,
+          quality,
         })
       );
-      expect(mocks.upload.mock.calls[0]?.[1]).toBe(bytes);
+      expect(mocks.upload.mock.calls[0]?.[1]).toEqual(Buffer.from(bytes));
       expect(result).toMatchObject({ success: true });
     }
   );
@@ -163,9 +141,23 @@ it.each([variants[0], ...legacyModels])(
       success: true,
     });
     expect(mocks.generate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        providerOptions: { grida: expect.any(Object) },
-      })
+      42,
+      expect.objectContaining({ model_id: model, prompt: "An icon" })
     );
+    expect(
+      (mocks.generate.mock.calls[0]![1] as { quality?: string }).quality
+    ).toBeUndefined();
   }
 );
+
+it("preserves explicit legacy image selections even when absent from the curated list", async () => {
+  const model = "openai/gpt-image-1-mini";
+  expect(models.image.models[model]!.listed).toBe(false);
+  expect(await generateAiImage({ model, prompt: "An icon" })).toMatchObject({
+    success: true,
+  });
+  expect(mocks.generate).toHaveBeenCalledWith(
+    42,
+    expect.objectContaining({ model_id: model })
+  );
+});

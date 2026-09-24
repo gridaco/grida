@@ -120,6 +120,11 @@
         "lib/ai/server.ts",
         "lib/ai/models.ts",
         "lib/ai/gg-three-d.ts",
+        "lib/ai/gg-fal-media.ts",
+        "lib/ai/gg-fal-billing.ts",
+        "lib/ai/gg-fal-http.ts",
+        "lib/ai/__tests__/gg-fal-media.test.ts",
+        "lib/ai/__tests__/gg-fal-billing.test.ts",
         "lib/ai/gg-three-d-http.ts",
         "lib/ai/__tests__/gg-three-d.test.ts",
         // The canvas agent constructs an OpenAI `tools.webSearch` factory

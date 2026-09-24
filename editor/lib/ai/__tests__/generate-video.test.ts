@@ -1,6 +1,7 @@
+// GRIDA-GG: gateway — retained Vercel media controls.
 // GRIDA-EE: billing — see ee-billing
 /**
- * `methods.generateVideo` — hosted video through the seam.
+ * `methods.generateVideo` — retained Vercel compatibility route through the seam.
  *
  * Pins: request validation (unknown/unlisted model, aspect, duration
  * bounds, resolution label mapping, unpriced (label,mode) pairs,
@@ -75,11 +76,12 @@ beforeEach(() => {
   stubGeneration();
 });
 
-describe("methods.generateVideo", () => {
-  it("happy path: gates, generates via the Vercel AI Gateway binding, ingests rate×duration", async () => {
+describe("methods.generateVideo Vercel compatibility", () => {
+  it("an explicit legacy fps control selects Vercel before submission and retains its billing", async () => {
     const duration = CARD.default.duration;
     const result = await methods.generateVideo(ORG, {
       model_id: MODEL_ID,
+      fps: 24,
       prompt: "a calm ocean",
     });
 
@@ -101,14 +103,17 @@ describe("methods.generateVideo", () => {
     const args = mockedGenerate.mock.calls[0]![0] as {
       prompt: unknown;
       duration: number;
+      fps: number;
     };
     expect(args.prompt).toBe("a calm ocean");
     expect(args.duration).toBe(duration);
+    expect(args.fps).toBe(24);
   });
 
   it("maps an explicit {width}x{height} resolution to the pricing label", async () => {
     await methods.generateVideo(ORG, {
       model_id: MODEL_ID,
+      fps: 24,
       prompt: "x",
       resolution: "1280x720",
     });
@@ -126,6 +131,7 @@ describe("methods.generateVideo", () => {
     await expect(
       methods.generateVideo(ORG, {
         model_id: MODEL_ID,
+        fps: 24,
         prompt: "x",
         aspect_ratio: "7:3",
       })
@@ -133,6 +139,7 @@ describe("methods.generateVideo", () => {
     await expect(
       methods.generateVideo(ORG, {
         model_id: MODEL_ID,
+        fps: 24,
         prompt: "x",
         duration: CARD.max_duration + 1,
       })
@@ -140,6 +147,7 @@ describe("methods.generateVideo", () => {
     await expect(
       methods.generateVideo(ORG, {
         model_id: MODEL_ID,
+        fps: 24,
         prompt: "x",
         resolution: "999x111",
       })
@@ -152,6 +160,7 @@ describe("methods.generateVideo", () => {
     await expect(
       methods.generateVideo(ORG, {
         model_id: MODEL_ID,
+        fps: 24,
         prompt: "x",
         image_url: "https://example.com/frame.png",
       })
@@ -167,7 +176,7 @@ describe("methods.generateVideo", () => {
       cachedAt: null,
     } as never);
     await expect(
-      methods.generateVideo(ORG, { model_id: MODEL_ID, prompt: "x" })
+      methods.generateVideo(ORG, { model_id: MODEL_ID, prompt: "x", fps: 24 })
     ).rejects.toMatchObject({ code: "blocked" });
     expect(mockedGenerate).not.toHaveBeenCalled();
   });

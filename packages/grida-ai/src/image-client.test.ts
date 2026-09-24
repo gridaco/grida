@@ -114,7 +114,7 @@ describe("ImageClient public operations", () => {
       await operation.generate({
         prompt: PROMPT,
         quality: "low",
-        size: "256x256",
+        size: "1024x1024",
       })
     ).toEqual({ images: [{ data: PNG, media_type: "image/png" }] });
     expect(request).toHaveBeenCalledOnce();
@@ -129,7 +129,7 @@ describe("ImageClient public operations", () => {
       view.image.binding(card, "vercel")!.id
     );
     expect(JSON.parse(String(init?.body))).toMatchObject({
-      size: "256x256",
+      size: "1024x1024",
       providerOptions: { openai: { quality: "low" } },
     });
     expect(download).not.toHaveBeenCalled();
@@ -157,8 +157,7 @@ describe("ImageClient public operations", () => {
     expect(
       await operation.generate({
         prompt: PROMPT,
-        size: "128x256",
-        seed: 0,
+        size: "1024x1024",
         quality: "high",
       })
     ).toEqual({ images: [{ data: PNG, media_type: "image/png" }] });
@@ -172,8 +171,7 @@ describe("ImageClient public operations", () => {
       )
     ).toBe(true);
     expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toMatchObject({
-      image_size: { width: 128, height: 256 },
-      seed: 0,
+      image_size: { width: 1024, height: 1024 },
       quality: "high",
     });
     expect(download).toHaveBeenCalledOnce();

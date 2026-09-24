@@ -20,13 +20,16 @@ export namespace MediaModelAvailability {
     );
   }
 
-  export type ImageProviderState = Readonly<{
+  type ProviderState = Readonly<{
     loaded: boolean;
-    images: boolean;
     desktopVersion?: string;
     configured: readonly models.image.ImageProvider[];
     hosted: boolean;
   }>;
+
+  export type ImageProviderState = ProviderState &
+    Readonly<{ images: boolean }>;
+  export type VideoProviderState = ProviderState & Readonly<{ video: boolean }>;
 
   export type ImageAccess = Readonly<{
     available: boolean;
@@ -35,12 +38,26 @@ export namespace MediaModelAvailability {
 
   export const imageUpdateMessage = "Update Grida Desktop to use this model";
 
-  /** Background request fields first ship in Desktop 0.0.22. */
-  export function supportsImageBackground(desktopVersion?: string): boolean {
+  /** Desktop 0.0.25 resolves GG media independently of BYOK bindings.
+   * See test/desktop-media-hosted-fal-compatibility.md for native verification.
+   */
+  export function supportsHostedMedia(desktopVersion?: string): boolean {
+    return supportsVersion(desktopVersion, 25);
+  }
+
+  function supportsVersion(
+    desktopVersion: string | undefined,
+    minimumPatch: number
+  ): boolean {
     const match = desktopVersion?.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/);
     if (!match) return false;
     const [major, minor, patch] = match.slice(1, 4).map(Number);
-    return major > 0 || minor > 0 || patch >= 22;
+    return major > 0 || minor > 0 || patch >= minimumPatch;
+  }
+
+  /** Background request fields first ship in Desktop 0.0.22. */
+  export function supportsImageBackground(desktopVersion?: string): boolean {
+    return supportsVersion(desktopVersion, 22);
   }
 
   /** Desktop 0.0.22 adds partial cards and GPT Image 2.5 request mappings. */
@@ -95,14 +112,24 @@ export namespace MediaModelAvailability {
     ) {
       return { available: true };
     }
-    // GRIDA-GG: desktop — hosted readiness follows the served Vercel AI Gateway binding.
+    // GRIDA-GG: desktop — hosted admission comes from the service operation.
+    const hosted = models.image.hostedBinding(card);
     if (
       state.hosted &&
-      models.image.binding(card, "vercel") &&
+      hosted &&
       (!transparent ||
-        models.image.supportsTransparentBackground(card, "vercel"))
+        models.image.supportsTransparentBackground(card, hosted.provider))
     ) {
-      return { available: true };
+      // Existing native clients can submit only their original Vercel-compatible
+      // shape. The server may switch that request's provider independently.
+      if (
+        supportsHostedMedia(state.desktopVersion) ||
+        (models.image.binding(card, "vercel") &&
+          (!transparent ||
+            models.image.supportsTransparentBackground(card, "vercel")))
+      )
+        return { available: true };
+      return { available: false, reason: imageUpdateMessage };
     }
     const purpose = transparent
       ? "for transparent backgrounds"
@@ -115,63 +142,119 @@ export namespace MediaModelAvailability {
     };
   }
 
+  /** Text-to-video readiness, including the installed native route contract. */
+  export function video(
+    card: models.video.VideoModelCard | undefined,
+    state: VideoProviderState
+  ): ImageAccess {
+    if (!card?.listed)
+      return { available: false, reason: "Choose a video model" };
+    if (
+      card.id === "google/gemini-omni-1.1-flash" &&
+      !supportsHostedMedia(state.desktopVersion)
+    ) {
+      return { available: false, reason: imageUpdateMessage };
+    }
+    if (!state.loaded)
+      return { available: false, reason: "Checking connected providers…" };
+    if (!state.video)
+      return {
+        available: false,
+        reason: "Video generation is unavailable in this Desktop version",
+      };
+    const eligible = byokProvidersFor("video").filter((provider) => {
+      const id = provider.id as models.video.VideoProvider;
+      if (supportsHostedMedia(state.desktopVersion))
+        return !!models.video.textToVideoBinding(card, id);
+      const mode = models.video.input(card, id);
+      return mode === "text" || mode === "text-or-image";
+    });
+    if (
+      eligible.some((provider) =>
+        state.configured.includes(provider.id as models.video.VideoProvider)
+      )
+    ) {
+      return { available: true };
+    }
+    // GRIDA-GG: desktop — a hosted session does not supply native adapter code.
+    if (state.hosted && models.video.hostedBinding(card)) {
+      const legacy = models.video.input(card, "vercel");
+      if (
+        supportsHostedMedia(state.desktopVersion) ||
+        legacy === "text" ||
+        legacy === "text-or-image"
+      ) {
+        return { available: true };
+      }
+      return { available: false, reason: imageUpdateMessage };
+    }
+    if (
+      !supportsHostedMedia(state.desktopVersion) &&
+      state.configured.some((id) => models.video.textToVideoBinding(card, id))
+    ) {
+      return { available: false, reason: imageUpdateMessage };
+    }
+    return {
+      available: false,
+      reason: eligible.length
+        ? `Connect a ${eligible.map((provider) => provider.label).join(" or ")} key to use this model`
+        : "Text-to-video is unavailable for this model's connected routes",
+    };
+  }
+
   /** Refreshable, secret-free key presence and hosted-session readiness. */
-  export class ImageProviders {
-    private current: ImageProviderState;
+  class ProviderStore<Card, State extends ProviderState> {
     private generation = 0;
     private listeners = new Set<() => void>();
 
     constructor(
       private readonly bridge: DesktopBridge | null,
-      private readonly refreshHosted: () => Promise<boolean>
-    ) {
-      this.current = {
-        loaded: false,
-        images: !!bridge?.images,
-        desktopVersion: bridge?.app.version,
-        configured: [],
-        hosted: false,
-      };
-    }
+      private readonly refreshHosted: () => Promise<boolean>,
+      private readonly supported: boolean,
+      private readonly providers: readonly models.image.ImageProvider[],
+      private readonly access: (
+        card: Card,
+        state: State,
+        transparent: boolean
+      ) => ImageAccess,
+      private current: State
+    ) {}
 
-    readonly getSnapshot = (): ImageProviderState => this.current;
+    readonly getSnapshot = (): State => this.current;
 
     readonly subscribe = (listener: () => void): (() => void) => {
       this.listeners.add(listener);
       return () => this.listeners.delete(listener);
     };
 
-    async refresh(
-      card?: models.image.ImageModelCard,
-      transparent = false
-    ): Promise<ImageProviderState> {
+    async refresh(card?: Card, transparent = false): Promise<State> {
       const generation = ++this.generation;
       const bridge = this.bridge;
-      const hosted = bridge?.images
+      const hosted = this.supported
         ? Promise.resolve()
             .then(() => this.refreshHosted())
             .catch(() => false)
         : Promise.resolve(false);
-      const presence = bridge?.images
-        ? await Promise.all(
-            models.image.providers.map(async (id) => ({
-              id,
-              connected: await Promise.resolve()
-                .then(() => bridge.secrets.has(id))
-                .catch(() => false),
-            }))
-          )
-        : [];
-      const next: ImageProviderState = {
+      const presence =
+        this.supported && bridge
+          ? await Promise.all(
+              this.providers.map(async (id) => ({
+                id,
+                connected: await Promise.resolve()
+                  .then(() => bridge.secrets.has(id))
+                  .catch(() => false),
+              }))
+            )
+          : [];
+      const next: State = {
+        ...this.current,
         loaded: true,
-        images: !!bridge?.images,
-        desktopVersion: bridge?.app.version,
         configured: presence
           .filter((provider) => provider.connected)
           .map((provider) => provider.id),
         hosted: false,
       };
-      const publish = (state: ImageProviderState): ImageProviderState => {
+      const publish = (state: State): State => {
         // A newer refresh or unmount invalidates this submit-time result too,
         // not only its UI update. Never return superseded connected keys.
         if (generation !== this.generation)
@@ -195,15 +278,16 @@ export namespace MediaModelAvailability {
       );
       if (
         card &&
-        (image(card, keyState, transparent).available ||
-          !image(card, { ...keyState, hosted: true }, transparent).available)
+        (this.access(card, keyState, transparent).available ||
+          !this.access(card, { ...keyState, hosted: true }, transparent)
+            .available)
       ) {
         return keyState;
       }
       return hostedState;
     }
 
-    /** Settings uses another window; recheck when the image surface regains focus. */
+    /** Settings uses another window; recheck when the media surface regains focus. */
     connect(): () => void {
       const refresh = () => {
         void this.refresh();
@@ -219,6 +303,56 @@ export namespace MediaModelAvailability {
         window.removeEventListener("focus", refresh);
         document.removeEventListener("visibilitychange", whenVisible);
       };
+    }
+  }
+
+  export class ImageProviders extends ProviderStore<
+    models.image.ImageModelCard,
+    ImageProviderState
+  > {
+    constructor(
+      bridge: DesktopBridge | null,
+      refreshHosted: () => Promise<boolean>
+    ) {
+      super(
+        bridge,
+        refreshHosted,
+        !!bridge?.images,
+        models.image.providers,
+        image,
+        {
+          loaded: false,
+          images: !!bridge?.images,
+          desktopVersion: bridge?.app.version,
+          configured: [],
+          hosted: false,
+        }
+      );
+    }
+  }
+
+  export class VideoProviders extends ProviderStore<
+    models.video.VideoModelCard,
+    VideoProviderState
+  > {
+    constructor(
+      bridge: DesktopBridge | null,
+      refreshHosted: () => Promise<boolean>
+    ) {
+      super(
+        bridge,
+        refreshHosted,
+        !!bridge?.video,
+        models.video.providers,
+        video,
+        {
+          loaded: false,
+          video: !!bridge?.video,
+          desktopVersion: bridge?.app.version,
+          configured: [],
+          hosted: false,
+        }
+      );
     }
   }
 

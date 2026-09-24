@@ -1,6 +1,5 @@
-type ProviderBoundModel = Readonly<{
-  providers?: object;
-}>;
+import { catalog as models } from "@grida/ai-models/grida";
+import { MediaModelAvailability } from "@/scaffolds/desktop/shared/media-model-availability";
 
 /** Settings readiness for models resolved through BYOK or Grida hosted media. */
 export namespace MediaModelReadiness {
@@ -15,34 +14,33 @@ export namespace MediaModelReadiness {
     return false;
   }
   /**
-   * Hosted image/video resolution follows the catalogue's Vercel AI Gateway
-   * binding, while BYOK resolution intersects every connected provider with the exact
-   * bindings on this card. A pending source keeps the result pending unless
-   * the other source has already proved the model runnable.
+   * Reuse the playground's operation and native-version gates. A pending source
+   * keeps readiness pending only if it could make this exact model runnable.
    */
   export function visual(
-    model: ProviderBoundModel,
+    kind: "image" | "video",
+    modelId: string,
     connectedByokProviderIds: ReadonlySet<string> | null,
-    hostedActive: boolean | null
+    hostedActive: boolean | null,
+    desktopVersion: string | undefined
   ): boolean | null {
-    const providers = model.providers;
-    if (!providers) return false;
-
-    if (
-      connectedByokProviderIds &&
-      [...connectedByokProviderIds].some((providerId) =>
-        Object.prototype.hasOwnProperty.call(providers, providerId)
-      )
-    ) {
-      return true;
-    }
-    if (
-      hostedActive === true &&
-      Object.prototype.hasOwnProperty.call(providers, "vercel")
-    ) {
-      return true;
-    }
-    if (connectedByokProviderIds === null || hostedActive === null) return null;
-    return false;
+    const access = (assumePending: boolean) => {
+      const state = {
+        loaded: true,
+        images: true,
+        video: true,
+        desktopVersion,
+        configured: models[kind].providers.filter(
+          (id) => connectedByokProviderIds?.has(id) ?? assumePending
+        ),
+        hosted: hostedActive ?? assumePending,
+      };
+      return kind === "image"
+        ? MediaModelAvailability.image(models.image.models[modelId], state)
+            .available
+        : MediaModelAvailability.video(models.video.models[modelId], state)
+            .available;
+    };
+    return access(false) ? true : access(true) ? null : false;
   }
 }
