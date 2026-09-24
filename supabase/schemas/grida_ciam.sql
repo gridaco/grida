@@ -322,7 +322,7 @@ GRANT ALL ON TABLE grida_ciam.customer_portal_session TO service_role;
 
 ---------------------------------------------------------------------
 -- [grida_ciam_public.create_customer_otp_challenge]
--- Public-facing RPC to create an OTP challenge
+-- Service-role RPC to create an OTP challenge (server generates the OTP)
 ---------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION grida_ciam_public.create_customer_otp_challenge(
@@ -379,11 +379,13 @@ BEGIN
 END;
 $function$;
 
-GRANT EXECUTE ON FUNCTION grida_ciam_public.create_customer_otp_challenge(bigint, text, text, int) TO anon, authenticated, service_role;
+-- Service-only: every caller is the server's service_role client.
+REVOKE ALL ON FUNCTION grida_ciam_public.create_customer_otp_challenge(bigint, text, text, int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION grida_ciam_public.create_customer_otp_challenge(bigint, text, text, int) TO service_role;
 
 ---------------------------------------------------------------------
 -- [grida_ciam_public.verify_customer_otp_and_create_session]
--- Public-facing RPC to verify OTP (no session creation)
+-- Service-role RPC to verify OTP (no session creation)
 ---------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION grida_ciam_public.verify_customer_otp_and_create_session(
@@ -461,7 +463,9 @@ BEGIN
 END;
 $function$;
 
-GRANT EXECUTE ON FUNCTION grida_ciam_public.verify_customer_otp_and_create_session(uuid, text, int) TO anon, authenticated, service_role;
+-- Service-only: every caller is the server's service_role client.
+REVOKE ALL ON FUNCTION grida_ciam_public.verify_customer_otp_and_create_session(uuid, text, int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION grida_ciam_public.verify_customer_otp_and_create_session(uuid, text, int) TO service_role;
 
 ---------------------------------------------------------------------
 -- [grida_ciam_public.create_customer_portal_session]
@@ -523,6 +527,9 @@ BEGIN
 END;
 $function$;
 
+REVOKE ALL ON FUNCTION grida_ciam_public.create_customer_portal_session(
+  bigint, uuid, int, int, text[]
+) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION grida_ciam_public.create_customer_portal_session(
   bigint, uuid, int, int, text[]
 ) TO service_role;
@@ -693,6 +700,8 @@ AS $$
     AND revoked_at IS NULL;
 $$;
 
+REVOKE ALL ON FUNCTION grida_ciam_public.revoke_customer_portal_sessions(bigint, uuid)
+FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION grida_ciam_public.revoke_customer_portal_sessions(bigint, uuid)
 TO service_role;
 
