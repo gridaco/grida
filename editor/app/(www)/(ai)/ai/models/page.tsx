@@ -137,7 +137,7 @@ function ReleaseDate({
 }
 
 const LONG_CONTEXT_PRICING_NOTE =
-  "For GPT-5.5, all GPT-5.6 variants, and GPT-6 Astra, requests above 272K total input tokens use 2× input/cache rates and 1.5× output rates for the full request.";
+  "For GPT-5.5, all GPT-5.6 variants, and all GPT-6 variants, requests above 272K total input tokens use 2× input/cache rates and 1.5× output rates for the full request.";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

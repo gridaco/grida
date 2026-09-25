@@ -249,6 +249,17 @@ API key. It presents two contract styles:
 - **Image and video: Grida-native generation surfaces** — request/response
   shapes owned by our own protocol, returning inline results.
 
+Display reasoning alone does not constitute resumable reasoning state. Models
+that require signed or encrypted state across tool calls need a client that
+preserves complete ordered assistant blocks, including empty reasoning blocks,
+against their original model and conversation prefix. GG offers an explicit
+continuation capability for this contract; older clients keep the compatible
+catalogue. Its bounded state conveys no organization or credential authority,
+and OpenAI continuation uses stateless execution. A consistency digest detects
+accidental prefix changes but does not authenticate upstream signatures. The
+[chat wire contract](https://github.com/gridaco/grida/blob/main/editor/lib/ai/openai-compat/README.md)
+defines the extension, rejection behavior and verification limits.
+
 ### 3. Metering against prepaid organization credit
 
 Every GG call is metered against the organization's prepaid AI credit. It runs
@@ -274,8 +285,9 @@ model. The result was a client whose own picker offered a model its own
 agent host rejected as unknown.
 
 The catalogue is therefore **published, not shipped**: authored in-repo
-(it is a curated product decision, not a scrape) and served at
-`GET /api/v1/models/catalog`.
+(it is a curated product decision, not a scrape) and served through versioned
+public snapshots. `GET /api/v1/models/catalog` retains schema 1;
+`GET /api/v1/models/catalog/2` publishes schema 2 for continuation-capable clients.
 
 **One package, two explicit entries.** The factual `@grida/ai-models` entry
 describes identities, capabilities, verified provider bindings, and published
@@ -297,9 +309,10 @@ selections and surface-specific tier choices take precedence over the general
 recommendation. Provider availability and implemented adapter capabilities are
 checked separately at execution.
 
-- **The published snapshot IS the deployed gate.** That endpoint's body
-  and the server's own model allowlist are the same static import in the
-  same deploy artifact, so they cannot disagree. This is why the published
+- **The published snapshot respects the deployed gate.** The current snapshot
+  and the server's model allowlist share service membership. Older snapshots
+  additionally restrict choices to their runtime's compatible subset; they
+  never reintroduce withdrawn membership. This is why the published
   catalogue outranks a client's bundled one even when the binary is newer:
   converging on it is converging on the table that will actually be
   enforced.
@@ -354,10 +367,21 @@ one code path rather than a family of overrides.
 fields they do not know, so a new optional field is safe to publish. A
 breaking change publishes at a NEW path and bumps the major, leaving old
 clients on the old path or falling back to their seed. One rule follows
-from that: a model requiring new CLIENT CODE (a new provider kind) must
+from that: a model requiring new CLIENT CODE (a new provider kind or reasoning
+continuation contract) must
 never be published into an existing schema, because old clients will
 accept its data and then fail to drive it. Ordinary models are pure data
 and need no accompanying release.
+
+**Runtime compatibility is explicit.** Schema 2 admits the new GPT-6 Sol/Luna
+and Claude Opus 5.5 execution contracts. Schema 1 retains its prior text choices,
+tiers and recommendation while using current facts and withdrawal policy.
+Current readers accept either version and replace rather than merge. An older
+server's 404 on the new path permits one fallback to the original path; invalid
+data and other errors do not trigger a downgrade. Desktop advertises support
+only when its bundled runtime can retain continuation through tool pauses and
+resume. A refreshed renderer uses legacy choices without that attestation.
+Native subscription availability is independent of hosted tiers.
 
 **Sections are independently fallible.** `text`, `image`, and `video` are
 validated separately: an unusable media section is dropped on its own and
@@ -467,10 +491,11 @@ expiry; each GG call uses the bounded native provider transport and Chromium
 system route without giving Electron main durable token custody; the gateway
 gates and meters through the live billing rail; BYOK
 continues to bypass everything. The model catalogue is published at
-`/api/v1/models/catalog` and agent hosts resolve through it — seeded from
+versioned `/api/v1/models/catalog` paths and agent hosts resolve through them — seeded from
 their bundled copy, refreshed at boot, on an interval, and once on a run-gate
 miss — so a model added or a tier retargeted on the server reaches an
-already-installed binary without a release. Text, image, and video are all
+already-installed compatible binary without a release. A new continuation
+contract still needs a native update and its explicit capability. Text, image, and video are all
 published and consumed; `audio`, `image_tools`, and `embedding` deliberately
 are not (no agent-host reader, and the embedding card is a compile-time
 consistency pin against a database column, not distributable data). The experimental ChatGPT subscription

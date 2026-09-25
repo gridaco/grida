@@ -40,6 +40,7 @@ import {
 import { isHostedTextModel } from "@/lib/ai/openai-compat/hosted-models";
 import { allowAiRequest } from "@/lib/ai/openai-compat/limits";
 import { chatCompletionRequestSchema } from "@/lib/ai/openai-compat/wire";
+import { GridaContinuation } from "@/lib/ai/openai-compat/gg-continuation";
 
 export const maxDuration = 300;
 
@@ -64,18 +65,26 @@ export async function POST(request: Request) {
     const model = grida.languageModel(req.model) as LanguageModelV3;
     const callOptions = {
       ...decoded.callOptions,
-      providerOptions: gridaProviderOptions({
-        organizationId: claims.org,
-        feature: "v1/ai/chat",
-        awaitIngest: false,
-      }),
+      providerOptions: {
+        ...(decoded.continuation
+          ? GridaContinuation.executionOptions(req.model)
+          : {}),
+        ...gridaProviderOptions({
+          organizationId: claims.org,
+          feature: "v1/ai/chat",
+          awaitIngest: false,
+        }),
+      },
     };
 
     if (!decoded.stream) {
       const result = await model.doGenerate(callOptions);
-      return Response.json(encodeCompletion(req.model, result), {
-        headers: NO_STORE,
-      });
+      return Response.json(
+        encodeCompletion(req.model, result, decoded.continuation),
+        {
+          headers: NO_STORE,
+        }
+      );
     }
 
     // The gate awaits inside doStream (middleware) — a blocked org
@@ -83,7 +92,10 @@ export async function POST(request: Request) {
     const { stream } = await model.doStream(callOptions);
     return new Response(
       stream.pipeThrough(
-        streamEncoder(req.model, { includeUsage: decoded.includeUsage })
+        streamEncoder(req.model, {
+          includeUsage: decoded.includeUsage,
+          continuation: decoded.continuation,
+        })
       ),
       {
         headers: {

@@ -36,6 +36,7 @@ const copiedFiles = [
   "lib/api/account.ts",
   "lib/api/gg.ts",
   "lib/api/gg-media.ts",
+  "lib/api/catalog.ts",
   "lib/gg/uploads.ts",
   "lib/account/account.ts",
   "lib/supabase/native-data.ts",
@@ -51,6 +52,7 @@ const copiedFiles = [
   "lib/gg/tokens.ts",
   "lib/gg/config.ts",
   "lib/ai/openai-compat/codec.ts",
+  "lib/ai/openai-compat/gg-continuation.ts",
   "lib/ai/openai-compat/errors.ts",
   "lib/ai/openai-compat/hosted-models.ts",
   "lib/ai/openai-compat/wire.ts",
@@ -60,6 +62,8 @@ const copiedFiles = [
   "app/(api)/(public)/api/v1/auth/me/route.ts",
   "app/(api)/(public)/api/v1/auth/gg/route.ts",
   "app/(api)/(public)/api/v1/ai/models/route.ts",
+  "app/(api)/(public)/api/v1/models/catalog/route.ts",
+  "app/(api)/(public)/api/v1/models/catalog/2/route.ts",
   "app/(api)/(public)/api/v1/ai/3d/uploads/route.ts",
   "app/(api)/(public)/api/v1/ai/3d/model-generation/route.ts",
   "app/(api)/(public)/api/v1/ai/3d/rig-check/route.ts",
@@ -2070,6 +2074,73 @@ async function assertions(
     );
   }
   issuer.mode = "ok";
+  // Real public catalog routes: rollout compatibility must hold through Next,
+  // independently of any account/GG credential or browser organization state.
+  const catalogPath = "/api/v1/models/catalog";
+  for (const [path, schema, pro] of [
+    [catalogPath, 1, "openai/gpt-5.6-sol"],
+    [catalogPath + "/2", 2, "openai/gpt-6-sol"],
+  ]) {
+    const response = await request(port, path);
+    check(response.status === 200, "public catalog route failed");
+    check(
+      response.headers["cache-control"]?.includes("public"),
+      "public catalog cache policy"
+    );
+    check(
+      !response.headers["set-cookie"] && !response.headers.location,
+      "public catalog acquired browser behavior"
+    );
+    const snapshot = JSON.parse(response.body);
+    check(
+      snapshot.schema === schema && snapshot.text.tier_model_ids.pro === pro,
+      "catalog compatibility or tier mismatch"
+    );
+    check(
+      Boolean(snapshot.text.catalog["anthropic/claude-opus-5.5"]) ===
+        (schema === 2),
+      "catalog new-model admission mismatch"
+    );
+    const withHeaders = await request(port, path, {
+      headers: {
+        ...auth(alpha),
+        cookie: "organization=another",
+        "x-organization-id": "999",
+      },
+    });
+    check(
+      withHeaders.body === response.body,
+      "public catalog varied by caller"
+    );
+    count += 2;
+  }
+  const catalogHead = await request(port, catalogPath + "/2", {
+    method: "HEAD",
+  });
+  check(catalogHead.status === 200 && catalogHead.body === "", "catalog HEAD");
+  const catalogOptions = await request(port, catalogPath + "/2", {
+    method: "OPTIONS",
+  });
+  check(
+    catalogOptions.status === 204 &&
+      catalogOptions.headers.allow === "GET, HEAD, OPTIONS",
+    "catalog OPTIONS"
+  );
+  safe(
+    await request(port, catalogPath + "/2", { method: "POST" }),
+    405,
+    "catalog write refused",
+    true,
+    false
+  );
+  safe(
+    await request(port, catalogPath + "/2?organization_id=1"),
+    400,
+    "catalog selector refused",
+    true,
+    false
+  );
+  count += 2;
   await organizationAssertions(port, issuer, safe, alpha, beta);
   await creditsAssertions(port, issuer, safe, alpha, beta);
   await ggAssertions(

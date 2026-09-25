@@ -62,8 +62,8 @@ describe("model_picker_options", () => {
     }
   });
 
-  it("always exposes the full Grida credit-backed catalog", () => {
-    const grida = model_picker_options.grida();
+  it("exposes the full current Grida credit-backed catalog on a capable runtime", () => {
+    const grida = model_picker_options.grida(true);
     const catalogIds = Object.keys(_models.text.catalog);
 
     expect(grida.label).toBe("Grida");
@@ -77,27 +77,76 @@ describe("model_picker_options", () => {
     ).toBe(true);
   });
 
-  it("places every legacy model after active choices without removing its provider tuple", () => {
-    for (const group of [
-      model_picker_options.grida(),
-      ...model_picker_options.byok(["openrouter", "vercel"]),
-    ]) {
-      const firstLegacy = group.options.findIndex(
-        (option) => option.deprecated
-      );
-      expect(firstLegacy).toBeGreaterThan(0);
+  it.each([undefined, false, true])(
+    "gates Grida and BYOK identically while leaving subscription and endpoints independent (%s)",
+    (textCatalogV2) => {
+      const groups = model_picker_options.groups({
+        textCatalogV2,
+        chatGptReady: true,
+        configuredByokProviderIds: ["openrouter", "vercel"],
+        endpoints: [
+          {
+            id: "custom",
+            base_url: "https://example.com/v1",
+            models: [{ id: "openai/gpt-6-sol", label: "Custom Sol" }],
+          },
+        ],
+      });
+      const expectedView =
+        textCatalogV2 === true
+          ? _models.snapshot.v2.view()
+          : _models.snapshot.view();
+      for (const providerId of [GG_PROVIDER_ID, "openrouter", "vercel"]) {
+        const group = groups.find((group) => group.id === providerId)!;
+        expect(group.options.map((option) => option.selection)).toEqual(
+          expectedView
+            .listed()
+            .map((model) => ({ provider_id: providerId, model_id: model.id }))
+        );
+        expect(
+          group.options.some(
+            (option) => option.selection.model_id === "openai/gpt-6-sol"
+          )
+        ).toBe(textCatalogV2 === true);
+      }
       expect(
-        group.options.slice(firstLegacy).every((option) => option.deprecated)
-      ).toBe(true);
-      expect(
-        group.options.some(
-          (option) =>
-            option.selection.model_id === "anthropic/claude-opus-4.8" &&
-            option.selection.provider_id === group.id
-        )
-      ).toBe(true);
+        groups
+          .find((group) => group.id === CHATGPT_PROVIDER_ID)
+          ?.options.map((option) => option.selection.model_id)
+      ).toEqual(CHATGPT_SUBSCRIPTION_MODEL_IDS);
+      expect(groups.find((group) => group.id === "custom")?.options).toEqual([
+        {
+          selection: { provider_id: "custom", model_id: "openai/gpt-6-sol" },
+          label: "Custom Sol",
+        },
+      ]);
     }
-  });
+  );
+
+  it.each([false, true])(
+    "places legacy models after active choices without removing provider tuples (v2=%s)",
+    (textCatalogV2) => {
+      for (const group of [
+        model_picker_options.grida(textCatalogV2),
+        ...model_picker_options.byok(["openrouter", "vercel"], textCatalogV2),
+      ]) {
+        const firstLegacy = group.options.findIndex(
+          (option) => option.deprecated
+        );
+        expect(firstLegacy).toBeGreaterThan(0);
+        expect(
+          group.options.slice(firstLegacy).every((option) => option.deprecated)
+        ).toBe(true);
+        expect(
+          group.options.some(
+            (option) =>
+              option.selection.model_id === "anthropic/claude-opus-4.8" &&
+              option.selection.provider_id === group.id
+          )
+        ).toBe(true);
+      }
+    }
+  );
 
   it("shows only ready subscription and configured non-Grida providers", () => {
     const signedOut = model_picker_options.groups({

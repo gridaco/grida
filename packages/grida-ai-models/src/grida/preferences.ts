@@ -3,7 +3,7 @@ import type { catalog } from "./catalog";
 
 /** Independent service recommendations. Omit a default to make no recommendation. */
 export const preferences = {
-  text: { default_id: "openai/gpt-5.6-terra" },
+  text: { default_id: "openai/gpt-6-sol" },
   image: {
     default_id: "openai/gpt-image-2.5-flare",
     order: ["openai/gpt-image-2.5-sunburst"],

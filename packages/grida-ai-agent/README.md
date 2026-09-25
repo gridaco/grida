@@ -67,11 +67,30 @@ scratch.
 The service policy comes from `@grida/ai-models/grida`, which joins Grida membership,
 legacy status, tiers, request presets and optional recommendations to the neutral
 `@grida/ai-models` facts. The shared SDK retains its Grida defaults and owns the
-refresh store, using the service entry's seed and schema-1 parser. The image and
+refresh store, using the service entry's schema-2 seed and version-aware parser. The image and
 video routes and chat runtime share that store; audio and 3D retain their bundled
 catalogs. The optional image default
 is used only when the caller has not chosen a model. Explicit legacy selections
 remain valid while the service still admits them.
+
+Text continuation requires more than display reasoning. The OpenRouter adapter
+uses its AI SDK 6 provider to retain `reasoning_details`; GG uses its bounded,
+opt-in continuation envelope. The recorder retains provider metadata, empty
+reasoning blocks and step boundaries across tool approval and resume. Model-view
+rebuilds retain that state only within the current user turn for the same resolved
+provider/model; older turns and changed prefixes drop it together. Automatic
+compaction waits for a new user turn, never an assistant tool continuation.
+Parallel human-input batches persist each answer immediately but wait for every
+approval/question before executing approved tools or resuming the model. An
+interrupted provider step is omitted on retry only when that cannot hide an
+already completed tool result; otherwise the user must start a new turn.
+The runtime does not interpret vendor signatures or enable stored responses.
+
+Current clients fetch `/api/v1/models/catalog/2`; a 404 falls back to the original
+schema-1 path. Accepted snapshots replace membership wholesale. Desktop's
+`text_catalog_v2` capability attests this bundled runtime; absent/false keeps the
+renderer on compatible schema-1 choices. These text adapters require a native
+app update. Native ChatGPT subscription choices remain independently configured.
 
 The shared operation does not retry a failed paid batch. Requesting multiple
 images can still require multiple submissions under the provider's batch limit.

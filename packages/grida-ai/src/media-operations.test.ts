@@ -313,25 +313,28 @@ describe("MediaOperations discovery", () => {
     );
   });
 
-  it("owns a pinned snapshot and never restores a removed image or video binding", () => {
-    const snapshot = JSON.parse(JSON.stringify(models.snapshot.seed()));
-    delete snapshot.image.models[image.model_id];
-    delete snapshot.video.models[video.model_id].providers.vercel;
-    const operations = new MediaOperations({ snapshot });
-    snapshot.image = models.snapshot.seed().image;
-    snapshot.video = models.snapshot.seed().video;
-    expect(
-      operations.list({ kind: "image", model_id: image.model_id })
-    ).toEqual([]);
-    rejects(() => operations.inspect(video), "operation_unavailable");
-    rejects(
-      () => operations.inspect({ ...video, provider: "gg" }),
-      "operation_unavailable"
-    );
-    expect(
-      operations.inspect({ ...video, provider: "fal", variant: "image" })
-    ).toBeDefined();
-  });
+  it.each([models.snapshot.seed(), models.snapshot.v2.seed()])(
+    "owns a pinned schema-$schema snapshot without restoring removed bindings",
+    (source) => {
+      const snapshot = JSON.parse(JSON.stringify(source));
+      delete snapshot.image.models[image.model_id];
+      delete snapshot.video.models[video.model_id].providers.vercel;
+      const operations = new MediaOperations({ snapshot });
+      snapshot.image = models.snapshot.seed().image;
+      snapshot.video = models.snapshot.seed().video;
+      expect(
+        operations.list({ kind: "image", model_id: image.model_id })
+      ).toEqual([]);
+      rejects(() => operations.inspect(video), "operation_unavailable");
+      rejects(
+        () => operations.inspect({ ...video, provider: "gg" }),
+        "operation_unavailable"
+      );
+      expect(
+        operations.inspect({ ...video, provider: "fal", variant: "image" })
+      ).toBeDefined();
+    }
+  );
 
   it("inherits only exact legacy video facts and refuses changed or explicitly unknown bindings", () => {
     const snapshot = JSON.parse(JSON.stringify(models.snapshot.seed()));
@@ -361,11 +364,24 @@ describe("MediaOperations discovery", () => {
     );
   });
 
-  it("rejects an invalid supplied section instead of falling back to bundled media", () => {
+  it.each([models.snapshot.seed(), models.snapshot.v2.seed()])(
+    "rejects an invalid schema-$schema media section instead of restoring the bundle",
+    (source) => {
+      expect.hasAssertions();
+      const snapshot = JSON.parse(JSON.stringify(source));
+      snapshot.image = { models: "malformed" };
+      rejects(() => new MediaOperations({ snapshot }));
+    }
+  );
+
+  it("rejects an unsupported snapshot schema even with valid media", () => {
     expect.hasAssertions();
-    const snapshot = JSON.parse(JSON.stringify(models.snapshot.seed()));
-    snapshot.image = { models: "malformed" };
-    rejects(() => new MediaOperations({ snapshot }));
+    rejects(
+      () =>
+        new MediaOperations({
+          snapshot: { ...models.snapshot.v2.seed(), schema: 3 },
+        })
+    );
   });
 });
 

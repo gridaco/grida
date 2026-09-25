@@ -181,6 +181,161 @@ const TOOLS: LanguageModelV3CallOptions["tools"] = [
 ];
 
 describe("POST /api/v1/ai/chat/completions (contract)", () => {
+  it.each([false, true])(
+    "continuation stream=%s preserves state and cannot replace billing or storage authority",
+    async (stream) => {
+      const model = "openai/gpt-5.6-terra";
+      const token = await mintedToken();
+      const post = (body: unknown) =>
+        POST(
+          new Request("http://grida.test/api/v1/ai/chat/completions", {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${token}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(body),
+          })
+        );
+      const metadata = {
+        openai: {
+          itemId: "rs_synthetic",
+          reasoningEncryptedContent: "synthetic-encrypted",
+        },
+      };
+      h.generate = {
+        content: [
+          { type: "reasoning", text: "", providerMetadata: metadata },
+          { type: "text", text: "Checking." },
+          {
+            type: "tool-call",
+            toolCallId: "call_1",
+            toolName: "weather",
+            input: "{}",
+          },
+        ],
+        finishReason: { unified: "tool-calls", raw: "tool_calls" },
+        usage: USAGE,
+        warnings: [],
+      };
+      h.parts = [
+        { type: "reasoning-start", id: "r" },
+        { type: "reasoning-end", id: "r", providerMetadata: metadata },
+        { type: "text-start", id: "t" },
+        { type: "text-delta", id: "t", delta: "Checking." },
+        { type: "text-end", id: "t" },
+        {
+          type: "tool-call",
+          toolCallId: "call_1",
+          toolName: "weather",
+          input: "{}",
+        },
+        {
+          type: "finish",
+          finishReason: { unified: "tool-calls", raw: "tool_calls" },
+          usage: USAGE,
+        },
+      ];
+      const body = {
+        model,
+        stream,
+        grida_continuation: { version: 1 },
+        messages: [{ role: "user", content: "weather?" }],
+        tools: [
+          {
+            type: "function",
+            function: { name: "weather", parameters: { type: "object" } },
+          },
+        ],
+        organizationId: 999,
+        providerOptions: {
+          grida: { organizationId: 999, feature: "injected" },
+          openai: { store: true },
+          gateway: { apiKey: "injected" },
+        },
+      };
+      const response = await post(body);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      let message;
+      if (stream) {
+        const raw = await response.text();
+        expect(raw).toContain("[DONE]");
+        const frames = raw
+          .split("\n\n")
+          .filter((s) => s.startsWith("data: ") && s !== "data: [DONE]")
+          .map((s) => JSON.parse(s.slice(6)));
+        const state = frames.find(
+          (f) => f.choices?.[0]?.delta?.grida_continuation
+        ).choices[0].delta.grida_continuation;
+        message = {
+          role: "assistant",
+          content: "Checking.",
+          tool_calls: [
+            {
+              id: "call_1",
+              type: "function",
+              function: { name: "weather", arguments: "{}" },
+            },
+          ],
+          grida_continuation: state,
+        };
+      } else {
+        message = (await response.json()).choices[0].message;
+      }
+      expect(
+        (h.lastCallOptions as LanguageModelV3CallOptions).providerOptions
+      ).toEqual({
+        openai: { store: false, include: ["reasoning.encrypted_content"] },
+        grida: {
+          organizationId: ORG,
+          feature: "v1/ai/chat",
+          awaitIngest: false,
+        },
+      });
+      h.generate = {
+        content: [{ type: "text", text: "Sunny." }],
+        finishReason: { unified: "stop", raw: "stop" },
+        usage: USAGE,
+        warnings: [],
+      };
+      const continued = await post({
+        ...body,
+        stream: false,
+        messages: [
+          ...body.messages,
+          message,
+          { role: "tool", tool_call_id: "call_1", content: "sunny" },
+        ],
+      });
+      expect(continued.status).toBe(200);
+      expect(
+        (h.lastCallOptions as LanguageModelV3CallOptions).prompt[1]
+      ).toEqual({
+        role: "assistant",
+        content: [
+          { type: "reasoning", text: "", providerOptions: metadata },
+          { type: "text", text: "Checking." },
+          {
+            type: "tool-call",
+            toolCallId: "call_1",
+            toolName: "weather",
+            input: {},
+          },
+        ],
+      });
+      expect(mockedGetEntitlement).toHaveBeenCalledTimes(2);
+      expect(mockedIngest).toHaveBeenCalledTimes(2);
+      expect(mockedIngest.mock.calls.every(([org]) => org === ORG)).toBe(true);
+      const invalid = await post({
+        ...body,
+        messages: [{ role: "user", content: "changed prefix" }, message],
+      });
+      expect(invalid.status).toBe(400);
+      expect(mockedGetEntitlement).toHaveBeenCalledTimes(2);
+    }
+  );
+
   it("non-stream: roundtrips the prompt, returns content + usage, bills real mills", async () => {
     h.generate = {
       content: [{ type: "text", text: "It is sunny." }],

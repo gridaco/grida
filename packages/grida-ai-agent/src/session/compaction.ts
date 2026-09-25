@@ -87,7 +87,7 @@ export function resolveModelLimits(
   // that refreshes passes its live view, so a model published after this
   // binary shipped is sized by its REAL window rather than falling
   // through to the frontier-sized default below.
-  view: models.snapshot.View = models.snapshot.view()
+  view: models.snapshot.View = models.snapshot.v2.view()
 ): ModelLimits {
   let spec: { contextWindow: number; outputLimit: number } | undefined =
     model?.model_id ? view.resolve(model.model_id, custom) : undefined;

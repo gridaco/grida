@@ -53,10 +53,10 @@ export class MediaHost {
       gg: this.gridaGatewayBaseUrl !== undefined,
     };
     this.modelCatalog = new ModelCatalogStore({
-      // Preserve the legacy operator pin in both host compositions.
+      // Disable refresh without downgrading this runtime's bundled catalog.
       snapshot:
         process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1"
-          ? models.snapshot.seed()
+          ? models.snapshot.v2.seed()
           : undefined,
       base_url: this.gridaGatewayBaseUrl,
       fetch: this.providerHttp.request,

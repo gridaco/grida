@@ -125,6 +125,22 @@ need their own lifecycle contract.
 
 ## Adding a route
 
+### Public model catalog
+
+`GET /api/v1/models/catalog/2` publishes schema 2 with current text membership,
+tiers, prices and recommendations. Its fixed `catalog` binding accepts no input
+and acquires no identity: bearer/cookie/organization headers do not change the
+response. GET/HEAD are CDN-cacheable for five minutes; OPTIONS advertises those
+methods, writes return 405 and query/body inputs return 400. No provider or
+billing work runs. The opaque version is a hash of the published catalog data.
+
+The original `/api/v1/models/catalog` remains schema 1 with compatible text
+membership/defaults for released clients. New models requiring continuation
+support appear only in schema 2. Current readers accept either version and try
+the original path only when the schema-2 route returns 404; malformed responses
+do not trigger a downgrade. The data establishes available choices, not a token,
+spending permission or proof of upstream readiness.
+
 ### Funded Tripo features
 
 The fixed `gg-media` binding serves four GG-only POST operations under

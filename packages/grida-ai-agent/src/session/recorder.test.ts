@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { openSessionsDb, type OpenedSessionsDb } from "./db";
 import { createRecorderConsumer } from "./recorder";
 import { SessionsStore } from "./store";
-import type { ChatSessionRow } from "./rows";
+import type { ChatModel, ChatSessionRow } from "./rows";
 
 let tempDir: string;
 let opened: OpenedSessionsDb;
@@ -41,6 +41,416 @@ async function feed(
 }
 
 describe("createRecorderConsumer", () => {
+  it("merges partial tool-call metadata through approval and resumed output without mixing result metadata", async () => {
+    const callMetadata = {
+      openai: { itemId: "call-item", phase: "available", cleared: null },
+      otherProvider: { kept: true },
+    };
+    await feed(createRecorderConsumer({ store, session_id: session.id }), [
+      { type: "start", messageId: "tool-metadata" },
+      {
+        type: "tool-input-start",
+        toolCallId: "call",
+        toolName: "list_files",
+        providerMetadata: {
+          openai: { itemId: "call-item", phase: "start", cleared: "old" },
+          otherProvider: { kept: true },
+        },
+      },
+      {
+        type: "tool-input-delta",
+        toolCallId: "call",
+        inputTextDelta: '{"path":"/"}',
+        providerMetadata: { openai: { phase: "delta", cleared: null } },
+      },
+      {
+        type: "tool-input-available",
+        toolCallId: "call",
+        toolName: "list_files",
+        input: { path: "/" },
+        providerMetadata: { openai: { phase: "available" } },
+      },
+      {
+        type: "tool-approval-request",
+        toolCallId: "call",
+        approvalId: "approval",
+      },
+    ]);
+    expect((await store.findToolPart(session.id, "call"))?.data).toMatchObject({
+      state: "approval-requested",
+      callProviderMetadata: callMetadata,
+    });
+
+    const resultMetadata = { openai: { itemId: "result-item" } };
+    await feed(createRecorderConsumer({ store, session_id: session.id }), [
+      { type: "start", messageId: "tool-metadata" },
+      {
+        type: "tool-output-available",
+        toolCallId: "call",
+        output: { files: [] },
+        providerMetadata: resultMetadata,
+      },
+    ]);
+    expect((await store.findToolPart(session.id, "call"))?.data).toEqual({
+      type: "tool-list_files",
+      toolCallId: "call",
+      state: "output-available",
+      input: { path: "/" },
+      output: { files: [] },
+      callProviderMetadata: callMetadata,
+      resultProviderMetadata: resultMetadata,
+    });
+  });
+
+  it.each(
+    ["text", "reasoning"].flatMap((type) =>
+      [false, true].map((ciphertext) => ({ type, ciphertext }))
+    )
+  )(
+    "merges $type metadata per provider through approval and resume (ciphertext: $ciphertext)",
+    async ({ type, ciphertext }) => {
+      const expected = {
+        openai: {
+          itemId: "synthetic-item",
+          reasoningEncryptedContent: ciphertext ? "synthetic-ciphertext" : null,
+          phase: "end",
+          cleared: null,
+          nested: { final: true },
+          deltaOnly: true,
+        },
+        initialProvider: { kept: true },
+        deltaProvider: { kept: true },
+      };
+      await feed(createRecorderConsumer({ store, session_id: session.id }), [
+        { type: "start", messageId: "metadata-continuation" },
+        {
+          type: `${type}-start`,
+          id: "content",
+          providerMetadata: {
+            openai: {
+              itemId: "synthetic-item",
+              reasoningEncryptedContent: null,
+              phase: "start",
+              cleared: "old value",
+              nested: { initial: true },
+            },
+            initialProvider: { kept: true },
+          },
+        },
+        {
+          type: `${type}-delta`,
+          id: "content",
+          delta: "Content",
+          providerMetadata: {
+            openai: { phase: "delta", deltaOnly: true },
+            deltaProvider: { kept: true },
+          },
+        },
+        {
+          type: `${type}-end`,
+          id: "content",
+          providerMetadata: {
+            openai: {
+              itemId: "synthetic-item",
+              phase: "end",
+              cleared: null,
+              nested: { final: true },
+              ...(ciphertext && {
+                reasoningEncryptedContent: "synthetic-ciphertext",
+              }),
+            },
+          },
+        },
+        {
+          type: "tool-input-available",
+          toolCallId: "metadata-call",
+          toolName: "list_files",
+          input: { path: "/" },
+        },
+        {
+          type: "tool-approval-request",
+          toolCallId: "metadata-call",
+          approvalId: "metadata-approval",
+        },
+      ]);
+      const [paused] = await store.listMessages(session.id);
+      expect(paused.parts[0].data).toEqual({
+        type,
+        text: "Content",
+        state: "done",
+        providerMetadata: expected,
+      });
+      expect(paused.parts[1].tool_state).toBe("approval-requested");
+      await feed(createRecorderConsumer({ store, session_id: session.id }), [
+        { type: "start", messageId: "metadata-continuation" },
+        {
+          type: "tool-output-available",
+          toolCallId: "metadata-call",
+          output: { files: [] },
+        },
+      ]);
+      const [resumed] = await store.listMessages(session.id);
+      expect(resumed.parts[0].data).toEqual(paused.parts[0].data);
+      expect(resumed.parts[1].tool_state).toBe("output-available");
+    }
+  );
+
+  it.each([undefined, "advertised-assistant"])(
+    "inserts resolved provenance with a new row even on abort (stream id: %s)",
+    async (messageId) => {
+      let model: ChatModel | undefined;
+      const consumer = createRecorderConsumer({
+        store,
+        session_id: session.id,
+        get_model: () => model,
+      });
+      model = {
+        provider_id: "openrouter",
+        model_id: "anthropic/claude-opus-5.5",
+        tier: "pro",
+      };
+      await feed(
+        consumer,
+        [
+          { type: "start", ...(messageId && { messageId }) },
+          { type: "reasoning-start", id: "thinking" },
+          { type: "reasoning-end", id: "thinking" },
+        ],
+        "abort"
+      );
+      const [message] = await store.listMessages(session.id);
+      expect(message.metadata.model).toEqual(model);
+      expect(consumer.message_id).toBe(message.id);
+      const generatedId = expect.any(String);
+      expect(message.id).toEqual(messageId ?? generatedId);
+    }
+  );
+
+  it.each([false, true])(
+    "adopts legacy tool output with durable provenance before new parts (known model: %s)",
+    async (knownModel) => {
+      const resumedModel: ChatModel = {
+        provider_id: "openrouter",
+        model_id: "anthropic/claude-opus-5.5",
+        tier: "pro",
+      };
+      const originalModel: ChatModel = {
+        provider_id: "vercel",
+        model_id: "openai/gpt-5.6-sol",
+        tier: "pro",
+      };
+      const expectedModel = knownModel ? originalModel : resumedModel;
+      const message = await store.appendMessage(session.id, {
+        id: "legacy-assistant",
+        role: "assistant",
+        ...(knownModel && { metadata: { model: originalModel } }),
+      });
+      await store.upsertPart(message.id, {
+        index: 0,
+        type: "tool-list_files",
+        tool_call_id: "legacy-call",
+        tool_state: "approval-responded",
+        data: {
+          type: "tool-list_files",
+          toolCallId: "legacy-call",
+          state: "approval-responded",
+          input: { path: "/" },
+          approval: { id: "legacy-approval", approved: true },
+        },
+      });
+      const upsertPart = store.upsertPart.bind(store);
+      const modelsAtPartWrite: unknown[] = [];
+      vi.spyOn(store, "upsertPart").mockImplementation(
+        async (messageId, part) => {
+          modelsAtPartWrite.push(
+            (await store.getMessage(messageId))?.metadata.model
+          );
+          return upsertPart(messageId, part);
+        }
+      );
+      const consumer = createRecorderConsumer({
+        store,
+        session_id: session.id,
+        get_model: () => resumedModel,
+      });
+      await feed(
+        consumer,
+        [
+          { type: "start", messageId: message.id },
+          // Existing tool slots bypass ensureAssistantMessage entirely.
+          {
+            type: "tool-output-available",
+            toolCallId: "legacy-call",
+            output: { files: [] },
+          },
+          { type: "reasoning-start", id: "resumed-thinking" },
+          {
+            type: "reasoning-end",
+            id: "resumed-thinking",
+            providerMetadata: {
+              anthropic: { signature: "synthetic-resumed-signature" },
+            },
+          },
+        ],
+        "abort"
+      );
+      expect(modelsAtPartWrite).toHaveLength(3);
+      for (const model of modelsAtPartWrite)
+        expect(model).toEqual(expectedModel);
+      const messages = await store.listMessages(session.id);
+      expect(messages).toHaveLength(1);
+      expect(messages[0].metadata.model).toEqual(expectedModel);
+      expect(messages[0].parts.map((part) => part.type)).toEqual([
+        "tool-list_files",
+        "reasoning",
+      ]);
+      expect(messages[0].parts[0].tool_state).toBe("output-available");
+      expect(consumer.message_id).toBe(message.id);
+    }
+  );
+
+  it("refuses successful settlement when legacy provenance cannot be persisted", async () => {
+    const message = await store.appendMessage(session.id, {
+      id: "legacy-write-failure",
+      role: "assistant",
+    });
+    vi.spyOn(store, "setMessageAccounting").mockRejectedValue(
+      new Error("synthetic metadata write failure")
+    );
+    const onError = vi.fn<(err: unknown) => void>();
+    const consumer = createRecorderConsumer({
+      store,
+      session_id: session.id,
+      get_model: () => ({
+        provider_id: "openrouter",
+        model_id: "anthropic/claude-opus-5.5",
+      }),
+      on_error: onError,
+    });
+    await expect(
+      feed(consumer, [
+        { type: "start", messageId: message.id },
+        { type: "reasoning-start", id: "thinking" },
+      ])
+    ).rejects.toThrow("Could not persist model identity");
+    expect(onError).toHaveBeenCalledOnce();
+    const [persisted] = await store.listMessages(session.id);
+    expect(persisted.metadata.model).toBeUndefined();
+    expect(persisted.parts).toEqual([]);
+  });
+
+  it("retains empty signed reasoning and provider state through approval and resumed output", async () => {
+    const metadata = {
+      openrouter: {
+        reasoning_details: [
+          {
+            type: "reasoning.text",
+            text: "",
+            signature: "synthetic-signature",
+            index: 0,
+          },
+        ],
+      },
+    };
+    await feed(createRecorderConsumer({ store, session_id: session.id }), [
+      { type: "start", messageId: "continuation" },
+      { type: "start-step" },
+      { type: "reasoning-start", id: "r1" },
+      {
+        type: "reasoning-end",
+        id: "r1",
+        providerMetadata: { anthropic: { signature: "synthetic-signature" } },
+      },
+      {
+        type: "tool-input-available",
+        toolCallId: "continue-tool",
+        toolName: "list_files",
+        input: { path: "/" },
+        providerMetadata: metadata,
+      },
+      {
+        type: "tool-approval-request",
+        toolCallId: "continue-tool",
+        approvalId: "allow-tool",
+      },
+    ]);
+    const pending = await store.findToolPart(session.id, "continue-tool");
+    expect(pending?.data).toMatchObject({ callProviderMetadata: metadata });
+    const [message] = await store.listMessages(session.id);
+    expect(message.parts.map((p) => p.type)).toEqual([
+      "step-start",
+      "reasoning",
+      "tool-list_files",
+    ]);
+    expect(message.parts[1].data).toEqual({
+      type: "reasoning",
+      text: "",
+      state: "done",
+      providerMetadata: { anthropic: { signature: "synthetic-signature" } },
+    });
+
+    // A new recorder adopts the original call slot after the approval pause.
+    await feed(createRecorderConsumer({ store, session_id: session.id }), [
+      { type: "start", messageId: "continuation" },
+      {
+        type: "tool-output-available",
+        toolCallId: "continue-tool",
+        output: { files: [] },
+      },
+      { type: "start-step" },
+      { type: "text-start", id: "answer" },
+      { type: "text-delta", id: "answer", delta: "Done" },
+      { type: "text-end", id: "answer" },
+    ]);
+    const completed = await store.findToolPart(session.id, "continue-tool");
+    expect(completed?.data).toMatchObject({
+      callProviderMetadata: metadata,
+      input: { path: "/" },
+      output: { files: [] },
+    });
+    const [resumed] = await store.listMessages(session.id);
+    expect(resumed.parts.map((p) => p.type)).toEqual([
+      "step-start",
+      "reasoning",
+      "tool-list_files",
+      "step-start",
+      "text",
+    ]);
+  });
+
+  it("does not persist an empty failed step", async () => {
+    await feed(
+      createRecorderConsumer({ store, session_id: session.id }),
+      [{ type: "start", messageId: "empty-step" }, { type: "start-step" }],
+      "abort"
+    );
+    expect(await store.listMessages(session.id)).toEqual([]);
+  });
+
+  it("keeps unfinished text and reasoning marked streaming after cancellation", async () => {
+    await feed(
+      createRecorderConsumer({ store, session_id: session.id }),
+      [
+        { type: "start", messageId: "canceled" },
+        { type: "start-step" },
+        { type: "reasoning-start", id: "r" },
+        { type: "reasoning-delta", id: "r", delta: "Partial thinking" },
+        { type: "text-start", id: "t" },
+        { type: "text-delta", id: "t", delta: "Partial answer" },
+      ],
+      "abort"
+    );
+    const [message] = await store.listMessages(session.id);
+    expect(
+      message.parts
+        .filter((part) => part.type !== "step-start")
+        .map((part) => part.data)
+    ).toEqual([
+      { type: "reasoning", text: "Partial thinking", state: "streaming" },
+      { type: "text", text: "Partial answer", state: "streaming" },
+    ]);
+  });
+
   it("persists text-* chunks as a mutable text part", async () => {
     const consumer = createRecorderConsumer({ store, session_id: session.id });
     await feed(consumer, [
@@ -65,9 +475,11 @@ describe("createRecorderConsumer", () => {
     const messages = await store.listMessages(session.id);
     expect(messages.length).toBe(1);
     expect(messages[0].role).toBe("assistant");
-    expect(messages[0].parts.length).toBe(1);
-    expect(messages[0].parts[0].type).toBe("text");
-    expect((messages[0].parts[0].data as { text: string }).text).toBe(
+    expect(messages[0].parts.map((p) => p.type)).toEqual([
+      "step-start",
+      "text",
+    ]);
+    expect((messages[0].parts[1].data as { text: string }).text).toBe(
       "Hello world"
     );
 
@@ -294,7 +706,7 @@ describe("createRecorderConsumer", () => {
     const afterT1 = await store.listMessages(session.id);
     expect(afterT1.length).toBe(1);
     expect(afterT1[0].id).toBe("msgA");
-    expect(afterT1[0].parts.length).toBe(2); // text + run_command(approval)
+    expect(afterT1[0].parts.length).toBe(3); // step + text + run_command(approval)
 
     await store.answerApproval(session.id, {
       tool_call_id: "tc1",
@@ -322,13 +734,13 @@ describe("createRecorderConsumer", () => {
     ]);
 
     // STILL one assistant message (no fork); the continuation APPENDED after the
-    // pausing turn's parts (index 2), never overwriting index 0.
+    // pausing turn's parts, never overwriting existing content.
     const merged = await store.listMessages(session.id);
     expect(merged.length).toBe(1);
     expect(merged[0].id).toBe("msgA");
     const parts = merged[0].parts;
-    expect(parts.length).toBe(3); // text, run_command(output), continuation text
-    expect((parts[0].data as { text: string }).text).toBe("Let me run it.");
+    expect(parts.length).toBe(5); // two steps + text + tool output + continuation
+    expect((parts[1].data as { text: string }).text).toBe("Let me run it.");
     const tool = parts.find((p) => p.type === "tool-run_command");
     expect(tool!.tool_state).toBe("output-available");
     const tail = parts[parts.length - 1];

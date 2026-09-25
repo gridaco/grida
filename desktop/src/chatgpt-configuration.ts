@@ -53,10 +53,9 @@ export const CHATGPT_SUBSCRIPTION_CONFIG: ChatGptProviderConfig = {
   responses_url: CHATGPT_RESPONSES_URL,
   originator: "grida",
   default_model_id: "openai/gpt-5.6-sol",
-  // Mirrors `TIER_MODEL_IDS` from the catalogue. It is a SEPARATE table
-  // because the subscription serves its own model set — a catalogue tier
-  // model the subscription does not offer is the only reason these may
-  // diverge. Pinned by `chatgpt-configuration.test.ts`; drift here is
+  // Independent, observed subscription choices — hosted catalogue additions
+  // cannot widen this backend's allowlist. Pinned by
+  // `chatgpt-configuration.test.ts`; drift here is
   // silent and expensive (background titler/compactor run on `nano`).
   tier_model_ids: {
     nano: "openai/gpt-5.6-luna",

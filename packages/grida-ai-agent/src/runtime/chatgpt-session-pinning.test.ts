@@ -348,7 +348,7 @@ describe("AgentRuntime — persisted ChatGPT/provider session identity", () => {
     const response = await runtime.compact(session.id);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ compacted: true });
-    expect(selected?.provider).toBe("openrouter.chat");
+    expect(selected?.provider).toBe("openrouter");
     expect(selected?.model_id).toBeTruthy();
 
     // Passing the persisted model into resolution is also load-bearing: an

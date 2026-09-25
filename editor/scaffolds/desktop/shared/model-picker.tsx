@@ -4,8 +4,8 @@
  * any user-registered endpoint models (issue #806 — local Ollama,
  * self-hosted gateways).
  *
- * The agent system is tier-based (4 tiers → 4 models), but the catalog
- * holds more models than the tiers map to, leaving some unreachable.
+ * The agent system has four tier keys, but the catalog holds more models
+ * than the tiers map to, leaving some unreachable.
  * This picker lists them all so a desktop user can run any specific
  * model. The chosen provider/model pair rides end-to-end (renderer → agent
  * sidecar → model factory), preserving native ChatGPT, BYOK, Grida, and
@@ -52,9 +52,10 @@ import {
 // providers (live keys) and is lint-blocked from the desktop renderer
 // (GRIDA-SEC-004). This entry is pure data and renderer-safe.
 import { catalog as _models } from "@grida/ai-models/grida";
-import type {
-  ChatSessionRow,
-  EndpointProviderConfig,
+import {
+  useDesktopBridge,
+  type ChatSessionRow,
+  type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
 import {
   registered_models,
@@ -68,7 +69,6 @@ import {
 import * as gridaGateway from "@/lib/desktop/gg-session";
 import { useChatGptSubscription } from "@/lib/desktop/chatgpt-subscription-react";
 import {
-  GG_INCLUDED_MODEL_ID,
   reconcileChatGptSubscriptionDefault,
   resolveDefaultModelSelection,
   resolveNewChatTransition,
@@ -80,6 +80,7 @@ import {
   type ModelPickerOption,
   type ModelPickerSelection,
 } from "./model-picker-options";
+import { desktop_text_catalog } from "./text-catalog";
 // The default-model constants live in a react-free module so the decision
 // is unit-testable in Node; re-exported here to keep the public symbol home.
 export { DEFAULT_MODEL_ID } from "./default-model";
@@ -103,6 +104,8 @@ export function DesktopModelPicker({
   endpoints?: readonly EndpointProviderConfig[];
 }) {
   const [open, setOpen] = useState(false);
+  const bridge = useDesktopBridge();
+  const textCatalogV2 = bridge?.caps.agent?.text_catalog_v2;
   const listId = useId();
   // GRIDA-SEC-008 — this hook exposes only the secret-free status DTO. OAuth
   // credentials remain in Electron main + the sidecar.
@@ -117,8 +120,9 @@ export function DesktopModelPicker({
         chatGptReady,
         configuredByokProviderIds,
         endpoints,
+        textCatalogV2,
       }),
-    [chatGptReady, configuredByokProviderIds, endpoints]
+    [chatGptReady, configuredByokProviderIds, endpoints, textCatalogV2]
   );
   const selectedCommandValue = useMemo(() => {
     for (const group of groups) {
@@ -321,7 +325,7 @@ export function ModelToolCallNotice({
  * refresh never clobbers a pick the user just made (the seed fires once per
  * id, not per `sessions` change). When a Grida Gateway session is live and
  * nothing else has claimed the selection, the keyless default is upgraded to
- * the included hosted tier ({@link GG_INCLUDED_MODEL_ID}; issue #942).
+ * the installed runtime's compatible included hosted tier (issue #942).
  */
 export function useModelPickerState({
   current_id: currentId,
@@ -355,6 +359,8 @@ export function useModelPickerState({
    *  default, so an unresolved default never masquerades as a pick. */
   is_user_pick: boolean;
 } {
+  const bridge = useDesktopBridge();
+  const textCatalogV2 = bridge?.caps.agent?.text_catalog_v2;
   const registeredIds = useMemo(
     () => new Set(registered_models.specs(endpoints).map((m) => m.id)),
     [endpoints]
@@ -387,6 +393,7 @@ export function useModelPickerState({
       // covers a cold cache.
       ggActive: gridaGateway.peek().kind === "active",
       isKnownId,
+      textCatalogV2,
     })
   );
   // Flipped once the user picks a model in the UI, so the async Grida
@@ -415,6 +422,7 @@ export function useModelPickerState({
         currentSessionId: currentId,
         chatGptReady,
         ggActive: gridaGateway.peek().kind === "active",
+        textCatalogV2,
       });
       seededFor.current = null;
       if (freshSelection) {
@@ -422,6 +430,23 @@ export function useModelPickerState({
         userPickedRef.current = false;
         setUserPicked(false);
         setSelection(freshSelection);
+      } else if (initialSeedActive.current && !userPickedRef.current) {
+        // SSR starts without native capability. Recover a supported explicit
+        // handoff after preload/endpoint hydration, never a stored or user pick.
+        setSelection((current) => {
+          const next = resolveDefaultModelSelection({
+            initial,
+            initialProviderId,
+            chatGptReady,
+            ggActive: gridaGateway.peek().kind === "active",
+            isKnownId,
+            textCatalogV2,
+          });
+          return current.model_id === next.model_id &&
+            current.provider_id === next.provider_id
+            ? current
+            : next;
+        });
       }
       return;
     }
@@ -448,7 +473,14 @@ export function useModelPickerState({
     // A session with NO stored model is seeded-done immediately.
     if (!stored) seededFor.current = currentId;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bindingEpoch, chatGptReady, currentId, sessions, registeredIds]);
+  }, [
+    bindingEpoch,
+    chatGptReady,
+    currentId,
+    sessions,
+    registeredIds,
+    textCatalogV2,
+  ]);
 
   // GRIDA-SEC-008 — reconcile async subscription readiness for a genuinely
   // fresh, untouched chat. Ready promotes the generic fallback to
@@ -465,9 +497,10 @@ export function useModelPickerState({
         userPicked: userPickedRef.current,
         hasInitial: initialSeedActive.current,
         storedSeeded: seededFor.current != null,
+        textCatalogV2,
       })
     );
-  }, [chatGptReady, currentId]);
+  }, [chatGptReady, currentId, textCatalogV2]);
 
   // GRIDA-SEC-006 / issue #942 — when a Grida Gateway session is live and
   // the user hasn't otherwise chosen a model, keep the keyless default on the
@@ -489,7 +522,7 @@ export function useModelPickerState({
           storedSeeded: seededFor.current != null,
         })
           ? {
-              model_id: GG_INCLUDED_MODEL_ID,
+              model_id: desktop_text_catalog.defaultId(textCatalogV2),
               provider_id: GG_PROVIDER_ID,
             }
           : current
@@ -498,9 +531,10 @@ export function useModelPickerState({
     return () => {
       cancelled = true;
     };
-    // Resolve once on mount; the guard reads live refs, not reactive deps.
+    // A late preload capability must replace only an untouched default.
+    // Explicit and stored selections are guarded by live refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [textCatalogV2]);
 
   // Wrap the setter so a user's explicit pick marks the selection touched —
   // the async GG upgrade above then leaves it alone. Internal seeding calls

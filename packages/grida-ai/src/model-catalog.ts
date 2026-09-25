@@ -6,7 +6,7 @@
  * only see the catalogue it was built with: a model added on the server
  * is rejected by this host's own run gate until someone ships a release.
  * This store removes that coupling — the bundled catalogue becomes a
- * SEED, and the published one (`GET /api/v1/models/catalog` on the
+ * SEED, and the published one (`GET /api/v1/models/catalog/2` on the
  * configured Grida base URL) becomes the authority.
  *
  * Remote wins over the seed, and that is the right way round even when
@@ -19,14 +19,17 @@
  * restart is the reset — which also means a bad-but-valid snapshot can
  * never outlive the process that fetched it. Nothing here touches disk.
  *
- * Fail-safe throughout: a fetch that errors, 404s, or fails validation
- * leaves the last good view in place. `start()` never throws and never
- * blocks a caller; `view()` is synchronous and always answers.
+ * A version-2 404 tries the original schema-1 endpoint once, so an older
+ * server can still replace the seed with its compatible membership.
+ * Other failures leave the last good view in place. `start()` never
+ * throws and never blocks a caller; `view()` always answers synchronously.
  */
 import { catalog as models } from "@grida/ai-models/grida";
 
 /** Published catalogue path on the Grida base URL. */
-export const CATALOG_PATH = "/api/v1/models/catalog";
+export const CATALOG_PATH = "/api/v1/models/catalog/2";
+
+const COMPAT_CATALOG_PATH = "/api/v1/models/catalog";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 60 * 60 * 1_000;
 
@@ -86,7 +89,7 @@ export class ModelCatalogStore {
   private warned = new Set<string>();
 
   constructor(options: ModelCatalogStoreOptions = {}) {
-    this.current = models.snapshot.view(options.snapshot);
+    this.current = models.snapshot.v2.view(options.snapshot);
     this.fetchImpl = options.fetch ?? globalThis.fetch;
     this.onChange = options.on_change;
     this.refreshIntervalMs =
@@ -199,7 +202,19 @@ export class ModelCatalogStore {
     if (url === null) return false;
     let raw: string;
     try {
-      raw = await this.fetchBody(url);
+      // One refresh deadline covers both reads. Always probe the current
+      // path first: an older server may have upgraded since the last refresh.
+      const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+      const current = await this.fetchBody(url, signal);
+      if (this.disposed) return false;
+      const body =
+        current ??
+        (await this.fetchBody(
+          new URL(COMPAT_CATALOG_PATH, url).toString(),
+          signal
+        ));
+      if (body === null) throw new Error("HTTP 404");
+      raw = body;
     } catch (err) {
       // Keyed on the failure KIND, not on `reason`: an offline host retries
       // at boot, on the interval, and on every miss, and keying by reason
@@ -223,18 +238,18 @@ export class ModelCatalogStore {
       this.warnOnce("parse", "published catalogue was not JSON; ignoring it");
       return false;
     }
-    const snapshot = models.snapshot.parse(parsed);
+    const snapshot = models.snapshot.v2.parse(parsed);
     if (!snapshot) {
       // Whole-or-reject: a catalogue that fails validation is never
       // half-applied, and the last good one keeps serving.
       this.warnOnce(
         "schema",
-        `published catalogue did not match schema ${models.snapshot.SCHEMA}; ignoring it`
+        `published catalogue did not match a supported schema (1 or ${models.snapshot.v2.SCHEMA}); ignoring it`
       );
       return false;
     }
     if (this.disposed) return false;
-    this.current = models.snapshot.view(snapshot);
+    this.current = models.snapshot.v2.view(snapshot);
     this.currentRaw = raw;
     // The catalogue is ALREADY live at this point, so a listener that
     // throws must not be reported as a refresh that did not happen: the
@@ -262,11 +277,17 @@ export class ModelCatalogStore {
    * Counted in BYTES off the wire, not in string length, which counts
    * UTF-16 code units and so under-counts every multi-byte character.
    */
-  private async fetchBody(url: string): Promise<string> {
+  private async fetchBody(
+    url: string,
+    signal: AbortSignal
+  ): Promise<string | null> {
+    signal.throwIfAborted();
     const res = await this.fetchImpl(url, {
       method: "GET",
       headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      credentials: "omit",
+      redirect: "error",
+      signal,
     });
     // Every early exit cancels the body first. An undici response whose
     // body is neither read nor cancelled holds its stream open, and the
@@ -277,6 +298,10 @@ export class ModelCatalogStore {
       await res.body?.cancel().catch(() => {});
       throw new Error(message);
     };
+    if (res.status === 404) {
+      await res.body?.cancel().catch(() => {});
+      return null;
+    }
     if (!res.ok) return bail(`HTTP ${res.status}`);
     const declared = Number(res.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
@@ -322,7 +347,7 @@ export class ModelCatalogStore {
  * wired, the bundled seed otherwise.
  *
  * One definition on purpose. Every resolver, gate, and estimator needs the
- * same "absent ⇒ bundled" rule, and a hand-inlined `?? models.snapshot.view()`
+ * same "absent ⇒ bundled" rule, and a hand-inlined `?? models.snapshot.v2.view()`
  * at each of them is a rule stated N times — the shape that drifts the day
  * one site starts defaulting to something else.
  *
@@ -332,7 +357,7 @@ export class ModelCatalogStore {
  * exists to remove.
  */
 export function catalogView(store?: ModelCatalogStore): models.snapshot.View {
-  return store?.view() ?? models.snapshot.view();
+  return store?.view() ?? models.snapshot.v2.view();
 }
 
 /**

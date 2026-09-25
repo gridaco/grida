@@ -18,9 +18,31 @@ import type {
 import type { MediaItem } from "@grida/daemon";
 import type {
   ChatGptConnectResult,
+  DesktopAgentCapabilities,
   DesktopBridge,
   DesktopMediaReadResult,
 } from "./index";
+import { DESKTOP_BRIDGE_PROTOCOL } from "./index";
+
+describe("DesktopBridge text runtime capability", () => {
+  it("keeps protocol 1 compatible when the text catalog capability is omitted", () => {
+    expectTypeOf<DesktopAgentCapabilities["text_catalog_v2"]>().toEqualTypeOf<
+      boolean | undefined
+    >();
+    const older: DesktopAgentCapabilities = {};
+    const unsupported: DesktopAgentCapabilities = { text_catalog_v2: false };
+
+    expect(DESKTOP_BRIDGE_PROTOCOL).toBe(1);
+    expect(older.text_catalog_v2 === true).toBe(false);
+    expect(unsupported.text_catalog_v2 === true).toBe(false);
+  });
+
+  it("allows explicit attestation of the complete text runtime profile", () => {
+    const supported: DesktopAgentCapabilities = { text_catalog_v2: true };
+
+    expect(supported.text_catalog_v2 === true).toBe(true);
+  });
+});
 
 describe("DesktopBridge ChatGPT connect result", () => {
   it("preserves status on success and exposes cancellation as a closed outcome", () => {

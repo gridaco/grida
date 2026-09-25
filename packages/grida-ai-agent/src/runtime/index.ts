@@ -101,7 +101,12 @@ import {
   removeScratch,
   writeScratchFile,
 } from "../session/scratch";
-import { buildModelMessages, type ModelUIMessage } from "./message-view";
+import {
+  buildModelMessages,
+  IncompleteToolContinuationError,
+  type ModelUIMessage,
+} from "./message-view";
+import { HUMAN_INPUT_PART_TYPES } from "../tools/names";
 import { buildReplayPrefix } from "./replay-prefix";
 import type { ChatMessageWithParts } from "../session/rows";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
@@ -1018,7 +1023,7 @@ export class AgentRuntime {
       }
       const effectiveReq: RunRequest = {
         ...req,
-        model_id: req.model_id ?? existingSession?.model?.model_id,
+        model_id: req.model_id ?? existingSession?.model?.model_id ?? undefined,
       };
       const explicitlyChangedModel =
         req.model_id !== undefined &&
@@ -1088,6 +1093,20 @@ export class AgentRuntime {
       }
 
       const runId = crypto.randomUUID();
+      // Freeze this run's selected model before asynchronous preparation. A
+      // catalog refresh must not retarget a tier between admission and execution.
+      if (provider.kind !== "agent-provider") {
+        const factory = provider.model_factory;
+        const selected = factory(effectiveReq.tier, effectiveReq.model_id);
+        provider = {
+          ...provider,
+          model_factory: (selectedTier, selectedId) =>
+            selectedTier === effectiveReq.tier &&
+            selectedId === effectiveReq.model_id
+              ? selected
+              : factory(selectedTier, selectedId),
+        };
+      }
       console.log(
         `[agent-host-agent] run started providerId=${provider.provider_id} runId=${runId} tier=${effectiveReq.tier} modelId=${effectiveReq.model_id ?? "(tier)"} kind=${provider.kind}`
       );
@@ -1135,16 +1154,56 @@ export class AgentRuntime {
       const pendingHumanInputKind =
         await this.deps.sessions_store.pendingHumanInputKind(sessionId);
       const assistantTail = messages.at(-1)?.role === "assistant";
+      const persistedTail = existingSession
+        ? (await this.deps.sessions_store.listVisibleMessages(sessionId)).at(-1)
+        : undefined;
       const continuationHasUnpersistedCallerHistory =
         approvalAnswer !== undefined ||
         pendingHumanInputKind !== null ||
-        assistantTail
+        assistantTail ||
+        persistedTail?.role === "assistant"
           ? await hasUnpersistedCallerMessage(
               this.deps.sessions_store,
               sessionId,
               messages
             )
           : false;
+      if (
+        existingSession &&
+        (approvalAnswer ||
+          pendingHumanInputKind ||
+          (persistedTail?.role === "assistant" &&
+            !continuationHasUnpersistedCallerHistory))
+      ) {
+        const prior =
+          (persistedTail?.metadata.model as ChatModel | undefined) ??
+          existingSession.model;
+        const selected =
+          provider.kind === "agent-provider"
+            ? undefined
+            : provider.model_factory(tier, modelId);
+        const selectedId =
+          modelId ??
+          (typeof selected === "string" ? selected : selected?.modelId);
+        if (
+          prior &&
+          (prior.provider_id !== provider.provider_id ||
+            (prior.model_id != null
+              ? prior.model_id !== selectedId
+              : explicitlyChangedModel ||
+                (prior.tier != null && prior.tier !== tier)))
+        ) {
+          return Response.json(
+            {
+              error:
+                "Resume the pending tool with its original provider and model; change models on a new user turn.",
+              code: "continuation-model-mismatch",
+              session_id: sessionId,
+            },
+            { status: 409 }
+          );
+        }
+      }
       let approvalContinuation: HumanInputContinuation | undefined;
       let incomingHumanInputResult: IncomingHumanInputResult | undefined;
       if (approvalAnswer) {
@@ -1650,10 +1709,12 @@ export class AgentRuntime {
     // `streams.finish` doesn't re-fire its `on_end`. The error/abort path
     // leaves it attached, flushed by `streams.finish` as usual.
     const sessionsStore = this.deps.sessions_store;
+    let turnModel: ChatModel | undefined;
     const persistedRecorder = createRecorderConsumer({
       store: this.deps.sessions_store,
       session_id: sessionId,
       run_id: runId,
+      get_model: () => turnModel,
     });
     const continuation = opts.human_input_continuation;
     const recorder: StreamConsumer = continuation
@@ -1756,6 +1817,27 @@ export class AgentRuntime {
         // failed read, and each consumer below falls back to its own read.
         const snapshotVisible = (await turnSnapshot).visible;
 
+        // A provider's signed response covers the entire parallel tool batch.
+        // Persist each human answer independently, but wait for all siblings
+        // before executing approvals or resuming the model with that batch.
+        if (continuation) {
+          const visible =
+            snapshotVisible ??
+            (await sessionsStore.listVisibleMessages(sessionId));
+          const awaitingSibling = visible.some((message) =>
+            message.parts.some(
+              (part) =>
+                part.tool_state === "approval-requested" ||
+                (part.tool_state === "input-available" &&
+                  HUMAN_INPUT_PART_TYPES.some((type) => type === part.type))
+            )
+          );
+          if (awaitingSibling) {
+            await this.finishSuccessfulTurn(entry, recorder, detachRecorder);
+            return;
+          }
+        }
+
         // Direct-run seed bytes already landed before persistence. Ordinary
         // shell/image scratch (including queue drains) is still created lazily
         // here before bindings resolve its real path.
@@ -1827,13 +1909,18 @@ export class AgentRuntime {
           return;
         }
 
-        // Auto-compaction (RFC `session / compaction`): if the session is
-        // at/over its usable context, block this turn on the summarizer.
-        const compacted = await this.maybeAutoCompact(
-          sessionId,
-          provider.model_factory,
-          entry.model_abort.signal
-        );
+        // Compaction may rewrite a prompt only at a new user turn. An assistant
+        // tail resumes an in-flight tool loop whose signed prefix must survive.
+        const beforeCompaction =
+          snapshotVisible ??
+          (await sessionsStore.listVisibleMessages(sessionId));
+        const compacted =
+          beforeCompaction.at(-1)?.role !== "assistant" &&
+          (await this.maybeAutoCompact(
+            sessionId,
+            provider.model_factory,
+            entry.model_abort.signal
+          ));
 
         // Server-authoritative message view (RFC `session`): rebuild what
         // the model sees from the VISIBLE persisted messages — NOT the raw
@@ -1842,13 +1929,29 @@ export class AgentRuntime {
         // reserve-time snapshot is that view — single-flight means nothing
         // else writes between reserve and here — EXCEPT when compaction just
         // rewrote the transcript, which forces a fresh read.
-        const visible =
-          !compacted && snapshotVisible
-            ? snapshotVisible
-            : await sessionsStore.listVisibleMessages(sessionId);
+        const visible = !compacted
+          ? beforeCompaction
+          : await sessionsStore.listVisibleMessages(sessionId);
+        // Resolve tier-only picks too: continuation is tied to the actual model,
+        // not an alias that a later catalog refresh can retarget.
+        const selectedModel = provider.model_factory(tier, modelId);
+        const resolvedModelId =
+          modelId ??
+          (typeof selectedModel === "string"
+            ? selectedModel
+            : selectedModel.modelId);
+        turnModel = {
+          provider_id: provider.provider_id,
+          tier,
+          model_id: resolvedModelId,
+        };
         const preparedMessages = buildModelMessages(visible, {
           availableDirectoryScopeIds,
           availableScratchAttachmentPaths,
+          continuationModel: {
+            provider_id: turnModel.provider_id,
+            model_id: resolvedModelId,
+          },
         });
 
         // Session-static skills + project instructions (discovered once).
@@ -1858,14 +1961,17 @@ export class AgentRuntime {
         // assistant message — recomputeRollups (rewind/fork/compaction)
         // sums per-message usage.
         const runUsage: MessageUsage = {};
-        const turnModel: ChatModel = {
-          provider_id: provider.provider_id,
-          tier,
-          model_id: modelId,
-        };
 
         const response = await runAgentFn(
-          provider,
+          {
+            ...provider,
+            // Queue drains enter startTurn directly; pin them too. Never pass a
+            // provider's bare upstream ID through a canonical-model selector.
+            model_factory: (selectedTier, selectedId) =>
+              selectedTier === tier && selectedId === modelId
+                ? selectedModel
+                : provider.model_factory(selectedTier, selectedId),
+          },
           {
             messages: preparedMessages as never,
             tier,
@@ -1908,9 +2014,8 @@ export class AgentRuntime {
         // Drain the recorder BEFORE stamping usage. The recorder creates the
         // assistant row on a fire-and-forget write_chain fed by each pushed
         // frame; `pumpResponseIntoRegistry` returning only means the frames
-        // were enqueued, not that the row was written. Usage/accounting stamps
-        // "the latest assistant row", so stamping before the write settles
-        // races onto the wrong row (or none). The recorder's terminal flush
+        // were enqueued, not that the row was written. Addressing the recorder's
+        // exact message before its writes settle can miss the row. Its terminal flush
         // (its `on_end`) awaits its write_chain + finalizes, so awaiting it
         // here makes the row exist deterministically. The detached recorder
         // flush + dependent accounting remain one terminal settlement task, so
@@ -1920,13 +2025,15 @@ export class AgentRuntime {
           recorder,
           detachRecorder,
           async () => {
-            if (hasUsage(runUsage)) {
+            // Required model provenance was inserted with the assistant row;
+            // only best-effort usage accounting remains at settlement.
+            if (persistedRecorder.message_id && hasUsage(runUsage))
               await sessionsStore
-                .setLatestAssistantAccounting(sessionId, {
-                  model: turnModel,
+                .setMessageAccounting(persistedRecorder.message_id, {
                   usage: runUsage,
                 })
                 .catch(() => undefined);
+            if (hasUsage(runUsage)) {
               await sessionsStore
                 .recomputeRollups(sessionId)
                 .catch(() => undefined);
@@ -1934,6 +2041,23 @@ export class AgentRuntime {
           }
         );
       } catch (err) {
+        if (
+          err instanceof IncompleteToolContinuationError &&
+          !entry.model_abort.signal.aborted
+        ) {
+          // This is an explicit SDK failure, not a broken transport. Closing
+          // the transport with controller.error would discard the actionable
+          // error frame before the client can read it.
+          streams.pushEntry(
+            entry,
+            JSON.stringify({
+              type: "error",
+              errorText: err.message,
+            })
+          );
+          await this.finishSuccessfulTurn(entry, recorder, detachRecorder);
+          return;
+        }
         const reason = entry.model_abort.signal.aborted ? "abort" : "error";
         console.log(
           `[agent-host-agent] run failed runId=${runId} reason=${reason} err=${

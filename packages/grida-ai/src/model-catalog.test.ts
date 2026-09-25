@@ -6,7 +6,12 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { catalog as models } from "@grida/ai-models/grida";
-import { CATALOG_PATH, ModelCatalogStore } from "./model-catalog";
+import {
+  CATALOG_PATH,
+  ModelCatalogStore,
+  catalogView,
+  catalogViewOnMiss,
+} from "./model-catalog";
 
 const BASE_URL = "https://grida.test";
 
@@ -33,7 +38,7 @@ function published(ids: string[], version = "v1"): models.snapshot.Snapshot {
   for (const id of ids) catalog[id] = spec(id);
   const first = ids[0]!;
   return {
-    schema: models.snapshot.SCHEMA,
+    schema: models.snapshot.v2.SCHEMA,
     version,
     text: {
       catalog,
@@ -77,10 +82,20 @@ afterEach(() => {
 });
 
 describe("ModelCatalogStore — before any fetch", () => {
-  it("answers from the bundled catalogue immediately", () => {
+  it("answers from the current bundled catalogue and tier map immediately", () => {
     const view = make({ base_url: BASE_URL, fetch: serving() }).view();
     expect(view.catalog).toEqual(models.text.catalog);
     expect(view.modelSpecById("openai/gpt-5.6-luna")).toBeDefined();
+    expect(view.modelSpecById("openai/gpt-6-luna")).toBeDefined();
+    expect(view.modelSpecById("openai/gpt-6-sol")).toBeDefined();
+    expect(view.modelSpecById("anthropic/claude-opus-5.5")).toBeDefined();
+    expect(view.tier_model_ids).toEqual({
+      nano: "openai/gpt-6-luna",
+      mini: "openai/gpt-6-sol",
+      pro: "openai/gpt-6-sol",
+      max: "openai/gpt-6-astra",
+    });
+    expect(catalogView()).toBe(models.snapshot.v2.view());
   });
 
   it("is not refreshable without a base url", async () => {
@@ -103,13 +118,16 @@ describe("ModelCatalogStore — before any fetch", () => {
 });
 
 describe("ModelCatalogStore — applying a published catalogue", () => {
-  it("requests the catalogue path on the configured base url", async () => {
+  it("requests the current catalogue path without credentials or redirects", async () => {
     const fetchImpl = serving(published(["acme/one"]));
     await make({ base_url: BASE_URL, fetch: fetchImpl }).refresh("boot");
     const [url, init] = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock
       .calls[0]!;
     expect(url).toBe(`${BASE_URL}${CATALOG_PATH}`);
+    expect(CATALOG_PATH).toBe("/api/v1/models/catalog/2");
     expect((init as RequestInit).method).toBe("GET");
+    expect((init as RequestInit).credentials).toBe("omit");
+    expect((init as RequestInit).redirect).toBe("error");
   });
 
   it("resolves a model the bundled catalogue has never heard of", async () => {
@@ -133,6 +151,98 @@ describe("ModelCatalogStore — applying a published catalogue", () => {
     await store.refresh("boot");
     expect(store.view().tier_model_ids.nano).toBe("acme/one");
     expect(store.view().by_tier.nano.id).toBe("acme/one");
+  });
+
+  it("accepts schema 1 without merging newer text membership or preferences", async () => {
+    const snapshot = models.snapshot.seed();
+    const store = make({ base_url: BASE_URL, fetch: serving(snapshot) });
+    expect(await store.refresh("boot")).toBe(true);
+    expect(store.view().catalog).toEqual(snapshot.text.catalog);
+    expect(store.view().tier_model_ids).toEqual(snapshot.text.tier_model_ids);
+    expect(store.view().default_id).toBe(
+      snapshot.preferences?.text?.default_id
+    );
+    expect(store.view().has("openai/gpt-6-sol")).toBe(false);
+    expect(store.view().has("anthropic/claude-opus-5.5")).toBe(false);
+  });
+
+  it("falls back once after a current-path 404 and probes current again next refresh", async () => {
+    const current = models.snapshot.v2.seed({ version: "current" });
+    const compat = models.snapshot.seed({ version: "compatible" });
+    let upgraded = false;
+    let cancelled = false;
+    const fetchImpl = vi.fn<typeof fetch>(async (url) => {
+      if (String(url).endsWith("/2")) {
+        if (upgraded) return jsonResponse(current);
+        return new Response(
+          new ReadableStream({
+            cancel: () => {
+              cancelled = true;
+            },
+          }),
+          { status: 404 }
+        );
+      }
+      expect(cancelled).toBe(true);
+      return jsonResponse(compat);
+    });
+    const store = make({ base_url: BASE_URL, fetch: fetchImpl });
+    expect(await store.refresh("boot")).toBe(true);
+    expect(store.view().has("openai/gpt-6-sol")).toBe(false);
+    expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
+      `${BASE_URL}/api/v1/models/catalog/2`,
+      `${BASE_URL}/api/v1/models/catalog`,
+    ]);
+    expect(fetchImpl.mock.calls[0]![1]?.signal).toBe(
+      fetchImpl.mock.calls[1]![1]?.signal
+    );
+
+    upgraded = true;
+    expect(await store.refresh("interval")).toBe(true);
+    expect(store.view().has("openai/gpt-6-sol")).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl.mock.calls[2]![0]).toBe(`${BASE_URL}${CATALOG_PATH}`);
+  });
+
+  it.each([
+    ["server error", () => new Response("", { status: 500 })],
+    ["malformed JSON", () => new Response("not JSON")],
+    [
+      "unsupported schema",
+      () => jsonResponse({ ...published(["acme/one"]), schema: 3 }),
+    ],
+    [
+      "invalid text",
+      () => jsonResponse({ ...published(["acme/one"]), text: {} }),
+    ],
+  ])(
+    "does not mask a current-path %s with a compatibility fetch",
+    async (_label, response) => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const fetchImpl = fetching(async () => response());
+      const store = make({ base_url: BASE_URL, fetch: fetchImpl });
+      expect(await store.refresh("boot")).toBe(false);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it("keeps the last good view when an older server returns malformed compatibility data", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let rolledBack = false;
+    const fetchImpl = vi.fn<typeof fetch>(async (url) =>
+      !rolledBack
+        ? jsonResponse(published(["acme/good"]))
+        : String(url).endsWith("/2")
+          ? new Response("", { status: 404 })
+          : jsonResponse({ ...published(["acme/bad"]), text: {} })
+    );
+    const store = make({ base_url: BASE_URL, fetch: fetchImpl });
+    expect(await store.refresh("boot")).toBe(true);
+    rolledBack = true;
+    expect(await store.refresh("interval")).toBe(false);
+    expect(store.view().has("acme/good")).toBe(true);
+    expect(store.view().has("acme/bad")).toBe(false);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
   it("replaces wholesale — a withdrawn model stops resolving", async () => {
@@ -201,7 +311,7 @@ describe("ModelCatalogStore — failure is never fatal", () => {
   });
 
   it.each([
-    ["a wrong schema major", { ...published(["acme/one"]), schema: 2 }],
+    ["a wrong schema major", { ...published(["acme/one"]), schema: 3 }],
     [
       "a dangling tier id",
       {
@@ -375,7 +485,7 @@ describe("ModelCatalogStore — failure is never fatal", () => {
     });
     expect(await tooBig.refresh("boot")).toBe(false);
 
-    expect(cancelled.sort()).toEqual(["404", "declared"]);
+    expect(cancelled.sort()).toEqual(["404", "404", "declared"]);
   });
 
   it("warns once per failure kind, not once per attempt", async () => {
@@ -422,6 +532,21 @@ describe("ModelCatalogStore — single-flight and rate limiting", () => {
     expect(store.view().has("acme/brand-new")).toBe(true);
   });
 
+  it("a current model missing from an older snapshot resolves on its first awaited lookup", async () => {
+    const store = make({
+      base_url: BASE_URL,
+      fetch: serving(models.snapshot.seed(), models.snapshot.v2.seed()),
+    });
+    await store.refresh("boot");
+    expect(store.view().has("openai/gpt-6-sol")).toBe(false);
+    const view = await catalogViewOnMiss(
+      store,
+      (current) => !current.has("openai/gpt-6-sol")
+    );
+    expect(view.has("openai/gpt-6-sol")).toBe(true);
+    expect(view.tier_model_ids.pro).toBe("openai/gpt-6-sol");
+  });
+
   it("rate-limits repeated misses", async () => {
     let clock = 0;
     const fetchImpl = serving(published(["acme/one"]));
@@ -452,6 +577,19 @@ describe("ModelCatalogStore — single-flight and rate limiting", () => {
 });
 
 describe("ModelCatalogStore — pinned by the host", () => {
+  it.each([models.snapshot.seed(), models.snapshot.v2.seed()])(
+    "preserves an explicitly pinned schema-$schema snapshot",
+    (snapshot) => {
+      const store = make({ base_url: BASE_URL, snapshot });
+      expect(store.refreshable).toBe(false);
+      expect(store.view().catalog).toEqual(snapshot.text.catalog);
+      expect(store.view().tier_model_ids).toEqual(snapshot.text.tier_model_ids);
+      expect(store.view().default_id).toBe(
+        snapshot.preferences?.text?.default_id
+      );
+    }
+  );
+
   it("serves a supplied catalogue and never fetches", async () => {
     const fetchImpl = serving(published(["acme/remote"]));
     const store = make({

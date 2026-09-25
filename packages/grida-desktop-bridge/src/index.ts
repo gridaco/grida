@@ -84,6 +84,14 @@ export type DesktopNativeCapabilities = {
 
 export type DesktopAgentCapabilities = {
   /**
+   * The bundled runtime supports text catalog schema 2, OpenRouter reasoning,
+   * and opt-in GG continuation, including native tool pause/resume.
+   * Only true attests this complete profile; omission/false requires the
+   * legacy text catalog and defaults. This grants no credentials, account
+   * access, local tool authority, or additional ChatGPT subscription models.
+   */
+  text_catalog_v2?: boolean;
+  /**
    * The host accepts base64 scratch seeds (`{ path, base64 }`) on agent runs.
    * Added after protocol 1 shipped; renderers must treat a missing/falsy value
    * as an old host that accepts text-only scratch seeds.

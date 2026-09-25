@@ -148,13 +148,21 @@ export namespace apiAudit {
     // not. In particular, a matching bind() call somewhere in a file is not
     // sufficient evidence that its exported handlers use that boundary.
     const owner =
-      binding === "gg-media"
-        ? "ggMediaApi"
-        : binding === "gg"
-          ? "ggApi"
-          : "accountApi";
+      binding === "catalog"
+        ? "catalogApi"
+        : binding === "gg-media"
+          ? "ggMediaApi"
+          : binding === "gg"
+            ? "ggApi"
+            : "accountApi";
     const bindingModule =
-      binding === "gg-media" ? "gg-media" : binding === "gg" ? "gg" : "account";
+      binding === "catalog"
+        ? "catalog"
+        : binding === "gg-media"
+          ? "gg-media"
+          : binding === "gg"
+            ? "gg"
+            : "account";
     const expected = source(
       "route.ts",
       `import { ${owner} } from "@/lib/api/${bindingModule}";
@@ -383,6 +391,19 @@ export namespace apiAudit {
             `${id}: legacy exceptions are fixed to six existing operations.`
           );
         }
+      } else if (definition.binding === "catalog") {
+        if (
+          id !== "models.catalog.v2" ||
+          definition.path !== "/api/v1/models/catalog/2" ||
+          definition.authority !== "public" ||
+          definition.cache !== "public" ||
+          definition.methods.join(",") !== "GET,HEAD,OPTIONS"
+        )
+          report(
+            "registry",
+            registryFile,
+            `${id}: catalog requires its fixed public binding, path and read-only methods.`
+          );
       } else if (definition.binding === "gg-media") {
         if (
           GG_MEDIA[id as keyof typeof GG_MEDIA] !== definition.path ||

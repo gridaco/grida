@@ -32,16 +32,15 @@ export type ModelTier = "nano" | "mini" | "pro" | "max";
  * tier mapped to an id that lacks a matching entry in the text
  * factual catalogue. Service membership is validated separately.
  *
- * Each tier is one adjacent rung in the current capability ladder:
- * GPT-6 Astra > GPT-5.6 Sol > GPT-5.6 Terra > GPT-5.6 Luna. When a new
- * model becomes the capability leader, shift the existing assignments by
- * one rung; do not skip a still-current model or collapse tiers without a
- * separate reason to change the topology.
+ * Four public keys remain stable even when two intentionally select the same
+ * model. GPT-6 Sol serves both mini and pro; the lowest matching tier is mini.
+ * The independently shipped schema-1 runtime retains its compatible map in
+ * the snapshot projection, not this current service table.
  */
 export const TIER_MODEL_IDS = Object.freeze({
-  nano: "openai/gpt-5.6-luna",
-  mini: "openai/gpt-5.6-terra",
-  pro: "openai/gpt-5.6-sol",
+  nano: "openai/gpt-6-luna",
+  mini: "openai/gpt-6-sol",
+  pro: "openai/gpt-6-sol",
   max: "openai/gpt-6-astra",
 } as const satisfies Record<ModelTier, models.text.CatalogId>);
 

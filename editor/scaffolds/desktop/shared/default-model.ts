@@ -21,10 +21,12 @@
  * Every resolved product default carries provider identity; an explicit or
  * stored provider/model pair always wins.
  */
-import { TIER_MODEL_IDS } from "@grida/ai-models/grida";
+import { desktop_text_catalog } from "./text-catalog";
 import {
   CHATGPT_PROVIDER_ID,
   GG_PROVIDER_ID,
+  isChatGptSubscriptionModelId,
+  isValidEndpointProviderId,
   type ChatGptSubscriptionModelId,
 } from "@grida/agent";
 
@@ -34,56 +36,68 @@ export type DefaultModelSelection = Readonly<{
 }>;
 
 /**
- * The keyless fallback default — a catalog model id compatible with the
+ * The legacy keyless fallback default — a catalog model id compatible with the
  * first-priority ChatGPT provider and the remaining native-provider cascade.
  * ACP models are a separate external-agent class and are not part of this
  * model picker.
  */
-export const DEFAULT_MODEL_ID: string = TIER_MODEL_IDS.pro;
+export const DEFAULT_MODEL_ID: string = desktop_text_catalog.defaultId();
 
 /**
- * The included hosted tier a live Grida Gateway session upgrades the
+ * The legacy included hosted tier a live Grida Gateway session upgrades the
  * keyless default to — a catalog model id served by `gg` (the "pro" tier).
  * A catalog id so it remains compatible with native model providers.
  */
-export const GG_INCLUDED_MODEL_ID: string = TIER_MODEL_IDS.pro;
+export const GG_INCLUDED_MODEL_ID: string = desktop_text_catalog.defaultId();
 
 /**
  * Desktop-only default for an untouched, ready subscription-backed chat.
- * The compile-time check keeps the catalogue's `pro` tier on the closed,
- * observed ChatGPT subscription allowlist even when `max` moves ahead of it.
+ * Subscription availability is independent of the hosted catalogue's tiers.
+ * Keep this on the closed, observed native allowlist when those tiers advance.
  */
 export const CHATGPT_READY_DEFAULT_MODEL_ID =
-  TIER_MODEL_IDS.pro satisfies ChatGptSubscriptionModelId;
+  "openai/gpt-5.6-sol" satisfies ChatGptSubscriptionModelId;
 
 /**
  * The initial default for a new chat. An explicit caller-seeded `initial`
- * (a known id — e.g. the welcome handoff carrying the home composer's pick)
- * always wins. Otherwise a ready subscription chooses ChatGPT/Sol, a live
- * Grida session chooses Grida/Sol, and the unresolved fallback stays
- * provider-less until availability resolves.
+ * (a known, runtime-compatible id — e.g. the welcome handoff carrying the home
+ * composer's pick) always wins. Otherwise a ready subscription chooses ChatGPT/Sol, a live
+ * Grida session chooses its runtime-compatible Grida/Sol, and the unresolved
+ * fallback stays provider-less until availability resolves.
  */
 export function resolveDefaultModelSelection(opts: {
   initial?: string;
   initialProviderId?: string;
   chatGptReady: boolean;
   ggActive: boolean;
+  textCatalogV2?: desktop_text_catalog.Capability;
   isKnownId: (id: string | undefined | null) => boolean;
 }): DefaultModelSelection {
+  const defaultId = desktop_text_catalog.defaultId(opts.textCatalogV2);
   // A caller-provided `initial` is explicit intent: honor it when known,
   // and NEVER substitute a provider-owned default for it. An id that isn't
   // known yet may be a late-loading endpoint model (issue #806) — falling
   // back to the plain default is safe; silently swapping in ChatGPT or the
   // included model would override the caller's choice.
   if (opts.initial != null && opts.initial !== "") {
-    return opts.isKnownId(opts.initial)
+    // Only new-chat seeds are admitted here. Persisted history keeps its exact
+    // identity even on an older runtime, never an implicit model replacement.
+    // Endpoint and subscription model sets remain owned by those providers.
+    const runtimeCompatible =
+      opts.initialProviderId === CHATGPT_PROVIDER_ID
+        ? isChatGptSubscriptionModelId(opts.initial)
+        : (opts.initialProviderId !== undefined &&
+            isValidEndpointProviderId(opts.initialProviderId)) ||
+          !desktop_text_catalog.view(true).has(opts.initial) ||
+          desktop_text_catalog.view(opts.textCatalogV2).has(opts.initial);
+    return opts.isKnownId(opts.initial) && runtimeCompatible
       ? {
           model_id: opts.initial,
           ...(opts.initialProviderId
             ? { provider_id: opts.initialProviderId }
             : {}),
         }
-      : { model_id: DEFAULT_MODEL_ID };
+      : { model_id: defaultId };
   }
   if (opts.chatGptReady) {
     return {
@@ -93,11 +107,11 @@ export function resolveDefaultModelSelection(opts: {
   }
   if (opts.ggActive) {
     return {
-      model_id: GG_INCLUDED_MODEL_ID,
+      model_id: defaultId,
       provider_id: GG_PROVIDER_ID,
     };
   }
-  return { model_id: DEFAULT_MODEL_ID };
+  return { model_id: defaultId };
 }
 
 /**
@@ -112,6 +126,7 @@ export function resolveNewChatTransition(opts: {
   currentSessionId: string | null;
   chatGptReady: boolean;
   ggActive: boolean;
+  textCatalogV2?: desktop_text_catalog.Capability;
 }): DefaultModelSelection | null {
   if (
     opts.previousBindingEpoch === undefined ||
@@ -123,13 +138,15 @@ export function resolveNewChatTransition(opts: {
   return resolveDefaultModelSelection({
     chatGptReady: opts.chatGptReady,
     ggActive: opts.ggActive,
+    textCatalogV2: opts.textCatalogV2,
     isKnownId: () => false,
   });
 }
 
 /**
- * Reconcile the untouched subscription default in both directions. The
- * result is transient UI state: it is not a saved preference.
+ * Reconcile untouched provider defaults when subscription readiness or the
+ * installed runtime capability resolves. The result is transient UI state:
+ * it is not a saved preference and never replaces an explicit/stored tuple.
  */
 export function reconcileChatGptSubscriptionDefault(opts: {
   current: DefaultModelSelection;
@@ -138,15 +155,16 @@ export function reconcileChatGptSubscriptionDefault(opts: {
   userPicked: boolean;
   hasInitial: boolean;
   storedSeeded: boolean;
+  textCatalogV2?: desktop_text_catalog.Capability;
 }): DefaultModelSelection {
   if (opts.userPicked || opts.hasInitial || opts.storedSeeded) {
     return opts.current;
   }
   const isGenericDefault =
-    opts.current.model_id === DEFAULT_MODEL_ID &&
+    desktop_text_catalog.isDefault(opts.current.model_id) &&
     opts.current.provider_id === undefined;
   const isGridaDefault =
-    opts.current.model_id === GG_INCLUDED_MODEL_ID &&
+    desktop_text_catalog.isDefault(opts.current.model_id) &&
     opts.current.provider_id === GG_PROVIDER_ID;
   const isChatGptDefault =
     opts.current.model_id === CHATGPT_READY_DEFAULT_MODEL_ID &&
@@ -158,13 +176,17 @@ export function reconcileChatGptSubscriptionDefault(opts: {
       provider_id: CHATGPT_PROVIDER_ID,
     };
   }
-  if (!opts.chatGptReady && isChatGptDefault) {
-    return opts.ggActive
+  if (
+    !opts.chatGptReady &&
+    (isChatGptDefault || isGenericDefault || isGridaDefault)
+  ) {
+    const defaultId = desktop_text_catalog.defaultId(opts.textCatalogV2);
+    return opts.ggActive || isGridaDefault
       ? {
-          model_id: GG_INCLUDED_MODEL_ID,
+          model_id: defaultId,
           provider_id: GG_PROVIDER_ID,
         }
-      : { model_id: DEFAULT_MODEL_ID };
+      : { model_id: defaultId };
   }
   return opts.current;
 }
@@ -193,7 +215,7 @@ export function shouldUpgradeToIncluded(opts: {
   if (opts.hasInitial) return false;
   if (opts.storedSeeded) return false;
   return (
-    opts.current.model_id === DEFAULT_MODEL_ID &&
+    desktop_text_catalog.isDefault(opts.current.model_id) &&
     opts.current.provider_id === undefined
   );
 }

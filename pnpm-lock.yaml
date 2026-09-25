@@ -480,6 +480,9 @@ importers:
       '@octokit/rest':
         specifier: ^21.1.1
         version: 21.1.1
+      '@openrouter/ai-sdk-provider':
+        specifier: 2.9.1
+        version: 2.9.1(ai@6.0.197(zod@4.3.6))(zod@4.3.6)
       '@pierre/diffs':
         specifier: ^1.2.12
         version: 1.2.12(@shikijs/themes@4.3.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -1152,6 +1155,9 @@ importers:
       '@hono/node-server':
         specifier: ^1.13.7
         version: 1.19.9(hono@4.11.8)
+      '@openrouter/ai-sdk-provider':
+        specifier: 2.9.1
+        version: 2.9.1(ai@6.0.197(zod@4.3.6))(zod@4.3.6)
       ai:
         specifier: 6.0.197
         version: 6.0.197(zod@4.3.6)
@@ -4471,6 +4477,13 @@ packages:
   '@open-draft/until@2.1.0':
     resolution: {integrity: sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg==}
 
+  '@openrouter/ai-sdk-provider@2.9.1':
+    resolution: {integrity: sha512-okgq07Vdkro4CB5INbfhwa0e6VR1HS7sidNcfHN/MeXLJvX1JmQCff/vem6tcxwT9r1avyFrXSlfv9B28D/Pag==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      ai: ^6.0.0
+      zod: ^3.25.0 || ^4.0.0
+
   '@opentelemetry/api-logs@0.207.0':
     resolution: {integrity: sha512-lAb0jQRVyleQQGiuuvCOTDVspc14nx6XJjP4FspJ1sNARo3Regq4ZZbrc3rN4b1TYSuUCvgH+UXUPug4SLOqEQ==}
     engines: {node: '>=8.0.0'}
@@ -7583,10 +7596,12 @@ packages:
 
   '@vercel/edge-config-fs@0.1.0':
     resolution: {integrity: sha512-NRIBwfcS0bUoUbRWlNGetqjvLSwgYH/BqKqDN7vK1g32p7dN96k0712COgaz6VFizAm9b0g6IG6hR6+hc0KCPg==}
+    deprecated: This package has been renamed to @vercel/global-config-fs. Install @vercel/global-config-fs instead.
 
   '@vercel/edge-config@1.4.3':
     resolution: {integrity: sha512-8vTDATodRrH49wMzKEjZ8/5H2qs1aPkD0uRK585f/Fx4YN2wfHfY/3td9OFrh+gdnCq07z8A5f0hoY6xhBcPkg==}
     engines: {node: '>=14.6'}
+    deprecated: This package has been renamed to @vercel/global-config. Install @vercel/global-config instead.
     peerDependencies:
       '@opentelemetry/api': ^1.7.0
       next: 16.2.6
@@ -19125,6 +19140,11 @@ snapshots:
       outvariant: 1.4.3
 
   '@open-draft/until@2.1.0': {}
+
+  '@openrouter/ai-sdk-provider@2.9.1(ai@6.0.197(zod@4.3.6))(zod@4.3.6)':
+    dependencies:
+      ai: 6.0.197(zod@4.3.6)
+      zod: 4.3.6
 
   '@opentelemetry/api-logs@0.207.0':
     dependencies:

@@ -67,7 +67,7 @@ const markdown = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Model picker — only the four tiered models (nano / mini / pro / max),
+// Model picker — only models assigned to nano / mini / pro / max,
 // derived from the `@grida/ai-models/grida` catalogue (`models.text.byTier`) so
 // ids, labels, and pricing stay in lockstep with the source of truth.
 // Non-tiered catalog entries (e.g. gpt-5.5, gpt-5.5-pro) are intentionally
@@ -100,7 +100,11 @@ const MODEL_OPTIONS: readonly ModelOption[] = TIER_ORDER.map((tier) => {
     inputUsd: spec.cost.input,
     outputUsd: spec.cost.output,
   };
-});
+}).filter(
+  // Tier aliases are one model choice, labeled with its lowest matching tier.
+  (option, index, options) =>
+    options.findIndex(({ id }) => id === option.id) === index
+);
 const DEFAULT_MODEL_ID = models.text.byTier.mini.id;
 
 // ---------------------------------------------------------------------------
@@ -318,7 +322,8 @@ export default function Page({ authed, context }: Props) {
   );
 
   const selectedModel =
-    MODEL_OPTIONS.find((m) => m.id === modelId) ?? MODEL_OPTIONS[1]!;
+    MODEL_OPTIONS.find((m) => m.id === modelId) ??
+    MODEL_OPTIONS.find((m) => m.id === DEFAULT_MODEL_ID)!;
 
   return (
     <main className="flex h-screen flex-col">

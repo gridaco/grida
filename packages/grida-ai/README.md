@@ -20,8 +20,8 @@ policy, HTTP routes, application defaults, and external-agent runtimes belong to
 their hosts. This package must not import their source, types, manifests, or test
 setup. `@grida/ai-models` supplies canonical facts; its explicit
 `@grida/ai-models/grida` entry supplies this SDK's existing bundled service
-catalogue and schema-1 defaults. The SDK retains those Grida defaults and does
-not promise service-policy neutrality. A result contains bytes
+catalogue and current schema-2 defaults. The SDK retains those Grida defaults
+and does not promise service-policy neutrality. A result contains bytes
 and a media type, never a host persistence receipt, workspace path, or `MediaItem`.
 
 ### Anti-goals and admission
@@ -556,8 +556,13 @@ and resolved operation expose no credential getter or SDK model.
 
 `ModelCatalogStore()` uses the bundled Grida catalogue by default. Image and video
 clients accept an optional store and use that bundled view when omitted.
-`ModelCatalogStore({ base_url, fetch })` uses the existing
-`/api/v1/models/catalog` schema-1 refresh path; every option remains optional.
+`ModelCatalogStore({ base_url, fetch })` uses the current
+`/api/v1/models/catalog/2` refresh path; every option remains optional. It accepts
+schema 2 and schema 1. Only HTTP 404 tries the original
+`/api/v1/models/catalog` endpoint once under the same ten-second deadline;
+later refreshes try the current path again. A valid older snapshot replaces the
+current text membership, tiers, and preferences wholesale, without restoring
+newer bundled models. Both reads omit credentials and refuse redirects.
 `ModelCatalogStore` keeps the bundled catalogue or a validated published snapshot
 in memory. Construction has no network or timer work. A supplied snapshot pins
 it; the host explicitly calls `start`/`dispose` for background refresh. A missing

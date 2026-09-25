@@ -12,6 +12,7 @@
  * are rejected explicitly in the codec with a 400.
  */
 import { z } from "zod";
+import { GridaContinuation } from "./gg-continuation";
 
 // ---------------------------------------------------------------------------
 // Request
@@ -61,6 +62,7 @@ const messageSchema = z.union([
     content: z.string().nullish(),
     reasoning_content: z.string().nullish(),
     tool_calls: z.array(wireToolCallSchema).nullish(),
+    grida_continuation: GridaContinuation.envelopeSchema.optional(),
   }),
   z.looseObject({
     role: z.literal("tool"),
@@ -71,6 +73,7 @@ const messageSchema = z.union([
 
 export const chatCompletionRequestSchema = z.looseObject({
   model: z.string(),
+  grida_continuation: GridaContinuation.capabilitySchema.optional(),
   messages: z.array(messageSchema).min(1),
   tools: z
     .array(
@@ -154,6 +157,7 @@ export type ChatCompletionResponse = {
       content: string | null;
       reasoning_content?: string;
       tool_calls?: WireResponseToolCall[];
+      grida_continuation?: GridaContinuation.Envelope;
     };
     finish_reason: WireFinishReason;
   }>;
@@ -177,6 +181,7 @@ export type ChatCompletionChunk = {
       role?: "assistant";
       content?: string;
       reasoning_content?: string;
+      grida_continuation?: GridaContinuation.Envelope;
       tool_calls?: Array<{
         index: number;
         id?: string;

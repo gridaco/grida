@@ -18,7 +18,7 @@
  */
 
 import { createGateway as createVercelAiGateway } from "ai";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { catalog as _catalog, TIER_MODEL_IDS } from "@grida/ai-models/grida";
 
 // ---------------------------------------------------------------------------
@@ -113,10 +113,11 @@ export const vercelAiGateway = createVercelAiGateway({
 function resolveByokProvider() {
   const openrouterKey = process.env.BYOK_OPENROUTER_API_KEY?.trim();
   if (openrouterKey) {
-    return createOpenAICompatible({
-      name: "openrouter",
-      baseURL: "https://openrouter.ai/api/v1",
+    return createOpenRouter({
       apiKey: openrouterKey,
+      // Preserve structured reasoning state across tool steps and request
+      // streamed usage through the provider's OpenRouter wire adapter.
+      compatibility: "strict",
       headers: { "HTTP-Referer": "https://grida.co", "X-Title": "Grida" },
     });
   }

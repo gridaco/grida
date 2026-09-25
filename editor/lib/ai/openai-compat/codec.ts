@@ -47,6 +47,7 @@ import type {
   WireResponseToolCall,
   WireUsage,
 } from "./wire";
+import { GridaContinuation } from "./gg-continuation";
 
 /** Request-shape failure the routes map to an OpenAI 400 envelope. */
 export class WireDecodeError extends Error {}
@@ -55,6 +56,7 @@ export type DecodedChatRequest = {
   callOptions: Omit<LanguageModelV3CallOptions, "providerOptions">;
   stream: boolean;
   includeUsage: boolean;
+  continuation?: GridaContinuation.Context;
 };
 
 // ---------------------------------------------------------------------------
@@ -62,7 +64,36 @@ export type DecodedChatRequest = {
 // ---------------------------------------------------------------------------
 
 export function decodeRequest(req: ChatCompletionRequest): DecodedChatRequest {
-  const prompt = decodeMessages(req.messages);
+  const continuation = req.grida_continuation?.version === 1;
+  if (GridaContinuation.requiresCapability(req.model) && !continuation) {
+    throw new WireDecodeError(
+      "this model requires grida_continuation: { version: 1 }"
+    );
+  }
+  if (continuation) {
+    if (req.reasoning_effort !== undefined) {
+      throw new WireDecodeError(
+        "reasoning_effort is not supported by continuation v1"
+      );
+    }
+    try {
+      GridaContinuation.provider(req.model);
+    } catch {
+      throw new WireDecodeError(
+        "continuation v1 supports OpenAI and Anthropic models only"
+      );
+    }
+  }
+  if (
+    req.model === "anthropic/claude-opus-5.5" &&
+    req.tool_choice != null &&
+    req.tool_choice !== "auto" &&
+    req.tool_choice !== "none"
+  ) {
+    throw new WireDecodeError(
+      "this model supports only auto or none tool_choice"
+    );
+  }
 
   const tools = req.tools?.map(
     (tool): LanguageModelV3FunctionTool => ({
@@ -74,6 +105,7 @@ export function decodeRequest(req: ChatCompletionRequest): DecodedChatRequest {
       inputSchema: (tool.function.parameters ?? {}) as JSONSchema7,
     })
   );
+  const prompt = decodeMessages(req.messages, req.model, tools, continuation);
 
   let toolChoice: LanguageModelV3ToolChoice | undefined;
   if (req.tool_choice != null) {
@@ -121,11 +153,17 @@ export function decodeRequest(req: ChatCompletionRequest): DecodedChatRequest {
     },
     stream: req.stream === true,
     includeUsage: req.stream_options?.include_usage === true,
+    ...(continuation
+      ? { continuation: { model: req.model, prompt, tools } }
+      : {}),
   };
 }
 
 function decodeMessages(
-  messages: ChatCompletionRequest["messages"]
+  messages: ChatCompletionRequest["messages"],
+  model: string,
+  tools: LanguageModelV3CallOptions["tools"],
+  continuation: boolean
 ): LanguageModelV3Message[] {
   // OpenAI `tool` messages carry no tool name — reconstruct from the
   // assistant turns seen so far.
@@ -146,6 +184,29 @@ function decodeMessages(
         break;
       }
       case "assistant": {
+        if (message.grida_continuation !== undefined) {
+          if (!continuation)
+            throw new WireDecodeError(
+              "assistant continuation requires grida_continuation: { version: 1 }"
+            );
+          try {
+            const content = GridaContinuation.restore(
+              message.grida_continuation,
+              { model, prompt, tools },
+              message
+            );
+            for (const part of content) {
+              if (part.type === "tool-call")
+                toolNameById.set(part.toolCallId, part.toolName);
+            }
+            prompt.push({ role: "assistant", content });
+          } catch {
+            throw new WireDecodeError(
+              "invalid continuation: expected matching model, provider, unchanged prompt/tools prefix and assistant content"
+            );
+          }
+          break;
+        }
         const content: Extract<
           LanguageModelV3Message,
           { role: "assistant" }
@@ -291,7 +352,8 @@ export function encodeFinishReason(
 
 export function encodeCompletion(
   modelId: string,
-  result: LanguageModelV3GenerateResult
+  result: LanguageModelV3GenerateResult,
+  continuation?: GridaContinuation.Context
 ): ChatCompletionResponse {
   let text = "";
   let reasoning = "";
@@ -331,6 +393,14 @@ export function encodeCompletion(
           content: toolCalls.length > 0 ? text || null : text,
           ...(reasoning ? { reasoning_content: reasoning } : {}),
           ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+          ...(continuation
+            ? {
+                grida_continuation: GridaContinuation.encode(
+                  continuation,
+                  result.content
+                ),
+              }
+            : {}),
         },
         finish_reason: encodeFinishReason(result.finishReason),
       },
@@ -359,7 +429,7 @@ function chunkId(): string {
  */
 export function streamEncoder(
   modelId: string,
-  opts: { includeUsage: boolean }
+  opts: { includeUsage: boolean; continuation?: GridaContinuation.Context }
 ): TransformStream<LanguageModelV3StreamPart, Uint8Array> {
   const textEncoder = new TextEncoder();
   const id = chunkId();
@@ -372,6 +442,9 @@ export function streamEncoder(
     usage: LanguageModelV3Usage;
   } | null = null;
   const toolIndexById = new Map<string, number>();
+  const continuation = opts.continuation
+    ? new GridaContinuation.Stream(opts.continuation)
+    : undefined;
 
   function frame(payload: unknown): Uint8Array {
     return textEncoder.encode(`data: ${JSON.stringify(payload)}\n\n`);
@@ -396,6 +469,21 @@ export function streamEncoder(
   return new TransformStream<LanguageModelV3StreamPart, Uint8Array>({
     transform(part, controller) {
       if (errored) return;
+      try {
+        continuation?.push(part);
+      } catch {
+        errored = true;
+        controller.enqueue(
+          frame({
+            error: {
+              message: "The model returned unsupported continuation state.",
+              type: "server_error",
+              code: "stream_error",
+            },
+          })
+        );
+        return;
+      }
       switch (part.type) {
         case "text-delta":
           controller.enqueue(frame(contentChunk({ content: part.delta })));
@@ -489,6 +577,24 @@ export function streamEncoder(
     },
     flush(controller) {
       if (errored) return; // no [DONE] after an error frame
+      let state: GridaContinuation.Envelope | undefined;
+      if (continuation) {
+        try {
+          if (!finish) throw new Error("missing continuation finish");
+          state = continuation.finish();
+        } catch {
+          controller.enqueue(
+            frame({
+              error: {
+                message: "The model returned incomplete continuation state.",
+                type: "server_error",
+                code: "stream_error",
+              },
+            })
+          );
+          return;
+        }
+      }
       if (finish) {
         controller.enqueue(
           frame({
@@ -499,7 +605,7 @@ export function streamEncoder(
             choices: [
               {
                 index: 0,
-                delta: {},
+                delta: state ? { grida_continuation: state } : {},
                 finish_reason: encodeFinishReason(finish.reason),
               },
             ],

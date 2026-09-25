@@ -1,6 +1,7 @@
 import { models as facts } from "../models";
 import { TIER_MODEL_IDS, type ModelTier } from "./tiers";
 import { preferences } from "./preferences";
+import { schema1 } from "./compatibility";
 
 // Keep the imported value lookup outside the namespace that exports `models`.
 // The declaration bundler otherwise shadows the import with that local value.
@@ -213,6 +214,12 @@ export namespace catalog {
         "openai/gpt-6-astra": {
           status: "listed",
         },
+        "openai/gpt-6-sol": {
+          status: "listed",
+        },
+        "openai/gpt-6-luna": {
+          status: "listed",
+        },
         "anthropic/claude-sonnet-5": {
           status: "listed",
         },
@@ -224,6 +231,9 @@ export namespace catalog {
           legacy: true,
         },
         "anthropic/claude-opus-5": {
+          status: "listed",
+        },
+        "anthropic/claude-opus-5.5": {
           status: "listed",
         },
         "anthropic/claude-opus-4.8": {
@@ -1249,7 +1259,7 @@ export namespace catalog {
      * host with no text catalogue cannot run a turn at all.
      */
     export interface Snapshot {
-      /** Always {@link SCHEMA} on a parsed value. */
+      /** 1 for the compatible projection; 2 for the current text runtime. */
       schema: number;
       /** Opaque publisher version (a deploy sha; `"seed"` for the bundle). */
       version: string;
@@ -2018,15 +2028,19 @@ export namespace catalog {
     }
 
     /**
-     * The bundled catalogue expressed as a snapshot — the seed a host
-     * starts from and falls back to. Also what the publishing endpoint
-     * serves, which is why `parse(JSON.parse(JSON.stringify(seed())))`
-     * round-trips exactly (pinned in `__tests__/snapshot.test.ts`).
+     * The schema-1-compatible bundled catalogue. Existing publishers and
+     * installed readers retain their admission, tiers and recommendation.
+     * Current facts and membership withdrawal still apply. Use {@link v2.seed}
+     * only when the caller implements the current text continuation runtime.
      */
     export function seed(opts?: { version?: string }): Snapshot {
+      return schema1.project(seedCurrent(opts));
+    }
+
+    function seedCurrent(opts?: { version?: string }): Snapshot {
       return JSON.parse(
         JSON.stringify({
-          schema: SCHEMA,
+          schema: v2.SCHEMA,
           version: opts?.version ?? "seed",
           text: {
             catalog: Object.fromEntries(
@@ -2064,6 +2078,10 @@ export namespace catalog {
      */
     export function parse(data: unknown): Snapshot | null {
       if (!isRecord(data) || data.schema !== SCHEMA) return null;
+      return parseSupported(data);
+    }
+
+    function parseSupported(data: Record<string, unknown>): Snapshot | null {
       if (!isText(data.version)) return null;
       if (!isRecord(data.text) || !isRecord(data.text.catalog)) return null;
 
@@ -2090,7 +2108,7 @@ export namespace catalog {
       }
 
       const parsed: Snapshot = {
-        schema: SCHEMA,
+        schema: data.schema as number,
         version: data.version,
         text: { catalog, tier_model_ids },
       };
@@ -2270,6 +2288,33 @@ export namespace catalog {
       if (s) return build(s);
       return (seedView ??= build(seed()));
     }
+
+    /**
+     * Explicit opt-in to the current text runtime's catalog. Publish at a
+     * separate versioned URL: installed schema-1 readers reject this envelope.
+     * Media validation and fallback retain the schema-1 contract.
+     */
+    export namespace v2 {
+      export const SCHEMA = 2;
+
+      export function seed(opts?: { version?: string }): Snapshot {
+        return seedCurrent(opts);
+      }
+
+      /** Accept both versions; a schema-1 response stays a schema-1 view. */
+      export function parse(data: unknown): Snapshot | null {
+        if (!isRecord(data) || (data.schema !== 1 && data.schema !== SCHEMA))
+          return null;
+        return parseSupported(data);
+      }
+
+      let seedView: View | undefined;
+
+      export function view(s?: Snapshot): View {
+        if (s) return build(s);
+        return (seedView ??= build(seed()));
+      }
+    }
   }
 }
 
@@ -2288,5 +2333,6 @@ for (const namespace of [
   catalog.three_d,
   catalog.image_tools,
   catalog.snapshot,
+  catalog.snapshot.v2,
 ])
   Object.freeze(namespace);

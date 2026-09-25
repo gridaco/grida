@@ -27,13 +27,16 @@
  *     `output-error`) that carry a valid `input` object are re-fed — one bad
  *     row must not poison the conversation.
  *
- *   - **Reasoning is dropped.** Re-feeding thinking blocks across turns is
- *     provider-fraught (signatures) and low value; the model re-reasons.
+ *   - **Continuation stays within its model's current user turn.** Signed or
+ *     encrypted reasoning is required when resuming a tool loop. Older turns
+ *     and model/provider switches drop all continuation metadata together;
+ *     selectively retaining later state would change its signed prefix.
  */
 
 import type { ChatMessageWithParts } from "../session/rows";
 import { compactionBoundary } from "../session/boundary";
 import { AgentDesignSearch } from "../tools/design-search";
+import { HUMAN_INPUT_PART_TYPES } from "../tools/names";
 import { AgentVision } from "../vision";
 import {
   CONTEXT_MARKERS,
@@ -47,6 +50,18 @@ export type ModelUIMessage = {
   role: "user" | "assistant" | "system";
   parts: unknown[];
 };
+
+/** Dropping this interrupted step would hide an already executed tool result. */
+export class IncompleteToolContinuationError extends Error {
+  readonly code = "incomplete-tool-continuation";
+
+  constructor() {
+    super(
+      "This interrupted step already has a tool result. Start a new user turn to continue without replaying incomplete provider state."
+    );
+    this.name = "IncompleteToolContinuationError";
+  }
+}
 
 /**
  * Rebuild the model's message view from the (rewind-filtered) persisted
@@ -70,6 +85,9 @@ export function buildModelMessages(
     /** Scratch-relative direct files live for this model turn. Omitted by
      * generic callers; the runtime always supplies a snapshot. */
     availableScratchAttachmentPaths?: ReadonlySet<string>;
+    /** Resolved native model identity. Omitted by structural/external-agent
+     * callers, which must not replay provider-specific continuation state. */
+    continuationModel?: { provider_id: string; model_id: string };
   } = {}
 ): ModelUIMessage[] {
   const boundary = compactionBoundary(visible);
@@ -96,6 +114,26 @@ export function buildModelMessages(
   // stay durable in `chat_parts` — this only changes what the model sees this
   // turn — and the model can re-call `view_image` to bring pixels back.
   const liveStart = imageLiveStartIndex(working);
+  const currentUserIndex = working.findLastIndex((m) => m.role === "user");
+  const continuationModel = opts.continuationModel;
+  const retainContinuation =
+    currentUserIndex >= 0 &&
+    // A retained tail predating compaction now has a different summary/prefix.
+    // Only state produced for a user turn AFTER that boundary can be reused.
+    (!boundary ||
+      visible.findIndex((m) => m.id === working[currentUserIndex].id) >
+        boundary.index) &&
+    continuationModel !== undefined &&
+    working.slice(currentUserIndex + 1).every((m) => {
+      if (m.role !== "assistant") return false;
+      const model = m.metadata.model as
+        | { provider_id?: unknown; model_id?: unknown }
+        | undefined;
+      return (
+        model?.provider_id === continuationModel.provider_id &&
+        model?.model_id === continuationModel.model_id
+      );
+    });
 
   const out: ModelUIMessage[] = [];
   let pendingSummary: string | null = leadingSummary;
@@ -113,6 +151,7 @@ export function buildModelMessages(
       elideImages: i < liveStart,
       availableDirectoryScopeIds: opts.availableDirectoryScopeIds,
       availableScratchAttachmentPaths: opts.availableScratchAttachmentPaths,
+      retainContinuation: retainContinuation && i > currentUserIndex,
     });
     if (m.role === "user" && pendingSummary !== null) {
       parts.unshift({
@@ -177,15 +216,23 @@ function lowerParts(
   parts: ChatMessageWithParts["parts"],
   opts: {
     elideImages: boolean;
+    retainContinuation?: boolean;
     availableDirectoryScopeIds?: ReadonlySet<string>;
     availableScratchAttachmentPaths?: ReadonlySet<string>;
   } = { elideImages: false }
 ): unknown[] {
   const out: unknown[] = [];
-  for (const p of parts) {
-    const data = p.data as Record<string, unknown> | null;
-    if (!data) continue;
+  for (const p of opts.retainContinuation
+    ? completeContinuationSteps(parts)
+    : parts) {
+    const raw = p.data as Record<string, unknown> | null;
+    if (!raw) continue;
+    const data = opts.retainContinuation ? raw : withoutContinuation(raw);
     const type = p.type;
+    if (type === "step-start") {
+      out.push({ type: "step-start" });
+      continue;
+    }
     if (type === "text") {
       if (typeof data.text === "string" && data.text.length > 0) out.push(data);
       continue;
@@ -205,7 +252,10 @@ function lowerParts(
       continue;
     }
     if (type === "reasoning") {
-      // Dropped on purpose — see file header.
+      // Empty thinking can still carry a required signature/encrypted item.
+      if (opts.retainContinuation && typeof data.text === "string") {
+        out.push(data);
+      }
       continue;
     }
     // Registered context tokens (WG `compositor.md` §templating) lower to a
@@ -268,7 +318,86 @@ function lowerParts(
     }
     // Other data-* parts are UI-only — not model-relevant. Drop.
   }
-  return out;
+  return out.some((p) => (p as { type: string }).type !== "step-start")
+    ? out
+    : [];
+}
+
+/**
+ * A canceled stream is displayable history, not replayable provider state.
+ * Omit its incomplete step as a unit from this model-only view. A later retry
+ * was generated against that cleaned view and remains independently replayable;
+ * truncating the whole durable suffix would hide every successful retry too.
+ * SDK `state` is persisted verbatim, with no parallel history format.
+ * Older rows without a stream state retain their established interpretation.
+ */
+function completeContinuationSteps(
+  parts: ChatMessageWithParts["parts"]
+): ChatMessageWithParts["parts"] {
+  const complete: ChatMessageWithParts["parts"] = [];
+  let stepStart = 0;
+  let incomplete = false;
+  let hasResult = false;
+  let hasUnsettledTool = false;
+  const finishStep = (end: number) => {
+    if (hasResult && (incomplete || hasUnsettledTool))
+      throw new IncompleteToolContinuationError();
+    if (!incomplete && !hasUnsettledTool)
+      complete.push(...parts.slice(stepStart, end));
+  };
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part.type === "step-start") {
+      finishStep(i);
+      stepStart = i;
+      incomplete = false;
+      hasResult = false;
+      hasUnsettledTool = false;
+    }
+    const data = part.data as { state?: unknown } | null;
+    // A fully streamed call can still be interrupted before its result. If a
+    // sibling completed, dropping only this call changes the signed batch;
+    // dropping both hides the completed effect. Without a result, omit the
+    // entire step, including its completed signed reasoning and text, rather
+    // than retaining state from a call the model view will drop. Human-input
+    // pauses are governed by admission and retain their approval semantics.
+    if (
+      (part.type.startsWith("tool-") || part.type === "dynamic-tool") &&
+      (data?.state ?? part.tool_state) === "input-available" &&
+      !HUMAN_INPUT_PART_TYPES.some((type) => type === part.type)
+    )
+      hasUnsettledTool = true;
+    if (
+      (part.type.startsWith("tool-") || part.type === "dynamic-tool") &&
+      ["output-available", "output-error", "output-denied"].includes(
+        String(data?.state ?? part.tool_state)
+      )
+    )
+      hasResult = true;
+    if (
+      ((part.type === "text" || part.type === "reasoning") &&
+        data?.state === "streaming") ||
+      ((part.type.startsWith("tool-") || part.type === "dynamic-tool") &&
+        (data?.state ?? part.tool_state) === "input-streaming")
+    ) {
+      incomplete = true;
+    }
+  }
+  finishStep(parts.length);
+  return complete;
+}
+
+/** Never mutate durable rows when omitting state from an older/model-switched turn. */
+function withoutContinuation(
+  data: Record<string, unknown>
+): Record<string, unknown> {
+  const {
+    providerMetadata: _provider,
+    callProviderMetadata: _call,
+    resultProviderMetadata: _result,
+    ...plain
+  } = data;
+  return plain;
 }
 
 /**

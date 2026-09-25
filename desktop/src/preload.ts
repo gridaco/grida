@@ -302,6 +302,8 @@ const bridge: DesktopBridge = {
   caps: {
     media: { tripo: true, rigging: true, tripo_gg: true, rigging_gg: true },
     agent: {
+      // Bundled catalog reader, provider continuation and native pause/resume.
+      text_catalog_v2: true,
       // This host accepts `{ path, base64 }` scratch seeds on agent runs.
       scratch_seed_base64: true,
       // Windows intentionally withholds confined run_command; a scratch-only

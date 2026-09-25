@@ -33,6 +33,45 @@ function parsed(frames: string[]): Array<Record<string, unknown>> {
 }
 
 describe("buildReplayPrefix", () => {
+  it("replays step boundaries and empty signed reasoning without losing call metadata", () => {
+    const metadata = {
+      gg: { continuation: { version: 1, model: "openai/gpt-6-sol" } },
+    };
+    const out = parsed(
+      buildReplayPrefix(
+        msg("assistant", [
+          { type: "step-start", data: { type: "step-start" } },
+          {
+            type: "reasoning",
+            data: { type: "reasoning", text: "", providerMetadata: metadata },
+          },
+          {
+            type: "tool-list_files",
+            data: {
+              type: "tool-list_files",
+              toolCallId: "tc",
+              state: "approval-requested",
+              input: {},
+              callProviderMetadata: metadata,
+              approval: { id: "ap" },
+            },
+          },
+        ])
+      )
+    );
+    expect(out.map((c) => c.type)).toEqual([
+      "start",
+      "start-step",
+      "reasoning-start",
+      "reasoning-delta",
+      "reasoning-end",
+      "tool-input-available",
+      "tool-approval-request",
+    ]);
+    expect(out[4].providerMetadata).toEqual(metadata);
+    expect(out[5].providerMetadata).toEqual(metadata);
+  });
+
   it("returns [] for a user tail (normal send / queue drain) and for no tail", () => {
     expect(buildReplayPrefix(undefined)).toEqual([]);
     expect(
