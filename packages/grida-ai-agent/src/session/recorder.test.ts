@@ -41,6 +41,118 @@ async function feed(
 }
 
 describe("createRecorderConsumer", () => {
+  it("retains empty signed reasoning and provider state through approval and resumed output", async () => {
+    const metadata = {
+      openrouter: {
+        reasoning_details: [
+          {
+            type: "reasoning.text",
+            text: "",
+            signature: "synthetic-signature",
+            index: 0,
+          },
+        ],
+      },
+    };
+    await feed(createRecorderConsumer({ store, session_id: session.id }), [
+      { type: "start", messageId: "continuation" },
+      { type: "start-step" },
+      { type: "reasoning-start", id: "r1" },
+      {
+        type: "reasoning-end",
+        id: "r1",
+        providerMetadata: { anthropic: { signature: "synthetic-signature" } },
+      },
+      {
+        type: "tool-input-available",
+        toolCallId: "continue-tool",
+        toolName: "list_files",
+        input: { path: "/" },
+        providerMetadata: metadata,
+      },
+      {
+        type: "tool-approval-request",
+        toolCallId: "continue-tool",
+        approvalId: "allow-tool",
+      },
+    ]);
+    const pending = await store.findToolPart(session.id, "continue-tool");
+    expect(pending?.data).toMatchObject({ callProviderMetadata: metadata });
+    const [message] = await store.listMessages(session.id);
+    expect(message.parts.map((p) => p.type)).toEqual([
+      "step-start",
+      "reasoning",
+      "tool-list_files",
+    ]);
+    expect(message.parts[1].data).toEqual({
+      type: "reasoning",
+      text: "",
+      state: "done",
+      providerMetadata: { anthropic: { signature: "synthetic-signature" } },
+    });
+
+    // A new recorder adopts the original call slot after the approval pause.
+    await feed(createRecorderConsumer({ store, session_id: session.id }), [
+      { type: "start", messageId: "continuation" },
+      {
+        type: "tool-output-available",
+        toolCallId: "continue-tool",
+        output: { files: [] },
+      },
+      { type: "start-step" },
+      { type: "text-start", id: "answer" },
+      { type: "text-delta", id: "answer", delta: "Done" },
+      { type: "text-end", id: "answer" },
+    ]);
+    const completed = await store.findToolPart(session.id, "continue-tool");
+    expect(completed?.data).toMatchObject({
+      callProviderMetadata: metadata,
+      input: { path: "/" },
+      output: { files: [] },
+    });
+    const [resumed] = await store.listMessages(session.id);
+    expect(resumed.parts.map((p) => p.type)).toEqual([
+      "step-start",
+      "reasoning",
+      "tool-list_files",
+      "step-start",
+      "text",
+    ]);
+  });
+
+  it("does not persist an empty failed step", async () => {
+    await feed(
+      createRecorderConsumer({ store, session_id: session.id }),
+      [{ type: "start", messageId: "empty-step" }, { type: "start-step" }],
+      "abort"
+    );
+    expect(await store.listMessages(session.id)).toEqual([]);
+  });
+
+  it("keeps unfinished text and reasoning marked streaming after cancellation", async () => {
+    await feed(
+      createRecorderConsumer({ store, session_id: session.id }),
+      [
+        { type: "start", messageId: "canceled" },
+        { type: "start-step" },
+        { type: "reasoning-start", id: "r" },
+        { type: "reasoning-delta", id: "r", delta: "Partial thinking" },
+        { type: "text-start", id: "t" },
+        { type: "text-delta", id: "t", delta: "Partial answer" },
+      ],
+      "abort"
+    );
+    const [message] = await store.listMessages(session.id);
+    expect(
+      message.parts
+        .filter((part) => part.type !== "step-start")
+        .map((part) => part.data)
+    ).toEqual([
+      { type: "reasoning", text: "Partial thinking", state: "streaming" },
+      { type: "text", text: "Partial answer", state: "streaming" },
+    ]);
+  });
+
   it("persists text-* chunks as a mutable text part", async () => {
     const consumer = createRecorderConsumer({ store, session_id: session.id });
     await feed(consumer, [
@@ -65,9 +177,11 @@ describe("createRecorderConsumer", () => {
     const messages = await store.listMessages(session.id);
     expect(messages.length).toBe(1);
     expect(messages[0].role).toBe("assistant");
-    expect(messages[0].parts.length).toBe(1);
-    expect(messages[0].parts[0].type).toBe("text");
-    expect((messages[0].parts[0].data as { text: string }).text).toBe(
+    expect(messages[0].parts.map((p) => p.type)).toEqual([
+      "step-start",
+      "text",
+    ]);
+    expect((messages[0].parts[1].data as { text: string }).text).toBe(
       "Hello world"
     );
 
@@ -294,7 +408,7 @@ describe("createRecorderConsumer", () => {
     const afterT1 = await store.listMessages(session.id);
     expect(afterT1.length).toBe(1);
     expect(afterT1[0].id).toBe("msgA");
-    expect(afterT1[0].parts.length).toBe(2); // text + run_command(approval)
+    expect(afterT1[0].parts.length).toBe(3); // step + text + run_command(approval)
 
     await store.answerApproval(session.id, {
       tool_call_id: "tc1",
@@ -322,13 +436,13 @@ describe("createRecorderConsumer", () => {
     ]);
 
     // STILL one assistant message (no fork); the continuation APPENDED after the
-    // pausing turn's parts (index 2), never overwriting index 0.
+    // pausing turn's parts, never overwriting existing content.
     const merged = await store.listMessages(session.id);
     expect(merged.length).toBe(1);
     expect(merged[0].id).toBe("msgA");
     const parts = merged[0].parts;
-    expect(parts.length).toBe(3); // text, run_command(output), continuation text
-    expect((parts[0].data as { text: string }).text).toBe("Let me run it.");
+    expect(parts.length).toBe(5); // two steps + text + tool output + continuation
+    expect((parts[1].data as { text: string }).text).toBe("Let me run it.");
     const tool = parts.find((p) => p.type === "tool-run_command");
     expect(tool!.tool_state).toBe("output-available");
     const tail = parts[parts.length - 1];

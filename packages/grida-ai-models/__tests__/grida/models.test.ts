@@ -855,14 +855,14 @@ describe("models.video catalogue invariants", () => {
 });
 
 describe("models.text.byTier", () => {
-  it("pins the accepted capability and cost topology", () => {
+  it("preserves four public keys with mini and pro intentionally sharing Sol", () => {
     expect(TIER_MODEL_IDS).toEqual({
-      nano: "openai/gpt-5.6-luna",
-      mini: "openai/gpt-5.6-terra",
-      pro: "openai/gpt-5.6-sol",
+      nano: "openai/gpt-6-luna",
+      mini: "openai/gpt-6-sol",
+      pro: "openai/gpt-6-sol",
       max: "openai/gpt-6-astra",
     });
-    expect(new Set(Object.values(TIER_MODEL_IDS)).size).toBe(4);
+    expect(new Set(Object.values(TIER_MODEL_IDS)).size).toBe(3);
   });
 
   // `nano` is the cheapest model still good enough for background work,

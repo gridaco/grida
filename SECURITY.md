@@ -237,7 +237,7 @@ inputOrgId })`. It resolves from: route param slug → request
    bypass is the BYOK carve-out below, and it does not bill.
 3. **One billing seam, explicit provider-import owners** —
    [editor/lib/ai/server.ts](editor/lib/ai/server.ts) owns shared billing;
-   value imports of `replicate`, `openai`, `@ai-sdk/*`, `@anthropic-ai/sdk`
+   value imports of `replicate`, `openai`, `@ai-sdk/*`, `@openrouter/ai-sdk-provider`, `@anthropic-ai/sdk`
    and the portable `@grida/ai` SDK are restricted to the reviewed seam allowlist.
    Enforced by oxlint
    `no-restricted-imports` ([editor/.oxlintrc.jsonc](editor/.oxlintrc.jsonc))
@@ -1004,7 +1004,7 @@ Today:
 - [Shared sound-effect operation](packages/grida-ai/src/sound-effect-client.ts) and [its tests](packages/grida-ai/src/sound-effect-client.test.ts) — the existing ElevenLabs BYOK model uses one fixed provider endpoint and a live key from the host's narrow reader. No GG credential or download destination is available. The shared [media invocation](packages/grida-ai/src/media-request.ts) bounds credential lookup, response reads and cancellation; only nonempty MP3 bytes within 16 MiB and a MIME type leave the operation. The [sound-effects route](packages/grida-ai-agent/src/http/routes/sound-effects.ts) and [its tests](packages/grida-ai-agent/src/http/routes/sound-effects.test.ts) retain admission, missing-key status, wire encoding, filenames and optional root-level receipts. Safe failures omit credential and upstream details. This replaces the former agent `elevenlabs-sound-effects.ts` adapter.
 - [Standalone package proof](scripts/ai-local/proof.mjs), [cleanup/report tests](scripts/ai-local/proof.test.mjs), [runtime guard](scripts/ai-local/network.cjs), [image consumer](scripts/ai-local/consumer.mjs), [video consumer](scripts/ai-local/video-consumer.mjs), [music consumer](scripts/ai-local/music-consumer.mjs), [sound-effect consumer](scripts/ai-local/sound-effect-consumer.mjs), [speech and voice consumer](scripts/ai-local/text-to-speech-consumer.mjs), [3D consumer](scripts/ai-local/three-d-consumer.mjs), and [guide](scripts/ai-local/README.md) — packed public exports with only declared production dependencies, synthetic transports, and guarded ambient network/credential/state access. No Grida host is installed or started.
 - [packages/grida-daemon/src/daemon.ts](packages/grida-daemon/src/daemon.ts) — daemon discovery contract: owner-only atomic registration + persistent credential, loopback-only records, authenticated probe.
-- [packages/grida-ai-agent/src/runtime/index.ts](packages/grida-ai-agent/src/runtime/index.ts) — agent run orchestration; owns run / stream / abort behavior and binds a consumed human-input result to the exact resumed run through terminal recorder settlement.
+- [packages/grida-ai-agent/src/runtime/index.ts](packages/grida-ai-agent/src/runtime/index.ts) — agent run orchestration; owns run / stream / abort behavior and binds a consumed human-input result to the exact resumed run through terminal recorder settlement. Parallel approvals/questions persist independently, but execution and model continuation wait until all human-input siblings are answered; settling one answer never grants an unanswered sibling execution authority. [Continuation tests](packages/grida-ai-agent/src/runtime/continuation.test.ts) pin this ordering, same-model resume, and refusal to replay an interrupted provider step that already executed a tool.
 - [packages/grida-ai-agent/src/runtime/stream-registry.ts](packages/grida-ai-agent/src/runtime/stream-registry.ts) — in-flight run replay/abort registry; async model producers append and finish only through their exact `StreamEntry` generation, so a late response or error from aborted turn A cannot mutate queued replacement B under the same session id. Explicit human abort remains session-keyed so it targets whichever turn is current.
 - [packages/grida-ai-agent/src/runtime/session-scheduler.ts](packages/grida-ai-agent/src/runtime/session-scheduler.ts), [status-sse.ts](packages/grida-ai-agent/src/runtime/status-sse.ts), and [the scheduler contract tests](packages/grida-ai-agent/src/runtime/session-scheduler.test.ts) — authoritative per-session run-state machine and its observation channel; classifies persisted approvals/questions, projects explicit waiting states after restart, and pauses/rechecks queue drain so an ordinary queued turn cannot run ahead of unresolved human input. Status-SSE hydration is deliberately read-only: only trusted lifecycle/mutation edges, host-start recovery, and provider-ready retries can schedule a queued turn.
 - [packages/grida-ai-agent/src/runtime/command-backend.ts](packages/grida-ai-agent/src/runtime/command-backend.ts) — agent `run_command` adapter: validates cwd against only the current canonical workspace/own scratch, flushes structured writes, and delegates the exact immutable scope to a host-injected executor. It never raw-spawns.
@@ -1579,6 +1579,13 @@ governs the surface, this record governs its security half.
 - `editor/app/(api)/(public)/api/v1/ai/**` — the hosted GG endpoints: OpenAI-compat chat/completions + models, Grida-native image/video/music generation and the four 3D feature routes. Verify with `verifyGgToken` EXCLUSIVELY; provider work is gated through the seam, and metered operations use actual receipts (pinned by route and seam contract tests).
 - `editor/app/(api)/(public)/api/v1/models/catalog/route.ts` — deliberately OUTSIDE the glob above, and deliberately unauthenticated: an agent host fetches the published model catalogue at boot, before any session token exists. It accepts NO credential (strictly stronger than accepting the wrong one), spends nothing, and returns only catalogue data already public on the models page. Listed here so it is not "fixed" into the token-gated family, which would break the boot fetch. See [catalogue distribution](docs/wg/platform/hosted-ai.md).
 - [editor/lib/ai/openai-compat/](editor/lib/ai/openai-compat/codec.ts) — the wire codec + error envelope + allowlist + rate limits.
+  [Continuation v1](editor/lib/ai/openai-compat/gg-continuation.ts) and
+  [its producer tests](editor/lib/ai/openai-compat/gg-continuation.test.ts) preserve
+  bounded, explicitly opted-in assistant state. Its prefix digest is a consistency
+  check, not authentication. It reconstructs only named prompt-part metadata;
+  top-level execution options remain server-owned, with OpenAI `store: false`
+  preventing untrusted item IDs from becoming stored-response references.
+  State never supplies organization, credential, destination or billing authority.
   The [allowlist test](editor/lib/ai/openai-compat/hosted-models.test.ts) pins direct
   catalogue consumption without importing provider factories for a model-list read.
 - [HTTP image adapter tests](packages/grida-ai-agent/src/http/routes/images.test.ts) and [workspace image adapter tests](packages/grida-ai-agent/src/runtime/image-generation.test.ts) — shared scoped GG execution behind existing host admission; expired authority and insufficient-credit status remain actionable.
@@ -1589,6 +1596,7 @@ governs the surface, this record governs its security half.
 - [Shared music operation](packages/grida-ai/src/music-client.ts) and [its tests](packages/grida-ai/src/music-client.test.ts) — the two bundled Lyria models use only the fixed GG music endpoint, with a live scoped token checked at resolution and submission. Each invocation submits once, validates the matching model/provider and bounded inline MP3, and exposes safe failures. The [shared media invocation](packages/grida-ai/src/media-request.ts) owns timeout/cancellation cleanup for music and video; it grants no credential or destination authority. The [music route](packages/grida-ai-agent/src/http/routes/music.ts) and [its tests](packages/grida-ai-agent/src/http/routes/music.test.ts) retain host admission and actionable GG status mapping. Mint, durable custody, entitlement and refresh remain host/server responsibilities.
 - [packages/grida-ai-agent/src/http/routes/gg-auth.ts](packages/grida-ai-agent/src/http/routes/gg-auth.ts) — `/auth/gg/set|clear|status` behind the daemon perimeter; token never logged (pinned by its test).
 - [packages/grida-ai-agent/src/providers/gg.ts](packages/grida-ai-agent/src/providers/gg.ts) and [text adapter tests](packages/grida-ai-agent/src/providers/gg.test.ts) — hosted text adapter consuming shared GG helpers: URL admission before token reads, editor-origin-only egress, code-led typed status errors (401→`gg_token_expired`, 402→`insufficient_credits`). Those constructed status messages omit upstream bodies; transport/parsing failures still require the calling operation's safe error boundary.
+- [Text continuation consumer](packages/grida-ai-agent/src/providers/gg-continuation.ts) and [its tests](packages/grida-ai-agent/src/providers/gg-continuation.test.ts) — bounded model-bound envelopes preserve the original tool arguments and reasoning state. Unknown or malformed state fails closed before tool execution; state never supplies a destination, credential, model override or arbitrary provider option.
 - The `gg` resolver arms ([providers/index.ts](packages/grida-ai-agent/src/providers/index.ts), resolve-image, resolve-video) — precedence: explicit wins; implicit BYOK → `gg` → endpoints. The `/secrets/*` allowlist keeps REJECTING the `gg` id (no key may be stored under it; pinned by `gg-auth.test.ts`).
 - [packages/grida-ai-agent/src/sandbox/policy.ts](packages/grida-ai-agent/src/sandbox/policy.ts) — `gg_host` egress for ambient-fetch hosts and its omission when provider HTTP is host-routed.
 - [desktop/src/main/agent-network-host.ts](desktop/src/main/agent-network-host.ts) — destination-bound Chromium transport; transiently carries the scoped Authorization header without persistence or renderer exposure.
@@ -2385,6 +2393,12 @@ browser cookies, UI code or request-global state into account operations.
    exemption: direct browser imports in the GG adapter and account/API imports
    of the execution seam still fail the audit. The AI seam's independent import
    audit and lint rules restrict portable SDK execution to its exact owners.
+   The fixed public `catalog` binding owns only `/api/v1/models/catalog/2` with
+   GET/HEAD/OPTIONS, no input and no caller authority. It publishes identical
+   cacheable data to all callers, while writes/errors are no-store. Its complete
+   route template and read-only/public declaration are source-audited; it has no
+   browser, provider or billing dependency exemption. Schema 1 retains the
+   original legacy path for clients lacking the new continuation contract.
 5. **Runtime proof stays local.** `scripts/api-local` builds a private production
    Next snapshot from the real API, proxy and config sources. Its synthetic
    loopback Auth and Data servers reject crossed service requests; web tripwires
@@ -2437,6 +2451,9 @@ release requirement.
 
 - [API guide](editor/lib/api/README.md), [inventory](editor/lib/api/operations.ts),
   [policy](editor/lib/api/policy.ts), and [policy tests](editor/lib/api/policy.test.ts).
+- [Public catalog binding](editor/lib/api/catalog.ts), [contract tests](editor/lib/api/catalog.test.ts),
+  and [schema-2 route](<editor/app/(api)/(public)/api/v1/models/catalog/2/route.ts>) —
+  credential-independent, input-free catalog publication with pinned HTTP policy.
 - [Funded 3D binding](editor/lib/api/gg-media.ts),
   [HTTP contract tests](editor/lib/api/gg-media.test.ts),
   [upload references](editor/lib/gg/uploads.ts) and

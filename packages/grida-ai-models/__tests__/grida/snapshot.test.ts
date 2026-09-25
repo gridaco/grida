@@ -1,6 +1,12 @@
 import { catalog as models, TIER_MODEL_IDS } from "../../src/grida";
 
 const snapshot = models.snapshot;
+const compatibleTiers = {
+  nano: "openai/gpt-5.6-luna",
+  mini: "openai/gpt-5.6-terra",
+  pro: "openai/gpt-5.6-sol",
+  max: "openai/gpt-6-astra",
+};
 
 /** A minimal valid spec — every optional field absent. */
 function spec(
@@ -41,12 +47,13 @@ function wire(value: unknown): unknown {
 }
 
 describe("models.snapshot.seed", () => {
-  it("expresses the bundled catalogue verbatim", () => {
+  it("preserves the schema-1 text projection independently of current tiers", () => {
     const s = snapshot.seed();
     expect(s.schema).toBe(snapshot.SCHEMA);
     expect(s.version).toBe("seed");
-    expect(s.text.catalog).toEqual(models.text.catalog);
-    expect(s.text.tier_model_ids).toEqual(TIER_MODEL_IDS);
+    expect(s.text.catalog).toHaveProperty("openai/gpt-5.6-terra");
+    expect(s.text.catalog).not.toHaveProperty("openai/gpt-6-sol");
+    expect(s.text.tier_model_ids).toEqual(compatibleTiers);
   });
 
   it("takes a publisher version", () => {
@@ -73,10 +80,10 @@ describe("models.snapshot round-trip", () => {
     expect(parsed).toEqual(seeded);
   });
 
-  it("carries every catalogue entry, including deprecated ones", () => {
+  it("carries every compatible catalogue entry, including deprecated ones", () => {
     const parsed = snapshot.parse(wire(snapshot.seed()))!;
     expect(Object.keys(parsed.text.catalog).sort()).toEqual(
-      Object.keys(models.text.catalog).sort()
+      Object.keys(snapshot.seed().text.catalog).sort()
     );
   });
 });
@@ -324,13 +331,17 @@ describe("models.snapshot.parse — rejection", () => {
 });
 
 describe("models.snapshot.view", () => {
-  it("memoizes the seed view and mirrors the static tables", () => {
+  it("memoizes the schema-1 seed view and resolves its compatible tier table", () => {
     const a = snapshot.view();
     const b = snapshot.view();
     expect(a).toBe(b);
-    expect(a.catalog).toEqual(models.text.catalog);
-    expect(a.tier_model_ids).toEqual(TIER_MODEL_IDS);
-    expect(a.by_tier).toEqual(models.text.byTier);
+    expect(a.catalog).toEqual(snapshot.seed().text.catalog);
+    expect(a.tier_model_ids).toEqual(compatibleTiers);
+    for (const [tier, id] of Object.entries(compatibleTiers)) {
+      expect(a.by_tier[tier as keyof typeof compatibleTiers]).toEqual(
+        models.text.modelSpecById(id)
+      );
+    }
   });
 
   it("matches modelSpecById's rules — exact, bare, and date-suffixed", () => {

@@ -6,7 +6,7 @@
 This proof builds and starts Next.js in **production mode**, then sends real
 HTTP requests to the current `/api/v1/auth/me`, `/api/v1/account/organizations`,
 `/api/v1/account/credits`, `/api/v1/auth/gg`, `/api/v1/ai/models`, and the four
-`/api/v1/ai/3d/*` implementations. It needs Node.js
+`/api/v1/ai/3d/*` implementations, plus both public model catalog versions. It needs Node.js
 24+ and the repository's installed dependencies. The command builds the model
 catalogue before starting the proof. It does not install packages, start Docker,
 use Supabase services, or read account credentials.
@@ -133,7 +133,10 @@ does not certify a platform upload timeout.
 This proves the **Next request pipeline**, not Supabase token cryptography,
 OAuth consent, grant revocation, RLS, or hosted infrastructure. The separate
 [local OAuth proof](../auth-local/README.md) covers the real Supabase flow.
-The legacy GG generation and public catalogue handlers are not built or
+Public catalog checks compare schema-1 compatibility with schema-2 membership
+and tiers through actual Next routing. They verify credential-independent public
+cache responses, bodyless HEAD/OPTIONS and rejected writes/selectors. These data
+reads perform no model inference. Legacy GG generation handlers are not built or
 exercised here; their registered paths remain part of the copied inventory.
 
 ## Isolation and cleanup

@@ -97,9 +97,9 @@ describe("GET /api/v1/ai/models", () => {
     const byId = new Map(body.data.map((entry) => [entry.id, entry]));
     // Tier annotation follows the reverse TIER_MODEL_IDS map.
     for (const [tier, id] of [
-      ["nano", "openai/gpt-5.6-luna"],
-      ["mini", "openai/gpt-5.6-terra"],
-      ["pro", "openai/gpt-5.6-sol"],
+      ["nano", "openai/gpt-6-luna"],
+      // mini and pro share Sol; the list reports the lowest applicable tier.
+      ["mini", "openai/gpt-6-sol"],
       ["max", "openai/gpt-6-astra"],
     ] as const) {
       expect(byId.get(id)?.grida).toMatchObject({ modality: "text", tier });
@@ -107,6 +107,8 @@ describe("GET /api/v1/ai/models", () => {
     for (const id of [
       "anthropic/claude-fable-5.1",
       "anthropic/claude-opus-5",
+      "anthropic/claude-opus-5.5",
+      "openai/gpt-5.6-sol",
       "google/gemini-3.8-flash",
     ]) {
       expect(byId.get(id)?.grida).toMatchObject({

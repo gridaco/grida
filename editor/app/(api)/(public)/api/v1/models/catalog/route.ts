@@ -8,11 +8,11 @@
  * is the fix — an agent host seeds from its bundled copy and refreshes
  * from here, so a grida.co deploy reaches installed binaries.
  *
- * The published snapshot IS the deployed gate. `isHostedTextModel`
- * (`lib/ai/openai-compat/hosted-models.ts`) and this body are the same
- * static import in the same deploy artifact, so they cannot disagree —
- * which is why a client converging on this payload is converging on the
- * exact table the server will enforce, even against a newer bundled seed.
+ * This schema-1 path retains the text subset compatible with released clients,
+ * intersected with current service membership so withdrawals still apply.
+ * Continuation-capable clients use /api/v1/models/catalog/2. A model requiring
+ * new client code must not enter this older projection merely because the
+ * server can run it.
  *
  * DELIBERATELY UNAUTHENTICATED, and deliberately NOT under
  * `/api/v1/ai/**`. That path is bound by SECURITY.md (GRIDA-SEC-006) to

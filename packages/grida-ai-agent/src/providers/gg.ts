@@ -17,6 +17,7 @@ import type { ModelFactory } from "../agent";
 import type { GgTokenSource } from "@grida/ai";
 import { ProviderHttp } from "./http";
 import { BUNDLED_TIER_MODEL_IDS, type TierModelIds } from "./byok";
+import { GgContinuationModel } from "./gg-continuation";
 
 // Shared scoped-token semantics belong to the AI producer; tiers stay agent-owned.
 import {
@@ -38,7 +39,7 @@ export function makeGridaGatewayFactory(
   providerHttp: ProviderHttp = new ProviderHttp(),
   tierModelIds: TierModelIds = BUNDLED_TIER_MODEL_IDS
 ): ModelFactory {
-  const provider = createOpenAICompatible({
+  const providerOptions = {
     name: "gg",
     baseURL: gridaGatewayApiBase(baseUrl),
     // Same load-bearing flag as the BYOK factories: without the usage
@@ -53,10 +54,22 @@ export function makeGridaGatewayFactory(
       await throwOnGgHttpError(response);
       return response;
     }) as typeof fetch,
-  });
+  };
+  const provider = createOpenAICompatible(providerOptions);
   // Catalog ids ARE the hosted call ids (the server allowlist is the
   // same catalog) — explicit picks hand straight through, tiers resolve
   // via the canonical table. Deliberately NOT the endpoint factory's
   // collapse-to-default: Grida Cloud serves the catalog.
-  return (tier, modelId) => provider(modelId ?? tierModelIds()[tier]);
+  return (tier, modelId) => {
+    const id = modelId ?? tierModelIds()[tier];
+    // Continuation v1 is explicitly scoped to these upstream namespaces.
+    // Gemini retains its existing wire until GG defines that contract.
+    return /^(openai|anthropic)\//.test(id)
+      ? new GgContinuationModel(id, (transformRequestBody) =>
+          createOpenAICompatible({ ...providerOptions, transformRequestBody })(
+            id
+          )
+        )
+      : provider(id);
+  };
 }

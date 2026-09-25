@@ -4,7 +4,7 @@ export namespace apiOperations {
     path: string;
     methods: readonly string[];
     authority: "native-account" | "gg" | "public";
-    binding: "account" | "gg" | "gg-media" | "legacy";
+    binding: "account" | "gg" | "gg-media" | "catalog" | "legacy";
     cache: "no-store" | "owner" | "public";
   }>;
 
@@ -111,6 +111,13 @@ export namespace apiOperations {
       methods: ["GET"],
       authority: "public",
       binding: "legacy",
+      cache: "public",
+    },
+    "models.catalog.v2": {
+      path: "/api/v1/models/catalog/2",
+      methods: ["GET", "HEAD", "OPTIONS"],
+      authority: "public",
+      binding: "catalog",
       cache: "public",
     },
   } as const satisfies Record<string, Definition>;

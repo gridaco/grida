@@ -58,6 +58,21 @@ describe("session cost accounting", () => {
     );
   });
 
+  it("uses current bundled model prices and tiers without a refresh store", () => {
+    expect(
+      baseCostUsdFromMessageUsage(
+        { provider_id: "openrouter", model_id: "openai/gpt-6-sol" },
+        { input: 1_000_000, output: 1_000_000 }
+      )
+    ).toBe(12);
+    expect(
+      baseCostUsdFromMessageUsage(
+        { provider_id: "openrouter", tier: "nano" },
+        { input: 1_000_000, output: 1_000_000 }
+      )
+    ).toBeCloseTo(0.6);
+  });
+
   it("returns undefined when no catalog price card is available", () => {
     expect(
       baseCostUsdFromMessageUsage(

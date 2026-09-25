@@ -4,7 +4,7 @@ Canonical model facts and pure lookup helpers: identities, source-backed release
 provenance, provider bindings, capabilities, IO limits, and published prices.
 
 The root entry owns factual data. Grida service membership, preferences, tiers
-and the schema-1 catalog live in the same package behind the explicit
+and the versioned catalog live in the same package behind the explicit
 `@grida/ai-models/grida` entry. The root never imports or re-exports that entry.
 
 ## Root-entry anti-goals
@@ -107,7 +107,7 @@ share one private package lifecycle; independent publication is not required.
 ## Grida service entry
 
 `@grida/ai-models/grida` joins stable model IDs to the package's canonical facts,
-exposing ordered service views and the compatible schema-1 distribution protocol.
+exposing ordered service views and versioned distribution projections.
 
 ### Authoring homes
 
@@ -117,7 +117,8 @@ exposing ordered service views and the compatible schema-1 distribution protocol
 | Membership, listed/staged status, legacy, primary image binding, request defaults | `src/grida/catalog.ts`, `catalog.definitions` |
 | Independent optional default model and partial order per family                   | `src/grida/preferences.ts`                    |
 | Text tier assignments                                                             | `src/grida/tiers.ts`                          |
-| Schema-1 projection, parser, resolved snapshot views                              | `src/grida/catalog.ts`, `catalog.snapshot`    |
+| Versioned projections, parsers, resolved snapshot views                           | `src/grida/catalog.ts`, `catalog.snapshot`    |
+| Fixed older-runtime text admission, tiers and recommendation                      | `src/grida/compatibility.ts`                  |
 
 Adding a factual model does not add it to the service. Removing a service member
 does not delete its factual record. Legacy is a product decision, not upstream
@@ -134,9 +135,11 @@ const candidates = catalog.image.listed_models();
 const recommendation = catalog.image.default_id;
 const completeReference = catalog.image.ordered_models();
 const pro = catalog.text.byTier.pro;
+// Current text runtime, published at its separate version-2 URL.
 const serialized = JSON.stringify(
-  catalog.snapshot.seed({ version: "deploy-sha" })
+  catalog.snapshot.v2.seed({ version: "deploy-sha" })
 );
+// Existing version-1 URL must continue publishing catalog.snapshot.seed().
 ```
 
 Families are `text`, `image`, `video`, `audio.music`, `audio.sound_effects`,
@@ -159,8 +162,11 @@ membership as that snapshot's view.
 Image starts with GPT Image 2.5 Flare, then Sunburst. Video and music retain
 Veo 3.1 and Lyria 3. Staged 3D playgrounds retain their initial choices through
 explicit order without making staged models listed defaults. Text's service
-recommendation is Terra; callers with an explicit tier choice, such as `pro`,
-keep that choice. Recommendations and sorting never replace saved user choices
+recommendation is GPT-6 Sol. The four public tier keys select GPT-6 Luna for
+`nano`, GPT-6 Sol for both `mini` and `pro`, and GPT-6 Astra for `max`. Duplicate
+tier values are intentional; a lowest-matching-tier projection returns `mini`
+for Sol. Callers with an explicit tier choice keep that choice. Recommendations
+and sorting never replace saved user choices
 or grant permission to execute a model.
 
 ### Independent policy resolution
@@ -193,7 +199,13 @@ additive `preferences` carries text/image/video default IDs and partial order;
 old parsers ignore it. New parsers reject inconsistent recommendation references.
 
 Membership comes from explicit service definitions, never the full factual
-registry. Text/video publish listed members; image retains its existing broad
+registry. Schema-1 text publishes only its fixed compatible membership intersected
+with current listed members. Its original Luna/Terra/Sol/Astra tier map and
+Terra recommendation remain independent of current service preferences; prices
+and lifecycle still come from the same current cards. Withdrawals remove members
+from both projections. A withdrawn tier target uses an explicitly declared
+compatible alternative; exhaustion refuses publication. A withdrawn or legacy
+Terra recommendation becomes absent. Video publishes listed members; image retains its existing broad
 GG/BYOK member coverage, including unlisted legacy choices. Listing does not
 prove adapter support; legacy does not withdraw execution. Withdrawing a broad
 image gate member requires an explicit membership removal. Provider bindings
@@ -205,6 +217,22 @@ associated recommendations are discarded together, preserving valid text and
 the bundled media fallback. Older absent recommendations stay absent. A view
 copies/freezes its effective snapshot so input mutation cannot change it.
 
+### Current text runtime (schema 2)
+
+`catalog.snapshot.v2.seed()`, `.parse(unknown)`, and `.view(snapshot?)` expose
+the current service admission: GPT-6 Sol, GPT-6 Luna and Claude Opus 5.5 join
+all existing members. The default and tiers match the current service view.
+The v2 reader accepts schema 1 as a complete fallback, preserving that payload's
+membership and preferences without merging in newer bundled choices. Unsupported
+versions and invalid text return `null`; media retains the existing independent
+validation and bundled fallback behavior.
+
+Publish schema 2 at a separate versioned URL and opt in only after the runtime
+can execute the new text continuation protocol and provider routes. Schema-1
+readers reject schema 2. Optional fields cannot grant adapter code to installed
+clients, and this catalog does not infer runtime support from provider bindings.
+Keep the original URL on `catalog.snapshot.seed()` throughout the migration.
+
 ### Anti-goals and staged follow-up
 
 - No duplicated factual prices/capabilities, network fetches, credentials,
@@ -214,8 +242,8 @@ copies/freezes its effective snapshot so input mutation cannot change it.
 - No Library embedding-storage policy or new billing estimate owner.
 
 A later effective-agent-snapshot UI transport can publish the active view.
-A genuinely atomic, separately versioned service envelope remains its own wire
-phase; schema-1's independent media fallback is not atomic. Billing estimates
+A fully atomic service envelope remains its own wire phase; neither schema's
+independent media fallback is atomic. Billing estimates
 and Library's persisted embedding contract each need their own extraction.
 None of those follow-up phases is implemented by this package.
 

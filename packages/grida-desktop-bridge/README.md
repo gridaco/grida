@@ -35,11 +35,21 @@ accept bounded inline mesh bytes, never input paths or provider URLs.
 Desktop still owns Electron IPC channel names, preload implementation, native
 window/dialog/shell behavior, and AgentHost supervision.
 
+`caps.agent.text_catalog_v2 === true` attests that the bundled runtime supports
+text catalog schema 2, OpenRouter reasoning, and opt-in GG continuation,
+including native tool pause/resume. The host may advertise it only when the
+complete profile is bundled. An omitted or false value requires the legacy
+text catalog projection and legacy defaults, even after a catalog refresh or
+an update notification. This optional capability preserves bridge protocol 1;
+it grants no credentials, account access, local tool authority, or additional
+ChatGPT subscription models.
+
 ## Anti-goals
 
 - Not an Electron IPC package.
 - Not an AgentHost HTTP client.
 - Not a native Desktop runtime.
+- Not a model catalog or provider router.
 - Not a public plugin or extension API.
 - Not a place for secrets, route strings, fetch logic, or filesystem access.
 

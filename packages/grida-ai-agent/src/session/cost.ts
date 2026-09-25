@@ -25,7 +25,7 @@ export function baseCostUsdFromMessageUsage(
   // that refreshes passes its live view, so a model published after this
   // binary shipped is estimated at its real rates instead of silently
   // costing nothing.
-  view: models.snapshot.View = models.snapshot.view()
+  view: models.snapshot.View = models.snapshot.v2.view()
 ): number | undefined {
   const modelId =
     model?.model_id ??

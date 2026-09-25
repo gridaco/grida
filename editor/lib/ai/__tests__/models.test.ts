@@ -177,9 +177,7 @@ describe("contributor Vercel AI Gateway override", () => {
     vi.stubEnv("BYOK_OPENROUTER_API_KEY", " fixture-openrouter-key ");
     vi.stubEnv("BYOK_VERCEL_AI_GATEWAY_API_KEY", "fixture-contributor-key");
     const { byok } = await import("../models");
-    expect(byok!.languageModel("fixture/model").provider).toBe(
-      "openrouter.chat"
-    );
+    expect(byok!.languageModel("fixture/model").provider).toBe("openrouter");
   });
 
   it("ignores a blank OpenRouter override before selecting Vercel AI Gateway", async () => {
@@ -202,4 +200,76 @@ describe("contributor Vercel AI Gateway override", () => {
       expect(isByokActive()).toBe(false);
     }
   );
+});
+
+describe("contributor OpenRouter override", () => {
+  it("keeps the contributor key and attribution on text and embedding requests", async () => {
+    vi.stubEnv("BYOK_OPENROUTER_API_KEY", "  fixture-openrouter-key  ");
+    vi.stubEnv("GG_VERCEL_AI_GATEWAY_API_KEY", "fixture-funded-key");
+    const bodies: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
+        requests.push({ url, headers: new Headers(init?.headers) });
+        bodies.push(JSON.parse(String(init?.body)));
+        if (url === "https://openrouter.ai/api/v1/embeddings") {
+          return Response.json({
+            object: "list",
+            model: "openai/text-embedding-3-small",
+            data: [{ object: "embedding", index: 0, embedding: [0.25, 0.5] }],
+            usage: { prompt_tokens: 1, total_tokens: 1 },
+          });
+        }
+        if (url === "https://openrouter.ai/api/v1/chat/completions") {
+          return Response.json({
+            id: "chat_synthetic",
+            created: 1,
+            model: "openai/gpt-6-sol",
+            choices: [
+              {
+                index: 0,
+                message: { role: "assistant", content: "fixture" },
+                finish_reason: "stop",
+              },
+            ],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          });
+        }
+        throw new Error("Unexpected request in synthetic OpenRouter test");
+      })
+    );
+    const { grida, embedTextUnbilled } = await import("../server");
+    // `grida` returns the actual bare BYOK model; invoking it also verifies
+    // that the adapter swap did not accidentally enter funded gate/ingest.
+    const { generateText } = await import("ai");
+    const text = await generateText({
+      model: grida("openai/gpt-6-sol"),
+      prompt: "fixture prompt",
+      maxRetries: 0,
+    });
+    expect(text.text).toBe("fixture");
+    await expect(
+      embedTextUnbilled("openai/text-embedding-3-small", "fixture query")
+    ).resolves.toEqual([0.25, 0.5]);
+
+    expect(requests.map(({ url }) => url)).toEqual([
+      "https://openrouter.ai/api/v1/chat/completions",
+      "https://openrouter.ai/api/v1/embeddings",
+    ]);
+    for (const { headers } of requests) {
+      expect(headers.get("authorization")).toBe(
+        "Bearer fixture-openrouter-key"
+      );
+      expect(headers.get("http-referer")).toBe("https://grida.co");
+      expect(headers.get("x-title")).toBe("Grida");
+    }
+    expect(bodies[0]).toMatchObject({ model: "openai/gpt-6-sol" });
+    expect(bodies[1]).toMatchObject({
+      model: "openai/text-embedding-3-small",
+      input: ["fixture query"],
+    });
+    expect(billing.getEntitlement).not.toHaveBeenCalled();
+    expect(billing.ingestUsageEvent).not.toHaveBeenCalled();
+  });
 });

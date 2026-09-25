@@ -54,6 +54,8 @@
               "@ai-sdk/openai/**",
               "@ai-sdk/openai-compatible",
               "@ai-sdk/openai-compatible/**",
+              "@openrouter/ai-sdk-provider",
+              "@openrouter/ai-sdk-provider/**",
               "@ai-sdk/anthropic",
               "@ai-sdk/anthropic/**",
               "@ai-sdk/google",

@@ -237,10 +237,12 @@ export namespace models {
 
     // OpenAI bills the full request at these multipliers once its total input
     // exceeds 272K tokens. The same rule is published for GPT-5.5, every
-    // GPT-5.6 family member, and GPT-6 Astra.
+    // GPT-5.6 family member, and GPT-6 Astra, Sol, and Luna.
     // https://developers.openai.com/api/docs/models/gpt-5.5
     // https://developers.openai.com/api/docs/models/gpt-5.6-sol
     // https://developers.openai.com/api/docs/models/gpt-6-astra
+    // https://developers.openai.com/api/docs/models/gpt-6-sol
+    // https://developers.openai.com/api/docs/models/gpt-6-luna
     const OPENAI_LONG_CONTEXT_PRICING = {
       inputTokensAbove: 272_000,
       inputMultiplier: 2,
@@ -378,6 +380,56 @@ export namespace models {
           longContext: OPENAI_LONG_CONTEXT_PRICING,
         },
       },
+      // Sol and Luna support tool calling with reasoning through Responses;
+      // Chat Completions requires reasoning_effort: "none" for tool calls.
+      // https://developers.openai.com/api/docs/models/gpt-6-sol
+      // https://vercel.com/ai-gateway/models/gpt-6-sol
+      // https://openrouter.ai/openai/gpt-6-sol
+      "openai/gpt-6-sol": {
+        id: "openai/gpt-6-sol",
+        label: "GPT-6 Sol",
+        release: {
+          date: "2026-09-22",
+          basis: "model",
+          source_url: "https://developers.openai.com/api/docs/changelog",
+        },
+        multimodal: true,
+        imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
+        tool_call: true,
+        contextWindow: 1_050_000,
+        outputLimit: 128_000,
+        cost: {
+          input: 2,
+          output: 10,
+          cacheRead: 0.2,
+          cacheWrite: 2.5,
+          longContext: OPENAI_LONG_CONTEXT_PRICING,
+        },
+      },
+      // https://developers.openai.com/api/docs/models/gpt-6-luna
+      // https://vercel.com/ai-gateway/models/gpt-6-luna
+      // https://openrouter.ai/openai/gpt-6-luna
+      "openai/gpt-6-luna": {
+        id: "openai/gpt-6-luna",
+        label: "GPT-6 Luna",
+        release: {
+          date: "2026-09-22",
+          basis: "model",
+          source_url: "https://developers.openai.com/api/docs/changelog",
+        },
+        multimodal: true,
+        imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
+        tool_call: true,
+        contextWindow: 1_050_000,
+        outputLimit: 128_000,
+        cost: {
+          input: 0.1,
+          output: 0.5,
+          cacheRead: 0.01,
+          cacheWrite: 0.125,
+          longContext: OPENAI_LONG_CONTEXT_PRICING,
+        },
+      },
       // $2/$10 is the standard rate, not a live discount: it launched as an
       // introductory rate and Anthropic made it permanent, cancelling the
       // announced step up to $3/$15. Do not restore the higher card.
@@ -438,6 +490,29 @@ export namespace models {
         contextWindow: 1_000_000,
         outputLimit: 128_000,
         cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+      },
+      // Standard pricing applies across the full 1M context window. Cache
+      // writes use the 5-minute rate. Like Fable 5.1, forced tool choice is
+      // rejected, so tool_call does not imply support for every tool mode.
+      // https://platform.claude.com/docs/en/models/opus-5-5/overview
+      // https://platform.claude.com/docs/en/build-with-claude/context-windows
+      // https://vercel.com/ai-gateway/models/claude-opus-5.5
+      // https://openrouter.ai/anthropic/claude-opus-5.5
+      "anthropic/claude-opus-5.5": {
+        id: "anthropic/claude-opus-5.5",
+        label: "Claude Opus 5.5",
+        release: {
+          date: "2026-09-22",
+          basis: "model",
+          source_url: "https://www.anthropic.com/claude-opus-5-5",
+        },
+        short_label: "Opus 5.5",
+        multimodal: true,
+        imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
+        tool_call: true,
+        contextWindow: 1_000_000,
+        outputLimit: 128_000,
+        cost: { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
       },
       // Drop-in successor to Opus 4.8 at the same rate card.
       "anthropic/claude-opus-5": {

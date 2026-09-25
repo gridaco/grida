@@ -19,6 +19,7 @@ import {
   type EndpointProviderConfig,
 } from "@grida/agent";
 import { catalog as _models } from "@grida/ai-models/grida";
+import { desktop_text_catalog } from "./text-catalog";
 
 export type ModelPickerSelection = Readonly<{
   model_id: string;
@@ -38,7 +39,6 @@ export type ModelPickerGroup = Readonly<{
 }>;
 
 const textCatalog = _models.text.catalog;
-const modelOptions = _models.text.listed_models();
 
 export namespace model_picker_options {
   /** The exact closed ChatGPT projection, never every `openai/*` model. */
@@ -61,8 +61,14 @@ export namespace model_picker_options {
   }
 
   /** Every hosted text model spends Grida credits through the `gg` provider. */
-  export function grida(): ModelPickerGroup {
-    return catalogProviderGroup(GG_PROVIDER_ID, GG_PROVIDER_METADATA.label);
+  export function grida(
+    textCatalogV2?: desktop_text_catalog.Capability
+  ): ModelPickerGroup {
+    return catalogProviderGroup(
+      GG_PROVIDER_ID,
+      GG_PROVIDER_METADATA.label,
+      textCatalogV2
+    );
   }
 
   /**
@@ -71,14 +77,17 @@ export namespace model_picker_options {
    * each row selects a different billing/privacy boundary.
    */
   export function byok(
-    configuredProviderIds: readonly ByokProviderId[]
+    configuredProviderIds: readonly ByokProviderId[],
+    textCatalogV2?: desktop_text_catalog.Capability
   ): ModelPickerGroup[] {
     const configured = new Set(configuredProviderIds);
     return BYOK_PROVIDER_METADATA.filter(
       (provider) =>
         configured.has(provider.id) &&
         (provider.modalities as readonly string[]).includes("text")
-    ).map((provider) => catalogProviderGroup(provider.id, provider.label));
+    ).map((provider) =>
+      catalogProviderGroup(provider.id, provider.label, textCatalogV2)
+    );
   }
 
   export function endpoints(
@@ -104,11 +113,12 @@ export namespace model_picker_options {
     chatGptReady: boolean;
     configuredByokProviderIds: readonly ByokProviderId[];
     endpoints: readonly EndpointProviderConfig[];
+    textCatalogV2?: desktop_text_catalog.Capability;
   }): ModelPickerGroup[] {
     return [
       ...(opts.chatGptReady ? [chatGpt()] : []),
-      grida(),
-      ...byok(opts.configuredByokProviderIds),
+      grida(opts.textCatalogV2),
+      ...byok(opts.configuredByokProviderIds, opts.textCatalogV2),
       ...endpoints(opts.endpoints),
     ];
   }
@@ -175,18 +185,22 @@ export namespace model_picker_options {
 
 function catalogProviderGroup(
   providerId: string,
-  label: string
+  label: string,
+  textCatalogV2?: desktop_text_catalog.Capability
 ): ModelPickerGroup {
   return {
     id: providerId,
     label,
-    options: modelOptions.map((model) => ({
-      selection: {
-        provider_id: providerId,
-        model_id: model.id,
-      },
-      label: _models.text.displayLabel(model),
-      deprecated: model.deprecated,
-    })),
+    options: desktop_text_catalog
+      .view(textCatalogV2)
+      .listed()
+      .map((model) => ({
+        selection: {
+          provider_id: providerId,
+          model_id: model.id,
+        },
+        label: _models.text.displayLabel(model),
+        deprecated: model.deprecated,
+      })),
   };
 }

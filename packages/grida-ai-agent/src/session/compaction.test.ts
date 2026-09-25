@@ -100,6 +100,15 @@ describe("threshold helpers", () => {
     expect(limits.output_limit).toBeGreaterThan(0);
   });
 
+  it("uses current bundled limits rather than a legacy tier fallback", () => {
+    expect(
+      resolveModelLimits({
+        provider_id: "openrouter",
+        model_id: "anthropic/claude-opus-5.5",
+      })
+    ).toEqual({ context_window: 1_000_000, output_limit: 128_000 });
+  });
+
   it("resolveModelLimits resolves a registered local model's real window (#806)", () => {
     const custom = [
       { id: "llama3.1:8b", contextWindow: 8_192, outputLimit: 2_048 },

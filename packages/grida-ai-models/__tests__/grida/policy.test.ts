@@ -138,7 +138,7 @@ describe("schema-1 recommendations", () => {
       expect(parsed[family]).toBeUndefined();
       expect(parsed.preferences![family]).toBeUndefined();
       const view = catalog.snapshot.view(parsed);
-      expect(view.has(catalog.text.default_id!)).toBe(true);
+      expect(view.has("openai/gpt-5.6-terra")).toBe(true);
       expect(view[family].default_id).toBeUndefined();
     }
   );
@@ -176,7 +176,7 @@ describe("schema-1 recommendations", () => {
         .slice(0, 2)
         .map((card) => card.id)
     ).toEqual(["bfl/flux-2-pro", "bfl/flux-2-max"]);
-    expect(view.default_id).toBe(catalog.text.default_id);
+    expect(view.default_id).toBe("openai/gpt-5.6-terra");
   });
 
   it("leaves omitted defaults absent on older snapshots", () => {
@@ -202,7 +202,7 @@ describe("schema-1 recommendations", () => {
   it("does not let callers mutate a snapshot view or change it through the input", () => {
     const seed = catalog.snapshot.seed();
     const view = catalog.snapshot.view(seed);
-    const id = catalog.text.default_id!;
+    const id = "openai/gpt-5.6-terra";
     seed.text.catalog[id].cost.input = 999;
     expect(view.catalog[id].cost.input).not.toBe(999);
     expect(() => {

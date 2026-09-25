@@ -61,13 +61,21 @@ export function buildReplayPrefix(
     const type = part.type;
     if (type === "text" || type === "reasoning") {
       const text = data.text;
-      if (typeof text !== "string" || text.length === 0) return;
+      if (typeof text !== "string" || (text.length === 0 && type === "text"))
+        return;
       const id = `rp-${i}`;
+      const metadata = data.providerMetadata
+        ? { providerMetadata: data.providerMetadata }
+        : {};
       chunks.push(
         { type: `${type}-start`, id },
         { type: `${type}-delta`, id, delta: text },
-        { type: `${type}-end`, id }
+        { type: `${type}-end`, id, ...metadata }
       );
+      return;
+    }
+    if (type === "step-start") {
+      chunks.push({ type: "start-step" });
       return;
     }
     if (
@@ -86,7 +94,7 @@ export function buildReplayPrefix(
       );
       return;
     }
-    // step-start is never persisted; anything else is UI-only. Skip.
+    // Other parts are UI-only. Skip.
   });
   return chunks.map((c) => JSON.stringify(c));
 }
@@ -116,6 +124,9 @@ function lowerToolPart(
     typeof n.providerExecuted === "boolean"
       ? { providerExecuted: n.providerExecuted }
       : {};
+  const callMetadata = n.callProviderMetadata
+    ? { providerMetadata: n.callProviderMetadata }
+    : {};
 
   const inputStart: Record<string, unknown> = {
     type: "tool-input-start",
@@ -123,6 +134,7 @@ function lowerToolPart(
     toolName,
     ...dynamic,
     ...providerExecuted,
+    ...callMetadata,
   };
   const hasInput = typeof n.input === "object" && n.input !== null;
   const inputAvailable: Record<string, unknown> = {
@@ -132,6 +144,7 @@ function lowerToolPart(
     input: n.input,
     ...dynamic,
     ...providerExecuted,
+    ...callMetadata,
   };
   // The chunk that makes the invocation exist client-side. Never fabricate
   // an input the call wasn't observed with.

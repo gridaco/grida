@@ -19,6 +19,7 @@ describe("Desktop preload agent seam", () => {
   it("exposes a versioned Electron-specific bridge protocol", () => {
     expect(preloadSource).toContain("protocol: DESKTOP_BRIDGE_PROTOCOL");
     expect(preloadSource).toContain("native:");
+    expect(preloadSource).toContain("text_catalog_v2: true");
     expect(preloadSource).toContain("scratch_seed_base64: true");
     expect(preloadSource).toContain(
       'scratch_binary_tools: process.platform !== "win32"'

@@ -63,7 +63,21 @@ async function callModel(
       model: modelId ?? TIER_MODEL_IDS.pro,
       choices: [
         {
-          message: { role: "assistant", content: "ok" },
+          message: {
+            role: "assistant",
+            content: "ok",
+            ...(/^(openai|anthropic)\//.test(modelId ?? TIER_MODEL_IDS.pro)
+              ? {
+                  grida_continuation: {
+                    version: 1,
+                    model: modelId ?? TIER_MODEL_IDS.pro,
+                    provider: (modelId ?? TIER_MODEL_IDS.pro).split("/")[0],
+                    prefix_sha256: "0".repeat(64),
+                    blocks: [{ type: "text", text: "ok" }],
+                  },
+                }
+              : {}),
+          },
           finish_reason: "stop",
         },
       ],

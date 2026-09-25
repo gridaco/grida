@@ -26,7 +26,7 @@ export class MediaOperations {
       if (options.snapshot !== undefined) {
         // Own the pinned data. Invalid supplied sections must never restore the seed.
         const raw = JSON.parse(JSON.stringify(options.snapshot));
-        const parsed = models.snapshot.parse(raw);
+        const parsed = models.snapshot.v2.parse(raw);
         if (
           !parsed ||
           (raw.image !== undefined && !parsed.image) ||
@@ -36,7 +36,7 @@ export class MediaOperations {
         snapshot = parsed;
       }
       this.#descriptors = InputSchema.freeze(
-        descriptors(models.snapshot.view(snapshot))
+        descriptors(models.snapshot.v2.view(snapshot))
       );
     } catch {
       throw new MediaOperations.Failure("invalid_input");

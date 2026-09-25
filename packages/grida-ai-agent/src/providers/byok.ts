@@ -7,6 +7,7 @@
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createGateway as createVercelAiGateway } from "@ai-sdk/gateway";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models/grida";
 import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
@@ -36,15 +37,12 @@ export function makeOpenRouterFactory(
   providerHttp: ProviderHttp = new ProviderHttp(),
   tierModelIds: TierModelIds = BUNDLED_TIER_MODEL_IDS
 ): ModelFactory {
-  const provider = createOpenAICompatible({
-    name: "openrouter",
-    baseURL: "https://openrouter.ai/api/v1",
+  const provider = createOpenRouter({
     apiKey,
     headers: OPENROUTER_HEADERS,
-    // OpenAI-compat streams omit the usage chunk unless
-    // `stream_options.include_usage` is requested — without it every
-    // streamed run records zero tokens (no rollups, no context meter).
-    includeUsage: true,
+    // The provider preserves signed/encrypted reasoning_details across tool
+    // steps. Strict mode also requests the streaming usage chunk.
+    compatibility: "strict",
     fetch: providerHttp.request,
   });
   // Both OpenRouter and the catalog use the `creator/model` format for

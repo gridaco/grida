@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { tool, validateUIMessages } from "ai";
+import {
+  convertToModelMessages,
+  tool,
+  validateUIMessages,
+  type UIMessage,
+} from "ai";
 import { z } from "zod";
-import { buildModelMessages, type ModelUIMessage } from "./message-view";
+import {
+  buildModelMessages,
+  IncompleteToolContinuationError,
+  type ModelUIMessage,
+} from "./message-view";
 import { AgentDesignSearch } from "../tools/design-search";
 import { AgentVision } from "../vision";
 import type { ChatMessageWithParts, ChatPartRow } from "../session/rows";
@@ -99,6 +108,272 @@ function textOf(m: ModelUIMessage): string {
 }
 
 describe("buildModelMessages", () => {
+  it.each(["text", "reasoning", "tool-input"])(
+    "omits an interrupted %s step but retains a complete retried step",
+    (kind) => {
+      const model = { provider_id: "vercel", model_id: "openai/gpt-6-sol" };
+      const interrupted =
+        kind === "tool-input"
+          ? part("tool-list_files", {
+              type: "tool-list_files",
+              state: "input-streaming",
+              toolCallId: "partial",
+            })
+          : part(kind, {
+              type: kind,
+              text: "unfinished",
+              state: "streaming",
+              providerMetadata: { openai: { itemId: "partial" } },
+            });
+      const assistant = msg("a", "assistant", [
+        part("step-start", { type: "step-start" }),
+        interrupted,
+        part("step-start", { type: "step-start" }),
+        part("reasoning", {
+          type: "reasoning",
+          text: "",
+          state: "done",
+          providerMetadata: {
+            openai: { itemId: "retry", reasoningEncryptedContent: "synthetic" },
+          },
+        }),
+        part("text", { type: "text", text: "Complete retry", state: "done" }),
+      ]);
+      assistant.metadata.model = model;
+      const rows = [
+        msg("u", "user", [part("text", { type: "text", text: "Start" })]),
+        assistant,
+      ];
+      const before = structuredClone(rows);
+      const view = buildModelMessages(rows, { continuationModel: model });
+      expect(JSON.stringify(view)).not.toContain("partial");
+      expect(JSON.stringify(view)).not.toContain("unfinished");
+      expect(JSON.stringify(view)).toContain("Complete retry");
+      expect(JSON.stringify(view)).toContain('"itemId":"retry"');
+      expect(rows).toEqual(before);
+    }
+  );
+
+  it.each(["reasoning", "tool-input-available"])(
+    "refuses to hide an executed result beside interrupted %s, but preserves it on a new user turn",
+    (kind) => {
+      const model = { provider_id: "vercel", model_id: "openai/gpt-6-sol" };
+      const assistant = msg("a", "assistant", [
+        part("step-start", { type: "step-start" }),
+        part("tool-list_files", {
+          type: "tool-list_files",
+          toolCallId: "completed",
+          state: "output-available",
+          input: { path: "/" },
+          output: { files: ["result.txt"] },
+        }),
+        kind === "reasoning"
+          ? part("reasoning", {
+              type: "reasoning",
+              text: "unfinished",
+              state: "streaming",
+              providerMetadata: { openai: { itemId: "partial" } },
+            })
+          : part("tool-list_files", {
+              type: "tool-list_files",
+              toolCallId: "partial",
+              state: "input-available",
+              input: { path: "/pending" },
+            }),
+      ]);
+      assistant.metadata.model = model;
+      const rows = [
+        msg("u", "user", [part("text", { type: "text", text: "Start" })]),
+        assistant,
+      ];
+      expect(() =>
+        buildModelMessages(rows, { continuationModel: model })
+      ).toThrow(IncompleteToolContinuationError);
+      const view = buildModelMessages(
+        [
+          ...rows,
+          msg("next", "user", [
+            part("text", { type: "text", text: "Continue" }),
+          ]),
+        ],
+        { continuationModel: model }
+      );
+      expect(JSON.stringify(view)).toContain("result.txt");
+      expect(JSON.stringify(view)).not.toContain("partial");
+    }
+  );
+
+  it.each([
+    ["tool-question", "input-available"],
+    ["tool-design_search", "input-available"],
+    ["tool-run_command", "approval-requested"],
+    ["tool-run_command", "approval-responded"],
+  ])(
+    "does not treat a %s %s human-input pause as an interrupted automatic tool",
+    (type, state) => {
+      const model = { provider_id: "vercel", model_id: "openai/gpt-6-sol" };
+      const assistant = msg("a", "assistant", [
+        part("step-start", { type: "step-start" }),
+        part("tool-list_files", {
+          type: "tool-list_files",
+          toolCallId: "completed",
+          state: "output-available",
+          input: { path: "/" },
+          output: { files: ["result.txt"] },
+        }),
+        part(type, {
+          type,
+          state,
+          toolCallId: "human-input",
+          input: {},
+          ...(state.startsWith("approval-") && {
+            approval: {
+              id: "approval",
+              ...(state === "approval-responded" && { approved: true }),
+            },
+          }),
+        }),
+      ]);
+      assistant.metadata.model = model;
+      const view = buildModelMessages(
+        [
+          msg("u", "user", [part("text", { type: "text", text: "Start" })]),
+          assistant,
+        ],
+        { continuationModel: model }
+      );
+      expect(JSON.stringify(view)).toContain("result.txt");
+      expect(JSON.stringify(view).includes("approval-responded")).toBe(
+        state === "approval-responded"
+      );
+    }
+  );
+
+  it("preserves empty reasoning, tool metadata and step boundaries only for the same current model", async () => {
+    const model = {
+      provider_id: "byok:openrouter",
+      model_id: "anthropic/claude-opus-5.5",
+    };
+    const metadata = {
+      openrouter: {
+        reasoning_details: [
+          {
+            type: "reasoning.text",
+            text: "",
+            signature: "synthetic-signature",
+          },
+        ],
+      },
+    };
+    const assistant = msg("a", "assistant", [
+      part("step-start", { type: "step-start" }),
+      part("reasoning", {
+        type: "reasoning",
+        text: "",
+        providerMetadata: { anthropic: { signature: "synthetic-signature" } },
+      }),
+      part("tool-list_files", {
+        type: "tool-list_files",
+        toolCallId: "tc",
+        state: "output-available",
+        input: { path: "/" },
+        output: { files: [] },
+        callProviderMetadata: metadata,
+      }),
+      part("step-start", { type: "step-start" }),
+      part("text", {
+        type: "text",
+        text: "Done",
+        providerMetadata: { openai: { itemId: "synthetic-item" } },
+      }),
+    ]);
+    assistant.metadata.model = model;
+    const rows = [
+      msg("u", "user", [part("text", { type: "text", text: "List files" })]),
+      assistant,
+    ];
+    const before = structuredClone(rows);
+    const view = buildModelMessages(rows, { continuationModel: model });
+    await expect(validateView(view)).resolves.toBeDefined();
+    const lowered = await convertToModelMessages(view as UIMessage[], {
+      tools: TOOLS,
+    });
+    expect(lowered.map((m) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "tool",
+      "assistant",
+    ]);
+    expect(lowered[1].content).toEqual([
+      {
+        type: "reasoning",
+        text: "",
+        providerOptions: { anthropic: { signature: "synthetic-signature" } },
+      },
+      {
+        type: "tool-call",
+        toolCallId: "tc",
+        toolName: "list_files",
+        input: { path: "/" },
+        providerOptions: metadata,
+      },
+    ]);
+
+    const assertPlain = (output: ModelUIMessage[]) => {
+      expect(JSON.stringify(output)).not.toContain("synthetic-");
+      expect(JSON.stringify(output)).not.toContain('"type":"reasoning"');
+    };
+    assertPlain(buildModelMessages(rows));
+    assertPlain(
+      buildModelMessages(rows, {
+        continuationModel: { ...model, provider_id: "gg" },
+      })
+    );
+    assertPlain(
+      buildModelMessages(rows, {
+        continuationModel: { ...model, model_id: "openai/gpt-6-sol" },
+      })
+    );
+    assertPlain(
+      buildModelMessages(
+        [
+          ...rows,
+          msg("u2", "user", [part("text", { type: "text", text: "Next" })]),
+        ],
+        { continuationModel: model }
+      )
+    );
+    const compacted = [
+      ...rows,
+      msg("summary", "assistant", [
+        part("data-compaction", {
+          type: "data-compaction",
+          data: { summary: "Compacted prefix", tail_start_id: "u", auto: true },
+        }),
+      ]),
+    ];
+    assertPlain(buildModelMessages(compacted, { continuationModel: model }));
+    // New state generated after compaction already incorporates that summary.
+    const afterCompaction = buildModelMessages(
+      [
+        msg("summary-first", "assistant", [
+          part("data-compaction", {
+            type: "data-compaction",
+            data: {
+              summary: "Prior context",
+              tail_start_id: null,
+              auto: false,
+            },
+          }),
+        ]),
+        ...rows,
+      ],
+      { continuationModel: model }
+    );
+    expect(JSON.stringify(afterCompaction)).toContain("synthetic-signature");
+    expect(rows).toEqual(before);
+  });
+
   it("passes through a normal user/assistant exchange", () => {
     const out = buildModelMessages([
       msg("m1", "user", [part("text", { type: "text", text: "hi" })]),

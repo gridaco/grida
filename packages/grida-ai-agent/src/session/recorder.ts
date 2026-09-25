@@ -5,7 +5,7 @@
  * The store owns rows; this module owns chunk interpretation.
  */
 
-import type { UIMessageChunk } from "ai";
+import type { ProviderMetadata, UIMessageChunk } from "ai";
 import type { StreamConsumer } from "../runtime/stream-registry";
 import type { SessionsStore } from "./store";
 
@@ -31,9 +31,12 @@ export type RecorderConsumerOptions = {
 
 export function createRecorderConsumer(
   opts: RecorderConsumerOptions
-): StreamConsumer {
+): StreamConsumer & { readonly message_id: string | null } {
   const accumulator = new PartAccumulator(opts);
   return {
+    get message_id() {
+      return accumulator.messageId;
+    },
     on_frame: (data) => {
       if (data === "[DONE]") return;
       let chunk: UIMessageChunk;
@@ -65,7 +68,11 @@ export function createRecorderConsumer(
 class PartAccumulator {
   private assistant_message_id: string | null = null;
   private part_index_counter = 0;
-  private text_buffers = new Map<string, { index: number; text: string }>();
+  private text_buffers = new Map<
+    string,
+    { index: number; text: string; providerMetadata?: ProviderMetadata }
+  >();
+  private pending_step = false;
   /**
    * Where each tool call's part lives — `(messageId, index)`. Resolved ONCE per
    * toolCallId via {@link resolveToolSlot}, which adopts the ORIGINAL part when
@@ -88,6 +95,8 @@ class PartAccumulator {
    * error"). See `runtime/message-view.ts`.
    */
   private input_by_tool = new Map<string, unknown>();
+  /** Continuation belongs to the call, not the later result/approval chunk. */
+  private metadata_by_tool = new Map<string, ProviderMetadata>();
   /**
    * The assistant message id the STREAM advertises (its `start` chunk). The
    * runtime passes `generateMessageId` so every turn carries one, and on the
@@ -103,6 +112,10 @@ class PartAccumulator {
   private aborted = false;
 
   constructor(private readonly opts: RecorderConsumerOptions) {}
+
+  get messageId(): string | null {
+    return this.assistant_message_id;
+  }
 
   handle(chunk: UIMessageChunk) {
     // Drop frames that arrive *after* an abort, but never drop frames
@@ -168,6 +181,7 @@ class PartAccumulator {
         tool_name?: unknown;
         toolName?: unknown;
         input?: unknown;
+        callProviderMetadata?: ProviderMetadata;
       } | null;
       const toolName =
         data?.toolName ??
@@ -181,12 +195,13 @@ class PartAccumulator {
       if (data?.input !== undefined && !this.input_by_tool.has(toolCallId)) {
         this.input_by_tool.set(toolCallId, data.input);
       }
+      if (data?.callProviderMetadata) {
+        this.metadata_by_tool.set(toolCallId, data.callProviderMetadata);
+      }
       slot = { messageId: existing.message_id, index: existing.index };
     } else {
-      slot = {
-        messageId: await this.ensureAssistantMessage(),
-        index: this.part_index_counter++,
-      };
+      const messageId = await this.ensureAssistantMessage();
+      slot = { messageId, index: await this.allocatePart(messageId) };
     }
     this.slot_by_tool.set(toolCallId, slot);
     return slot;
@@ -194,6 +209,13 @@ class PartAccumulator {
 
   private async handleAsync(chunk: UIMessageChunk) {
     const type = chunk.type as string;
+
+    if (type === "start-step") {
+      // Wait for actual content: a failed empty step must not create an empty
+      // assistant message. The marker preserves tool-step boundaries on resume.
+      this.pending_step = true;
+      return;
+    }
 
     // Capture the stream's advertised assistant message id (see
     // `stream_message_id`). Arrives before any content, so `ensureAssistantMessage`
@@ -211,37 +233,59 @@ class PartAccumulator {
       const id = (chunk as { id?: string }).id;
       if (typeof id !== "string") return;
       const messageId = await this.ensureAssistantMessage();
-      const partIndex = this.part_index_counter++;
-      this.text_buffers.set(id, { index: partIndex, text: "" });
+      const partIndex = await this.allocatePart(messageId);
+      const providerMetadata = (
+        chunk as { providerMetadata?: ProviderMetadata }
+      ).providerMetadata;
+      this.text_buffers.set(id, {
+        index: partIndex,
+        text: "",
+        providerMetadata,
+      });
       await this.opts.store.upsertPart(messageId, {
         index: partIndex,
         type: "text",
-        data: { type: "text", text: "" },
+        data: {
+          type: "text",
+          text: "",
+          state: "streaming",
+          ...(providerMetadata && { providerMetadata }),
+        },
         tool_call_id: null,
         tool_state: null,
         session_id: this.opts.session_id,
       });
       return;
     }
-    if (type === "text-delta") {
+    if (type === "text-delta" || type === "text-end") {
       const id = (chunk as { id?: string; delta?: string }).id;
       const delta = (chunk as { delta?: string }).delta ?? "";
       if (typeof id !== "string") return;
       const buf = this.text_buffers.get(id);
       if (!buf) return;
       buf.text += delta;
+      const providerMetadata = (
+        chunk as { providerMetadata?: ProviderMetadata }
+      ).providerMetadata;
+      if (providerMetadata) buf.providerMetadata = providerMetadata;
       const messageId = await this.ensureAssistantMessage();
       await this.opts.store.upsertPart(messageId, {
         index: buf.index,
         type: "text",
-        data: { type: "text", text: buf.text },
+        data: {
+          type: "text",
+          text: buf.text,
+          state: type === "text-end" ? "done" : "streaming",
+          ...(buf.providerMetadata && {
+            providerMetadata: buf.providerMetadata,
+          }),
+        },
         tool_call_id: null,
         tool_state: null,
         session_id: this.opts.session_id,
       });
       return;
     }
-    if (type === "text-end") return;
 
     if (
       type === "reasoning-start" ||
@@ -253,30 +297,50 @@ class PartAccumulator {
       if (typeof id !== "string") return;
       if (type === "reasoning-start") {
         const messageId = await this.ensureAssistantMessage();
-        const partIndex = this.part_index_counter++;
+        const partIndex = await this.allocatePart(messageId);
+        const providerMetadata = (
+          chunk as { providerMetadata?: ProviderMetadata }
+        ).providerMetadata;
         this.text_buffers.set(`reasoning:${id}`, {
           index: partIndex,
           text: "",
+          providerMetadata,
         });
         await this.opts.store.upsertPart(messageId, {
           index: partIndex,
           type: "reasoning",
-          data: { type: "reasoning", text: "" },
+          data: {
+            type: "reasoning",
+            text: "",
+            state: "streaming",
+            ...(providerMetadata && { providerMetadata }),
+          },
           tool_call_id: null,
           tool_state: null,
           session_id: this.opts.session_id,
         });
         return;
       }
-      if (type === "reasoning-delta") {
+      if (type === "reasoning-delta" || type === "reasoning-end") {
         const buf = this.text_buffers.get(`reasoning:${id}`);
         if (!buf) return;
         buf.text += delta;
+        const providerMetadata = (
+          chunk as { providerMetadata?: ProviderMetadata }
+        ).providerMetadata;
+        if (providerMetadata) buf.providerMetadata = providerMetadata;
         const messageId = await this.ensureAssistantMessage();
         await this.opts.store.upsertPart(messageId, {
           index: buf.index,
           type: "reasoning",
-          data: { type: "reasoning", text: buf.text },
+          data: {
+            type: "reasoning",
+            text: buf.text,
+            state: type === "reasoning-end" ? "done" : "streaming",
+            ...(buf.providerMetadata && {
+              providerMetadata: buf.providerMetadata,
+            }),
+          },
           tool_call_id: null,
           tool_state: null,
           session_id: this.opts.session_id,
@@ -306,6 +370,7 @@ class PartAccumulator {
         provider_executed?: boolean;
         providerExecuted?: boolean;
         dynamic?: boolean;
+        providerMetadata?: ProviderMetadata;
       };
       const toolCallId = c.tool_call_id ?? c.toolCallId;
       if (typeof toolCallId !== "string") return;
@@ -317,6 +382,9 @@ class PartAccumulator {
       }
       if (c.input !== undefined) {
         this.input_by_tool.set(toolCallId, c.input);
+      }
+      if (type.startsWith("tool-input-") && c.providerMetadata) {
+        this.metadata_by_tool.set(toolCallId, c.providerMetadata);
       }
       const stickyToolName = this.tool_name_by_call.get(toolCallId);
       const stickyInput = this.input_by_tool.get(toolCallId);
@@ -337,6 +405,12 @@ class PartAccumulator {
       // row wholesale, so reading the chunk here would erase the input on the
       // final write and poison the session for the next turn.
       if (stickyInput !== undefined) data.input = stickyInput;
+      const callProviderMetadata = this.metadata_by_tool.get(toolCallId);
+      if (callProviderMetadata)
+        data.callProviderMetadata = callProviderMetadata;
+      if (type.startsWith("tool-output-") && c.providerMetadata) {
+        data.resultProviderMetadata = c.providerMetadata;
+      }
       const inputTextDelta = c.input_text_delta ?? c.inputTextDelta;
       if (inputTextDelta !== undefined) data.inputTextDelta = inputTextDelta;
       if (c.output !== undefined) data.output = c.output;
@@ -388,6 +462,9 @@ class PartAccumulator {
       // Keep the input attached (the request chunk omits it) — the UI renders
       // the pending command from it, and the resumed turn lowers it.
       if (stickyInput !== undefined) data.input = stickyInput;
+      const callProviderMetadata = this.metadata_by_tool.get(toolCallId);
+      if (callProviderMetadata)
+        data.callProviderMetadata = callProviderMetadata;
       await this.opts.store.upsertPart(messageId, {
         index: partIndex,
         type: partType,
@@ -408,7 +485,7 @@ class PartAccumulator {
       type.startsWith("data-")
     ) {
       const messageId = await this.ensureAssistantMessage();
-      const partIndex = this.part_index_counter++;
+      const partIndex = await this.allocatePart(messageId);
       await this.opts.store.upsertPart(messageId, {
         index: partIndex,
         type,
@@ -418,6 +495,21 @@ class PartAccumulator {
         session_id: this.opts.session_id,
       });
     }
+  }
+
+  private async allocatePart(messageId: string): Promise<number> {
+    if (this.pending_step) {
+      this.pending_step = false;
+      await this.opts.store.upsertPart(messageId, {
+        index: this.part_index_counter++,
+        type: "step-start",
+        data: { type: "step-start" },
+        tool_call_id: null,
+        tool_state: null,
+        session_id: this.opts.session_id,
+      });
+    }
+    return this.part_index_counter++;
   }
 
   private async ensureAssistantMessage(): Promise<string> {

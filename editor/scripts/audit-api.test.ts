@@ -55,6 +55,21 @@ export const DELETE = handlers.DELETE;
 `;
 const roots: string[] = [];
 
+const CATALOG_ROUTE = "app/(api)/(public)/api/v1/models/catalog/2/route.ts";
+const CATALOG_TEMPLATE = TEMPLATE.replaceAll("accountApi", "catalogApi")
+  .replace("@/lib/api/account", "@/lib/api/catalog")
+  .replace("auth.me", "models.catalog.v2");
+const CATALOG_DEFINITIONS = {
+  ...DEFINITIONS,
+  "models.catalog.v2": {
+    path: "/api/v1/models/catalog/2",
+    methods: ["GET", "HEAD", "OPTIONS"],
+    authority: "public",
+    binding: "catalog",
+    cache: "public",
+  },
+} as const;
+
 async function fixture(
   entries: Record<string, string | null> = {},
   definitions: Readonly<Record<string, apiAudit.Definition>> = DEFINITIONS,
@@ -90,6 +105,52 @@ afterEach(async () => {
   await Promise.all(
     roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))
   );
+});
+
+describe("public catalog source binding", () => {
+  const entries = {
+    [CATALOG_ROUTE]: CATALOG_TEMPLATE,
+    "lib/api/catalog.ts": "export namespace catalogApi {}",
+  };
+  it("accepts only the fixed public read binding", async () => {
+    expect(await fixture(entries, CATALOG_DEFINITIONS)).toEqual([]);
+    expect(
+      await fixture(entries, {
+        ...CATALOG_DEFINITIONS,
+        "models.catalog.v2": {
+          ...CATALOG_DEFINITIONS["models.catalog.v2"],
+          methods: ["POST"],
+        },
+      })
+    ).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "registry" })])
+    );
+  });
+  it("rejects route overrides and browser dependencies", async () => {
+    expect(
+      await fixture(
+        {
+          ...entries,
+          [CATALOG_ROUTE]: CATALOG_TEMPLATE + "export const extra = true;",
+        },
+        CATALOG_DEFINITIONS
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "route-binding" }),
+      ])
+    );
+    expect(
+      await fixture(
+        { ...entries, "lib/api/catalog.ts": 'import "next/headers";' },
+        CATALOG_DEFINITIONS
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "forbidden-import" }),
+      ])
+    );
+  });
 });
 
 describe("GG funded media source binding", () => {

@@ -169,6 +169,19 @@ describe("agent tenant generated-media wiring", () => {
       expect(music.gg).toBe(runtime.gg);
       expect(runtime.catalog).toBe(image.catalog);
       expect(video.catalog).toBe(runtime.catalog);
+      expect(runtime.catalog?.refreshable).toBe(false);
+      expect(runtime.catalog?.view().tier_model_ids).toEqual({
+        nano: "openai/gpt-6-luna",
+        mini: "openai/gpt-6-sol",
+        pro: "openai/gpt-6-sol",
+        max: "openai/gpt-6-astra",
+      });
+      for (const id of [
+        "openai/gpt-6-sol",
+        "openai/gpt-6-luna",
+        "anthropic/claude-opus-5.5",
+      ])
+        expect(runtime.catalog?.view().has(id)).toBe(true);
       expect(runtime.catalog?.view().image.default_id).toBe(
         "openai/gpt-image-2.5-flare"
       );
