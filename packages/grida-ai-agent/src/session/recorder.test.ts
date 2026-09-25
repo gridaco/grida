@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { openSessionsDb, type OpenedSessionsDb } from "./db";
 import { createRecorderConsumer } from "./recorder";
 import { SessionsStore } from "./store";
-import type { ChatSessionRow } from "./rows";
+import type { ChatModel, ChatSessionRow } from "./rows";
 
 let tempDir: string;
 let opened: OpenedSessionsDb;
@@ -41,6 +41,150 @@ async function feed(
 }
 
 describe("createRecorderConsumer", () => {
+  it.each([undefined, "advertised-assistant"])(
+    "inserts resolved provenance with a new row even on abort (stream id: %s)",
+    async (messageId) => {
+      let model: ChatModel | undefined;
+      const consumer = createRecorderConsumer({
+        store,
+        session_id: session.id,
+        get_model: () => model,
+      });
+      model = {
+        provider_id: "openrouter",
+        model_id: "anthropic/claude-opus-5.5",
+        tier: "pro",
+      };
+      await feed(
+        consumer,
+        [
+          { type: "start", ...(messageId && { messageId }) },
+          { type: "reasoning-start", id: "thinking" },
+          { type: "reasoning-end", id: "thinking" },
+        ],
+        "abort"
+      );
+      const [message] = await store.listMessages(session.id);
+      expect(message.metadata.model).toEqual(model);
+      expect(consumer.message_id).toBe(message.id);
+      const generatedId = expect.any(String);
+      expect(message.id).toEqual(messageId ?? generatedId);
+    }
+  );
+
+  it.each([false, true])(
+    "adopts legacy tool output with durable provenance before new parts (known model: %s)",
+    async (knownModel) => {
+      const resumedModel: ChatModel = {
+        provider_id: "openrouter",
+        model_id: "anthropic/claude-opus-5.5",
+        tier: "pro",
+      };
+      const originalModel: ChatModel = {
+        provider_id: "vercel",
+        model_id: "openai/gpt-5.6-sol",
+        tier: "pro",
+      };
+      const expectedModel = knownModel ? originalModel : resumedModel;
+      const message = await store.appendMessage(session.id, {
+        id: "legacy-assistant",
+        role: "assistant",
+        ...(knownModel && { metadata: { model: originalModel } }),
+      });
+      await store.upsertPart(message.id, {
+        index: 0,
+        type: "tool-list_files",
+        tool_call_id: "legacy-call",
+        tool_state: "approval-responded",
+        data: {
+          type: "tool-list_files",
+          toolCallId: "legacy-call",
+          state: "approval-responded",
+          input: { path: "/" },
+          approval: { id: "legacy-approval", approved: true },
+        },
+      });
+      const upsertPart = store.upsertPart.bind(store);
+      const modelsAtPartWrite: unknown[] = [];
+      vi.spyOn(store, "upsertPart").mockImplementation(
+        async (messageId, part) => {
+          modelsAtPartWrite.push(
+            (await store.getMessage(messageId))?.metadata.model
+          );
+          return upsertPart(messageId, part);
+        }
+      );
+      const consumer = createRecorderConsumer({
+        store,
+        session_id: session.id,
+        get_model: () => resumedModel,
+      });
+      await feed(
+        consumer,
+        [
+          { type: "start", messageId: message.id },
+          // Existing tool slots bypass ensureAssistantMessage entirely.
+          {
+            type: "tool-output-available",
+            toolCallId: "legacy-call",
+            output: { files: [] },
+          },
+          { type: "reasoning-start", id: "resumed-thinking" },
+          {
+            type: "reasoning-end",
+            id: "resumed-thinking",
+            providerMetadata: {
+              anthropic: { signature: "synthetic-resumed-signature" },
+            },
+          },
+        ],
+        "abort"
+      );
+      expect(modelsAtPartWrite).toHaveLength(3);
+      for (const model of modelsAtPartWrite)
+        expect(model).toEqual(expectedModel);
+      const messages = await store.listMessages(session.id);
+      expect(messages).toHaveLength(1);
+      expect(messages[0].metadata.model).toEqual(expectedModel);
+      expect(messages[0].parts.map((part) => part.type)).toEqual([
+        "tool-list_files",
+        "reasoning",
+      ]);
+      expect(messages[0].parts[0].tool_state).toBe("output-available");
+      expect(consumer.message_id).toBe(message.id);
+    }
+  );
+
+  it("refuses successful settlement when legacy provenance cannot be persisted", async () => {
+    const message = await store.appendMessage(session.id, {
+      id: "legacy-write-failure",
+      role: "assistant",
+    });
+    vi.spyOn(store, "setMessageAccounting").mockRejectedValue(
+      new Error("synthetic metadata write failure")
+    );
+    const onError = vi.fn<(err: unknown) => void>();
+    const consumer = createRecorderConsumer({
+      store,
+      session_id: session.id,
+      get_model: () => ({
+        provider_id: "openrouter",
+        model_id: "anthropic/claude-opus-5.5",
+      }),
+      on_error: onError,
+    });
+    await expect(
+      feed(consumer, [
+        { type: "start", messageId: message.id },
+        { type: "reasoning-start", id: "thinking" },
+      ])
+    ).rejects.toThrow("Could not persist model identity");
+    expect(onError).toHaveBeenCalledOnce();
+    const [persisted] = await store.listMessages(session.id);
+    expect(persisted.metadata.model).toBeUndefined();
+    expect(persisted.parts).toEqual([]);
+  });
+
   it("retains empty signed reasoning and provider state through approval and resumed output", async () => {
     const metadata = {
       openrouter: {

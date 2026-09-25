@@ -342,7 +342,8 @@ function completeContinuationSteps(
   const finishStep = (end: number) => {
     if (hasResult && (incomplete || hasUnsettledTool))
       throw new IncompleteToolContinuationError();
-    if (!incomplete) complete.push(...parts.slice(stepStart, end));
+    if (!incomplete && !hasUnsettledTool)
+      complete.push(...parts.slice(stepStart, end));
   };
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
@@ -356,8 +357,10 @@ function completeContinuationSteps(
     const data = part.data as { state?: unknown } | null;
     // A fully streamed call can still be interrupted before its result. If a
     // sibling completed, dropping only this call changes the signed batch;
-    // dropping both hides the completed effect. Human-input pauses are instead
-    // governed by admission and must retain their existing approval semantics.
+    // dropping both hides the completed effect. Without a result, omit the
+    // entire step, including its completed signed reasoning and text, rather
+    // than retaining state from a call the model view will drop. Human-input
+    // pauses are governed by admission and retain their approval semantics.
     if (
       (part.type.startsWith("tool-") || part.type === "dynamic-tool") &&
       (data?.state ?? part.tool_state) === "input-available" &&

@@ -131,62 +131,89 @@ describe("AgentRuntime continuation provenance", () => {
     approved: true,
   };
 
-  it("rebuilds a same-model approval resume from persisted signed state without requiring usage", async () => {
-    const session = await pause();
-    const paused = await store.getMessage("paused-assistant");
-    expect(paused?.metadata.model).toMatchObject({
-      provider_id: "openrouter",
-      model_id: OPUS,
-    });
-    let rebuilt: UIMessage[] = [];
-    runAgent = async (_provider, req) => {
-      rebuilt = req.messages as UIMessage[];
-      return stream([
-        { type: "start", messageId: "paused-assistant" },
+  it.each([false, true])(
+    "rebuilds an approval from durable provenance without usage (accounting unavailable: %s)",
+    async (accountingUnavailable) => {
+      if (accountingUnavailable) {
+        vi.spyOn(store, "setMessageAccounting").mockRejectedValue(
+          new Error("synthetic accounting failure")
+        );
+      }
+      const upsertPart = store.upsertPart.bind(store);
+      const modelsAtPartWrite: unknown[] = [];
+      vi.spyOn(store, "upsertPart").mockImplementation(
+        async (messageId, part) => {
+          const message = await store.getMessage(messageId);
+          if (message?.role === "assistant")
+            modelsAtPartWrite.push(message.metadata.model);
+          return upsertPart(messageId, part);
+        }
+      );
+      const session = await pause();
+      expect(modelsAtPartWrite.length).toBeGreaterThan(0);
+      for (const model of modelsAtPartWrite) {
+        expect(model).toMatchObject({
+          provider_id: "openrouter",
+          model_id: OPUS,
+        });
+      }
+      const paused = await store.getMessage("paused-assistant");
+      expect(paused?.metadata.model).toMatchObject({
+        provider_id: "openrouter",
+        model_id: OPUS,
+      });
+      let rebuilt: UIMessage[] = [];
+      runAgent = async (_provider, req) => {
+        rebuilt = req.messages as UIMessage[];
+        return stream([
+          { type: "start", messageId: "paused-assistant" },
+          {
+            type: "tool-output-available",
+            toolCallId: "call",
+            output: { files: [] },
+          },
+          { type: "start-step" },
+          { type: "text-start", id: "answer" },
+          { type: "text-delta", id: "answer", delta: "Done" },
+          { type: "text-end", id: "answer" },
+          { type: "finish-step" },
+          { type: "finish" },
+        ]);
+      };
+      const response = await runtime.run(
         {
-          type: "tool-output-available",
-          toolCallId: "call",
-          output: { files: [] },
+          session_id: session.id,
+          messages: [],
+          approval_answer: answer,
         },
-        { type: "start-step" },
-        { type: "text-start", id: "answer" },
-        { type: "text-delta", id: "answer", delta: "Done" },
-        { type: "text-end", id: "answer" },
-        { type: "finish-step" },
-        { type: "finish" },
-      ]);
-    };
-    const response = await runtime.run(
-      {
-        session_id: session.id,
-        messages: [],
-        approval_answer: answer,
-      },
-      new AbortController().signal
-    );
-    expect(response.status).toBe(200);
-    await response.text();
-    const lowered = await convertToModelMessages(rebuilt);
-    const assistant = lowered.find((message) => message.role === "assistant");
-    expect(assistant?.content).toEqual(
-      expect.arrayContaining([
-        { type: "reasoning", text: "", providerOptions: CALL_METADATA },
-        {
-          type: "tool-call",
-          toolCallId: "call",
-          toolName: "list_files",
-          input: { path: "/" },
-          providerOptions: CALL_METADATA,
-        },
-      ])
-    );
-    const rows = await store.listVisibleMessages(session.id);
-    expect(rows.filter((row) => row.role === "assistant")).toHaveLength(1);
-    expect((await store.findToolPart(session.id, "call"))?.data).toMatchObject({
-      callProviderMetadata: CALL_METADATA,
-      state: "output-available",
-    });
-  });
+        new AbortController().signal
+      );
+      expect(response.status).toBe(200);
+      await response.text();
+      const lowered = await convertToModelMessages(rebuilt);
+      const assistant = lowered.find((message) => message.role === "assistant");
+      expect(assistant?.content).toEqual(
+        expect.arrayContaining([
+          { type: "reasoning", text: "", providerOptions: CALL_METADATA },
+          {
+            type: "tool-call",
+            toolCallId: "call",
+            toolName: "list_files",
+            input: { path: "/" },
+            providerOptions: CALL_METADATA,
+          },
+        ])
+      );
+      const rows = await store.listVisibleMessages(session.id);
+      expect(rows.filter((row) => row.role === "assistant")).toHaveLength(1);
+      expect(
+        (await store.findToolPart(session.id, "call"))?.data
+      ).toMatchObject({
+        callProviderMetadata: CALL_METADATA,
+        state: "output-available",
+      });
+    }
+  );
 
   it.each([
     { label: "model", overrides: { model_id: SOL } },

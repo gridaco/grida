@@ -1709,10 +1709,12 @@ export class AgentRuntime {
     // `streams.finish` doesn't re-fire its `on_end`. The error/abort path
     // leaves it attached, flushed by `streams.finish` as usual.
     const sessionsStore = this.deps.sessions_store;
+    let turnModel: ChatModel | undefined;
     const persistedRecorder = createRecorderConsumer({
       store: this.deps.sessions_store,
       session_id: sessionId,
       run_id: runId,
+      get_model: () => turnModel,
     });
     const continuation = opts.human_input_continuation;
     const recorder: StreamConsumer = continuation
@@ -1938,7 +1940,7 @@ export class AgentRuntime {
           (typeof selectedModel === "string"
             ? selectedModel
             : selectedModel.modelId);
-        const turnModel: ChatModel = {
+        turnModel = {
           provider_id: provider.provider_id,
           tier,
           model_id: resolvedModelId,
@@ -2012,9 +2014,8 @@ export class AgentRuntime {
         // Drain the recorder BEFORE stamping usage. The recorder creates the
         // assistant row on a fire-and-forget write_chain fed by each pushed
         // frame; `pumpResponseIntoRegistry` returning only means the frames
-        // were enqueued, not that the row was written. Usage/accounting stamps
-        // "the latest assistant row", so stamping before the write settles
-        // races onto the wrong row (or none). The recorder's terminal flush
+        // were enqueued, not that the row was written. Addressing the recorder's
+        // exact message before its writes settle can miss the row. Its terminal flush
         // (its `on_end`) awaits its write_chain + finalizes, so awaiting it
         // here makes the row exist deterministically. The detached recorder
         // flush + dependent accounting remain one terminal settlement task, so
@@ -2024,13 +2025,12 @@ export class AgentRuntime {
           recorder,
           detachRecorder,
           async () => {
-            // Model provenance is required even when the provider omits usage
-            // (e.g. an approval pause). Cost rollups still require actual usage.
-            if (persistedRecorder.message_id)
+            // Required model provenance was inserted with the assistant row;
+            // only best-effort usage accounting remains at settlement.
+            if (persistedRecorder.message_id && hasUsage(runUsage))
               await sessionsStore
                 .setMessageAccounting(persistedRecorder.message_id, {
-                  model: turnModel,
-                  ...(hasUsage(runUsage) && { usage: runUsage }),
+                  usage: runUsage,
                 })
                 .catch(() => undefined);
             if (hasUsage(runUsage)) {

@@ -108,6 +108,61 @@ function textOf(m: ModelUIMessage): string {
 }
 
 describe("buildModelMessages", () => {
+  it.each(["tool-list_files", "dynamic-tool"])(
+    "omits the entire signed step when %s has complete input but no result",
+    (type) => {
+      const model = { provider_id: "vercel", model_id: "openai/gpt-6-sol" };
+      const assistant = msg("a", "assistant", [
+        part("step-start", { type: "step-start" }),
+        part("text", {
+          type: "text",
+          text: "Earlier complete step",
+          state: "done",
+        }),
+        part("step-start", { type: "step-start" }),
+        part("reasoning", {
+          type: "reasoning",
+          text: "Interrupted step reasoning",
+          state: "done",
+          providerMetadata: {
+            openai: {
+              itemId: "interrupted",
+              reasoningEncryptedContent: "synthetic-interrupted-state",
+            },
+          },
+        }),
+        part("text", {
+          type: "text",
+          text: "Interrupted step text",
+          state: "done",
+        }),
+        part(type, {
+          type,
+          ...(type === "dynamic-tool" && { toolName: "list_files" }),
+          toolCallId: "unsettled-call",
+          input: { path: "/" },
+          state: "input-available",
+        }),
+        part("step-start", { type: "step-start" }),
+        part("text", { type: "text", text: "Complete retry", state: "done" }),
+      ]);
+      assistant.metadata.model = model;
+      const rows = [
+        msg("u", "user", [part("text", { type: "text", text: "Start" })]),
+        assistant,
+      ];
+      const before = structuredClone(rows);
+      const view = buildModelMessages(rows, { continuationModel: model });
+      expect(view[1].parts).toEqual([
+        { type: "step-start" },
+        { type: "text", text: "Earlier complete step", state: "done" },
+        { type: "step-start" },
+        { type: "text", text: "Complete retry", state: "done" },
+      ]);
+      expect(rows).toEqual(before);
+    }
+  );
+
   it.each(["text", "reasoning", "tool-input"])(
     "omits an interrupted %s step but retains a complete retried step",
     (kind) => {

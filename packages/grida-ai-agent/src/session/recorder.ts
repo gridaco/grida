@@ -8,6 +8,7 @@
 import type { ProviderMetadata, UIMessageChunk } from "ai";
 import type { StreamConsumer } from "../runtime/stream-registry";
 import type { SessionsStore } from "./store";
+import type { ChatModel } from "./rows";
 
 const TOOL_STATE_BY_CHUNK: Record<string, string> = {
   "tool-input-start": "input-streaming",
@@ -22,6 +23,8 @@ export type RecorderConsumerOptions = {
   session_id: string;
   /** Optional run id for log correlation. */
   run_id?: string;
+  /** Resolved before model frames arrive; persisted with a new assistant row. */
+  get_model?: () => ChatModel | undefined;
   /**
    * Optional error sink. Defaults to `console.warn` with the agent host's
    * existing logging prefix. Tests inject a spy.
@@ -110,6 +113,7 @@ class PartAccumulator {
   private stream_message_id: string | null = null;
   private write_chain: Promise<unknown> = Promise.resolve();
   private aborted = false;
+  private provenance_failed = false;
 
   constructor(private readonly opts: RecorderConsumerOptions) {}
 
@@ -136,6 +140,10 @@ class PartAccumulator {
     } catch {
       // Errors are already reported via onError in the per-write catch.
     }
+    if (this.provenance_failed)
+      throw new Error(
+        "Could not persist model identity for resumed assistant message"
+      );
     if (this.assistant_message_id) {
       try {
         await this.opts.store.finalizeMessage(this.assistant_message_id);
@@ -177,6 +185,7 @@ class PartAccumulator {
     );
     let slot: { messageId: string; index: number };
     if (existing) {
+      await this.ensureExistingProvenance(existing.message_id);
       const data = existing.data as {
         tool_name?: unknown;
         toolName?: unknown;
@@ -514,6 +523,10 @@ class PartAccumulator {
 
   private async ensureAssistantMessage(): Promise<string> {
     if (this.assistant_message_id) return this.assistant_message_id;
+    // Provenance must survive cancellation or a later accounting failure.
+    // Insert it atomically with the row, before any continuation parts exist.
+    const model = this.opts.get_model?.();
+    const metadata = model ? { model } : undefined;
     const streamId = this.stream_message_id;
     if (streamId) {
       // RESUME across the approval pause: the stream re-advertises the original
@@ -524,6 +537,7 @@ class PartAccumulator {
       // message under it so the client-rendered id and the DB row agree.
       const existing = await this.opts.store.getMessage(streamId);
       if (existing) {
+        await this.ensureExistingProvenance(streamId);
         this.assistant_message_id = streamId;
         this.part_index_counter = await this.opts.store.nextPartIndex(streamId);
         return streamId;
@@ -533,6 +547,7 @@ class PartAccumulator {
         {
           role: "assistant",
           id: streamId,
+          metadata,
         }
       );
       this.assistant_message_id = created.id;
@@ -540,9 +555,27 @@ class PartAccumulator {
     }
     const msg = await this.opts.store.appendMessage(this.opts.session_id, {
       role: "assistant",
+      metadata,
     });
     this.assistant_message_id = msg.id;
     return msg.id;
+  }
+
+  private async ensureExistingProvenance(messageId: string): Promise<void> {
+    const model = this.opts.get_model?.();
+    if (!model) return;
+    try {
+      const existing = await this.opts.store.getMessage(messageId);
+      if (!existing) throw new Error("Assistant message missing during resume");
+      // Legacy rows may predate per-message provenance. Backfill before writing
+      // resumed parts, but never relabel an already attributed provider step.
+      if (existing.metadata.model == null)
+        await this.opts.store.setMessageAccounting(messageId, { model });
+    } catch (err) {
+      // Skipping a required identity write cannot settle as a successful turn.
+      this.provenance_failed = true;
+      throw err;
+    }
   }
 
   private report(err: unknown) {
