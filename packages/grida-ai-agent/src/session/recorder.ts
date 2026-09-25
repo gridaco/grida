@@ -401,7 +401,13 @@ class PartAccumulator {
         this.input_by_tool.set(toolCallId, c.input);
       }
       if (type.startsWith("tool-input-") && c.providerMetadata) {
-        this.metadata_by_tool.set(toolCallId, c.providerMetadata);
+        this.metadata_by_tool.set(
+          toolCallId,
+          PartAccumulator.mergeMetadata(
+            this.metadata_by_tool.get(toolCallId),
+            c.providerMetadata
+          )
+        );
       }
       const stickyToolName = this.tool_name_by_call.get(toolCallId);
       const stickyInput = this.input_by_tool.get(toolCallId);

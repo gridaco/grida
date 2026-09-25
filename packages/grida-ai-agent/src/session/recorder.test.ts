@@ -41,6 +41,67 @@ async function feed(
 }
 
 describe("createRecorderConsumer", () => {
+  it("merges partial tool-call metadata through approval and resumed output without mixing result metadata", async () => {
+    const callMetadata = {
+      openai: { itemId: "call-item", phase: "available", cleared: null },
+      otherProvider: { kept: true },
+    };
+    await feed(createRecorderConsumer({ store, session_id: session.id }), [
+      { type: "start", messageId: "tool-metadata" },
+      {
+        type: "tool-input-start",
+        toolCallId: "call",
+        toolName: "list_files",
+        providerMetadata: {
+          openai: { itemId: "call-item", phase: "start", cleared: "old" },
+          otherProvider: { kept: true },
+        },
+      },
+      {
+        type: "tool-input-delta",
+        toolCallId: "call",
+        inputTextDelta: '{"path":"/"}',
+        providerMetadata: { openai: { phase: "delta", cleared: null } },
+      },
+      {
+        type: "tool-input-available",
+        toolCallId: "call",
+        toolName: "list_files",
+        input: { path: "/" },
+        providerMetadata: { openai: { phase: "available" } },
+      },
+      {
+        type: "tool-approval-request",
+        toolCallId: "call",
+        approvalId: "approval",
+      },
+    ]);
+    expect((await store.findToolPart(session.id, "call"))?.data).toMatchObject({
+      state: "approval-requested",
+      callProviderMetadata: callMetadata,
+    });
+
+    const resultMetadata = { openai: { itemId: "result-item" } };
+    await feed(createRecorderConsumer({ store, session_id: session.id }), [
+      { type: "start", messageId: "tool-metadata" },
+      {
+        type: "tool-output-available",
+        toolCallId: "call",
+        output: { files: [] },
+        providerMetadata: resultMetadata,
+      },
+    ]);
+    expect((await store.findToolPart(session.id, "call"))?.data).toEqual({
+      type: "tool-list_files",
+      toolCallId: "call",
+      state: "output-available",
+      input: { path: "/" },
+      output: { files: [] },
+      callProviderMetadata: callMetadata,
+      resultProviderMetadata: resultMetadata,
+    });
+  });
+
   it.each(
     ["text", "reasoning"].flatMap((type) =>
       [false, true].map((ciphertext) => ({ type, ciphertext }))
