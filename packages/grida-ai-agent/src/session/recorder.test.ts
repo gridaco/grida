@@ -41,6 +41,99 @@ async function feed(
 }
 
 describe("createRecorderConsumer", () => {
+  it.each(
+    ["text", "reasoning"].flatMap((type) =>
+      [false, true].map((ciphertext) => ({ type, ciphertext }))
+    )
+  )(
+    "merges $type metadata per provider through approval and resume (ciphertext: $ciphertext)",
+    async ({ type, ciphertext }) => {
+      const expected = {
+        openai: {
+          itemId: "synthetic-item",
+          reasoningEncryptedContent: ciphertext ? "synthetic-ciphertext" : null,
+          phase: "end",
+          cleared: null,
+          nested: { final: true },
+          deltaOnly: true,
+        },
+        initialProvider: { kept: true },
+        deltaProvider: { kept: true },
+      };
+      await feed(createRecorderConsumer({ store, session_id: session.id }), [
+        { type: "start", messageId: "metadata-continuation" },
+        {
+          type: `${type}-start`,
+          id: "content",
+          providerMetadata: {
+            openai: {
+              itemId: "synthetic-item",
+              reasoningEncryptedContent: null,
+              phase: "start",
+              cleared: "old value",
+              nested: { initial: true },
+            },
+            initialProvider: { kept: true },
+          },
+        },
+        {
+          type: `${type}-delta`,
+          id: "content",
+          delta: "Content",
+          providerMetadata: {
+            openai: { phase: "delta", deltaOnly: true },
+            deltaProvider: { kept: true },
+          },
+        },
+        {
+          type: `${type}-end`,
+          id: "content",
+          providerMetadata: {
+            openai: {
+              itemId: "synthetic-item",
+              phase: "end",
+              cleared: null,
+              nested: { final: true },
+              ...(ciphertext && {
+                reasoningEncryptedContent: "synthetic-ciphertext",
+              }),
+            },
+          },
+        },
+        {
+          type: "tool-input-available",
+          toolCallId: "metadata-call",
+          toolName: "list_files",
+          input: { path: "/" },
+        },
+        {
+          type: "tool-approval-request",
+          toolCallId: "metadata-call",
+          approvalId: "metadata-approval",
+        },
+      ]);
+      const [paused] = await store.listMessages(session.id);
+      expect(paused.parts[0].data).toEqual({
+        type,
+        text: "Content",
+        state: "done",
+        providerMetadata: expected,
+      });
+      expect(paused.parts[1].tool_state).toBe("approval-requested");
+      await feed(createRecorderConsumer({ store, session_id: session.id }), [
+        { type: "start", messageId: "metadata-continuation" },
+        {
+          type: "tool-output-available",
+          toolCallId: "metadata-call",
+          output: { files: [] },
+        },
+      ]);
+      const [resumed] = await store.listMessages(session.id);
+      expect(resumed.parts[0].data).toEqual(paused.parts[0].data);
+      expect(resumed.parts[1].tool_state).toBe("output-available");
+    }
+  );
+
   it.each([undefined, "advertised-assistant"])(
     "inserts resolved provenance with a new row even on abort (stream id: %s)",
     async (messageId) => {

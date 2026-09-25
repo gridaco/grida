@@ -1023,7 +1023,7 @@ export class AgentRuntime {
       }
       const effectiveReq: RunRequest = {
         ...req,
-        model_id: req.model_id ?? existingSession?.model?.model_id,
+        model_id: req.model_id ?? existingSession?.model?.model_id ?? undefined,
       };
       const explicitlyChangedModel =
         req.model_id !== undefined &&
@@ -1188,10 +1188,10 @@ export class AgentRuntime {
         if (
           prior &&
           (prior.provider_id !== provider.provider_id ||
-            (prior.model_id !== undefined
+            (prior.model_id != null
               ? prior.model_id !== selectedId
               : explicitlyChangedModel ||
-                (prior.tier !== undefined && prior.tier !== tier)))
+                (prior.tier != null && prior.tier !== tier)))
         ) {
           return Response.json(
             {

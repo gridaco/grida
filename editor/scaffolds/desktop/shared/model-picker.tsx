@@ -430,6 +430,23 @@ export function useModelPickerState({
         userPickedRef.current = false;
         setUserPicked(false);
         setSelection(freshSelection);
+      } else if (initialSeedActive.current && !userPickedRef.current) {
+        // SSR starts without native capability. Recover a supported explicit
+        // handoff after preload/endpoint hydration, never a stored or user pick.
+        setSelection((current) => {
+          const next = resolveDefaultModelSelection({
+            initial,
+            initialProviderId,
+            chatGptReady,
+            ggActive: gridaGateway.peek().kind === "active",
+            isKnownId,
+            textCatalogV2,
+          });
+          return current.model_id === next.model_id &&
+            current.provider_id === next.provider_id
+            ? current
+            : next;
+        });
       }
       return;
     }

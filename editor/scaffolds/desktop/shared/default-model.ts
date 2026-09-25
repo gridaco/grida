@@ -25,6 +25,8 @@ import { desktop_text_catalog } from "./text-catalog";
 import {
   CHATGPT_PROVIDER_ID,
   GG_PROVIDER_ID,
+  isChatGptSubscriptionModelId,
+  isValidEndpointProviderId,
   type ChatGptSubscriptionModelId,
 } from "@grida/agent";
 
@@ -58,8 +60,8 @@ export const CHATGPT_READY_DEFAULT_MODEL_ID =
 
 /**
  * The initial default for a new chat. An explicit caller-seeded `initial`
- * (a known id — e.g. the welcome handoff carrying the home composer's pick)
- * always wins. Otherwise a ready subscription chooses ChatGPT/Sol, a live
+ * (a known, runtime-compatible id — e.g. the welcome handoff carrying the home
+ * composer's pick) always wins. Otherwise a ready subscription chooses ChatGPT/Sol, a live
  * Grida session chooses its runtime-compatible Grida/Sol, and the unresolved
  * fallback stays provider-less until availability resolves.
  */
@@ -78,7 +80,17 @@ export function resolveDefaultModelSelection(opts: {
   // back to the plain default is safe; silently swapping in ChatGPT or the
   // included model would override the caller's choice.
   if (opts.initial != null && opts.initial !== "") {
-    return opts.isKnownId(opts.initial)
+    // Only new-chat seeds are admitted here. Persisted history keeps its exact
+    // identity even on an older runtime, never an implicit model replacement.
+    // Endpoint and subscription model sets remain owned by those providers.
+    const runtimeCompatible =
+      opts.initialProviderId === CHATGPT_PROVIDER_ID
+        ? isChatGptSubscriptionModelId(opts.initial)
+        : (opts.initialProviderId !== undefined &&
+            isValidEndpointProviderId(opts.initialProviderId)) ||
+          !desktop_text_catalog.view(true).has(opts.initial) ||
+          desktop_text_catalog.view(opts.textCatalogV2).has(opts.initial);
+    return opts.isKnownId(opts.initial) && runtimeCompatible
       ? {
           model_id: opts.initial,
           ...(opts.initialProviderId

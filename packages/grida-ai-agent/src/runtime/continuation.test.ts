@@ -11,7 +11,7 @@ import {
   SecretsStore,
   WorkspaceRegistry,
 } from "@grida/daemon/server";
-import { openSessionsDb } from "../session/db";
+import { openSessionsDb, type OpenedSessionsDb } from "../session/db";
 import { SessionsStore } from "../session/store";
 import { chunksOf } from "../testing/sse";
 import { AgentRuntime, type AgentRuntimeDeps } from ".";
@@ -41,6 +41,7 @@ function stream(chunks: unknown[]): Response {
 
 describe("AgentRuntime continuation provenance", () => {
   let tempDir: string;
+  let opened: OpenedSessionsDb;
   let store: SessionsStore;
   let runtime: AgentRuntime;
   let modelCatalog: ModelCatalogStore;
@@ -52,7 +53,8 @@ describe("AgentRuntime continuation provenance", () => {
     const secrets = new SecretsStore(new AuthStore(tempDir));
     await secrets.set("openrouter", "synthetic-openrouter-key");
     await secrets.set("vercel", "synthetic-vercel-key");
-    store = new SessionsStore(openSessionsDb({ user_data_path: tempDir }));
+    opened = openSessionsDb({ user_data_path: tempDir });
+    store = new SessionsStore(opened);
     nextSnapshot = catalog.snapshot.v2.seed();
     modelCatalog = new ModelCatalogStore({
       base_url: "https://catalog.example.test",
@@ -242,6 +244,58 @@ describe("AgentRuntime continuation provenance", () => {
       expect(called).toBe(false);
       expect((await store.get(session.id))?.model).toEqual(before?.model);
       expect(await store.matchesPendingApproval(session.id, answer)).toBe(true);
+    }
+  );
+
+  it.each(
+    [true, false].flatMap((approved) =>
+      ["pro", null].map((tier) => ({ approved, tier }))
+    )
+  )(
+    "resumes a nullable legacy tier-only identity (approved: $approved, tier: $tier)",
+    async ({ approved, tier }) => {
+      const session = await store.create({ agent: "grida" });
+      // Exercise persisted JSON from older clients, not the current typed writer.
+      opened.sqlite
+        .prepare("UPDATE chat_sessions SET model_json = ? WHERE id = ?")
+        .run(
+          JSON.stringify({ provider_id: "openrouter", model_id: null, tier }),
+          session.id
+        );
+      const assistant = await store.appendMessage(session.id, {
+        role: "assistant",
+      });
+      await store.upsertPart(assistant.id, {
+        index: 0,
+        type: "tool-list_files",
+        tool_call_id: "call",
+        tool_state: "approval-requested",
+        data: {
+          type: "tool-list_files",
+          toolCallId: "call",
+          input: { path: "/" },
+          state: "approval-requested",
+          approval: { id: "approval" },
+        },
+      });
+      const run = vi.fn<NonNullable<AgentRuntimeDeps["run_agent"]>>(async () =>
+        stream([])
+      );
+      runAgent = run;
+      const response = await runtime.run(
+        {
+          session_id: session.id,
+          messages: [],
+          approval_answer: { ...answer, approved },
+        },
+        new AbortController().signal
+      );
+      expect(response.status).toBe(200);
+      await response.text();
+      expect(run).toHaveBeenCalledOnce();
+      expect(
+        (await store.findToolPart(session.id, "call"))?.data
+      ).toMatchObject({ approval: { id: "approval", approved } });
     }
   );
 

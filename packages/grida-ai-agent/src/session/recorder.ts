@@ -276,7 +276,11 @@ class PartAccumulator {
       const providerMetadata = (
         chunk as { providerMetadata?: ProviderMetadata }
       ).providerMetadata;
-      if (providerMetadata) buf.providerMetadata = providerMetadata;
+      if (providerMetadata)
+        buf.providerMetadata = PartAccumulator.mergeMetadata(
+          buf.providerMetadata,
+          providerMetadata
+        );
       const messageId = await this.ensureAssistantMessage();
       await this.opts.store.upsertPart(messageId, {
         index: buf.index,
@@ -337,7 +341,11 @@ class PartAccumulator {
         const providerMetadata = (
           chunk as { providerMetadata?: ProviderMetadata }
         ).providerMetadata;
-        if (providerMetadata) buf.providerMetadata = providerMetadata;
+        if (providerMetadata)
+          buf.providerMetadata = PartAccumulator.mergeMetadata(
+            buf.providerMetadata,
+            providerMetadata
+          );
         const messageId = await this.ensureAssistantMessage();
         await this.opts.store.upsertPart(messageId, {
           index: buf.index,
@@ -504,6 +512,22 @@ class PartAccumulator {
         session_id: this.opts.session_id,
       });
     }
+  }
+
+  /** Stream updates may contain only the changed fields of one provider. */
+  private static mergeMetadata(
+    current: ProviderMetadata | undefined,
+    incoming: ProviderMetadata
+  ): ProviderMetadata {
+    return {
+      ...current,
+      ...Object.fromEntries(
+        Object.entries(incoming).map(([provider, fields]) => [
+          provider,
+          { ...current?.[provider], ...fields },
+        ])
+      ),
+    };
   }
 
   private async allocatePart(messageId: string): Promise<number> {

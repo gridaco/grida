@@ -341,6 +341,101 @@ describe("shouldUpgradeToIncluded — the async GG-active guard", () => {
 });
 
 describe("installed text runtime defaults", () => {
+  it.each([undefined, false])(
+    "rejects a current-only initial seed on an older runtime (%s)",
+    (textCatalogV2) => {
+      for (const initial of [
+        "openai/gpt-6-sol",
+        "openai/gpt-6-luna",
+        "anthropic/claude-opus-5.5",
+      ]) {
+        for (const initialProviderId of [
+          undefined,
+          "gg",
+          "openrouter",
+          "vercel",
+        ]) {
+          expect(
+            resolveDefaultModelSelection({
+              initial,
+              initialProviderId,
+              textCatalogV2,
+              chatGptReady: true,
+              ggActive: true,
+              isKnownId: knows(initial),
+            })
+          ).toEqual({ model_id: DEFAULT_MODEL_ID });
+        }
+      }
+    }
+  );
+
+  it("recovers an untouched explicit seed when the capable preload hydrates", () => {
+    const initial = "anthropic/claude-opus-5.5";
+    const opts = {
+      initial,
+      initialProviderId: "openrouter",
+      chatGptReady: true,
+      ggActive: true,
+      isKnownId: knows(initial),
+    };
+    expect(resolveDefaultModelSelection(opts)).toEqual({
+      model_id: DEFAULT_MODEL_ID,
+    });
+    expect(
+      resolveDefaultModelSelection({ ...opts, textCatalogV2: true })
+    ).toEqual({
+      model_id: initial,
+      provider_id: "openrouter",
+    });
+  });
+
+  it("does not impose service admission on a configured endpoint's model identity", () => {
+    const initial = "openai/gpt-6-sol";
+    expect(
+      resolveDefaultModelSelection({
+        initial,
+        initialProviderId: "local-gateway",
+        textCatalogV2: false,
+        chatGptReady: false,
+        ggActive: false,
+        isKnownId: knows(initial),
+      })
+    ).toEqual({ model_id: initial, provider_id: "local-gateway" });
+  });
+
+  it("does not infer native subscription admission from current service admission", () => {
+    const initial = "openai/gpt-6-sol";
+    expect(
+      resolveDefaultModelSelection({
+        initial,
+        initialProviderId: CHATGPT_PROVIDER_ID,
+        textCatalogV2: true,
+        chatGptReady: true,
+        ggActive: true,
+        isKnownId: knows(initial),
+      })
+    ).toEqual({ model_id: "openai/gpt-6-sol" });
+  });
+
+  it("does not reroute a stored or user-picked current model on an older runtime", () => {
+    const current = { model_id: "openai/gpt-6-sol", provider_id: "openrouter" };
+    for (const guard of ["storedSeeded", "userPicked"] as const) {
+      expect(
+        reconcileChatGptSubscriptionDefault({
+          current,
+          chatGptReady: true,
+          ggActive: true,
+          textCatalogV2: false,
+          hasInitial: false,
+          storedSeeded: false,
+          userPicked: false,
+          [guard]: true,
+        })
+      ).toBe(current);
+    }
+  });
+
   it.each([
     { textCatalogV2: undefined, expected: "openai/gpt-5.6-sol" },
     { textCatalogV2: false, expected: "openai/gpt-5.6-sol" },
