@@ -7,7 +7,8 @@
     "strict": true,
     "skipLibCheck": true,
     "declaration": true,
-    "types": ["node"]
+    "types": ["node"],
+    "resolveJsonModule": true
   },
   "include": ["src"],
   "exclude": ["dist"]

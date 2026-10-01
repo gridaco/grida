@@ -1,0 +1,19 @@
+Grida — account access and tools
+
+Usage: grida <command>
+
+Commands:
+  auth       Sign in and manage this CLI's session
+  account    Read your identity, organizations and credits
+  models     Discover executable models and input schemas
+  providers  Manage shared provider API keys
+  generate   Generate media into a new local directory
+  voices     List available speech voices
+  rigging    Check mesh eligibility and create a rigged GLB
+  docs       Print canonical documentation URLs
+
+Options: --help, --version
+Use grida <command> --help for details.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli

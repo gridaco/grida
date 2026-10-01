@@ -92,6 +92,16 @@ the catalogue's exact-match legacy video fallback. Absent snapshot sections reta
 the existing bundled-section behavior. Audio and 3D use their existing fixed
 bundled contracts. There is no implicit refresh or provider discovery.
 
+Field contracts are authored in repository-root
+[`data/ai/inputs.json`](https://github.com/gridaco/grida/blob/main/data/ai/inputs.json).
+Generation produces `schemas/inputs.generated.json` for the TypeScript native
+parser and the Rust crate-local copy. The package bundles its local schema copy
+into `dist`; it never imports repository data at runtime. Builds and typechecks
+reject stale generated source. `schemas/operations.generated.json`
+is the derived discovery projection; edit the input contracts or canonical model
+facts instead. Semantic checks such as portable GLB validation remain explicit
+implementations in each language, checked by shared migration vectors.
+
 The input schema uses JSON Schema 2020-12 plus the following `x-grida-*` rules.
 **`parseInput` is normative**: a general JSON Schema validator alone does not
 perform these normalizations or all JavaScript numeric/URI checks. Native clients

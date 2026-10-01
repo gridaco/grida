@@ -1,0 +1,10 @@
+Usage: grida auth <command>
+
+Commands:
+  login      Sign in using the system browser
+  status     Inspect the local session (no server verification)
+  logout     Clear local credentials and request session revocation
+  storage    Inspect or explicitly migrate credential storage
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/auth

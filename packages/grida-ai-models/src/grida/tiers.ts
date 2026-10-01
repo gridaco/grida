@@ -38,12 +38,18 @@ export type ModelTier = "nano" | "mini" | "pro" | "max";
  * one rung; do not skip a still-current model or collapse tiers without a
  * separate reason to change the topology.
  */
-export const TIER_MODEL_IDS = Object.freeze({
-  nano: "openai/gpt-5.6-luna",
-  mini: "openai/gpt-5.6-terra",
-  pro: "openai/gpt-5.6-sol",
-  max: "openai/gpt-6-astra",
-} as const satisfies Record<ModelTier, models.text.CatalogId>);
+export const TIER_MODEL_IDS = Object.freeze(
+  /* generated:service:tiers:start */
+  {
+    nano: "openai/gpt-5.6-luna",
+    mini: "openai/gpt-5.6-terra",
+    pro: "openai/gpt-5.6-sol",
+    max: "openai/gpt-6-astra",
+  } /* generated:service:tiers:end */ as const satisfies Record<
+    ModelTier,
+    models.text.CatalogId
+  >
+);
 
 /** Literal union of tier-mapped model ids (values of {@link TIER_MODEL_IDS}). */
 export type TierModelId = (typeof TIER_MODEL_IDS)[ModelTier];

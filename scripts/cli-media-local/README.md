@@ -1,32 +1,40 @@
-# Installed CLI media proof
+# TypeScript CLI media reference proof
 
 > **GRIDA-SEC-013 / GRIDA-SEC-006** — synthetic provider authority and an owned GG HTTP fixture.
 > **GRIDA-SEC-010** — offline hosted registration and disposable ordinary-home custody.
 > **GRIDA-GG: token** — fresh synthetic scoped grants stay in invocation memory.
 > See [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md).
 
-This proof packs and installs the real private `grida` package, then invokes its
-bin in independent Node processes with an isolated home and environment. It
-copies the built artifact; build current workspace dependencies and the CLI
-before running it. No source import or replacement custody implementation is used.
+This directory retains the former TypeScript CLI's installed-media fixture.
+Its Node preload hooks instrument only that implementation. They do not constrain
+or verify the Rust executable, and this runner is not a native release gate.
+The sections below describe the retained reference proof.
+
+For the current CLI, use the
+[native installed acceptance proof](../conformance/README.md) and
+[native candidate preparation](../cli-release/README.md):
 
 ```sh
-pnpm --filter grida... build
-node scripts/cli-media-local/proof.mjs
+node scripts/conformance/installed.mjs --candidate /absolute/native-candidate
+```
+
+The candidate must already contain the verified native npm archive set. The
+complete `just cli-conformance-target` gate also requires a frozen workspace
+install and a current docs build; its prerequisites are in the conformance README.
+It rebuilds the pinned TypeScript reference independently of the retired workspace
+source. Node guard tests remain useful for that reference:
+
+```sh
 node --test scripts/cli-media-local/network.test.mjs scripts/cli-local/network.test.mjs
 ```
 
-An optional `--archive /absolute/path/grida-version.tgz` tests an existing
-candidate instead of packing a new one. It snapshots that bounded regular file
-into its owned fixture and records its hash. The release and docs jobs use this
-path to verify the exact package that will be published. Default packing uses
-the shared [release preparation](../cli-release/README.md) file boundary.
-
-Node 24+, its bundled npm, and permission to bind the owned loopback API port
-`3041` plus at least one registered callback port (`55435` or `55436`) are required.
-An occupied API port or both occupied callback ports fail the proof; it does not
-stop or adopt another service. npm installation is offline, ignores lifecycle scripts,
-and omits the optional keyring binding. No Docker or hosted service is needed.
+Historically, this proof packed a built TypeScript CLI or accepted its archive via
+`--archive`, then invoked independent Node processes with isolated homes. Its
+old `prepare.mjs` boundary does not accept native candidates. Reference runs need
+Node 24+, npm, the owned loopback API port `3041`, and at least one registered
+callback port (`55435` or `55436`). An occupied port fails rather than adopting or
+stopping another service. Installation is offline, ignores lifecycle scripts and
+omits the optional keyring binding. No hosted service is used.
 
 The proof checks the shipped hosted registration without visiting its issuer:
 ordinary-home storage metadata, explicit file selection, restart/status, the

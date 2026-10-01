@@ -35,7 +35,7 @@ Currently, we have below features / modules.
 - TypeScript 5 - main language for most apps
 - Python 3.12 - partially used for tasks / jobs that are independent (hosted out-of-tree, e.g. [gridaco/library](https://github.com/gridaco/library))
 - Deno - partially used for tasks / jobs, that shares the codebase, e.g. `/jobs`
-- Rust - not in this repo; the graphics engine lives in [gridaco/nothing](https://github.com/gridaco/nothing) and is consumed as the published `@grida/canvas-wasm` artifact.
+- Rust - application crates live in the root Cargo workspace (`crates/`), starting with the native CLI migration. The graphics engine lives in [gridaco/nothing](https://github.com/gridaco/nothing) and is consumed as the published `@grida/canvas-wasm` artifact.
 
 **Database**
 
@@ -212,7 +212,12 @@ pnpm turbo dev
 pnpm turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
 ```
 
-> **Important for agents:** Formatting and linting run automatically on commit via lefthook pre-commit hooks (`oxfmt`, `oxlint`). You can also run `just fmt` manually. `oxfmt` is enforced in CI — PRs will fail format checks if code is not formatted. (Rust tooling lives with the engine repo.)
+> **Important for agents:** Formatting and linting run automatically on commit via lefthook pre-commit hooks (`oxfmt`, `oxlint`). You can also run `just fmt` manually. `oxfmt` is enforced in CI — PRs will fail format checks if code is not formatted. Application Rust uses the pinned `rust-toolchain.toml`: run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` and `cargo test --workspace --all-features --locked`. Engine tooling stays with its own repo.
+
+For the native CLI migration, `just cli-conformance` builds the pinned TypeScript
+reference and Rust executable, checks the runner and requires completed contracts.
+`just cli-conformance-target` checks the full migration target and fails while any
+required coverage remains pending. See [`scripts/conformance/README.md`](scripts/conformance/README.md).
 
 Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.
 To handle this, you can build the `/packages/*`, then run typecheck.

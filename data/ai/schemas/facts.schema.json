@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grida.co/schemas/ai-model-facts-v1.json",
+  "title": "Canonical model facts, authoring envelope version 1",
+  "description": "Structural interchange schema. Generated TypeScript satisfies declarations additionally check each modality's detailed capability and pricing vocabulary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "text.catalog",
+    "image.models",
+    "video.models",
+    "audio.music.models",
+    "audio.sound_effects.models",
+    "audio.text_to_speech.models",
+    "three_d.models",
+    "three_d.model_generation.models",
+    "three_d.rigging.models",
+    "three_d.rig_check.operation",
+    "image_tools.models",
+    "embedding.models"
+  ],
+  "properties": {
+    "text.catalog": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/text_card"
+      }
+    },
+    "image.models": {
+      "$ref": "#/$defs/table"
+    },
+    "video.models": {
+      "$ref": "#/$defs/table"
+    },
+    "audio.music.models": {
+      "$ref": "#/$defs/table"
+    },
+    "audio.sound_effects.models": {
+      "$ref": "#/$defs/table"
+    },
+    "audio.text_to_speech.models": {
+      "$ref": "#/$defs/table"
+    },
+    "three_d.models": {
+      "$ref": "#/$defs/table"
+    },
+    "three_d.model_generation.models": {
+      "$ref": "#/$defs/table"
+    },
+    "three_d.rigging.models": {
+      "$ref": "#/$defs/table"
+    },
+    "image_tools.models": {
+      "$ref": "#/$defs/table"
+    },
+    "embedding.models": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["id", "label"]
+      }
+    },
+    "three_d.rig_check.operation": {
+      "type": "object",
+      "required": [
+        "feature",
+        "provider",
+        "binding_id",
+        "rig_types",
+        "input",
+        "pricing"
+      ],
+      "properties": {
+        "feature": {
+          "const": "rig-check"
+        },
+        "provider": {
+          "const": "tripo"
+        },
+        "binding_id": {
+          "const": "rig-check"
+        },
+        "rig_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "table": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/card"
+      }
+    },
+    "card": {
+      "type": "object",
+      "required": ["id", "label", "release"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "release": {
+          "type": "object",
+          "required": ["date", "basis", "source_url"],
+          "additionalProperties": false,
+          "properties": {
+            "date": {
+              "type": ["string", "null"],
+              "format": "date"
+            },
+            "basis": {
+              "enum": ["model", "provider_endpoint"]
+            },
+            "source_url": {
+              "type": "string",
+              "pattern": "^https://"
+            }
+          },
+          "if": {
+            "properties": {
+              "date": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "basis": {
+                "const": "provider_endpoint"
+              }
+            }
+          }
+        },
+        "providers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["provider", "id"],
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "text_card": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/card"
+        }
+      ],
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+      },
+      "properties": {
+        "image_input_mimes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "context_window": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "output_limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "input": {
+              "type": "number",
+              "minimum": 0
+            },
+            "output": {
+              "type": "number",
+              "minimum": 0
+            },
+            "cache_read": {
+              "type": "number",
+              "minimum": 0
+            },
+            "cache_write": {
+              "type": "number",
+              "minimum": 0
+            },
+            "long_context": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "input_tokens_above",
+                "input_multiplier",
+                "output_multiplier"
+              ],
+              "properties": {
+                "input_tokens_above": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "input_multiplier": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "output_multiplier": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

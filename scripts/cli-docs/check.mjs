@@ -17,16 +17,17 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { Cli } from "../../packages/grida-cli/src/cli.ts";
-import { MediaInput } from "../../packages/grida-cli/src/media-input.ts";
-import { CliRelease } from "../cli-release/prepare.mjs";
+import { npmProgram } from "../cli-release/native.mjs";
+import { installNative } from "../cli-release/native-proof.mjs";
+import { buildHostFixture } from "../cli-release/native-fixture.mjs";
+import { referenceRoot, verifyBuild } from "../conformance/baseline.mjs";
 
 const repository = fileURLToPath(new URL("../../", import.meta.url));
-// Resolve the SDK's public package export in its actual consumer's dependency scope.
+// Resolve the continuing TypeScript SDK's own export, independent of CLI dependencies.
 const { MediaOperations } = createRequire(
-  new URL("../../packages/grida-cli/package.json", import.meta.url)
+  new URL("../../packages/grida-ai/package.json", import.meta.url)
 )("@grida/ai");
 const execute = promisify(execFile);
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -138,7 +139,29 @@ export const CliDocs = {
     return { examples, files };
   },
 
-  async run({ archive } = {}) {
+  async run({
+    archive,
+    nativeCandidate = process.env.GRIDA_NATIVE_CANDIDATE,
+  } = {}) {
+    // Grammar and input lowering are compared with the immutable migration
+    // oracle. Worktree CLI TypeScript files can be retired after cutover.
+    await verifyBuild();
+    const [{ Cli }, { MediaInput }] = await Promise.all([
+      import(
+        pathToFileURL(path.join(referenceRoot, "packages/grida-cli/src/cli.ts"))
+          .href
+      ),
+      import(
+        pathToFileURL(
+          path.join(referenceRoot, "packages/grida-cli/src/media-input.ts")
+        ).href
+      ),
+    ]);
+    assert(
+      !(archive && nativeCandidate),
+      "Choose a TS archive or a native candidate, not both"
+    );
+    if (nativeCandidate) assert(path.isAbsolute(nativeCandidate));
     const owned = await realpath(
       await mkdtemp(path.join(tmpdir(), "grida-cli-docs-"))
     );
@@ -307,57 +330,106 @@ export const CliDocs = {
       };
       await writeFile(env.npm_config_userconfig, "");
       await writeFile(env.npm_config_globalconfig, "");
-      if (!archive) {
-        const destination = path.join(owned, "candidate");
-        const candidate = await CliRelease.prepare(destination);
-        archive = path.join(destination, candidate.archive);
+      let native;
+      if (!archive && !nativeCandidate) {
+        nativeCandidate = path.join(owned, "native-candidate");
+        await buildHostFixture(nativeCandidate);
       }
-      const bytes = await readFile(path.resolve(archive));
-      report.archive_sha256 = digest(bytes);
-      const copiedArchive = path.join(owned, "candidate.tgz");
-      await writeFile(copiedArchive, bytes);
-      const npm = await CliRelease.npm();
-      await execute(
-        process.execPath,
-        [
-          npm,
-          "install",
-          "--prefix",
-          runtime,
-          copiedArchive,
-          "--offline",
-          "--ignore-scripts",
-          "--omit=optional",
-          "--no-audit",
-          "--no-fund",
-          "--package-lock=false",
-        ],
-        { env, cwd: owned, timeout: 60_000, maxBuffer: 512 * 1024 }
-      );
-      const bin = path.join(runtime, "node_modules/grida/dist/bin.mjs");
+      if (nativeCandidate) {
+        native = await installNative(nativeCandidate, runtime);
+        report.archive_sha256 = native.report.launcher.sha256;
+      } else {
+        const bytes = await readFile(path.resolve(archive));
+        report.archive_sha256 = digest(bytes);
+        const copiedArchive = path.join(owned, "candidate.tgz");
+        await writeFile(copiedArchive, bytes);
+        const npm = await npmProgram();
+        await execute(
+          process.execPath,
+          [
+            npm,
+            "install",
+            "--prefix",
+            runtime,
+            copiedArchive,
+            "--offline",
+            "--ignore-scripts",
+            "--omit=optional",
+            "--no-audit",
+            "--no-fund",
+            "--package-lock=false",
+          ],
+          { env, cwd: owned, timeout: 60_000, maxBuffer: 512 * 1024 }
+        );
+      }
+      const bin =
+        native?.executable ??
+        path.join(runtime, "node_modules/grida/dist/bin.mjs");
       const guard = path.join(owned, "network.cjs"),
         guardReport = path.join(owned, "network.json");
       await cp(path.join(repository, "scripts/cli-local/network.cjs"), guard);
       const invoke = async (args) => {
-        const result = await execute(
-          process.execPath,
-          ["--require", guard, bin, ...args],
-          {
-            cwd: runtime,
-            timeout: 15_000,
-            maxBuffer: 1024 * 1024,
-            env: {
-              ...env,
-              GRIDA_CLI_PROOF_ROOT: owned,
-              GRIDA_CLI_PROOF_REPORT: guardReport,
-              GRIDA_CLI_PROOF_OFFLINE: "1",
-            },
-          }
-        );
-        assert.deepEqual(JSON.parse(await readFile(guardReport, "utf8")), {
-          denied: 0,
-          requests: [],
+        // JavaScript tripwires cannot constrain a native child. Offline native
+        // documentation reads execute inside an OS network perimeter instead.
+        let executable = process.execPath;
+        let parameters = ["--require", guard, bin, ...args];
+        if (native) {
+          if (process.platform === "darwin") {
+            executable = "/usr/bin/sandbox-exec";
+            parameters = [
+              "-p",
+              "(version 1)(allow default)(deny network*)",
+              bin,
+              ...args,
+            ];
+          } else if (process.platform === "linux") {
+            if (process.env.GRIDA_CLI_DOCS_SUDO_NETWORK === "1") {
+              // CI hosts can disable unprivileged namespaces. Elevate only the
+              // read-only child inside its empty network namespace, never the
+              // checker, npm installation, builds, or credential/keyring tests.
+              executable = "/usr/bin/sudo";
+              parameters = [
+                "-n",
+                "/usr/bin/unshare",
+                "--net",
+                "/usr/bin/env",
+                "-i",
+                ...Object.entries(env).map(([key, value]) => `${key}=${value}`),
+                bin,
+                ...args,
+              ];
+            } else {
+              executable = "/usr/bin/unshare";
+              parameters = [
+                ...(process.getuid() === 0
+                  ? []
+                  : ["--user", "--map-root-user"]),
+                "--net",
+                bin,
+                ...args,
+              ];
+            }
+          } else
+            throw new Error(
+              "The native offline documentation proof requires the macOS or Linux network perimeter"
+            );
+        }
+        const result = await execute(executable, parameters, {
+          cwd: runtime,
+          timeout: 15_000,
+          maxBuffer: 1024 * 1024,
+          env: {
+            ...env,
+            GRIDA_CLI_PROOF_ROOT: owned,
+            GRIDA_CLI_PROOF_REPORT: guardReport,
+            GRIDA_CLI_PROOF_OFFLINE: "1",
+          },
         });
+        if (!native)
+          assert.deepEqual(JSON.parse(await readFile(guardReport, "utf8")), {
+            denied: 0,
+            requests: [],
+          });
         assert.equal(
           result.stderr,
           "",
@@ -477,9 +549,15 @@ if (
 ) {
   const args = process.argv.slice(2);
   assert(
-    args.length === 0 || (args.length === 2 && args[0] === "--archive"),
-    "Usage: node --import tsx scripts/cli-docs/check.mjs [--archive /absolute/candidate.tgz]"
+    args.length === 0 ||
+      (args.length === 2 &&
+        ["--archive", "--native-candidate"].includes(args[0])),
+    "Usage: node --import tsx scripts/cli-docs/check.mjs [--archive /absolute/candidate.tgz | --native-candidate /absolute/candidate-directory]"
   );
-  const report = await CliDocs.run({ archive: args[1] });
+  const report = await CliDocs.run(
+    args[0] === "--native-candidate"
+      ? { nativeCandidate: args[1] }
+      : { archive: args[1] }
+  );
   console.log(JSON.stringify(report, null, 2));
 }

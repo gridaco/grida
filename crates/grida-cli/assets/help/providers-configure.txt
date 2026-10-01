@@ -1,0 +1,21 @@
+Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]
+
+Save an API key in shared plaintext credentials.toml with private permissions.
+Desktop and CLI use the same stored keys. No Grida login required.
+Validate format, then check OpenRouter/Vercel AI Gateway/fal/Tripo once before saving.
+A failed check leaves stored keys unchanged. ElevenLabs saves unverified.
+Without --key-stdin, enter the key at a hidden terminal prompt.
+Automation requires --key-stdin; keys are never accepted as arguments.
+
+Credential file: ~/.grida/providers/credentials.toml
+With an absolute GRIDA_HOME: $GRIDA_HOME/providers/credentials.toml
+Plaintext on macOS/Linux: providers directory 0700, file 0600.
+Manual edits: stop Desktop and other Grida processes using this home;
+preserve version and migration metadata. Use providers remove for deletion.
+File format and manual configuration:
+https://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md
+Key validation policy:
+https://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/providers

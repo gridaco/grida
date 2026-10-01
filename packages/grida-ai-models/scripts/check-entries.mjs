@@ -17,6 +17,10 @@ function relativePath(path) {
 function dependencies(entry) {
   const visited = new Set();
   function visit(path) {
+    assert.ok(
+      !relativePath(path).startsWith("../"),
+      `dependency stays inside the distributed package: ${path}`
+    );
     if (visited.has(path)) return;
     visited.add(path);
     const source = ts.createSourceFile(
@@ -52,6 +56,12 @@ function dependencies(entry) {
   }
   visit(resolve(packageRoot, entry));
   return [...visited].map(relativePath);
+}
+
+for (const entry of ["src/grida.ts", "dist/grida.js", "dist/grida.mjs"]) {
+  test(`${entry} dependency graph stays inside the distributed package`, () => {
+    assert.ok(dependencies(entry).length > 1);
+  });
 }
 
 test("dependency paths use forward slashes on every platform", () => {

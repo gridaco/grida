@@ -1,0 +1,20 @@
+[package]
+name = "grida-ai"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+license.workspace = true
+
+[dependencies]
+base64 = "0.22"
+percent-encoding = "2"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+tokio = { version = "1", features = ["time", "macros", "rt", "sync"] }
+tokio-util = "0.7"
+url = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util"] }

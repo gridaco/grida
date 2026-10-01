@@ -38,23 +38,28 @@ jobs:
         run: |
           test "$GITHUB_REPOSITORY" = gridaco/grida
           test "$GITHUB_REF" = refs/heads/main
-          node scripts/cli-release/prepare.mjs --check-only --release-version "$CLI_VERSION" --tag "$CLI_TAG"
+          node scripts/cli-release/native-publish.mjs --check-only --version "$CLI_VERSION" --tag "$CLI_TAG"
   package:
     needs: guard
-    uses: ./.github/workflows/cli-verify.yml
+    uses: ./.github/workflows/cli-native.yml
+  conformance:
+    needs: guard
+    uses: ./.github/workflows/rust.yml
   docs:
     needs: package
     uses: ./.github/workflows/cli-docs.yml
     with:
-      archive_artifact: grida-cli-candidate
+      native_candidate_artifact: grida-native-candidate
   auth:
-    needs: guard
+    needs: [guard, package]
     uses: ./.github/workflows/auth-local.yml
+    with:
+      native_candidate_artifact: grida-native-candidate
   api:
     needs: guard
     uses: ./.github/workflows/api.yml
   publish:
-    needs: [package, docs, auth, api]
+    needs: [package, conformance, docs, auth, api]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: npm-publish
@@ -74,16 +79,20 @@ jobs:
           node-version-file: .nvmrc
       - uses: actions/download-artifact@v4
         with:
-          name: grida-cli-candidate
-          path: ${{ runner.temp }}/grida-cli-candidate
-      - name: Verify and publish the exact tested tarball through npm OIDC
+          name: grida-native-candidate
+          path: ${{ runner.temp }}/grida-native-candidate
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: grida-native-installed-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/grida-native-candidate
+      - name: Verify and publish the exact tested platform archives, then launcher, through npm OIDC
         env:
           CLI_VERSION: ${{ inputs.version }}
           CLI_TAG: ${{ inputs.tag }}
+          CLI_NPM_RELEASE_ENABLED: ${{ vars.CLI_NPM_RELEASE_ENABLED }}
         run: |
-          node scripts/cli-release/prepare.mjs --verify --out "$RUNNER_TEMP/grida-cli-candidate" --release-version "$CLI_VERSION" --tag "$CLI_TAG"
-          node -e 'const [major, minor, patch] = process.argv[1].split(".").map(Number); if (!(major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1))))) process.exit(1)' "$(npm --version)"
-          CLI_ARCHIVE=$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).archive" "$RUNNER_TEMP/grida-cli-candidate/candidate.json")
-          npm publish "$RUNNER_TEMP/grida-cli-candidate/$CLI_ARCHIVE" --access public --provenance --tag "$CLI_TAG" --ignore-scripts --registry https://registry.npmjs.org
+          node scripts/cli-release/native-publish.mjs --dry-run --out "$RUNNER_TEMP/grida-native-candidate" --version "$CLI_VERSION" --tag "$CLI_TAG"
+          node scripts/cli-release/native-publish.mjs --out "$RUNNER_TEMP/grida-native-candidate" --version "$CLI_VERSION" --tag "$CLI_TAG"
       # No static npm token. The npm publisher must authorize this workflow and
       # npm-publish environment, including npm publish permission (not stage only).

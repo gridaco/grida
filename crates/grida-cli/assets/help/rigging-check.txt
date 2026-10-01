@@ -1,0 +1,11 @@
+Usage: grida rigging check --provider tripo|gg (--mesh FILE | --input @file|-) [--key-stdin] [--json]
+
+Upload a GLB and return riggable, rig_type and a task receipt.
+This never starts paid rigging or writes a generated artifact.
+Local GLBs: at most 60,000,000 bytes; JSON input: at most 16 MiB.
+Input URLs and paths inside JSON are not fetched. Stdin has one reader.
+BYOK key precedence: stdin, TRIPO_API_KEY, shared credentials.toml.
+GG uses Grida login and --org or --org-id; --key-stdin is BYOK only.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/generate

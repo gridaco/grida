@@ -1,0 +1,7 @@
+Usage: grida rigging <list|inspect|check|run>
+
+Discover mesh operations, check eligibility, or explicitly create a rigged GLB.
+Checking never starts rigging. Select Tripo BYOK or Grida credits explicitly.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/generate

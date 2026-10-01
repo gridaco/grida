@@ -1,0 +1,6 @@
+Usage: grida models <list|inspect>
+
+Discover bundled executable operations without credentials or network access.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/models

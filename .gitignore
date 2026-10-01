@@ -201,6 +201,9 @@ $RECYCLE.BIN/
 # Turborepo
 .turbo
 
+# Cargo workspace build output
+/target/
+
 # node-compile-cache
 node-compile-cache/
 

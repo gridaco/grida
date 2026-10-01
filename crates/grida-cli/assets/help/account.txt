@@ -1,0 +1,8 @@
+Usage: grida account <command>
+
+Commands:
+  view       Verify your identity and list all memberships
+  credits    Read one organization's cached credit estimate
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/account

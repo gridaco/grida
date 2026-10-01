@@ -1,0 +1,7 @@
+Usage: grida account view [--json] [--no-input]
+
+Verify your account online and list all your organization memberships.
+Reads require an existing CLI session and never open login.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/account

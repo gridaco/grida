@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grida.co/schemas/ai-model-service-v1.json",
+  "title": "Grida service policy authoring envelope version 1",
+  "type": "object",
+  "required": ["definitions", "tiers", "preferences"],
+  "additionalProperties": false,
+  "properties": {
+    "definitions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["members"],
+        "properties": {
+          "members": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["status"],
+              "properties": {
+                "status": { "enum": ["listed", "staged"] },
+                "legacy": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tiers": {
+      "type": "object",
+      "required": ["nano", "mini", "pro", "max"],
+      "additionalProperties": false,
+      "properties": {
+        "nano": { "type": "string" },
+        "mini": { "type": "string" },
+        "pro": { "type": "string" },
+        "max": { "type": "string" }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "default_id": { "type": "string", "minLength": 1 },
+          "order": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

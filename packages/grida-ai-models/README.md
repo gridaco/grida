@@ -46,8 +46,30 @@ record without choosing a provider.
 
 ## Authoring facts
 
-Edit `src/models.ts` for model facts. Do not edit facts to change which models
-Grida lists.
+Edit repository-root
+[`data/ai/facts.json`](https://github.com/gridaco/grida/blob/main/data/ai/facts.json)
+for model facts. Do not edit facts to change which models Grida lists. The marked literals in `src/models.ts` are generated consumers that
+retain the existing TypeScript declarations and literal ID unions. Structural
+interchange schemas live in `data/ai/schemas/`; the generated TypeScript
+additionally checks modality-specific capability and pricing types.
+
+Authored domain keys use `lower_snake_case`. The generator explicitly projects
+text-card keys (`image_input_mimes`, `context_window`, `output_limit`) and nested
+cost keys (`cache_read`, `cache_write`, `long_context`, `input_tokens_above`,
+`input_multiplier`, `output_multiplier`) to the existing camelCase TypeScript
+API fields. The schema-1 web payload keeps those published spellings. Model and
+provider IDs and standard JSON Schema keywords are never case-converted.
+The Rust raw facts bundle uses the authored snake-case vocabulary; its snapshot
+and service-view bundles preserve the existing wire format. All authored JSON
+lives in repository-root `data/ai/`; the package ships generated local consumers.
+
+From this package, run `pnpm generate`, build this package and `@grida/ai`, then
+run `node scripts/generate.mjs --bundle` to update the checked-in Rust bundle. Run
+`node scripts/generate.mjs --bundle --check` after those builds to detect drift.
+Builds and typechecks reject stale generated source. Cargo builds consume their
+local generated assets without invoking Node. See the shared
+[data authoring guide](https://github.com/gridaco/grida/blob/main/data/ai/README.md)
+for the full generation sequence.
 
 Each built-in includes `release: {date, basis, source_url}`. Dates mean the exact
 model's first broad public availability; public preview counts, closed preview
@@ -57,7 +79,8 @@ only there when the exact day is unknown. An authoritative HTTPS source is
 required. Snapshot time and Grida insertion time are not release dates. Base
 types keep release optional for older/custom records.
 
-Text rates use USD per million tokens. `imageInputMimes` records exact published
+Text rates use USD per million tokens. `image_input_mimes` (public TS
+`imageInputMimes`) records exact published
 input MIME types independently of the broad `multimodal` capability.
 
 Image constraints form the size-validation envelope; `sizes` supplies presets
@@ -111,13 +134,13 @@ exposing ordered service views and the compatible schema-1 distribution protocol
 
 ### Authoring homes
 
-| Decision                                                                          | Authoring file                                |
-| --------------------------------------------------------------------------------- | --------------------------------------------- |
-| Identity, capability, provenance, bindings, published prices                      | `src/models.ts`                               |
-| Membership, listed/staged status, legacy, primary image binding, request defaults | `src/grida/catalog.ts`, `catalog.definitions` |
-| Independent optional default model and partial order per family                   | `src/grida/preferences.ts`                    |
-| Text tier assignments                                                             | `src/grida/tiers.ts`                          |
-| Schema-1 projection, parser, resolved snapshot views                              | `src/grida/catalog.ts`, `catalog.snapshot`    |
+| Decision                                                                          | Authoring file                             |
+| --------------------------------------------------------------------------------- | ------------------------------------------ |
+| Identity, capability, provenance, bindings, published prices                      | `data/ai/facts.json`                       |
+| Membership, listed/staged status, legacy, primary image binding, request defaults | `data/ai/service.json`, `definitions`      |
+| Independent optional default model and partial order per family                   | `data/ai/service.json`, `preferences`      |
+| Text tier assignments                                                             | `data/ai/service.json`, `tiers`            |
+| Schema-1 projection, parser, resolved snapshot views                              | `src/grida/catalog.ts`, `catalog.snapshot` |
 
 Adding a factual model does not add it to the service. Removing a service member
 does not delete its factual record. Legacy is a product decision, not upstream
@@ -285,3 +308,6 @@ order and no default model: the source mesh determines compatible rig choices.
 `catalog.three_d.rig_check.operation` separately adds the check service status.
 These families remain bundled and do not change the schema-1 distribution
 protocol. Checks remain structured findings, distinct from generated media.
+
+Source-specific pricing and capability qualifications from the former literals
+are retained in [catalogue research notes](https://github.com/gridaco/grida/blob/main/data/ai/PROVENANCE.md).

@@ -1,0 +1,1359 @@
+{
+  "image": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "x-grida-nonblank": true
+      },
+      "n": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 16,
+        "default": 1
+      },
+      "size": {
+        "type": "string",
+        "pattern": "^[0-9]+x[0-9]+$",
+        "x-grida-positive-pair": "safe-integer"
+      },
+      "aspect_ratio": {
+        "type": "string",
+        "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
+        "x-grida-positive-pair": "finite-number"
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "quality": {
+        "type": "string",
+        "x-grida-max-length": 128,
+        "x-grida-length-unit": "utf16"
+      },
+      "background": {
+        "type": "string",
+        "enum": ["auto"]
+      }
+    },
+    "required": ["prompt"]
+  },
+  "image_references": {
+    "type": "array",
+    "minItems": 1,
+    "maxItems": 16,
+    "items": {
+      "type": "string",
+      "x-grida-url": {
+        "schemes": ["https", "image-data"],
+        "userinfo": false,
+        "fragments": true
+      }
+    }
+  },
+  "video": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "x-grida-nonblank": true
+      },
+      "aspect_ratio": {
+        "type": "string",
+        "pattern": "^[0-9]+:[0-9]+$",
+        "x-grida-positive-pair": "safe-integer"
+      },
+      "resolution": {
+        "type": "string",
+        "pattern": "^[0-9]+x[0-9]+$",
+        "x-grida-positive-pair": "safe-integer"
+      },
+      "duration": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      },
+      "fps": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": ["prompt"]
+  },
+  "video_image": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "x-grida-nonblank": true
+      },
+      "aspect_ratio": {
+        "type": "string",
+        "pattern": "^[0-9]+:[0-9]+$",
+        "x-grida-positive-pair": "safe-integer"
+      },
+      "resolution": {
+        "type": "string",
+        "pattern": "^[0-9]+x[0-9]+$",
+        "x-grida-positive-pair": "safe-integer"
+      },
+      "duration": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      },
+      "fps": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "image_url": {
+        "type": "string",
+        "x-grida-url": {
+          "schemes": ["https"],
+          "userinfo": false,
+          "fragments": false
+        }
+      }
+    },
+    "required": ["prompt", "image_url"]
+  },
+  "video_lite": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "x-grida-nonblank": true
+      },
+      "aspect_ratio": {
+        "type": "string",
+        "enum": ["16:9", "9:16"]
+      },
+      "resolution": {
+        "type": "string",
+        "enum": ["1280x720", "720x1280", "1920x1080", "1080x1920"]
+      },
+      "duration": {
+        "type": "number",
+        "enum": [4, 6, 8]
+      },
+      "generate_audio": {
+        "type": "boolean"
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "image_url": {
+        "type": "string",
+        "x-grida-url": {
+          "schemes": ["https"],
+          "userinfo": false,
+          "fragments": false
+        }
+      },
+      "image": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "minLength": 4,
+            "maxLength": 10666668,
+            "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+            "x-grida-decoded-max-bytes": 8000000
+          },
+          "media_type": {
+            "type": "string",
+            "enum": ["image/png", "image/jpeg", "image/webp"]
+          }
+        },
+        "required": ["data", "media_type"]
+      }
+    },
+    "required": ["prompt"],
+    "oneOf": [
+      {
+        "required": ["image"]
+      },
+      {
+        "required": ["image_url"]
+      }
+    ],
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "resolution": {
+              "const": "1280x720"
+            }
+          },
+          "required": ["resolution"]
+        },
+        "then": {
+          "properties": {
+            "aspect_ratio": {
+              "const": "16:9"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "resolution": {
+              "const": "720x1280"
+            }
+          },
+          "required": ["resolution"]
+        },
+        "then": {
+          "properties": {
+            "aspect_ratio": {
+              "const": "9:16"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "resolution": {
+              "const": "1920x1080"
+            }
+          },
+          "required": ["resolution"]
+        },
+        "then": {
+          "properties": {
+            "aspect_ratio": {
+              "const": "16:9"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "resolution": {
+              "const": "1080x1920"
+            }
+          },
+          "required": ["resolution"]
+        },
+        "then": {
+          "properties": {
+            "aspect_ratio": {
+              "const": "9:16"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "music": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "x-grida-trim": true,
+        "x-grida-nonblank": true,
+        "x-grida-max-length": 4096,
+        "x-grida-length-unit": "utf16"
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": ["prompt"]
+  },
+  "sound_effect": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "x-grida-trim": true,
+        "x-grida-nonblank": true,
+        "x-grida-max-length": 450,
+        "x-grida-length-unit": "codepoints"
+      },
+      "duration_seconds": {
+        "type": "number",
+        "minimum": 0.5,
+        "maximum": 30
+      },
+      "loop": {
+        "type": "boolean"
+      },
+      "prompt_influence": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "required": ["prompt"]
+  },
+  "speech_json": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "voice_id": {
+        "type": "string",
+        "x-grida-trim": true,
+        "x-grida-nonblank": true,
+        "x-grida-max-length": 256,
+        "x-grida-length-unit": "codepoints",
+        "x-grida-uri-segment": true,
+        "x-grida-excluded-values": [".", ".."]
+      },
+      "text": {
+        "type": "string",
+        "x-grida-nonblank": true,
+        "maxLength": 5000
+      }
+    },
+    "required": ["voice_id", "text"]
+  },
+  "three_d_text": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "x-grida-trim": true,
+        "x-grida-nonblank": true,
+        "x-grida-max-length": 1024,
+        "x-grida-length-unit": "codepoints"
+      }
+    },
+    "required": ["prompt"]
+  },
+  "three_d_image": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "image": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "minLength": 4,
+            "maxLength": 11184812,
+            "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+            "x-grida-decoded-max-bytes": 8388608
+          },
+          "media_type": {
+            "type": "string",
+            "enum": ["image/png", "image/jpeg", "image/webp"]
+          }
+        },
+        "required": ["data", "media_type"]
+      }
+    },
+    "required": ["image"]
+  },
+  "rig_check": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "mesh": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "minLength": 4,
+            "maxLength": 80000000,
+            "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+            "x-grida-decoded-max-bytes": 60000000
+          },
+          "media_type": {
+            "type": "string",
+            "enum": ["model/gltf-binary"]
+          }
+        },
+        "required": ["data", "media_type"],
+        "x-grida-portable-glb": true
+      }
+    },
+    "required": ["mesh"]
+  },
+  "rigging": {
+    "tripo/rig-v1.0": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mesh": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "type": "string",
+              "contentEncoding": "base64",
+              "minLength": 4,
+              "maxLength": 80000000,
+              "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+              "x-grida-decoded-max-bytes": 60000000
+            },
+            "media_type": {
+              "type": "string",
+              "enum": ["model/gltf-binary"]
+            }
+          },
+          "required": ["data", "media_type"],
+          "x-grida-portable-glb": true
+        },
+        "rig_type": {
+          "type": "string",
+          "enum": ["biped"]
+        },
+        "spec": {
+          "type": "string",
+          "enum": ["tripo", "mixamo"]
+        }
+      },
+      "required": ["mesh", "rig_type", "spec"]
+    },
+    "tripo/rig-v2.5": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mesh": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "type": "string",
+              "contentEncoding": "base64",
+              "minLength": 4,
+              "maxLength": 80000000,
+              "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+              "x-grida-decoded-max-bytes": 60000000
+            },
+            "media_type": {
+              "type": "string",
+              "enum": ["model/gltf-binary"]
+            }
+          },
+          "required": ["data", "media_type"],
+          "x-grida-portable-glb": true
+        },
+        "rig_type": {
+          "type": "string",
+          "enum": [
+            "quadruped",
+            "hexapod",
+            "octopod",
+            "avian",
+            "serpentine",
+            "aquatic"
+          ]
+        },
+        "spec": {
+          "type": "string",
+          "enum": ["tripo", "mixamo"]
+        }
+      },
+      "required": ["mesh", "rig_type", "spec"]
+    }
+  },
+  "model_generation": {
+    "tripo/h3.1": {
+      "image": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "texture": {
+            "type": "boolean"
+          },
+          "pbr": {
+            "type": "boolean"
+          },
+          "texture_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed", "extreme"]
+          },
+          "face_limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000000
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "geometry_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed"]
+          },
+          "image": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "data": {
+                "type": "string",
+                "contentEncoding": "base64",
+                "minLength": 4,
+                "maxLength": 26666668,
+                "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                "x-grida-decoded-max-bytes": 20000000
+              },
+              "media_type": {
+                "type": "string",
+                "enum": ["image/png", "image/jpeg"]
+              }
+            },
+            "required": ["data", "media_type"]
+          }
+        },
+        "required": ["image"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "texture": {
+                  "const": false
+                }
+              },
+              "required": ["texture"]
+            },
+            "then": {
+              "properties": {
+                "pbr": {
+                  "const": false
+                }
+              },
+              "not": {
+                "required": ["texture_quality"]
+              }
+            }
+          },
+          {
+            "if": {
+              "not": {
+                "properties": {
+                  "geometry_quality": {
+                    "const": "detailed"
+                  }
+                },
+                "required": ["geometry_quality"]
+              }
+            },
+            "then": {
+              "properties": {
+                "face_limit": {
+                  "maximum": 1500000
+                }
+              }
+            }
+          }
+        ]
+      },
+      "multiview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "texture": {
+            "type": "boolean"
+          },
+          "pbr": {
+            "type": "boolean"
+          },
+          "texture_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed", "extreme"]
+          },
+          "face_limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000000
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "geometry_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed"]
+          },
+          "images": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "front": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              },
+              "left": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              },
+              "back": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              },
+              "right": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              }
+            },
+            "required": ["front"],
+            "anyOf": [
+              {
+                "required": ["left"]
+              },
+              {
+                "required": ["back"]
+              },
+              {
+                "required": ["right"]
+              }
+            ]
+          }
+        },
+        "required": ["images"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "texture": {
+                  "const": false
+                }
+              },
+              "required": ["texture"]
+            },
+            "then": {
+              "properties": {
+                "pbr": {
+                  "const": false
+                }
+              },
+              "not": {
+                "required": ["texture_quality"]
+              }
+            }
+          },
+          {
+            "if": {
+              "not": {
+                "properties": {
+                  "geometry_quality": {
+                    "const": "detailed"
+                  }
+                },
+                "required": ["geometry_quality"]
+              }
+            },
+            "then": {
+              "properties": {
+                "face_limit": {
+                  "maximum": 1500000
+                }
+              }
+            }
+          }
+        ]
+      },
+      "text": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "texture": {
+            "type": "boolean"
+          },
+          "pbr": {
+            "type": "boolean"
+          },
+          "texture_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed", "extreme"]
+          },
+          "face_limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000000
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "geometry_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed"]
+          },
+          "prompt": {
+            "type": "string",
+            "x-grida-trim": true,
+            "x-grida-nonblank": true,
+            "x-grida-max-length": 1024,
+            "x-grida-length-unit": "codepoints"
+          }
+        },
+        "required": ["prompt"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "texture": {
+                  "const": false
+                }
+              },
+              "required": ["texture"]
+            },
+            "then": {
+              "properties": {
+                "pbr": {
+                  "const": false
+                }
+              },
+              "not": {
+                "required": ["texture_quality"]
+              }
+            }
+          },
+          {
+            "if": {
+              "not": {
+                "properties": {
+                  "geometry_quality": {
+                    "const": "detailed"
+                  }
+                },
+                "required": ["geometry_quality"]
+              }
+            },
+            "then": {
+              "properties": {
+                "face_limit": {
+                  "maximum": 1500000
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "tripo/p1": {
+      "image": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "texture": {
+            "type": "boolean"
+          },
+          "pbr": {
+            "type": "boolean"
+          },
+          "texture_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed", "extreme"]
+          },
+          "face_limit": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 20000
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "image": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "data": {
+                "type": "string",
+                "contentEncoding": "base64",
+                "minLength": 4,
+                "maxLength": 26666668,
+                "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                "x-grida-decoded-max-bytes": 20000000
+              },
+              "media_type": {
+                "type": "string",
+                "enum": ["image/png", "image/jpeg"]
+              }
+            },
+            "required": ["data", "media_type"]
+          }
+        },
+        "required": ["image"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "texture": {
+                  "const": false
+                }
+              },
+              "required": ["texture"]
+            },
+            "then": {
+              "properties": {
+                "pbr": {
+                  "const": false
+                }
+              },
+              "not": {
+                "required": ["texture_quality"]
+              }
+            }
+          }
+        ]
+      },
+      "multiview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "texture": {
+            "type": "boolean"
+          },
+          "pbr": {
+            "type": "boolean"
+          },
+          "texture_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed", "extreme"]
+          },
+          "face_limit": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 20000
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "images": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "front": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              },
+              "left": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              },
+              "back": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              },
+              "right": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              }
+            },
+            "required": ["front"],
+            "anyOf": [
+              {
+                "required": ["left"]
+              },
+              {
+                "required": ["back"]
+              },
+              {
+                "required": ["right"]
+              }
+            ]
+          }
+        },
+        "required": ["images"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "texture": {
+                  "const": false
+                }
+              },
+              "required": ["texture"]
+            },
+            "then": {
+              "properties": {
+                "pbr": {
+                  "const": false
+                }
+              },
+              "not": {
+                "required": ["texture_quality"]
+              }
+            }
+          }
+        ]
+      },
+      "text": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "texture": {
+            "type": "boolean"
+          },
+          "pbr": {
+            "type": "boolean"
+          },
+          "texture_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed", "extreme"]
+          },
+          "face_limit": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 20000
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "prompt": {
+            "type": "string",
+            "x-grida-trim": true,
+            "x-grida-nonblank": true,
+            "x-grida-max-length": 1024,
+            "x-grida-length-unit": "codepoints"
+          }
+        },
+        "required": ["prompt"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "texture": {
+                  "const": false
+                }
+              },
+              "required": ["texture"]
+            },
+            "then": {
+              "properties": {
+                "pbr": {
+                  "const": false
+                }
+              },
+              "not": {
+                "required": ["texture_quality"]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "tripo/p2": {
+      "image": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "texture": {
+            "type": "boolean"
+          },
+          "pbr": {
+            "type": "boolean"
+          },
+          "texture_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed", "extreme"]
+          },
+          "face_limit": {
+            "type": "integer",
+            "minimum": 48,
+            "maximum": 50000
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "image": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "data": {
+                "type": "string",
+                "contentEncoding": "base64",
+                "minLength": 4,
+                "maxLength": 26666668,
+                "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                "x-grida-decoded-max-bytes": 20000000
+              },
+              "media_type": {
+                "type": "string",
+                "enum": ["image/png", "image/jpeg"]
+              }
+            },
+            "required": ["data", "media_type"]
+          }
+        },
+        "required": ["image"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "texture": {
+                  "const": false
+                }
+              },
+              "required": ["texture"]
+            },
+            "then": {
+              "properties": {
+                "pbr": {
+                  "const": false
+                }
+              },
+              "not": {
+                "required": ["texture_quality"]
+              }
+            }
+          }
+        ]
+      },
+      "multiview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "texture": {
+            "type": "boolean"
+          },
+          "pbr": {
+            "type": "boolean"
+          },
+          "texture_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed", "extreme"]
+          },
+          "face_limit": {
+            "type": "integer",
+            "minimum": 48,
+            "maximum": 50000
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "images": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "front": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              },
+              "left": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              },
+              "back": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              },
+              "right": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "minLength": 4,
+                    "maxLength": 26666668,
+                    "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                    "x-grida-decoded-max-bytes": 20000000
+                  },
+                  "media_type": {
+                    "type": "string",
+                    "enum": ["image/png", "image/jpeg"]
+                  }
+                },
+                "required": ["data", "media_type"]
+              }
+            },
+            "required": ["front"],
+            "anyOf": [
+              {
+                "required": ["left"]
+              },
+              {
+                "required": ["back"]
+              },
+              {
+                "required": ["right"]
+              }
+            ]
+          }
+        },
+        "required": ["images"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "texture": {
+                  "const": false
+                }
+              },
+              "required": ["texture"]
+            },
+            "then": {
+              "properties": {
+                "pbr": {
+                  "const": false
+                }
+              },
+              "not": {
+                "required": ["texture_quality"]
+              }
+            }
+          }
+        ]
+      },
+      "text": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "texture": {
+            "type": "boolean"
+          },
+          "pbr": {
+            "type": "boolean"
+          },
+          "texture_quality": {
+            "type": "string",
+            "enum": ["standard", "detailed", "extreme"]
+          },
+          "face_limit": {
+            "type": "integer",
+            "minimum": 48,
+            "maximum": 50000
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "prompt": {
+            "type": "string",
+            "x-grida-trim": true,
+            "x-grida-nonblank": true,
+            "x-grida-max-length": 1024,
+            "x-grida-length-unit": "codepoints"
+          }
+        },
+        "required": ["prompt"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "texture": {
+                  "const": false
+                }
+              },
+              "required": ["texture"]
+            },
+            "then": {
+              "properties": {
+                "pbr": {
+                  "const": false
+                }
+              },
+              "not": {
+                "required": ["texture_quality"]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

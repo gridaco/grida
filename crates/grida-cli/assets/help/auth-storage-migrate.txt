@@ -1,0 +1,7 @@
+Usage: grida auth storage migrate <keyring|file> [--json] [--no-input]
+
+Migrate credentials using the auth owner's coordinated storage operation.
+An unavailable keyring never silently falls back to a file.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/auth

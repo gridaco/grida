@@ -1,0 +1,6 @@
+Usage: grida rigging list [--provider tripo|gg] [--feature rig-check|rigging] [--json]
+
+Discover supported mesh operations without credentials or network access.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/models

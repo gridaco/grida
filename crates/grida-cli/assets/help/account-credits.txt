@@ -1,0 +1,10 @@
+Usage: grida account credits [--org <slug> | --org-id <id>] [--json] [--no-input]
+
+Read cached USD credits and billing eligibility for an organization.
+Omit the selector only when you belong to exactly one organization.
+Numeric slugs remain slugs; --org-id selects a positive numeric ID.
+An unknown balance is distinct from zero. Cached eligibility is not a
+guarantee that generation will succeed.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/account

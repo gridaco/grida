@@ -1,0 +1,38 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/packages/grida-ai-models/scripts/generate.mjs",
+        "$TURBO_ROOT$/.oxfmtrc.jsonc"
+      ]
+    },
+    "typecheck": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/packages/grida-ai-models/scripts/generate.mjs",
+        "$TURBO_ROOT$/.oxfmtrc.jsonc"
+      ]
+    },
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/packages/grida-ai-models/scripts/generate.mjs",
+        "$TURBO_ROOT$/.oxfmtrc.jsonc"
+      ]
+    },
+    "test:package": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/packages/grida-ai-models/scripts/generate.mjs",
+        "$TURBO_ROOT$/.oxfmtrc.jsonc"
+      ],
+      "dependsOn": ["^build"]
+    }
+  }
+}

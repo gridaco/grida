@@ -1,0 +1,62 @@
+[
+  {
+    "id": "darwin-x64",
+    "target": "x86_64-apple-darwin",
+    "os": "darwin",
+    "cpu": "x64",
+    "runner": "macos-15-intel"
+  },
+  {
+    "id": "darwin-arm64",
+    "target": "aarch64-apple-darwin",
+    "os": "darwin",
+    "cpu": "arm64",
+    "runner": "macos-15"
+  },
+  {
+    "id": "linux-x64-gnu",
+    "target": "x86_64-unknown-linux-gnu",
+    "os": "linux",
+    "cpu": "x64",
+    "libc": "glibc",
+    "runner": "ubuntu-22.04"
+  },
+  {
+    "id": "linux-arm64-gnu",
+    "target": "aarch64-unknown-linux-gnu",
+    "os": "linux",
+    "cpu": "arm64",
+    "libc": "glibc",
+    "runner": "ubuntu-22.04-arm"
+  },
+  {
+    "id": "linux-x64-musl",
+    "target": "x86_64-unknown-linux-musl",
+    "os": "linux",
+    "cpu": "x64",
+    "libc": "musl",
+    "runner": "ubuntu-22.04"
+  },
+  {
+    "id": "linux-arm64-musl",
+    "target": "aarch64-unknown-linux-musl",
+    "os": "linux",
+    "cpu": "arm64",
+    "libc": "musl",
+    "runner": "ubuntu-22.04-arm"
+  },
+  {
+    "id": "win32-x64",
+    "target": "x86_64-pc-windows-msvc",
+    "os": "win32",
+    "cpu": "x64",
+    "runner": "windows-2025"
+  },
+  {
+    "id": "win32-arm64",
+    "target": "aarch64-pc-windows-msvc",
+    "os": "win32",
+    "cpu": "arm64",
+    "runner": "windows-11-arm"
+  }
+]

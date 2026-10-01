@@ -1,0 +1,10 @@
+Usage: grida models list [--provider <provider>] [--modality image|video|audio|3d] [--kind <kind>] [--local-image] [--available] [--org <slug> | --org-id <id>] [--json]
+
+Lists executable operations, including staged models, with accepted local-image flags.
+--local-image filters to operations accepting --reference FILE or --image FILE.
+No provider probes. --available requires --provider: BYOK checks key presence;
+GG checks cached organization eligibility online. Neither guarantees model access
+or generation.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/models

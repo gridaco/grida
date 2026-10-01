@@ -18,6 +18,7 @@ on:
       - "packages/grida-daemon/**"
       - "packages/grida-auth/**"
       - "packages/grida-ai-models/**"
+      - "data/ai/**"
       - "packages/grida-desktop-bridge/**"
       - "packages/grida-home/**"
       - ".github/workflows/verify-desktop-package.yml"

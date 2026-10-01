@@ -1463,36 +1463,7 @@ importers:
         specifier: workspace:*
         version: link:../grida-svg
 
-  packages/grida-cli:
-    devDependencies:
-      '@grida/account':
-        specifier: workspace:*
-        version: link:../grida-account
-      '@grida/ai':
-        specifier: workspace:*
-        version: link:../grida-ai
-      '@grida/auth':
-        specifier: workspace:*
-        version: link:../grida-auth
-      '@grida/home':
-        specifier: workspace:*
-        version: link:../grida-home
-      '@types/node':
-        specifier: ^24
-        version: 24.12.2
-      tsdown:
-        specifier: ^0.22.1
-        version: 0.22.1(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.36)
-      typescript:
-        specifier: 6.0.3
-        version: 6.0.3
-      vitest:
-        specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
-    optionalDependencies:
-      '@github/keytar':
-        specifier: 7.10.6
-        version: 7.10.6
+  packages/grida-cli: {}
 
   packages/grida-cmath: {}
 
@@ -7587,6 +7558,7 @@ packages:
   '@vercel/edge-config@1.4.3':
     resolution: {integrity: sha512-8vTDATodRrH49wMzKEjZ8/5H2qs1aPkD0uRK585f/Fx4YN2wfHfY/3td9OFrh+gdnCq07z8A5f0hoY6xhBcPkg==}
     engines: {node: '>=14.6'}
+    deprecated: This package has been renamed to @vercel/global-config. Install @vercel/global-config instead.
     peerDependencies:
       '@opentelemetry/api': ^1.7.0
       next: 16.2.6

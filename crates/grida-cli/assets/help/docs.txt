@@ -1,0 +1,7 @@
+Usage: grida docs [command...]
+
+Print the canonical documentation URL. Does not open a browser or fetch it.
+Examples: grida docs, grida docs account credits, grida docs auth storage
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli

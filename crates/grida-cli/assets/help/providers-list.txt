@@ -1,0 +1,20 @@
+Usage: grida providers list [--json]
+
+Show key presence and source after static validation, never key contents.
+No login or probes; configured does not mean provider-verified.
+Stored keys use shared plaintext credentials.toml with private permissions.
+OPENROUTER_API_KEY, AI_GATEWAY_API_KEY, FAL_KEY, ELEVENLABS_API_KEY, TRIPO_API_KEY.
+GG uses a separate Grida login and organization; no provider key.
+
+Credential file: ~/.grida/providers/credentials.toml
+With an absolute GRIDA_HOME: $GRIDA_HOME/providers/credentials.toml
+Plaintext on macOS/Linux: providers directory 0700, file 0600.
+Manual edits: stop Desktop and other Grida processes using this home;
+preserve version and migration metadata. Use providers remove for deletion.
+File format and manual configuration:
+https://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md
+Key validation policy:
+https://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/providers

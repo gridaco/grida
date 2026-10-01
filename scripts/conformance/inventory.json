@@ -1,0 +1,3786 @@
+{
+  "version": 1,
+  "description": "Required migration coverage inventory, not executable tests or proof of parity. Contract IDs identify groups; cases lists contain implemented test IDs only. Empty cases and pending status remain required work, even when other groups pass. Operation tuples are a pinned scope snapshot, not a second authoritative catalogue.",
+  "baseline_revision": "b26ede1d62e21a0e24d52030538b8f7288ec9b4b",
+  "contracts": [
+    {
+      "id": "cli.offline",
+      "description": "Run help, version, docs and bundled model/rigging discovery through the actual executable with empty and invalid host configuration. Assert exit/stdout/stderr and no credentials, keyring, browser, network or persistent host side effects. Include root and every help/docs topic, aliases and parent-command defaults.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/bin.ts",
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/cli.test.ts",
+        "packages/grida-cli/src/media-run.test.ts",
+        "packages/grida-cli/src/rigging-run.test.ts",
+        "scripts/cli-docs/README.md"
+      ],
+      "cases": [
+        "cli.help.root",
+        "cli.docs.root",
+        "cli.help.auth",
+        "cli.docs.auth",
+        "cli.help.auth-login",
+        "cli.docs.auth-login",
+        "cli.help.auth-status",
+        "cli.docs.auth-status",
+        "cli.help.auth-logout",
+        "cli.docs.auth-logout",
+        "cli.help.auth-storage",
+        "cli.docs.auth-storage",
+        "cli.help.auth-storage-show",
+        "cli.docs.auth-storage-show",
+        "cli.help.auth-storage-migrate",
+        "cli.docs.auth-storage-migrate",
+        "cli.help.account",
+        "cli.docs.account",
+        "cli.help.account-view",
+        "cli.docs.account-view",
+        "cli.help.account-credits",
+        "cli.docs.account-credits",
+        "cli.help.models",
+        "cli.docs.models",
+        "cli.help.models-list",
+        "cli.docs.models-list",
+        "cli.help.models-inspect",
+        "cli.docs.models-inspect",
+        "cli.help.providers",
+        "cli.docs.providers",
+        "cli.help.providers-configure",
+        "cli.docs.providers-configure",
+        "cli.help.providers-remove",
+        "cli.docs.providers-remove",
+        "cli.help.providers-list",
+        "cli.docs.providers-list",
+        "cli.help.generate",
+        "cli.docs.generate",
+        "cli.help.voices",
+        "cli.docs.voices",
+        "cli.help.voices-list",
+        "cli.docs.voices-list",
+        "cli.help.rigging",
+        "cli.docs.rigging",
+        "cli.help.rigging-list",
+        "cli.docs.rigging-list",
+        "cli.help.rigging-inspect",
+        "cli.docs.rigging-inspect",
+        "cli.help.rigging-check",
+        "cli.docs.rigging-check",
+        "cli.help.rigging-run",
+        "cli.docs.rigging-run",
+        "cli.help.docs",
+        "cli.docs.docs",
+        "cli.bare.root",
+        "cli.bare.auth",
+        "cli.bare.account",
+        "cli.bare.auth-storage",
+        "cli.bare.models",
+        "cli.bare.providers",
+        "cli.bare.voices",
+        "cli.bare.rigging",
+        "cli.help.alias",
+        "cli.help.provider-specific",
+        "cli.docs.provider-specific",
+        "cli.version.long",
+        "cli.version.short",
+        "cli.help.short",
+        "domain.inspect.001",
+        "domain.inspect.002",
+        "domain.inspect.003",
+        "domain.inspect.004",
+        "domain.inspect.005",
+        "domain.inspect.006",
+        "domain.inspect.007",
+        "domain.inspect.008",
+        "domain.inspect.009",
+        "domain.inspect.010",
+        "domain.inspect.011",
+        "domain.inspect.012",
+        "domain.inspect.013",
+        "domain.inspect.014",
+        "domain.inspect.015",
+        "domain.inspect.016",
+        "domain.inspect.017",
+        "domain.inspect.018",
+        "domain.inspect.019",
+        "domain.inspect.020",
+        "domain.inspect.021",
+        "domain.inspect.022",
+        "domain.inspect.023",
+        "domain.inspect.024",
+        "domain.inspect.025",
+        "domain.inspect.026",
+        "domain.inspect.027",
+        "domain.inspect.028",
+        "domain.inspect.029",
+        "domain.inspect.030",
+        "domain.inspect.031",
+        "domain.inspect.032",
+        "domain.inspect.033",
+        "domain.inspect.034",
+        "domain.inspect.035",
+        "domain.inspect.036",
+        "domain.inspect.037",
+        "domain.inspect.038",
+        "domain.inspect.039",
+        "domain.inspect.040",
+        "domain.inspect.041",
+        "domain.inspect.042",
+        "domain.inspect.043",
+        "domain.inspect.044",
+        "domain.inspect.045",
+        "domain.inspect.046",
+        "domain.inspect.047",
+        "domain.inspect.048",
+        "domain.inspect.049",
+        "domain.inspect.050",
+        "domain.inspect.051",
+        "domain.inspect.052",
+        "domain.inspect.053",
+        "domain.inspect.054",
+        "domain.inspect.055",
+        "domain.inspect.056",
+        "domain.inspect.057",
+        "domain.inspect.058",
+        "domain.inspect.059",
+        "domain.inspect.060",
+        "domain.inspect.061",
+        "domain.inspect.062",
+        "domain.inspect.063",
+        "domain.inspect.064",
+        "domain.inspect.065",
+        "domain.inspect.066",
+        "domain.inspect.067",
+        "domain.inspect.068",
+        "domain.inspect.069",
+        "domain.inspect.070",
+        "domain.inspect.071",
+        "domain.inspect.072",
+        "domain.inspect.073",
+        "domain.inspect.074",
+        "domain.inspect.075",
+        "domain.inspect.076",
+        "domain.inspect.077",
+        "domain.inspect.078",
+        "domain.inspect.079",
+        "domain.inspect.080",
+        "domain.inspect.081",
+        "domain.inspect.082",
+        "domain.inspect.083",
+        "domain.inspect.084",
+        "domain.inspect.085",
+        "domain.inspect.086",
+        "domain.inspect.087",
+        "domain.inspect.088",
+        "domain.inspect.089",
+        "domain.inspect.090",
+        "domain.inspect.091",
+        "domain.inspect.092",
+        "domain.inspect.093",
+        "domain.inspect.094",
+        "domain.inspect.095",
+        "domain.inspect.096",
+        "domain.inspect.097",
+        "domain.inspect.098",
+        "domain.inspect.099",
+        "domain.inspect.100",
+        "domain.inspect.101",
+        "domain.inspect.102",
+        "domain.inspect.103",
+        "domain.inspect.104",
+        "domain.inspect.105",
+        "domain.inspect.106",
+        "domain.inspect.107",
+        "domain.inspect.108",
+        "domain.inspect.109",
+        "domain.inspect.110",
+        "domain.inspect.111",
+        "domain.inspect.112",
+        "domain.inspect.113",
+        "domain.inspect.114",
+        "domain.inspect.115",
+        "domain.inspect.116",
+        "domain.inspect.117",
+        "domain.inspect.118",
+        "domain.inspect.119",
+        "domain.inspect.120",
+        "domain.inspect.121",
+        "domain.inspect.122",
+        "domain.inspect.123",
+        "domain.inspect.124",
+        "domain.inspect.125",
+        "domain.inspect.126",
+        "domain.inspect.127",
+        "domain.inspect.128",
+        "domain.inspect.129",
+        "domain.inspect.130",
+        "domain.inspect.131",
+        "domain.inspect.132",
+        "domain.inspect.133",
+        "domain.inspect.134",
+        "domain.inspect.135",
+        "domain.inspect.136",
+        "domain.inspect.137",
+        "domain.inspect.138",
+        "domain.inspect.139",
+        "domain.inspect.140",
+        "domain.inspect.141",
+        "domain.inspect.142",
+        "domain.inspect.143",
+        "domain.inspect.144",
+        "domain.inspect.145",
+        "domain.inspect.146",
+        "domain.inspect.147",
+        "domain.inspect.148",
+        "domain.inspect.149",
+        "domain.inspect.150",
+        "domain.inspect.151",
+        "domain.inspect.152",
+        "domain.inspect.153",
+        "domain.inspect.154",
+        "domain.inspect.155",
+        "domain.inspect.156",
+        "domain.inspect.157",
+        "domain.inspect.158",
+        "domain.inspect.159",
+        "domain.inspect.160",
+        "domain.inspect.161",
+        "domain.inspect.162",
+        "domain.inspect.163",
+        "domain.inspect.164",
+        "domain.inspect.165",
+        "domain.inspect.166",
+        "domain.inspect.167",
+        "domain.inspect.168",
+        "domain.inspect.169",
+        "domain.inspect.170",
+        "domain.inspect.171",
+        "domain.inspect.172",
+        "domain.inspect.173",
+        "domain.inspect.174",
+        "domain.inspect.175",
+        "domain.inspect.176",
+        "domain.inspect.177",
+        "domain.inspect.178",
+        "domain.inspect.179",
+        "domain.inspect.180",
+        "domain.inspect.181",
+        "domain.inspect.182",
+        "domain.inspect.183",
+        "domain.inspect.184",
+        "domain.inspect.185",
+        "domain.inspect.186",
+        "domain.inspect.187",
+        "domain.inspect.188",
+        "domain.inspect.189",
+        "domain.inspect.190",
+        "domain.inspect.191",
+        "domain.inspect.192",
+        "domain.inspect.193",
+        "domain.inspect.194",
+        "domain.inspect.195",
+        "domain.inspect.196",
+        "domain.inspect.197",
+        "domain.inspect.198",
+        "domain.inspect.199",
+        "domain.inspect.200",
+        "domain.inspect.201",
+        "domain.inspect.202",
+        "domain.inspect.203",
+        "domain.inspect.204",
+        "domain.inspect.205",
+        "domain.inspect.206",
+        "domain.inspect.207",
+        "domain.inspect.208",
+        "domain.inspect.209",
+        "domain.inspect.210",
+        "domain.inspect.211",
+        "domain.inspect.212",
+        "domain.inspect.213",
+        "domain.inspect.214",
+        "domain.inspect.215",
+        "domain.inspect.216",
+        "domain.inspect.217",
+        "domain.inspect.218",
+        "domain.inspect.219",
+        "domain.inspect.220",
+        "domain.inspect.221",
+        "domain.inspect.222",
+        "domain.inspect.223",
+        "domain.inspect.224",
+        "domain.list.all.all",
+        "domain.list.all.local",
+        "domain.list.openrouter.all",
+        "domain.list.openrouter.local",
+        "domain.list.vercel.all",
+        "domain.list.vercel.local",
+        "domain.list.fal.all",
+        "domain.list.fal.local",
+        "domain.list.elevenlabs.all",
+        "domain.list.elevenlabs.local",
+        "domain.list.tripo.all",
+        "domain.list.tripo.local",
+        "domain.list.gg.all",
+        "domain.list.gg.local",
+        "domain.rigging.all.all",
+        "domain.rigging.all.rig-check",
+        "domain.rigging.all.rigging",
+        "domain.rigging.tripo.all",
+        "domain.rigging.tripo.rig-check",
+        "domain.rigging.tripo.rigging",
+        "domain.rigging.gg.all",
+        "domain.rigging.gg.rig-check",
+        "domain.rigging.gg.rigging"
+      ]
+    },
+    {
+      "id": "cli.invalid-usage",
+      "description": "Reject unknown commands/options, repeated non-repeatable options, missing/extra arguments, command-inapplicable options, malformed selectors and conflicting input/stdin/authority flags before host effects. Preserve invalid_usage exit 2 versus interaction_required exit 1 and JSON error selection. Positive controls must prove the corresponding admitted command reaches its owner.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/cli.test.ts",
+        "packages/grida-cli/src/bin.ts"
+      ],
+      "cases": [
+        "cli.invalid.unknown-command",
+        "cli.invalid.unknown-option",
+        "cli.invalid.missing-option-value",
+        "cli.invalid.duplicate-option",
+        "cli.invalid.duplicate-alias",
+        "cli.invalid.help-json",
+        "cli.invalid.version-command",
+        "cli.invalid.version-json",
+        "cli.invalid.docs-json",
+        "cli.invalid.docs-unknown",
+        "cli.invalid.org-conflict",
+        "cli.invalid.org-id-zero",
+        "cli.invalid.org-id-leading-zero",
+        "cli.invalid.org-id-unsafe",
+        "cli.invalid.org-upper",
+        "cli.invalid.org-double-hyphen",
+        "cli.invalid.org-empty",
+        "cli.invalid.org-inapplicable",
+        "cli.invalid.login-storage",
+        "cli.invalid.migrate-missing",
+        "cli.invalid.migrate-extra",
+        "cli.invalid.provider-gg",
+        "cli.invalid.provider-key-argument",
+        "cli.invalid.models-available-provider",
+        "cli.invalid.models-org-offline",
+        "cli.invalid.inspect-missing-model",
+        "cli.invalid.voices-wrong-provider",
+        "cli.invalid.generate-missing-input",
+        "cli.invalid.generate-mixed-input",
+        "cli.invalid.generate-gg-key",
+        "cli.invalid.generate-two-stdin",
+        "cli.invalid.rig-check-model",
+        "cli.invalid.rig-inspect-check-model",
+        "cli.invalid.rig-inspect-model-missing",
+        "cli.invalid.rig-mesh-stdin",
+        "cli.invalid.rig-two-stdin",
+        "cli.invalid.rig-gg-key",
+        "cli.invalid.rig-check-wrong-provider",
+        "cli.parse.login-default",
+        "cli.parse.login-file",
+        "cli.parse.login-keyring",
+        "cli.parse.auth-status",
+        "cli.parse.auth-logout",
+        "cli.parse.storage-show",
+        "cli.parse.storage-migrate",
+        "cli.parse.account-view",
+        "cli.parse.credits-default",
+        "cli.parse.credits-numeric-slug",
+        "cli.parse.credits-numeric-id",
+        "cli.parse.credits-max-safe-id",
+        "cli.parse.providers-list",
+        "cli.parse.provider-configure-interactive",
+        "cli.parse.provider-configure-stdin",
+        "cli.parse.provider-remove",
+        "cli.parse.models-list",
+        "cli.parse.models-filter",
+        "cli.parse.models-byok-available",
+        "cli.parse.models-gg-available",
+        "cli.parse.models-inspect",
+        "cli.parse.voices",
+        "cli.parse.generate-json",
+        "cli.parse.generate-json-stdin",
+        "cli.parse.generate-gg",
+        "cli.parse.generate-image",
+        "cli.parse.generate-references",
+        "cli.parse.generate-text",
+        "cli.parse.generate-text-file",
+        "cli.parse.generate-prompt-file",
+        "cli.parse.generate-empty-prompt",
+        "cli.parse.generate-parameter-equals",
+        "cli.parse.rig-list",
+        "cli.parse.rig-inspect-check",
+        "cli.parse.rig-inspect-run",
+        "cli.parse.rig-check-mesh",
+        "cli.parse.rig-check-json",
+        "cli.parse.rig-run-mesh",
+        "cli.parse.rig-run-json",
+        "cli.parse.dash-terminator-help",
+        "cli.parse.edge-model-utf16-boundary",
+        "cli.parse.edge-model-utf16-too-long",
+        "cli.parse.edge-model-format-control",
+        "cli.parse.edge-model-control",
+        "cli.parse.edge-model-line-separator",
+        "cli.parse.edge-org-length-boundary",
+        "cli.parse.edge-org-length-too-long",
+        "cli.parse.edge-org-trailing-hyphen",
+        "cli.parse.edge-org-id-scientific",
+        "cli.parse.edge-org-id-negative",
+        "cli.parse.edge-json-value",
+        "cli.parse.edge-boolean-equals",
+        "cli.parse.edge-boolean-short-value",
+        "cli.parse.edge-option-prefix",
+        "cli.parse.edge-option-value-hyphen",
+        "cli.parse.edge-option-value-literal-hyphen",
+        "cli.parse.edge-mixed-short-alias",
+        "cli.parse.edge-short-alias-repeat",
+        "cli.parse.edge-option-terminator",
+        "cli.parse.edge-interspersed-options",
+        "cli.parse.edge-prompt-control-accepted",
+        "cli.parse.edge-prompt-nul-accepted",
+        "cli.parse.edge-prompt-and-file",
+        "cli.parse.edge-prompt-and-text",
+        "cli.parse.edge-text-and-file",
+        "cli.parse.edge-reference-and-image",
+        "cli.parse.edge-empty-reference",
+        "cli.parse.edge-reference-stdin",
+        "cli.parse.edge-empty-image",
+        "cli.parse.edge-empty-text-file",
+        "cli.parse.edge-nul-out",
+        "cli.parse.edge-stdin-text-and-key",
+        "cli.parse.edge-stdin-prompt-and-key",
+        "cli.parse.edge-param-missing-equals",
+        "cli.parse.edge-param-empty-field",
+        "cli.parse.edge-param-upper-field",
+        "cli.parse.edge-param-duplicate-field",
+        "cli.parse.edge-param-empty-value",
+        "cli.parse.edge-rig-type-control",
+        "cli.parse.edge-help-provider-unknown",
+        "cli.parse.edge-help-positionals-joined",
+        "cli.parse.edge-configure-before-json"
+      ]
+    },
+    {
+      "id": "cli.output",
+      "description": "Preserve public result/error envelopes, stdout/stderr roles, exits 0/1/2, null/zero/negative credit facts, integer-cent formatting, safe organization choices, task receipts and partial-save reports. Escape terminal controls in human output while retaining JSON values; never print raw errors, stack traces, credential bytes, provider bodies or warnings. Closed output pipes must fail safely.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/output.ts",
+        "packages/grida-cli/src/output.test.ts",
+        "packages/grida-cli/src/run.test.ts",
+        "packages/grida-cli/src/bin.ts"
+      ],
+      "cases": [
+        "cli.output.safe-json",
+        "cli.output.login-json",
+        "cli.output.login-no-input",
+        "cli.output.configure-json",
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.help",
+      "description": "Cover grida with no args, -h/--help, help [topic], topic --help and bare command-group defaults across every Cli.topics entry. Unknown topics and incompatible flags fail; provider help includes shared-store/manual-edit guidance without opening custody. Human layout changes need an explicit compatibility decision.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/cli.test.ts",
+        "scripts/cli-docs/check.mjs"
+      ],
+      "cases": [
+        "cli.help.root",
+        "cli.help.auth",
+        "cli.help.auth-login",
+        "cli.help.auth-status",
+        "cli.help.auth-logout",
+        "cli.help.auth-storage",
+        "cli.help.auth-storage-show",
+        "cli.help.auth-storage-migrate",
+        "cli.help.account",
+        "cli.help.account-view",
+        "cli.help.account-credits",
+        "cli.help.models",
+        "cli.help.models-list",
+        "cli.help.models-inspect",
+        "cli.help.providers",
+        "cli.help.providers-configure",
+        "cli.help.providers-remove",
+        "cli.help.providers-list",
+        "cli.help.generate",
+        "cli.help.voices",
+        "cli.help.voices-list",
+        "cli.help.rigging",
+        "cli.help.rigging-list",
+        "cli.help.rigging-inspect",
+        "cli.help.rigging-check",
+        "cli.help.rigging-run",
+        "cli.help.docs",
+        "cli.bare.root",
+        "cli.bare.auth",
+        "cli.bare.account",
+        "cli.bare.auth-storage",
+        "cli.bare.models",
+        "cli.bare.providers",
+        "cli.bare.voices",
+        "cli.bare.rigging",
+        "cli.help.alias",
+        "cli.help.provider-specific",
+        "cli.help.short"
+      ]
+    },
+    {
+      "id": "command.version",
+      "description": "Cover -v and --version with the packaged version and newline; no host initialization. Positional commands and unrelated flags reject instead of selecting another operation.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/bin.ts",
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/cli.test.ts",
+        "packages/grida-cli/package.json"
+      ],
+      "cases": [
+        "cli.version.long",
+        "cli.version.short",
+        "cli.invalid.version-command",
+        "cli.invalid.version-json"
+      ]
+    },
+    {
+      "id": "command.docs",
+      "description": "Cover docs and docs [topic] for every known help topic, canonical guide ownership and no fetch/browser launch. Reject unknown topics/options; validate installed links against built documentation.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/cli.test.ts",
+        "scripts/cli-docs/check.mjs"
+      ],
+      "cases": [
+        "cli.docs.root",
+        "cli.docs.auth",
+        "cli.docs.auth-login",
+        "cli.docs.auth-status",
+        "cli.docs.auth-logout",
+        "cli.docs.auth-storage",
+        "cli.docs.auth-storage-show",
+        "cli.docs.auth-storage-migrate",
+        "cli.docs.account",
+        "cli.docs.account-view",
+        "cli.docs.account-credits",
+        "cli.docs.models",
+        "cli.docs.models-list",
+        "cli.docs.models-inspect",
+        "cli.docs.providers",
+        "cli.docs.providers-configure",
+        "cli.docs.providers-remove",
+        "cli.docs.providers-list",
+        "cli.docs.generate",
+        "cli.docs.voices",
+        "cli.docs.voices-list",
+        "cli.docs.rigging",
+        "cli.docs.rigging-list",
+        "cli.docs.rigging-inspect",
+        "cli.docs.rigging-check",
+        "cli.docs.rigging-run",
+        "cli.help.docs",
+        "cli.docs.docs",
+        "cli.docs.provider-specific",
+        "cli.invalid.docs-json",
+        "cli.invalid.docs-unknown"
+      ]
+    },
+    {
+      "id": "command.auth-login",
+      "description": "Cover default keyring choice, explicit file/keyring choice, saved backend retention, system browser and --no-browser manual URL on stderr. Refuse --json/--no-input; return only safe identity/expiry after verified commit. Cover denied/failed/cancelled ceremonies without replacing a valid prior session.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/commands/auth.ts",
+        "packages/grida-cli/src/commands/auth.test.ts",
+        "packages/grida-cli/src/run.test.ts",
+        "packages/grida-auth/src/auth-client.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.auth-mixed",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.auth-status",
+      "description": "Read safe local session state without online verification. Signed-out is a successful status DTO with exit 1; signed-in/refresh-needed exit 0. Never expose credentials or turn malformed/unavailable established custody into signed-out.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/run.ts",
+        "packages/grida-cli/src/run.test.ts",
+        "packages/grida-cli/src/commands/auth.ts",
+        "packages/grida-auth/src/credential-store.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.auth-mixed",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.auth-logout",
+      "description": "Clear local credentials durably and request only session-local remote revocation. confirmed/not-needed exit 0; unconfirmed exits 1 with local sign-out retained. Cover already signed-out, offline/expired revocation, custody failure and newer-login races without restoring old credentials.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/run.ts",
+        "packages/grida-cli/src/commands/auth.test.ts",
+        "packages/grida-auth/src/auth-client.test.ts",
+        "packages/grida-auth/src/persistent-auth.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.auth-mixed",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.auth-storage-show",
+      "description": "Return backend/profile/initialization/migration metadata without reading credential secrets, starting login or checking keyring access. Preserve malformed-store and host configuration failures.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/run.ts",
+        "packages/grida-cli/src/commands/auth.test.ts",
+        "packages/grida-auth/src/credential-store.ts",
+        "packages/grida-auth/src/credential-store.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.auth-storage-migrate",
+      "description": "Accept only explicit keyring/file destination, preserve revision/profile identity, settle started mutations on signals, and report safe storage state. Cover same backend, both directions, copy/read-back/retirement failures and resumable migration; no implicit fallback.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/run.test.ts",
+        "packages/grida-cli/src/commands/auth.test.ts",
+        "packages/grida-auth/src/credential-store.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.auth-mixed",
+        "proof.auth-native",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.account-view",
+      "description": "Verify identity first, then gather complete projected memberships through terminal cursor, including empty accounts and short nonterminal pages. Permit completion on page 100; refuse exhaustion, stalled cursors, later-page failure or signed-out rather than returning partial success. Never launch login.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/commands/account.ts",
+        "packages/grida-cli/src/commands/account.test.ts",
+        "packages/grida-cli/src/run.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.account-credits",
+      "description": "Cover explicit slug/id and sole-membership selection; numeric slug remains a slug. Preserve cached unknown/zero/negative USD cents, timestamp and server billing gate. Ambiguity exposes bounded safe choices; missing membership, refusal and invalid selectors cause no fallback, login or inferred credit eligibility.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/commands/account.test.ts",
+        "packages/grida-cli/src/run.ts",
+        "packages/grida-account/src/account-client.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.providers-list",
+      "description": "Report supported BYOK key presence, effective source, expected environment name and shared plaintext storage without secrets, provider verification or account login. Preserve malformed explicit key and corrupt/pending store errors instead of reporting absence; GG remains a separate unchecked login authority.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/media-run.ts",
+        "packages/grida-cli/src/media-run.test.ts",
+        "packages/grida-cli/src/provider-credentials.test.ts",
+        "packages/grida-cli/src/provider-storage.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.providers-configure",
+      "description": "Cover each supported provider through hidden prompt or --key-stdin, never keys on argv. Validate first; check OpenRouter/Vercel/fal/Tripo once before opening or changing custody; ElevenLabs returns not_supported without a request. Denied/unavailable/invalid/cancelled checks preserve old keys. Settle a durable write already started; JSON/no-input require stdin.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/commands/providers.ts",
+        "packages/grida-cli/src/provider-storage.test.ts",
+        "packages/grida-cli/src/provider-prompt.test.ts",
+        "packages/grida-ai/src/provider-credentials.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.providers-remove",
+      "description": "Remove only the selected shared stored key, including durable pre-import tombstones. Do not read ambient keys, revoke at the provider or sign out Grida. Fresh readers observe removal while an explicit environment key can remain effective; pending/corrupt/unsafe stores fail unchanged.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/commands/providers.ts",
+        "packages/grida-cli/src/provider-storage.test.ts",
+        "packages/grida-auth/src/provider-credential-store.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.auth-mixed",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.models-list",
+      "description": "Cover provider/kind/modality/local-image filters, staged and deprecated executable routes and schema-derived local_image_flags. Ordinary list is offline. --available requires explicit provider: BYOK checks selected key presence without probe; GG reads selected organization's cached gate online without minting a grant or promising readiness.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/media-run.ts",
+        "packages/grida-cli/src/media-run.test.ts",
+        "packages/grida-ai/src/media-operations.test.ts"
+      ],
+      "cases": [
+        "domain.list.all.all",
+        "domain.list.all.local",
+        "domain.list.openrouter.all",
+        "domain.list.openrouter.local",
+        "domain.list.vercel.all",
+        "domain.list.vercel.local",
+        "domain.list.fal.all",
+        "domain.list.fal.local",
+        "domain.list.elevenlabs.all",
+        "domain.list.elevenlabs.local",
+        "domain.list.tripo.all",
+        "domain.list.tripo.local",
+        "domain.list.gg.all",
+        "domain.list.gg.local",
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.models-inspect",
+      "description": "Require explicit provider/model, infer kind only if unambiguous, preserve default and explicitly selected variants, and return the full schema in JSON with corresponding human input guidance. Unknown/unavailable routes fail without authority or provider fallback; retained historical bindings remain inspectable.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/media-input.ts",
+        "packages/grida-cli/src/media-input.test.ts",
+        "packages/grida-ai/src/media-operations.test.ts"
+      ],
+      "cases": [
+        "domain.inspect.001",
+        "domain.inspect.002",
+        "domain.inspect.003",
+        "domain.inspect.004",
+        "domain.inspect.005",
+        "domain.inspect.006",
+        "domain.inspect.007",
+        "domain.inspect.008",
+        "domain.inspect.009",
+        "domain.inspect.010",
+        "domain.inspect.011",
+        "domain.inspect.012",
+        "domain.inspect.013",
+        "domain.inspect.014",
+        "domain.inspect.015",
+        "domain.inspect.016",
+        "domain.inspect.017",
+        "domain.inspect.018",
+        "domain.inspect.019",
+        "domain.inspect.020",
+        "domain.inspect.021",
+        "domain.inspect.022",
+        "domain.inspect.023",
+        "domain.inspect.024",
+        "domain.inspect.025",
+        "domain.inspect.026",
+        "domain.inspect.027",
+        "domain.inspect.028",
+        "domain.inspect.029",
+        "domain.inspect.030",
+        "domain.inspect.031",
+        "domain.inspect.032",
+        "domain.inspect.033",
+        "domain.inspect.034",
+        "domain.inspect.035",
+        "domain.inspect.036",
+        "domain.inspect.037",
+        "domain.inspect.038",
+        "domain.inspect.039",
+        "domain.inspect.040",
+        "domain.inspect.041",
+        "domain.inspect.042",
+        "domain.inspect.043",
+        "domain.inspect.044",
+        "domain.inspect.045",
+        "domain.inspect.046",
+        "domain.inspect.047",
+        "domain.inspect.048",
+        "domain.inspect.049",
+        "domain.inspect.050",
+        "domain.inspect.051",
+        "domain.inspect.052",
+        "domain.inspect.053",
+        "domain.inspect.054",
+        "domain.inspect.055",
+        "domain.inspect.056",
+        "domain.inspect.057",
+        "domain.inspect.058",
+        "domain.inspect.059",
+        "domain.inspect.060",
+        "domain.inspect.061",
+        "domain.inspect.062",
+        "domain.inspect.063",
+        "domain.inspect.064",
+        "domain.inspect.065",
+        "domain.inspect.066",
+        "domain.inspect.067",
+        "domain.inspect.068",
+        "domain.inspect.069",
+        "domain.inspect.070",
+        "domain.inspect.071",
+        "domain.inspect.072",
+        "domain.inspect.073",
+        "domain.inspect.074",
+        "domain.inspect.075",
+        "domain.inspect.076",
+        "domain.inspect.077",
+        "domain.inspect.078",
+        "domain.inspect.079",
+        "domain.inspect.080",
+        "domain.inspect.081",
+        "domain.inspect.082",
+        "domain.inspect.083",
+        "domain.inspect.084",
+        "domain.inspect.085",
+        "domain.inspect.086",
+        "domain.inspect.087",
+        "domain.inspect.088",
+        "domain.inspect.089",
+        "domain.inspect.090",
+        "domain.inspect.091",
+        "domain.inspect.092",
+        "domain.inspect.093",
+        "domain.inspect.094",
+        "domain.inspect.095",
+        "domain.inspect.096",
+        "domain.inspect.097",
+        "domain.inspect.098",
+        "domain.inspect.099",
+        "domain.inspect.100",
+        "domain.inspect.101",
+        "domain.inspect.102",
+        "domain.inspect.103",
+        "domain.inspect.104",
+        "domain.inspect.105",
+        "domain.inspect.106",
+        "domain.inspect.107",
+        "domain.inspect.108",
+        "domain.inspect.109",
+        "domain.inspect.110",
+        "domain.inspect.111",
+        "domain.inspect.112",
+        "domain.inspect.113",
+        "domain.inspect.114",
+        "domain.inspect.115",
+        "domain.inspect.116",
+        "domain.inspect.117",
+        "domain.inspect.118",
+        "domain.inspect.119",
+        "domain.inspect.120",
+        "domain.inspect.121",
+        "domain.inspect.122",
+        "domain.inspect.123",
+        "domain.inspect.124",
+        "domain.inspect.125",
+        "domain.inspect.126",
+        "domain.inspect.127",
+        "domain.inspect.128",
+        "domain.inspect.129",
+        "domain.inspect.130",
+        "domain.inspect.131",
+        "domain.inspect.132",
+        "domain.inspect.133",
+        "domain.inspect.134",
+        "domain.inspect.135",
+        "domain.inspect.136",
+        "domain.inspect.137",
+        "domain.inspect.138",
+        "domain.inspect.139",
+        "domain.inspect.140",
+        "domain.inspect.141",
+        "domain.inspect.142",
+        "domain.inspect.143",
+        "domain.inspect.144",
+        "domain.inspect.145",
+        "domain.inspect.146",
+        "domain.inspect.147",
+        "domain.inspect.148",
+        "domain.inspect.149",
+        "domain.inspect.150",
+        "domain.inspect.151",
+        "domain.inspect.152",
+        "domain.inspect.153",
+        "domain.inspect.154",
+        "domain.inspect.155",
+        "domain.inspect.156",
+        "domain.inspect.157",
+        "domain.inspect.158",
+        "domain.inspect.159",
+        "domain.inspect.160",
+        "domain.inspect.161",
+        "domain.inspect.162",
+        "domain.inspect.163",
+        "domain.inspect.164",
+        "domain.inspect.165",
+        "domain.inspect.166",
+        "domain.inspect.167",
+        "domain.inspect.168",
+        "domain.inspect.169",
+        "domain.inspect.170",
+        "domain.inspect.171",
+        "domain.inspect.172",
+        "domain.inspect.173",
+        "domain.inspect.174",
+        "domain.inspect.175",
+        "domain.inspect.176",
+        "domain.inspect.177",
+        "domain.inspect.178",
+        "domain.inspect.179",
+        "domain.inspect.180",
+        "domain.inspect.181",
+        "domain.inspect.182",
+        "domain.inspect.183",
+        "domain.inspect.184",
+        "domain.inspect.185",
+        "domain.inspect.186",
+        "domain.inspect.187",
+        "domain.inspect.188",
+        "domain.inspect.189",
+        "domain.inspect.190",
+        "domain.inspect.191",
+        "domain.inspect.192",
+        "domain.inspect.193",
+        "domain.inspect.194",
+        "domain.inspect.195",
+        "domain.inspect.196",
+        "domain.inspect.197",
+        "domain.inspect.198",
+        "domain.inspect.199",
+        "domain.inspect.200",
+        "domain.inspect.201",
+        "domain.inspect.202",
+        "domain.inspect.203",
+        "domain.inspect.204",
+        "domain.inspect.205",
+        "domain.inspect.206",
+        "domain.inspect.207",
+        "domain.inspect.208",
+        "domain.inspect.209",
+        "domain.inspect.210",
+        "domain.inspect.211",
+        "domain.inspect.212"
+      ]
+    },
+    {
+      "id": "command.generate",
+      "description": "Cover all exact tuples in operation_inventory for image/video/music/sound-effect/text-to-speech/three-d. Validate selected operation, friendly or JSON input and fresh output destination before authority/submission. Preserve explicit provider/model/variant and scoped GG versus BYOK. Save returned bytes plus receipt; failures/cancellation retain safe paid-work identity and partial files without replay.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/media-run.ts",
+        "packages/grida-cli/src/media-run.test.ts",
+        "packages/grida-cli/src/media-input.test.ts",
+        "packages/grida-cli/src/media-files.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.catalogue-reference",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "command.voices-list",
+      "description": "Allow only explicit ElevenLabs with selected env/stdin/store key and no Grida login. Project/deduplicate/sort public voices; preserve paging caps and terminal/partial semantics. Later-page denial, malformed pages, cycles, timeout or cancellation must not become successful partial data outside the documented cap behavior.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/media-run.test.ts",
+        "packages/grida-ai/src/text-to-speech-client.ts",
+        "packages/grida-ai/src/text-to-speech-voices.test.ts"
+      ],
+      "cases": ["proof.rust-workspace"]
+    },
+    {
+      "id": "command.rigging-list",
+      "description": "List Tripo and GG rig-check/rigging descriptors with optional provider/feature filters, entirely offline. Eligibility has structured output and no model identity; paid rigging has a specific model and GLB output.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/rigging-run.ts",
+        "packages/grida-cli/src/rigging-run.test.ts",
+        "packages/grida-ai/src/rigging-client.test.ts"
+      ],
+      "cases": [
+        "domain.rigging.all.all",
+        "domain.rigging.all.rig-check",
+        "domain.rigging.all.rigging",
+        "domain.rigging.tripo.all",
+        "domain.rigging.tripo.rig-check",
+        "domain.rigging.tripo.rigging",
+        "domain.rigging.gg.all",
+        "domain.rigging.gg.rig-check",
+        "domain.rigging.gg.rigging"
+      ]
+    },
+    {
+      "id": "command.rigging-inspect",
+      "description": "Require tripo/gg and rig-check/rigging; refuse model for rig-check and require model for rigging. Return selected input/output schemas without custody/network, distinguishing invalid selector from absent model.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/rigging-run.ts",
+        "packages/grida-cli/src/rigging-run.test.ts",
+        "packages/grida-ai/src/rigging-client.test.ts"
+      ],
+      "cases": [
+        "domain.inspect.213",
+        "domain.inspect.214",
+        "domain.inspect.215",
+        "domain.inspect.216",
+        "domain.inspect.217",
+        "domain.inspect.218",
+        "domain.inspect.219",
+        "domain.inspect.220",
+        "domain.inspect.221",
+        "domain.inspect.222",
+        "domain.inspect.223",
+        "domain.inspect.224"
+      ]
+    },
+    {
+      "id": "command.rigging-check",
+      "description": "Accept exactly explicit local mesh or JSON input with one stdin owner; check on selected Tripo BYOK or GG authority. Return riggable, rig_type and safe task metadata; riggable=false still exits 0. Never submit rigging or write generated artifacts. Reject malformed/oversized/unsupported mesh before authority; preserve accepted-task failures.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/rigging-run.ts",
+        "packages/grida-cli/src/rigging-run.test.ts",
+        "packages/grida-ai/src/rigging-client.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.catalogue-reference"]
+    },
+    {
+      "id": "command.rigging-run",
+      "description": "Require explicit supported rig model, fresh output directory and exact mesh+rig-type+spec or JSON input. Run independently of any earlier check; preserve model-specific rig types/specifications, Tripo/GG separation, GLB bytes and task receipt. Never overwrite/replay; save returned paid bytes even when interrupted and report partial publication safely.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/rigging-run.ts",
+        "packages/grida-cli/src/rigging-run.test.ts",
+        "packages/grida-ai/src/rigging-client.test.ts",
+        "packages/grida-ai/src/gg-tripo.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.catalogue-reference"]
+    },
+    {
+      "id": "host.registration",
+      "description": "Use only bundled hosted client/issuer/API/callback registration, or the explicit trusted local fixture configuration. Reject arbitrary origin/client overrides, invalid/local-as-hosted fixtures and absent/unsafe files without hosted fallback. Cwd/dotenv discovery never grants authority; public admission-key rotation must not change profile identity.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/host.ts",
+        "packages/grida-cli/src/host.test.ts",
+        "packages/grida-cli/src/oauth-client-registration.ts",
+        "packages/grida-auth/src/credential-store.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "host.home",
+      "description": "Preserve default and absolute GRIDA_HOME handling, canonicalize permitted OS home aliases at the host boundary, isolate local fixture custody and fail empty/relative/ordinary-home aliases appropriately. Provider store receives one canonical home; its stricter path checks must not be bypassed. Cover missing descendants and platform-limited stored credentials while preserving explicit Windows env/stdin.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/host.ts",
+        "packages/grida-cli/src/host.test.ts",
+        "packages/grida-cli/src/provider-store.ts",
+        "packages/grida-cli/src/provider-storage.test.ts",
+        "packages/grida-auth/PROVIDER-CREDENTIALS-V1.md"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.auth-mixed",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "host.browser",
+      "description": "Launch only the validated trusted authorization URL with argument-safe platform browser invocation or explicit manual output. Cover malformed destinations, launcher errors/timeouts, cancellation and unsupported platforms; never expose raw host errors or silently substitute manual/browser mode.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/host.ts",
+        "packages/grida-cli/src/host.test.ts",
+        "packages/grida-auth/src/node.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.installed-native"]
+    },
+    {
+      "id": "cli.cancellation",
+      "description": "Test real executable SIGINT/SIGTERM during startup, login, credential acquisition/mutation, network work and artifact publication. Refuse new work after interruption; clean listeners and login resources; let started native writes and already-returned paid bytes settle. No forced exit, automatic logout, credential rollback or replay.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/run.ts",
+        "packages/grida-cli/src/run.test.ts",
+        "packages/grida-cli/src/provider-storage.test.ts",
+        "packages/grida-cli/src/media-run.test.ts",
+        "packages/grida-cli/src/rigging-run.test.ts",
+        "packages/grida-cli/src/bin.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.auth-mixed",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "account.selection",
+      "description": "Validate exact ID/slug selectors before I/O; choose automatically only one terminal membership. Explicit lookup follows at most 100 progressing pages, no first-member fallback or selection cache. Preserve no_organizations/organization_required/organization_not_found/selection_unavailable distinctions, bounded choices and fresh server authorization after selection.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-account/src/account-client.ts",
+        "packages/grida-account/src/account-client.test.ts",
+        "packages/grida-account/README.md"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "account.wire",
+      "description": "Preserve only fixed organizations.list and credits.read paths and canonical input fields, response projection, ordered safe-integer IDs and cursor semantics. Credits preserve all allowed cache/billing states and reject inconsistent/mismatched schemas. No generic authenticated fetch, automatic read replay, implicit login or inference of model readiness.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/src/auth-client.ts",
+        "packages/grida-auth/src/auth-client.test.ts",
+        "packages/grida-auth/README.md"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "auth.profile-identity",
+      "description": "Known vectors must preserve profile hash serialization/key order, canonical home, issuer/client/API binding, on-disk names and native item lookup identity. Public admission-key rotation leaves profile/revision unchanged. Reject rebound or malformed envelopes and never adopt untracked keyring credentials after metadata loss.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/src/credential-store.ts",
+        "packages/grida-auth/src/credential-store.test.ts",
+        "packages/grida-auth/src/keyring.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.auth-mixed", "proof.auth-native"]
+    },
+    {
+      "id": "auth.lifecycle",
+      "description": "Prove PKCE/live-identity login commit, local status, 30-second refresh window, one-use refresh rotation saved before follow-up acceptance, generation/revision fences and session-local logout. Test stale verify/login/refresh results, cancelled writes, old logout versus new login and identity/network failure after accepted rotation without resurrecting or rolling back spent credentials.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/src/auth-client.ts",
+        "packages/grida-auth/src/auth-client.test.ts",
+        "packages/grida-auth/src/persistent-auth.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.auth-mixed",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "auth.callback",
+      "description": "Exercise real registered loopback ports, bind before browser, fallback only among registered ports, exact path/method/host/state/issuer and duplicate-parameter admission, denial, two-minute expiry, socket cleanup and cancellation. Bound token requests/bodies, refuse redirects and raw upstream error output.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/src/node.ts",
+        "packages/grida-auth/src/node.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "auth.custody",
+      "description": "Preserve versioned metadata/envelope/revision/tombstone/backend semantics, established missing-item failures, explicit backend choice and no silent keyring-to-file fallback. Require native write completion and read-back; retain committed mutations after later failures and reject malformed/rebound/oversized data without recovery overwrite.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/src/credential-store.ts",
+        "packages/grida-auth/src/credential-store.test.ts",
+        "packages/grida-auth/src/keyring.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.auth-mixed", "proof.auth-native"]
+    },
+    {
+      "id": "auth.migrations",
+      "description": "Test both file/keyring migration directions and every copy/publication/retirement failure boundary. Resume the recorded destination without adopting stale source or reviving old authority; remove plaintext or clear old native secret only in the accepted order. Include cancellation and uncertain post-publication failure.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/src/credential-store.ts",
+        "packages/grida-auth/src/credential-store.test.ts",
+        "packages/grida-auth/src/persistent-auth.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.auth-mixed"]
+    },
+    {
+      "id": "auth.mixed-process",
+      "description": "Run TS/TS, TS/Rust, Rust/TS and Rust/Rust real-process pairings against disposable shared custody. Prove one-use refresh rotation, verify versus refresh, logout versus in-flight login/newer login, process restart and migration crash recovery. Historical supported artifacts must be selected explicitly; current source-only success is insufficient.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/src/persistent-auth.test.ts",
+        "packages/grida-auth/src/profile-lock.test.ts",
+        "scripts/cli-local/README.md"
+      ],
+      "cases": ["proof.auth-mixed"]
+    },
+    {
+      "id": "auth.keyring",
+      "description": "Use disposable synthetic native entries on macOS and Linux to prove TS keytar/Rust item read-write-tombstone compatibility, service/account/Secret Service attributes, access behavior, absence versus failure and write/read-back integrity. Cover locked/unavailable/permission-denied stores without file fallback; mocked bindings alone do not satisfy this gate.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/src/keyring.ts",
+        "packages/grida-auth/src/keyring.test.ts",
+        "packages/grida-auth/src/credential-store.ts",
+        "packages/grida-auth/README.md"
+      ],
+      "cases": ["proof.auth-native", "proof.rust-workspace"]
+    },
+    {
+      "id": "auth.blocking-cancellation",
+      "description": "Rust-specific proof: cancelling or dropping an async waiter must not release SQLite/profile authority while a started blocking native credential mutation or its read-back continues. Use competing processes and controlled mutation completion; verify subsequent custody remains ordered, including failed write/read-back.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/src/keyring.test.ts",
+        "packages/grida-auth/src/profile-lock.test.ts",
+        "packages/grida-cli/src/run.test.ts",
+        "packages/grida-cli/src/provider-storage.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.auth-mixed"]
+    },
+    {
+      "id": "providers.format-v1",
+      "description": "Reuse raw protocol fixtures and add boundary vectors for TOML 1.1, strict UTF-8/no BOM, exact key bytes, integer version, exact schema, nesting/byte/provider bounds, unknown versions, escaping and tombstones. Missing file is empty unstarted; corrupt/unsupported/unsafe/pending is not absence. Invalid cases leave canonical bytes untouched and expose fixed safe failure codes.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/PROVIDER-CREDENTIALS-V1.md",
+        "packages/grida-auth/fixtures/providers-v1/README.md",
+        "packages/grida-auth/src/provider-credential-store.ts",
+        "packages/grida-auth/src/provider-credential-store.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.auth-mixed"]
+    },
+    {
+      "id": "providers.private-files",
+      "description": "Use real files to verify owner/mode/ACL/no-follow/hardlink/inode rules and safe existing ancestors without chmod repair. Writes use exclusive private temp, fsync, atomic rename and parent fsync; failures after rename never restore older data. Validate and discard only matching orphan temps; never adopt them. Test symlink/special-file/ACL races and injected publication/fsync failures; SIGKILL is not power-loss proof.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/PROVIDER-CREDENTIALS-V1.md",
+        "packages/grida-auth/src/private-files.ts",
+        "packages/grida-auth/src/private-files.test.ts",
+        "packages/grida-auth/src/provider-credential-store.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.auth-mixed"]
+    },
+    {
+      "id": "providers.locking",
+      "description": "Preserve stable zero-byte SQLite inode, BEGIN IMMEDIATE/ROLLBACK exclusion, no schema/commit/WAL or unlink, safe journal/sidecar checks, process-local descriptor serialization, busy-only retries and bounded acquisition. Held work outlives acquisition deadline; cancellation never steals/releases a live holder. Test independent processes/module copies and crash release.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/PROVIDER-CREDENTIALS-V1.md",
+        "packages/grida-auth/src/profile-lock.ts",
+        "packages/grida-auth/src/profile-lock.test.ts",
+        "packages/grida-auth/src/credential-lock.test.ts",
+        "packages/grida-auth/src/provider-process.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.auth-mixed"]
+    },
+    {
+      "id": "providers.migration",
+      "description": "Prove source-writer-before-canonical lock order, canonical value/tombstone precedence, durable unstarted-to-pending publication before source retirement and pending-to-complete only after durable idempotent retirement. Resume retirement without reimport after crash; preserve unrelated source OAuth records. Failed/uncertain publication cannot retire source; pending blocks ordinary operations.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/PROVIDER-CREDENTIALS-V1.md",
+        "packages/grida-auth/src/provider-credential-store.ts",
+        "packages/grida-auth/src/provider-credential-store.test.ts",
+        "packages/grida-auth/src/provider-process.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.auth-mixed"]
+    },
+    {
+      "id": "providers.mixed-process",
+      "description": "Run all TS/Rust reader-writer pairings on real shared provider files and SQLite locks. Cover exact values, concurrent disjoint/same-provider updates, deletion/restart tombstones, migration fences and crashed writers. Include supported Desktop-owned source retirement; older writers that ignore the protocol cannot be silently declared compatible.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-auth/PROVIDER-CREDENTIALS-V1.md",
+        "packages/grida-auth/src/provider-process.test.ts",
+        "packages/grida-auth/src/provider-credential-store.test.ts"
+      ],
+      "cases": ["proof.auth-mixed"]
+    },
+    {
+      "id": "providers.key-resolution",
+      "description": "Only selected provider authority is inspected. Explicit stdin wins over exact supported environment variable then shared store; blank/malformed explicit values fail rather than fall back. Environment/stdin bypass custody and never persist. No aliases/inherited values/dotenv, GG-as-BYOK or cross-provider fallback. Bound raw stdin bytes, timeout/cancellation and hidden prompt restoration without echo.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/provider-credentials.ts",
+        "packages/grida-cli/src/provider-credentials.test.ts",
+        "packages/grida-cli/src/provider-prompt.ts",
+        "packages/grida-cli/src/provider-prompt.test.ts",
+        "packages/grida-cli/src/provider-storage.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "providers.key-policy",
+      "description": "Preserve shared static normalization and provider-specific accepted key forms, raw-byte bounds and fixed verification endpoints. Explicit checks run once, admit read-only success without promising credits/model access, reject management credentials where required and project only safe statuses. ElevenLabs check is unsupported. Bound body/deadline/cancellation, reject redirects and never retain server/native diagnostics.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-ai/src/provider-credentials.ts",
+        "packages/grida-ai/src/provider-credentials.test.ts",
+        "packages/grida-cli/src/provider-storage.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "media.input",
+      "description": "For every advertised operation, compare friendly CLI and JSON input after semantic normalization. Preserve absent/null/false/zero, safe integers, model-specific seed/options and Unicode length rules; reject unknown/unsupported fields and conflicts before reads or authority. Own input snapshots; validate URL/base64/GLB semantics beyond schema. Include exact byte limits, malformed raw UTF-8/JSON, BOM behavior and no path expansion from JSON.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/media-input.ts",
+        "packages/grida-cli/src/media-input.test.ts",
+        "packages/grida-cli/src/media-files.test.ts",
+        "packages/grida-ai/src/media-operations.test.ts",
+        "packages/grida-ai/src/media-input-parity.test.ts",
+        "packages/grida-ai/src/rigging-client.test.ts"
+      ],
+      "cases": [
+        "domain.input.empty-object",
+        "domain.input.array",
+        "domain.input.malformed",
+        "domain.input.utf-bom",
+        "domain.input.unknown",
+        "domain.input.flags-collision",
+        "proof.rust-workspace",
+        "proof.catalogue-reference",
+        "proof.catalogue-consumers",
+        "parity.rig.invalid-object",
+        "parity.rig.invalid-json",
+        "parity.rig.missing-mesh",
+        "parity.rig.unknown-model"
+      ]
+    },
+    {
+      "id": "media.files",
+      "description": "Explicit cwd-relative grants only; bounded one-time JSON/text/image/mesh reads, content-based PNG/JPEG/static-WebP/GLB admission, growth/cancellation races and aggregate base64 budget. Reserve new output under existing parent before authority, probe atomic publication, exclusively save bytes/hashes/receipt and never overwrite. Partial save retains published paths/task metadata; abandon removes only an empty owned reservation.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/media-files.ts",
+        "packages/grida-cli/src/media-files.test.ts",
+        "packages/grida-cli/src/media-input.test.ts",
+        "packages/grida-cli/src/media-run.test.ts",
+        "packages/grida-cli/src/rigging-run.test.ts"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "media.authority",
+      "description": "Input/operation/output refusal must precede key/account access and submission. Selected BYOK never consults Grida login or another provider; selected GG never inspects BYOK. Separate account, scoped GG, provider requests, signed upload and public-download authority; no credential-bearing arbitrary URLs or implicit provider/model/billing fallback.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/media-run.test.ts",
+        "packages/grida-cli/src/rigging-run.test.ts",
+        "packages/grida-cli/src/media-http.test.ts",
+        "packages/grida-ai/src/gg.test.ts",
+        "SECURITY.md"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "media.transport",
+      "description": "Prove fixed route/method/header/body admission, DNS address validation and pinning with original TLS authority, no ambient proxies/cookies, no authenticated redirects/replay and reviewed credential-free download redirects. Check each redirected DNS result, mixed public/private answers, response/body bounds, multipart/signed-upload limits, whole deadlines, cancellation/late work and safe errors. Resolve reqwest fit using behavior, not Node internals.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/media-http.ts",
+        "packages/grida-cli/src/media-http.test.ts",
+        "packages/grida-ai/src/http.ts",
+        "packages/grida-ai/src/http.test.ts",
+        "SECURITY.md"
+      ],
+      "cases": ["proof.rust-workspace", "proof.installed-native"]
+    },
+    {
+      "id": "media.execution",
+      "description": "Every pending operation tuple needs admitted request/result plus meaningful invalid/failure/cancellation cases through the real adapter. Preserve one accepted paid submission, explicit batching ceiling, no retry after ambiguous submission, safe accepted-task identity, polling/SSE completion versus premature EOF, credential lifetime and cumulative time/byte limits. No paid provider calls in deterministic conformance.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/media-run.test.ts",
+        "packages/grida-cli/src/rigging-run.test.ts",
+        "packages/grida-ai/src/image-client.test.ts",
+        "packages/grida-ai/src/video-client.test.ts",
+        "packages/grida-ai/src/three-d-lifecycle.test.ts",
+        "packages/grida-ai/src/tripo-client.test.ts",
+        "packages/grida-ai/src/rigging-client.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.catalogue-reference"]
+    },
+    {
+      "id": "media.gg",
+      "description": "Verify selected membership followed by one scoped memory-only GG mint, safe metadata versus actual grant distinction, fixed hosted/local-fixture routes and live expiry checks. Never forward account tokens into media, persist/reuse grants across invocations, remint/retry or fall back to BYOK. Funded Tripo uses signed credential-free uploads and rechecks scoped authority before paid submission.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-cli/src/media-run.test.ts",
+        "packages/grida-cli/src/rigging-run.test.ts",
+        "packages/grida-auth/src/auth-client.test.ts",
+        "packages/grida-ai/src/gg-session.test.ts",
+        "packages/grida-ai/src/gg-tripo.test.ts",
+        "packages/grida-cli/src/media-http.test.ts",
+        "SECURITY.md"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.auth-mixed",
+        "proof.installed-reference",
+        "proof.installed-native"
+      ]
+    },
+    {
+      "id": "media.image",
+      "description": "Cover exact image provider/model/text-reference bindings, provider controls and native-background eligibility; Vercel image wire, OpenRouter unified images, fal queues and GG fixed route. Preserve bounded image counts, provider batch splitting, ordering/result-byte limits, MIME admission and secret-safe failure. SDK-native automatic resolution is not a new CLI feature.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-ai/src/image-client.ts",
+        "packages/grida-ai/src/image-client.test.ts",
+        "packages/grida-ai/src/image-byok.ts",
+        "packages/grida-ai/src/image-byok.test.ts",
+        "packages/grida-ai/src/media-operations.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.catalogue-reference"]
+    },
+    {
+      "id": "media.video",
+      "description": "Cover exact text/image bindings and model-specific options, including inline versus URL-only frame admission and fal Veo Lite audio control. Exercise Vercel SSE result/error/EOF, OpenRouter authenticated polling/content, fal queue and GG envelopes with one submission, bounded frame/body/result budgets and cancellation. Preserve the zero-seed restriction until an explicit approved divergence changes it.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-ai/src/video-client.ts",
+        "packages/grida-ai/src/video-client.test.ts",
+        "packages/grida-ai/src/media-operations.test.ts",
+        "packages/grida-cli/src/media-input.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.catalogue-reference"]
+    },
+    {
+      "id": "media.audio",
+      "description": "Cover GG music and ElevenLabs sound-effect/speech exact wires. Preserve music trimmed UTF-16 lengths/safe seed, sound-effect trimmed code-point lengths and absent/false/zero options, and speech voice normalization with unchanged Unicode text. Project only admitted audio bytes, fixed formats and bounded deadlines/bodies; errors or access loss do not replay.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-ai/src/music-client.test.ts",
+        "packages/grida-ai/src/sound-effect-client.test.ts",
+        "packages/grida-ai/src/text-to-speech-client.test.ts",
+        "packages/grida-ai/src/media-operations.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.catalogue-reference"]
+    },
+    {
+      "id": "media.three-d",
+      "description": "Cover fal exact text/image routes and Tripo h3.1/p1/p2 text/image/multiview across BYOK and GG. Preserve per-model input/options, bounded PNG/JPEG upload, exact task/model/type identity and polling, reviewed GLB download and self-contained GLB validation. Retain safe task IDs/credit refusals; no substitution or repeated paid submission after loss/timeout.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-ai/src/three-d-client.test.ts",
+        "packages/grida-ai/src/three-d-lifecycle.test.ts",
+        "packages/grida-ai/src/tripo-client.test.ts",
+        "packages/grida-ai/src/tripo-uploaded.test.ts",
+        "packages/grida-ai/src/gg-tripo.test.ts",
+        "packages/grida-cli/src/media-run.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.catalogue-reference"]
+    },
+    {
+      "id": "media.rigging",
+      "description": "Cover standalone model-free eligibility and rig-v1.0/rig-v2.5-specific rigging on Tripo/GG, mesh validation, exact rig types/specifications and accepted observed legacy task kinds. Preserve structured negative success versus paid GLB results, task identity and credits. Bound uploads/polling/downloads and retain accepted tasks on cancellation, transport or publication failure without resubmission.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-ai/src/rigging-client.ts",
+        "packages/grida-ai/src/rigging-client.test.ts",
+        "packages/grida-ai/src/gg-tripo.test.ts",
+        "packages/grida-cli/src/rigging-run.test.ts"
+      ],
+      "cases": ["proof.rust-workspace", "proof.catalogue-reference"]
+    },
+    {
+      "id": "catalog.compatibility",
+      "description": "Pin exact discovery/inspection tuples, schemas, listed/staged/deprecated status, binding identities and local-image metadata. Preserve existing TS/web schema-1 snapshot projections, pinned snapshot rejection/removal semantics and bundled families outside refresh projection. CLI discovery stays bundled/offline; catalogue refresh APIs outside CLI are not automatically Rust port scope.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-ai/src/media-operations.ts",
+        "packages/grida-ai/src/media-operations.test.ts",
+        "packages/grida-ai/src/model-catalog.test.ts",
+        "packages/grida-ai/src/tripo-client.test.ts",
+        "packages/grida-ai-models/README.md"
+      ],
+      "cases": [
+        "proof.rust-workspace",
+        "proof.catalogue-reference",
+        "proof.catalogue-consumers"
+      ]
+    },
+    {
+      "id": "catalog.generated",
+      "description": "Make authored JSON/schema the shared source with deterministic TS/Rust generated consumers, bundled references and explicit semantic normalization. Check generated drift, unchanged TS/web behavior and package completeness; ordinary Rust build must not need Node, network or paths outside its Cargo package. Prototype representative schemas before selecting type generation.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "packages/grida-ai-models/README.md",
+        "packages/grida-ai/README.md",
+        "packages/grida-ai/src/input-schema.ts",
+        "packages/grida-ai/src/media-input-parity.test.ts"
+      ],
+      "cases": ["proof.catalogue-consumers", "proof.rust-workspace"]
+    },
+    {
+      "id": "release.installed",
+      "description": "Test the actual packed npm candidate set and native target selection, executable bits, version coupling, spaces in paths, streams/signals and absence of optional binaries. Preserve grida command and supported Windows env/stdin behavior. Exercise local installed OAuth, synthetic provider/media/rigging and supported historical TS/Desktop compatibility before replacement; source tests alone do not prove installability.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "scripts/cli-release/README.md",
+        "scripts/cli-local/README.md",
+        "scripts/cli-media-local/README.md",
+        "packages/grida-cli/package.json"
+      ],
+      "cases": [
+        "proof.npm-delivery",
+        "proof.installed-native",
+        "proof.auth-mixed",
+        "proof.auth-native"
+      ]
+    },
+    {
+      "id": "release.docs",
+      "description": "Check canonical guide examples, exhaustive command/help/docs ownership and built routes using the actual installed candidate. Update Node-only guidance when packaging changes and maintain third-party notices for shipped Rust dependencies and launcher contents.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "scripts/cli-docs/README.md",
+        "scripts/cli-docs/check.mjs",
+        "packages/grida-cli/README.md",
+        "packages/grida-cli/CONTRIBUTING.md",
+        "packages/grida-cli/THIRD-PARTY-NOTICES.txt"
+      ],
+      "cases": ["proof.installed-docs"]
+    },
+    {
+      "id": "release.artifacts",
+      "description": "Implement and test build-once/package-once exact-hash publication, matched versions, provenance and platform-first/root-last ordering. Preserve manual/main-only/environment gates; reject missing target proof, partial-release mismatch and unsupported libc. The real eight-platform execution and deployed-account/provider checks are mandatory release_acceptance prerequisites, outside a local pre-PR run.",
+      "required": true,
+      "status": "complete",
+      "sources": [
+        "scripts/cli-release/README.md",
+        "scripts/cli-local/README.md",
+        "scripts/cli-media-local/README.md",
+        "packages/grida-cli/package.json"
+      ],
+      "cases": ["proof.npm-delivery"]
+    }
+  ],
+  "operation_inventory": {
+    "sources": [
+      "packages/grida-ai/src/media-operations.ts",
+      "packages/grida-ai/src/rigging-operations.ts",
+      "packages/grida-ai-models/src"
+    ],
+    "captured_from": "MediaOperations.list() and MediaOperations.rigging.list(), importing current TypeScript source after fresh baseline workspace builds. Each tuple needs positive request/result and meaningful negative/failure/cancellation cases before completion.",
+    "operations": [
+      {
+        "id": "generate:image:fal:generation:bfl/flux-2-max:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bfl/flux-2-max",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/flux-2-max",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:bfl/flux-2-max:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bfl/flux-2-max",
+        "provider_id": "gg",
+        "binding_id": "bfl/flux-2-max",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:bfl/flux-2-max:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bfl/flux-2-max",
+        "provider_id": "openrouter",
+        "binding_id": "black-forest-labs/flux.2-max",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:bfl/flux-2-max:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bfl/flux-2-max",
+        "provider_id": "openrouter",
+        "binding_id": "black-forest-labs/flux.2-max",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:bfl/flux-2-max:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bfl/flux-2-max",
+        "provider_id": "vercel",
+        "binding_id": "bfl/flux-2-max",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:bfl/flux-2-pro:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bfl/flux-2-pro",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/flux-2-pro",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:bfl/flux-2-pro:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bfl/flux-2-pro",
+        "provider_id": "gg",
+        "binding_id": "bfl/flux-2-pro",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:bfl/flux-2-pro:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bfl/flux-2-pro",
+        "provider_id": "openrouter",
+        "binding_id": "black-forest-labs/flux.2-pro",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:bfl/flux-2-pro:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bfl/flux-2-pro",
+        "provider_id": "openrouter",
+        "binding_id": "black-forest-labs/flux.2-pro",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:bfl/flux-2-pro:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bfl/flux-2-pro",
+        "provider_id": "vercel",
+        "binding_id": "bfl/flux-2-pro",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:bytedance/seedream-5.0-lite:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bytedance/seedream-5.0-lite",
+        "provider_id": "fal",
+        "binding_id": "bytedance/seedream/v5/lite/text-to-image",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:bytedance/seedream-5.0-lite:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bytedance/seedream-5.0-lite",
+        "provider_id": "gg",
+        "binding_id": "bytedance/seedream-5.0-lite",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:bytedance/seedream-5.0-lite:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bytedance/seedream-5.0-lite",
+        "provider_id": "openrouter",
+        "binding_id": "bytedance-seed/seedream-5-0-lite",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:bytedance/seedream-5.0-lite:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bytedance/seedream-5.0-lite",
+        "provider_id": "openrouter",
+        "binding_id": "bytedance-seed/seedream-5-0-lite",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:bytedance/seedream-5.0-lite:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bytedance/seedream-5.0-lite",
+        "provider_id": "vercel",
+        "binding_id": "bytedance/seedream-5.0-lite",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:bytedance/seedream-5.0-pro:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bytedance/seedream-5.0-pro",
+        "provider_id": "fal",
+        "binding_id": "bytedance/seedream/v5/pro/text-to-image",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:bytedance/seedream-5.0-pro:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bytedance/seedream-5.0-pro",
+        "provider_id": "gg",
+        "binding_id": "bytedance/seedream-5.0-pro",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:bytedance/seedream-5.0-pro:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bytedance/seedream-5.0-pro",
+        "provider_id": "openrouter",
+        "binding_id": "bytedance-seed/seedream-5-0-pro",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:bytedance/seedream-5.0-pro:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bytedance/seedream-5.0-pro",
+        "provider_id": "openrouter",
+        "binding_id": "bytedance-seed/seedream-5-0-pro",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:bytedance/seedream-5.0-pro:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "bytedance/seedream-5.0-pro",
+        "provider_id": "vercel",
+        "binding_id": "bytedance/seedream-5.0-pro",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:google/gemini-3-pro-image:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "google/gemini-3-pro-image",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/nano-banana-pro",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:google/gemini-3-pro-image:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "google/gemini-3-pro-image",
+        "provider_id": "gg",
+        "binding_id": "google/gemini-3-pro-image",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:google/gemini-3-pro-image:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "google/gemini-3-pro-image",
+        "provider_id": "openrouter",
+        "binding_id": "google/gemini-3-pro-image-preview",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:google/gemini-3-pro-image:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "google/gemini-3-pro-image",
+        "provider_id": "openrouter",
+        "binding_id": "google/gemini-3-pro-image-preview",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:google/gemini-3-pro-image:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "google/gemini-3-pro-image",
+        "provider_id": "vercel",
+        "binding_id": "google/gemini-3-pro-image",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:google/gemini-3.1-flash-image-preview:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "google/gemini-3.1-flash-image-preview",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/nano-banana-2",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:google/gemini-3.1-flash-image-preview:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "google/gemini-3.1-flash-image-preview",
+        "provider_id": "gg",
+        "binding_id": "google/gemini-3.1-flash-image-preview",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:google/gemini-3.1-flash-image-preview:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "google/gemini-3.1-flash-image-preview",
+        "provider_id": "openrouter",
+        "binding_id": "google/gemini-3.1-flash-image",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:google/gemini-3.1-flash-image-preview:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "google/gemini-3.1-flash-image-preview",
+        "provider_id": "openrouter",
+        "binding_id": "google/gemini-3.1-flash-image",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:google/gemini-3.1-flash-image-preview:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "google/gemini-3.1-flash-image-preview",
+        "provider_id": "vercel",
+        "binding_id": "google/gemini-3.1-flash-image",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:openai/gpt-image-2.5-flare:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-flare",
+        "provider_id": "fal",
+        "binding_id": "openai/gpt-image-2.5/flare/edit",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:openai/gpt-image-2.5-flare:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-flare",
+        "provider_id": "fal",
+        "binding_id": "openai/gpt-image-2.5/flare/text-to-image",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:openai/gpt-image-2.5-flare:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-flare",
+        "provider_id": "gg",
+        "binding_id": "openai/gpt-image-2.5-flare",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:openai/gpt-image-2.5-flare:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-flare",
+        "provider_id": "openrouter",
+        "binding_id": "openai/gpt-image-2.5-flare",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:openai/gpt-image-2.5-flare:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-flare",
+        "provider_id": "openrouter",
+        "binding_id": "openai/gpt-image-2.5-flare",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:openai/gpt-image-2.5-flare:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-flare",
+        "provider_id": "vercel",
+        "binding_id": "openai/gpt-image-2.5-flare",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:openai/gpt-image-2.5-sunburst:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-sunburst",
+        "provider_id": "fal",
+        "binding_id": "openai/gpt-image-2.5/sunburst/edit",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:openai/gpt-image-2.5-sunburst:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-sunburst",
+        "provider_id": "fal",
+        "binding_id": "openai/gpt-image-2.5/sunburst/text-to-image",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:openai/gpt-image-2.5-sunburst:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-sunburst",
+        "provider_id": "gg",
+        "binding_id": "openai/gpt-image-2.5-sunburst",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:openai/gpt-image-2.5-sunburst:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-sunburst",
+        "provider_id": "openrouter",
+        "binding_id": "openai/gpt-image-2.5-sunburst",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:openai/gpt-image-2.5-sunburst:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-sunburst",
+        "provider_id": "openrouter",
+        "binding_id": "openai/gpt-image-2.5-sunburst",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:openai/gpt-image-2.5-sunburst:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2.5-sunburst",
+        "provider_id": "vercel",
+        "binding_id": "openai/gpt-image-2.5-sunburst",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:openai/gpt-image-2:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/gpt-image-2",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:openai/gpt-image-2:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2",
+        "provider_id": "gg",
+        "binding_id": "openai/gpt-image-2",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:openai/gpt-image-2:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2",
+        "provider_id": "openrouter",
+        "binding_id": "openai/gpt-image-2",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:openai/gpt-image-2:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2",
+        "provider_id": "openrouter",
+        "binding_id": "openai/gpt-image-2",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:openai/gpt-image-2:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "openai/gpt-image-2",
+        "provider_id": "vercel",
+        "binding_id": "openai/gpt-image-2",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:recraft/recraft-v4.1:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "recraft/recraft-v4.1",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/recraft/v4.1/text-to-image",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:recraft/recraft-v4.1:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "recraft/recraft-v4.1",
+        "provider_id": "gg",
+        "binding_id": "recraft/recraft-v4.1",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:recraft/recraft-v4.1:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "recraft/recraft-v4.1",
+        "provider_id": "openrouter",
+        "binding_id": "recraft/recraft-v4.1",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:recraft/recraft-v4.1:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "recraft/recraft-v4.1",
+        "provider_id": "openrouter",
+        "binding_id": "recraft/recraft-v4.1",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:recraft/recraft-v4.1:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "recraft/recraft-v4.1",
+        "provider_id": "vercel",
+        "binding_id": "recraft/recraft-v4.1",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:fal:generation:xai/grok-imagine-image-2.0:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "xai/grok-imagine-image-2.0",
+        "provider_id": "fal",
+        "binding_id": "xai/grok-imagine-image/v2.0/text-to-image",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:gg:generation:xai/grok-imagine-image-2.0:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "xai/grok-imagine-image-2.0",
+        "provider_id": "gg",
+        "binding_id": "xai/grok-imagine-image-2.0",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:xai/grok-imagine-image-2.0:references",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "xai/grok-imagine-image-2.0",
+        "provider_id": "openrouter",
+        "binding_id": "x-ai/grok-imagine-image-2.0",
+        "variant": "references",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:openrouter:generation:xai/grok-imagine-image-2.0:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "xai/grok-imagine-image-2.0",
+        "provider_id": "openrouter",
+        "binding_id": "x-ai/grok-imagine-image-2.0",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:image:vercel:generation:xai/grok-imagine-image-2.0:text",
+        "command": "generate",
+        "contract": "media.image",
+        "kind": "image",
+        "model_id": "xai/grok-imagine-image-2.0",
+        "provider_id": "vercel",
+        "binding_id": "spacexai/grok-imagine-image-2.0",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:music:gg:generation:google/lyria-3-pro:text",
+        "command": "generate",
+        "contract": "media.audio",
+        "kind": "music",
+        "model_id": "google/lyria-3-pro",
+        "provider_id": "gg",
+        "binding_id": "google/lyria-3-pro",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:music:gg:generation:google/lyria-3:text",
+        "command": "generate",
+        "contract": "media.audio",
+        "kind": "music",
+        "model_id": "google/lyria-3",
+        "provider_id": "gg",
+        "binding_id": "google/lyria-3",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:sound-effect:elevenlabs:generation:eleven_text_to_sound_v2:text",
+        "command": "generate",
+        "contract": "media.audio",
+        "kind": "sound-effect",
+        "model_id": "eleven_text_to_sound_v2",
+        "provider_id": "elevenlabs",
+        "binding_id": "eleven_text_to_sound_v2",
+        "variant": "text",
+        "catalog_status": "staged",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:text-to-speech:elevenlabs:generation:eleven_v3:text",
+        "command": "generate",
+        "contract": "media.audio",
+        "kind": "text-to-speech",
+        "model_id": "eleven_v3",
+        "provider_id": "elevenlabs",
+        "binding_id": "eleven_v3",
+        "variant": "text",
+        "catalog_status": "staged",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:fal:generation:fal-ai/hunyuan-3d/v3.1/pro/image-to-3d:image",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "model_id": "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+        "variant": "image",
+        "catalog_status": "staged",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:fal:generation:fal-ai/hunyuan-3d/v3.1/pro/text-to-3d:text",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "model_id": "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+        "variant": "text",
+        "catalog_status": "staged",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:fal:generation:fal-ai/trellis-2:image",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "model_id": "fal-ai/trellis-2",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/trellis-2",
+        "variant": "image",
+        "catalog_status": "staged",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:gg:model-generation:tripo/h3.1:image",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/h3.1",
+        "provider_id": "gg",
+        "binding_id": "v3.1-20260211",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:gg:model-generation:tripo/h3.1:multiview",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/h3.1",
+        "provider_id": "gg",
+        "binding_id": "v3.1-20260211",
+        "variant": "multiview",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:gg:model-generation:tripo/h3.1:text",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/h3.1",
+        "provider_id": "gg",
+        "binding_id": "v3.1-20260211",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:tripo:model-generation:tripo/h3.1:image",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/h3.1",
+        "provider_id": "tripo",
+        "binding_id": "v3.1-20260211",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:tripo:model-generation:tripo/h3.1:multiview",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/h3.1",
+        "provider_id": "tripo",
+        "binding_id": "v3.1-20260211",
+        "variant": "multiview",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:tripo:model-generation:tripo/h3.1:text",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/h3.1",
+        "provider_id": "tripo",
+        "binding_id": "v3.1-20260211",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:gg:model-generation:tripo/p1:image",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p1",
+        "provider_id": "gg",
+        "binding_id": "P1-20260311",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:gg:model-generation:tripo/p1:multiview",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p1",
+        "provider_id": "gg",
+        "binding_id": "P1-20260311",
+        "variant": "multiview",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:gg:model-generation:tripo/p1:text",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p1",
+        "provider_id": "gg",
+        "binding_id": "P1-20260311",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:tripo:model-generation:tripo/p1:image",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p1",
+        "provider_id": "tripo",
+        "binding_id": "P1-20260311",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:tripo:model-generation:tripo/p1:multiview",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p1",
+        "provider_id": "tripo",
+        "binding_id": "P1-20260311",
+        "variant": "multiview",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:tripo:model-generation:tripo/p1:text",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p1",
+        "provider_id": "tripo",
+        "binding_id": "P1-20260311",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:gg:model-generation:tripo/p2:image",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p2",
+        "provider_id": "gg",
+        "binding_id": "P2-20260801",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:gg:model-generation:tripo/p2:multiview",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p2",
+        "provider_id": "gg",
+        "binding_id": "P2-20260801",
+        "variant": "multiview",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:gg:model-generation:tripo/p2:text",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p2",
+        "provider_id": "gg",
+        "binding_id": "P2-20260801",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:tripo:model-generation:tripo/p2:image",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p2",
+        "provider_id": "tripo",
+        "binding_id": "P2-20260801",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:tripo:model-generation:tripo/p2:multiview",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p2",
+        "provider_id": "tripo",
+        "binding_id": "P2-20260801",
+        "variant": "multiview",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:three-d:tripo:model-generation:tripo/p2:text",
+        "command": "generate",
+        "contract": "media.three-d",
+        "kind": "three-d",
+        "feature": "model-generation",
+        "model_id": "tripo/p2",
+        "provider_id": "tripo",
+        "binding_id": "P2-20260801",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:fal:generation:alibaba/wan-3.0:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "alibaba/wan-3.0",
+        "provider_id": "fal",
+        "binding_id": "alibaba/wan-3.0/image-to-video",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:gg:generation:alibaba/wan-3.0:text",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "alibaba/wan-3.0",
+        "provider_id": "gg",
+        "binding_id": "alibaba/wan-3.0",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:vercel:generation:alibaba/wan-3.0:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "alibaba/wan-3.0",
+        "provider_id": "vercel",
+        "binding_id": "alibaba/wan-v3.0-video",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:vercel:generation:alibaba/wan-3.0:text",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "alibaba/wan-3.0",
+        "provider_id": "vercel",
+        "binding_id": "alibaba/wan-v3.0-video",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:fal:generation:bytedance/seedance-2.0:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "bytedance/seedance-2.0",
+        "provider_id": "fal",
+        "binding_id": "bytedance/seedance-2.0/image-to-video",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:openrouter:generation:bytedance/seedance-2.0:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "bytedance/seedance-2.0",
+        "provider_id": "openrouter",
+        "binding_id": "bytedance/seedance-2.0",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:openrouter:generation:bytedance/seedance-2.0:text",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "bytedance/seedance-2.0",
+        "provider_id": "openrouter",
+        "binding_id": "bytedance/seedance-2.0",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:fal:generation:bytedance/seedance-2.5:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "bytedance/seedance-2.5",
+        "provider_id": "fal",
+        "binding_id": "bytedance/seedance-2.5/image-to-video",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:fal:generation:google/veo-3.1-fast:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1-fast",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/veo3.1/fast/image-to-video",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:gg:generation:google/veo-3.1-fast:text",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1-fast",
+        "provider_id": "gg",
+        "binding_id": "google/veo-3.1-fast",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:vercel:generation:google/veo-3.1-fast:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1-fast",
+        "provider_id": "vercel",
+        "binding_id": "google/veo-3.1-fast-generate-001",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:vercel:generation:google/veo-3.1-fast:text",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1-fast",
+        "provider_id": "vercel",
+        "binding_id": "google/veo-3.1-fast-generate-001",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:fal:generation:google/veo-3.1-lite:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1-lite",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/veo3.1/lite/image-to-video",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:gg:generation:google/veo-3.1-lite:text",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1-lite",
+        "provider_id": "gg",
+        "binding_id": "google/veo-3.1-lite",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:vercel:generation:google/veo-3.1-lite:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1-lite",
+        "provider_id": "vercel",
+        "binding_id": "google/veo-3.1-lite-generate-001",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:vercel:generation:google/veo-3.1-lite:text",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1-lite",
+        "provider_id": "vercel",
+        "binding_id": "google/veo-3.1-lite-generate-001",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:fal:generation:google/veo-3.1:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1",
+        "provider_id": "fal",
+        "binding_id": "fal-ai/veo3.1/image-to-video",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:gg:generation:google/veo-3.1:text",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1",
+        "provider_id": "gg",
+        "binding_id": "google/veo-3.1",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:openrouter:generation:google/veo-3.1:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1",
+        "provider_id": "openrouter",
+        "binding_id": "google/veo-3.1",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:openrouter:generation:google/veo-3.1:text",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1",
+        "provider_id": "openrouter",
+        "binding_id": "google/veo-3.1",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:vercel:generation:google/veo-3.1:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1",
+        "provider_id": "vercel",
+        "binding_id": "google/veo-3.1-generate-001",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:vercel:generation:google/veo-3.1:text",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "google/veo-3.1",
+        "provider_id": "vercel",
+        "binding_id": "google/veo-3.1-generate-001",
+        "variant": "text",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:fal:generation:xai/grok-imagine-video-1.5:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "xai/grok-imagine-video-1.5",
+        "provider_id": "fal",
+        "binding_id": "xai/grok-imagine-video/v1.5/image-to-video",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "generate:video:vercel:generation:xai/grok-imagine-video-1.5:image",
+        "command": "generate",
+        "contract": "media.video",
+        "kind": "video",
+        "model_id": "xai/grok-imagine-video-1.5",
+        "provider_id": "vercel",
+        "binding_id": "spacexai/grok-imagine-video-1.5",
+        "variant": "image",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "rigging check:three-d:tripo:rig-check:no-model:mesh",
+        "command": "rigging check",
+        "contract": "media.rigging",
+        "kind": "three-d",
+        "feature": "rig-check",
+        "provider_id": "tripo",
+        "binding_id": "rig-check",
+        "variant": "mesh",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "rigging check:three-d:gg:rig-check:no-model:mesh",
+        "command": "rigging check",
+        "contract": "media.rigging",
+        "kind": "three-d",
+        "feature": "rig-check",
+        "provider_id": "gg",
+        "binding_id": "rig-check",
+        "variant": "mesh",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "rigging run:three-d:tripo:rigging:tripo/rig-v1.0:mesh",
+        "command": "rigging run",
+        "contract": "media.rigging",
+        "kind": "three-d",
+        "feature": "rigging",
+        "model_id": "tripo/rig-v1.0",
+        "provider_id": "tripo",
+        "binding_id": "v1.0-20240301",
+        "variant": "mesh",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "rigging run:three-d:gg:rigging:tripo/rig-v1.0:mesh",
+        "command": "rigging run",
+        "contract": "media.rigging",
+        "kind": "three-d",
+        "feature": "rigging",
+        "model_id": "tripo/rig-v1.0",
+        "provider_id": "gg",
+        "binding_id": "v1.0-20240301",
+        "variant": "mesh",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "rigging run:three-d:tripo:rigging:tripo/rig-v2.5:mesh",
+        "command": "rigging run",
+        "contract": "media.rigging",
+        "kind": "three-d",
+        "feature": "rigging",
+        "model_id": "tripo/rig-v2.5",
+        "provider_id": "tripo",
+        "binding_id": "v2.5-20260210",
+        "variant": "mesh",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      },
+      {
+        "id": "rigging run:three-d:gg:rigging:tripo/rig-v2.5:mesh",
+        "command": "rigging run",
+        "contract": "media.rigging",
+        "kind": "three-d",
+        "feature": "rigging",
+        "model_id": "tripo/rig-v2.5",
+        "provider_id": "gg",
+        "binding_id": "v2.5-20260210",
+        "variant": "mesh",
+        "catalog_status": "listed",
+        "required": true,
+        "status": "complete",
+        "cases": [
+          "proof.catalogue-reference",
+          "proof.catalogue-consumers",
+          "proof.rust-workspace"
+        ]
+      }
+    ]
+  },
+  "divergences": [
+    {
+      "id": "decision.vercel-video-zero-seed",
+      "status": "preserved",
+      "description": "Current shared/native input validation rejects zero seed for Vercel video because the pinned JS adapter cannot represent it. Rust may remove the SDK limitation, but zero remains a required rejection until the compatibility decision and shared expectations explicitly change.",
+      "sources": [
+        "packages/grida-ai/src/video-client.test.ts",
+        "packages/grida-ai/src/media-operations.test.ts"
+      ],
+      "decision": "Preserve the pinned TypeScript adapter’s Vercel video seed-zero rejection. Rust-native internals do not authorize changing the public contract."
+    },
+    {
+      "id": "decision.help-rendering",
+      "status": "preserved",
+      "description": "Command grammar, guidance and canonical URLs must remain; byte-for-byte human help layout is not yet ratified. Clap defaults must not silently change accepted aliases, incompatible-option refusal, exit codes or stdout/stderr behavior. Update installed docs checks explicitly if layout changes.",
+      "sources": [
+        "packages/grida-cli/src/cli.ts",
+        "packages/grida-cli/src/cli.test.ts",
+        "scripts/cli-docs/check.mjs"
+      ],
+      "decision": "Preserve current help prose byte-for-byte in owned Rust assets for the first slice. All 27 topics compared with the pinned reference on 2026-10-01; no intentional layout divergence introduced."
+    }
+  ],
+  "release_acceptance": {
+    "note": "These execution prerequisites belong to release/CI after the pre-PR implementation handoff. Local conformance does not claim that remote CI or hosted acceptance has run.",
+    "requirements": [
+      "All eight real platform binaries build and the same exact npm archives pass the target-native installed matrix; fixture headers are rejected by publication.",
+      "The exact candidate passes installed documentation and local OAuth/account/media proofs in release CI.",
+      "Hosted registration/consent/account/GG and appropriate live-provider acceptance remain required by the existing release procedure; deterministic tests never spend provider credits."
+    ]
+  }
+}

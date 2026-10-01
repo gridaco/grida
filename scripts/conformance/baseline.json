@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "revision": "b26ede1d62e21a0e24d52030538b8f7288ec9b4b",
+  "package_version": "0.2.0",
+  "recorded": "2026-10-01",
+  "paths": [
+    "packages/grida-cli",
+    "packages/grida-auth",
+    "packages/grida-account",
+    "packages/grida-home",
+    "packages/grida-ai",
+    "packages/grida-ai-models",
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "turbo.json",
+    ".nvmrc",
+    "scripts/cli-local/network.cjs"
+  ],
+  "sha256": "461fa45327cb3dbea0087bc9fdf38fc8bc532fd2e70367fe227723ce76364aca"
+}

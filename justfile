@@ -1,18 +1,42 @@
 default:
     just --list
 
-# Format the entire repo (JS/TS via oxfmt; Rust left with the engine repo)
+# Format application code (graphics-engine tooling stays in its own repo).
 fmt:
     pnpm fmt
+    cargo fmt --all
 
 # Run type checking
 check:
     pnpm turbo typecheck
     pnpm fmt:check
+    cargo fmt --all --check
+    cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
 # Run tests
 test:
     pnpm turbo test
+    cargo test --workspace --all-features --locked
+
+# Build both CLI implementations and check the completed migration contracts.
+cli-conformance:
+    node scripts/conformance/prepare.mjs
+    pnpm --filter docs build
+    node --test scripts/conformance/cli.test.mjs scripts/conformance/catalogue-request.test.mjs
+    node scripts/conformance/run.mjs
+
+# Full migration target; fails until all required contracts are complete.
+cli-conformance-target:
+    node scripts/conformance/prepare.mjs
+    pnpm --filter docs build
+    node --test scripts/conformance/cli.test.mjs scripts/conformance/catalogue-request.test.mjs
+    node scripts/conformance/run.mjs --suite target
+
+# Provider contracts and native HTTP with synthetic data and local sockets only.
+cli-provider-contracts:
+    node --test scripts/conformance/catalogue-request.test.mjs
+    cargo test -p grida-ai --locked
+    cargo test -p grida-cli --lib --locked http::
 
 # Run Supabase Splinter advisors against the local database — same set
 # of security + performance lints the Dashboard's "Database Advisors"

@@ -112,11 +112,29 @@ organization and is the default persona for normal feature work.
 [`supabase/seed.md`](./supabase/seed.md) documents the other seeded personas
 for multi-tenant and no-organization testing.
 
-## The Rust engine
+## Application Rust and the graphics engine
+
+The root Cargo workspace contains application crates, starting with the native
+CLI under `crates/grida-cli`, with `grida-auth` and `grida-ai` libraries. Install
+Rust through rustup; commands use the toolchain pinned in `rust-toolchain.toml`.
+The `grida` npm package launches a target-specific native executable.
+
+```sh
+cargo build --workspace --locked
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --all-features --locked
+just cli-conformance
+```
+
+The [conformance guide](scripts/conformance/README.md) explains the pinned
+reference, shared cases, native fixtures and release acceptance boundaries.
+Ordinary Rust builds need no Node code generation. The complete mirrored gate
+needs the normal pnpm install, built documentation (`pnpm --filter docs build`)
+and native keyring dependencies described in that guide.
 
 The Rust rendering engine (canvas WASM) is developed in
-[gridaco/nothing](https://github.com/gridaco/nothing). This repo does not
-contain Rust code and needs no Rust toolchain — the editor consumes the
+[gridaco/nothing](https://github.com/gridaco/nothing). The editor consumes the
 published `@grida/canvas-wasm` package from npm. To contribute to the engine
 itself, see that repository.
 

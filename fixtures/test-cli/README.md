@@ -23,8 +23,8 @@ speech and 3D descriptors are currently staged despite having executable contrac
 
 ## Run with a harness
 
-The [CLI package](../../packages/grida-cli/README.md) owns installation and local
-build instructions. This preview is not the legacy `grida` npm release. The
+The [CLI guide](https://grida.co/docs/cli) covers installation; the
+[package contribution guide](../../packages/grida-cli/CONTRIBUTING.md) covers local builds. This preview is not the legacy `grida` npm release. The
 [media contract](https://grida.co/docs/wg/cli/media) owns command syntax and
 availability semantics; do not duplicate those rules in these fixtures.
 

@@ -1,0 +1,7 @@
+Usage: grida auth logout [--json] [--no-input]
+
+Remove this CLI's credentials and request remote session revocation.
+Unconfirmed remote revocation exits 1; an already signed-out profile exits 0.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/auth

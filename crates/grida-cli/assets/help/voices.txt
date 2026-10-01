@@ -1,0 +1,4 @@
+Usage: grida voices list --provider elevenlabs [--key-stdin] [--json]
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/models

@@ -13,8 +13,9 @@ format: md
 > **Status: accepted custody design for the CLI preview.** Native
 > account custody and shared BYOK storage in TOML are implemented.
 > Environment/stdin keys remain explicit per-invocation overrides.
-> The [native package contract](https://github.com/gridaco/grida/blob/main/packages/grida-auth/README.md)
-> records implemented platforms and verification limits. See the [v1 spec](./v1.md).
+> The [Rust custody contract](https://github.com/gridaco/grida/blob/main/crates/grida-auth/README.md)
+> and [TypeScript custody contract](https://github.com/gridaco/grida/blob/main/packages/grida-auth/README.md)
+> record implementation-specific platforms and verification limits. See the [v1 spec](./v1.md).
 
 Sign in once, close the terminal, and keep using Grida. Two commands running
 together must not invalidate each other's session. Signing out must survive a
@@ -109,8 +110,8 @@ still require login. Recovery must report that outcome honestly.
 **Implemented in the CLI preview:** Desktop and CLI share
 `providers/credentials.toml` for BYOK API keys under the user's Grida home
 (`~/.grida` by default, or the explicit `GRIDA_HOME`). Plaintext
-with user-only permissions is the default. Both clients use the same credential
-owner; neither requires the other to run. A language rewrite must preserve this
+with user-only permissions is the default. Both clients use the same versioned
+storage contract; neither requires the other to run. A language rewrite must preserve this
 contract without requiring the previous runtime or a credential daemon.
 
 TOML provides readable sections, comments, and explicit types. The filename
@@ -150,8 +151,9 @@ grida providers remove fal
 `configure` uses hidden terminal input. Automation supplies `--key-stdin`;
 there is no literal key argument. `list` reports presence and effective source,
 never key contents or verified access. Shared stored credentials currently require
-macOS/Linux and Node 24+ on the main thread. Windows CLI stored BYOK is unsupported;
-explicit CLI environment/stdin keys remain available.
+macOS/Linux. Runtime requirements belong to each client implementation; the storage
+protocol does not require a shared language or runtime. Windows CLI stored BYOK is
+unsupported; explicit CLI environment/stdin keys remain available.
 
 Precedence is `--key-stdin`, the selected provider's environment variable, then
 the shared file. A blank or malformed explicit key fails; unset the environment

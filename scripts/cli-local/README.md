@@ -3,6 +3,63 @@
 > **GRIDA-SEC-010 / GRIDA-SEC-011** — real native account custody in an owned
 > local OAuth fixture. See [SECURITY.md](../../SECURITY.md).
 
+## Native CLI acceptance
+
+`native-proof.mjs` installs the exact verified native candidate using
+`installNative`, then invokes its installed Rust executable in separate processes.
+It accepts an already bootstrapped [owned OAuth fixture](../auth-local/README.md)
+whose dedicated editor is running. It never starts, adopts, resets, or stops a
+Supabase stack.
+
+```sh
+node scripts/cli-local/native-proof.mjs \
+  --state /absolute/fixture/fixture.json \
+  --candidate /absolute/native-candidate
+node --test scripts/cli-local/native-proof.test.mjs
+```
+
+The candidate directory must come from the native release preparer. Local CI may
+use `buildHostFixture` from `scripts/cli-release/native-fixture.mjs`; the selected
+host executable is real, foreign headers are marked as inert fixtures, and such
+a candidate cannot be published. The report records both archive hashes and the
+installed executable hash.
+
+The native proof covers manual browser consent with fresh PKCE/state, real code
+exchange and identity, explicit file storage, process restart, independent native
+profiles, occupied callback ports, cancellation cleanup, concurrent account reads,
+cached credits and membership denial, local-session logout, and durable revision
+advancement after empty logout. It does not open the OS keyring: default storage
+metadata is inspected, then file custody is selected explicitly before session
+access.
+
+Children receive a constructed environment and private home. Browser routing
+allows only the fixture origins; traces, screenshots, video and service workers
+are disabled. Authorization URLs, seeded passwords and tokens remain in memory
+or the disposable owned custody tree. All owned child processes, browser storage
+and credential files are removed before the safe report is written to ignored
+`.cache/cli-local/native-result.json`. The caller retains ownership of the stack
+and editor. The auth-local workflow runs this installed proof while its fixture
+editor is alive and preserves the existing TypeScript auth-package/keytar tests.
+
+The native executable is not instrumented by Node preloads or an injected clock.
+This command consequently makes no claim about forced-expiry refresh, expired
+logout, or CLI network tripwire counts. Those remain covered by the mixed-process
+auth contracts, controlled Rust transport tests, and the fixture's separate auth
+proof. The native host itself pins its account endpoints. These checks do not
+certify hosted registration, the system browser launcher, naturally expired JWTs,
+Windows custody, or native keyring availability.
+
+## Frozen TypeScript acceptance
+
+The following `proof.mjs` and `linux-smoke.mjs` documentation describes the
+TypeScript CLI before native cutover. That acceptance is frozen at revision
+`b26ede1d62e21a0e24d52030538b8f7288ec9b4b`, also recorded in the conformance baseline.
+Run these legacy commands from a checkout of that revision with its dependencies
+and fixture tooling; the current native npm candidate does not contain `dist/bin`
+or keytar and cannot satisfy that legacy install contract. The legacy proof files
+remain available, and their clock/preload checks are not silently claimed as
+native coverage. Use the native command above for the current executable.
+
 This proof prepares the current `grida` build through the shared
 [candidate preparer](../cli-release/README.md), installs its tarball with npm into a
 private temporary directory, and runs the installed executable in separate
