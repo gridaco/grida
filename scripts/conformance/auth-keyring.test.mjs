@@ -67,7 +67,13 @@ before(async () => {
       "--locked",
       "--message-format=json",
     ],
-    { cwd: repository, encoding: "utf8" }
+    { cwd: repository, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }
+  );
+  if (built.error) throw built.error;
+  assert.equal(
+    built.signal,
+    null,
+    "Auth conformance build terminated by signal"
   );
   assert.equal(built.status, 0, built.stderr);
   const executables = built.stdout
