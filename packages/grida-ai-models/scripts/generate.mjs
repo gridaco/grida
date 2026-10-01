@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 const require = createRequire(import.meta.url);
+const formatterPackage = require.resolve("oxfmt/package.json");
+const formatter = path.join(
+  path.dirname(formatterPackage),
+  require(formatterPackage).bin.oxfmt
+);
 const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../.."
@@ -15,11 +20,11 @@ const check = process.argv.includes("--check");
 const bundle = process.argv.includes("--bundle");
 let changed = false;
 function write(name, text) {
-  text = execFileSync(
-    path.join(root, "node_modules/.bin/oxfmt"),
-    ["--stdin-filepath", name],
-    { cwd: root, input: text, encoding: "utf8" }
-  );
+  text = execFileSync(process.execPath, [formatter, "--stdin-filepath", name], {
+    cwd: root,
+    input: text,
+    encoding: "utf8",
+  });
   const existing = fs.existsSync(name) ? fs.readFileSync(name, "utf8") : "";
   if (existing === text) return;
   if (check) {

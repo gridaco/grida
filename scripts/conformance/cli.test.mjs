@@ -27,6 +27,28 @@ import {
   assertOperationVectors,
 } from "./inventory.mjs";
 import { assertCheck } from "./checks.mjs";
+import { assertInstalledStderr } from "./installed.mjs";
+
+test("installed reference admits only its own exact SQLite runtime warning", () => {
+  const pid = 12345;
+  const warning =
+    `(node:${pid}) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n` +
+    "(Use `node --trace-warnings ...` to show where the warning was created)\n";
+  assertInstalledStderr({ stderr: "", pid });
+  assertInstalledStderr({ stderr: "", pid }, true);
+  assertInstalledStderr({ stderr: warning, pid }, true);
+  assert.throws(() => assertInstalledStderr({ stderr: warning, pid }));
+  for (const stderr of [
+    "debug secret\n",
+    warning + "debug secret\n",
+    "debug secret\n" + warning,
+    warning + warning,
+    warning.replace("SQLite", "Other API"),
+    warning.replace(String(pid), String(pid + 1)),
+  ])
+    assert.throws(() => assertInstalledStderr({ stderr, pid }, true));
+  assert.throws(() => assertInstalledStderr({ stderr: warning }, true));
+});
 
 const example = {
   id: "selfcheck.json",

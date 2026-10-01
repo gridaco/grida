@@ -19,6 +19,20 @@ const uuid = "[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}";
 const developer =
   "anchor apple generic and (certificate leaf[field.1.2.840.113635.100.6.1.9] exists or certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists or certificate 1[field.1.2.840.113635.100.6.2.1] exists and (certificate leaf[field.1.2.840.113635.100.6.1.12] exists or certificate leaf[field.1.2.840.113635.100.6.1.7] exists))";
 
+class FixtureStageError extends Error {}
+function stage(name, action, previous) {
+  try {
+    return action();
+  } catch {
+    // Only fixed labels reach CI logs: never native output, arguments, marker
+    // contents, paths, passwords, or arbitrary exception messages.
+    throw new FixtureStageError(
+      (previous instanceof FixtureStageError ? `${previous.message} ` : "") +
+        `Disposable macOS custody failed at ${name}.`
+    );
+  }
+}
+
 function command(runner, executable, args, env) {
   try {
     const result = runner(executable, args, {
@@ -117,18 +131,22 @@ export class MacosKeychainFixture {
     wait = () =>
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20),
   } = {}) {
-    this.guard(env, platform, uid);
-    assert(
-      !env.GRIDA_AUTH_MACOS_FIXTURE,
-      "Nested macOS fixtures are not allowed"
+    stage("CI guard", () => {
+      this.guard(env, platform, uid);
+      assert(
+        !env.GRIDA_AUTH_MACOS_FIXTURE,
+        "Nested macOS fixtures are not allowed"
+      );
+      assert(
+        !env.GRIDA_AUTH_CONFORMANCE_BIN && !env.GRIDA_AUTH_KEYTAR_MODULE,
+        "CI custody must use the built Rust driver and installed keytar"
+      );
+    });
+    const root = stage("runner temporary directory", () =>
+      realpathSync(env.RUNNER_TEMP)
     );
-    assert(
-      !env.GRIDA_AUTH_CONFORMANCE_BIN && !env.GRIDA_AUTH_KEYTAR_MODULE,
-      "CI custody must use the built Rust driver and installed keytar"
-    );
-    const root = realpathSync(env.RUNNER_TEMP);
-    const directory = realpathSync(
-      mkdtempSync(path.join(root, "grida-auth-macos-"))
+    const directory = stage("fixture directory creation", () =>
+      realpathSync(mkdtempSync(path.join(root, "grida-auth-macos-")))
     );
     const filename = path.join(directory, "fixture.json");
     const state = {
@@ -143,46 +161,62 @@ export class MacosKeychainFixture {
     let search;
     let creationStarted = false;
     let testGroupSettled = true;
+    let failedStage;
     try {
-      privatePath(directory, true);
-      assert(!existsSync(state.keychain), "Fixture keychain must not exist");
-      writeFileSync(filename, JSON.stringify(state), {
-        mode: 0o600,
-        flag: "wx",
+      stage("private fixture marker", () => {
+        privatePath(directory, true);
+        assert(!existsSync(state.keychain), "Fixture keychain must not exist");
+        writeFileSync(filename, JSON.stringify(state), {
+          mode: 0o600,
+          flag: "wx",
+        });
       });
-      defaults = keychainPaths(
-        security(runner, ["default-keychain", "-d", "user"], env)
-      );
-      assert(defaults.length === 1, "Expected one runner default keychain");
-      search = keychainPaths(
-        security(runner, ["list-keychains", "-d", "user"], env)
+      defaults = stage("default keychain snapshot", () => {
+        const paths = keychainPaths(
+          security(runner, ["default-keychain", "-d", "user"], env)
+        );
+        assert(paths.length === 1, "Expected one runner default keychain");
+        return paths;
+      });
+      search = stage("search keychain snapshot", () =>
+        keychainPaths(security(runner, ["list-keychains", "-d", "user"], env))
       );
       creationStarted = true;
-      security(
-        runner,
-        ["create-keychain", "-p", state.password, state.keychain],
-        env
+      stage("keychain creation", () =>
+        security(
+          runner,
+          ["create-keychain", "-p", state.password, state.keychain],
+          env
+        )
       );
-      privatePath(state.keychain);
-      security(
-        runner,
-        ["unlock-keychain", "-p", state.password, state.keychain],
-        env
+      stage("created keychain ownership", () => privatePath(state.keychain));
+      stage("keychain unlock", () =>
+        security(
+          runner,
+          ["unlock-keychain", "-p", state.password, state.keychain],
+          env
+        )
       );
-      security(
-        runner,
-        ["set-keychain-settings", "-t", "3600", state.keychain],
-        env
+      stage("keychain settings", () =>
+        security(
+          runner,
+          ["set-keychain-settings", "-t", "3600", state.keychain],
+          env
+        )
       );
-      security(
-        runner,
-        ["default-keychain", "-d", "user", "-s", state.keychain],
-        env
+      stage("default keychain selection", () =>
+        security(
+          runner,
+          ["default-keychain", "-d", "user", "-s", state.keychain],
+          env
+        )
       );
-      security(
-        runner,
-        ["list-keychains", "-d", "user", "-s", state.keychain],
-        env
+      stage("search keychain selection", () =>
+        security(
+          runner,
+          ["list-keychains", "-d", "user", "-s", state.keychain],
+          env
+        )
       );
       // The real adapters use the runner's default keychain. Only this disposable
       // runner's preferences change; no developer invocation may enter this path.
@@ -199,9 +233,14 @@ export class MacosKeychainFixture {
           detached: true,
         }
       );
-      stopGroup(result, kill, wait);
+      stage("owned process group termination", () =>
+        stopGroup(result, kill, wait)
+      );
       testGroupSettled = true;
       return result;
+    } catch (error) {
+      if (error instanceof FixtureStageError) failedStage = error;
+      throw error;
     } finally {
       // Abrupt CI cancellation is handled by disposable-runner destruction.
       // Do not expose surviving fixture children to restored runner credentials.
@@ -239,9 +278,10 @@ export class MacosKeychainFixture {
           });
       }
       cleanup(() => rmSync(directory, { recursive: true, force: true }));
-      assert(
-        failures.length === 0,
-        "Could not completely restore and remove the disposable macOS keychain"
+      stage(
+        "keychain restoration and cleanup",
+        () => assert(failures.length === 0),
+        failedStage
       );
     }
   }
@@ -430,9 +470,11 @@ if (
     process.stdout.write(result.stdout || "");
     process.stderr.write(result.stderr || "");
     process.exitCode = result.error || result.signal ? 1 : (result.status ?? 1);
-  } catch {
+  } catch (error) {
     process.stderr.write(
-      "Disposable macOS custody setup, test, or cleanup failed.\n"
+      error instanceof FixtureStageError
+        ? `${error.message}\n`
+        : "Disposable macOS custody setup, test, or cleanup failed.\n"
     );
     process.exitCode = 1;
   }

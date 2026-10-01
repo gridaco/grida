@@ -102,7 +102,7 @@ fn acl(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn acl(_: &Path) -> Result<()> {
     Ok(())
 }

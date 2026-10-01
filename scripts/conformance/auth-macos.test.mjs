@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
 import {
+  chmodSync,
   existsSync,
   mkdtempSync,
   readFileSync,
@@ -22,6 +23,7 @@ function fake(
     fail = () => false,
     lingering = false,
     appleIdentifier = "com.apple.security",
+    keychainMode = 0o600,
   } = {}
 ) {
   const root = realpathSync(
@@ -53,11 +55,13 @@ function fake(
       pid: 424242,
     };
     if (executable === "/usr/bin/security") {
-      if (args[0] === "create-keychain")
+      if (args[0] === "create-keychain") {
         writeFileSync(args.at(-1), "synthetic-keychain-file", {
           mode: 0o600,
           flag: "wx",
         });
+        chmodSync(args.at(-1), keychainMode);
+      }
       if (fail(args))
         return {
           ...result,
@@ -164,6 +168,26 @@ test("every CI guard rejects before any keychain command", (t) => {
     })
   );
 });
+
+test("unsafe created keychain mode remains rejected with safe setup and cleanup stages", (t) => {
+  const setup = fake(t, { keychainMode: 0o644 });
+  assert.throws(() => MacosKeychainFixture.run(setup), {
+    message:
+      "Disposable macOS custody failed at created keychain ownership. " +
+      "Disposable macOS custody failed at keychain restoration and cleanup.",
+  });
+  assert(!setup.calls.some((call) => call.executable === process.execPath));
+  assert.equal(setup.preferences().currentDefault, setup.original);
+});
+
+for (const operation of ["default-keychain", "list-keychains"])
+  test(`failed ${operation} snapshot reports only its fixed stage before creating a keychain`, (t) => {
+    const setup = fake(t, { fail: (args) => args[0] === operation });
+    assert.throws(() => MacosKeychainFixture.run(setup), {
+      message: `Disposable macOS custody failed at ${operation === "default-keychain" ? "default" : "search"} keychain snapshot.`,
+    });
+    assert(!setup.calls.some((call) => call.args?.[0] === "create-keychain"));
+  });
 
 test("owned fixture repairs only confirmed exact items and restores preferences", (t) => {
   let marker;
@@ -313,10 +337,17 @@ for (const failingCommand of [
         return false;
       },
     });
-    assert.throws(
-      () => MacosKeychainFixture.run(setup),
-      (error) => !error.message.includes("synthetic-password-native-error")
-    );
+    assert.throws(() => MacosKeychainFixture.run(setup), {
+      message: `Disposable macOS custody failed at ${
+        {
+          "create-keychain": "keychain creation",
+          "unlock-keychain": "keychain unlock",
+          "set-keychain-settings": "keychain settings",
+          "default-keychain": "default keychain selection",
+          "list-keychains": "search keychain selection",
+        }[failingCommand]
+      }.`,
+    });
     assert(failed);
     assert.deepEqual(setup.preferences(), {
       currentDefault: setup.original,
@@ -364,10 +395,10 @@ test("restoration failure does not prevent remaining cleanup attempts", (t) => {
     fail: (args) =>
       childFinished && args[0] === "default-keychain" && args.includes("-s"),
   });
-  assert.throws(
-    () => MacosKeychainFixture.run(setup),
-    /Could not completely restore/
-  );
+  assert.throws(() => MacosKeychainFixture.run(setup), {
+    message:
+      "Disposable macOS custody failed at keychain restoration and cleanup.",
+  });
   assert.deepEqual(setup.preferences().currentSearch, [
     setup.original,
     "/Library/Keychains/Another Fixture.keychain",

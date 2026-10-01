@@ -31,9 +31,12 @@ test("canonical authoring and each package-local projection cannot drift silentl
     mkdirSync(dirname(target), { recursive: true });
     cpSync(join(root, name), target, { recursive: true });
   }
+  // Only the installed package is available: no POSIX/.cmd bin shim exists.
+  // The generator must invoke its declared JS bin through this Node runtime.
+  mkdirSync(join(fixture, "node_modules"));
   symlinkSync(
-    join(root, "node_modules"),
-    join(fixture, "node_modules"),
+    join(root, "node_modules/oxfmt"),
+    join(fixture, "node_modules/oxfmt"),
     process.platform === "win32" ? "junction" : "dir"
   );
   function run(...args) {

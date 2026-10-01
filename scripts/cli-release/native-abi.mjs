@@ -1,5 +1,27 @@
 import assert from "node:assert/strict";
 
+export function verifyMuslStatic(programHeaders, dynamic) {
+  assert(
+    /Program Headers:/.test(programHeaders) &&
+      /^\s*LOAD\s/m.test(programHeaders),
+    "Missing musl ELF program headers"
+  );
+  assert(
+    !/^\s*INTERP\s/m.test(programHeaders),
+    "Static musl executable must not request a dynamic interpreter"
+  );
+  assert(
+    /Dynamic section at offset/.test(dynamic) ||
+      /There is no dynamic section in this file\./.test(dynamic),
+    "Missing musl ELF dynamic-section inspection"
+  );
+  assert(
+    !/\(NEEDED\)/.test(dynamic),
+    "Static musl executable must not depend on shared libraries"
+  );
+  return { linkage: "static", needed: [] };
+}
+
 export function verifyGlibcBaseline(versions, dynamic) {
   const names = [...versions.matchAll(/\bGLIBC_([A-Za-z0-9_.]+)\b/g)].map(
     (match) => match[1]

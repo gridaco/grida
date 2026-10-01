@@ -27,7 +27,7 @@ import {
 } from "./native.mjs";
 import { proveNative } from "./native-proof.mjs";
 import { fixtureBinary } from "./native-fixture.mjs";
-import { verifyGlibcBaseline } from "./native-abi.mjs";
+import { verifyGlibcBaseline, verifyMuslStatic } from "./native-abi.mjs";
 import {
   publishVerifiedArchives,
   releaseGuard,
@@ -317,6 +317,37 @@ test("publication rechecks a package after preflight instead of overwriting a ra
   assert.equal(
     fixture.calls.filter(([operation]) => operation === "publish").length,
     0
+  );
+});
+
+test("musl artifacts reject interpreters and shared dependencies while allowing static PIE", () => {
+  const headers = "Program Headers:\n  Type Offset VirtAddr\n  LOAD 0x0 0x0\n";
+  const pie =
+    "Dynamic section at offset 0x100 contains 2 entries:\n  (FLAGS_1) Flags: PIE\n  (NULL) 0x0\n";
+  const fixed = "There is no dynamic section in this file.\n";
+  assert.deepEqual(verifyMuslStatic(headers, pie), {
+    linkage: "static",
+    needed: [],
+  });
+  assert.deepEqual(verifyMuslStatic(headers, fixed), {
+    linkage: "static",
+    needed: [],
+  });
+  // musl-gcc's static-PIE wrapper regression links successfully but adds this
+  // loader and crashes before main. ABI inspection must reject it before packing.
+  assert.throws(
+    () => verifyMuslStatic(`${headers}  INTERP 0x270 0x270\n`, pie),
+    /dynamic interpreter/
+  );
+  assert.throws(
+    () =>
+      verifyMuslStatic(headers, `${pie}  (NEEDED) Shared library: [libc.so]\n`),
+    /shared libraries/
+  );
+  assert.throws(() => verifyMuslStatic("", pie), /program headers/);
+  assert.throws(
+    () => verifyMuslStatic(headers, ""),
+    /dynamic-section inspection/
   );
 });
 

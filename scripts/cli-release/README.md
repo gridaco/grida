@@ -33,8 +33,13 @@ GNU binaries build on their native architecture inside PyPA's
 with the exact Rust version from `rust-toolchain.toml`. The build executes the
 binary in that glibc 2.28 environment, rejects newer glibc symbol requirements,
 and rejects unexpected unbundled shared libraries. A newer Ubuntu runner does
-not raise the ABI minimum. musl builds use `musl-gcc` and installed proofs run
-inside the official Alpine Node image. macOS sets deployment target 11.0.
+not raise the ABI minimum. musl builds compile native C dependencies with
+`musl-gcc` and link Rust's self-contained musl runtime with the host `cc` driver.
+Using the `musl-gcc` wrapper as Rust's linker can produce an x64 static-PIE binary
+that crashes at startup ([Rust issue 95926](https://github.com/rust-lang/rust/issues/95926)).
+Before execution and packaging, musl builds reject ELF interpreters and shared
+library dependencies; a static PIE's own dynamic section is permitted. Installed
+proofs run inside the official Alpine Node image. macOS sets deployment target 11.0.
 Windows uses its native architecture and MSVC target.
 
 ## Preparing a candidate

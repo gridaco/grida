@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
 import { binaryHeader, platforms } from "./native.mjs";
-import { verifyGlibcBaseline } from "./native-abi.mjs";
+import { verifyGlibcBaseline, verifyMuslStatic } from "./native-abi.mjs";
 
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -33,9 +33,12 @@ const environment = {
 };
 if (platform.os === "darwin") environment.MACOSX_DEPLOYMENT_TARGET = "11.0";
 if (platform.libc === "musl") {
+  // Rust supplies its own musl CRT/libc. musl-gcc is only the C compiler:
+  // its linker wrapper adds an interpreter to x64 static PIE and crashes at
+  // startup (https://github.com/rust-lang/rust/issues/95926).
   environment[
     `CARGO_TARGET_${platform.target.replaceAll("-", "_").toUpperCase()}_LINKER`
-  ] = "musl-gcc";
+  ] = "cc";
   environment[`CC_${platform.target.replaceAll("-", "_")}`] = "musl-gcc";
 }
 let abi;
@@ -112,6 +115,17 @@ const name = platform.os === "win32" ? "grida.exe" : "grida";
 const binary = path.join(targetDir, platform.target, "release", name);
 const bytes = await readFile(binary);
 binaryHeader(bytes, platform);
+if (platform.libc === "musl") {
+  const inspection = {
+    timeout: 10_000,
+    env: { ...process.env, LC_ALL: "C" },
+  };
+  const [headers, dynamic] = await Promise.all([
+    exec("readelf", ["--program-headers", binary], inspection),
+    exec("readelf", ["--dynamic", binary], inspection),
+  ]);
+  abi = verifyMuslStatic(headers.stdout, dynamic.stdout);
+}
 const manifest = JSON.parse(
   await readFile(path.join(root, "packages/grida-cli/package.json"), "utf8")
 );
