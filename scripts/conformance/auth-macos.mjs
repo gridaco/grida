@@ -3,9 +3,14 @@ import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
+  closeSync,
+  constants,
   existsSync,
+  fchmodSync,
+  fstatSync,
   lstatSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -70,12 +75,46 @@ function privatePath(filename, directory = false) {
   const stat = lstatSync(filename);
   assert(
     !stat.isSymbolicLink() &&
-      (directory ? stat.isDirectory() : stat.isFile()) &&
+      (directory ? stat.isDirectory() : stat.isFile() && stat.nlink === 1) &&
       stat.uid === process.getuid() &&
       (stat.mode & 0o077) === 0,
     "Invalid macOS fixture ownership"
   );
   assert(realpathSync(filename) === filename, "Aliased macOS fixture path");
+}
+function secureCreatedKeychain(filename) {
+  // security(1) may create its database with group/world-readable mode bits.
+  // Only our freshly created keychain in its private, unique fixture directory
+  // may be tightened. Loading an existing fixture still uses strict privatePath.
+  stage("created keychain parent", () =>
+    privatePath(path.dirname(filename), true)
+  );
+  const fd = stage("created keychain no-follow open", () =>
+    openSync(
+      filename,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
+    )
+  );
+  try {
+    const stat = stage("created keychain file identity", () => {
+      const value = fstatSync(fd);
+      assert(
+        value.isFile() && value.uid === process.getuid() && value.nlink === 1
+      );
+      assert(realpathSync(filename) === filename);
+      return value;
+    });
+    stage("created keychain private permissions", () => fchmodSync(fd, 0o600));
+    stage("created keychain identity after permissions", () => {
+      const current = lstatSync(filename);
+      const opened = fstatSync(fd);
+      assert(current.dev === stat.dev && current.ino === stat.ino);
+      assert(opened.nlink === 1 && (opened.mode & 0o777) === 0o600);
+      privatePath(filename);
+    });
+  } finally {
+    closeSync(fd);
+  }
 }
 function stopGroup(result, kill, wait) {
   if (!result.pid && result.error) return;
@@ -189,7 +228,7 @@ export class MacosKeychainFixture {
           env
         )
       );
-      stage("created keychain ownership", () => privatePath(state.keychain));
+      secureCreatedKeychain(state.keychain);
       stage("keychain unlock", () =>
         security(
           runner,

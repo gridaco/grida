@@ -55,6 +55,25 @@ test("canonical authoring and each package-local projection cannot drift silentl
     writeFileSync(target, JSON.stringify(value));
   }
   succeeds(run("--check"));
+  // Windows Git checkouts may use CRLF. That checkout policy is not authored
+  // drift, and a read-only check must not rewrite the working tree to LF.
+  const projections = [
+    "packages/grida-ai/schemas/inputs.generated.json",
+    "packages/grida-ai-models/src/models.ts",
+    "packages/grida-ai-models/src/grida/catalog.ts",
+    "packages/grida-ai-models/src/grida/preferences.ts",
+    "packages/grida-ai-models/src/grida/tiers.ts",
+  ].map((name) => join(fixture, name));
+  const crlf = projections.map((name) => {
+    const text = readFileSync(name, "utf8").replace(/\r?\n/g, "\r\n");
+    writeFileSync(name, text);
+    return text;
+  });
+  succeeds(run("--check"));
+  assert.deepEqual(
+    projections.map((name) => readFileSync(name, "utf8")),
+    crlf
+  );
   for (const [name, edit, stale] of [
     [
       "data/ai/facts.json",
@@ -83,6 +102,13 @@ test("canonical authoring and each package-local projection cannot drift silentl
     assert.equal(result.status, 1, result.stderr);
     assert.ok(result.stderr.includes(stale), result.stderr);
     succeeds(run());
+    assert.ok(
+      !readFileSync(
+        projections.find((name) => name.endsWith(stale)),
+        "utf8"
+      ).includes("\r\n"),
+      "regenerated projections use canonical LF"
+    );
     succeeds(run("--check"));
   }
   update("packages/grida-ai/schemas/inputs.generated.json", (data) => {

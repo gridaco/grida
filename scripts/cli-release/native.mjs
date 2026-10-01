@@ -178,6 +178,10 @@ export async function npmRun(args, scratch, options = {}) {
         path.delimiter
       ),
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
+      // npm resolves the OS home before reading the explicit config paths.
+      // Container users may have only a numeric UID, with no passwd entry.
+      HOME: scratch,
+      USERPROFILE: scratch,
       TMPDIR: scratch,
       TEMP: scratch,
       TMP: scratch,

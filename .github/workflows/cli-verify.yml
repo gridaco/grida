@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/cli-*.yml"
+      - ".gitattributes"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"

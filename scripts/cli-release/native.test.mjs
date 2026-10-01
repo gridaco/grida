@@ -38,6 +38,73 @@ import { selectPlatform } from "../../packages/grida-cli/native/bin.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const exec = promisify(execFile);
 
+test("npm runs with a disposable home even before loading its explicit config", async (t) => {
+  const scratch = await mkdtemp(path.join(tmpdir(), "grida-native-npm-home-"));
+  t.after(() => rm(scratch, { recursive: true, force: true }));
+  await writeFile(
+    path.join(scratch, "package.json"),
+    JSON.stringify({ scripts: { proof: "node home.cjs" } })
+  );
+  await writeFile(
+    path.join(scratch, "home.cjs"),
+    "if (require('node:fs').realpathSync(require('node:os').homedir()) !== process.cwd()) process.exit(19); process.stdout.write('isolated home\\n');\n"
+  );
+  const { stdout } = await npmRun(
+    ["run", "--silent", "--ignore-scripts", "proof"],
+    scratch
+  );
+  assert.equal(stdout, "isolated home\n");
+});
+
+test("Windows checkout filters preserve byte-verified native release sources", async (t) => {
+  const scratch = await mkdtemp(path.join(tmpdir(), "grida-native-checkout-"));
+  t.after(() => rm(scratch, { recursive: true, force: true }));
+  await exec("git", ["init", "--quiet", scratch]);
+  try {
+    await copyFile(
+      path.join(root, ".gitattributes"),
+      path.join(scratch, ".gitattributes")
+    );
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  const git = (...args) =>
+    exec("git", ["-c", "core.autocrlf=true", "-c", "core.eol=crlf", ...args], {
+      cwd: scratch,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  for (const filename of [
+    "Cargo.lock",
+    "LICENSE",
+    "packages/grida-cli/README.md",
+    "packages/grida-cli/THIRD-PARTY-NOTICES.txt",
+    "packages/grida-cli/native/bin.mjs",
+    "packages/grida-cli/native/platforms.json",
+    "packages/grida-cli/native/licenses.json",
+  ]) {
+    const bytes = await readFile(path.join(root, filename));
+    const input = path.join(scratch, "source");
+    await writeFile(input, bytes);
+    const { stdout: object } = await git(
+      "hash-object",
+      "--no-filters",
+      "-w",
+      input
+    );
+    const { stdout } = await git(
+      "cat-file",
+      "--filters",
+      `--path=${filename}`,
+      object.trim()
+    );
+    assert.equal(
+      createHash("sha256").update(stdout).digest("hex"),
+      createHash("sha256").update(bytes).digest("hex"),
+      filename
+    );
+  }
+});
+
 async function rootOnlyInstall(out, report, runtime) {
   const metadata = new Map();
   const archives = new Map();

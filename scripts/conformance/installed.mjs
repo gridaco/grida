@@ -84,6 +84,93 @@ export function assertInstalledStderr(
     );
   } else assert.equal(stderr, "");
 }
+export function startInstalledCommand(
+  command,
+  args,
+  options,
+  timeoutMs = 15000
+) {
+  const grouped = process.platform !== "win32";
+  const child = spawn(command, args, {
+    ...options,
+    stdio: "pipe",
+    detached: grouped,
+  });
+  let stdout = "",
+    stderr = "",
+    finished = false;
+  const closed = new Promise((resolve) =>
+    child.once("close", () => {
+      finished = true;
+      resolve();
+    })
+  );
+  const terminate = () => {
+    if (finished || !child.pid) return;
+    try {
+      // Killing only the npm launcher leaves its native child holding pipes and
+      // callback sockets. Own and terminate the entire POSIX proof process group.
+      if (grouped) process.kill(-child.pid, "SIGKILL");
+      else child.kill("SIGKILL");
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
+  };
+  const result = new Promise((resolve, reject) => {
+    let timer;
+    const fail = (error) => {
+      clearTimeout(timer);
+      try {
+        terminate();
+      } catch {
+        /* stop() also verifies cleanup. */
+      }
+      reject(error);
+    };
+    timer = setTimeout(
+      () => fail(new Error("Installed command timed out")),
+      timeoutMs
+    );
+    child.once("error", fail);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (c) => {
+      stdout += c;
+      if (stdout.length >= 1024 * 1024)
+        fail(new Error("Installed stdout exceeded its bound"));
+    });
+    child.stderr.on("data", (c) => {
+      stderr += c;
+      if (stderr.length >= 65536)
+        fail(new Error("Installed stderr exceeded its bound"));
+    });
+    child.once("close", (code, signal) => {
+      clearTimeout(timer);
+      resolve({ code, signal, stdout, stderr, pid: child.pid });
+    });
+  });
+  // A proof can be awaiting a socket or authorization URL when the child fails.
+  // Observe that rejection immediately while preserving it for every consumer.
+  result.catch(() => {});
+  const stop = async () => {
+    terminate();
+    let timer;
+    try {
+      await Promise.race([
+        closed,
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("Installed child cleanup timed out")),
+            5000
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  return { child, result, closed, stop, stderr: () => stderr };
+}
 export async function proveInstalled({
   binary,
   launcher,
@@ -242,39 +329,14 @@ export async function proveInstalled({
   const api = http.createServer(handler);
   const children = new Set();
   function start(argv, stdin = "") {
-    const child = spawn(command, [...prefix, ...argv], {
+    const operation = startInstalledCommand(command, [...prefix, ...argv], {
       cwd: owned,
       env,
-      stdio: "pipe",
     });
-    children.add(child);
-    child.stdin.end(stdin);
-    let stdout = "",
-      stderr = "";
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (c) => {
-      stdout += c;
-      assert(stdout.length < 1024 * 1024);
-    });
-    child.stderr.on("data", (c) => {
-      stderr += c;
-      assert(stderr.length < 65536);
-    });
-    let timer;
-    const result = new Promise((resolve, reject) => {
-      timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        reject(new Error("Installed command timed out"));
-      }, 15000);
-      child.once("error", reject);
-      child.once("close", (code, signal) => {
-        clearTimeout(timer);
-        children.delete(child);
-        resolve({ code, signal, stdout, stderr, pid: child.pid });
-      });
-    });
-    return { child, result, stderr: () => stderr };
+    children.add(operation);
+    operation.closed.then(() => children.delete(operation));
+    operation.child.stdin.end(stdin);
+    return operation;
   }
   async function run(argv, { stdin = "", exit = 0 } = {}) {
     const r = await start(argv, stdin).result;
@@ -293,7 +355,12 @@ export async function proveInstalled({
       routeReached = resolve;
     });
     const operation = start(argv);
-    await reached;
+    await Promise.race([
+      reached,
+      operation.result.then(() => {
+        throw new Error("Installed command exited before the held route");
+      }),
+    ]);
     operation.child.kill("SIGTERM");
     // The started request settles; the cancelled command must not begin its next step.
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -384,12 +451,16 @@ export async function proveInstalled({
         }
       };
       login.child.stderr.on("data", inspect);
-      login.result.then((r) => {
-        if (r.code !== 0) {
+      login.result.then(
+        () => {
           clearTimeout(timer);
           reject(new Error("Login exited before callback"));
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
         }
-      });
+      );
       inspect();
     });
     assert.equal(authorize.searchParams.get("code_challenge_method"), "S256");
@@ -544,7 +615,12 @@ export async function proveInstalled({
     const cancel = start(
       generate.map((v) => (v === "./image" ? "./cancelled" : v))
     );
-    await pending;
+    await Promise.race([
+      pending,
+      cancel.result.then(() => {
+        throw new Error("Installed command exited before media submission");
+      }),
+    ]);
     cancel.child.kill("SIGTERM");
     const cancelled = await cancel.result;
     assert.equal(cancelled.code, 1);
@@ -571,7 +647,7 @@ export async function proveInstalled({
   } finally {
     releaseResponse?.();
     releaseRoute?.();
-    for (const child of children) child.kill("SIGKILL");
+    await Promise.all([...children].map((operation) => operation.stop()));
     await Promise.all([close(issuer), close(api)]);
     await rm(owned, { recursive: true, force: true });
   }

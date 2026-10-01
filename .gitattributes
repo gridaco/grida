@@ -1,0 +1,5 @@
+# Native release verification compares source bytes with the packed candidate.
+# Keep these inputs identical when Windows enables core.autocrlf.
+/Cargo.lock text eol=lf
+/LICENSE text eol=lf
+/packages/grida-cli/** text=auto eol=lf

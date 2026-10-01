@@ -27,7 +27,56 @@ import {
   assertOperationVectors,
 } from "./inventory.mjs";
 import { assertCheck } from "./checks.mjs";
-import { assertInstalledStderr } from "./installed.mjs";
+import { assertInstalledStderr, startInstalledCommand } from "./installed.mjs";
+
+test(
+  "installed proof cleanup terminates the launcher and its pipe-holding child",
+  { skip: process.platform === "win32", timeout: 7000 },
+  async (t) => {
+    const operation = startInstalledCommand(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `
+    import { spawn } from "node:child_process";
+    spawn(process.execPath, ["-e", "process.stdout.write('ready'); setInterval(() => {}, 1000)"], { stdio: "inherit" });
+    setInterval(() => {}, 1000);
+  `,
+      ],
+      { env: {} }
+    );
+    t.after(() => operation.stop());
+    await new Promise((resolve, reject) => {
+      operation.child.stdout.once("data", resolve);
+      operation.result.then(
+        () => reject(new Error("Fixture exited before readiness")),
+        reject
+      );
+    });
+    await operation.stop();
+    assert.equal((await operation.result).signal, "SIGKILL");
+  }
+);
+
+test(
+  "installed command timeouts stay observable after another proof step fails",
+  { timeout: 7000 },
+  async (t) => {
+    const operation = startInstalledCommand(
+      process.execPath,
+      ["-e", "setInterval(() => {}, 1000)"],
+      { env: {} },
+      50
+    );
+    t.after(() => operation.stop());
+    // The timeout must not create an unhandled rejection while another proof
+    // await owns control, nor may cleanup turn its failed result into success.
+    await operation.closed;
+    await operation.stop();
+    await assert.rejects(operation.result, /Installed command timed out/);
+  }
+);
 
 test("installed reference admits only its own exact SQLite runtime warning", () => {
   const pid = 12345;

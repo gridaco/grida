@@ -19,14 +19,19 @@ const authored = path.join(root, "data/ai");
 const check = process.argv.includes("--check");
 const bundle = process.argv.includes("--bundle");
 let changed = false;
+// Git may materialize CRLF on Windows. Compare canonical LF text; all other
+// bytes still participate in drift checks, and newly generated files use LF.
+const lf = (text) => text.replaceAll("\r\n", "\n");
 function write(name, text) {
-  text = execFileSync(process.execPath, [formatter, "--stdin-filepath", name], {
-    cwd: root,
-    input: text,
-    encoding: "utf8",
-  });
+  text = lf(
+    execFileSync(process.execPath, [formatter, "--stdin-filepath", name], {
+      cwd: root,
+      input: text,
+      encoding: "utf8",
+    })
+  );
   const existing = fs.existsSync(name) ? fs.readFileSync(name, "utf8") : "";
-  if (existing === text) return;
+  if (lf(existing) === text) return;
   if (check) {
     console.error(`Generated catalogue differs: ${path.relative(root, name)}`);
     changed = true;

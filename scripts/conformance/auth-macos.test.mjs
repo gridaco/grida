@@ -5,10 +5,12 @@ import { randomUUID } from "node:crypto";
 import {
   chmodSync,
   existsSync,
+  linkSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -24,6 +26,7 @@ function fake(
     lingering = false,
     appleIdentifier = "com.apple.security",
     keychainMode = 0o600,
+    createKeychain,
   } = {}
 ) {
   const root = realpathSync(
@@ -56,11 +59,14 @@ function fake(
     };
     if (executable === "/usr/bin/security") {
       if (args[0] === "create-keychain") {
-        writeFileSync(args.at(-1), "synthetic-keychain-file", {
-          mode: 0o600,
-          flag: "wx",
-        });
-        chmodSync(args.at(-1), keychainMode);
+        if (createKeychain) createKeychain(args.at(-1));
+        else {
+          writeFileSync(args.at(-1), "synthetic-keychain-file", {
+            mode: 0o600,
+            flag: "wx",
+          });
+          chmodSync(args.at(-1), keychainMode);
+        }
       }
       if (fail(args))
         return {
@@ -169,16 +175,56 @@ test("every CI guard rejects before any keychain command", (t) => {
   );
 });
 
-test("unsafe created keychain mode remains rejected with safe setup and cleanup stages", (t) => {
-  const setup = fake(t, { keychainMode: 0o644 });
-  assert.throws(() => MacosKeychainFixture.run(setup), {
-    message:
-      "Disposable macOS custody failed at created keychain ownership. " +
-      "Disposable macOS custody failed at keychain restoration and cleanup.",
+test("only the freshly created keychain mode is tightened before use", (t) => {
+  const setup = fake(t, {
+    keychainMode: 0o644,
+    child(env, runner) {
+      const state = JSON.parse(
+        readFileSync(env.GRIDA_AUTH_MACOS_FIXTURE, "utf8")
+      );
+      assert.equal(statSync(state.keychain).mode & 0o777, 0o600);
+      chmodSync(state.keychain, 0o644);
+      assert.throws(() =>
+        MacosKeychainFixture.load({ env, platform: "darwin", uid: 501, runner })
+      );
+      assert.equal(statSync(state.keychain).mode & 0o777, 0o644);
+      chmodSync(state.keychain, 0o600);
+    },
   });
-  assert(!setup.calls.some((call) => call.executable === process.execPath));
+  assert.equal(MacosKeychainFixture.run(setup).status, 0);
   assert.equal(setup.preferences().currentDefault, setup.original);
 });
+
+for (const alias of ["symlink", "hardlink"])
+  test(`created keychain ${alias} cannot change another file's permissions`, (t) => {
+    let target;
+    const setup = fake(t, {
+      createKeychain(filename) {
+        target = path.join(
+          path.dirname(path.dirname(filename)),
+          "unowned-keychain"
+        );
+        writeFileSync(target, "unowned-synthetic", { mode: 0o600, flag: "wx" });
+        chmodSync(target, 0o644);
+        if (alias === "symlink") symlinkSync(target, filename);
+        else linkSync(target, filename);
+      },
+    });
+    assert.throws(
+      () => MacosKeychainFixture.run(setup),
+      (error) => {
+        assert(
+          error.message.startsWith(
+            `Disposable macOS custody failed at created keychain ${alias === "symlink" ? "no-follow open" : "file identity"}.`
+          )
+        );
+        return true;
+      }
+    );
+    assert.equal(statSync(target).mode & 0o777, 0o644);
+    assert(!setup.calls.some((call) => call.executable === process.execPath));
+    assert.equal(setup.preferences().currentDefault, setup.original);
+  });
 
 for (const operation of ["default-keychain", "list-keychains"])
   test(`failed ${operation} snapshot reports only its fixed stage before creating a keychain`, (t) => {

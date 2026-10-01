@@ -687,6 +687,12 @@ fn callback_request(
     deadline: Instant,
     check: impl Fn() -> Result<()>,
 ) -> Option<Result<String>> {
+    // Darwin accepts inherit the listener's nonblocking flag. This reader uses
+    // bounded blocking I/O; otherwise a delayed first byte looks like a failed
+    // request and resets a valid callback before the browser sends its headers.
+    if stream.set_nonblocking(false).is_err() {
+        return Some(Err(failure("callback_unavailable")));
+    }
     let _ = stream.set_write_timeout(Some(Duration::from_millis(250)));
     let mut bytes = Vec::new();
     let mut chunk = [0u8; 1024];
@@ -1178,6 +1184,39 @@ mod tests {
     #[test]
     fn callback_header_cancellation_interrupts_a_trickling_peer() {
         trickling_callback(true);
+    }
+    #[test]
+    fn callback_accepts_headers_after_accepting_a_nonblocking_socket() {
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let mut peer = TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port)).unwrap();
+        peer.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+        let (mut stream, _) = listener.accept().unwrap();
+        // Darwin inherits the listener's O_NONBLOCK flag. Force that state on
+        // every host so Linux also verifies the same delayed-first-byte race.
+        stream.set_nonblocking(true).unwrap();
+        let writer = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(50));
+            let request = format!(
+                "GET /callback?state=expected&code=synthetic HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n"
+            );
+            let _ = peer.write_all(request.as_bytes());
+            let mut response = String::new();
+            let _ = peer.read_to_string(&mut response);
+            response
+        });
+        let result = callback_request(
+            &mut stream,
+            &format!("http://127.0.0.1:{port}/callback"),
+            "expected",
+            "https://identity.example/auth/v1",
+            Instant::now() + Duration::from_secs(2),
+            || Ok(()),
+        );
+        drop(stream);
+        let response = writer.join().unwrap();
+        assert_eq!(result.unwrap().unwrap(), "synthetic");
+        assert!(response.starts_with("HTTP/1.1 200 OK\r\n"));
     }
     #[test]
     fn cancellation_keeps_lock_until_transport_settles_and_preserves_rotation() {

@@ -352,10 +352,10 @@ impl Directory {
                     .file_name()
                     .ok_or_else(|| io::Error::other("name"))?,
             );
-            let mut builder = fs::DirBuilder::new();
             #[cfg(unix)]
-            builder.mode(0o700);
-            builder.create(&path)?;
+            fs::DirBuilder::new().mode(0o700).create(&path)?;
+            #[cfg(not(unix))]
+            fs::create_dir(&path)?;
             let identity = identity(&fs::symlink_metadata(&path)?)?;
             let dir = Self {
                 path,
