@@ -437,8 +437,16 @@ export async function verifyNative(out) {
     const bytes = await readFile(archive);
     assert.equal(bytes.length, record.bytes);
     assert.equal(sha256(bytes), record.sha256);
-    const options = { timeout: 20_000, maxBuffer: 1024 * 1024 };
-    const listing = (await exec("tar", ["-tzf", archive], options)).stdout
+    // GNU tar interprets a Windows drive colon in -f as a remote host.
+    // The validated basename stays local with both GNU and BSD tar.
+    const options = {
+      cwd: path.dirname(archive),
+      timeout: 20_000,
+      maxBuffer: 1024 * 1024,
+    };
+    const listing = (
+      await exec("tar", ["-tzf", record.archive], options)
+    ).stdout
       .trim()
       .split("\n");
     assert(listing.every((name) => name.startsWith("package/")));
@@ -447,8 +455,13 @@ export async function verifyNative(out) {
       record.files.map((file) => file.path).sort()
     );
     const packedManifest = JSON.parse(
-      (await exec("tar", ["-xOzf", archive, "package/package.json"], options))
-        .stdout
+      (
+        await exec(
+          "tar",
+          ["-xOzf", record.archive, "package/package.json"],
+          options
+        )
+      ).stdout
     );
     const platform = platforms.find((p) => p.id === record.platform);
     const expected = platform
@@ -462,7 +475,7 @@ export async function verifyNative(out) {
       (
         await exec(
           "tar",
-          ["-xOzf", archive, "package/THIRD-PARTY-NOTICES.txt"],
+          ["-xOzf", record.archive, "package/THIRD-PARTY-NOTICES.txt"],
           options
         )
       ).stdout,
@@ -473,7 +486,7 @@ export async function verifyNative(out) {
       const binary = (
         await exec(
           "tar",
-          ["-xOzf", archive, `package/bin/${binaryName(platform)}`],
+          ["-xOzf", record.archive, `package/bin/${binaryName(platform)}`],
           { ...options, encoding: "buffer", maxBuffer: 256 * 1024 * 1024 }
         )
       ).stdout;
@@ -488,7 +501,11 @@ export async function verifyNative(out) {
         "native/licenses.json",
       ]) {
         const packed = (
-          await exec("tar", ["-xOzf", archive, `package/${file}`], options)
+          await exec(
+            "tar",
+            ["-xOzf", record.archive, `package/${file}`],
+            options
+          )
         ).stdout;
         assert.equal(packed, await readFile(path.join(source, file), "utf8"));
       }

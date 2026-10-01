@@ -137,7 +137,8 @@ async function rootOnlyInstall(out, report, runtime) {
     const bytes = await readFile(filename);
     const manifest = JSON.parse(
       (
-        await exec("tar", ["-xOzf", filename, "package/package.json"], {
+        await exec("tar", ["-xOzf", record.archive, "package/package.json"], {
+          cwd: path.dirname(filename),
           timeout: 10_000,
           maxBuffer: 1024 * 1024,
         })

@@ -260,10 +260,11 @@ export const CliRelease = {
       report.archive_sha256,
       "Candidate hash changed"
     );
-    const options = { timeout: 10_000, maxBuffer: 1024 * 1024 };
+    // Keep GNU tar from interpreting a Windows drive colon as a remote host.
+    const options = { cwd: out, timeout: 10_000, maxBuffer: 1024 * 1024 };
     // Read without extraction or lifecycle scripts. The archive must match both
     // the reviewed manifest and the exact file boundary used during preparation.
-    const listed = await execute("tar", ["-tzf", archive], options);
+    const listed = await execute("tar", ["-tzf", report.archive], options);
     const entries = listed.stdout.trim().split("\n");
     assert(entries.every((name) => name.startsWith("package/")));
     const filenames = entries.map((name) => name.slice("package/".length));
@@ -274,7 +275,7 @@ export const CliRelease = {
     );
     const packed = await execute(
       "tar",
-      ["-xOzf", archive, "package/package.json"],
+      ["-xOzf", report.archive, "package/package.json"],
       options
     );
     const manifest = JSON.parse(packed.stdout);
