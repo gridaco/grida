@@ -10,29 +10,56 @@ import { npmRun, verifyNative } from "./native.mjs";
 import { selectPlatform } from "../../packages/grida-cli/native/bin.mjs";
 
 const exec = promisify(execFile);
+
+class NativeProofError extends Error {
+  constructor(stage, cause) {
+    const code = cause?.code;
+    const detail = Number.isInteger(code)
+      ? ` (exit ${code})`
+      : ["ENOENT", "EACCES", "EPERM", "ENOTDIR", "ENOSPC"].includes(code)
+        ? ` (${code})`
+        : "";
+    super(`Installed native candidate proof failed at ${stage}${detail}.`, {
+      cause,
+    });
+  }
+}
+
+async function proofStep(stage, operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    throw new NativeProofError(stage, error);
+  }
+}
+
 /** Install the verified host pair into a caller-owned directory; caller cleans up. */
 export async function installNative(out, runtime) {
   assert(path.isAbsolute(runtime));
-  const report = await verifyNative(out);
+  const report = await proofStep("candidate_verification", () =>
+    verifyNative(out)
+  );
   const platform = selectPlatform();
   assert(platform, "Unsupported proof host");
   const selected = report.platforms.find(
     (item) => item.platform === platform.id
   );
   await mkdir(runtime, { recursive: true });
-  await npmRun(
-    [
-      "install",
-      path.join(out, "archives", report.launcher.archive),
-      path.join(out, "archives", selected.archive),
-      "--offline",
-      "--ignore-scripts",
-      "--no-audit",
-      "--no-fund",
-      "--package-lock=false",
-      "--omit=dev",
-    ],
-    runtime
+  await proofStep("offline_npm_install", () =>
+    npmRun(
+      [
+        "install",
+        path.join(out, "archives", report.launcher.archive),
+        path.join(out, "archives", selected.archive),
+        "--offline",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund",
+        "--package-lock=false",
+        "--omit=dev",
+      ],
+      runtime
+    )
   );
   const launcher = path.join(runtime, "node_modules/grida/native/bin.mjs");
   const executable = path.join(
@@ -69,7 +96,9 @@ export async function installNative(out, runtime) {
 }
 
 export async function proveNative(out) {
-  const scratch = await mkdtemp(path.join(tmpdir(), "grida-native-install-"));
+  // Exercise the npm shim with a space-containing path on every proof host.
+  const scratch = await mkdtemp(path.join(tmpdir(), "grida native install-"));
+  let stage = "installed_metadata";
   try {
     const {
       report,
@@ -92,6 +121,7 @@ export async function proveNative(out) {
         GRIDA_HOME: path.join(scratch, "profile"),
       },
     };
+    stage = "version";
     const version = await exec(
       process.execPath,
       [launcher, "--version"],
@@ -99,20 +129,24 @@ export async function proveNative(out) {
     );
     assert.equal(version.stdout.trim(), `grida ${report.version}`);
     assert.equal(version.stderr, "");
+    stage = "help";
     const help = await exec(process.execPath, [launcher, "--help"], options);
     assert(help.stdout.includes("grida"));
     assert.equal(help.stderr, "");
+    stage = "docs";
     const docs = await exec(
       process.execPath,
       [launcher, "docs", "providers"],
       options
     );
     assert(docs.stdout.startsWith("https://grida.co/docs/cli"));
+    stage = "usage_exit_2";
     await assert.rejects(
       exec(process.execPath, [launcher, "--definitely-invalid"], options),
       (error) =>
         error.code === 2 && error.stdout === "" && error.stderr.length > 0
     );
+    stage = "npm_bin_shim";
     if (process.platform !== "win32") {
       const shim = await exec(
         path.join(scratch, "node_modules/.bin/grida"),
@@ -127,7 +161,9 @@ export async function proveNative(out) {
       const invoked = await exec(
         command,
         ["/d", "/s", "/c", `""${shim}" --version"`],
-        options
+        // The /c command is already quoted for cmd.exe. Node's default
+        // Windows argv escaping would add a second, incompatible quote layer.
+        { ...options, windowsVerbatimArguments: true }
       );
       assert.equal(invoked.stdout.trim(), `grida ${report.version}`);
     }
@@ -149,12 +185,16 @@ export async function proveNative(out) {
         "npm_bin_shim",
       ],
     };
+    stage = "write_report";
     await writeFile(
       path.join(out, `installed-${platform.id}.json`),
       JSON.stringify(result, null, 2) + "\n",
       { mode: 0o600 }
     );
     return result;
+  } catch (error) {
+    if (error instanceof NativeProofError) throw error;
+    throw new NativeProofError(stage, error);
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
@@ -172,7 +212,7 @@ if (
     )
     .catch((error) => {
       process.stderr.write(
-        `${error instanceof assert.AssertionError ? error.message : "Installed native candidate proof failed."}\n`
+        `${error instanceof NativeProofError ? error.message : "Installed native candidate proof failed."}\n`
       );
       process.exitCode = 1;
     });

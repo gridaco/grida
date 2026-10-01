@@ -38,6 +38,30 @@ import { selectPlatform } from "../../packages/grida-cli/native/bin.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const exec = promisify(execFile);
 
+test("installed proof reports a safe failure stage without private paths", async (t) => {
+  const scratch = await mkdtemp(
+    path.join(tmpdir(), "grida-native-private-path-")
+  );
+  t.after(() => rm(scratch, { recursive: true, force: true }));
+  await assert.rejects(
+    exec(process.execPath, [
+      path.join(root, "scripts/cli-release/native-proof.mjs"),
+      "--out",
+      scratch,
+    ]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.equal(error.stdout, "");
+      assert.equal(
+        error.stderr,
+        "Installed native candidate proof failed at candidate_verification (ENOENT).\n"
+      );
+      assert(!error.stderr.includes(scratch));
+      return true;
+    }
+  );
+});
+
 test("npm runs with a disposable home even before loading its explicit config", async (t) => {
   const scratch = await mkdtemp(path.join(tmpdir(), "grida-native-npm-home-"));
   t.after(() => rm(scratch, { recursive: true, force: true }));
