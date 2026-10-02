@@ -144,17 +144,18 @@ candidate and all eight installed reports. The publish job does not rebuild.
 checks hashes and proofs, then prints the single publication record without contacting npm.
 
 Publication requires `CLI_NPM_RELEASE_ENABLED=true`, the `npm-publish` GitHub
-environment and its branch protections, and npm Trusted Publishing
+environment and its required-reviewer/branch protections, and npm Trusted Publishing
 through GitHub Actions OIDC. The trusted publisher for `grida` must authorize
 repository `gridaco/grida`, workflow `cli-release.yml`, environment `npm-publish`,
 and direct publication, not only staged publication. Keep the workflow filename
 stable on the default branch. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 and [provenance](https://docs.npmjs.com/generating-provenance-statements/).
 Do not configure `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or a token fallback.
-If the environment has required reviewers, the automatic run waits for their
-approval before publishing. Unattended publication requires a maintainer to
-deliberately remove that approval requirement in the GitHub environment settings;
-the workflow does not change environment protections.
+The automatic run waits for maintainer approval before publishing. Keep this
+release approval boundary: green contributor PR checks do not themselves grant
+publication authority. The npm trusted publisher must bind the environment as
+well as the workflow, so removing the environment from a workflow does not bypass
+approval. The workflow does not change these protections.
 
 `0.3.0-rc.1` was published using separate platform packages. Those immutable
 versions remain historical releases; `0.3.0-rc.2` introduces the bundled layout.
