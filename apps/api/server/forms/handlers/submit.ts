@@ -1,3 +1,4 @@
+import { normalizeEmail } from "./challenge/context";
 import { redirect } from "../http";
 import {
   SYSTEM_GF_KEY_STARTS_WITH,
@@ -23,13 +24,13 @@ import {
   validate_options_inventory,
 } from "../services/form/inventory";
 import assert from "assert";
-import { GridaCommerceClient } from "../services/commerce/index";
+import { GridaCommerceClient } from "@app/database/commerce";
 import { OnSubmit } from "../completion";
 import { Features } from "@grida/forms";
 import type { SchemaTableConnectionXSupabaseMainTableJoint } from "../types";
 import type { FormFieldStorageSchema } from "@grida/forms";
-import { PGXXError } from "../k/errcode";
-import { qval } from "../utils/qs";
+import { PGXXError } from "@app/database/errcode";
+import { qval } from "@workspace/utils/http";
 import { notFound } from "../http";
 import { FormSubmitErrorCode } from "../types";
 import { SessionMeta, meta } from "./meta";
@@ -40,7 +41,7 @@ import {
   GRIDA_FORMS_RESPONSE_BUCKET,
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
 } from "../k/env";
-import type { InsertDto } from "../types/supabase-ext";
+import type { InsertDto } from "@app/database/supabase-ext";
 import { parseGFKeys } from "../grida-forms/lib/gfkeys";
 import {
   SessionStagedFileStorage,
@@ -52,16 +53,12 @@ import {
 } from "../services/x-supabase/index";
 import { FormValue, projectFormField } from "@grida/forms";
 import { XSupabase } from "../services/x-supabase/index";
-import { TemplateVariables } from "../lib/templating/index";
+import { TemplateVariables } from "@grida/forms/templating";
 import { RichTextStagedFileUtils } from "@grida/forms";
 import { config } from "../config";
 import { SubmissionDiagnostics } from "../submission-diagnostics";
 
 type Params = { id: string };
-
-function normalizeEmail(email: string) {
-  return String(email).trim().toLowerCase();
-}
 
 export async function GET(req: Request, params: Params) {
   const { id: form_id } = params;
@@ -1330,7 +1327,8 @@ class ResponseFieldFilesProcessor {
     }
     this._m_file_commits[field_id][from] = {
       path: to,
-      publicUrl: storage.getPublicUrl(to).data.publicUrl,
+      publicUrl: storage.client.storage.from(storage.bucket).getPublicUrl(to)
+        .data.publicUrl,
     };
 
     return result;

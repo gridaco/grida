@@ -2,9 +2,11 @@
   "name": "@app/database",
   "private": true,
   "scripts": {
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.90.1",
     "type-fest": "^4.41.0"
   }
 }

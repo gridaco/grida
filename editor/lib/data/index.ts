@@ -1,4 +1,4 @@
-import type { SupabasePostgRESTOpenApi } from "../supabase-postgrest";
+import type { SupabasePostgRESTOpenApi } from "@grida/postgrest";
 import type { PGSupportedColumnType } from "../pg-meta/@types/pg";
 
 /**
@@ -20,109 +20,13 @@ export namespace Data {
 
     export type DefinitionJSONSchema = PostgRESTRelationJSONSchema;
 
-    /**
-     * FK relationship with a single referencing column
-     *
-     * non-composite foreign key relationship
-     *
-     * @example
-     * ```sql
-     * constraint some_id_fkey foreign key (some_id) references some_table(some_id)
-     * ```
-     * use when only one column per foreign key is supported (e.g. postgREST)
-     */
-    export type NonCompositeRelationship = {
-      referencing_column: string;
-      referenced_table: string;
-      referenced_column: string;
-    };
+    export type NonCompositeRelationship =
+      SupabasePostgRESTOpenApi.NonCompositeRelationship;
 
-    /**
-     * Analyzed Table Property (Column) Definition
-     *
-     * This type is a standard representation of a column definition in a table.
-     */
-    export type Attribute = {
-      /**
-       * column name
-       */
-      name: string;
+    /** Parsed column metadata, including arbitrary PostgreSQL custom formats. */
+    export type Attribute = SupabasePostgRESTOpenApi.Attribute;
 
-      description: string | undefined;
-
-      /**
-       * type - json schema type
-       *
-       * when format is json or jsonb, the type is undefined (not "object") since json can be any type @see https://github.com/PostgREST/postgrest/issues/3744
-       */
-      type:
-        | "string"
-        | "number"
-        | "integer"
-        | "boolean"
-        | "null"
-        | "array"
-        | undefined;
-
-      /**
-       * format - sql column type
-       *
-       * Important: this can also be any string for user defined types (although we are not explicitly typing as so)
-       */
-      format:
-        | PGSupportedColumnType
-        | `${PGSupportedColumnType}[]`
-        | (string & {});
-
-      /**
-       * format - sql column type (scalar - non array)
-       *
-       * Important: this can also be any string for user defined types (although we are not explicitly typing as so)
-       */
-      scalar_format: PGSupportedColumnType;
-
-      /**
-       * when present, this is an enum type
-       */
-      enum: string[] | undefined;
-
-      /**
-       * if this is an array type.
-       *
-       * when true, the {@link Attribute.type} shall be `"array"` the {@link Attribute.format} is an array type, including `...[]`
-       */
-      array: boolean;
-
-      /**
-       * this is primary key
-       */
-      pk: boolean;
-
-      /**
-       * this is foreign key
-       */
-      fk: NonCompositeRelationship | false;
-
-      /**
-       * nullable
-       *
-       * `null` or `not null`
-       *
-       */
-      null: boolean;
-
-      /**
-       * default value
-       */
-      default: string | undefined;
-    };
-
-    export type TableDefinition = {
-      name: string;
-      pks: string[];
-      fks: NonCompositeRelationship[];
-      properties: Record<string, Attribute>;
-    };
+    export type TableDefinition = SupabasePostgRESTOpenApi.TableDefinition;
 
     export const INITIAL_QUERY_STATE: QueryState = {
       q_page_limit: 100,

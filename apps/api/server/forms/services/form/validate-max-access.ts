@@ -1,4 +1,4 @@
-import { PGXXError } from "../../k/errcode";
+import { PGXXError } from "@app/database/errcode";
 import {
   FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED,
   FORM_RESPONSE_LIMIT_REACHED,

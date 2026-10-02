@@ -4,7 +4,7 @@ import type {
   FormMethod,
   FormAgentPrefetchData,
 } from "@grida/forms";
-import type { SupabasePostgRESTOpenApi } from "./lib/supabase-postgrest/parse";
+import type { SupabasePostgRESTOpenApi } from "@grida/postgrest";
 export type {
   Geo,
   FormSubmitErrorCode,
@@ -14,11 +14,7 @@ export type {
   StoragePublicUrlData,
 } from "@grida/forms";
 
-export type PlatformPoweredBy =
-  | "api"
-  | "grida_forms"
-  | "web_client"
-  | "simulator";
+export type { PlatformPoweredBy } from "@grida/forms";
 export type SchemaTableConnectionXSupabaseMainTableJoint =
   Database["grida_forms"]["Tables"]["connection_supabase"]["Row"];
 export type FormDocument = Omit<
@@ -50,41 +46,10 @@ export namespace GridaXSupabase {
       main_supabase_table: SupabaseTable | null;
       tables: SupabaseTable[];
     };
-  export namespace Forms {
-    export type XSBSearchMetaResult = {
-      meta: {
-        provider: "x-supabase";
-        supabase_project_id: number;
-        schema_name: string;
-        referenced_table: string;
-        referenced_column: string;
-      };
-    };
-  }
 }
 export namespace Relation {
-  export type NonCompositeRelationship = {
-    referencing_column: string;
-    referenced_table: string;
-    referenced_column: string;
-  };
-  export type Attribute = {
-    name: string;
-    description?: string;
-    type?: "string" | "number" | "integer" | "boolean" | "null" | "array";
-    format: string;
-    scalar_format: string;
-    enum?: string[];
-    array: boolean;
-    pk: boolean;
-    fk: NonCompositeRelationship | false;
-    null: boolean;
-    default?: string;
-  };
-  export type TableDefinition = {
-    name: string;
-    pks: string[];
-    fks: NonCompositeRelationship[];
-    properties: Record<string, Attribute>;
-  };
+  export type NonCompositeRelationship =
+    SupabasePostgRESTOpenApi.NonCompositeRelationship;
+  export type Attribute = SupabasePostgRESTOpenApi.Attribute;
+  export type TableDefinition = SupabasePostgRESTOpenApi.TableDefinition;
 }

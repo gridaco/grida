@@ -1,35 +1,10 @@
 import { headers } from "next/headers";
-import { match } from "@formatjs/intl-localematcher";
-import Negotiator from "negotiator";
+import { getLocale as matchLocale } from "@workspace/translations/forms";
 
-/**
- * server only
- * @param availableLocales list of available locales
- * @param defaultLocale default locale
- * @returns
- */
+/** Binds the shared locale matcher to the current Next.js request. */
 export async function getLocale<T extends string = string>(
-  availableLocales: T[],
+  availableLocales: readonly T[],
   defaultLocale: T = "en" as T
 ): Promise<T> {
-  const headersList = await headers();
-  const _headers = {
-    "accept-language": headersList.get("accept-language") || "",
-  };
-
-  // Negotiator can return "*" for an absent/wildcard header, and accepts
-  // malformed tags that Intl rejects. Public API callers need a fallback too.
-  const languages = new Negotiator({ headers: _headers })
-    .languages()
-    .flatMap((language) => {
-      try {
-        return Intl.getCanonicalLocales(language);
-      } catch {
-        return [];
-      }
-    });
-
-  const locale = match(languages, availableLocales, defaultLocale);
-
-  return locale as T;
+  return matchLocale(await headers(), availableLocales, defaultLocale);
 }

@@ -1,22 +1,11 @@
 import { service_role } from "../../db";
 import type { PostgrestError } from "@supabase/supabase-js";
 
-export type ChallengeEmailState =
-  | "idle"
-  | "challenge-session-started"
-  | "challenge-expired"
-  | "challenge-failed"
-  | "challenge-success"
-  | "error";
-
-export type ChallengeEmailSessionState = {
-  state: ChallengeEmailState;
-  email: string | null;
-  challenge_id: string | null;
-  expires_at: string | null;
-  verified_at: string | null;
-  customer_uid: string | null;
-};
+import type { EmailChallengeSessionState as ChallengeEmailSessionState } from "@grida/forms";
+export type {
+  EmailChallengeState as ChallengeEmailState,
+  EmailChallengeSessionState as ChallengeEmailSessionState,
+} from "@grida/forms";
 
 export type ChallengeEmailContext = {
   session: {

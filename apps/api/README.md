@@ -7,9 +7,23 @@ administration and Toss payment callbacks remain in `editor/`.
 
 The API shares the existing Supabase project, identities, organizations, projects,
 buckets and migration stream. There is no new database or account system.
-`supabase/` remains the sole migration authority; `@app/database` supplies its
-generated types. `@grida/forms` contains neutral contracts and pure utilities.
-Neither shared package exports the API's privileged operations.
+`supabase/` remains the sole migration authority. Shared producers have explicit
+boundaries:
+
+| Package                               | Responsibility                                                           |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| `@grida/forms`                        | Neutral Forms contracts, projections and pure utilities                  |
+| `@app/database`                       | Generated types and adapters that receive a caller-owned Supabase client |
+| `@grida/postgrest`                    | Pure schema interpretation and JSON-path utilities                       |
+| `@workspace/utils/http`               | Request/header normalization with explicit inputs                        |
+| `@workspace/utils/otp`                | Node-only cryptographic OTP generation                                   |
+| `@workspace/translations/forms`       | Forms catalogs, locale selection and request-local translators           |
+| `@workspace/emails/ciam-verification` | Verification email presentation and subject text                         |
+
+These packages do not own credentials, application request context or provider
+delivery. The API owns authorization, privileged client creation, operation
+orchestration and required effects. Editor consumers call its public HTTP
+contract; they do not import API operations.
 
 ## Develop
 
@@ -17,7 +31,7 @@ From the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm --filter @grida/forms... build
+pnpm turbo build --filter='@grida/api^...'
 cp apps/api/.env.example apps/api/.env
 # Fill the API's local Supabase values, then:
 pnpm --filter @grida/api dev
@@ -38,9 +52,17 @@ pnpm --filter @grida/api build
 ```
 
 `build:local` produces `.output/server/index.mjs`; `build` produces the Vercel
-Node function in `.vercel/output`. Build shared dependencies first. Production
-Node processes receive configuration from their environment; they do not load
-the editor's dotenv files.
+Node function in `.vercel/output`. The dependency-only Turbo command above builds
+the API's shared packages, including the token dependency of Forms, without
+building the API. `@app/database` exports source and has no build step. The
+compiled packages export from `dist`; their runtime dependencies remain declared
+in their manifests and are resolved by the application build.
+
+Forms translation JSON lives in [`data/translations`](../../data/translations/README.md)
+and is embedded by the translation package build; deployed processes do not read
+the repository data directory. That package's Turbo inputs include the canonical
+catalog directory. Production Node processes receive configuration from their
+environment; they do not load the editor's dotenv files.
 
 ## Environment ownership
 

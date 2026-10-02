@@ -3,11 +3,11 @@ import TenantCIAMEmailVerification, {
   subject,
   supported_languages,
   type CIAMVerificationEmailLang,
-} from "../../theme/templates-email/ciam-verifiaction/default";
-import { otp6 } from "../../lib/crypto/otp";
+} from "@workspace/emails/ciam-verification";
+import { otp6 } from "@workspace/utils/otp";
 import { service_role } from "../../db";
-import { select_lang } from "../../i18n/utils";
-import { getLocale } from "../../i18n/server";
+import { select_lang } from "@workspace/translations/forms";
+import { getLocale } from "@workspace/translations/forms";
 import {
   challengeEmailStateKey,
   loadChallengeEmailContext,

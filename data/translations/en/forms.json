@@ -1,0 +1,71 @@
+{
+  "next": "Next",
+  "back": "Previous",
+  "submit": "Submit",
+  "pay": "Pay",
+  "home": "Home",
+  "verify": "Verify",
+  "resend": "Resend",
+  "retry": "Retry",
+  "sending": "Sending",
+  "email_challenge": {
+    "verify_code": "Verify",
+    "enter_verification_code": "Enter verification code",
+    "code_sent": "A verification code has been sent to your inbox.",
+    "didnt_receive_code": "Didn't receive a code?",
+    "code_expired": "Verification code has expired.",
+    "incorrect_code": "Incorrect verification code. Please try again.",
+    "error_occurred": "An error occurred. Please try again later."
+  },
+  "left_in_stock": "{{available}} left",
+  "sold_out": "Sold Out",
+  "support_metadata": "Support Metadata",
+  "support_metadata_no_share": "Please do not share this information with anyone except support.",
+  "formclosed": {
+    "default": {
+      "title": "Form Closed",
+      "description": "This form is no longer accepting responses."
+    },
+    "while_responding": {
+      "title": "Form Closed",
+      "description": "Thank you for your interest. Unfortunately, the form closed during your response. If you believe this is a mistake, please contact support."
+    }
+  },
+  "formsoldout": {
+    "default": {
+      "title": "Sold Out",
+      "description": "All stock has been depleted, and we are no longer accepting orders."
+    }
+  },
+  "formoptionsoldout": {
+    "default": {
+      "title": "Option Sold Out",
+      "description": "The selected option is sold out and no longer available."
+    }
+  },
+  "formcomplete": {
+    "default": {
+      "h1": "{{form_title}}",
+      "p": "Thank you for your response.",
+      "button": "Home",
+      "href": "/"
+    },
+    "receipt01": {
+      "h1": "{{response.idx}}",
+      "h2": "Receipt Confirmed - {{form_title}}",
+      "p": "Your receipt has been confirmed. Please consider taking a screenshot for your records."
+    }
+  },
+  "alreadyresponded": {
+    "default": {
+      "title": "Already Responded",
+      "description": "You have already submitted this form. If you believe this is a mistake, please contact support."
+    }
+  },
+  "badrequest": {
+    "default": {
+      "title": "Something went wrong",
+      "description": "Your request could not be processed. This may have occurred because the form was altered during the submission process or you are using an outdated version of the app. If the issue persists, please contact our support team for assistance."
+    }
+  }
+}

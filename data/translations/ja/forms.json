@@ -1,0 +1,71 @@
+{
+  "next": "次へ",
+  "back": "戻る",
+  "submit": "提出する",
+  "pay": "支払う",
+  "home": "ホーム",
+  "verify": "確認",
+  "resend": "再送信",
+  "retry": "再試行",
+  "sending": "送信中",
+  "email_challenge": {
+    "verify_code": "確認",
+    "enter_verification_code": "確認コードを入力",
+    "code_sent": "確認コードをメールで送信しました。",
+    "didnt_receive_code": "コードが届きませんか？",
+    "code_expired": "確認コードの有効期限が切れました。",
+    "incorrect_code": "確認コードが正しくありません。もう一度お試しください。",
+    "error_occurred": "エラーが発生しました。しばらくしてからもう一度お試しください。"
+  },
+  "left_in_stock": "残り{{available}}個",
+  "sold_out": "完売",
+  "support_metadata": "サポートメタデータ",
+  "support_metadata_no_share": "この情報はサポート以外の誰とも共有しないでください。",
+  "formclosed": {
+    "default": {
+      "title": "フォームは閉鎖されました",
+      "description": "このフォームはもう回答を受け付けていません。"
+    },
+    "while_responding": {
+      "title": "フォームは閉鎖されました",
+      "description": "ご関心をお寄せいただきありがとうございます。残念ながら、回答中にフォームが閉鎖されました。これが誤りであると思われる場合は、サポートに連絡してください。"
+    }
+  },
+  "formsoldout": {
+    "default": {
+      "title": "完売",
+      "description": "在庫がすべて無くなり、これ以上の注文は受け付けておりません。"
+    }
+  },
+  "formoptionsoldout": {
+    "default": {
+      "title": "オプション完売",
+      "description": "選択されたオプションは売り切れで、もう利用できません。"
+    }
+  },
+  "formcomplete": {
+    "default": {
+      "h1": "{{form_title}}",
+      "p": "回答いただきありがとうございます。",
+      "button": "ホーム",
+      "href": "/"
+    },
+    "receipt01": {
+      "h1": "{{response.idx}}",
+      "h2": "受領確認済み - {{form_title}}",
+      "p": "このページのスクリーンショットを取って記録しておくことを検討してください。"
+    }
+  },
+  "alreadyresponded": {
+    "default": {
+      "title": "既に回答済み",
+      "description": "このフォームはすでに提出されています。これが間違いだと思われる場合は、サポートに連絡してください。"
+    }
+  },
+  "badrequest": {
+    "default": {
+      "title": "エラーが発生しました",
+      "description": "リクエストを処理できませんでした。送信プロセス中にフォームが変更されたか、アプリの古いバージョンを使用している可能性があります。問題が解決しない場合は、サポートチームにお問い合わせください。"
+    }
+  }
+}

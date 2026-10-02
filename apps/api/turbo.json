@@ -12,6 +12,16 @@
       "outputs": [".nitro/**", ".output/**"]
     },
     "typecheck": { "dependsOn": ["^build", "^typecheck"] },
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/editor/**/*.{js,ts,mjs,mts,cjs,cts,jsx,tsx}",
+        "!$TURBO_ROOT$/editor/**/node_modules/**",
+        "!$TURBO_ROOT$/editor/**/dist/**",
+        "!$TURBO_ROOT$/editor/**/.*/**",
+        "!$TURBO_ROOT$/editor/**/.*"
+      ]
+    },
     "dev": {
       "passThroughEnv": [
         "GRIDA_OPEN_API_ORIGIN",

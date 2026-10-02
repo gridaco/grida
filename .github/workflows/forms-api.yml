@@ -31,9 +31,23 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build and check shared Forms contracts
+      - name: Build and check shared producers
         run: |
           pnpm --filter @grida/tokens build
+          pnpm --filter @workspace/utils build
+          pnpm --filter @workspace/utils typecheck
+          pnpm --filter @workspace/utils test
+          pnpm --filter @workspace/translations build
+          pnpm --filter @workspace/translations typecheck
+          pnpm --filter @workspace/translations test
+          pnpm --filter @workspace/emails build
+          pnpm --filter @workspace/emails typecheck
+          pnpm --filter @workspace/emails test
+          pnpm --filter @grida/postgrest build
+          pnpm --filter @grida/postgrest typecheck
+          pnpm --filter @grida/postgrest test
+          pnpm --filter @app/database typecheck
+          pnpm --filter @app/database test
           pnpm --filter @grida/forms build
           pnpm --filter @grida/forms typecheck
           pnpm --filter @grida/forms test

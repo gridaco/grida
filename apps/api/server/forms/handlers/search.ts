@@ -1,11 +1,11 @@
 import { service_role } from "../db";
 import { GridaXSupabaseService } from "../services/x-supabase/index";
-import { GridaXSupabase } from "../types";
+import type { FormReferenceSearchMetaResponse } from "@grida/forms";
 import type { FormFieldReferenceSchema } from "@grida/forms";
 
 import { notFound } from "../http";
 import assert from "assert";
-import { SupabasePostgRESTOpenApi } from "../lib/supabase-postgrest/parse";
+import { SupabasePostgRESTOpenApi } from "@grida/postgrest";
 
 type Params = { session: string; field: string };
 
@@ -60,7 +60,7 @@ export async function GET(req: Request, params: Params) {
                 referenced_table: table,
                 referenced_column: column,
               },
-            } satisfies GridaXSupabase.Forms.XSBSearchMetaResult);
+            } satisfies FormReferenceSearchMetaResponse);
           }
           case "public":
           default: {
@@ -72,7 +72,7 @@ export async function GET(req: Request, params: Params) {
                 referenced_table: table,
                 referenced_column: column,
               },
-            } satisfies GridaXSupabase.Forms.XSBSearchMetaResult);
+            } satisfies FormReferenceSearchMetaResponse);
           }
         }
       }
@@ -114,7 +114,7 @@ export async function GET(req: Request, params: Params) {
               referenced_table: column.fk.referenced_table,
               referenced_column: column.fk.referenced_column,
             },
-          } satisfies GridaXSupabase.Forms.XSBSearchMetaResult);
+          } satisfies FormReferenceSearchMetaResponse);
         }
       }
     }

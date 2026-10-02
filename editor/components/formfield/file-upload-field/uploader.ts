@@ -136,6 +136,6 @@ function makeRequestUrlResolver({
     });
 
     const data = (await res.json()) as FormsApiResponse<StoragePublicUrlData>;
-    return data.data;
+    return data.data ?? null;
   };
 }

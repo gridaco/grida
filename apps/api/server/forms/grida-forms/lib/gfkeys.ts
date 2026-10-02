@@ -7,7 +7,7 @@ import {
   SYSTEM_GF_KEY_STARTS_WITH,
   SYSTEM_GF_SESSION_KEY,
 } from "@grida/forms";
-import { is_uuid_v4 } from "../../utils/is";
+import { is_uuid_v4 } from "@grida/forms";
 
 export type GFKeys = {
   [SYSTEM_GF_TIMEZONE_UTC_OFFSET_KEY]?: number;

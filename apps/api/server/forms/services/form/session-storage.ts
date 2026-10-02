@@ -1,10 +1,5 @@
-import { service_role } from "../../db";
 import assert from "assert";
-import {
-  GRIDA_FORMS_RESPONSE_BUCKET,
-  GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER,
-  GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
-} from "../../k/env";
+import { GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER } from "../../k/env";
 import { UniqueFileNameGenerator } from "@grida/forms";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { config } from "../../config";
@@ -90,30 +85,13 @@ export const parse_tmp_storage_object_path = (path: string) => {
   assert(false, "invalid path");
 };
 
-export class FileStorage {
+export class SessionStagedFileStorage {
   constructor(
-    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK generic params
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Caller-owned dynamic Supabase client.
     readonly client: SupabaseClient<any, any>,
     readonly bucket: string
-  ) {
-    //
-  }
+  ) {}
 
-  createSignedUploadUrl(path: string, options?: { upsert: boolean }) {
-    return (
-      this.client.storage
-        .from(this.bucket)
-        // valid for 2 hours - https://supabase.com/docs/reference/javascript/storage-from-createsigneduploadurl
-        .createSignedUploadUrl(path, options)
-    );
-  }
-
-  getPublicUrl(path: string) {
-    return this.client.storage.from(this.bucket).getPublicUrl(path);
-  }
-}
-
-export class SessionStagedFileStorage extends FileStorage {
   async createStagedSignedUploadUrl(
     path: SessionStoragePath,
     name: string,
@@ -124,7 +102,7 @@ export class SessionStagedFileStorage extends FileStorage {
       rejectComma: true,
     });
 
-    return this.createSignedUploadUrl(
+    return this.client.storage.from(this.bucket).createSignedUploadUrl(
       tmp_storage_object_path({
         ...path,
         unique: unique ? Date.now().toString() : undefined,
@@ -137,108 +115,4 @@ export class SessionStagedFileStorage extends FileStorage {
   async commitStagedFile(tmp: string, target: string) {
     return this.client.storage.from(this.bucket).move(tmp, target);
   }
-}
-
-/**
- * pre-generate signed upload urls for response file uploads - used when session is created
- * @param session_id
- * @param field_id
- * @param n
- * @returns
- */
-export async function prepare_response_file_upload_storage_presigned_url(
-  path: SessionStoragePath,
-  n: number
-): Promise<
-  Array<{
-    path: string;
-    token: string;
-  }>
-> {
-  const { session_id, field_id } = path;
-  assert(n > 0, "n should be greater than 0");
-  assert(
-    n <= GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
-    "n should be less than " + GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD
-  );
-
-  const storage = new SessionStagedFileStorage(
-    service_role.forms,
-    GRIDA_FORMS_RESPONSE_BUCKET
-  );
-
-  const tasks = [];
-
-  for (let i = 0; i < n; i++) {
-    const task = storage.createSignedUploadUrl(
-      tmp_storage_object_path({
-        name: i.toString(),
-        field_id: field_id,
-        session_id: session_id,
-      })
-    );
-    tasks.push(task);
-  }
-
-  const results = await Promise.all(tasks);
-
-  const failures = results.filter((r) => r.error);
-
-  if (failures.length > 0) {
-  }
-
-  return results.map((r) => r.data).filter(Boolean) as Array<{
-    path: string;
-    token: string;
-  }>;
-}
-
-/**
- * @deprecated forms agent by default, now uses 'requesturl' strategy instead of 'presignedurl' strategy.
- * @param session_id
- * @param fields
- * @returns {Promise<Record<string, { path: string; token: string; }[]>>}
- *
- * @example
- * ```
- * const field_upload_urls = await prepare_presigned_upload_url_for_fields(
- *   session.id,
- *   fields
- * );
- * const resolver = (field_id: string) => ({
- *   type: "signedurl",
- *   signed_urls: field_upload_urls[field_id],
- * });
- * ```
- *
- */
-export async function prepare_presigned_upload_url_for_fields(
-  session_id: string,
-  fields: {
-    id: string;
-    type: "file" | "image";
-    multiple: boolean;
-  }[]
-) {
-  // region file upload presigned urls
-  const field_upload_urls: Record<
-    string,
-    Array<{
-      path: string;
-      token: string;
-    }>
-  > = {};
-
-  for (const field of fields) {
-    const urls = await prepare_response_file_upload_storage_presigned_url(
-      {
-        session_id: session_id,
-        field_id: field.id,
-      },
-      field.multiple ? GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD : 1
-    );
-    field_upload_urls[field.id] = urls;
-  }
-
-  return field_upload_urls;
 }

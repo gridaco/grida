@@ -11,10 +11,8 @@ Do not use a developer stack or a hosted project. The two proofs share the
 fixed `grida_auth_test` fixture identity and must run serially on one machine.
 
 ```sh
-pnpm --filter @grida/tokens build
-pnpm --filter @grida/forms build
-pnpm --filter @grida/forms typecheck
-pnpm --filter @grida/forms test
+pnpm turbo build --filter='@grida/api^...'
+pnpm turbo typecheck test --filter='@grida/api^...'
 pnpm --filter @grida/api typecheck
 pnpm --filter @grida/api test
 pnpm --filter @grida/api build:local
@@ -36,10 +34,16 @@ fails the command; nothing is skipped.
 ## What the proof executes
 
 The runner copies and hashes the API source, configuration and package manifest.
-It also hashes the lockfile and the linked Forms, token and database packages,
-including built package output. Build shared dependencies first. The snapshot
-runs a production Nitro `node-server` build with a constructed environment,
-private HOME and fresh output, then starts that output and makes real HTTP calls.
+It also hashes the lockfile and the linked Forms, token, database, PostgREST,
+utility, translation and email packages, including built package output and the
+canonical JSON in `data/translations`. Database adapters export source; the
+other producers export compiled `dist` entrypoints. Build shared dependencies
+first: the dependency-only Turbo selector above excludes the API itself. The
+translation build embeds its JSON catalogs and tracks their directory in Turbo
+inputs; deployed processes need no repository data-directory access.
+
+The snapshot runs a production Nitro `node-server` build with a constructed
+environment, private HOME and fresh output, then starts that output and makes real HTTP calls.
 Separate typechecks, contract tests and the Vercel build remain required; the
 local HTTP proof does not exercise Vercel ingress.
 

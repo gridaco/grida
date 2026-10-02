@@ -1,6 +1,6 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "../../k/env";
 import { service_role } from "../../db";
-import { FileStorage, SessionStagedFileStorage } from "./session-storage";
+import { SessionStagedFileStorage } from "./session-storage";
 import { createXSupabaseClient } from "../x-supabase/index";
 import type { SchemaTableConnectionXSupabaseMainTableJoint } from "../../types";
 import type { FormFieldDefinition, FormFieldStorageSchema } from "@grida/forms";
@@ -45,7 +45,7 @@ export namespace SessionStorageServices {
           );
           switch (mode) {
             case "direct": {
-              const storage = new FileStorage(client, bucket);
+              const storage = client.storage.from(bucket);
               return storage.createSignedUploadUrl(path);
               break;
             }
@@ -117,7 +117,7 @@ export namespace SessionStorageServices {
             }
           );
 
-          const storage = new FileStorage(client, bucket);
+          const storage = client.storage.from(bucket);
           return storage.getPublicUrl(file.path);
         }
         case "grida":
@@ -126,8 +126,7 @@ export namespace SessionStorageServices {
           throw new Error("storage type not supported");
       }
     } else {
-      const storage = new FileStorage(
-        service_role.forms,
+      const storage = service_role.forms.storage.from(
         GRIDA_FORMS_RESPONSE_BUCKET
       );
 

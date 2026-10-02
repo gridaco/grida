@@ -24,101 +24,108 @@ export type FormResponseUnknownFieldHandlingStrategyType =
   | "ignore"
   | "reject";
 
-export type FormInputType =
-  | "text"
-  | "textarea"
-  | "richtext"
-  | "tel"
-  | "url"
-  | "checkbox"
-  | "checkboxes"
-  | "switch"
-  | "toggle"
-  | "toggle-group"
-  | "radio"
-  | "number"
-  | "date"
-  | "datetime-local"
-  | "month"
-  | "week"
-  | "time"
-  | "email"
-  | "challenge_email"
-  | "file"
-  | "image"
-  | "audio"
-  | "video"
-  | "select"
-  | "latlng"
-  | "password"
-  | "color"
-  | "country"
-  | "payment"
-  | "hidden"
-  | "signature"
-  | "range"
-  | "search"
-  | "json"
-  | "canvas";
+export const FormInputTypes = [
+  "text",
+  "textarea",
+  "richtext",
+  "tel",
+  "url",
+  "checkbox",
+  "checkboxes",
+  "switch",
+  "toggle",
+  "toggle-group",
+  "radio",
+  "number",
+  "date",
+  "datetime-local",
+  "month",
+  "week",
+  "time",
+  "email",
+  "challenge_email",
+  "file",
+  "image",
+  "audio",
+  "video",
+  "select",
+  "latlng",
+  "password",
+  "color",
+  "country",
+  "payment",
+  "hidden",
+  "signature",
+  "range",
+  "search",
+  "json",
+  "canvas",
+] as const;
+
+export type FormInputType = (typeof FormInputTypes)[number];
+
+export const FormFieldAutocompleteTypes = [
+  "off",
+  "on",
+  "name",
+  "honorific-prefix",
+  "given-name",
+  "additional-name",
+  "family-name",
+  "honorific-suffix",
+  "nickname",
+  "email",
+  "username",
+  "new-password",
+  "current-password",
+  "one-time-code",
+  "organization-title",
+  "organization",
+  "street-address",
+  "shipping",
+  "billing",
+  "address-line1",
+  "address-line2",
+  "address-line3",
+  "address-level4",
+  "address-level3",
+  "address-level2",
+  "address-level1",
+  "country",
+  "country-name",
+  "postal-code",
+  "cc-name",
+  "cc-given-name",
+  "cc-additional-name",
+  "cc-family-name",
+  "cc-number",
+  "cc-exp",
+  "cc-exp-month",
+  "cc-exp-year",
+  "cc-csc",
+  "cc-type",
+  "transaction-currency",
+  "transaction-amount",
+  "language",
+  "bday",
+  "bday-day",
+  "bday-month",
+  "bday-year",
+  "sex",
+  "tel",
+  "tel-country-code",
+  "tel-national",
+  "tel-area-code",
+  "tel-local",
+  "tel-extension",
+  "impp",
+  "url",
+  "photo",
+  "webauthn",
+] as const;
 
 export type FormFieldAutocompleteType =
-  | "off"
-  | "on"
-  | "name"
-  | "honorific-prefix"
-  | "given-name"
-  | "additional-name"
-  | "family-name"
-  | "honorific-suffix"
-  | "nickname"
-  | "email"
-  | "username"
-  | "new-password"
-  | "current-password"
-  | "one-time-code"
-  | "organization-title"
-  | "organization"
-  | "street-address"
-  | "shipping"
-  | "billing"
-  | "address-line1"
-  | "address-line2"
-  | "address-line3"
-  | "address-level4"
-  | "address-level3"
-  | "address-level2"
-  | "address-level1"
-  | "country"
-  | "country-name"
-  | "postal-code"
-  | "cc-name"
-  | "cc-given-name"
-  | "cc-additional-name"
-  | "cc-family-name"
-  | "cc-number"
-  | "cc-exp"
-  | "cc-exp-month"
-  | "cc-exp-year"
-  | "cc-csc"
-  | "cc-type"
-  | "transaction-currency"
-  | "transaction-amount"
-  | "language"
-  | "bday"
-  | "bday-day"
-  | "bday-month"
-  | "bday-year"
-  | "sex"
-  | "tel"
-  | "tel-country-code"
-  | "tel-national"
-  | "tel-area-code"
-  | "tel-local"
-  | "tel-extension"
-  | "impp"
-  | "url"
-  | "photo"
-  | "webauthn";
+  (typeof FormFieldAutocompleteTypes)[number];
 
 export type FormFieldInit = {
   id?: string;

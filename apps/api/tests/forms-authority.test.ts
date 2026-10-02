@@ -302,8 +302,7 @@ describe("session file authority", () => {
     );
     expect(response.status).toBe(200);
     expect(mocks.sign).toHaveBeenCalledWith(
-      `tmp/${sessionId}/${fieldId}/file-name.png`,
-      undefined
+      `tmp/${sessionId}/${fieldId}/file-name.png`
     );
   });
   test.each([

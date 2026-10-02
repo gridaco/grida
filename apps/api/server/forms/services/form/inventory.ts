@@ -1,5 +1,5 @@
 import { service_role } from "../../db";
-import { GridaCommerceClient } from "../commerce";
+import { GridaCommerceClient } from "@app/database/commerce";
 import type { Option } from "@grida/forms";
 import { FORM_OPTION_UNAVAILABLE, FORM_SOLD_OUT } from "@grida/forms";
 import assert from "assert";

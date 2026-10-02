@@ -1,3 +1,4 @@
+import { FormsRequestHeaders } from "@grida/forms";
 import { randomUUID } from "node:crypto";
 import {
   createError,
@@ -9,14 +10,9 @@ import {
 
 const methods = ["GET", "POST", "PUT", "PATCH", "OPTIONS"];
 const headers = [
+  ...Object.values(FormsRequestHeaders),
   "content-type",
   "x-request-id",
-  "x-gf-simulator",
-  "x-gf-geo-country",
-  "x-gf-geo-region",
-  "x-gf-geo-city",
-  "x-gf-geo-latitude",
-  "x-gf-geo-longitude",
 ];
 
 export default defineEventHandler((event) => {

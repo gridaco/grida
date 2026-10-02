@@ -1,5 +1,5 @@
 import React from "react";
-import i18next from "i18next";
+import type { i18n } from "i18next";
 import {
   Card,
   CardContent,
@@ -16,8 +16,10 @@ import { render } from "@/lib/templating/template";
 export default function FormCompletePageDefault({
   overrides,
   context,
+  t,
 }: {
   overrides?: Record<string, string>;
+  t: i18n["t"];
   context: TemplateVariables.FormResponseContext;
 }) {
   const texts = getRenderedTexts({
@@ -26,7 +28,7 @@ export default function FormCompletePageDefault({
     config: {
       context,
       i18n: {
-        t: i18next.t,
+        t,
         basePath: `formcomplete.default`,
       },
       renderer: render,

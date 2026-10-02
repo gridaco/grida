@@ -1,5 +1,5 @@
-import { SupabasePostgRESTOpenApi } from "../lib/supabase-postgrest/parse";
-import { FlatPostgREST } from "../lib/supabase-postgrest/flat";
+import { SupabasePostgRESTOpenApi } from "@grida/postgrest";
+import { FlatPostgREST } from "@grida/postgrest";
 import { service_role } from "../db";
 import { createXSupabaseClient } from "../services/x-supabase/index";
 import type {

@@ -1,52 +1,9 @@
-import { create } from "handlebars";
-import { ObjectPath } from "./@types";
-import { v4 as uuid } from "uuid";
+export { render } from "@grida/forms/templating";
+import type { TemplateVariables } from "@grida/forms/templating";
+import type { ObjectPath } from "./@types";
 import { z } from "zod/v3";
-import type { TemplateVariables } from ".";
 import type { i18n } from "i18next";
 import type { Translation } from "@/i18n/resources";
-
-function createGridaHandlebars(
-  features: {
-    uuid?: boolean;
-  } = { uuid: true }
-) {
-  const GridaHandlebars = create();
-
-  if (features.uuid) {
-    GridaHandlebars.registerHelper("uuid", function () {
-      return uuid();
-    });
-  }
-
-  return GridaHandlebars;
-}
-
-export function render(
-  source: string,
-  context: TemplateVariables.Context,
-  options?: CompileOptions
-) {
-  const GridaHandlebars = createGridaHandlebars();
-  return GridaHandlebars.compile(source, options)(context);
-}
-
-// export function validate(
-//   source: string,
-//   policy: "x-supabase-storage-compile-time-renderable-single-file-path-template"
-// ) {
-//   const validator = createGridaHandlebars({});
-//   switch (policy) {
-//     // the compile time renderable path shall not contain context like `uuid` or `file.*`
-//     // this path should be rendered solely based on the context without a
-//     case "x-supabase-storage-compile-time-renderable-single-file-path-template": {
-//       const context = TemplateVariables.Validation.availability(
-//         TemplateVariables.ConnectedDatasourcePostgresSelectRecordContextSchema,
-//         (p) => p.evaluation === "compiletime"
-//       );
-//     }
-//   }
-// }
 
 export function getRenderedTexts({
   shape,

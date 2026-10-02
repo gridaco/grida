@@ -1,0 +1,71 @@
+{
+  "next": "Weiter",
+  "back": "Zurück",
+  "submit": "Einreichen",
+  "pay": "Bezahlen",
+  "home": "Startseite",
+  "verify": "Bestätigen",
+  "resend": "Erneut senden",
+  "retry": "Erneut versuchen",
+  "sending": "Wird gesendet",
+  "email_challenge": {
+    "verify_code": "Bestätigen",
+    "enter_verification_code": "Bestätigungscode eingeben",
+    "code_sent": "Ein Bestätigungscode wurde an Ihre E-Mail gesendet.",
+    "didnt_receive_code": "Keinen Code erhalten?",
+    "code_expired": "Der Bestätigungscode ist abgelaufen.",
+    "incorrect_code": "Falscher Code. Bitte erneut versuchen.",
+    "error_occurred": "Ein Fehler ist aufgetreten. Bitte später erneut versuchen."
+  },
+  "left_in_stock": "{{available}} übrig",
+  "sold_out": "Ausverkauft",
+  "support_metadata": "Support-Metadaten",
+  "support_metadata_no_share": "Bitte teilen Sie diese Informationen nur mit dem Support und sonst niemandem.",
+  "formclosed": {
+    "default": {
+      "title": "Formular Geschlossen",
+      "description": "Dieses Formular akzeptiert keine Antworten mehr."
+    },
+    "while_responding": {
+      "title": "Formular Geschlossen",
+      "description": "Vielen Dank für Ihr Interesse. Leider wurde das Formular während der Beantwortung geschlossen. Wenn Sie glauben, dass dies ein Fehler ist, kontaktieren Sie bitte den Support."
+    }
+  },
+  "formsoldout": {
+    "default": {
+      "title": "Ausverkauft",
+      "description": "Unser gesamter Vorrat ist erschöpft, und wir nehmen keine Bestellungen mehr an."
+    }
+  },
+  "formoptionsoldout": {
+    "default": {
+      "title": "Option Ausverkauft",
+      "description": "Die gewählte Option ist ausverkauft und nicht mehr verfügbar."
+    }
+  },
+  "formcomplete": {
+    "default": {
+      "h1": "{{form_title}}",
+      "p": "Vielen Dank für Ihre Antwort.",
+      "button": "Startseite",
+      "href": "/"
+    },
+    "receipt01": {
+      "h1": "{{response.idx}}",
+      "h2": "Empfang Bestätigt - {{form_title}}",
+      "p": "Erwägen Sie, einen Screenshot dieser Seite für Ihre Unterlagen zu machen."
+    }
+  },
+  "alreadyresponded": {
+    "default": {
+      "title": "Schon geantwortet",
+      "description": "Sie haben dieses Formular bereits eingereicht. Wenn Sie glauben, dass dies ein Fehler ist, kontaktieren Sie bitte den Support."
+    }
+  },
+  "badrequest": {
+    "default": {
+      "title": "Etwas ist schief gelaufen",
+      "description": "Ihre Anfrage konnte nicht bearbeitet werden. Dies kann passiert sein, weil das Formular während des Einreichungsprozesses geändert wurde oder Sie eine veraltete Version der App verwenden. Wenn das Problem weiterhin besteht, kontaktieren Sie bitte unser Support-Team für Unterstützung."
+    }
+  }
+}

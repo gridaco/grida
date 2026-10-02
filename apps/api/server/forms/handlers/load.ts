@@ -6,7 +6,7 @@ import {
   POSSIBLE_CUSTOMER_IDENTITY_FORGE,
   REQUIRED_HIDDEN_FIELD_NOT_USED,
 } from "@grida/forms";
-import resources from "../i18n/resources";
+import { createFormsTranslator } from "@workspace/translations/forms";
 import {
   SYSTEM_GF_CUSTOMER_EMAIL_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
@@ -24,7 +24,6 @@ import {
   validate_max_access_by_customer,
   validate_max_access_by_form,
 } from "../services/form/validate-max-access";
-import i18next from "i18next";
 import { notFound } from "../http";
 import { FormRenderTree } from "@grida/forms";
 import type { FormMethod, FormsPageLanguage } from "@grida/forms";
@@ -44,10 +43,7 @@ import type {
   MaxResponseByCustomerError,
 } from "@grida/forms";
 import type { FormDocument } from "../types";
-type FormClientFetchResponse = {
-  data: FormAgentPrefetchData | null;
-  error: FormClientFetchResponseError | null;
-};
+import type { FormClientFetchResponse } from "@grida/forms";
 
 export async function GET(req: Request, params: Params) {
   const response: FormClientFetchResponse = {
@@ -134,13 +130,7 @@ export async function GET(req: Request, params: Params) {
   const start_page =
     (default_page as unknown as FormDocument | null)?.start_page ?? null;
 
-  // load serverside i18n
-  await i18next.init({
-    lng: lang,
-    debug: false,
-    resources: resources,
-    preload: [lang],
-  });
+  const t = await createFormsTranslator(lang);
 
   const page_blocks = (data.default_page as unknown as FormDocument | null)
     ?.blocks;
@@ -230,9 +220,9 @@ export async function GET(req: Request, params: Params) {
       ...option,
       label: is_inventory_available
         ? is_alerting_inventory
-          ? `${option.label} (${i18next.t("left_in_stock", { available })})`
+          ? `${option.label} (${t("left_in_stock", { available })})`
           : option.label
-        : `${option.label} (${i18next.t("sold_out")})`,
+        : `${option.label} (${t("sold_out")})`,
       disabled: !is_inventory_available || (option.disabled ?? undefined),
     };
   }
@@ -438,8 +428,9 @@ export async function GET(req: Request, params: Params) {
       is_open:
         is_open === false
           ? false
-          : response.error?.code !==
-            FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code,
+          : (typeof response.error === "object"
+              ? response.error?.code
+              : undefined) !== FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code,
       // TODO:
       customer_identity_status: "anonymous",
       // TODO:
@@ -449,7 +440,11 @@ export async function GET(req: Request, params: Params) {
   };
 
   response.data = payload;
-  if (response.error && "missing_required_hidden_fields" in response.error) {
+  if (
+    response.error &&
+    typeof response.error === "object" &&
+    "missing_required_hidden_fields" in response.error
+  ) {
     response.error.missing_required_hidden_fields =
       response.error.missing_required_hidden_fields.map(projectFormField);
   }

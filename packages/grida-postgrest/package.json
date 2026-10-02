@@ -1,0 +1,32 @@
+{
+  "name": "@grida/postgrest",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure PostgREST schema interpretation and JSON-path utilities",
+  "license": "Apache-2.0",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "fast-xml-parser": "^5.8.0",
+    "flat": "^6.0.1"
+  }
+}

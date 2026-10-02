@@ -18,7 +18,7 @@ import { Env } from "@/env";
 import { AgentPagesFlow } from "@/grida-forms/formstate/core/flow";
 import type {
   FormAgentPrefetchData,
-  FormClientFetchResponseError,
+  FormClientFetchResponse,
 } from "@grida/forms";
 import { FormAgentGeo } from "@/grida-forms/formstate/core/geo";
 
@@ -75,7 +75,11 @@ export function Agent({
       session={session}
       geo={geo}
       data={data}
-      error={error}
+      error={
+        typeof error === "string"
+          ? { code: "SERVICE_ERROR", message: error }
+          : error
+      }
       translation={translation}
       debug={debug}
     />
@@ -95,7 +99,7 @@ function Ready({
   session: string;
   geo?: FormAgentGeo;
   data: FormAgentPrefetchData;
-  error?: FormClientFetchResponseError | null;
+  error?: Exclude<FormClientFetchResponse["error"], string>;
   translation: FormViewTranslation;
   debug?: boolean;
 }) {
@@ -209,7 +213,7 @@ function FormPage({
   session: string;
   geo?: FormAgentGeo;
   data: FormAgentPrefetchData;
-  error?: FormClientFetchResponseError | null;
+  error?: Exclude<FormClientFetchResponse["error"], string>;
   translation: FormViewTranslation;
 }) {
   const {
@@ -232,6 +236,7 @@ function FormPage({
   if (error) {
     switch (error.code) {
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
+        if (!("max" in error)) break;
         const { __gf_fp_fingerprintjs_visitorid, customer_id } = error;
         return redirect(
           formlink(Env.web.HOST, form_id, "alreadyresponded", {

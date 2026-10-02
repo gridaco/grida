@@ -7,11 +7,9 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_SESSION_KEY,
 } from "@/k/system";
-import type { EditorApiResponse } from "@/types/private/api";
 import type {
-  FormAgentPrefetchData,
   FormSessionResponse,
-  FormClientFetchResponseError,
+  FormClientFetchResponse,
 } from "@grida/forms";
 import { Env } from "@/env";
 
@@ -130,9 +128,7 @@ export function useFormSession(
     }
   }
 
-  return useSWR<
-    EditorApiResponse<FormAgentPrefetchData, FormClientFetchResponseError>
-  >(
+  return useSWR<FormClientFetchResponse>(
     req_url,
     async (url: string) => {
       const res = await fetch(url, { credentials: "omit" });

@@ -1,6 +1,5 @@
-import resources from "./resources";
 import { service_role } from "@/lib/supabase/server";
-import i18next from "i18next";
+import { createFormsTranslator } from "@workspace/translations/forms";
 
 type InitWith = { form_id: string } | { lng: string };
 
@@ -28,10 +27,5 @@ export async function ssr_page_init_i18n(init: InitWith) {
     }
   }
 
-  return i18next.init({
-    lng: lng,
-    debug: false, //!IS_PRODUTION,
-    resources: resources,
-    preload: [lng],
-  });
+  return createFormsTranslator(lng);
 }

@@ -1,0 +1,71 @@
+{
+  "next": "Volgende",
+  "back": "Vorige",
+  "submit": "Indienen",
+  "pay": "Betalen",
+  "home": "Home",
+  "verify": "Verifiëren",
+  "resend": "Opnieuw verzenden",
+  "retry": "Opnieuw proberen",
+  "sending": "Bezig met verzenden",
+  "email_challenge": {
+    "verify_code": "Verifiëren",
+    "enter_verification_code": "Voer verificatiecode in",
+    "code_sent": "Er is een verificatiecode naar je e-mail gestuurd.",
+    "didnt_receive_code": "Geen code ontvangen?",
+    "code_expired": "De verificatiecode is verlopen.",
+    "incorrect_code": "Onjuiste code. Probeer het opnieuw.",
+    "error_occurred": "Er is een fout opgetreden. Probeer het later opnieuw."
+  },
+  "left_in_stock": "Nog {{available}} beschikbaar",
+  "sold_out": "Uitverkocht",
+  "support_metadata": "Ondersteuningsmetadata",
+  "support_metadata_no_share": "Deel deze informatie alstublieft niet met iemand anders dan de ondersteuning.",
+  "formclosed": {
+    "default": {
+      "title": "Formulier Gesloten",
+      "description": "Dit formulier accepteert geen reacties meer."
+    },
+    "while_responding": {
+      "title": "Formulier Gesloten",
+      "description": "Dank u voor uw interesse. Helaas is het formulier gesloten terwijl u reageerde. Als u denkt dat dit een vergissing is, neem dan contact op met de ondersteuning."
+    }
+  },
+  "formsoldout": {
+    "default": {
+      "title": "Uitverkocht",
+      "description": "Al onze voorraad is opgebruikt, en we nemen geen bestellingen meer aan."
+    }
+  },
+  "formoptionsoldout": {
+    "default": {
+      "title": "Optie Uitverkocht",
+      "description": "De geselecteerde optie is uitverkocht en niet meer beschikbaar."
+    }
+  },
+  "formcomplete": {
+    "default": {
+      "h1": "{{form_title}}",
+      "p": "Bedankt voor uw reactie.",
+      "button": "Home",
+      "href": "/"
+    },
+    "receipt01": {
+      "h1": "{{response.idx}}",
+      "h2": "Ontvangst Bevestigd - {{form_title}}",
+      "p": "Overweeg een screenshot van deze pagina te maken voor uw administratie."
+    }
+  },
+  "alreadyresponded": {
+    "default": {
+      "title": "Al Gereageerd",
+      "description": "U heeft dit formulier al ingediend. Als u denkt dat dit een vergissing is, neem dan contact op met de ondersteuning."
+    }
+  },
+  "badrequest": {
+    "default": {
+      "title": "Er is iets misgegaan",
+      "description": "Uw verzoek kon niet worden verwerkt. Dit kan zijn gebeurd omdat het formulier tijdens het indienen is gewijzigd of omdat u een verouderde versie van de app gebruikt. Als het probleem aanhoudt, neem dan contact op met ons ondersteuningsteam voor hulp."
+    }
+  }
+}

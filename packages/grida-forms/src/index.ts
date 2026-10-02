@@ -11,3 +11,6 @@ export * from "./constants";
 export * from "./links";
 export * from "./utils";
 export * from "./projection";
+export * from "./protocol";
+export * from "./response-contacts";
+export * from "./response-index";

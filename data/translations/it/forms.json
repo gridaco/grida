@@ -1,0 +1,71 @@
+{
+  "next": "Avanti",
+  "back": "Indietro",
+  "submit": "Invia",
+  "pay": "Paga",
+  "home": "Home",
+  "verify": "Verifica",
+  "resend": "Reinvia",
+  "retry": "Riprova",
+  "sending": "Invio in corso",
+  "email_challenge": {
+    "verify_code": "Verifica",
+    "enter_verification_code": "Inserisci il codice di verifica",
+    "code_sent": "Un codice di verifica è stato inviato alla tua email.",
+    "didnt_receive_code": "Non hai ricevuto il codice?",
+    "code_expired": "Il codice di verifica è scaduto.",
+    "incorrect_code": "Codice non corretto. Riprova.",
+    "error_occurred": "Si è verificato un errore. Riprova più tardi."
+  },
+  "left_in_stock": "{{available}} rimasti",
+  "sold_out": "Esaurito",
+  "support_metadata": "Metadati di supporto",
+  "support_metadata_no_share": "Si prega di non condividere queste informazioni con nessuno tranne il supporto.",
+  "formclosed": {
+    "default": {
+      "title": "Modulo Chiuso",
+      "description": "Questo modulo non accetta più risposte."
+    },
+    "while_responding": {
+      "title": "Modulo Chiuso",
+      "description": "Grazie per il tuo interesse. Sfortunatamente, il modulo è stato chiuso durante la compilazione. Se credi che sia un errore, contatta l'assistenza."
+    }
+  },
+  "formsoldout": {
+    "default": {
+      "title": "Esaurito",
+      "description": "Tutto il stock è esaurito e non stiamo più accettando ordini."
+    }
+  },
+  "formoptionsoldout": {
+    "default": {
+      "title": "Opzione Esaurita",
+      "description": "L'opzione selezionata è esaurita e non è più disponibile."
+    }
+  },
+  "formcomplete": {
+    "default": {
+      "h1": "{{form_title}}",
+      "p": "Grazie per la tua risposta.",
+      "button": "Home",
+      "href": "/"
+    },
+    "receipt01": {
+      "h1": "{{response.idx}}",
+      "h2": "Ricevuta Confermata - {{form_title}}",
+      "p": "Considera di fare uno screenshot di questa pagina per i tuoi archivi."
+    }
+  },
+  "alreadyresponded": {
+    "default": {
+      "title": "Già Risposto",
+      "description": "Hai già inviato questo modulo. Se pensi che sia un errore, contatta il supporto."
+    }
+  },
+  "badrequest": {
+    "default": {
+      "title": "Qualcosa è andato storto",
+      "description": "La tua richiesta non può essere elaborata. Ciò può essere accaduto perché il modulo è stato modificato durante il processo di invio o stai utilizzando una versione obsoleta dell'app. Se il problema persiste, contatta il nostro team di supporto per assistenza."
+    }
+  }
+}

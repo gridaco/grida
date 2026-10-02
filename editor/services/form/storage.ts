@@ -3,7 +3,6 @@ import { UniqueFileNameGenerator } from "@/grida-forms/lib/storage";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { service_role } from "@/lib/supabase/server";
 import { TemplateVariables } from "@/lib/templating";
-import { FileStorage } from "@/services/form/session-storage";
 import {
   GridaXSupabaseService,
   XSupabase,
@@ -50,7 +49,9 @@ export class FieldStorageService {
     return this._m_xsupabaseclient;
   }
 
-  private _m_fileStorage: FileStorage | null = null;
+  private _m_fileStorage: ReturnType<
+    XSupabase.Client["storage"]["from"]
+  > | null = null;
   private async getFileStorage() {
     if (this._m_fileStorage) {
       return this._m_fileStorage;
@@ -61,15 +62,14 @@ export class FieldStorageService {
         assert(this.supabase_connection, "supabase_connection not found");
         const client = await this.getXSupabaseClient();
 
-        this._m_fileStorage = new FileStorage(client, this.storage.bucket);
+        this._m_fileStorage = client.storage.from(this.storage.bucket);
         return this._m_fileStorage;
       }
 
       throw new Error("storage type not supported");
     }
 
-    this._m_fileStorage = new FileStorage(
-      service_role.forms,
+    this._m_fileStorage = service_role.forms.storage.from(
       GRIDA_FORMS_RESPONSE_BUCKET
     );
     return this._m_fileStorage;

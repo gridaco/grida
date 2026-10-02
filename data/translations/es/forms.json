@@ -1,0 +1,71 @@
+{
+  "next": "Siguiente",
+  "back": "Anterior",
+  "submit": "Enviar",
+  "pay": "Pagar",
+  "home": "Inicio",
+  "verify": "Verificar",
+  "resend": "Reenviar",
+  "retry": "Reintentar",
+  "sending": "Enviando",
+  "email_challenge": {
+    "verify_code": "Verificar",
+    "enter_verification_code": "Introduce el código de verificación",
+    "code_sent": "Se ha enviado un código de verificación a tu correo.",
+    "didnt_receive_code": "¿No recibiste el código?",
+    "code_expired": "El código de verificación ha caducado.",
+    "incorrect_code": "Código incorrecto. Inténtalo de nuevo.",
+    "error_occurred": "Ocurrió un error. Inténtalo más tarde."
+  },
+  "left_in_stock": "{{available}} restantes",
+  "sold_out": "Agotado",
+  "support_metadata": "Metadatos de soporte",
+  "support_metadata_no_share": "Por favor, no comparta esta información con nadie excepto con el soporte.",
+  "formclosed": {
+    "default": {
+      "title": "Formulario Cerrado",
+      "description": "Este formulario ya no acepta respuestas."
+    },
+    "while_responding": {
+      "title": "Formulario Cerrado",
+      "description": "Gracias por su interés. Desafortunadamente, el formulario se cerró durante la respuesta. Si cree que esto es un error, por favor contacte al soporte."
+    }
+  },
+  "formsoldout": {
+    "default": {
+      "title": "Agotado",
+      "description": "El stock ha sido agotado y no estamos aceptando más pedidos."
+    }
+  },
+  "formoptionsoldout": {
+    "default": {
+      "title": "Opción Agotada",
+      "description": "La opción seleccionada está agotada y ya no está disponible."
+    }
+  },
+  "formcomplete": {
+    "default": {
+      "h1": "{{form_title}}",
+      "p": "Gracias por su respuesta.",
+      "button": "Inicio",
+      "href": "/"
+    },
+    "receipt01": {
+      "h1": "{{response.idx}}",
+      "h2": "Recibo Confirmado - {{form_title}}",
+      "p": "Considere tomar una captura de pantalla de esta página para sus registros."
+    }
+  },
+  "alreadyresponded": {
+    "default": {
+      "title": "Ya ha respondido",
+      "description": "Si considera que esto es un error, por favor contacte al soporte."
+    }
+  },
+  "badrequest": {
+    "default": {
+      "title": "Algo salió mal",
+      "description": "Su solicitud no pudo ser procesada. Esto puede haber ocurrido porque el formulario fue alterado durante el proceso de envío o está utilizando una versión desactualizada de la aplicación. Si el problema persiste, por favor contacte a nuestro equipo de soporte para obtener ayuda."
+    }
+  }
+}

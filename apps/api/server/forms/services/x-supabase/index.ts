@@ -10,8 +10,8 @@ import {
   SupabaseClientOptions,
   createClient,
 } from "@supabase/supabase-js";
-import { render } from "../../lib/templating/template";
-import type { TemplateVariables } from "../../lib/templating/index";
+import { render } from "@grida/forms/templating";
+import type { TemplateVariables } from "@grida/forms/templating";
 import assert from "assert";
 
 /**

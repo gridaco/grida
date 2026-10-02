@@ -1,3 +1,4 @@
+import { FormResponseContacts } from "@grida/forms";
 import { service_role } from "./db";
 import { RawdataProcessing } from "./grida-forms/lib/rawdata";
 import { renderRespondentEmail } from "./services/form/respondent-email";
@@ -80,22 +81,13 @@ export namespace OnSubmit {
         .eq("project_id", form.project_id)
         .single();
     if (customerError || !customer) throw new Error("Unable to index response");
-    const emails: string[] = [],
-      phones: string[] = [];
-    const raw = response.raw as Record<string, unknown> | null;
-    for (const field of response.response_fields) {
-      if (!field.form_field) continue;
-      const value = raw?.[field.form_field.name];
-      if (typeof value !== "string") continue;
-      const state = field.challenge_state as { state?: string } | null;
-      if (
-        field.form_field.type === "email" ||
-        (field.form_field.type === "challenge_email" &&
-          state?.state === "challenge-success")
-      )
-        emails.push(value);
-      if (field.form_field.type === "tel") phones.push(value);
-    }
+    const { email_provisional: emails, phone_provisional: phones } =
+      FormResponseContacts.provisional([
+        {
+          raw: response.raw as Record<string, unknown> | null,
+          response_fields: response.response_fields,
+        },
+      ]);
     const { error: updateError } = await service_role.workspace
       .from("customer")
       .update({

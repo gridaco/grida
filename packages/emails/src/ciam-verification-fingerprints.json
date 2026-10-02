@@ -1,0 +1,22 @@
+{
+  "en": {
+    "minimal": "96a7bd218432db0d16aa3e73cdbfa82e54ac953406eab7b95c322226f813bbc9",
+    "full": "6ec6bcc05d0fc3fcaf8826f01d403626ebcbb2a876d468f28cb9552b35c9af32"
+  },
+  "ko": {
+    "minimal": "af957721fee87e578c84488a1a2b9df09d6add6be3cf590f11b26be9e5b94db9",
+    "full": "970bac2a91c1001a163f6b21ab3ac6c5897180bda01a1949effc61a9e0f8666b"
+  },
+  "es": {
+    "minimal": "f844804046143a9970acb759deb6b88accc7f24868d3489005bd3be90220acb2",
+    "full": "6543a56233836179c9a863cfac65d3a28145d85588d73a15e3b586fcc9fb5ee7"
+  },
+  "ja": {
+    "minimal": "c955efa505f8b04a2fc53ae15898b8b800d7b7a7fdc4b758a2c5543df3a36ab8",
+    "full": "1b9001ef3498fe873aa171ebc36d7bd7ef37168afebdc37f3beabf21e8c751ac"
+  },
+  "zh": {
+    "minimal": "a9aec0bc65982322f3ac6895552d093005443b7e1e57da52c2b17ec95c059e43",
+    "full": "c76d5ffba3b614254074ecd95c23ff153a8d5177dd37b38beeaa3ee33035aa0d"
+  }
+}

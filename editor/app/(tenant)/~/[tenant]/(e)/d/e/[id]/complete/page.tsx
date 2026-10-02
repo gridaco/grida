@@ -47,7 +47,7 @@ export default async function SubmitCompletePage({
   const { lang, ending_page_template_id, ending_page_i18n_overrides } =
     default_page as unknown as FormDocument;
 
-  await ssr_page_init_i18n({
+  const t = await ssr_page_init_i18n({
     lng: lang,
   });
 
@@ -94,6 +94,7 @@ export default async function SubmitCompletePage({
   return (
     <main className="container mx-auto flex items-center justify-center w-dvw min-h-dvh">
       <EndingPageWithContext
+        t={t}
         template_id={ending_page_template_id}
         overrides={ending_page_i18n_overrides as {} as EndingPageI18nOverrides}
         context={{

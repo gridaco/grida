@@ -48,8 +48,9 @@ export type PublicFormField = Pick<
 >;
 
 export interface FormClientFetchResponse {
-  data: FormAgentPrefetchData | null;
-  error: FormClientFetchResponseError | null;
+  data?: FormAgentPrefetchData | null;
+  error: FormClientFetchResponseError | string | FormsApiError | null;
+  request_id?: string;
 }
 
 /**
@@ -143,13 +144,20 @@ export type FormSubmitErrorCode =
   | typeof ERR.FORM_SCHEDULE_NOT_IN_RANGE.code
   | typeof ERR.CHALLENGE_EMAIL_NOT_VERIFIED.code;
 
+/** Sanitized infrastructure errors, distinct from endpoint-specific errors. */
+export interface FormsApiError {
+  code: string;
+  message: string;
+}
+
+/** Failed operations may omit data; a response body alone does not imply success. */
 export type FormsApiResponse<T, E = unknown> = (
   | {
-      data: null;
-      error: E;
+      data?: null;
+      error: E | FormsApiError;
     }
   | { data: T; error: null }
-) & { message?: string };
+) & { message?: string; request_id?: string };
 
 export interface CreateSignedUploadUrlRequest {
   file: {

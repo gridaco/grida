@@ -1,5 +1,5 @@
-import { render } from "../../lib/templating/template";
-import { fmt_local_index } from "../../utils/fmt";
+import { render } from "@grida/forms/templating";
+import { formatResponseIndex } from "@grida/forms";
 
 export function toStringValue(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -45,7 +45,7 @@ export function renderRespondentEmail({
     response: {
       short_id: response_local_id ?? null,
       index: response_local_index,
-      idx: fmt_local_index(response_local_index),
+      idx: formatResponseIndex(response_local_index),
     },
   };
 

@@ -155,6 +155,12 @@ async function snapshot(workspace) {
     ].map((name) => `packages/ui/src/components/${name}.tsx`),
     ...(await files("packages/grida-forms")),
     ...(await files("packages/grida-tokens")),
+    ...(await files("packages/workspace-utils")),
+    ...(await files("packages/translations")),
+    ...(await files("packages/emails")),
+    ...(await files("packages/grida-postgrest")),
+    ...(await files("data/translations")),
+    // Includes the source-exported, client-injected database adapters.
     ...(await files("database")),
   ])
     hashes.push({

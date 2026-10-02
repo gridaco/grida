@@ -1,5 +1,5 @@
 import { service_role } from "../../db";
-import { is_uuid_v4 } from "../../utils/is";
+import { is_uuid_v4 } from "@grida/forms";
 
 export async function upsert_customer_with({
   project_id,
