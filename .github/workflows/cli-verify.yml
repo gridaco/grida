@@ -21,7 +21,6 @@ on:
       - "packages/grida-ai-models/**"
       - "data/ai/**"
       - "scripts/cli-release/**"
-      - "scripts/cli-media-local/**"
       - "scripts/cli-local/**"
       - "scripts/npm*.mjs"
       - "scripts/publish-packages*.mjs"
@@ -56,9 +55,6 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Verify independent publication and retained reference instrumentation
+      - name: Verify independent package publication
         run: |
           node --test scripts/publish-packages.test.mjs scripts/npm.test.mjs
-          node --test scripts/cli-media-local/network.test.mjs scripts/cli-local/network.test.mjs
-      # Retained Node guard tests qualify only their historical instrumentation.
-      # Native contracts and delivery verify the current packed executable.

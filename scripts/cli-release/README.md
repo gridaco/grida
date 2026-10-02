@@ -109,9 +109,8 @@ manifest without scripts or dependencies. Do not publish or pack the source
 directory directly: source checkouts do not contain the release binaries.
 
 Use `just cli-contracts` for the current native contract gate and see the
-[conformance prerequisites](../cli-contracts/README.md) for custody tools and docs
-build requirements. `legacy-prepare.mjs` describes the retired TypeScript archive
-boundary and cannot prepare a native release; use the `native-*` commands above.
+[contract prerequisites](../cli-contracts/README.md) for custody tools and docs
+build requirements. The `native-*` commands above are the current release path.
 
 ## Release ownership
 
