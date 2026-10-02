@@ -1,4 +1,4 @@
-import { OnSubmitProcessors } from "@/app/(api)/(public)/v1/submit/[id]/hooks";
+import { OnSubmitProcessors } from "@/services/form/sms";
 import { createFormsClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 

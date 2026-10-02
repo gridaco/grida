@@ -11,6 +11,7 @@ import {
 export async function runFormsScenarios({
   origin,
   webOrigin = "http://localhost:3000",
+  publicContract = true,
   fixture: f,
   provider,
   log = () => {},
@@ -85,10 +86,15 @@ export async function runFormsScenarios({
     );
   }
   async function session(form) {
-    const data = success(
+    const envelope = success(
       await request(`/v1/${form.id}/session`),
       "create session"
-    ).data;
+    );
+    const data = envelope.data;
+    if (publicContract) {
+      assert.equal(envelope.error, null);
+      assert.deepEqual(Object.keys(data).sort(), ["form_id", "id"]);
+    }
     assert.equal(data.form_id, form.id);
     assert.match(data.id, /^[a-f0-9-]{36}$/);
     return data.id;
@@ -140,9 +146,25 @@ export async function runFormsScenarios({
   assert.equal(load.data.title, `Forms baseline native ${f.run}`);
   assert.equal(load.data.is_open, true);
   assert(load.data.fields.some((field) => field.id === f.a.fields.name.id));
+  if (publicContract) assertPublicRender(load);
   const aSession = load.data.session_id;
   assert.equal((await sessionRow(aSession)).form_id, f.a.id);
   const bSession = await session(f.b);
+  if (publicContract) {
+    const identified = success(
+      await request(
+        `/v1/${f.b.id}?${new URLSearchParams({
+          __gf_session: bSession,
+          __gf_customer_uuid: f.b.customer.uuid,
+        })}`
+      ),
+      "public customer projection"
+    );
+    assert.deepEqual(identified.data.customer_access.customer, {
+      uid: f.b.customer.uid,
+    });
+    assertPublicRender(identified);
+  }
   denied(await request(`/v1/${randomUUID()}`), "unknown form");
   done("load and real respondent sessions");
 
@@ -390,6 +412,7 @@ export async function runFormsScenarios({
     }),
     "multipart submission"
   );
+  if (publicContract) assertPublicSubmission(accepted);
   assert(accepted.data?.id, "Submit did not return persisted response ID");
   const response = await f.one(
     "grida_forms",
@@ -544,6 +567,19 @@ export async function runFormsScenarios({
   done("real member, other-tenant, outsider and anonymous database policies");
 
   const connectedSession = await session(f.connected);
+  if (publicContract) {
+    const connectedLoad = success(
+      await request(`/v1/${f.connected.id}?__gf_session=${connectedSession}`),
+      "connected public projection"
+    );
+    assertPublicRender(connectedLoad);
+    assert(connectedLoad.data.blocks.length > 0);
+    assert(
+      connectedLoad.data.fields.some(
+        (field) => field.id === f.connected.fields.file.id
+      )
+    );
+  }
   const meta = success(
     await request(
       `${sessionPath(connectedSession, f.connected.fields.name.id)}/search/meta`
@@ -581,6 +617,7 @@ export async function runFormsScenarios({
     }),
     "connected submission"
   );
+  if (publicContract) assertPublicSubmission(connectedResult);
   assert(connectedResult.data?.id);
   const connectedRows = await f.rows("public", f.connected.targetTable);
   assert.equal(connectedRows.length, 1);
@@ -621,7 +658,12 @@ export async function runFormsScenarios({
     await request(`/v1/submit/${f.connected.id}?${identical}`),
     "GET submit with coherent duplicates"
   );
-  assert.equal(getResult.data.raw.full_name, "GET Fixture");
+  if (publicContract) assertPublicSubmission(getResult);
+  assert.equal(
+    (await f.one("grida_forms", "response", `id=eq.${getResult.data.id}`)).raw
+      .full_name,
+    "GET Fixture"
+  );
   assert.equal(
     (
       await f.rows(
@@ -820,6 +862,46 @@ export async function runFormsScenarios({
   );
   done("post-commit receipt failure preserves accepted state without replay");
 
+  // The staged-path cases above do not exercise multipart File parsing. Send
+  // actual bytes in one native submission and observe the resulting object.
+  const directSession = await session(f.directFile);
+  const directAccepted = success(
+    await submit(f.directFile, directSession, {
+      full_name: "Direct multipart bytes",
+      attachment: new File([f.bytes], "direct.png", { type: "image/png" }),
+    }),
+    "direct multipart file submission"
+  );
+  if (publicContract) assertPublicSubmission(directAccepted);
+  const directResponse = await f.one(
+    "grida_forms",
+    "response",
+    `id=eq.${directAccepted.data.id}`
+  );
+  assert.equal(directResponse.form_id, f.directFile.id);
+  assert.equal(directResponse.session_id, directSession);
+  assert.equal(directResponse.raw.full_name, "Direct multipart bytes");
+  assert.equal((await responseRows(f.directFile)).length, 1);
+  const directFileField = await f.one(
+    "grida_forms",
+    "response_field",
+    `response_id=eq.${directResponse.id}&form_field_id=eq.${f.directFile.fields.file.id}`
+  );
+  assert.deepEqual(directFileField.storage_object_paths, [
+    `response/${directResponse.id}/${f.directFile.fields.file.id}/direct.png`,
+  ]);
+  const directBytes = await fetch(
+    `${f.apiUrl}/storage/v1/object/public/${f.bucket}/${directFileField.storage_object_paths[0]}`,
+    { redirect: "error", signal: AbortSignal.timeout(15_000) }
+  );
+  assert.equal(directBytes.status, 200);
+  assert.deepEqual(Buffer.from(await directBytes.arrayBuffer()), f.bytes);
+  assert.equal(
+    (await sessionRow(directSession)).raw[f.directFile.fields.name.id],
+    "Direct multipart bytes"
+  );
+  done("direct multipart File stores actual bytes");
+
   // Final observed counts, without claiming exactly-once behavior or proving
   // the absence of work after this bounded run.
   assert.equal((await responseRows(f.a)).length, 1);
@@ -838,6 +920,7 @@ export async function runFormsScenarios({
       nativeResponses: 1,
       connectedRows: 3,
       acceptedBeforeReceiptFailure: 1,
+      directMultipartResponses: 1,
       foreignResponses: 0,
       inventoryConsumed: 1,
       actualStorageBytes: f.bytes.length,
@@ -875,6 +958,53 @@ function carryoverHttp(origin) {
     );
     return response.json();
   };
+}
+
+function assertPublicSubmission(envelope) {
+  assert.equal(envelope.error, null);
+  assert.deepEqual(Object.keys(envelope.data).sort(), ["customer_id", "id"]);
+  assert.equal(typeof envelope.data.id, "string");
+  assert(
+    envelope.data.customer_id === null ||
+      typeof envelope.data.customer_id === "string"
+  );
+  assert.equal(Object.hasOwn(envelope, "raw"), false);
+  assert.equal(Object.hasOwn(envelope, "response_field"), false);
+}
+
+function assertPublicRender(envelope) {
+  // Deliberately independent of the production projector. Walk fields and both
+  // render representations, including nested options, data and section children.
+  const internal = new Set([
+    "storage",
+    "reference",
+    "connection",
+    "connection_id",
+    "project_id",
+    "form_id",
+    "form_field_id",
+    "form_page_id",
+    "created_at",
+    "updated_at",
+    "supabase_project_id",
+    "sb_service_key_id",
+    "sb_anon_key",
+    "password",
+    "service_role_key",
+    "internal_fixture",
+  ]);
+  function walk(value) {
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) return value.forEach(walk);
+    for (const [key, child] of Object.entries(value)) {
+      assert(!internal.has(key), `Public render contains internal key: ${key}`);
+      walk(child);
+    }
+  }
+  for (const key of ["fields", "required_hidden_fields", "blocks", "tree"]) {
+    walk(envelope.data[key]);
+  }
+  walk(envelope.error?.missing_required_hidden_fields);
 }
 
 // The returned session ID is a respondent capability. Keep this metadata in the
@@ -994,6 +1124,7 @@ export async function resumeCarryover({
     0
   );
   const loaded = await request(`/v1/${c.formId}?__gf_session=${c.sessionId}`);
+  assertPublicRender(loaded);
   assert.equal(loaded.data.session_id, c.sessionId);
   assert.equal(loaded.data.default_values.full_name, c.draft);
   const payload = new FormData();
@@ -1005,6 +1136,7 @@ export async function resumeCarryover({
     method: "POST",
     body: payload,
   });
+  assertPublicSubmission(accepted);
   const response = await db.one(
     "grida_forms",
     "response",
@@ -1066,5 +1198,359 @@ export async function resumeCarryover({
     addedResponses: 1,
     addedConnectedRows: 1,
     bytes: c.byteLength,
+  };
+}
+
+export async function runTransportScenarios({ origin, fixture: f, webOrigin }) {
+  const base = new URL(origin);
+  assert.equal(base.hostname, "127.0.0.1");
+  assert.equal(base.protocol, "http:");
+  const expectedOrigin = new URL(webOrigin).origin;
+  const requestId = "client-chosen-id-must-not-be-trusted";
+  const path = `/v1/${f.connected.id}/session`;
+  const observedIds = new Set();
+  const headerValues = (value) =>
+    (value ?? "")
+      .toLowerCase()
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  function transport(response) {
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+    assert.equal(
+      response.headers.get("access-control-allow-credentials"),
+      null
+    );
+    assert(
+      headerValues(
+        response.headers.get("access-control-expose-headers")
+      ).includes("x-request-id")
+    );
+    assert(
+      headerValues(response.headers.get("cache-control")).includes("no-store")
+    );
+    const id = response.headers.get("x-request-id");
+    assert(
+      id && id.length >= 16,
+      "Every response needs a generated request ID"
+    );
+    assert.notEqual(id, requestId, "The API must generate its own request ID");
+    assert(
+      !observedIds.has(id),
+      "Different requests must receive distinct request IDs"
+    );
+    observedIds.add(id);
+    assert.equal(response.headers.get("set-cookie"), null);
+    return id;
+  }
+  async function json(response) {
+    assert(
+      response.headers
+        .get("content-type")
+        ?.toLowerCase()
+        .startsWith("application/json")
+    );
+    const value = await response.json();
+    assert(value && typeof value === "object");
+    assert.equal(Object.hasOwn(value, "stack"), false);
+    assert.equal(Object.hasOwn(value, "cause"), false);
+    return value;
+  }
+  const simple = await fetch(new URL(path, base), {
+    headers: { Origin: expectedOrigin, "x-request-id": requestId },
+    redirect: "error",
+    signal: AbortSignal.timeout(15_000),
+  });
+  assert.equal(simple.status, 200);
+  transport(simple);
+  const session = (await json(simple)).data;
+  assert.deepEqual(Object.keys(session).sort(), ["form_id", "id"]);
+  assert.equal(session.form_id, f.connected.id);
+
+  const head = await fetch(new URL(path, base), {
+    method: "HEAD",
+    headers: { Origin: expectedOrigin, "x-request-id": requestId },
+    redirect: "error",
+    signal: AbortSignal.timeout(15_000),
+  });
+  assert.equal(head.status, 405);
+  transport(head);
+  assert.equal(await head.text(), "");
+
+  const allowedHeaders = [
+    "content-type",
+    "x-gf-simulator",
+    "x-gf-geo-country",
+    "x-gf-geo-region",
+    "x-gf-geo-city",
+    "x-gf-geo-latitude",
+    "x-gf-geo-longitude",
+    "x-request-id",
+  ];
+  const preflight = await fetch(new URL(path, base), {
+    method: "OPTIONS",
+    redirect: "error",
+    signal: AbortSignal.timeout(15_000),
+    headers: {
+      Origin: "https://consumer.example",
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": allowedHeaders.join(","),
+      "x-request-id": requestId,
+    },
+  });
+  assert.equal(preflight.status, 204);
+  transport(preflight);
+  assert.deepEqual(
+    headerValues(preflight.headers.get("access-control-allow-headers")).sort(),
+    allowedHeaders.slice().sort()
+  );
+  assert.deepEqual(
+    headerValues(preflight.headers.get("access-control-allow-methods")).sort(),
+    ["get", "post", "put", "patch", "options"].sort()
+  );
+  assert.equal(await preflight.text(), "");
+
+  const missing = await fetch(
+    new URL("/v1/not-a-real-operation/absent", base),
+    {
+      headers: { Origin: expectedOrigin, "x-request-id": requestId },
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    }
+  );
+  assert.equal(missing.status, 404);
+  const missingRequestId = transport(missing);
+  const missingBody = await json(missing);
+  assert.equal(typeof missingBody.error?.code, "string");
+  assert.equal(typeof missingBody.error?.message, "string");
+  assert.equal(missingBody.request_id, missingRequestId);
+  assert.equal(Object.hasOwn(missingBody.error, "stack"), false);
+
+  const before = await f.one(
+    "grida_forms",
+    "response_session",
+    `id=eq.${session.id}`
+  );
+  const malformed = await fetch(
+    new URL(
+      `/v1/session/${session.id}/field/${f.connected.fields.name.id}`,
+      base
+    ),
+    {
+      method: "PATCH",
+      body: "{broken",
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+      headers: {
+        Origin: expectedOrigin,
+        "Content-Type": "application/json",
+        "x-request-id": requestId,
+      },
+    }
+  );
+  assert.equal(malformed.status, 400);
+  transport(malformed);
+  const malformedBody = await json(malformed);
+  assert(malformedBody.error);
+  assert.deepEqual(
+    await f.one("grida_forms", "response_session", `id=eq.${session.id}`),
+    before
+  );
+  return {
+    count: 5,
+    scenarios: [
+      "public CORS response",
+      "HEAD without response body",
+      "explicit preflight headers and methods",
+      "correlated sanitized JSON 404",
+      "malformed JSON 400 without writes",
+    ],
+    credentials: false,
+    cache: "no-store",
+  };
+}
+
+/** Exercise actual editor callers in a separate credential-free process. */
+export async function runClientScenarios({
+  origin,
+  fixture: f,
+  provider,
+  runClient,
+  log = () => {},
+}) {
+  assert.equal(typeof runClient, "function");
+  const request = carryoverHttp(origin);
+  const form = f.directFile;
+  async function createSession(target) {
+    const result = await request(`/v1/${target.id}/session`);
+    assert.equal(result.error, null);
+    assert.deepEqual(Object.keys(result.data).sort(), ["form_id", "id"]);
+    assert.equal(result.data.form_id, target.id);
+    return result.data.id;
+  }
+  const sdkSession = await createSession(form);
+  const manualSession = await createSession(form);
+  const fileSession = await createSession(form);
+  const challengeSession = await createSession(f.b);
+  const before = await f.rows(
+    "grida_forms",
+    "response",
+    `form_id=eq.${form.id}`
+  );
+  const foreignBefore = await f.rows(
+    "grida_forms",
+    "response",
+    `form_id=eq.${f.b.id}`
+  );
+  const payload = {
+    apiOrigin: origin,
+    storageOrigin: f.apiUrl,
+    sdk: {
+      formId: form.id,
+      sessionId: sdkSession,
+      values: { full_name: "Actual SDK caller" },
+    },
+    manual: {
+      formId: form.id,
+      sessionId: manualSession,
+      values: { full_name: "Actual manual caller" },
+    },
+    missingFormId: randomUUID(),
+    file: {
+      sessionId: fileSession,
+      fieldId: form.fields.file.id,
+      name: "client.png",
+      bytesBase64: f.bytes.toString("base64"),
+    },
+    challenge: {
+      sessionId: challengeSession,
+      fieldId: f.b.fields.challenge.id,
+      email: `clients-${f.run}@example.com`,
+    },
+  };
+  // Only public origins, respondent capabilities and synthetic input cross this
+  // process boundary. Auth/service-role keys stay in the parent fixture client.
+  const result = await runClient(payload);
+  assert.deepEqual(result.denied, { sdk: true, manual: true });
+  assert.equal(result.manual.completed, true);
+  assert.deepEqual(Object.keys(result.sdk).sort(), ["customer_id", "id"]);
+  assert.match(result.sdk.customer_id, /^[a-f0-9-]{36}$/);
+
+  const accepted = [];
+  for (const context of [payload.sdk, payload.manual]) {
+    const response = await f.one(
+      "grida_forms",
+      "response",
+      `form_id=eq.${context.formId}&session_id=eq.${context.sessionId}`
+    );
+    accepted.push(response);
+    const customer = await f.one(
+      "public",
+      "customer",
+      `uid=eq.${response.customer_id}`
+    );
+    assert.equal(customer.project_id, f.projectA.id);
+    assert.equal(customer.is_email_verified, false);
+    assert.equal(response.raw.full_name, context.values.full_name);
+    const field = await f.one(
+      "grida_forms",
+      "response_field",
+      `response_id=eq.${response.id}&form_field_id=eq.${form.fields.name.id}`
+    );
+    assert.equal(field.form_id, form.id);
+    assert.equal(field.value, context.values.full_name);
+    const session = await f.one(
+      "grida_forms",
+      "response_session",
+      `id=eq.${context.sessionId}`
+    );
+    assert.equal(session.form_id, form.id);
+    assert.equal(session.raw[form.fields.name.id], context.values.full_name);
+  }
+  assert.equal(accepted[0].id, result.sdk.id);
+  assert.equal(accepted[0].customer_id, result.sdk.customer_id);
+  assert.notEqual(accepted[0].id, accepted[1].id);
+  assert.equal(
+    (await f.rows("grida_forms", "response", `form_id=eq.${form.id}`)).length,
+    before.length + 2
+  );
+  assert.equal(
+    (
+      await f.rows(
+        "grida_forms",
+        "response",
+        `form_id=eq.${payload.missingFormId}`
+      )
+    ).length,
+    0
+  );
+  log(
+    "forms: actual SDK/manual callers persist success and refuse unknown forms"
+  );
+
+  assert.equal(typeof result.file.path, "string");
+  assert(
+    result.file.path.startsWith(`tmp/${fileSession}/${form.fields.file.id}/`)
+  );
+  assert.equal(result.file.path.split("/").at(-1), payload.file.name);
+  const publicUrl = new URL(result.file.publicUrl);
+  assert.equal(publicUrl.origin, f.apiUrl);
+  assert.equal(
+    decodeURIComponent(publicUrl.pathname),
+    `/storage/v1/object/public/${f.bucket}/${result.file.path}`
+  );
+  const bytes = await fetch(publicUrl, {
+    redirect: "error",
+    signal: AbortSignal.timeout(15_000),
+  });
+  assert.equal(bytes.status, 200);
+  assert.deepEqual(Buffer.from(await bytes.arrayBuffer()), f.bytes);
+  assert.equal(
+    (await f.rows("grida_forms", "response", `session_id=eq.${fileSession}`))
+      .length,
+    0
+  );
+  log("forms: actual file uploader/resolver preserves real Storage bytes");
+
+  assert.equal(result.challenge.state, "challenge-session-started");
+  assert.equal(result.challenge.invalidVerifyRejected, true);
+  const challengeRow = await f.one(
+    "grida_forms",
+    "response_session",
+    `id=eq.${challengeSession}`
+  );
+  assert.equal(challengeRow.form_id, f.b.id);
+  assert.equal(challengeRow.customer_id, null);
+  const state =
+    challengeRow.raw[`__challenge_email__${f.b.fields.challenge.id}`];
+  assert.equal(state.state, "challenge-session-started");
+  assert.equal(state.challenge_id, result.challenge.challengeId);
+  assert.equal(state.email, payload.challenge.email);
+  assert.equal(state.customer_uid, null);
+  const customer = await f.one(
+    "public",
+    "customer",
+    `project_id=eq.${f.projectB.id}&email=eq.${payload.challenge.email}`
+  );
+  assert.equal(customer.is_email_verified, false);
+  const mail = await provider.awaitEmail({ to: payload.challenge.email });
+  assert.match(mail.otp, /^\d{6}$/);
+  assert.deepEqual(
+    await f.rows("grida_forms", "response", `form_id=eq.${f.b.id}`),
+    foreignBefore
+  );
+  log("forms: actual challenge client cannot verify an unrelated challenge");
+  return {
+    count: 3,
+    scenarios: [
+      "actual SDK/manual success and missing-form refusal",
+      "actual uploader/resolver Storage bytes",
+      "actual challenge start/state and invalid verification refusal",
+    ],
+    outcomes: {
+      acceptedResponses: 2,
+      storedBytes: f.bytes.length,
+      verifiedCustomers: 0,
+    },
   };
 }

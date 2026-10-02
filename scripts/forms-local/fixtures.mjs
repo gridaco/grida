@@ -233,12 +233,17 @@ export async function createFixtures({ setup, executeSql }) {
   });
   const [customerB] = await insert("public", "customer", {
     project_id: projectB.id,
+    uuid: randomUUID(),
     email: `other-${run}@example.com`,
     name: "Other tenant customer",
   });
   b.customer = customerB;
   a.email = `verified-${run}@example.com`;
   a.provisionalEmail = `contact-${run}@example.com`;
+  const directFile = await form(projectA.id, "direct_file", {
+    name: { name: "full_name", type: "text" },
+    file: { name: "attachment", type: "file" },
+  });
   const completionFailure = await form(projectA.id, "completion_failure", {
     name: { name: "full_name", type: "text" },
     email: { name: "contact_email", type: "email" },
@@ -328,6 +333,7 @@ export async function createFixtures({ setup, executeSql }) {
     name: {
       name: "full_name",
       type: "text",
+      data: { internal_fixture: "not-public", password: "fixture-only" },
       reference: {
         type: "x-supabase",
         schema: "public",
@@ -407,6 +413,7 @@ export async function createFixtures({ setup, executeSql }) {
     a,
     b,
     connected,
+    directFile,
     completionFailure,
     personas,
     projectA,

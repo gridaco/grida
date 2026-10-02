@@ -1,3 +1,4 @@
+import { Env } from "@/env";
 import { nanoid } from "nanoid";
 import { v4 } from "uuid";
 import { FormRenderTree } from "../../grida-forms/lib";
@@ -258,8 +259,9 @@ async function submit(
     formdata.append(key, data[key]);
   }
 
-  return fetch(`/v1/submit/${form_id}`, {
+  return fetch(`${Env.forms.API_ORIGIN}/v1/submit/${form_id}`, {
     method: "POST",
+    credentials: "omit",
     body: formdata,
     headers,
   });

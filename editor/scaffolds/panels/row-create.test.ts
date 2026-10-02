@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRow } from "./row-create";
 
+vi.mock("@/env", () => ({
+  Env: { forms: { API_ORIGIN: "https://api.example.com" } },
+}));
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -19,10 +23,14 @@ describe("manual row creation", () => {
 
     await createRow("form", data).then(onSaved);
 
-    expect(request).toHaveBeenCalledWith("/v1/submit/form", {
-      method: "POST",
-      body: data,
-    });
+    expect(request).toHaveBeenCalledWith(
+      "https://api.example.com/v1/submit/form",
+      {
+        method: "POST",
+        credentials: "omit",
+        body: data,
+      }
+    );
     expect(onSaved).toHaveBeenCalledOnce();
   });
 

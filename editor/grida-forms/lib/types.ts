@@ -1,11 +1,8 @@
 import type { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 
-export interface FormBlockTree<
+export type FormBlockTree<
   A = FormBlockTreeFolderBlock[] | EditorFlatFormBlock[],
-> {
-  depth: number;
-  children: A;
-}
+> = import("@grida/forms").FormBlockTree<A>;
 
 export type FormBlockTreeChild = FormBlockTreeFolderBlock | EditorFlatFormBlock;
 

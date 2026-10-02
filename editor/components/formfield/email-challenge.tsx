@@ -1,5 +1,11 @@
 "use client";
 
+import type {
+  EmailChallengeState,
+  EmailChallengeSessionState,
+  EmailChallengeProvider as HttpEmailChallengeProvider,
+} from "@grida/forms";
+
 import * as React from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { CheckIcon } from "lucide-react";
@@ -50,40 +56,12 @@ const defaultEmailChallengeI18nEn: EmailChallengeI18n = {
 /**
  * Email challenge state type
  */
-export type EmailChallengeState =
-  | "idle"
-  | "challenge-session-started"
-  | "challenge-expired"
-  | "challenge-failed"
-  | "challenge-success"
-  | "error";
 
-export type EmailChallengeSessionState = {
-  state: EmailChallengeState;
-  email: string | null;
-  challenge_id: string | null;
-  expires_at: string | null;
-  verified_at: string | null;
-  customer_uid: string | null;
-};
-
-export type EmailChallengeProvider = {
-  getState(args: {
-    sessionId: string;
-    fieldId: string;
-  }): Promise<EmailChallengeSessionState>;
-  start(args: {
-    sessionId: string;
-    fieldId: string;
-    email: string;
-  }): Promise<EmailChallengeSessionState>;
-  verify(args: {
-    sessionId: string;
-    fieldId: string;
-    challengeId: string;
-    otp: string;
-  }): Promise<EmailChallengeSessionState>;
-};
+export type {
+  EmailChallengeState,
+  EmailChallengeSessionState,
+} from "@grida/forms";
+export type EmailChallengeProvider = HttpEmailChallengeProvider;
 
 const EmailChallengeProviderContext =
   React.createContext<EmailChallengeProvider | null>(null);
@@ -100,10 +78,10 @@ export function EmailChallengeProvider({
 }
 
 export function createHttpEmailChallengeProvider({
-  base = `${Env.web.HOST}/v1`,
+  base = `${Env.forms.API_ORIGIN}/v1`,
 }: {
   /**
-   * Base URL for the public v1 API. Defaults to `${Env.web.HOST}/v1`.
+   * Base URL for the public v1 API. Defaults to `${Env.forms.API_ORIGIN}/v1`.
    * Using the canonical host is important because some renderers can run on
    * non-API origins (e.g. embeds/custom domains).
    */
@@ -129,7 +107,7 @@ export function createHttpEmailChallengeProvider({
         `${base}/session/${encodeURIComponent(sessionId)}/field/${encodeURIComponent(
           fieldId
         )}/challenge/email/state`,
-        { method: "GET" }
+        { method: "GET", credentials: "omit" }
       );
       const data = await json<{ state: EmailChallengeSessionState }>(res);
       return data.state;
@@ -141,6 +119,7 @@ export function createHttpEmailChallengeProvider({
         )}/challenge/email/start`,
         {
           method: "POST",
+          credentials: "omit",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ email }),
         }
@@ -155,6 +134,7 @@ export function createHttpEmailChallengeProvider({
         )}/challenge/email/verify`,
         {
           method: "POST",
+          credentials: "omit",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ challenge_id: challengeId, otp }),
         }

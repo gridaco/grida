@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   copyFile,
   lstat,
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   rm,
   symlink,
   writeFile,
@@ -19,13 +20,14 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { readState } from "../auth-local/stack.mjs";
 import { guards } from "../auth-local/guards.mjs";
-import { sources } from "./sources.mjs";
 import { createProviders } from "./providers.mjs";
 
 const scripts = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(scripts, "../..");
-const require = createRequire(path.join(repository, "editor/package.json"));
-const next = require.resolve("next/dist/bin/next");
+const require = createRequire(path.join(repository, "apps/api/package.json"));
+const nitroPackage = require.resolve("nitropack/package.json");
+const nitro = path.join(path.dirname(nitroPackage), "dist/cli/index.mjs");
+const tsx = require.resolve("tsx");
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const children = new Set();
 
@@ -97,29 +99,71 @@ function launch(binary, args, { cwd, env, input } = {}) {
   return running;
 }
 
+async function files(directory) {
+  const result = [];
+  for (const entry of await readdir(path.join(repository, directory), {
+    withFileTypes: true,
+  })) {
+    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+    const relative = path.join(directory, entry.name);
+    if (entry.isDirectory()) result.push(...(await files(relative)));
+    else if (entry.isFile()) result.push(relative);
+    else throw new Error(`Unexpected source link: ${relative}`);
+  }
+  return result.sort();
+}
+
 async function snapshot(workspace) {
+  const application = [
+    "apps/api/package.json",
+    "apps/api/tsconfig.json",
+    "apps/api/nitro.config.ts",
+    ...(await files("apps/api/server")),
+  ];
   const hashes = [];
-  for (const relative of [
-    ...sources,
-    "editor/package.json",
-    "editor/tsconfig.json",
-  ]) {
+  for (const relative of application) {
     const source = path.join(repository, relative);
-    const destination = path.join(
-      workspace,
-      relative === "editor/next.config.ts"
-        ? "editor/next.actual.config.ts"
-        : relative
-    );
+    const destination = path.join(workspace, relative);
     assert((await lstat(source)).isFile(), `Expected source file: ${relative}`);
     await mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
     await copyFile(source, destination);
     hashes.push({ path: relative, sha256: hash(await readFile(destination)) });
   }
-  const editor = path.join(workspace, "editor");
+  // These linked dependencies must be built before the runner. Hash both source
+  // and compiled package bytes consumed by the real Nitro bundler.
+  for (const relative of [
+    "pnpm-lock.yaml",
+    "apps/api/vercel.json",
+    "editor/tsconfig.json",
+    "editor/package.json",
+    "editor/env.ts",
+    "editor/k/env.ts",
+    "editor/grida-forms-hosted/internal-sdk/submit.ts",
+    "editor/scaffolds/panels/row-create.ts",
+    "editor/components/formfield/file-upload-field/uploader.ts",
+    "editor/components/formfield/email-challenge.tsx",
+    "editor/lib/supabase/storage-ext.ts",
+    "packages/ui/package.json",
+    "packages/ui/src/lib/utils.ts",
+    ...[
+      "button",
+      "input",
+      "input-group",
+      "input-otp",
+      "spinner",
+      "textarea",
+    ].map((name) => `packages/ui/src/components/${name}.tsx`),
+    ...(await files("packages/grida-forms")),
+    ...(await files("packages/grida-tokens")),
+    ...(await files("database")),
+  ])
+    hashes.push({
+      path: relative,
+      sha256: hash(await readFile(path.join(repository, relative))),
+    });
   await symlink(
-    path.join(repository, "editor/node_modules"),
-    path.join(editor, "node_modules"),
+    path.join(repository, "apps/api/node_modules"),
+    path.join(workspace, "apps/api/node_modules"),
     "dir"
   );
   await symlink(
@@ -127,18 +171,19 @@ async function snapshot(workspace) {
     path.join(workspace, "node_modules"),
     "dir"
   );
+  // Fixture-only diagnostics omit messages and data; no debug switch ships in
+  // the product. Stack frames identify bundling/adapter faults in private logs.
   await put(
-    path.join(editor, "next.config.ts"),
-    `import original from './next.actual.config';
-export default {...original, turbopack: {...original.turbopack, root: ${JSON.stringify(repository)}}};\n`
-  );
-  await put(
-    path.join(editor, "app/layout.tsx"),
-    `export default function Layout({children}: {children: React.ReactNode}) { return <html><body>{children}</body></html>; }\n`
-  );
-  await put(
-    path.join(editor, "app/page.tsx"),
-    `export default function Page() { return <main>Forms API fixture</main>; }\n`
+    path.join(workspace, "apps/api/server/plugins/proof-errors.ts"),
+    `
+import { defineNitroPlugin } from "nitropack/runtime";
+export default defineNitroPlugin((nitro) => {
+  nitro.hooks.hook("error", (error) => {
+    const frames = error.stack?.split("\\n").slice(1).filter((line) => /^\\s+at /.test(line));
+    console.error(JSON.stringify({ event: "local_proof_error", frames }));
+  });
+});
+`
   );
   return hashes;
 }
@@ -149,7 +194,10 @@ async function reserve(port) {
     server.once("error", reject);
     server.listen(port, "127.0.0.1", resolve);
   });
-  return () => new Promise((resolve) => server.close(resolve));
+  return {
+    port: server.address().port,
+    release: () => new Promise((resolve) => server.close(resolve)),
+  };
 }
 
 async function ready(server, origin) {
@@ -157,7 +205,7 @@ async function ready(server, origin) {
   while (Date.now() < deadline) {
     assert(
       server.child.exitCode === null && server.child.signalCode === null,
-      "Next exited before readiness"
+      "Nitro exited before readiness"
     );
     try {
       const response = await fetch(origin, {
@@ -170,14 +218,16 @@ async function ready(server, origin) {
     }
     await delay(100);
   }
-  throw new Error("Next readiness deadline exceeded");
+  throw new Error("Nitro readiness deadline exceeded");
 }
 
 async function main() {
   const args = process.argv.slice(2);
   assert(
-    args.length === 2 && args[0] === "--state",
-    "Usage: node scripts/forms-local/proof.mjs --state ABSOLUTE_FIXTURE_STATE"
+    (args.length === 2 ||
+      (args.length === 3 && args[2] === "--resume-carryover")) &&
+      args[0] === "--state",
+    "Usage: node scripts/forms-local/proof.mjs --state ABSOLUTE_FIXTURE_STATE [--resume-carryover]"
   );
   assert(Number(process.versions.node.split(".")[0]) >= 24, "Node24+ required");
   const state = await readState(args[1]);
@@ -197,12 +247,12 @@ async function main() {
       (cacheStat.mode & 0o077) === 0,
     "Expected private Forms cache"
   );
-  const workspace = await mkdtemp(path.join(cache, "next-"));
+  const workspace = await mkdtemp(path.join(cache, "nitro-"));
   const reportPath = path.join(cache, `result-${randomUUID()}.json`);
   const report = {
-    mode: "current-next",
+    mode: "extracted-nitro",
     node: process.version,
-    next: require("next/package.json").version,
+    nitro: require("nitropack/package.json").version,
     backend: "real-local-supabase",
     passed: false,
     sources: [],
@@ -222,12 +272,15 @@ async function main() {
   process.once("SIGINT", interrupt);
   process.once("SIGTERM", interrupt);
   try {
-    releasePort = await reserve(3000);
+    const reservation = await reserve(0);
+    releasePort = reservation.release;
+    const origin = `http://127.0.0.1:${reservation.port}`;
+    const webOrigin = "http://localhost:3000";
     provider = await createProviders();
     report.harness = await Promise.all(
       [
         "proof.mjs",
-        "sources.mjs",
+        "clients.ts",
         "fixtures.mjs",
         "scenarios.mjs",
         "providers.mjs",
@@ -238,7 +291,7 @@ async function main() {
       }))
     );
     report.sources = await snapshot(workspace);
-    const editor = path.join(workspace, "editor");
+    const api = path.join(workspace, "apps/api");
     const home = path.join(workspace, "home");
     await mkdir(home, { mode: 0o700 });
     const env = {
@@ -250,33 +303,34 @@ async function main() {
       LANG: "C",
       TZ: "UTC",
       NODE_ENV: "production",
-      NEXT_TELEMETRY_DISABLED: "1",
-      NEXT_PUBLIC_GRIDA_USE_TELEMETRY: "0",
-      NEXT_PUBLIC_SUPABASE_URL: setup.apiUrl,
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: setup.publishableKey,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: setup.anonKey,
+      SUPABASE_URL: setup.apiUrl,
+      SUPABASE_PUBLISHABLE_KEY: setup.publishableKey,
+      GRIDA_OPEN_API_ORIGIN: origin,
+      GRIDA_WEB_ORIGIN: webOrigin,
+      NITRO_HOST: "127.0.0.1",
+      NITRO_PORT: String(reservation.port),
       SUPABASE_SECRET_KEY: setup.serviceRoleKey,
-      SUPABASE_SERVICE_ROLE_KEY: setup.serviceRoleKey,
-      GRIDA_S2S_PRIVATE_API_KEY: randomBytes(32).toString("hex"),
       RESEND_API_KEY: "re_forms_local_fixture",
       BIRD_API_KEY: "forms-local-fixture",
       BIRD_WORKSPACE_ID: "forms-fixture",
       BIRD_SMS_CHANNEL_ID: "forms-fixture",
       IPINFO_ACCESS_TOKEN: "forms-local-fixture",
-      NEXT_PUBLIC_DOCS_URL: "http://127.0.0.1:3000",
-      NEXT_PUBLIC_BLOG_URL: "http://127.0.0.1:3000",
-      GRIDA_FORMS_TEST_PORTS: `3000,55431,${new URL(provider.origin).port}`,
+      GRIDA_FORMS_TEST_PORTS: `${reservation.port},55431,${new URL(provider.origin).port}`,
       GRIDA_FORMS_TEST_PROVIDER_ORIGIN: provider.origin,
       NODE_OPTIONS: `--dns-result-order=ipv4first --require=${JSON.stringify(path.join(scripts, "network.cjs"))}`,
     };
-    phase = "production Next build";
+    phase = "production Nitro build";
     console.log(
-      `Forms proof: current Next ${report.next}, ${report.node}, real local backend.`
+      `Forms proof: extracted Nitro ${report.nitro}, ${report.node}, real local backend.`
     );
-    const build = launch(process.execPath, [next, "build"], {
-      cwd: editor,
-      env,
-    });
+    const build = launch(
+      process.execPath,
+      [nitro, "build", "--preset", "node-server"],
+      {
+        cwd: api,
+        env,
+      }
+    );
     try {
       await build.wait(240_000);
     } finally {
@@ -321,25 +375,103 @@ async function main() {
         }
       },
     });
-    phase = "current-owner scenarios";
+    phase = "extracted-owner scenarios";
     await releasePort();
     releasePort = undefined;
     const server = launch(
       process.execPath,
-      [next, "start", "-H", "127.0.0.1", "-p", "3000"],
-      { cwd: editor, env }
+      [path.join(api, ".output/server/index.mjs")],
+      { cwd: api, env }
     );
     try {
-      await ready(server, "http://127.0.0.1:3000");
-      const { runFormsScenarios, prepareCarryover } =
-        await import("./scenarios.mjs");
+      await ready(server, `${origin}/health`);
+      const {
+        runFormsScenarios,
+        runTransportScenarios,
+        runClientScenarios,
+        resumeCarryover,
+      } = await import("./scenarios.mjs");
       report.scenarios = await runFormsScenarios({
-        origin: "http://127.0.0.1:3000",
-        webOrigin: "http://localhost:3000",
+        origin,
+        webOrigin,
         fixture,
         provider,
         log: (message) => console.log(`Forms proof: ${message}`),
       });
+      report.transport = await runTransportScenarios({
+        origin,
+        fixture,
+        webOrigin,
+      });
+      phase = "actual editor clients";
+      report.clients = await runClientScenarios({
+        origin,
+        fixture,
+        provider,
+        log: (message) => console.log(`Forms proof: ${message}`),
+        runClient: async (input) => {
+          const inputPath = path.join(
+            workspace,
+            `client-input-${randomUUID()}.json`
+          );
+          const outputPath = path.join(
+            workspace,
+            `client-output-${randomUUID()}.json`
+          );
+          await put(inputPath, JSON.stringify(input));
+          const client = launch(
+            process.execPath,
+            [
+              "--import",
+              tsx,
+              path.join(scripts, "clients.ts"),
+              inputPath,
+              outputPath,
+            ],
+            {
+              cwd: path.join(repository, "editor"),
+              env: {
+                PATH: env.PATH,
+                HOME: env.HOME,
+                TMPDIR: env.TMPDIR,
+                LANG: "C",
+                TZ: "UTC",
+                NODE_ENV: "production",
+                NODE_OPTIONS: env.NODE_OPTIONS,
+                GRIDA_FORMS_TEST_PORTS: env.GRIDA_FORMS_TEST_PORTS,
+                GRIDA_FORMS_TEST_PROVIDER_ORIGIN:
+                  env.GRIDA_FORMS_TEST_PROVIDER_ORIGIN,
+                NEXT_PUBLIC_GRIDA_OPEN_API_ORIGIN: origin,
+                TSX_TSCONFIG_PATH: path.join(
+                  repository,
+                  "editor/tsconfig.json"
+                ),
+              },
+            }
+          );
+          try {
+            await client.wait(90_000);
+            return JSON.parse(await readFile(outputPath, "utf8"));
+          } finally {
+            logs.push(client.log());
+            await client.stop();
+          }
+        },
+      });
+      if (args[2] === "--resume-carryover") {
+        // This metadata was prepared through the pre-extraction owner on the
+        // same owned fixture. Missing or already-consumed drafts fail loudly.
+        const carryover = JSON.parse(
+          await readFile(path.join(state.root, "forms-carryover.json"), "utf8")
+        );
+        await resumeCarryover({
+          origin,
+          setup,
+          carryover,
+          log: (message) => console.log(`Forms proof: ${message}`),
+        });
+        report.carryoverResumed = true;
+      }
       assert(
         provider.calls.every(
           (call) =>
@@ -347,16 +479,6 @@ async function main() {
         ),
         "Unexpected provider operation"
       );
-      const carryover = await prepareCarryover({
-        origin: "http://127.0.0.1:3000",
-        fixture,
-        log: (message) => console.log(`Forms proof: ${message}`),
-      });
-      await put(
-        path.join(state.root, "forms-carryover.json"),
-        JSON.stringify(carryover) + "\n"
-      );
-      report.carryoverPrepared = true;
       report.passed = true;
     } finally {
       logs.push(server.log());

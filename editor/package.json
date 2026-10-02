@@ -56,6 +56,7 @@
     "@grida/color": "workspace:*",
     "@grida/desktop-bridge": "workspace:*",
     "@grida/fonts": "workspace:*",
+    "@grida/forms": "workspace:*",
     "@grida/history": "workspace:*",
     "@grida/hud": "workspace:*",
     "@grida/io": "workspace:*",

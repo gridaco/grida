@@ -1,0 +1,50 @@
+{
+  "name": "@grida/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nitro build",
+    "build:local": "nitro build --preset node-server",
+    "check:vercel": "node scripts/check-vercel-output.mjs",
+    "dev": "nitro dev --port 4000",
+    "start": "node .output/server/index.mjs",
+    "test": "vitest run",
+    "typecheck": "nitro prepare && tsc --noEmit"
+  },
+  "dependencies": {
+    "@app/database": "workspace:*",
+    "@formatjs/intl-localematcher": "^0.6.1",
+    "@grida/forms": "workspace:*",
+    "@react-email/components": "^0.0.38",
+    "@supabase/supabase-js": "^2.90.1",
+    "@vercel/functions": "^1.6.0",
+    "fast-xml-parser": "^5.8.0",
+    "flat": "^6.0.1",
+    "h3": "^1.15.4",
+    "handlebars": "^4.7.9",
+    "i18next": "^23.7.9",
+    "negotiator": "^1.0.0",
+    "react": "^19",
+    "react-dom": "^19",
+    "resend": "^4.5.1",
+    "uuid": "^9.0.1",
+    "validator": "^13.12.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/negotiator": "^0.6.3",
+    "@types/node": "^24",
+    "@types/react": "19.2.8",
+    "@types/react-dom": "19.2.3",
+    "@types/uuid": "^9.0.8",
+    "@types/validator": "^13.12.0",
+    "ajv": "^8.20.0",
+    "nitropack": "2.13.4",
+    "typescript": "^6",
+    "vitest": "^4"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

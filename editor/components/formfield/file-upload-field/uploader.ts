@@ -12,7 +12,7 @@ import type {
   FormsApiResponse,
   StoragePublicUrlData,
   SessionSignedUploadUrlData,
-} from "@/types/private/api";
+} from "@grida/forms";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 
 export type FileUploaderFn = (
@@ -73,6 +73,7 @@ function makeRequestUrlUploader({ request_url }: { request_url: string }) {
   return async (file: File) => {
     const res = await fetch(request_url, {
       method: "PUT",
+      credentials: "omit",
       headers: {
         "Content-Type": "application/json",
       },
@@ -128,6 +129,7 @@ function makeRequestUrlResolver({
     const url = `${resolve_url}?${params.toString()}`;
     const res = await fetch(url, {
       method: "GET",
+      credentials: "omit",
       headers: {
         "Content-Type": "application/json",
       },

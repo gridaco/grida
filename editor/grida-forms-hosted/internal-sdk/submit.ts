@@ -1,22 +1,23 @@
 "use client";
 
 import { Env } from "@/env";
-import type { EditorApiResponse } from "@/types/private/api";
+import type {
+  FormSubmitResponseData,
+  FormsApiResponse,
+  FormSubmitDiagnostics,
+} from "@grida/forms";
 
 /**
  * Minimal, stable shape from `POST /v1/submit/:form_id` JSON response.
  *
- * The endpoint returns a full `response` row as `data`, but most callers only
- * need `customer_id`.
+ * Submission returns its response ID and customer ID; database row metadata
+ * is not part of the public result.
  */
-export type DefaultFormSubmitResponseData = {
-  customer_id?: string | null;
-  [key: string]: unknown;
-};
+export type DefaultFormSubmitResponseData = FormSubmitResponseData;
 
 export type DefaultFormSubmitResponse<
   TData extends DefaultFormSubmitResponseData = DefaultFormSubmitResponseData,
-> = EditorApiResponse<TData, unknown>;
+> = FormsApiResponse<TData, string> & Partial<FormSubmitDiagnostics>;
 
 /**
  * Submits a form to the default Grida forms endpoint (`/v1/submit/:form_id`)
@@ -29,7 +30,7 @@ export async function submitFormToDefaultEndpoint<
   formdata: FormData,
   opts?: {
     /**
-     * Defaults to `Env.web.HOST`.
+     * Defaults to `Env.forms.API_ORIGIN`.
      *
      * Useful for running in non-standard hosts (e.g. simulator environments).
      */
@@ -37,10 +38,11 @@ export async function submitFormToDefaultEndpoint<
     signal?: AbortSignal;
   }
 ): Promise<DefaultFormSubmitResponse<TData>> {
-  const host = opts?.host ?? Env.web.HOST;
+  const host = opts?.host ?? Env.forms.API_ORIGIN;
 
   const res = await fetch(`${host}/v1/submit/${form_id}`, {
     method: "POST",
+    credentials: "omit",
     body: formdata,
     signal: opts?.signal,
     headers: {

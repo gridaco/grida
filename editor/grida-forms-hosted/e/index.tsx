@@ -19,7 +19,7 @@ import { AgentPagesFlow } from "@/grida-forms/formstate/core/flow";
 import type {
   FormAgentPrefetchData,
   FormClientFetchResponseError,
-} from "@/app/(api)/(public)/v1/[id]/route";
+} from "@grida/forms";
 import { FormAgentGeo } from "@/grida-forms/formstate/core/geo";
 
 export function Agent({
@@ -251,7 +251,7 @@ function FormPage({
     }
   }
 
-  const submit_action = `${Env.web.HOST}/v1/submit/${form_id}`;
+  const submit_action = `${Env.forms.API_ORIGIN}/v1/submit/${form_id}`;
 
   return (
     <main className="min-h-screen flex flex-col items-center pt-10 md:pt-16">

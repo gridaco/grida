@@ -17,7 +17,7 @@ export async function GET(
     url: `${Env.web.HOST}/d/e/${form_id}`,
     url_tenant: `${baseUrl}/d/e/${form_id}`,
     embed: `${Env.web.HOST}/v1/embed/${form_id}`,
-    submit: `${Env.web.HOST}/v1/submit/${form_id}`,
+    submit: `${Env.forms.API_ORIGIN}/v1/submit/${form_id}`,
   });
 }
 

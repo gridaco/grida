@@ -396,9 +396,7 @@ function SignUpForm({
     e.preventDefault();
 
     const formdata = new FormData(e.target as HTMLFormElement);
-    const submit_json = await submitFormToDefaultEndpoint<{
-      customer_id?: string | null;
-    }>(form_id, formdata);
+    const submit_json = await submitFormToDefaultEndpoint(form_id, formdata);
 
     const resError = submit_json && (submit_json as { error?: string }).error;
     const resMessage =

@@ -23,13 +23,17 @@ export function SessionDataSyncProvider({
       value: string | number | boolean | string[] | undefined | null
     ) => {
       try {
-        fetch(`${Env.web.HOST}/v1/session/${session_id}/field/${field_id}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ value: value }),
-        });
+        fetch(
+          `${Env.forms.API_ORIGIN}/v1/session/${session_id}/field/${field_id}`,
+          {
+            method: "PATCH",
+            credentials: "omit",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ value: value }),
+          }
+        );
       } catch {}
     };
 

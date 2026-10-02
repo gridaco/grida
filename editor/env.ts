@@ -67,4 +67,48 @@ export namespace Env {
         "https://" + process.env.NEXT_PUBLIC_URL
       : "http://localhost:3000";
   }
+
+  /** Public Forms API origin. Resolved only when a Forms operation is used. */
+  export const forms = {
+    get API_ORIGIN(): string {
+      const configured = process.env.NEXT_PUBLIC_GRIDA_OPEN_API_ORIGIN;
+      if (!configured) {
+        if (
+          process.env.NODE_ENV === "production" ||
+          process.env.VERCEL_ENV === "production" ||
+          process.env.VERCEL_ENV === "preview"
+        ) {
+          throw new Error(
+            "NEXT_PUBLIC_GRIDA_OPEN_API_ORIGIN is required for Forms."
+          );
+        }
+        return "http://localhost:4000";
+      }
+      let url: URL;
+      try {
+        url = new URL(configured);
+      } catch {
+        throw new Error(
+          "NEXT_PUBLIC_GRIDA_OPEN_API_ORIGIN must be an HTTP(S) origin."
+        );
+      }
+      const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(
+        url.hostname
+      );
+      if (
+        (url.protocol !== "https:" &&
+          !(url.protocol === "http:" && loopback)) ||
+        url.username ||
+        url.password ||
+        url.pathname !== "/" ||
+        url.search ||
+        url.hash
+      ) {
+        throw new Error(
+          "NEXT_PUBLIC_GRIDA_OPEN_API_ORIGIN must be an HTTPS origin (HTTP is allowed only on loopback)."
+        );
+      }
+      return url.origin;
+    },
+  };
 }

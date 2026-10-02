@@ -1,10 +1,2 @@
-export type MaybeArray<T> = T | T[];
-
-export function toArrayOf<T>(
-  value: MaybeArray<T>,
-  nofalsy = true
-): NonNullable<T>[] {
-  return (
-    Array.isArray(value) ? value : nofalsy && value ? [value] : []
-  ) as NonNullable<T>[];
-}
+export { toArrayOf } from "@grida/forms";
+export type { MaybeArray } from "@grida/forms";

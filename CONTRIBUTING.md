@@ -150,6 +150,14 @@ itself, see that repository.
 - When unsure: file where the fix would land. Cross-repo references are always
   full `gridaco/<repo>#N` form — never bare `#N`.
 
+## Forms Open API
+
+Public Forms operations run in the separate [Nitro API application](apps/api/README.md).
+The editor and tenant UI use `NEXT_PUBLIC_GRIDA_OPEN_API_ORIGIN`; local development
+normally pairs the editor on port 3000 with the API on port 4000 and the same local
+Supabase project. See the [Forms proof guide](scripts/forms-local/README.md) for
+disposable seeded database, Storage and HTTP verification.
+
 ## Support
 
 If you have any problem running the project locally or for any further information, please contact us via Slack.

@@ -9,9 +9,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: [
-      "services/form/public-routes.test.ts",
       "scaffolds/panels/row-create.test.ts",
       "i18n/server.test.ts",
+      "env.forms.test.ts",
     ],
   },
 });
