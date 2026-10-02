@@ -26,11 +26,7 @@ import assert from "assert";
 import { GridaCommerceClient } from "../services/commerce/index";
 import { OnSubmit } from "../completion";
 import { Features } from "@grida/forms";
-import { IpInfo, ipinfo } from "../clients/ipinfo/index";
-import type {
-  SchemaTableConnectionXSupabaseMainTableJoint,
-  Geo,
-} from "../types";
+import type { SchemaTableConnectionXSupabaseMainTableJoint } from "../types";
 import type { FormFieldStorageSchema } from "@grida/forms";
 import { PGXXError } from "../k/errcode";
 import { qval } from "../utils/qs";
@@ -239,11 +235,6 @@ async function submit({
   const nonsystem_keys = __keys_all.filter(
     (key) => !Object.keys(system_keys).includes(key)
   );
-
-  // pre meta processing
-  const ipinfo_data: IpInfo | null = isObjectEmpty(meta.geo)
-    ? await fetchipinfo(meta.ip)
-    : null;
 
   // customer handling
   // NOTE: challenge_email can bind a verified customer to the response_session.
@@ -612,12 +603,7 @@ async function submit({
           effective_session_customer_id ?? customer?.uid ?? session_customer_id,
         x_referer: meta.referer,
         x_useragent: meta.useragent,
-        x_ipinfo: ipinfo_data as {},
-        geo: isObjectEmpty(meta.geo)
-          ? ipinfo_data
-            ? ipinfogeo(ipinfo_data)
-            : undefined
-          : (meta.geo as {}),
+        geo: meta.geo ? { ...meta.geo } : null,
         platform_powered_by: meta.platform_powered_by,
       })
       .select("id")
@@ -1619,44 +1605,6 @@ function error(
   }
 
   //
-}
-
-// oxlint-disable-next-line no-unused-vars
-function isObjectEmpty(obj: object | null | undefined) {
-  try {
-    return Object.keys(obj as object).length === 0;
-  } catch {
-    return true;
-  }
-}
-
-function ipinfogeo(ipinfo: IpInfo): Geo | null {
-  if (!ipinfo) return null;
-  if (ipinfo.loc) {
-    const [lat, long] = ipinfo.loc.split(",");
-    return {
-      city: ipinfo.city,
-      country: ipinfo.country,
-      region: ipinfo.region,
-      latitude: lat,
-      longitude: long,
-    };
-  }
-
-  return {
-    city: ipinfo.city,
-    country: ipinfo.country,
-    region: ipinfo.region,
-  };
-}
-
-async function fetchipinfo(ip?: string | null) {
-  if (!ip) return null;
-  try {
-    return await ipinfo(ip, process.env.IPINFO_ACCESS_TOKEN);
-  } catch {
-    return null;
-  }
 }
 
 function filename(path: string) {

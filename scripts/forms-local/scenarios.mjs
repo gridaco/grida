@@ -42,7 +42,6 @@ export async function runFormsScenarios({
       signal: AbortSignal.timeout(15_000),
       headers: {
         Accept: "application/json",
-        "x-gf-geo-country": "KR",
         ...(json === undefined ? {} : { "Content-Type": "application/json" }),
         ...headers,
       },
@@ -902,6 +901,106 @@ export async function runFormsScenarios({
   );
   done("direct multipart File stores actual bytes");
 
+  // Emulate platform metadata at the actual HTTP boundary. The deployment
+  // region differs from the visitor subdivision; it must not become geo.region.
+  const vercelHeaders = {
+    "x-real-ip": "203.0.113.42",
+    "x-vercel-id": "iad1::fixture",
+    "x-vercel-ip-city": encodeURIComponent("서울"),
+    "x-vercel-ip-country": "KR",
+    "x-vercel-ip-country-region": "11",
+    "x-vercel-ip-latitude": "37.5665",
+    "x-vercel-ip-longitude": "126.9780",
+  };
+  const geoCases = [
+    {
+      name: "Vercel visitor metadata",
+      headers: vercelHeaders,
+      geo: {
+        city: "서울",
+        country: "KR",
+        region: "11",
+        latitude: "37.5665",
+        longitude: "126.9780",
+      },
+      platform: "web_client",
+    },
+    {
+      name: "Vercel country only",
+      headers: {
+        "x-real-ip": "203.0.113.42",
+        "x-vercel-ip-country": "JP",
+        "x-vercel-id": "iad1::fixture",
+      },
+      geo: { country: "JP" },
+      platform: "web_client",
+    },
+    {
+      name: "Missing visitor metadata",
+      headers: { "x-real-ip": "203.0.113.42", "x-vercel-id": "iad1::fixture" },
+      geo: null,
+      platform: "web_client",
+    },
+    {
+      name: "Simulator override",
+      headers: {
+        ...vercelHeaders,
+        "x-gf-simulator": "true",
+        "x-gf-geo-city": "Osaka",
+        "x-gf-geo-country": "JP",
+        "x-gf-geo-region": "27",
+        "x-gf-geo-latitude": "34.6937",
+        "x-gf-geo-longitude": "135.5023",
+      },
+      geo: {
+        city: "Osaka",
+        country: "JP",
+        region: "27",
+        latitude: "34.6937",
+        longitude: "135.5023",
+      },
+      platform: "simulator",
+    },
+  ];
+  const providerCallsBeforeGeo = provider.calls.length;
+  for (const scenario of geoCases) {
+    const geoSession = await session(f.directFile);
+    const accepted = success(
+      await submit(
+        f.directFile,
+        geoSession,
+        { full_name: scenario.name },
+        scenario.headers
+      ),
+      scenario.name
+    );
+    if (publicContract) assertPublicSubmission(accepted);
+    const persisted = await f.one(
+      "grida_forms",
+      "response",
+      `id=eq.${accepted.data.id}`
+    );
+    assert.equal(persisted.form_id, f.directFile.id);
+    assert.equal(persisted.session_id, geoSession);
+    assert.equal(persisted.raw.full_name, scenario.name);
+    assert.deepEqual(
+      persisted.geo,
+      scenario.geo,
+      `${scenario.name}: persisted geo differs`
+    );
+    assert.equal(persisted.x_ipinfo, null);
+    assert.equal(persisted.platform_powered_by, scenario.platform);
+  }
+  assert.equal(
+    provider.calls.length,
+    providerCallsBeforeGeo,
+    "Geo cases must not call a provider"
+  );
+  assert.equal((await responseRows(f.directFile)).length, 1 + geoCases.length);
+  done(
+    "Vercel geo, missing metadata and simulator overrides persist without lookup"
+  );
+
   // Final observed counts, without claiming exactly-once behavior or proving
   // the absence of work after this bounded run.
   assert.equal((await responseRows(f.a)).length, 1);
@@ -921,6 +1020,7 @@ export async function runFormsScenarios({
       connectedRows: 3,
       acceptedBeforeReceiptFailure: 1,
       directMultipartResponses: 1,
+      geoResponses: geoCases.length,
       foreignResponses: 0,
       inventoryConsumed: 1,
       actualStorageBytes: f.bytes.length,
@@ -941,7 +1041,6 @@ function carryoverHttp(origin) {
       signal: AbortSignal.timeout(15_000),
       headers: {
         Accept: "application/json",
-        "x-gf-geo-country": "KR",
         ...(json === undefined ? {} : { "Content-Type": "application/json" }),
       },
     };

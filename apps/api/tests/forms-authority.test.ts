@@ -36,9 +36,6 @@ vi.mock("../server/forms/db", () => ({
 vi.mock("../server/forms/clients/resend/index", () => ({
   resend: { emails: { send: mocks.send } },
 }));
-vi.mock("../server/forms/clients/ipinfo/index", () => ({
-  ipinfo: vi.fn<() => Promise<null>>().mockResolvedValue(null),
-}));
 
 import { PATCH as patch } from "../server/forms/handlers/partial";
 import { GET as read } from "../server/forms/handlers/load";

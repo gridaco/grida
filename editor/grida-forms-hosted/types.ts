@@ -1,4 +1,3 @@
-import type { IpInfo } from "@/clients/ipinfo";
 import type { FormNotificationRespondentEmailConfig } from "@app/database";
 import type {
   PlatformPoweredBy,
@@ -122,7 +121,17 @@ export interface FormResponse {
   updated_at: string;
   x_referer: string | null;
   x_useragent: string | null;
-  x_ipinfo: IpInfo | null;
+  /** Historical IPinfo payloads remain readable; new responses use geo. */
+  x_ipinfo: {
+    ip: string;
+    city?: string;
+    region?: string;
+    country?: string;
+    loc?: string;
+    org?: string;
+    postal?: string;
+    timezone?: string;
+  } | null;
   geo: Geo | null;
 }
 

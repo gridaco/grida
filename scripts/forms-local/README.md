@@ -54,7 +54,11 @@ resetting previous data. `scenarios.mjs` imports no application operation or
 validator: it checks public responses against independent persisted rows,
 associations, inventory and downloaded bytes. Authenticated seed personas and an
 anonymous caller exercise the actual migrated RLS and RPC privileges. Separate
-transport cases check CORS, request IDs, no-store, HEAD and JSON failures.
+transport cases check CORS, request IDs, no-store, HEAD and JSON failures. Geo
+cases submit platform headers over local HTTP and verify decoded city, client
+subdivision, partial/missing metadata and simulator overrides in persisted rows.
+They emulate Vercel metadata locally; hosted header handling remains a preview
+deployment check.
 
 `clients.ts` runs the real editor submission, upload/resolver and email-challenge
 clients in a separate process against that same API. Its input and output files
@@ -94,11 +98,12 @@ does not claim to repeat that historical handoff or require old source artifacts
 
 ## Effects and containment
 
-`network.cjs` permits only owned loopback ports. It redirects the exact Resend,
-IPinfo and Bird provider origins to the local recorder, preserving actual SDK
+`network.cjs` permits only owned loopback ports. It redirects the exact Resend
+and Bird provider origins to the local recorder, preserving actual SDK
 serialization and email template rendering. No live provider credential is
 supplied. Unexpected provider operations fail verification. The guard rejects
 other destinations, unowned loopback ports, Unix sockets and implicit redirects.
+IPinfo is explicitly rejected by the guard test and has no recorder or credential.
 This is an application guard, not an OS network sandbox; the runtime, dependencies
 and same-user machine are trusted.
 

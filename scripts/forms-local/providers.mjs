@@ -37,17 +37,6 @@ export async function createProviders() {
         });
         return reply(200, { id: `forms-fixture-email-${emails.length}` });
       }
-      if (
-        req.method === "GET" &&
-        /^\/ipinfo\/[\d.:]+\/json$/.test(url.pathname)
-      ) {
-        return reply(200, {
-          ip: "127.0.0.1",
-          country: "US",
-          city: "Fixture",
-          timezone: "UTC",
-        });
-      }
       // No scenario permits SMS. Record an unexpected attempt and fail the run.
       reply(500, { error: "Unexpected provider operation" });
     } catch {

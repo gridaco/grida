@@ -24,7 +24,9 @@ test("Forms network guard admits only owned loopback and exact recorded provider
       (async () => {
         assert.equal(await (await fetch('http://127.0.0.1:${port}/owned')).text(), 'fixture');
         assert.equal(await (await fetch('https://api.resend.com/emails', {method:'POST', body:'{}'})).text(), 'fixture');
-        assert.equal(await (await fetch(new Request('https://ipinfo.io/127.0.0.1/json'))).text(), 'fixture');
+        // Geolocation comes from Vercel metadata, never a paid external lookup.
+        await assert.rejects(fetch(new Request('https://ipinfo.io/203.0.113.42/json')), /unowned network/);
+        await assert.rejects(fetch('https://ipinfo.io/203.0.113.42/json?token=fixture'), /unowned network/);
         for (const target of ['https://example.invalid/', 'http://api.resend.com/emails', 'https://api.resend.com.evil.invalid/emails', 'http://127.0.0.1:9/', 'http://user:secret@127.0.0.1:${port}/']) {
           await assert.rejects(fetch(target), /unowned network/);
         }
@@ -48,12 +50,7 @@ test("Forms network guard admits only owned loopback and exact recorded provider
       }),
       0
     );
-    assert.deepEqual(paths, [
-      "/owned",
-      "/resend/emails",
-      "/ipinfo/127.0.0.1/json",
-      "/redirect",
-    ]);
+    assert.deepEqual(paths, ["/owned", "/resend/emails", "/redirect"]);
   } finally {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));

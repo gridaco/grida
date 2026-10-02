@@ -44,7 +44,6 @@ net.Socket.prototype.connect = function (...args) {
 
 const providers = new Map([
   ["https://api.resend.com", "/resend"],
-  ["https://ipinfo.io", "/ipinfo"],
   ["https://api.bird.com", "/bird"],
 ]);
 const fetch = globalThis.fetch;

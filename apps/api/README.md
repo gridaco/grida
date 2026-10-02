@@ -51,7 +51,6 @@ the editor's dotenv files.
 | `SUPABASE_URL`                      | API: existing project origin                           |
 | `SUPABASE_SECRET_KEY`               | API only: privileged server key; never a browser value |
 | `RESEND_API_KEY`                    | API: OTP and respondent receipt delivery               |
-| `IPINFO_ACCESS_TOKEN`               | API: optional IP enrichment                            |
 | `NEXT_PUBLIC_GRIDA_OPEN_API_ORIGIN` | Editor: compiled public API origin                     |
 
 Origins are complete URLs without a path, query, fragment or credentials.
@@ -85,6 +84,13 @@ operations. CORS permits anonymous browser callers (`*`, no credentials), with
 explicit content and existing simulator/geo headers. These metadata headers do
 not confer authorization. Responses are not cached. `x-request-id` correlates
 requests without logging session URLs, request bodies or provider responses.
+
+Respondent location comes from Vercel request geolocation, with the existing
+developer/simulator header overrides. The API maps Vercel's `countryRegion` to
+the response's geographic `region`; the Vercel compute region is not a respondent
+location. Missing location stays empty, including in local development. No
+external IP lookup or enrichment credential is used. Historical `x_ipinfo` data
+remains readable; new submissions write only the normalized `geo` column.
 
 The session response exposes `{ id, form_id }`; submission data exposes
 `{ id, customer_id }`. Form fields and render blocks use explicit recursive

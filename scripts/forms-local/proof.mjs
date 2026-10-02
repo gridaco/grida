@@ -314,7 +314,6 @@ async function main() {
       BIRD_API_KEY: "forms-local-fixture",
       BIRD_WORKSPACE_ID: "forms-fixture",
       BIRD_SMS_CHANNEL_ID: "forms-fixture",
-      IPINFO_ACCESS_TOKEN: "forms-local-fixture",
       GRIDA_FORMS_TEST_PORTS: `${reservation.port},55431,${new URL(provider.origin).port}`,
       GRIDA_FORMS_TEST_PROVIDER_ORIGIN: provider.origin,
       NODE_OPTIONS: `--dns-result-order=ipv4first --require=${JSON.stringify(path.join(scripts, "network.cjs"))}`,
@@ -473,10 +472,7 @@ async function main() {
         report.carryoverResumed = true;
       }
       assert(
-        provider.calls.every(
-          (call) =>
-            call.path === "/resend/emails" || call.path.startsWith("/ipinfo/")
-        ),
+        provider.calls.every((call) => call.path === "/resend/emails"),
         "Unexpected provider operation"
       );
       report.passed = true;

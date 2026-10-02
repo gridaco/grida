@@ -19,8 +19,7 @@
         "SUPABASE_URL",
         "SUPABASE_SECRET_KEY",
         "SUPABASE_PUBLISHABLE_KEY",
-        "RESEND_API_KEY",
-        "IPINFO_ACCESS_TOKEN"
+        "RESEND_API_KEY"
       ]
     }
   }

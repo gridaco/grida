@@ -362,15 +362,20 @@ function SectionResponseMetadataJson({
 function ResponseCustomerMetaTable({
   customer_id,
   platform_powered_by,
+  geo,
   x_ipinfo,
   x_useragent,
 }: Pick<
   FormResponse,
-  "x_useragent" | "customer_id" | "platform_powered_by" | "x_ipinfo"
+  "x_useragent" | "customer_id" | "platform_powered_by" | "geo" | "x_ipinfo"
 >) {
   const ua = useMemo(() => {
     return x_useragent ? new UAParser(x_useragent).getResult() : undefined;
   }, []);
+  const location =
+    [geo?.country || x_ipinfo?.country, geo?.city || x_ipinfo?.city]
+      .filter(Boolean)
+      .join(" / ") || "—";
 
   return (
     <Table>
@@ -430,9 +435,7 @@ function ResponseCustomerMetaTable({
             <code>location</code>
           </TableCell>
           <TableCell>
-            <pre>
-              {x_ipinfo?.country} / {x_ipinfo?.city}
-            </pre>
+            <pre>{location}</pre>
           </TableCell>
         </TableRow>
       </TableBody>

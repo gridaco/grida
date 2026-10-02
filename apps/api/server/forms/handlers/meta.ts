@@ -36,6 +36,15 @@ export function meta(
 
   const session = system_keys[SYSTEM_GF_SESSION_KEY];
   const utc_offset = system_keys[SYSTEM_GF_TIMEZONE_UTC_OFFSET_KEY];
+  const location = geolocation(req);
+  const geo: Geo = {
+    city: location.city || undefined,
+    country: location.country || undefined,
+    // Vercel's `region` is its compute region, not the respondent's region.
+    region: location.countryRegion || undefined,
+    latitude: location.latitude || undefined,
+    longitude: location.longitude || undefined,
+  };
 
   const meta: SessionMeta = {
     request_id: req.headers.get("x-request-id"),
@@ -47,13 +56,13 @@ export function meta(
       ipAddress(req) ||
       req.headers.get("x-real-ip") ||
       req.headers.get("x-forwarded-for"),
-    geo: geolocation(req),
+    geo: Object.values(geo).some(Boolean) ? geo : null,
     referer: req.headers.get("referer"),
     browser: req.headers.get("sec-ch-ua"),
     platform_powered_by: "web_client",
   };
 
-  // optionally, developer can override the ip and geo via data body.
+  // Existing developer/simulator headers may override location metadata.
   // gf geo
   const __GF_GEO_LATITUDE = req.headers.get(
     Platform.headers["x-gf-geo-latitude"]
