@@ -47,7 +47,6 @@ export namespace SessionStorageServices {
             case "direct": {
               const storage = client.storage.from(bucket);
               return storage.createSignedUploadUrl(path);
-              break;
             }
             case "staged": {
               const storage = new SessionStagedFileStorage(client, bucket);

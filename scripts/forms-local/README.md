@@ -64,6 +64,21 @@ subdivision, partial/missing metadata and simulator overrides in persisted rows.
 They emulate Vercel metadata locally; hosted header handling remains a preview
 deployment check.
 
+Choice cases send repeated checkbox literals and both repeated and comma-packed
+toggle option IDs through GET and multipart POST. They compare response raw,
+native field values/option IDs, saved session values and connected `text[]` rows.
+Conflicting scalar input and unsupported multiple inventory selections must fail
+before customer, session, response, target or inventory writes. File uploads keep
+their existing raw representation and separate byte-processing assertions.
+
+OTP cases check that the normalized project/email cooldown applies across casing
+and respondent sessions, returns `429` with `Retry-After: 60`, and creates neither
+another challenge nor another provider request. Eight wrong guesses must persist
+their attempt count; a subsequent correct code and a consumed-code replay are
+denied. Fixture-owned SQL reads inspect private challenge counters and consumed
+state without exposing OTP hashes or salts. SQL transaction rollback on an
+injected binding failure is covered by the separate database pgTAP contract.
+
 `clients.ts` runs the real editor submission, upload/resolver and email-challenge
 clients in a separate process against that same API. Its input and output files
 stay private; it receives public origins and synthetic respondent capabilities,

@@ -309,6 +309,100 @@ export async function runFormsScenarios({
   assert.equal(started.state.state, "challenge-session-started");
   const email = await provider.awaitEmail({ to: f.a.email });
   assert.match(email.otp, /^\d{6}$/);
+  const issuedBeforeCooldown = await f.otpChallengeCount(
+    f.projectA.id,
+    f.a.email
+  );
+  assert.equal(issuedBeforeCooldown, 1);
+  const emailsBeforeCooldown = provider.calls.filter(
+    (call) => call.path === "/resend/emails"
+  ).length;
+  const cooldownSession = await session(f.a);
+  for (const [targetSession, address] of [
+    [aSession, f.a.email.toUpperCase()],
+    [cooldownSession, f.a.email],
+  ]) {
+    const before = await sessionRow(targetSession);
+    const cooldown = await request(
+      `${sessionPath(targetSession, f.a.fields.challenge.id)}/challenge/email/start`,
+      {
+        method: "POST",
+        json: { email: address },
+      }
+    );
+    assert.equal(
+      cooldown.status,
+      429,
+      "OTP cooldown is project/email scoped, including case aliases and new sessions"
+    );
+    assert.equal(cooldown.headers.get("retry-after"), "60");
+    assert.deepEqual(
+      await sessionRow(targetSession),
+      before,
+      "Cooldown must not replace session state"
+    );
+    assert.equal(
+      await f.otpChallengeCount(f.projectA.id, f.a.email),
+      issuedBeforeCooldown
+    );
+    assert.equal(
+      provider.calls.filter((call) => call.path === "/resend/emails").length,
+      emailsBeforeCooldown
+    );
+  }
+  done(
+    "normalized email cooldown prevents issuance and delivery across sessions"
+  );
+  const concurrentEmail = `concurrent-${f.run}@example.com`;
+  const concurrentSessions = await Promise.all([session(f.a), session(f.a)]);
+  const concurrentBefore = await Promise.all(
+    concurrentSessions.map(sessionRow)
+  );
+  assert.equal(await f.otpChallengeCount(f.projectA.id, concurrentEmail), 0);
+  const emailsBeforeConcurrent = provider.calls.filter(
+    (call) => call.path === "/resend/emails"
+  ).length;
+  const concurrentIssuance = await Promise.all(
+    concurrentSessions.map((sessionId, index) =>
+      request(
+        `${sessionPath(sessionId, f.a.fields.challenge.id)}/challenge/email/start`,
+        {
+          method: "POST",
+          json: {
+            email:
+              index === 0 ? concurrentEmail : concurrentEmail.toUpperCase(),
+          },
+        }
+      )
+    )
+  );
+  assert.deepEqual(
+    concurrentIssuance.map((result) => result.status).sort(),
+    [200, 429]
+  );
+  assert.equal(await f.otpChallengeCount(f.projectA.id, concurrentEmail), 1);
+  assert.equal(
+    provider.calls.filter((call) => call.path === "/resend/emails").length,
+    emailsBeforeConcurrent + 1
+  );
+  const concurrentMail = await provider.awaitEmail({ to: concurrentEmail });
+  assert.match(concurrentMail.otp, /^\d{6}$/);
+  for (const [index, result] of concurrentIssuance.entries()) {
+    const persisted = await sessionRow(concurrentSessions[index]);
+    assert.equal(persisted.customer_id, null);
+    if (result.status === 429) {
+      assert.equal(result.headers.get("retry-after"), "60");
+      assert.deepEqual(persisted, concurrentBefore[index]);
+    } else {
+      assert.equal(
+        persisted.raw[`__challenge_email__${f.a.fields.challenge.id}`].state,
+        "challenge-session-started"
+      );
+    }
+  }
+  done(
+    "concurrent normalized OTP issuance admits one challenge and one provider email"
+  );
   const wrongOtp = email.otp === "000000" ? "000001" : "000000";
   denied(
     await request(`${challengePath}/verify`, {
@@ -347,7 +441,80 @@ export async function runFormsScenarios({
       .state,
     "challenge-success"
   );
+  const verifiedSession = await sessionRow(aSession);
+  assert.equal(
+    (
+      await request(`${challengePath}/verify`, {
+        method: "POST",
+        json: { challenge_id: started.challenge_id, otp: email.otp },
+      })
+    ).status,
+    401,
+    "A consumed OTP cannot be replayed"
+  );
+  assert.deepEqual(await sessionRow(aSession), verifiedSession);
   done("real OTP challenge, verified customer and cross-field denial");
+
+  const exhaustedSession = await session(f.b);
+  const exhaustedPath = `${sessionPath(exhaustedSession, f.b.fields.challenge.id)}/challenge/email`;
+  const exhaustedEmail = `attempt-limit-${f.run}@example.com`;
+  const exhaustedStart = success(
+    await request(`${exhaustedPath}/start`, {
+      method: "POST",
+      json: { email: exhaustedEmail },
+    }),
+    "limited OTP start"
+  );
+  const exhaustedMail = await provider.awaitEmail({ to: exhaustedEmail });
+  const alwaysWrong = exhaustedMail.otp === "000000" ? "000001" : "000000";
+  for (let attempt = 1; attempt <= 8; attempt++) {
+    assert.equal(
+      (
+        await request(`${exhaustedPath}/verify`, {
+          method: "POST",
+          json: { challenge_id: exhaustedStart.challenge_id, otp: alwaysWrong },
+        })
+      ).status,
+      401,
+      `Wrong OTP attempt ${attempt} must be denied`
+    );
+    assert.deepEqual(await f.otpState(exhaustedStart.challenge_id), {
+      attempts: attempt,
+      consumed: false,
+    });
+  }
+  assert.equal(
+    (
+      await request(`${exhaustedPath}/verify`, {
+        method: "POST",
+        json: {
+          challenge_id: exhaustedStart.challenge_id,
+          otp: exhaustedMail.otp,
+        },
+      })
+    ).status,
+    401,
+    "A correct OTP must fail after eight wrong guesses"
+  );
+  assert.deepEqual(await f.otpState(exhaustedStart.challenge_id), {
+    attempts: 8,
+    consumed: false,
+  });
+  const exhaustedRow = await sessionRow(exhaustedSession);
+  assert.equal(exhaustedRow.customer_id, null);
+  assert.equal(
+    exhaustedRow.raw[`__challenge_email__${f.b.fields.challenge.id}`].state,
+    "challenge-failed"
+  );
+  const exhaustedCustomer = await f.one(
+    "public",
+    "customer",
+    `project_id=eq.${f.projectB.id}&email=eq.${exhaustedEmail}`
+  );
+  assert.equal(exhaustedCustomer.is_email_verified, false);
+  done(
+    "wrong OTP attempts persist and exhaust before customer/session authority"
+  );
 
   const foreignUploadSession = await session(f.a);
   const foreignUpload = success(
@@ -722,14 +889,15 @@ export async function runFormsScenarios({
   assert.equal(soldOut.data.is_open, false);
   assert.equal(soldOut.error.code, "FORM_SOLD_OUT");
   const soldOutChallenge = `${sessionPath(soldOut.data.session_id, f.a.fields.challenge.id)}/challenge/email`;
+  const soldOutEmail = `sold-out-${f.run}@example.com`;
   const soldOutStarted = success(
     await request(`${soldOutChallenge}/start`, {
       method: "POST",
-      json: { email: f.a.email },
+      json: { email: soldOutEmail },
     }),
     "sold-out OTP start"
   );
-  const soldOutMail = await provider.awaitEmail({ to: f.a.email });
+  const soldOutMail = await provider.awaitEmail({ to: soldOutEmail });
   success(
     await request(`${soldOutChallenge}/verify`, {
       method: "POST",
@@ -739,7 +907,7 @@ export async function runFormsScenarios({
   );
   const soldOutSubmit = await submit(f.a, soldOut.data.session_id, {
     full_name: "Sold out",
-    __gf_customer_email: f.a.email,
+    __gf_customer_email: soldOutEmail,
     ticket: f.a.inventory.optionId,
   });
   assert.equal(soldOutSubmit.status, 403);
@@ -1001,6 +1169,188 @@ export async function runFormsScenarios({
     "Vercel geo, missing metadata and simulator overrides persist without lookup"
   );
 
+  // Real repeated multipart and query values must agree across all persisted
+  // representations. Checkbox values are literals (including commas and UUID
+  // syntax); toggle values are option IDs, repeated or packed by the web input.
+  const choices = f.multiValue;
+  const checkboxValues = choices.options.checkboxes.map(
+    (option) => option.value
+  );
+  const checkboxIds = choices.options.checkboxes.map((option) => option.id);
+  const toggleValues = choices.options.toggles.map((option) => option.value);
+  const toggleIds = choices.options.toggles.map((option) => option.id);
+  for (const [method, packed] of [
+    ["POST", false],
+    ["POST", true],
+    ["GET", false],
+    ["GET", true],
+  ]) {
+    const label = `${method} ${packed ? "packed" : "repeated"} choices`;
+    const choiceSession = await session(choices);
+    const body = method === "POST" ? new FormData() : new URLSearchParams();
+    body.set("__gf_session", choiceSession);
+    body.set("full_name", label);
+    for (const value of checkboxValues) body.append("checkboxes", value);
+    for (const value of packed ? [toggleIds.join(",")] : toggleIds)
+      body.append("toggles", value);
+    const result = success(
+      method === "POST"
+        ? await request(`/v1/submit/${choices.id}`, { method, body })
+        : await request(`/v1/submit/${choices.id}?${body}`),
+      label
+    );
+    if (publicContract) assertPublicSubmission(result);
+    const response = await f.one(
+      "grida_forms",
+      "response",
+      `id=eq.${result.data.id}`
+    );
+    assert.equal(response.form_id, choices.id);
+    assert.equal(response.session_id, choiceSession);
+    assert.deepEqual(
+      response.raw.checkboxes,
+      checkboxValues,
+      `${label}: raw checkbox literals`
+    );
+    assert.deepEqual(
+      response.raw.toggles,
+      toggleIds,
+      `${label}: raw toggle references`
+    );
+    const fields = await f.rows(
+      "grida_forms",
+      "response_field",
+      `response_id=eq.${response.id}`
+    );
+    for (const [key, values, ids] of [
+      ["checkboxes", checkboxValues, checkboxIds],
+      ["toggles", toggleValues, toggleIds],
+    ]) {
+      const field = fields.find(
+        (entry) => entry.form_field_id === choices.fields[key].id
+      );
+      assert(field, `${label}: persisted ${key} field is missing`);
+      assert.deepEqual(field.value, values, `${label}: ${key} values`);
+      assert.deepEqual(
+        field.form_field_option_ids,
+        ids,
+        `${label}: ${key} identities`
+      );
+      assert.equal(field.form_field_option_id, null);
+    }
+    const target = await f.one(
+      "public",
+      choices.targetTable,
+      `full_name=eq.${encodeURIComponent(label)}`
+    );
+    assert.deepEqual(
+      target.checkboxes,
+      checkboxValues,
+      `${label}: connected text[] checkbox values`
+    );
+    assert.deepEqual(
+      target.toggles,
+      toggleValues,
+      `${label}: connected text[] toggle values`
+    );
+    const savedSession = await sessionRow(choiceSession);
+    assert.deepEqual(
+      savedSession.raw[choices.fields.checkboxes.id],
+      checkboxValues
+    );
+    assert.deepEqual(savedSession.raw[choices.fields.toggles.id], toggleIds);
+  }
+  done(
+    "repeated checkbox and repeated/packed toggle values persist through multipart and GET"
+  );
+
+  const inventoryBeforeChoices = await Promise.all(
+    choices.inventory.map((item) =>
+      f.one("grida_commerce", "inventory_item", `id=eq.${item.itemId}`)
+    )
+  );
+  const responsesBeforeChoices = await responseRows(choices);
+  const targetsBeforeChoices = await f.rows("public", choices.targetTable);
+  for (const [label, method, values] of [
+    [
+      "conflicting multipart scalar",
+      "POST",
+      [
+        ["full_name", "First"],
+        ["full_name", "Second"],
+      ],
+    ],
+    [
+      "multiple checkbox inventory options",
+      "POST",
+      choices.options.stock.map((option) => ["stock", option.value]),
+    ],
+    [
+      "repeated toggle inventory options",
+      "GET",
+      choices.options.stockToggles.map((option) => [
+        "stock_toggles",
+        option.id,
+      ]),
+    ],
+    [
+      "packed toggle inventory options",
+      "POST",
+      [
+        [
+          "stock_toggles",
+          choices.options.stockToggles.map((option) => option.id).join(","),
+        ],
+      ],
+    ],
+  ]) {
+    const choiceSession = await session(choices);
+    const beforeSession = await sessionRow(choiceSession);
+    const customerUuid = randomUUID();
+    const body = method === "POST" ? new FormData() : new URLSearchParams();
+    body.set("__gf_session", choiceSession);
+    body.set("__gf_customer_uuid", customerUuid);
+    if (label !== "conflicting multipart scalar") body.set("full_name", label);
+    for (const [name, value] of values) body.append(name, value);
+    const result =
+      method === "POST"
+        ? await request(`/v1/submit/${choices.id}`, { method, body })
+        : await request(`/v1/submit/${choices.id}?${body}`);
+    assert.equal(result.status, 400, `${label}: expected safe client denial`);
+    assert.deepEqual(
+      await sessionRow(choiceSession),
+      beforeSession,
+      `${label}: session changed`
+    );
+    assert.deepEqual(
+      await f.rows("public", "customer", `uuid=eq.${customerUuid}`),
+      [],
+      `${label}: customer was created`
+    );
+    assert.deepEqual(
+      await responseRows(choices),
+      responsesBeforeChoices,
+      `${label}: response was written`
+    );
+    assert.deepEqual(
+      await f.rows("public", choices.targetTable),
+      targetsBeforeChoices,
+      `${label}: connected target changed`
+    );
+    assert.deepEqual(
+      await Promise.all(
+        choices.inventory.map((item) =>
+          f.one("grida_commerce", "inventory_item", `id=eq.${item.itemId}`)
+        )
+      ),
+      inventoryBeforeChoices,
+      `${label}: inventory changed`
+    );
+  }
+  done(
+    "ambiguous scalar and unsupported multiple inventory selections deny before writes"
+  );
+
   // Final observed counts, without claiming exactly-once behavior or proving
   // the absence of work after this bounded run.
   assert.equal((await responseRows(f.a)).length, 1);
@@ -1021,6 +1371,7 @@ export async function runFormsScenarios({
       acceptedBeforeReceiptFailure: 1,
       directMultipartResponses: 1,
       geoResponses: geoCases.length,
+      multiValueResponses: 4,
       foreignResponses: 0,
       inventoryConsumed: 1,
       actualStorageBytes: f.bytes.length,

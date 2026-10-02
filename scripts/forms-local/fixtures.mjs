@@ -315,12 +315,18 @@ export async function createFixtures({ setup, executeSql }) {
   // same disposable server. This proves adapter/SQL effects, not a second hosted
   // project's network or Auth configuration. No production schema is changed.
   const targetTable = `forms_local_connected_${run}`;
+  const multiTargetTable = `forms_local_choices_${run}`;
   assert.match(targetTable, /^forms_local_connected_[a-f0-9]{12}$/);
+  assert.match(multiTargetTable, /^forms_local_choices_[a-f0-9]{12}$/);
   await executeSql(`
     CREATE TABLE public.${targetTable} (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), full_name text NOT NULL, attachment text);
     ALTER TABLE public.${targetTable} ENABLE ROW LEVEL SECURITY;
     REVOKE ALL ON public.${targetTable} FROM PUBLIC, anon, authenticated;
     GRANT ALL ON public.${targetTable} TO service_role;
+    CREATE TABLE public.${multiTargetTable} (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), full_name text NOT NULL, checkboxes text[], toggles text[], stock text[], stock_toggles text[]);
+    ALTER TABLE public.${multiTargetTable} ENABLE ROW LEVEL SECURITY;
+    REVOKE ALL ON public.${multiTargetTable} FROM PUBLIC, anon, authenticated;
+    GRANT ALL ON public.${multiTargetTable} TO service_role;
     NOTIFY pgrst, 'reload schema';
   `);
   await eventually(
@@ -366,6 +372,24 @@ export async function createFixtures({ setup, executeSql }) {
       attachment: { type: "string", format: "text" },
     },
   };
+  const multiSchema = {
+    type: "object",
+    required: ["id", "full_name"],
+    properties: {
+      id: schema.properties.id,
+      full_name: schema.properties.full_name,
+      ...Object.fromEntries(
+        ["checkboxes", "toggles", "stock", "stock_toggles"].map((name) => [
+          name,
+          {
+            type: "array",
+            format: "text[]",
+            items: { type: "string", format: "text" },
+          },
+        ])
+      ),
+    },
+  };
   const [connectionProject] = await insert(
     "grida_x_supabase",
     "supabase_project",
@@ -374,8 +398,13 @@ export async function createFixtures({ setup, executeSql }) {
       sb_anon_key: setup.anonKey,
       sb_project_reference_id: `forms-fixture-${run}`,
       sb_project_url: setup.apiUrl,
-      sb_public_schema: { [targetTable]: schema },
-      sb_schema_definitions: { public: { [targetTable]: schema } },
+      sb_public_schema: {
+        [targetTable]: schema,
+        [multiTargetTable]: multiSchema,
+      },
+      sb_schema_definitions: {
+        public: { [targetTable]: schema, [multiTargetTable]: multiSchema },
+      },
       sb_schema_openapi_docs: {},
     }
   );
@@ -408,11 +437,117 @@ export async function createFixtures({ setup, executeSql }) {
   connected.targetTable = targetTable;
   connected.connectionProjectId = connectionProject.id;
 
+  const multiValue = await form(projectA.id, "choices", {
+    name: { name: "full_name", type: "text" },
+    checkboxes: { name: "checkboxes", type: "checkboxes", multiple: false },
+    toggles: { name: "toggles", type: "toggle-group", multiple: true },
+    stock: { name: "stock", type: "checkboxes", multiple: null },
+    stockToggles: {
+      name: "stock_toggles",
+      type: "toggle-group",
+      multiple: true,
+    },
+  });
+  const [multiConnectionTable] = await insert(
+    "grida_x_supabase",
+    "supabase_table",
+    {
+      supabase_project_id: connectionProject.id,
+      sb_schema_name: "public",
+      sb_table_name: multiTargetTable,
+      sb_table_schema: multiSchema,
+      sb_postgrest_methods: ["get", "post"],
+    }
+  );
+  await insert("grida_forms", "connection_supabase", {
+    form_id: multiValue.id,
+    supabase_project_id: connectionProject.id,
+    main_supabase_table_id: multiConnectionTable.id,
+  });
+  multiValue.targetTable = multiTargetTable;
+  multiValue.options = {};
+  for (const [key, values] of [
+    ["checkboxes", ["Research, design", randomUUID()]],
+    ["toggles", ["First choice", "Second choice"]],
+    ["stock", ["Standard ticket", "Extended ticket"]],
+    ["stockToggles", ["Standard toggle ticket", "Extended toggle ticket"]],
+  ]) {
+    multiValue.options[key] = await insert(
+      "grida_forms",
+      "option",
+      values.map((value) => ({
+        form_id: multiValue.id,
+        form_field_id: multiValue.fields[key].id,
+        value,
+        label: value,
+      }))
+    );
+  }
+  await insert("grida_forms", "connection_commerce_store", {
+    form_id: multiValue.id,
+    project_id: projectA.id,
+    store_id: store.id,
+  });
+  multiValue.inventory = [];
+  for (const option of [
+    ...multiValue.options.stock,
+    ...multiValue.options.stockToggles,
+  ]) {
+    const [item] = await insert("grida_commerce", "inventory_item", {
+      store_id: store.id,
+      sku: option.id,
+      is_negative_level_allowed: false,
+    });
+    const level = await one(
+      "grida_commerce",
+      "inventory_level",
+      `inventory_item_id=eq.${item.id}`
+    );
+    await insert("grida_commerce", "inventory_level_commit", {
+      inventory_level_id: level.id,
+      diff: 3,
+      reason: "initialize",
+    });
+    multiValue.inventory.push({
+      optionId: option.id,
+      itemId: item.id,
+      levelId: level.id,
+    });
+  }
+
+  // CIAM's private challenge table is deliberately absent from PostgREST.
+  // Inspect only counters/terminal state through the runner-owned SQL channel;
+  // neither OTP hashes/salts nor challenge capabilities enter its output.
+  async function otpState(challengeId) {
+    assert.match(challengeId, /^[a-f0-9-]{36}$/);
+    return JSON.parse(
+      (
+        await executeSql(`
+      SELECT json_build_object('attempts', attempt_count, 'consumed', consumed_at IS NOT NULL)
+      FROM grida_ciam.customer_otp_challenge WHERE id = '${challengeId}'::uuid;
+    `)
+      ).trim()
+    );
+  }
+  async function otpChallengeCount(projectId, email) {
+    assert(Number.isSafeInteger(projectId));
+    assert.match(email, /^[a-z0-9-]+@example\.com$/);
+    return Number(
+      (
+        await executeSql(`
+      SELECT count(*) FROM grida_ciam.customer_otp_challenge
+      WHERE project_id = ${projectId} AND email = '${email}';
+    `)
+      ).trim()
+    );
+  }
+
   return {
     run,
     a,
     b,
     connected,
+    multiValue,
     directFile,
     completionFailure,
     personas,
@@ -422,6 +557,8 @@ export async function createFixtures({ setup, executeSql }) {
     rows,
     one,
     patch,
+    otpState,
+    otpChallengeCount,
     apiUrl: setup.apiUrl,
     anonKey: setup.anonKey,
     bytes: FILE_BYTES,

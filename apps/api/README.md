@@ -119,6 +119,22 @@ The session response exposes `{ id, form_id }`; submission data exposes
 projections; customer access exposes only `{ uid }`. Database rows and internal
 storage/connection configuration are not the public response contract.
 
+Checkbox groups accept repeated literal values; enabled multi-toggle groups
+accept repeated option IDs or the existing comma-packed encoding. Raw response,
+field values and connected array columns preserve every selection. Conflicting
+scalar duplicates and multiple inventory-backed selections are rejected before
+writes; identical scalar duplicates remain accepted.
+
+Email OTP issuance has a database-enforced 60-second cooldown per normalized
+recipient and project, shared across sessions and CIAM callers. Forms returns
+429 with `Retry-After: 60` without sending another email. The eight failed-guess
+limit persists between requests. Forms verification consumes the OTP, binds the
+system customer identity when applicable and stores success in one transaction;
+unexpected database errors return 500 and roll back consumption. A denied guess
+returns 401 while committing its attempt count. Delivery at challenge start
+remains best effort, and a recipient cooldown does not limit bulk requests across
+different recipients or IPs.
+
 Successful submission awaits session clearing, customer indexing and any
 configured respondent email. Those are internal functions, with no public hook
 routes or self-HTTP. A required effect can fail after the response and files have
@@ -148,15 +164,22 @@ Before production cutover:
 
 1. Hold automatic editor promotion. Record the previous editor release and the
    candidate API/editor revisions and environment pairing.
-2. Verify paired hosted previews against an isolated nonproduction backend.
+2. Apply the [OTP repair migration](../../supabase/migrations/20261002171546_otp_attempts_and_forms_verification.sql)
+   through the normal operator-owned database release before deploying this API.
+   The generic CIAM verifier keeps its signature and reports invalid codes with
+   zero rows; existing callers already deny that result. The new Forms verifier
+   must exist before this API serves verification requests.
+3. Verify paired hosted previews against an isolated nonproduction backend.
    Exercise real ingress, CORS, payloads, sessions, uploads and required effects.
-   Runner-local loopback URLs are not a hosted preview backend.
-3. Build with production-target configuration and make the API ready at its
+   Confirm effective abuse controls on the new API origin, including OTP requests
+   across recipients/IPs; controls attached to the editor project do not carry
+   over automatically. Runner-local loopback URLs are not a hosted preview backend.
+4. Build with production-target configuration and make the API ready at its
    intended origin first. Do not promote a preview editor artifact containing a
    different compiled API origin.
-4. Promote the matching editor only after API readiness is established. Automated
+5. Promote the matching editor only after API readiness is established. Automated
    agents must not access the production database.
-5. If cutover fails, restore the recorded compatible release/configuration pair.
+6. If cutover fails, restore the recorded compatible release/configuration pair.
    Preserve accepted data and files; do not replay uncertain submissions or
    restore a database snapshot. Keep the API available for outstanding clients.
 

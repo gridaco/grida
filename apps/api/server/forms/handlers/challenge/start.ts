@@ -19,12 +19,8 @@ type Params = { session: string; field: string };
 export async function POST(req: Request, params: Params) {
   const { session: sessionId, field: fieldId } = params;
 
-  // TODO(security): add rate limiting / abuse protection for OTP start.
-  // This endpoint is public and can be abused to spam arbitrary emails by creating
-  // sessions and repeatedly calling `start`. Options:
-  // - DB-enforced per-(project_id,email) and per-IP cooldown
-  // - edge/middleware rate limiting
-  // - CAPTCHA / proof-of-work for public forms
+  // The database enforces a recipient cooldown across sessions and callers.
+  // Deployment ingress must separately limit abuse across recipients/IPs.
   const { data: ctx, error } = await loadChallengeEmailContext({
     sessionId,
     fieldId,
@@ -43,7 +39,7 @@ export async function POST(req: Request, params: Params) {
   } | null;
 
   const emailInput = body?.email;
-  if (!emailInput) {
+  if (typeof emailInput !== "string" || !emailInput) {
     return Response.json({ error: "email is required" }, { status: 400 });
   }
 
@@ -94,6 +90,12 @@ export async function POST(req: Request, params: Params) {
     });
 
   if (challenge_error || !challenge_id) {
+    if (challenge_error?.code === "PT429") {
+      return Response.json(
+        { error: "please wait before requesting another code" },
+        { status: 429, headers: { "Retry-After": "60" } }
+      );
+    }
     // Generic failure (do not enumerate)
     return Response.json(
       { error: "unable to start challenge" },
@@ -179,11 +181,21 @@ export async function POST(req: Request, params: Params) {
     customer_uid: null,
   };
 
-  await service_role.forms.rpc("set_response_session_field_value", {
-    session_id: sessionId,
-    key,
-    value: state,
-  });
+  const { error: stateError } = await service_role.forms.rpc(
+    "set_response_session_field_value",
+    {
+      session_id: sessionId,
+      key,
+      value: state,
+    }
+  );
+
+  if (stateError) {
+    return Response.json(
+      { error: "unable to start challenge" },
+      { status: 500 }
+    );
+  }
 
   return Response.json({
     challenge_id,

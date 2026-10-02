@@ -255,6 +255,10 @@ CREATE TABLE grida_ciam.customer_otp_challenge (
 
 CREATE INDEX customer_otp_challenge_lookup ON grida_ciam.customer_otp_challenge (project_id, email, created_at DESC);
 
+-- Normalized per-project/email issuance cooldown (60 seconds).
+CREATE INDEX IF NOT EXISTS customer_otp_challenge_recipient_cooldown
+ON grida_ciam.customer_otp_challenge (project_id, lower(btrim(email)), created_at DESC);
+
 ALTER TABLE grida_ciam.customer_otp_challenge ENABLE ROW LEVEL SECURITY;
 
 GRANT ALL ON TABLE grida_ciam.customer_otp_challenge TO service_role;
@@ -334,52 +338,57 @@ CREATE OR REPLACE FUNCTION grida_ciam_public.create_customer_otp_challenge(
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions, pg_temp
+SET search_path = pg_catalog, pg_temp
 AS $function$
 DECLARE
+    v_email text := lower(btrim(p_email));
     v_customer_uid uuid;
     v_challenge_id uuid;
     v_salt bytea;
-    v_hash bytea;
+    v_now timestamptz;
 BEGIN
-    -- Look up customer by project_id and email (optional, may be null to prevent enumeration)
-    SELECT uid INTO v_customer_uid
-    FROM public.customer
-    WHERE project_id = p_project_id
-      AND email = p_email
-    ORDER BY uid
-    LIMIT 1;
+    IF p_project_id IS NULL OR v_email IS NULL OR v_email = ''
+       OR p_otp IS NULL OR p_otp = ''
+       OR p_expires_in_seconds IS NULL OR p_expires_in_seconds <= 0 THEN
+        RAISE EXCEPTION 'invalid challenge parameters' USING ERRCODE = '22023';
+    END IF;
 
-    -- Generate salt and hash the OTP
-    v_salt := gen_random_bytes(16);
-    v_hash := digest(v_salt || convert_to(p_otp, 'utf8'), 'sha256');
+    -- Serializes issuance across sessions for one normalized recipient/project.
+    -- A transaction lock plus a fresh READ COMMITTED query prevents two concurrent
+    -- starts from both observing no recent challenge. Hash collisions only serialize
+    -- unrelated recipients; the cooldown query still uses the exact recipient.
+    PERFORM pg_catalog.pg_advisory_xact_lock(
+        pg_catalog.hashtextextended(p_project_id::text || ':' || v_email, 0)
+    );
+    v_now := clock_timestamp();
+    IF EXISTS (
+        SELECT 1 FROM grida_ciam.customer_otp_challenge c
+        WHERE c.project_id = p_project_id
+          AND lower(btrim(c.email)) = v_email
+          AND c.created_at > v_now - interval '60 seconds'
+    ) THEN
+        RAISE EXCEPTION 'OTP recipient cooldown' USING ERRCODE = 'PT429';
+    END IF;
 
-    -- Insert challenge
+    SELECT c.uid INTO v_customer_uid
+    FROM public.customer c
+    WHERE c.project_id = p_project_id AND c.email = v_email
+    ORDER BY c.uid LIMIT 1;
+
+    v_salt := extensions.gen_random_bytes(16);
     INSERT INTO grida_ciam.customer_otp_challenge (
-        project_id,
-        email,
-        customer_uid,
-        token_type,
-        otp_salt,
-        otp_hash,
-        expires_at
-    )
-    VALUES (
-        p_project_id,
-        p_email,
-        v_customer_uid,
-        'confirmation_token',
-        v_salt,
-        v_hash,
-        now() + make_interval(secs => p_expires_in_seconds)
-    )
-    RETURNING id INTO v_challenge_id;
+        project_id, email, customer_uid, token_type, otp_salt, otp_hash,
+        created_at, expires_at
+    ) VALUES (
+        p_project_id, v_email, v_customer_uid, 'confirmation_token', v_salt,
+        extensions.digest(v_salt || convert_to(p_otp, 'utf8'), 'sha256'),
+        v_now, v_now + make_interval(secs => p_expires_in_seconds)
+    ) RETURNING id INTO v_challenge_id;
 
     RETURN v_challenge_id;
 END;
 $function$;
 
--- Service-only: every caller is the server's service_role client.
 REVOKE ALL ON FUNCTION grida_ciam_public.create_customer_otp_challenge(bigint, text, text, int) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION grida_ciam_public.create_customer_otp_challenge(bigint, text, text, int) TO service_role;
 
@@ -393,77 +402,52 @@ CREATE OR REPLACE FUNCTION grida_ciam_public.verify_customer_otp_and_create_sess
     p_otp text,
     p_session_ttl_seconds int DEFAULT 2592000
 )
-RETURNS TABLE (
-    customer_uid uuid,
-    project_id bigint
-)
+RETURNS TABLE (customer_uid uuid, project_id bigint)
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions, pg_temp
+SET search_path = pg_catalog, pg_temp
 AS $function$
 DECLARE
     c grida_ciam.customer_otp_challenge%ROWTYPE;
     v_hash bytea;
-    v_customer_uid uuid;
-    v_project_id bigint;
 BEGIN
-    -- Lock and fetch challenge row
-    SELECT * INTO c
-    FROM grida_ciam.customer_otp_challenge
-    WHERE id = p_challenge_id
-    FOR UPDATE;
+    -- The legacy TTL argument remains for callers; this RPC does not mint sessions.
+    SELECT * INTO c FROM grida_ciam.customer_otp_challenge
+    WHERE id = p_challenge_id FOR UPDATE;
 
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'invalid';
+    IF NOT FOUND THEN RETURN; END IF;
+    IF c.consumed_at IS NOT NULL OR c.expires_at <= clock_timestamp()
+       OR c.attempt_count >= 8 OR c.token_type <> 'confirmation_token' THEN
+        RETURN;
     END IF;
 
-    -- Validate challenge state
-    IF c.consumed_at IS NOT NULL OR c.expires_at <= now() THEN
-        RAISE EXCEPTION 'invalid';
-    END IF;
-
-    IF c.attempt_count >= 8 THEN
-        RAISE EXCEPTION 'invalid';
-    END IF;
-
-    -- Verify token type
-    IF c.token_type != 'confirmation_token' THEN
-        RAISE EXCEPTION 'invalid';
-    END IF;
-
-    -- Hash OTP with stored salt
-    v_hash := digest(c.otp_salt || convert_to(p_otp, 'utf8'), 'sha256');
-
-    -- Verify hash and customer_uid
-    IF v_hash != c.otp_hash OR c.customer_uid IS NULL THEN
+    v_hash := extensions.digest(c.otp_salt || convert_to(p_otp, 'utf8'), 'sha256');
+    -- IS DISTINCT FROM also rejects a NULL OTP (SQL NULL must not skip denial).
+    IF v_hash IS DISTINCT FROM c.otp_hash OR c.customer_uid IS NULL
+       OR NOT EXISTS (
+           SELECT 1 FROM public.customer u
+           WHERE u.uid = c.customer_uid AND u.project_id = c.project_id
+       ) THEN
         UPDATE grida_ciam.customer_otp_challenge
-        SET attempt_count = attempt_count + 1
-        WHERE id = c.id;
-        
-        RAISE EXCEPTION 'invalid';
+        SET attempt_count = attempt_count + 1 WHERE id = c.id;
+        -- Raising here would roll back the counter. Zero rows is the denied result.
+        RETURN;
     END IF;
 
-    -- Mark challenge as consumed
-    UPDATE grida_ciam.customer_otp_challenge
-    SET consumed_at = now()
-    WHERE id = c.id;
-
-    -- Update customer: set email verified and update email
     UPDATE public.customer
-    SET is_email_verified = true,
-        email = c.email
-    WHERE public.customer.uid = c.customer_uid
-      AND public.customer.project_id = c.project_id;
+    SET is_email_verified = true, email = c.email
+    WHERE uid = c.customer_uid AND public.customer.project_id = c.project_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'OTP customer binding changed';
+    END IF;
 
-    -- Return customer scope for downstream portal session minting
-    v_customer_uid := c.customer_uid;
-    v_project_id := c.project_id;
+    UPDATE grida_ciam.customer_otp_challenge
+    SET consumed_at = clock_timestamp() WHERE id = c.id;
 
-    RETURN QUERY SELECT v_customer_uid, v_project_id;
+    RETURN QUERY SELECT c.customer_uid, c.project_id;
 END;
 $function$;
 
--- Service-only: every caller is the server's service_role client.
 REVOKE ALL ON FUNCTION grida_ciam_public.verify_customer_otp_and_create_session(uuid, text, int) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION grida_ciam_public.verify_customer_otp_and_create_session(uuid, text, int) TO service_role;
 

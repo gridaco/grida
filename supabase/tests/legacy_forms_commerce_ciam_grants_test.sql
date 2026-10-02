@@ -295,13 +295,12 @@ SELECT throws_ok(sql, '42501', NULL, 'a project member cannot ' || label)
 SELECT pg_temp.as_nobody();
 
 SET LOCAL ROLE service_role;
--- A fresh challenge, so this does not depend on the denied calls above.
+-- Denied calls cannot consume the challenge issued above. Reuse it rather than
+-- issuing to the same recipient inside the shared 60-second cooldown.
 SELECT is(
   (SELECT customer_uid
      FROM grida_ciam_public.verify_customer_otp_and_create_session(
-       grida_ciam_public.create_customer_otp_challenge(
-         (SELECT project_id FROM fx WHERE tenant = 'insider'),
-         'insider-customer@example.com', '000000', 600),
+       current_setting('grants_test.challenge_id')::uuid,
        '000000', 0)),
   (SELECT customer_uid FROM fx WHERE tenant = 'insider'),
   'service_role can verify an OTP challenge'

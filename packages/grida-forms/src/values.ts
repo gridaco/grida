@@ -7,20 +7,106 @@ import type { FormInputType } from "./model";
 type EnumOption = { id: string; value: string };
 
 export namespace FormValue {
-  export function parse(
-    value_or_reference: unknown,
-    extra: {
-      // in minutes, where the givven value is the offset from UTC
-      utc_offset?: number;
-      enums?: EnumOption[];
-      type: FormInputType | undefined;
-      multiple?: boolean | null;
-    }
-  ): {
+  export type ParseOptions = {
+    // In minutes, where the given value is the offset from UTC.
+    utc_offset?: number;
+    enums?: readonly EnumOption[];
+    type: FormInputType | undefined;
+    multiple?: boolean | null;
+  };
+
+  export type Parsed = {
     value: unknown;
     enum_id?: string | null;
     enum_ids?: string[] | null;
-  } {
+  };
+
+  export type Submission =
+    | {
+        ok: true;
+        raw: unknown;
+        parsed: Parsed;
+        /** All matched option identities, deduplicated in encounter order. */
+        option_ids: string[];
+      }
+    | { ok: false; error: "ambiguous-scalar" };
+
+  /** Submission cardinality is independent of HTML's multiple capability. */
+  export function submissionCardinality({
+    type,
+    multiple,
+  }: Pick<ParseOptions, "type" | "multiple">): "scalar" | "plural" {
+    return type === "checkboxes" ||
+      (type === "toggle-group" && multiple === true) ||
+      FieldSupports.file_alias(type)
+      ? "plural"
+      : "scalar";
+  }
+
+  /**
+   * Normalize all entries for one field before choosing raw or parsed output.
+   * Checkbox values are literals; only multiple toggle references unpack commas.
+   * File entries are preserved for their separate transport, without inspection.
+   * Conflicting scalar entries fail; other conversion errors from parse propagate.
+   */
+  export function parseEntries(
+    entries: readonly unknown[],
+    extra: ParseOptions
+  ): Submission {
+    if (submissionCardinality(extra) === "scalar") {
+      const raw = entries.length ? entries[0] : null;
+      if (entries.some((entry) => !Object.is(entry, raw))) {
+        return { ok: false, error: "ambiguous-scalar" };
+      }
+      const parsed = parse(raw, extra);
+      return {
+        ok: true,
+        raw,
+        parsed,
+        option_ids: parsed.enum_id ? [parsed.enum_id] : [],
+      };
+    }
+
+    if (FieldSupports.file_alias(extra.type)) {
+      const raw = [...entries];
+      return { ok: true, raw, parsed: { value: raw }, option_ids: [] };
+    }
+
+    if (extra.type === "checkboxes") {
+      const raw = [...entries];
+      const option_ids = [
+        ...new Set(
+          raw.flatMap((entry) =>
+            (extra.enums ?? [])
+              .filter((option) => option.value === entry)
+              .map((option) => option.id)
+          )
+        ),
+      ];
+      return {
+        ok: true,
+        raw,
+        parsed: { value: raw, enum_ids: option_ids },
+        option_ids,
+      };
+    }
+
+    const raw = entries.flatMap((entry) =>
+      typeof entry === "string" ? entry.split(",") : [entry]
+    );
+    const parsed = parse(raw, extra);
+    return {
+      ok: true,
+      raw,
+      parsed,
+      option_ids: [...new Set(parsed.enum_ids ?? [])],
+    };
+  }
+
+  export function parse(
+    value_or_reference: unknown,
+    extra: ParseOptions
+  ): Parsed {
     const { type, multiple, enums } = extra;
     if (!type) {
       return {
@@ -135,7 +221,7 @@ export namespace FormValue {
 
   export function getEnum(
     value_or_reference: string,
-    enums?: EnumOption[]
+    enums?: readonly EnumOption[]
   ): EnumOption | null {
     if (!enums) return null;
     if (!is_uuid_v4(value_or_reference)) return null;

@@ -164,22 +164,33 @@ async function submit({
     default_page,
   } = form_reference;
 
-  // A scalar must have one meaning for get(), raw persistence, and a connected
-  // database insert. Repeated identical values are harmless; conflicting ones
-  // must be rejected before any customer, inventory, or response writes.
+  // Normalize the transport once. HTML multiple-attribute support does not
+  // determine cardinality: checkbox groups are plural even without that flag.
   const submitted = new Map<string, FormDataEntryValue[]>();
   for (const [name, value] of formdata.entries()) {
     submitted.set(name, [...(submitted.get(name) ?? []), value]);
   }
-  for (const [name, values] of submitted) {
-    const field = fields.find((field) => field.name === name);
-    const acceptsMany =
-      field &&
-      (FieldSupports.file_alias(field.type) ||
-        (FieldSupports.multiple(field.type) && field.multiple));
-    if (!acceptsMany && values.some((value) => value !== values[0])) {
-      return error(400, { form_id }, meta);
+  const normalized = new Map<
+    string,
+    Extract<FormValue.Submission, { ok: true }>
+  >();
+  try {
+    for (const name of new Set([
+      ...submitted.keys(),
+      ...fields.map((field) => field.name),
+    ])) {
+      const field = fields.find((field) => field.name === name);
+      const value = FormValue.parseEntries(submitted.get(name) ?? [], {
+        type: field?.type,
+        multiple: field?.multiple,
+        enums: field?.options,
+        utc_offset: meta.utc_offset,
+      });
+      if (!value.ok) return error(400, { form_id }, meta);
+      normalized.set(name, value);
     }
+  } catch {
+    return error(400, { form_id }, meta);
   }
 
   // Staging paths are capabilities scoped to both the session and the field.
@@ -215,6 +226,29 @@ async function submit({
     }
   }
 
+  // Admission is read-only. Multiple stock selections remain unsupported,
+  // including identities after the first repeated/packed value. Reject them
+  // before customer upserts or any other writes; stock consumption stays below.
+  let options_inventory: FormFieldOptionsInventoryMap | null = null;
+  let inventory_selection_id: string | null = null;
+  if (store_connection) {
+    options_inventory = await form_field_options_inventory({
+      project_id,
+      store_id: store_connection.store_id,
+    });
+    const selected = [
+      ...new Set(
+        fields.flatMap((field) =>
+          normalized
+            .get(field.name)!
+            .option_ids.filter((id) => id in options_inventory!)
+        )
+      ),
+    ];
+    if (selected.length > 1) return error(400, { form_id }, meta);
+    inventory_selection_id = selected[0] ?? null;
+  }
+
   const {
     is_redirect_after_response_uri_enabled,
     redirect_after_response_uri,
@@ -222,8 +256,6 @@ async function submit({
     ending_page_template_id,
     // oxlint-disable-next-line typescript-eslint/no-explicit-any -- Supabase SDK nested join type
   } = (default_page as any) || {};
-
-  const entries = formdata.entries();
 
   const __keys_all = Array.from(formdata.keys());
 
@@ -490,7 +522,6 @@ async function submit({
   // ==================================================
 
   // validatopn - check if user selected option is connected to inventory and is available
-  let options_inventory: FormFieldOptionsInventoryMap | null = null;
   if (store_connection) {
     const commerce = new GridaCommerceClient(
       service_role.commerce,
@@ -498,38 +529,13 @@ async function submit({
       store_connection.store_id
     );
 
-    options_inventory = await form_field_options_inventory({
-      project_id: project_id,
-      store_id: store_connection.store_id,
-    });
-    const inventory_keys = Object.keys(options_inventory);
-
     // TODO: this may conflict the validation policy since v1/load uses render fields.
     const options = form_reference.fields.flatMap((f) => f.options);
-
-    // TODO: now we only support one inventory option selection per form
-    const data_present_option_fields = fields.filter((f) => {
-      return f.options.length > 0 && !!formdata.get(f.name);
-    });
-
-    // get the option id that is both present in inventory and form data
-    const possible_selection_option_ids = data_present_option_fields
-      .map((f) => String(formdata.get(f!.name)))
-      .filter((id) => inventory_keys.includes(id));
-
-    assert(
-      possible_selection_option_ids.length <= 1,
-      "Multiple inventory options is not supported yet."
-    );
-
-    const selection_id =
-      possible_selection_option_ids.length == 1
-        ? possible_selection_option_ids[0]
-        : null;
+    const selection_id = inventory_selection_id;
 
     // validate if inventory is present
     const inventory_access_error = await validate_options_inventory({
-      inventory: options_inventory,
+      inventory: options_inventory!,
       options: options,
       selection: selection_id ? { id: selection_id } : undefined,
       config: {
@@ -589,7 +595,20 @@ async function submit({
     await service_role.forms
       .from("response")
       .insert({
-        raw: FormValue.safejson(Object.fromEntries(entries)),
+        raw: FormValue.safejson(
+          Object.fromEntries(
+            [...submitted.keys()].map((name) => {
+              const field = fields.find((field) => field.name === name);
+              // Preserve the existing file raw contract. All original entries
+              // still reach the separate upload pipeline through getAll().
+              const raw =
+                field && FieldSupports.file_alias(field.type)
+                  ? submitted.get(name)!.at(-1)
+                  : normalized.get(name)!.raw;
+              return [name, raw];
+            })
+          )
+        ),
         form_id: form_id,
         session_id: meta.session,
         browser: meta.browser,
@@ -727,17 +746,22 @@ async function submit({
       // parsed values
       const entries = v_form_fields.map((field) => {
         const { type, name, options, multiple } = field;
-        const value_or_reference = formdata.get(name);
+        // Connected file columns keep their existing scalar placeholder until
+        // upload completion replaces it. Files retain separate transport and
+        // storage cardinality; this change does not enable array file columns.
+        const parsed = FieldSupports.file_alias(type)
+          ? FormValue.parse(formdata.get(name), {
+              type,
+              enums: options,
+              multiple,
+              utc_offset: meta.utc_offset,
+            })
+          : normalized.get(name)!.parsed;
         return [
           // name: column name
           field.name,
           // value: parsed value
-          FormValue.parse(value_or_reference, {
-            type: type,
-            enums: options,
-            multiple: multiple,
-            utc_offset: meta.utc_offset,
-          }).value,
+          parsed.value,
         ];
       });
       // oxlint-disable-next-line typescript-eslint/no-explicit-any -- dynamic form data record
@@ -800,19 +824,10 @@ async function submit({
     .from("response_field")
     .insert(
       v_form_fields!.map((field) => {
-        const { type, name, options, multiple } = field;
+        const { type, name } = field;
 
         // the field's value can be a input value or a reference to form_field_option
-        const value_or_reference = formdata.get(name);
-        const { value, enum_id, enum_ids } = FormValue.parse(
-          value_or_reference,
-          {
-            utc_offset: meta.utc_offset,
-            type: type,
-            enums: options,
-            multiple: multiple,
-          }
-        );
+        const { value, enum_id, enum_ids } = normalized.get(name)!.parsed;
 
         // handle file uploads
         if (FieldSupports.file_upload(type)) {
@@ -965,15 +980,7 @@ async function submit({
         // this is partially implemented only for 'richtext' cms implementation
         if (FieldSupports.richtext(field.type)) {
           // const value = RECORD![field.name]; // -> this can cause side effects with user's db trugger. (but also makes sence to use the updated one?)
-          const { value } = FormValue.parse(
-            (formdata as FormData).get(field.name),
-            {
-              utc_offset: meta.utc_offset,
-              enums: field.options,
-              type: field.type,
-              multiple: field.multiple,
-            }
-          );
+          const { value } = normalized.get(field.name)!.parsed;
 
           const document = value
             ? RichTextStagedFileUtils.renderDocument(value, {
@@ -1049,15 +1056,7 @@ async function submit({
     };
 
     if (FieldSupports.richtext(field.type)) {
-      const { value } = FormValue.parse(
-        (formdata as FormData).get(field.name),
-        {
-          utc_offset: meta.utc_offset,
-          enums: field.options,
-          type: field.type,
-          multiple: field.multiple,
-        }
-      );
+      const { value } = normalized.get(field.name)!.parsed;
 
       const document = value
         ? RichTextStagedFileUtils.renderDocument(value as object | string, {
