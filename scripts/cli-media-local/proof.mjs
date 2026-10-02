@@ -22,7 +22,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
-import { CliRelease } from "../cli-release/prepare.mjs";
+import { LegacyCliRelease } from "../cli-release/legacy-prepare.mjs";
 
 const execute = promisify(execFile);
 const repository = fileURLToPath(new URL("../../", import.meta.url));
@@ -549,7 +549,7 @@ async function main() {
     );
     report.sources = await sourceHashes();
     await check("offline packed installation", async () => {
-      const npm = await CliRelease.npm();
+      const npm = await LegacyCliRelease.npm();
       const options = {
         cwd: owned,
         env,
@@ -562,7 +562,7 @@ async function main() {
         await writeFile(archive, candidate, { mode: 0o600 });
       } else {
         const directory = path.join(owned, "archives", "candidate");
-        const record = await CliRelease.prepare(directory);
+        const record = await LegacyCliRelease.prepare(directory);
         archive = path.join(directory, record.archive);
       }
       report.archive_sha256 = sha256(await readFile(archive));

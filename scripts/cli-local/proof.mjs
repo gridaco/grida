@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
 import { readState } from "../auth-local/stack.mjs";
 import { fixture } from "../auth-local/guards.mjs";
-import { CliRelease } from "../cli-release/prepare.mjs";
+import { LegacyCliRelease } from "../cli-release/legacy-prepare.mjs";
 
 const execute = promisify(execFile);
 const repository = fileURLToPath(new URL("../../", import.meta.url));
@@ -406,7 +406,7 @@ async function main() {
     report.sources = await sourceHashes();
     await phase("offline package installation", async () => {
       const source = path.join(repository, "packages/grida-cli");
-      const npm = await CliRelease.npm();
+      const npm = await LegacyCliRelease.npm();
       const options = {
         cwd: owned,
         env: childEnv,
@@ -419,8 +419,8 @@ async function main() {
         await writeFile(archive, candidate, { mode: 0o600 });
       } else {
         const out = path.join(owned, "archives", "candidate");
-        const record = await CliRelease.prepare(out);
-        await CliRelease.verify(out);
+        const record = await LegacyCliRelease.prepare(out);
+        await LegacyCliRelease.verify(out);
         archive = path.join(out, record.archive);
       }
       report.archive_sha256 = hash(await readFile(archive));
@@ -445,13 +445,13 @@ async function main() {
       const manifest = JSON.parse(
         await readFile(path.join(installed, "package.json"), "utf8")
       );
-      CliRelease.manifest(manifest);
+      LegacyCliRelease.manifest(manifest);
       assert.deepEqual(
         manifest,
         JSON.parse(await readFile(path.join(source, "package.json"), "utf8"))
       );
       const installedFiles = await files(installed); // No package-internal symlink to workspace source/dependencies.
-      CliRelease.files(
+      LegacyCliRelease.files(
         installedFiles.map((filename) => ({
           path: path.relative(installed, filename),
         }))

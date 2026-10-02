@@ -25,7 +25,7 @@ Install with Node.js 24 or later:
 npm install -g grida
 ```
 
-npm selects the native executable for your platform. No Rust toolchain is required.
+Grida’s launcher selects the native executable for your platform. No Rust toolchain is required.
 
 Stored credentials currently support macOS and Linux. Windows users can supply
 BYOK through explicit environment variables or stdin; durable account login is

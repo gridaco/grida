@@ -1,9 +1,10 @@
+// Retired TypeScript CLI archive policy; current releases use native.mjs.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { CliRelease } from "./prepare.mjs";
+import { LegacyCliRelease } from "./legacy-prepare.mjs";
 
 const manifest = () => ({
   name: "grida",
@@ -29,9 +30,9 @@ const files = () =>
   ].map((path) => ({ path }));
 
 test("release guard refuses private/placeholder/mismatched/unreviewed package releases", () => {
-  CliRelease.release(manifest(), "1.0.0", "latest");
-  CliRelease.release(manifest(), "1.0.0", "next");
-  CliRelease.release(
+  LegacyCliRelease.release(manifest(), "1.0.0", "latest");
+  LegacyCliRelease.release(manifest(), "1.0.0", "next");
+  LegacyCliRelease.release(
     { ...manifest(), version: "1.0.0-rc.1" },
     "1.0.0-rc.1",
     "next"
@@ -63,11 +64,11 @@ test("release guard refuses private/placeholder/mismatched/unreviewed package re
       "next",
     ],
   ])
-    assert.throws(() => CliRelease.release(value, version, tag));
+    assert.throws(() => LegacyCliRelease.release(value, version, tag));
 });
 
 test("tarball must contain entry, README and license, with no source, secrets, maps or traversal", () => {
-  CliRelease.files(files());
+  LegacyCliRelease.files(files());
   for (const path of [
     ".env",
     "credentials.toml",
@@ -76,7 +77,7 @@ test("tarball must contain entry, README and license, with no source, secrets, m
     "dist/../../secret.mjs",
     "README.md",
   ])
-    assert.throws(() => CliRelease.files([...files(), { path }]));
+    assert.throws(() => LegacyCliRelease.files([...files(), { path }]));
   for (const required of [
     "package.json",
     "README.md",
@@ -85,7 +86,7 @@ test("tarball must contain entry, README and license, with no source, secrets, m
     "dist/bin.mjs",
   ])
     assert.throws(() =>
-      CliRelease.files(files().filter(({ path }) => path !== required))
+      LegacyCliRelease.files(files().filter(({ path }) => path !== required))
     );
 });
 
@@ -103,11 +104,11 @@ test("built candidate verifies outside the repository and rejects changed archiv
   const owned = await mkdtemp(path.join(tmpdir(), "grida-release-test-"));
   const out = path.join(owned, "candidate");
   try {
-    const report = await CliRelease.prepare(out);
-    assert.deepEqual(await CliRelease.verify(out), report);
-    await assert.rejects(CliRelease.prepare(out), { code: "EEXIST" });
+    const report = await LegacyCliRelease.prepare(out);
+    assert.deepEqual(await LegacyCliRelease.verify(out), report);
+    await assert.rejects(LegacyCliRelease.prepare(out), { code: "EEXIST" });
     assert.deepEqual(
-      await CliRelease.verify(out),
+      await LegacyCliRelease.verify(out),
       report,
       "Refused preparation must preserve the existing candidate"
     );
@@ -115,7 +116,10 @@ test("built candidate verifies outside the repository and rejects changed archiv
     const changed = await readFile(archive);
     changed[changed.length - 1] ^= 1;
     await writeFile(archive, changed);
-    await assert.rejects(CliRelease.verify(out), /Candidate hash changed/);
+    await assert.rejects(
+      LegacyCliRelease.verify(out),
+      /Candidate hash changed/
+    );
   } finally {
     await rm(owned, { recursive: true, force: true });
   }

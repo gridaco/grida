@@ -21,7 +21,7 @@ node --test scripts/cli-local/native-proof.test.mjs
 The candidate directory must come from the native release preparer. Local CI may
 use `buildHostFixture` from `scripts/cli-release/native-fixture.mjs`; the selected
 host executable is real, foreign headers are marked as inert fixtures, and such
-a candidate cannot be published. The report records both archive hashes and the
+a candidate cannot be published. The report records the package archive hash and the
 installed executable hash.
 
 The native proof covers manual browser consent with fresh PKCE/state, real code
@@ -53,7 +53,7 @@ Windows custody, or native keyring availability.
 
 The following `proof.mjs` and `linux-smoke.mjs` documentation describes the
 TypeScript CLI before native cutover. That acceptance is frozen at revision
-`b26ede1d62e21a0e24d52030538b8f7288ec9b4b`, also recorded in the conformance baseline.
+`b26ede1d62e21a0e24d52030538b8f7288ec9b4b` in Git history.
 Run these legacy commands from a checkout of that revision with its dependencies
 and fixture tooling; the current native npm candidate does not contain `dist/bin`
 or keytar and cannot satisfy that legacy install contract. The legacy proof files

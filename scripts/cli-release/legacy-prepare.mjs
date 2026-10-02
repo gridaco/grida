@@ -1,3 +1,4 @@
+// Retired TypeScript CLI archive policy; current releases use native.mjs.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -21,7 +22,7 @@ const execute = promisify(execFile);
 const repository = fileURLToPath(new URL("../../", import.meta.url));
 
 /** Package policy shared by candidate preparation and the explicit release guard. */
-export const CliRelease = {
+export const LegacyCliRelease = {
   npm: npmCli,
   manifest(value) {
     assert.equal(value.name, "grida", "Unexpected package name");
@@ -75,7 +76,7 @@ export const CliRelease = {
   },
 
   release(value, version, tag) {
-    CliRelease.manifest(value);
+    LegacyCliRelease.manifest(value);
     assert.equal(
       value.private,
       false,
@@ -144,10 +145,11 @@ export const CliRelease = {
       "Candidate output must be an absolute new directory"
     );
     const source = path.join(repository, "packages/grida-cli");
-    const manifest = CliRelease.manifest(
+    const manifest = LegacyCliRelease.manifest(
       JSON.parse(await readFile(path.join(source, "package.json"), "utf8"))
     );
-    if (release) CliRelease.release(manifest, release.version, release.tag);
+    if (release)
+      LegacyCliRelease.release(manifest, release.version, release.tag);
     const scratch = await mkdtemp(path.join(tmpdir(), "grida-cli-pack-"));
     let created = false;
     try {
@@ -175,7 +177,7 @@ export const CliRelease = {
       await writeFile(path.join(scratch, "global.npmrc"), "");
       await mkdir(out, { mode: 0o700 });
       created = true;
-      const npm = await CliRelease.npm();
+      const npm = await LegacyCliRelease.npm();
       const packed = await execute(
         process.execPath,
         [
@@ -209,7 +211,7 @@ export const CliRelease = {
       assert.equal(record.name, "grida");
       assert.equal(record.version, manifest.version);
       assert.equal(path.basename(record.filename), record.filename);
-      CliRelease.files(record.files);
+      LegacyCliRelease.files(record.files);
       const archive = await readFile(path.join(out, record.filename));
       const report = {
         name: manifest.name,
@@ -268,7 +270,7 @@ export const CliRelease = {
     const entries = listed.stdout.trim().split("\n");
     assert(entries.every((name) => name.startsWith("package/")));
     const filenames = entries.map((name) => name.slice("package/".length));
-    CliRelease.files(filenames.map((path) => ({ path })));
+    LegacyCliRelease.files(filenames.map((path) => ({ path })));
     assert.deepEqual(
       filenames.sort(),
       report.files.map(({ path }) => path).sort()
@@ -289,11 +291,12 @@ export const CliRelease = {
       ),
       "Packed manifest differs from this revision"
     );
-    CliRelease.manifest(manifest);
+    LegacyCliRelease.manifest(manifest);
     assert.equal(report.name, manifest.name);
     assert.equal(report.version, manifest.version);
     assert.equal(report.private, manifest.private);
-    if (release) CliRelease.release(manifest, release.version, release.tag);
+    if (release)
+      LegacyCliRelease.release(manifest, release.version, release.tag);
     return report;
   },
 };
@@ -325,7 +328,7 @@ async function main() {
       release && values.out === undefined && !values.verify,
       "--check-only requires a release version and no output directory"
     );
-    CliRelease.release(
+    LegacyCliRelease.release(
       JSON.parse(
         await readFile(
           path.join(repository, "packages/grida-cli/package.json"),
@@ -340,10 +343,9 @@ async function main() {
     assert(values.out, "--out is required");
     console.info(
       JSON.stringify(
-        await (values.verify ? CliRelease.verify : CliRelease.prepare)(
-          values.out,
-          release
-        ),
+        await (
+          values.verify ? LegacyCliRelease.verify : LegacyCliRelease.prepare
+        )(values.out, release),
         null,
         2
       )
