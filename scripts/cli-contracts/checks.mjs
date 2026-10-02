@@ -15,19 +15,23 @@ export const checks = [
   {
     id: "proof.auth-mixed",
     description: "Current TS/Rust real-process custody pairings",
-    commands: [["node", "--test", "scripts/conformance/auth-process.test.mjs"]],
+    commands: [
+      ["node", "--test", "scripts/cli-contracts/auth-process.test.mjs"],
+    ],
     assertion: "node_tests",
   },
   {
     id: "proof.auth-native",
     description: "Native keytar interoperability on the current supported OS",
     commands: [
-      ["node", "--test", "scripts/conformance/auth-macos.test.mjs"],
+      ["node", "--test", "scripts/cli-contracts/auth-macos.test.mjs"],
       ...(process.platform === "linux"
-        ? [["sh", "scripts/conformance/auth-linux.sh"]]
+        ? [["sh", "scripts/cli-contracts/auth-linux.sh"]]
         : process.env.GRIDA_AUTH_MACOS_CI === "1"
-          ? [["node", "scripts/conformance/auth-macos.mjs"]]
-          : [["node", "--test", "scripts/conformance/auth-keyring.test.mjs"]]),
+          ? [["node", "scripts/cli-contracts/auth-macos.mjs"]]
+          : [
+              ["node", "--test", "scripts/cli-contracts/auth-keyring.test.mjs"],
+            ]),
     ],
     assertion: "node_tests",
   },
@@ -39,7 +43,7 @@ export const checks = [
       ["pnpm", "exec", "turbo", "run", "build", "--filter=@grida/ai..."],
       ...["media", "inputs", "errors"].map((name) => [
         "node",
-        `scripts/conformance/catalogue-${name}.mjs`,
+        `scripts/cli-contracts/catalogue-${name}.mjs`,
         "--check",
       ]),
       [
@@ -54,7 +58,7 @@ export const checks = [
     id: "proof.installed-native",
     description:
       "Local OAuth/account/provider/GG/artifact/signal scenarios through the npm-installed Rust binary",
-    commands: [["node", "scripts/conformance/installed.mjs"]],
+    commands: [["node", "scripts/cli-contracts/installed.mjs"]],
     assertion: "json_proof",
   },
   {
@@ -68,7 +72,7 @@ export const checks = [
     id: "proof.installed-docs",
     description:
       "Installed command/help/docs and guide examples match the built documentation",
-    commands: [["node", "--import", "tsx", "scripts/conformance/docs.mjs"]],
+    commands: [["node", "--import", "tsx", "scripts/cli-contracts/docs.mjs"]],
     assertion: "json_proof",
   },
 ];

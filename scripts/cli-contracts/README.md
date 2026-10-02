@@ -60,22 +60,22 @@ on its disposable runner.
 
 ```sh
 # Native CLI argv and parser contracts: no Keychain or provider access.
-node --test scripts/conformance/cli.test.mjs scripts/conformance/catalogue-request.test.mjs
-node scripts/conformance/run.mjs --cli-only
-node scripts/conformance/run.mjs --list
+node --test scripts/cli-contracts/cli.test.mjs scripts/cli-contracts/catalogue-request.test.mjs
+node scripts/cli-contracts/run.mjs --cli-only
+node scripts/cli-contracts/run.mjs --list
 
 # Fast Rust provider/input/fault/HTTP regression checks.
 just cli-provider-contracts
 
 # Continuing TypeScript SDK consumers against the same reviewed fixtures.
 pnpm exec turbo run build --filter=@grida/ai...
-node scripts/conformance/catalogue-media.mjs --check
-node scripts/conformance/catalogue-inputs.mjs --check
-node scripts/conformance/catalogue-errors.mjs --check
+node scripts/cli-contracts/catalogue-media.mjs --check
+node scripts/cli-contracts/catalogue-inputs.mjs --check
+node scripts/cli-contracts/catalogue-errors.mjs --check
 
 cargo test --workspace --all-features --locked
-node --test scripts/conformance/auth-process.test.mjs
-node scripts/conformance/installed.mjs
+node --test scripts/cli-contracts/auth-process.test.mjs
+node scripts/cli-contracts/installed.mjs
 ```
 
 `--cli-only` runs every CLI/parser vector and explicitly reports that integration

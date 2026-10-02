@@ -11,11 +11,11 @@ or verify the Rust executable, and this runner is not a native release gate.
 The sections below describe the retained reference proof.
 
 For the current CLI, use the
-[native installed acceptance proof](../conformance/README.md) and
+[native installed acceptance proof](../cli-contracts/README.md) and
 [native candidate preparation](../cli-release/README.md):
 
 ```sh
-node scripts/conformance/installed.mjs --candidate /absolute/native-candidate
+node scripts/cli-contracts/installed.mjs --candidate /absolute/native-candidate
 ```
 
 The candidate must already contain the verified `grida` npm archive with all

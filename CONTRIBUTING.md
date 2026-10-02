@@ -128,7 +128,7 @@ cargo test --workspace --all-features --locked
 just cli-contracts
 ```
 
-The [contract guide](scripts/conformance/README.md) explains reviewed command and
+The [contract guide](scripts/cli-contracts/README.md) explains reviewed command and
 provider fixtures, current TS/Rust interoperability, and release acceptance
 boundaries. Ordinary Rust builds need no Node code generation. `just cli-contracts`
 builds current TS consumers and documentation after the normal pnpm install;

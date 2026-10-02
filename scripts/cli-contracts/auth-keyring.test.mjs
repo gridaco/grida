@@ -123,7 +123,7 @@ function driver(implementation, home, operation, extra = {}) {
   const run = spawnSync(
     implementation === "ts" ? process.execPath : rustExecutable,
     implementation === "ts"
-      ? ["--import", "tsx", "scripts/conformance/auth-driver.mjs"]
+      ? ["--import", "tsx", "scripts/cli-contracts/auth-driver.mjs"]
       : [],
     {
       cwd: repository,

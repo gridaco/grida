@@ -13,5 +13,5 @@ export XDG_RUNTIME_DIR="$fixture_root/runtime"
 mkdir -m 700 -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR"
 dbus-run-session -- sh -eu -c '
   printf "%s" synthetic-fixture-password | gnome-keyring-daemon --unlock --components=secrets >/dev/null
-  node --test scripts/conformance/auth-keyring.test.mjs
+  node --test scripts/cli-contracts/auth-keyring.test.mjs
 '

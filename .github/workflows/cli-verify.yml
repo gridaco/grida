@@ -11,7 +11,7 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - "crates/**"
-      - "scripts/conformance/**"
+      - "scripts/cli-contracts/**"
       - ".changeset/config.json"
       - "packages/grida-cli/**"
       - "packages/grida-auth/**"

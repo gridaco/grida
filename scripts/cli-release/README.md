@@ -66,7 +66,7 @@ node scripts/cli-release/native-notices.mjs --check
 node scripts/cli-release/native.mjs --artifacts "$PWD/.tmp/native-artifacts" --out "$PWD/.tmp/native-candidate"
 node scripts/cli-release/native.mjs --verify --out "$PWD/.tmp/native-candidate"
 node scripts/cli-release/native-proof.mjs --out "$PWD/.tmp/native-candidate"
-node scripts/conformance/installed.mjs --candidate "$PWD/.tmp/native-candidate"
+node scripts/cli-contracts/installed.mjs --candidate "$PWD/.tmp/native-candidate"
 ```
 
 `cargo-about` is a maintainer tool, not a CLI dependency. Its checked inventory
@@ -109,7 +109,7 @@ manifest without scripts or dependencies. Do not publish or pack the source
 directory directly: source checkouts do not contain the release binaries.
 
 Use `just cli-contracts` for the current native contract gate and see the
-[conformance prerequisites](../conformance/README.md) for custody tools and docs
+[conformance prerequisites](../cli-contracts/README.md) for custody tools and docs
 build requirements. The old `prepare.mjs` describes the retired TypeScript archive
 boundary and cannot prepare a native release; use the `native-*` commands above.
 

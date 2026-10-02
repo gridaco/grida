@@ -77,7 +77,7 @@ just cli-contracts
 The gate builds current TypeScript consumers, documentation and Rust drivers.
 It covers reviewed command and SDK contracts, current TS/Rust custody, installed
 npm execution, synthetic local OAuth/account/GG media, artifact safety and docs.
-The [contract harness](https://github.com/gridaco/grida/tree/main/scripts/conformance)
+The [contract harness](https://github.com/gridaco/grida/tree/main/scripts/cli-contracts)
 owns the golden vectors, operation coverage and integration checks. It does not
 fetch or build the retired TypeScript CLI. Its guide describes the explicit
 native keyring setup required for the complete gate.

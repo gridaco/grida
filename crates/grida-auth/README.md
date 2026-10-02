@@ -33,11 +33,11 @@ Tests use temporary homes and synthetic credentials:
 ```sh
 cargo test -p grida-auth --all-features --locked
 pnpm exec turbo run build --filter=@grida/auth...
-node --test scripts/conformance/auth-process.test.mjs
+node --test scripts/cli-contracts/auth-process.test.mjs
 # Explicit native integration test: disposable entries and real logout custody.
-GRIDA_AUTH_KEYRING_SMOKE=1 node --test scripts/conformance/auth-keyring.test.mjs
+GRIDA_AUTH_KEYRING_SMOKE=1 node --test scripts/cli-contracts/auth-keyring.test.mjs
 # Linux CI, after installing dbus-x11, gnome-keyring and libsecret-1-dev:
-sh scripts/conformance/auth-linux.sh
+sh scripts/cli-contracts/auth-linux.sh
 ```
 
 The process suite checks all current TypeScript/Rust combinations. The continuing

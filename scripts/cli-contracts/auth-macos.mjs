@@ -262,7 +262,7 @@ export class MacosKeychainFixture {
       testGroupSettled = false;
       const result = runner(
         process.execPath,
-        ["--test", "scripts/conformance/auth-keyring.test.mjs"],
+        ["--test", "scripts/cli-contracts/auth-keyring.test.mjs"],
         {
           cwd: repository,
           env: { ...env, GRIDA_AUTH_MACOS_FIXTURE: filename },

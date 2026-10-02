@@ -218,7 +218,7 @@ For the native CLI, `just cli-contracts` builds current TypeScript SDK consumers
 and the Rust executable, then checks public command/provider contracts, shared
 custody and installed npm behavior. It uses reviewed fixtures without rebuilding
 the retired TypeScript CLI. Native keyring checks require the explicit platform
-setup in [`scripts/conformance/README.md`](scripts/conformance/README.md).
+setup in [`scripts/cli-contracts/README.md`](scripts/cli-contracts/README.md).
 
 Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.
 To handle this, you can build the `/packages/*`, then run typecheck.

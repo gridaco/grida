@@ -22,12 +22,12 @@ test:
 cli-contracts:
     pnpm exec turbo run build --filter=@grida/ai... --filter=@grida/auth...
     pnpm --filter docs build
-    node --test scripts/conformance/cli.test.mjs scripts/conformance/catalogue-request.test.mjs
-    node scripts/conformance/run.mjs
+    node --test scripts/cli-contracts/cli.test.mjs scripts/cli-contracts/catalogue-request.test.mjs
+    node scripts/cli-contracts/run.mjs
 
 # Provider contracts and native HTTP with synthetic data and local sockets only.
 cli-provider-contracts:
-    node --test scripts/conformance/catalogue-request.test.mjs
+    node --test scripts/cli-contracts/catalogue-request.test.mjs
     cargo test -p grida-ai --locked
     cargo test -p grida-cli --lib --locked http::
 

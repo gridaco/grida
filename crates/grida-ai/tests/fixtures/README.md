@@ -10,9 +10,9 @@ Verify the reviewed fixtures against the current TypeScript SDK consumers:
 
 ```sh
 pnpm exec turbo run build --filter=@grida/ai...
-node scripts/conformance/catalogue-media.mjs --check
-node scripts/conformance/catalogue-inputs.mjs --check
-node scripts/conformance/catalogue-errors.mjs --check
+node scripts/cli-contracts/catalogue-media.mjs --check
+node scripts/cli-contracts/catalogue-inputs.mjs --check
+node scripts/cli-contracts/catalogue-errors.mjs --check
 ```
 
 Omit `--check` only for a reviewed baseline update. The fixtures were first

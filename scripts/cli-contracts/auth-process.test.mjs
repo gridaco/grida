@@ -109,7 +109,7 @@ function worker(t, implementation, home, operation, extra = {}) {
     implementation === "ts"
       ? spawn(
           process.execPath,
-          ["--import", "tsx", "scripts/conformance/auth-driver.mjs"],
+          ["--import", "tsx", "scripts/cli-contracts/auth-driver.mjs"],
           {
             cwd: repository,
             stdio: ["pipe", "pipe", "pipe"],

@@ -73,7 +73,7 @@ scripts; installation does not download or resolve separate platform packages.
 
 After `pnpm install --frozen-lockfile`, run `just cli-contracts` for the reviewed
 CLI/provider fixtures, current TS/Rust shared custody, installed package and
-documentation checks. The [contract guide](https://github.com/gridaco/grida/blob/main/scripts/conformance/README.md)
+documentation checks. The [contract guide](https://github.com/gridaco/grida/blob/main/scripts/cli-contracts/README.md)
 describes the native keyring prerequisites and focused zero-cost commands.
 No retired TypeScript CLI build is needed.
 
@@ -85,7 +85,7 @@ public-client JSON path and `GRIDA_HOME` to a separate absolute private director
 outside your ordinary Grida home. This explicit override accepts only the fixed
 local fixture issuer/API. Invalid local configuration never falls back to hosted
 authentication. There is no repository or dotenv discovery. The
-[installed native proof](https://github.com/gridaco/grida/blob/main/scripts/conformance/installed.mjs)
+[installed native proof](https://github.com/gridaco/grida/blob/main/scripts/cli-contracts/installed.mjs)
 owns synthetic local OAuth/account/media checks. The separate
 [local-Supabase/browser proof](https://github.com/gridaco/grida/tree/main/scripts/cli-local)
 checks the actual local issuer integration. Cross-platform CI, deployed account access and
@@ -229,6 +229,6 @@ allowed to settle.
 The CLI owns a Rust HTTP/1 adapter with fixed provider routes, DNS-address
 validation and pinning, and credential-free result downloads. It is independent
 of the Desktop transport and sandbox. The
-[installed synthetic media proof](https://github.com/gridaco/grida/blob/main/scripts/conformance/installed.mjs)
+[installed synthetic media proof](https://github.com/gridaco/grida/blob/main/scripts/cli-contracts/installed.mjs)
 checks the packed executable without real provider calls. Deployed account/GG
 access, actual provider compatibility and cross-platform release checks remain release gates.

@@ -1535,7 +1535,7 @@ limitation tracked in [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-
   [recovery tests](editor/lib/desktop/gg-tripo.test.ts) — explicit funding,
   capability-aware readiness and one pre-acceptance token refresh.
 - [CLI rigging composition](crates/grida-cli/src/runtime.rs) and
-  [funding tests](scripts/conformance/installed.mjs) — explicit org
+  [funding tests](scripts/cli-contracts/installed.mjs) — explicit org
   selection, scoped memory-only authority and cleanup; also GRIDA-SEC-013.
 
 - [Public SDK exports](packages/grida-ai/src/index.ts), [operation discovery](packages/grida-ai/src/media-operations.ts), [shared route eligibility](packages/grida-ai/src/media-routes.ts), and [discovery tests](packages/grida-ai/src/media-operations.test.ts), and [native parser parity tests](packages/grida-ai/src/media-input-parity.test.ts) — GG route facts grant no scoped token, organization authority or credits.
@@ -1575,7 +1575,7 @@ governs the surface, this record governs its security half.
 - [CLI account host](crates/grida-cli/src/host.rs) and
   [host tests](crates/grida-cli/src/host_tests.rs),
   [media composition](crates/grida-cli/src/runtime.rs) and
-  [composition tests](scripts/conformance/installed.mjs) — fixed native
+  [composition tests](scripts/cli-contracts/installed.mjs) — fixed native
   exchange into invocation-only GG authority, no BYOK reads on the GG path,
   and cleanup without credential output. Account custody remains GRIDA-SEC-010;
   CLI media egress and artifacts remain GRIDA-SEC-013.
@@ -2125,7 +2125,7 @@ current TypeScript SDK consumers and frozen custody fixtures retain the ongoing
 contracts without building or executing the retired CLI.
 The Node-preload proofs under `scripts/cli-local` and `scripts/cli-media-local`
 remain reference evidence; their preload guards do not constrain a Rust process.
-The [native installed proof](scripts/conformance/installed.mjs) exercises the
+The [native installed proof](scripts/cli-contracts/installed.mjs) exercises the
 current executable directly, while the real local-issuer proof below covers
 the independently provisioned OAuth service. Neither certifies hosted deployment.
 
@@ -2140,13 +2140,13 @@ the independently provisioned OAuth service. Neither certifies hosted deployment
   [crates/grida-auth/src/conformance.rs](crates/grida-auth/src/conformance.rs),
   [crates/grida-cli/src/account_tests.rs](crates/grida-cli/src/account_tests.rs),
   [crates/grida-cli/src/http_tests.rs](crates/grida-cli/src/http_tests.rs),
-  [scripts/conformance/auth-driver.mjs](scripts/conformance/auth-driver.mjs),
-  [scripts/conformance/auth-keyring.test.mjs](scripts/conformance/auth-keyring.test.mjs),
-  [scripts/conformance/auth-macos.mjs](scripts/conformance/auth-macos.mjs),
-  [scripts/conformance/auth-macos.test.mjs](scripts/conformance/auth-macos.test.mjs),
-  [scripts/conformance/auth-linux.sh](scripts/conformance/auth-linux.sh),
-  [scripts/conformance/auth-process.test.mjs](scripts/conformance/auth-process.test.mjs),
-  [scripts/conformance/cli.mjs](scripts/conformance/cli.mjs).
+  [scripts/cli-contracts/auth-driver.mjs](scripts/cli-contracts/auth-driver.mjs),
+  [scripts/cli-contracts/auth-keyring.test.mjs](scripts/cli-contracts/auth-keyring.test.mjs),
+  [scripts/cli-contracts/auth-macos.mjs](scripts/cli-contracts/auth-macos.mjs),
+  [scripts/cli-contracts/auth-macos.test.mjs](scripts/cli-contracts/auth-macos.test.mjs),
+  [scripts/cli-contracts/auth-linux.sh](scripts/cli-contracts/auth-linux.sh),
+  [scripts/cli-contracts/auth-process.test.mjs](scripts/cli-contracts/auth-process.test.mjs),
+  [scripts/cli-contracts/cli.mjs](scripts/cli-contracts/cli.mjs).
   The frozen [account-v1 contract](packages/grida-auth/fixtures/account-v1/README.md)
   and [custody bytes](packages/grida-auth/fixtures/account-v1/custody.json) check
   historical profile binding, file/keyring envelopes and logout tombstones
@@ -2185,7 +2185,7 @@ the independently provisioned OAuth service. Neither certifies hosted deployment
   [safe failure types](crates/grida-cli/src/lib.rs),
   [process entry](crates/grida-cli/src/main.rs) and
   [output](crates/grida-cli/src/output.rs) — offline parsing and safe errors,
-  checked by adjacent Rust tests and [shared cases](scripts/conformance/cases.json).
+  checked by adjacent Rust tests and [shared cases](scripts/cli-contracts/cases.json).
   [Native host](crates/grida-cli/src/host.rs), [account composition](crates/grida-cli/src/account.rs),
   [command runtime](crates/grida-cli/src/runtime.rs), [safe domain errors](crates/grida-cli/src/error.rs)
   and [HTTP](crates/grida-cli/src/http.rs) enforce the same shipped/local registration and fixed account routes.
@@ -2265,10 +2265,10 @@ the independently provisioned OAuth service. Neither certifies hosted deployment
   [CLI host](crates/grida-cli/src/host.rs) and
   [host tests](crates/grida-cli/src/host_tests.rs),
   [command lifecycle](crates/grida-cli/src/runtime.rs) and
-  [lifecycle tests](scripts/conformance/installed.mjs),
+  [lifecycle tests](scripts/cli-contracts/installed.mjs),
   [process entry](crates/grida-cli/src/main.rs),
   [grammar](crates/grida-cli/src/grammar.rs) and
-  [grammar tests](scripts/conformance/cases.json),
+  [grammar tests](scripts/cli-contracts/cases.json),
   [output](crates/grida-cli/src/output.rs) and
   [output tests](crates/grida-cli/src/output.rs) — fixed operations,
   independent custody, explicit browser launch, and safe presentation.
@@ -2707,8 +2707,8 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
   [safe failure types](crates/grida-cli/src/lib.rs),
   [entry](crates/grida-cli/src/main.rs) and
   [output](crates/grida-cli/src/output.rs) — syntax and output gates
-  before host work. The [conformance runner](scripts/conformance/cli.mjs),
-  [golden cases](scripts/conformance/cases.json) and
+  before host work. The [conformance runner](scripts/cli-contracts/cli.mjs),
+  [golden cases](scripts/cli-contracts/cases.json) and
   [native parser driver](crates/grida-cli/src/bin/conformance.rs) exercise these gates
   with isolated homes, explicit child environments and mutation assertions.
   The retired Node preload guard constrained only the former TypeScript CLI;
@@ -2729,13 +2729,13 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
   [tests](crates/grida-cli/src/credentials.rs) — scoped process
   inputs, safe presence metadata and invocation cleanup.
 - [Provider registration](crates/grida-cli/src/runtime.rs) and
-  [storage adoption tests](scripts/conformance/installed.mjs) —
+  [storage adoption tests](scripts/cli-contracts/installed.mjs) —
   one explicit supported check before custody, with no overwrite on failure.
   The [shared provider policy](packages/grida-ai/src/provider-credentials.ts) and
   [producer tests](packages/grida-ai/src/provider-credentials.test.ts) retain
   GRIDA-SEC-004; shared custody retains GRIDA-SEC-014.
 - [Media composition](crates/grida-cli/src/runtime.rs) and
-  [tests](scripts/conformance/installed.mjs) — public SDK parsing,
+  [tests](scripts/cli-contracts/installed.mjs) — public SDK parsing,
   preflight, authority selection and safe completion; also GRIDA-SEC-006.
 - [Media transport](crates/grida-cli/src/http.rs) and
   [tests](crates/grida-cli/src/http_tests.rs) — fixed credential routes,
@@ -2746,7 +2746,7 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
   [tests](crates/grida-cli/src/files.rs) — explicit input, publication
   preflight, no overwrite and partial-save reporting.
 - [Request input assembly](crates/grida-cli/src/input.rs) and
-  [tests](scripts/conformance/cases.json) — explicit file flags,
+  [tests](scripts/cli-contracts/cases.json) — explicit file flags,
   schema-typed scalar input, bounded encoding, advertised variant selection,
   human inspection and the shared SDK validation boundary.
 - [Output projection](crates/grida-cli/src/output.rs) and
@@ -2771,7 +2771,7 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
 
 The CLI rigging entry and its boundary tests are
 [command runtime](crates/grida-cli/src/runtime.rs) and
-[installed acceptance proof](scripts/conformance/installed.mjs).
+[installed acceptance proof](scripts/cli-contracts/installed.mjs).
 They consume the neutral rigging SDK with explicit CLI file grants and a chosen
 BYOK or GG funding source. GG requires explicit organization selection and the
 existing native account exchange into invocation-only scoped authority; it never
@@ -2907,8 +2907,8 @@ platform evidence, not Windows or cross-platform release certification.
   [crates/grida-auth/src/credential_lock.rs](crates/grida-auth/src/credential_lock.rs),
   [crates/grida-auth/tests/process.rs](crates/grida-auth/tests/process.rs),
   [crates/grida-auth/tests/providers.rs](crates/grida-auth/tests/providers.rs),
-  [scripts/conformance/auth-driver.mjs](scripts/conformance/auth-driver.mjs),
-  [scripts/conformance/auth-process.test.mjs](scripts/conformance/auth-process.test.mjs).
+  [scripts/cli-contracts/auth-driver.mjs](scripts/cli-contracts/auth-driver.mjs),
+  [scripts/cli-contracts/auth-process.test.mjs](scripts/cli-contracts/auth-process.test.mjs).
   These preserve this boundary. Rust conformance adapters, where present, are
   feature-gated and excluded from the distributed executable.
 
@@ -2954,8 +2954,8 @@ platform evidence, not Windows or cross-platform release certification.
   [native home adapter](crates/grida-cli/src/host.rs),
   [invocation owner](crates/grida-cli/src/credentials.rs),
   [hidden input](crates/grida-cli/src/credentials.rs),
-  [hidden-input tests](scripts/conformance/installed.mjs), and
-  [shared-store adoption tests](scripts/conformance/installed.mjs).
+  [hidden-input tests](scripts/cli-contracts/installed.mjs), and
+  [shared-store adoption tests](scripts/cli-contracts/installed.mjs).
   Grammar, dispatch, media composition and installed proof retain GRIDA-SEC-013.
   [Shared static/probe policy](packages/grida-ai/src/provider-credentials.ts),
   [producer tests](packages/grida-ai/src/provider-credentials.test.ts), and the
@@ -3053,10 +3053,10 @@ incident investigations out of the architectural guarantee.
   acquire a scoped GG grant for the selected organization, independently of provider custody.
   Account transport and media transport are distinct capabilities; no account token enters media execution.
 - [CLI media composition](crates/grida-cli/src/runtime.rs) and
-  [tests](scripts/conformance/installed.mjs) — real SDK handoff, BYOK/account
+  [tests](scripts/cli-contracts/installed.mjs) — real SDK handoff, BYOK/account
   independence, missing-key failure, no stale grant reuse or credential output.
 - [CLI rigging composition](crates/grida-cli/src/runtime.rs) and
-  [tests](scripts/conformance/installed.mjs) — eligibility and rigging
+  [tests](scripts/cli-contracts/installed.mjs) — eligibility and rigging
   use the same explicit-organization scoped handoff, never account tokens as
   provider credentials; also GRIDA-SEC-006/013.
 - [Native bearer verifier](editor/lib/auth/bearer.ts) and

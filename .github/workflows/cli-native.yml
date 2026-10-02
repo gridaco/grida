@@ -112,13 +112,13 @@ jobs:
       - name: Prove installed native OAuth, account and media over owned local HTTP
         if: matrix.os != 'win32' && matrix.libc != 'musl'
         shell: bash
-        run: node scripts/conformance/installed.mjs --candidate "$RUNNER_TEMP/grida-native-candidate"
+        run: node scripts/cli-contracts/installed.mjs --candidate "$RUNNER_TEMP/grida-native-candidate"
       - name: Prove the bundled package selects and executes musl on Alpine
         if: matrix.libc == 'musl'
         shell: bash
         run: |
           docker run --rm --network none --user "$(id -u):$(id -g)" -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/grida-native-candidate:/candidate" -w /repo node:24-alpine node scripts/cli-release/native-proof.mjs --out /candidate
-          docker run --rm --network none --user "$(id -u):$(id -g)" -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/grida-native-candidate:/candidate" -w /repo node:24-alpine node scripts/conformance/installed.mjs --candidate /candidate
+          docker run --rm --network none --user "$(id -u):$(id -g)" -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/grida-native-candidate:/candidate" -w /repo node:24-alpine node scripts/cli-contracts/installed.mjs --candidate /candidate
       - uses: actions/upload-artifact@v4
         with:
           name: grida-native-installed-${{ matrix.id }}

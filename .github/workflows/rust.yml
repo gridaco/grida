@@ -11,7 +11,7 @@ on:
       - "rust-toolchain.toml"
       - ".cargo/**"
       - "crates/**"
-      - "scripts/conformance/**"
+      - "scripts/cli-contracts/**"
       - "scripts/cli-local/network.cjs"
       - "packages/grida-cli/**"
       - "packages/grida-auth/**"
@@ -34,7 +34,7 @@ on:
       - "rust-toolchain.toml"
       - ".cargo/**"
       - "crates/**"
-      - "scripts/conformance/**"
+      - "scripts/cli-contracts/**"
       - "scripts/cli-local/network.cjs"
       - "packages/grida-cli/**"
       - "packages/grida-auth/**"
@@ -109,5 +109,5 @@ jobs:
           GRIDA_AUTH_MACOS_CI: ${{ runner.os == 'macOS' && '1' || '0' }}
           GRIDA_CLI_DOCS_SUDO_NETWORK: ${{ runner.os == 'Linux' && '1' || '0' }}
         run: |
-          node --test scripts/conformance/cli.test.mjs scripts/conformance/catalogue-request.test.mjs
-          node scripts/conformance/run.mjs
+          node --test scripts/cli-contracts/cli.test.mjs scripts/cli-contracts/catalogue-request.test.mjs
+          node scripts/cli-contracts/run.mjs
