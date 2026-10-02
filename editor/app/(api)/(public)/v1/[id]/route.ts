@@ -157,6 +157,20 @@ export async function GET(
     response.error = e as FormClientFetchResponseError;
   }
 
+  // A supplied session must already belong to this form. Never upsert caller
+  // IDs: doing so can reassign a foreign session and its verified identity.
+  const existingSession = system_keys.__gf_session
+    ? await service_role.forms
+        .from("response_session")
+        .select("*")
+        .eq("id", system_keys.__gf_session)
+        .eq("form_id", id)
+        .single()
+    : null;
+  if (existingSession && (existingSession.error || !existingSession.data)) {
+    return NextResponse.json({ error: "session not found" }, { status: 404 });
+  }
+
   // TODO: strict with permissions
   const { data, error } = await service_role.forms
     .from("form")
@@ -262,20 +276,18 @@ export async function GET(
   // ==================================================
   // session
   // ==================================================
-  const { data: session, error: session_error } = await service_role.forms
-    .from("response_session")
-    .upsert(
-      {
-        id: system_keys.__gf_session ?? undefined,
+  const { data: session, error: session_error } =
+    existingSession ??
+    (await service_role.forms
+      .from("response_session")
+      .insert({
         form_id: id,
         // IMPORTANT: never overwrite an existing session.customer_id with null.
         // customer_id is a sticky binding set by trusted verification flows.
         customer_id: customer?.uid ?? undefined,
-      },
-      { onConflict: "id" }
-    )
-    .select()
-    .single();
+      })
+      .select()
+      .single());
 
   if (session_error || !session) {
     console.error("error while creating session", session_error);

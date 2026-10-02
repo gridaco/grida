@@ -3,11 +3,11 @@ import { toArrayOf } from "@/types/utility";
 import { Env } from "@/env";
 import { resend } from "@/clients/resend";
 import EmailTemplate from "@/theme/templates-email/formcomplete/default";
+import { FormCompletionAuth } from "@/services/form/completion-auth";
 
 // In hosted env, avoid calling the deployment domain (`*.vercel.app`) since it
 // can be protected upstream (401) even when our app routes would allow it.
 const HOOK_BASE_URL = Env.server.IS_HOSTED ? Env.web.HOST : Env.server.HOST;
-const GRIDA_S2S_PRIVATE_API_KEY = process.env.GRIDA_S2S_PRIVATE_API_KEY ?? null;
 
 const bird = new Bird(
   process.env.BIRD_WORKSPACE_ID as string,
@@ -18,6 +18,18 @@ const bird = new Bird(
 );
 
 export namespace OnSubmit {
+  async function invoke(path: string, body: unknown) {
+    const response = await fetch(`${HOOK_BASE_URL}${path}`, {
+      headers: FormCompletionAuth.headers(),
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000),
+      redirect: "error",
+    });
+    if (!response.ok)
+      throw new Error(`Forms completion failed (${response.status})`);
+    return response;
+  }
   export async function clearsession({
     form_id,
     response_id,
@@ -27,15 +39,9 @@ export namespace OnSubmit {
     response_id: string;
     session_id: string;
   }) {
-    return fetch(`${HOOK_BASE_URL}/v1/submit/${form_id}/hooks/clearsession`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-      body: JSON.stringify({
-        response_id,
-        session_id,
-      }),
+    return invoke(`/v1/submit/${form_id}/hooks/clearsession`, {
+      response_id,
+      session_id,
     });
   }
 
@@ -46,14 +52,8 @@ export namespace OnSubmit {
     form_id: string;
     response_id: string;
   }) {
-    return fetch(`${HOOK_BASE_URL}/v1/submit/${form_id}/hooks/postindexing`, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-      body: JSON.stringify({
-        response_id,
-      }),
+    return invoke(`/v1/submit/${form_id}/hooks/postindexing`, {
+      response_id,
     });
   }
 
@@ -64,21 +64,9 @@ export namespace OnSubmit {
     form_id: string;
     response_id: string;
   }) {
-    return fetch(
-      `${HOOK_BASE_URL}/v1/submit/${form_id}/hooks/notification-respondent-email`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          ...(GRIDA_S2S_PRIVATE_API_KEY
-            ? { "x-grida-s2s-key": GRIDA_S2S_PRIVATE_API_KEY }
-            : {}),
-        },
-        method: "POST",
-        body: JSON.stringify({
-          response_id,
-        }),
-      }
-    );
+    return invoke(`/v1/submit/${form_id}/hooks/notification-respondent-email`, {
+      response_id,
+    });
   }
 }
 

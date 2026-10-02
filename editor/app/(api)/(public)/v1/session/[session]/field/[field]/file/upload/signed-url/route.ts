@@ -5,7 +5,6 @@ import type {
   FormsApiResponse,
   SessionSignedUploadUrlData,
 } from "@/types/private/api";
-import assert from "assert";
 import { NextRequest, NextResponse } from "next/server";
 
 type Params = { session: string; field: string };
@@ -18,9 +17,16 @@ export async function POST(
 ) {
   const { session: session_id, field: field_id } = await context.params;
 
-  const body = (await req.json()) as CreateSessionSignedUploadUrlRequest;
-
-  const { file } = body;
+  const body = (await req
+    .json()
+    .catch(() => null)) as CreateSessionSignedUploadUrlRequest | null;
+  const file = body?.file;
+  if (!file || typeof file.name !== "string" || !file.name) {
+    return NextResponse.json(
+      { error: "file name is required" },
+      { status: 400 }
+    );
+  }
 
   // TODO: validate if anonymous user is owner of this session
   // TODO: validate if session is open
@@ -34,14 +40,14 @@ export async function POST(
     .single();
 
   if (error || !data) {
-    throw error;
+    return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
   const { form } = data;
-  assert(form, "form not found");
+  if (!form) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const field = form.fields.find((field) => field.id === field_id);
-  assert(field, "form not found");
+  if (!field) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const { data: signeduploadurldata, error: signerr } =
     await SessionStorageServices.createSignedUploadUrl({
@@ -52,6 +58,12 @@ export async function POST(
       config: {},
     });
 
+  if (signerr) {
+    return NextResponse.json(
+      { error: "unable to sign upload" },
+      { status: 500 }
+    );
+  }
   return NextResponse.json(<FormsApiResponse<SessionSignedUploadUrlData>>{
     data: signeduploadurldata,
     error: signerr,
@@ -66,9 +78,16 @@ export async function PUT(
 ) {
   const { session: session_id, field: field_id } = await context.params;
 
-  const body = (await req.json()) as CreateSessionSignedUploadUrlRequest;
-
-  const { file } = body;
+  const body = (await req
+    .json()
+    .catch(() => null)) as CreateSessionSignedUploadUrlRequest | null;
+  const file = body?.file;
+  if (!file || typeof file.name !== "string" || !file.name) {
+    return NextResponse.json(
+      { error: "file name is required" },
+      { status: 400 }
+    );
+  }
 
   // TODO: validate if anonymous user is owner of this session
   // TODO: validate if session is open
@@ -82,14 +101,14 @@ export async function PUT(
     .single();
 
   if (error || !data) {
-    throw error;
+    return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
   const { form } = data;
-  assert(form, "form not found");
+  if (!form) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const field = form.fields.find((field) => field.id === field_id);
-  assert(field, "form not found");
+  if (!field) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const { data: signeduploadurldata, error: signerr } =
     await SessionStorageServices.createSignedUploadUrl({

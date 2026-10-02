@@ -187,6 +187,57 @@ async function submit({
     default_page,
   } = form_reference;
 
+  // A scalar must have one meaning for get(), raw persistence, and a connected
+  // database insert. Repeated identical values are harmless; conflicting ones
+  // must be rejected before any customer, inventory, or response writes.
+  const submitted = new Map<string, FormDataEntryValue[]>();
+  for (const [name, value] of formdata.entries()) {
+    submitted.set(name, [...(submitted.get(name) ?? []), value]);
+  }
+  for (const [name, values] of submitted) {
+    const field = fields.find((field) => field.name === name);
+    const acceptsMany =
+      field &&
+      (FieldSupports.file_alias(field.type) ||
+        (FieldSupports.multiple(field.type) && field.multiple));
+    if (!acceptsMany && values.some((value) => value !== values[0])) {
+      return error(400, { form_id }, meta);
+    }
+  }
+
+  // Staging paths are capabilities scoped to both the session and the field.
+  // Check before persistence, rather than discovering a mismatch after saving
+  // the response and silently dropping its files.
+  for (const field of fields) {
+    if (!FieldSupports.file_upload(field.type)) continue;
+    const values = submitted.get(field.name) ?? [];
+    for (const value of values) {
+      if (typeof value !== "string" || !value) continue;
+      const paths = FieldSupports.richtext(field.type)
+        ? RichTextStagedFileUtils.parseDocument(value).staged_file_paths
+        : value.split(",");
+      for (const path of paths) {
+        const storage = field.storage as FormFieldStorageSchema | null;
+        if (storage?.type === "x-supabase" && storage.mode === "direct") {
+          if (path !== storage.path) return error(400, { form_id }, meta);
+          continue;
+        }
+        try {
+          const staged = parse_tmp_storage_object_path(path);
+          if (
+            !meta.session ||
+            staged.session_id !== meta.session ||
+            staged.field_id !== field.id
+          ) {
+            return error(400, { form_id }, meta);
+          }
+        } catch {
+          return error(400, { form_id }, meta);
+        }
+      }
+    }
+  }
+
   const {
     is_redirect_after_response_uri_enabled,
     redirect_after_response_uri,
@@ -226,7 +277,7 @@ async function submit({
   let session_customer_id: string | null = null;
   let verified_customer_id: string | null = null;
 
-  if (challenge_email_fields.length > 0 && meta.session) {
+  if (meta.session) {
     const { data: response_session, error: response_session_err } =
       await service_role.forms
         .from("response_session")
@@ -237,7 +288,7 @@ async function submit({
 
     if (response_session_err || !response_session) {
       console.error("submit/err/session", response_session_err);
-      return error(ERR.SERVICE_ERROR.code, { form_id }, meta);
+      return error(400, { form_id }, meta);
     }
 
     session_raw =
@@ -261,6 +312,19 @@ async function submit({
 
   const effective_session_customer_id =
     session_customer_id ?? verified_customer_id ?? null;
+
+  if (effective_session_customer_id) {
+    const { data: boundCustomer, error: customerError } =
+      await service_role.workspace
+        .from("customer")
+        .select("uid")
+        .eq("uid", effective_session_customer_id)
+        .eq("project_id", project_id)
+        .single();
+    if (customerError || !boundCustomer) {
+      return error(400, { form_id }, meta);
+    }
+  }
 
   const _gf_customer_uuid: string | null = qval(
     formdata.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string
@@ -308,7 +372,8 @@ async function submit({
       phone?: string;
       name?: string;
     } = { last_seen_at: new Date().toISOString() };
-    if (_gf_customer_email) patch.email = _gf_customer_email;
+    // An unverified submitted hint must not replace a bound customer's email
+    // while retaining that customer's verified-email flag.
     if (_gf_customer_phone) patch.phone = _gf_customer_phone;
     if (_gf_customer_name) patch.name = _gf_customer_name;
 
@@ -1101,34 +1166,37 @@ async function submit({
   // system hooks
   if (meta.session) {
     try {
-      OnSubmit.clearsession({
+      await OnSubmit.clearsession({
         form_id,
         response_id: response_reference_obj.id,
         session_id: meta.session,
       });
     } catch (e) {
       console.error("submit/err/hooks/clearsession", e);
+      return error(500, { form_id }, meta);
     }
   }
 
   try {
-    OnSubmit.postindexing({
+    await OnSubmit.postindexing({
       form_id,
       response_id: response_reference_obj.id,
     });
   } catch (e) {
     console.error("submit/err/hooks/postindexing", e);
+    return error(500, { form_id }, meta);
   }
 
-  // respondent email hook (best-effort)
-  // TODO: move to PGMQ/jobs for retryable delivery
+  // Completion failures are observable, but the response may already be saved.
+  // Callers must not automatically replay submission after an uncertain result.
   try {
-    OnSubmit.notification_respondent_email({
+    await OnSubmit.notification_respondent_email({
       form_id,
       response_id: response_reference_obj.id,
     });
   } catch (e) {
     console.error("submit/err/hooks/notification-respondent-email", e);
+    return error(500, { form_id }, meta);
   }
 
   // notification hooks are not ready yet
@@ -1398,6 +1466,7 @@ class ResponseFieldFilesProcessor {
               _p.session_id === session_id,
               `session_id mismatch. expected: ${session_id}, got: ${_p.session_id}`
             );
+            assert(_p.field_id === field_id, "staged file field mismatch");
 
             if (storage) {
               try {

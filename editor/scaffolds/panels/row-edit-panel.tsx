@@ -43,6 +43,7 @@ import {
   useRequestFormSession,
 } from "@/grida-forms-hosted/e/load";
 import { toast } from "sonner";
+import { createRow } from "./row-create";
 
 type ResponseRow = TVirtualRow<FormResponseField, FormResponse>;
 
@@ -89,24 +90,19 @@ export function RowEditPanel({
               )}
               <EditRowForm
                 onSubmit={(data) => {
-                  const promise = fetch(`/v1/submit/${table_id}`, {
-                    method: "POST",
-                    body: data,
-                  });
-
-                  toast.promise(promise, {
-                    loading: "Saving...",
-                    success: "Saved!",
-                    error: "Failed to save.",
-                  });
-
-                  promise.then(() => {
+                  const promise = createRow(table_id, data).then(() => {
                     props.onOpenChange?.(false);
 
                     // refresh data once saved
                     dispatch({
                       type: "data/query/refresh",
                     });
+                  });
+
+                  toast.promise(promise, {
+                    loading: "Saving...",
+                    success: "Saved!",
+                    error: "Failed to save.",
                   });
                 }}
               />

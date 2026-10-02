@@ -5,6 +5,7 @@ import assert from "assert";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import validator from "validator";
+import { FormCompletionAuth } from "@/services/form/completion-auth";
 
 type Params = { id: string };
 
@@ -14,6 +15,8 @@ export async function POST(
     params: Promise<Params>;
   }
 ) {
+  const denied = FormCompletionAuth.authorize(req);
+  if (denied) return denied;
   const { id: form_id } = await context.params;
   const { response_id } = await req.json();
 
@@ -37,14 +40,7 @@ export async function POST(
   // targets - provisional - email, phone
 
   if (!response.customer_id) {
-    return NextResponse.json(
-      {
-        message: "ok",
-      },
-      {
-        status: 204,
-      }
-    );
+    return new NextResponse(null, { status: 204 });
   }
 
   // Extract customer info based on form_field type

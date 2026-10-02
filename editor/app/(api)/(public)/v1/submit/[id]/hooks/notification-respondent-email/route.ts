@@ -5,6 +5,7 @@ import validator from "validator";
 import { service_role } from "@/lib/supabase/server";
 import { resend } from "@/clients/resend";
 import { renderRespondentEmail } from "@/services/form/respondent-email";
+import { FormCompletionAuth } from "@/services/form/completion-auth";
 
 type Params = { id: string };
 
@@ -14,27 +15,14 @@ type Params = { id: string };
  * This route uses `service_role` and can send emails, so it must not be
  * callable by arbitrary third-parties.
  */
-const GRIDA_S2S_PRIVATE_API_KEY = process.env.GRIDA_S2S_PRIVATE_API_KEY ?? null;
-
 export async function POST(
   req: NextRequest,
   context: {
     params: Promise<Params>;
   }
 ) {
-  const provided = req.headers.get("x-grida-s2s-key");
-  if (!GRIDA_S2S_PRIVATE_API_KEY) {
-    console.error(
-      "notification-respondent-email/err/misconfigured: GRIDA_S2S_PRIVATE_API_KEY missing"
-    );
-    return NextResponse.json({ ok: false }, { status: 500 });
-  }
-  if (!provided) {
-    return NextResponse.json({ ok: false }, { status: 401 });
-  }
-  if (provided !== GRIDA_S2S_PRIVATE_API_KEY) {
-    return NextResponse.json({ ok: false }, { status: 403 });
-  }
+  const denied = FormCompletionAuth.authorize(req);
+  if (denied) return denied;
 
   const { id: form_id } = await context.params;
   const { response_id } = await req.json();
@@ -131,7 +119,7 @@ export async function POST(
   const fromName = cfg.from_name?.trim() || "Grida Forms";
 
   try {
-    await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: `${fromName} <no-reply@accounts.grida.co>`,
       to: [to],
       subject,
@@ -142,6 +130,9 @@ export async function POST(
         { name: "form_id", value: form_id },
       ],
     });
+    if (error) {
+      return NextResponse.json({ ok: false }, { status: 502 });
+    }
   } catch (e) {
     console.error("notification-respondent-email/err/send", e);
     return NextResponse.json({ ok: false }, { status: 500 });

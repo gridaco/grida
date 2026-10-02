@@ -17,7 +17,17 @@ export async function getLocale<T extends string = string>(
     "accept-language": headersList.get("accept-language") || "",
   };
 
-  const languages = new Negotiator({ headers: _headers }).languages();
+  // Negotiator can return "*" for an absent/wildcard header, and accepts
+  // malformed tags that Intl rejects. Public API callers need a fallback too.
+  const languages = new Negotiator({ headers: _headers })
+    .languages()
+    .flatMap((language) => {
+      try {
+        return Intl.getCanonicalLocales(language);
+      } catch {
+        return [];
+      }
+    });
 
   const locale = match(languages, availableLocales, defaultLocale);
 

@@ -3,6 +3,7 @@ import assert from "assert";
 import { service_role } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { RawdataProcessing } from "@/grida-forms/lib/rawdata";
+import { FormCompletionAuth } from "@/services/form/completion-auth";
 
 type Params = { id: string };
 
@@ -12,6 +13,8 @@ export async function POST(
     params: Promise<Params>;
   }
 ) {
+  const denied = FormCompletionAuth.authorize(req);
+  if (denied) return denied;
   const { id: form_id } = await context.params;
   const { response_id, session_id } = await req.json();
 
@@ -35,18 +38,19 @@ export async function POST(
       .from("response")
       .select("raw, session_id")
       .eq("id", response_id)
+      .eq("form_id", form_id)
       .eq("session_id", session_id)
       .single();
 
   if (response_ref_err) console.error("clearsession/err", response_ref_err);
   if (!response_ref) {
-    return notFound();
+    return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
   // convert response raw data to session raw data
   // name:value -> id:value
 
-  await service_role.forms
+  const { data: updatedSession, error: updateError } = await service_role.forms
     .from("response_session")
     .update({
       raw: response_ref.raw
@@ -56,7 +60,13 @@ export async function POST(
           ) as Record<string, string>)
         : {},
     })
-    .eq("id", session_id);
+    .eq("id", session_id)
+    .eq("form_id", form_id)
+    .select("id")
+    .single();
+  if (updateError || !updatedSession) {
+    return NextResponse.json({ ok: false }, { status: 500 });
+  }
 
   // clear tmp files
   // TODO: disabling this since we now support x-supabase, this can be a possible attack point. for clearing tmp files, we can use a cron job.
