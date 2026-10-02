@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,6 +45,76 @@ export function releaseGuard(manifest, version, tag) {
   );
   assert(tag === "latest" || tag === "next");
   assert(tag !== "latest" || !match[4], "Prereleases cannot replace latest");
+}
+
+export async function selectReleaseEvent({
+  eventName,
+  event,
+  repository,
+  ref,
+  sha,
+  directory = root,
+}) {
+  assert.equal(repository, "gridaco/grida");
+  assert.equal(ref, "refs/heads/main");
+  assert.equal(event.repository?.full_name, repository);
+  assert(/^[a-f0-9]{40}$/i.test(sha ?? "") && !/^0+$/.test(sha));
+  const manifest = JSON.parse(
+    await readFile(
+      path.join(directory, "packages/grida-cli/package.json"),
+      "utf8"
+    )
+  );
+  if (eventName === "workflow_dispatch") {
+    const { version, tag } = event.inputs ?? {};
+    releaseGuard(manifest, version, tag);
+    return { publish: true, version, tag };
+  }
+  assert.equal(
+    eventName,
+    "push",
+    "Only main pushes and manual releases are accepted"
+  );
+  assert.equal(event.ref, ref);
+  assert.equal(
+    event.after,
+    sha,
+    "Push target differs from the workflow revision"
+  );
+  assert(
+    /^[a-f0-9]{40}$/i.test(event.before ?? "") && !/^0+$/.test(event.before),
+    "Push must identify its previous main revision"
+  );
+  const version = manifest.version;
+  const tag =
+    typeof version === "string" && version.includes("-") ? "next" : "latest";
+  releaseGuard(manifest, version, tag);
+  let previous;
+  try {
+    previous = JSON.parse(
+      (
+        await exec(
+          "git",
+          ["show", `${event.before}:packages/grida-cli/package.json`],
+          {
+            cwd: directory,
+            timeout: 10_000,
+            maxBuffer: 1024 * 1024,
+          }
+        )
+      ).stdout
+    );
+  } catch {
+    assert.fail("Cannot read the CLI manifest at the previous main revision");
+  }
+  assert.equal(previous.name, "grida");
+  assert.equal(
+    typeof previous.version,
+    "string",
+    "Previous CLI version is missing"
+  );
+  assert(previous.version.length > 0, "Previous CLI version is missing");
+  return { publish: previous.version !== version, version, tag };
 }
 
 export async function verifyInstalledMatrix(out, report) {
@@ -180,8 +250,34 @@ async function main() {
       tag: { type: "string" },
       "check-only": { type: "boolean" },
       "dry-run": { type: "boolean" },
+      "github-event": { type: "boolean" },
     },
   });
+  if (values["github-event"]) {
+    assert.equal(
+      Object.keys(values).length,
+      1,
+      "GitHub event selection cannot be mixed with publication arguments"
+    );
+    assert(process.env.GITHUB_EVENT_PATH && process.env.GITHUB_OUTPUT);
+    const selection = await selectReleaseEvent({
+      eventName: process.env.GITHUB_EVENT_NAME,
+      event: JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, "utf8")),
+      repository: process.env.GITHUB_REPOSITORY,
+      ref: process.env.GITHUB_REF,
+      sha: process.env.GITHUB_SHA,
+    });
+    await appendFile(
+      process.env.GITHUB_OUTPUT,
+      `publish=${selection.publish}\nversion=${selection.version}\ntag=${selection.tag}\n`
+    );
+    process.stdout.write(
+      selection.publish
+        ? `Selected grida@${selection.version} for ${selection.tag}.\n`
+        : `CLI version ${selection.version} is unchanged; publication skipped.\n`
+    );
+    return;
+  }
   const manifest = JSON.parse(
     await readFile(path.join(root, "packages/grida-cli/package.json"), "utf8")
   );

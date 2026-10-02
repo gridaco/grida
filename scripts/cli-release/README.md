@@ -128,34 +128,46 @@ configuration and hosted verification. Green CI does not deploy that configurati
 activate Supabase registration or publish the documentation site. Verify those
 separately before authorizing publication.
 
-[`cli-release.yml`](../../.github/workflows/cli-release.yml) is manual and main-only.
-It verifies the reviewed non-placeholder source version and native cutover marker,
-runs the delivery/docs/auth/API workflows, and downloads the exact verified
+[`cli-release.yml`](../../.github/workflows/cli-release.yml) starts automatically
+when a push to `main` changes the version in `packages/grida-cli/package.json`.
+Stable versions publish under `latest`; prereleases publish under `next`.
+Manifest edits that leave the version unchanged skip release work. The guard
+compares against the push event's previous commit, including multi-commit merges,
+and refuses missing comparison history. Keep the npm manifest, CLI crate version,
+lockfile and generated notices aligned when preparing a version bump.
+
+Manual dispatch remains available from `main`, with an exact source version and
+explicit tag. Both triggers verify the non-placeholder version and native cutover marker,
+run the delivery/docs/auth/API workflows, and download the exact verified
 candidate and all eight installed reports. The publish job does not rebuild.
 `native-publish.mjs --dry-run --out /absolute/candidate --version VERSION --tag next`
 checks hashes and proofs, then prints the single publication record without contacting npm.
 
 Publication requires `CLI_NPM_RELEASE_ENABLED=true`, the `npm-publish` GitHub
-environment and its reviewer/branch protections, and npm Trusted Publishing
+environment and its branch protections, and npm Trusted Publishing
 through GitHub Actions OIDC. The trusted publisher for `grida` must authorize
 repository `gridaco/grida`, workflow `cli-release.yml`, environment `npm-publish`,
 and direct publication, not only staged publication. Keep the workflow filename
 stable on the default branch. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 and [provenance](https://docs.npmjs.com/generating-provenance-statements/).
 Do not configure `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or a token fallback.
+If the environment has required reviewers, the automatic run waits for their
+approval before publishing. Unattended publication requires a maintainer to
+deliberately remove that approval requirement in the GitHub environment settings;
+the workflow does not change environment protections.
 
 `0.3.0-rc.1` was published using separate platform packages. Those immutable
 versions remain historical releases; `0.3.0-rc.2` introduces the bundled layout.
 No new `@grida/cli-*` versions or publisher setup are required for bundled releases.
-The stable `latest` tag remains on `0.2.0` until a separately approved stable
-release. Verify existing registry versions, tags and trusted-publisher authority
-before dispatching a release.
+The stable `latest` tag changes only after a successful stable publication.
+Verify existing registry versions, tags and trusted-publisher authority before
+merging a release version bump or dispatching a release.
 
 The current workflow and publisher both enforce `main`, including releases under
 `next`. A PR can build and install the complete candidate matrix but cannot
-publish it through this path. Registry acceptance therefore follows merge unless
-a separately reviewed release path is introduced. Publish a new prerelease to
-`next`, test its exact registry version, and then prepare the stable release.
+publish it through this path. Registry acceptance therefore follows merge.
+For a prerelease qualification cycle, merge a new prerelease version, test its
+exact registry version under `next`, and then prepare the stable version bump.
 Changing the version or executable requires fresh candidate proofs; a prerelease
 proof does not certify different stable bytes.
 

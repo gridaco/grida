@@ -1,6 +1,6 @@
 {
   "name": "grida",
-  "version": "0.3.0-rc.2",
+  "version": "0.3.0",
   "private": false,
   "description": "The Grida command line: account access and tools, independent of Desktop.",
   "homepage": "https://grida.co/docs/cli",

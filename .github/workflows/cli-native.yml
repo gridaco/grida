@@ -74,7 +74,7 @@ jobs:
         env:
           GRIDA_NATIVE_TEST_BINARY: ${{ runner.temp }}/grida-native-artifacts/x86_64-unknown-linux-gnu/grida
         run: |
-          node --test scripts/cli-release/native.test.mjs
+          node --test scripts/cli-release/native.test.mjs scripts/cli-release/native-release.test.mjs
           node scripts/cli-release/native.mjs --artifacts "$RUNNER_TEMP/grida-native-artifacts" --out "$RUNNER_TEMP/grida-native-candidate"
           node scripts/cli-release/native.mjs --verify --out "$RUNNER_TEMP/grida-native-candidate"
           node scripts/cli-release/native-proof.mjs --out "$RUNNER_TEMP/grida-native-candidate"

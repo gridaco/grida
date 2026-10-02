@@ -8769,7 +8769,7 @@ DEALINGS IN THE SOFTWARE.
 
 
 ========================================================================
-Apache-2.0: async-trait@0.1.92, aws-lc-sys@0.45.0, document-features@0.2.12, dunce@1.0.5, grida-ai@0.1.0, grida-auth@0.1.0, grida-cli@0.3.0-rc.2, itoa@1.0.18, libc@0.2.189, litrs@1.0.0, num-conv@0.2.2, pin-project-lite@0.2.17, proc-macro2@1.0.107, quote@1.0.47, rand@0.8.8, semver@1.0.28, serde@1.0.229, serde_core@1.0.229, serde_derive@1.0.229, serde_json@1.0.151, serde_path_to_error@0.1.20, serde_repr@0.1.21, shlex@2.0.1, syn@2.0.119, syn@3.0.6, thiserror-impl@1.0.69, thiserror@1.0.69, time-core@0.1.9, time@0.3.55, unicode-ident@1.0.26
+Apache-2.0: async-trait@0.1.92, aws-lc-sys@0.45.0, document-features@0.2.12, dunce@1.0.5, grida-ai@0.1.0, grida-auth@0.1.0, grida-cli@0.3.0, itoa@1.0.18, libc@0.2.189, litrs@1.0.0, num-conv@0.2.2, pin-project-lite@0.2.17, proc-macro2@1.0.107, quote@1.0.47, rand@0.8.8, semver@1.0.28, serde@1.0.229, serde_core@1.0.229, serde_derive@1.0.229, serde_json@1.0.151, serde_path_to_error@0.1.20, serde_repr@0.1.21, shlex@2.0.1, syn@2.0.119, syn@3.0.6, thiserror-impl@1.0.69, thiserror@1.0.69, time-core@0.1.9, time@0.3.55, unicode-ident@1.0.26
 Upstream notice: document-features@0.2.12/LICENSE-APACHE
 ========================================================================
 Apache License

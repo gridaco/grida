@@ -1,6 +1,9 @@
 name: Release CLI
 
 on:
+  push:
+    branches: [main]
+    paths: [packages/grida-cli/package.json]
   workflow_dispatch:
     inputs:
       version:
@@ -24,26 +27,28 @@ concurrency:
 jobs:
   guard:
     runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.release.outputs.publish }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-      - name: Require main and an explicitly publishable, reviewed version
-        env:
-          CLI_VERSION: ${{ inputs.version }}
-          CLI_TAG: ${{ inputs.tag }}
-        run: |
-          test "$GITHUB_REPOSITORY" = gridaco/grida
-          test "$GITHUB_REF" = refs/heads/main
-          node scripts/cli-release/native-publish.mjs --check-only --version "$CLI_VERSION" --tag "$CLI_TAG"
+      - name: Select a main-branch version change or explicit release
+        id: release
+        run: node scripts/cli-release/native-publish.mjs --github-event
   package:
     needs: guard
+    if: needs.guard.outputs.publish == 'true'
     uses: ./.github/workflows/cli-native.yml
   conformance:
     needs: guard
+    if: needs.guard.outputs.publish == 'true'
     uses: ./.github/workflows/rust.yml
   docs:
     needs: package
@@ -57,9 +62,11 @@ jobs:
       native_candidate_artifact: grida-native-candidate
   api:
     needs: guard
+    if: needs.guard.outputs.publish == 'true'
     uses: ./.github/workflows/api.yml
   publish:
-    needs: [package, conformance, docs, auth, api]
+    needs: [guard, package, conformance, docs, auth, api]
+    if: needs.guard.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: npm-publish
@@ -88,8 +95,8 @@ jobs:
           path: ${{ runner.temp }}/grida-native-candidate
       - name: Verify and publish the exact tested grida archive through npm OIDC
         env:
-          CLI_VERSION: ${{ inputs.version }}
-          CLI_TAG: ${{ inputs.tag }}
+          CLI_VERSION: ${{ needs.guard.outputs.version }}
+          CLI_TAG: ${{ needs.guard.outputs.tag }}
           CLI_NPM_RELEASE_ENABLED: ${{ vars.CLI_NPM_RELEASE_ENABLED }}
         run: |
           node scripts/cli-release/native-publish.mjs --dry-run --out "$RUNNER_TEMP/grida-native-candidate" --version "$CLI_VERSION" --tag "$CLI_TAG"
