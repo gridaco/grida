@@ -46,9 +46,10 @@ BEGIN
         RAISE EXCEPTION 'OTP recipient cooldown' USING ERRCODE = 'PT429';
     END IF;
 
+    -- Rows predating the normalization trigger may retain mixed-case email text.
     SELECT c.uid INTO v_customer_uid
     FROM public.customer c
-    WHERE c.project_id = p_project_id AND c.email = v_email
+    WHERE c.project_id = p_project_id AND lower(btrim(c.email)) = v_email
     ORDER BY c.uid LIMIT 1;
 
     v_salt := extensions.gen_random_bytes(16);

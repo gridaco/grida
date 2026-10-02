@@ -1,7 +1,7 @@
 -- OTP counters survive denials; Forms success is one transaction. Fixtures use
 -- the seeded local/acme projects and are entirely rolled back.
 BEGIN;
-SELECT plan(79);
+SELECT plan(84);
 
 CREATE TEMP TABLE otp_rpc (signature text PRIMARY KEY);
 INSERT INTO otp_rpc VALUES
@@ -82,6 +82,23 @@ SELECT pg_temp.otp_case(label, label = 'nonidentity') FROM unnest(ARRAY[
   'foreignproject', 'emailmismatch', 'formwrong', 'formnull', 'nonidentity', 'rollback'
 ]) label;
 
+-- The 20250316110737 migration cast existing text emails to the citext-based
+-- domain before installing the normalization trigger; it did not lowercase old
+-- rows. Reproduce that valid historical state without weakening the domain.
+-- Disable only this trigger during transactional setup, then restore it before
+-- calling either RPC. Same-email customers in both seed projects prove scope.
+CREATE TEMP TABLE otp_legacy AS
+SELECT tenant, project_id, gen_random_uuid() AS customer_uid, NULL::uuid AS challenge_id
+FROM otp_forms;
+GRANT SELECT, UPDATE ON otp_legacy TO service_role;
+ALTER TABLE public.customer DISABLE TRIGGER normalize_customer_email;
+INSERT INTO public.customer (uid, project_id, email, is_email_verified)
+SELECT customer_uid, project_id, 'Legacy.MixedCase@example.com', false FROM otp_legacy;
+ALTER TABLE public.customer ENABLE TRIGGER normalize_customer_email;
+SELECT is((SELECT count(*) FROM public.customer c JOIN otp_legacy l ON c.uid = l.customer_uid
+  WHERE c.email::text = 'Legacy.MixedCase@example.com'), 2::bigint,
+  'legacy fixtures preserve mixed-case stored text in both projects');
+
 -- Denied calls have real, valid arguments. Grants—not missing fixtures—deny them.
 CREATE TEMP TABLE otp_calls (sql text);
 INSERT INTO otp_calls
@@ -110,9 +127,21 @@ SET LOCAL ROLE authenticated;
 SELECT throws_ok(sql, '42501', NULL, 'nonmember cannot invoke privileged OTP RPC') FROM otp_calls;
 RESET ROLE;
 
+-- Both issuer and verifier use the real service role and historical data.
+SET LOCAL ROLE service_role;
+UPDATE otp_legacy SET challenge_id = grida_ciam_public.create_customer_otp_challenge(
+  project_id, ' legacy.mixedcase@example.com ', '123456', 600);
+SELECT is((SELECT customer_uid FROM grida_ciam.customer_otp_challenge WHERE id = l.challenge_id),
+  l.customer_uid, 'normalized issuance finds the legacy customer in ' || l.tenant)
+FROM otp_legacy l ORDER BY l.tenant;
+SELECT is((SELECT jsonb_build_object('customer_uid', customer_uid, 'project_id', project_id)
+  FROM grida_ciam_public.verify_customer_otp_and_create_session(l.challenge_id, '123456', 0)),
+  jsonb_build_object('customer_uid', l.customer_uid, 'project_id', l.project_id),
+  'correct OTP verifies the original legacy customer and project in ' || l.tenant)
+FROM otp_legacy l ORDER BY l.tenant;
+
 -- Complete wrong-code calls normally. No exception wrapper may
 -- hide the rollback bug that motivated this regression.
-SET LOCAL ROLE service_role;
 SELECT is((SELECT count(*) FROM grida_ciam_public.verify_customer_otp_and_create_session(
   (SELECT challenge_id FROM otp_cases WHERE label = 'attempts'), lpad(n::text, 6, '0'), 0)), 0::bigint,
   'wrong guess ' || n || ' returns zero rows') FROM generate_series(1, 8) n;
