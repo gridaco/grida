@@ -348,6 +348,8 @@ describe.skipIf(process.platform === "win32")("durable native custody", () => {
     expect([...values.values()].join()).not.toContain(session.refreshToken);
   });
 
+  // Several durable operations each spawn macOS ACL checks. Allow CI scheduling
+  // overhead in this test; production storage and lock deadlines stay unchanged.
   it("keeps a failed migration explicit and resumable without reviving old custody", async () => {
     const { store, directory, keyring } = await setup();
     await save(store);
@@ -371,7 +373,7 @@ describe.skipIf(process.platform === "win32")("durable native custody", () => {
     });
     expect(await restarted.migrate("file")).toMatchObject({ migration: null });
     expect((await snapshot(restarted)).session).toEqual(session);
-  });
+  }, 15_000);
 
   it("can resume a failed copy into the destination keyring", async () => {
     const { store, keyring } = await setup("file");

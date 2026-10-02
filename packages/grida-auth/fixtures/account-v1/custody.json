@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "source_revision": "b26ede1d62e21a0e24d52030538b8f7288ec9b4b",
+  "source_cli_version": "0.2.0",
+  "binding_preimage": "{\"home\":\"/synthetic/grida\",\"issuer\":\"http://127.0.0.1:47901/auth/v1\",\"clientId\":\"synthetic-conformance\",\"apiOrigin\":\"http://127.0.0.1:47901\"}",
+  "profile_sha256": "4eee04a3263c12b52223858db187e3f0d8b030a228ee0eb6f0e78ab825cf4d51",
+  "file_metadata": {
+    "version": 1,
+    "binding": {
+      "home": "/synthetic/grida",
+      "issuer": "http://127.0.0.1:47901/auth/v1",
+      "clientId": "synthetic-conformance",
+      "apiOrigin": "http://127.0.0.1:47901"
+    },
+    "backend": "file",
+    "initialized": true,
+    "envelope": {
+      "revision": "11111111-1111-4111-8111-111111111111",
+      "session": {
+        "issuer": "http://127.0.0.1:47901/auth/v1",
+        "clientId": "synthetic-conformance",
+        "apiOrigin": "http://127.0.0.1:47901",
+        "accessToken": "synthetic-access-α-🙂",
+        "refreshToken": "synthetic-refresh-β-🙂",
+        "expiresAt": 4000000000000,
+        "identity": {
+          "id": "synthetic-user",
+          "email": null,
+          "display_name": "Synthetic"
+        }
+      }
+    }
+  },
+  "keyring_metadata": {
+    "version": 1,
+    "binding": {
+      "home": "/synthetic/grida",
+      "issuer": "http://127.0.0.1:47901/auth/v1",
+      "clientId": "synthetic-conformance",
+      "apiOrigin": "http://127.0.0.1:47901"
+    },
+    "backend": "keyring",
+    "initialized": true
+  },
+  "keyring_record": {
+    "version": 1,
+    "binding": {
+      "home": "/synthetic/grida",
+      "issuer": "http://127.0.0.1:47901/auth/v1",
+      "clientId": "synthetic-conformance",
+      "apiOrigin": "http://127.0.0.1:47901"
+    },
+    "revision": "11111111-1111-4111-8111-111111111111",
+    "session": {
+      "issuer": "http://127.0.0.1:47901/auth/v1",
+      "clientId": "synthetic-conformance",
+      "apiOrigin": "http://127.0.0.1:47901",
+      "accessToken": "synthetic-access-α-🙂",
+      "refreshToken": "synthetic-refresh-β-🙂",
+      "expiresAt": 4000000000000,
+      "identity": {
+        "id": "synthetic-user",
+        "email": null,
+        "display_name": "Synthetic"
+      }
+    }
+  },
+  "keyring_tombstone": {
+    "version": 1,
+    "binding": {
+      "home": "/synthetic/grida",
+      "issuer": "http://127.0.0.1:47901/auth/v1",
+      "clientId": "synthetic-conformance",
+      "apiOrigin": "http://127.0.0.1:47901"
+    },
+    "revision": "22222222-2222-4222-8222-222222222222",
+    "session": null
+  }
+}

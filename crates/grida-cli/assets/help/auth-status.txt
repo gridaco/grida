@@ -1,0 +1,9 @@
+Usage: grida auth status [--json] [--no-input]
+
+Read local session metadata without contacting the server.
+Use grida account view to verify this session online.
+--json includes session state, identity and access expiry for diagnostics.
+Signed-out status exits 1. Credentials are never displayed.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/auth

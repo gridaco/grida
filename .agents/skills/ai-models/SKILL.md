@@ -1,7 +1,7 @@
 ---
 name: ai-models
 description: >
-  Research, compare, and update AI model configurations.
+  Research, compare, and update shared AI model JSON for TypeScript, web, and Rust consumers.
   Covers text model tiers, image and video generation models, image tool models,
   release provenance, pricing data sourcing, and provider-cost metering against prepaid org credit.
   Use when bumping model versions, adding new models, updating pricing, or
@@ -23,18 +23,57 @@ description: >
 
 ## Key Files
 
-| File                                                | Role                                                                                                             |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `packages/grida-ai-models/src/models.ts`            | Agnostic facts: identities, capabilities, provider bindings, published rates and provenance (`models` namespace) |
-| `packages/grida-ai-models/src/grida/catalog.ts`     | Grida service membership/lifecycle and joined views; compatible schema-1 snapshot (`catalog` namespace)          |
-| `packages/grida-ai-models/src/grida/preferences.ts` | Optional default and independent partial order per service family                                                |
-| `packages/grida-ai-models/src/grida/tiers.ts`       | Grida text `ModelTier` set and `TIER_MODEL_IDS`                                                                  |
-| `editor/lib/ai/models.ts`                           | AI Gateway + BYOK provider seam (service catalog from `@grida/ai-models/grida`)                                  |
-| `editor/lib/ai/ai.ts`                               | `toMills()` + Replicate call shapes; re-aggregates the shared catalogue under `ai.*`                             |
-| `editor/lib/ai/server.ts`                           | AI seam: prepaid-credit gate, provider call, and post-flight usage ingest                                        |
-| `editor/lib/billing/metronome.ts`                   | Organization credit entitlement, cached balance gate, and Metronome usage ledger                                 |
-| `editor/app/(www)/(ai)/ai/models/page.tsx`          | Public models catalog page                                                                                       |
-| `docs/models/index.md`                              | User-facing models & pricing documentation                                                                       |
+| File                                            | Role                                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `data/ai/facts.json`                            | Authored model identities, capabilities, provider bindings, published rates and provenance |
+| `data/ai/service.json`                          | Authored Grida membership/lifecycle, preferences, request presets and text tiers           |
+| `data/ai/inputs.json`                           | Authored operation input schemas and documented `x-grida-*` validation rules               |
+| `data/ai/schemas/`                              | Structural JSON Schema envelopes for facts and service data                                |
+| `data/ai/PROVENANCE.md`                         | Research qualifications and source notes that do not belong in JSON comments               |
+| `packages/grida-ai-models/scripts/generate.mjs` | Deterministic source generation and Rust bundle drift checks                               |
+| `packages/grida-ai-models/src/models.ts`        | Generated factual literals plus handwritten TypeScript types and lookup helpers            |
+| `packages/grida-ai-models/src/grida/`           | Generated service literals plus handwritten ordering and schema-1 compatibility helpers    |
+| `packages/grida-ai/schemas/`                    | Generated package-local input schemas and operation projections                            |
+| `crates/grida-ai/data/`                         | Generated embedded Rust assets; never a separate authoring home                            |
+| `editor/lib/ai/models.ts`                       | AI Gateway + BYOK provider seam (service catalog from `@grida/ai-models/grida`)            |
+| `editor/lib/ai/ai.ts`                           | `toMills()` + Replicate call shapes; re-aggregates the shared catalogue under `ai.*`       |
+| `editor/lib/ai/server.ts`                       | AI seam: prepaid-credit gate, provider call, and post-flight usage ingest                  |
+| `editor/lib/billing/metronome.ts`               | Organization credit entitlement, cached balance gate, and Metronome usage ledger           |
+| `editor/app/(www)/(ai)/ai/models/page.tsx`      | Public models catalog page                                                                 |
+| `docs/models/index.md`                          | User-facing models & pricing documentation                                                 |
+
+## Shared authoring and generation
+
+Author catalogue data in repository-root `data/ai/`. TypeScript packages, the
+web API and the Rust CLI consume generated projections of those sources. Follow
+[the shared data guide](../../../data/ai/README.md) and commit authored and
+generated changes together.
+
+Use `lower_snake_case` for authored domain fields. Preserve exact model/provider
+IDs and standard JSON Schema keywords. The generator explicitly maps text-card
+and cost fields to existing camelCase TypeScript API fields; preserve schema-1
+wire spelling instead of renaming public fields during a data update.
+
+Do not hand-edit `generated:*` literal blocks or package/crate JSON copies.
+Types, lookup helpers, validation semantics and provider adapters remain
+handwritten code. Update an explicit ID union or type outside generated blocks
+when a new card requires it; a JSON binding alone does not implement a provider.
+
+From the repository root, after editing JSON:
+
+```sh
+node packages/grida-ai-models/scripts/generate.mjs
+pnpm --filter @grida/ai-models build
+pnpm --filter @grida/ai build
+node packages/grida-ai-models/scripts/generate.mjs --bundle
+node packages/grida-ai-models/scripts/generate.mjs --bundle --check
+```
+
+The first pass updates TS literals and package-local input schemas. The bundle
+pass uses freshly built TS consumers to derive operations, snapshots and service
+views, and writes the checked-in Rust assets. Cargo builds use these embedded
+assets without Node or network access. Builds/typechecks reject stale source
+projections; the CLI contract gate also checks the complete generated bundle.
 
 ## Tools
 
@@ -121,7 +160,7 @@ wrong answer, not a conservative one.
 
 - **Price the steady state, not the promotion.** When a vendor runs an
   introductory or time-limited rate, catalogue the price that applies once it
-  ends and note the date in a comment. Otherwise the promotion expiring is a
+  ends and record the date and qualification in `data/ai/PROVENANCE.md`. Otherwise the promotion expiring is a
   silent cost increase. Recheck when that date passes: a promotion can also be
   made permanent, which changes the fact, not the rule.
 - **Deprecate a card that is still a real choice; remove one that is not.**
@@ -131,26 +170,33 @@ wrong answer, not a conservative one.
   one): a card nobody should choose is noise in every picker, and keeping it is
   not caution.
 
-Removal from the service catalog is the kill switch — the id stops passing the run gate, and on a
-published catalogue that reaches installed clients within a refresh interval
-(`docs/wg/platform/hosted-ai.md`). That decisiveness is the point; it also means
-removal is the wrong tool for tidying. It does not require deleting factual
-identity or imply upstream retirement. Preserve schema-1 membership and legacy
-fields when publishing; installed clients ignore additive preferences. The v1
-snapshot still has broad GG/BYOK membership and per-family fallback behavior;
-runtime adapter support and authorization remain independent checks.
+Removing a service member changes admission for consumers of the updated
+catalogue; it is not merely picker cleanup. It does not require deleting factual
+identity or imply upstream retirement. TS consumers configured to refresh a
+published snapshot receive updates through that refresh lifecycle
+(`docs/wg/platform/hosted-ai.md`). The Rust CLI embeds its catalogue and does not
+refresh it at runtime: regenerate its assets and ship a new CLI version for
+updated discovery data. Do not assume a remote catalogue update revokes an
+installed binary's bundled knowledge. Hosted authorization remains a separate
+runtime boundary. Preserve schema-1 membership and legacy fields when publishing;
+installed snapshot clients ignore additive preferences. The v1 snapshot still
+has broad GG/BYOK membership and per-family fallback behavior; adapter support
+and authorization remain independent checks.
 
 ## Release dates and provenance
 
 Every bundled entry carries a `release` object:
 
-```ts
+```json
 {
-  date: "2026-07-09", // YYYY-MM-DD, or null only when an endpoint day is unknown
-  basis: "model", // or "provider_endpoint"
-  source_url: "https://vendor.example/release-note"
+  "date": "2026-07-09",
+  "basis": "model",
+  "source_url": "https://vendor.example/release-note"
 }
 ```
+
+Use a `YYYY-MM-DD` date, or `null` only when an endpoint day is unknown.
+`basis` is `model` or `provider_endpoint`.
 
 The date means the earliest day the exact named model or variant became broadly
 available. A public preview counts; a closed, invitation-only, or limited
@@ -185,19 +231,19 @@ and the narrow `null` rule.
 
 ## Text Models
 
-Facts live in `packages/grida-ai-models/src/models.ts` under `models.text.catalog: Record<CatalogId, ModelSpec>`. Grida tier assignments live in `packages/grida-ai-models/src/grida/tiers.ts`; each must resolve to a listed service member.
+Author text facts in `data/ai/facts.json` under `text.catalog`. The generated TypeScript consumer exposes `models.text.catalog: Record<CatalogId, ModelSpec>`. Author Grida tier assignments in `data/ai/service.json` under `tiers`; each must resolve to a listed service member.
 
-Fields to update per tier:
+Authored fields to update per model:
 
 - `id` — gateway format: `provider/model-name`
 - `label` — human-readable name
 - `release` — grounded date, basis, and first-party source under the contract above
-- `contextWindow`, `outputLimit` — from `model_info.py`
-- `cost` — `{ input, output, cacheRead?, cacheWrite? }` per 1M tokens
+- `context_window`, `output_limit` — use `model_info.py` as a discovery lead and verify against provider documentation
+- `cost` — `input`, `output`, optional `cache_read` and `cache_write`, per 1M tokens; TS projects these to its existing camelCase fields
 
 ## Image Models
 
-Facts live in `packages/grida-ai-models/src/models.ts` under `models.image.models`. The service view adds membership, legacy state, primary-provider choice and request presets. Editor consumers reach that joined view via `import { ai } from "@/lib/ai/ai"` (which also adds `ai.toMills` and `ai.server.methods.*`).
+Author image facts in `data/ai/facts.json` under `image.models`, and membership, legacy state, primary-provider choice and request presets in `data/ai/service.json`. The generated service view joins them. Editor consumers reach that joined view via `import { ai } from "@/lib/ai/ai"` (which also adds `ai.toMills` and `ai.server.methods.*`).
 
 ### Pricing types
 
@@ -220,7 +266,7 @@ per_token         — charged by token (e.g. Google Gemini)
 - `avg_cost_usd` — existing fallback billable-cost estimate, not a provider quote. Retained compatibility surface; do not treat it as independently verified pricing or expand it into service routing/billing policy.
 - `release` — intrinsic model release; do not use a provider-binding date
 - `min_width`, `max_width`, `min_height`, `max_height`, `sizes` — dimension constraints
-- Add new model IDs to the `ImageModelId` type union
+- Add new factual cards in JSON and update the handwritten `ImageModelId` type union outside the generated block in `src/models.ts`
 
 ### New providers
 
@@ -232,7 +278,7 @@ Image generation currently routes through the Vercel AI Gateway (`gateway.image(
 
 ## Video Models
 
-Facts live in `models.video.models` in `packages/grida-ai-models/src/models.ts`. Like image, a video card is **canonical**: `id` is provider-agnostic (`vendor/model`, e.g. `google/veo-3.1`) and holds intrinsic specs; per-provider routes live in `providers`, keyed by provider.
+Author video facts in `data/ai/facts.json` under `video.models`; `models.video.models` is the generated TS consumer. Like image, a video card is **canonical**: `id` is provider-agnostic (`vendor/model`, e.g. `google/veo-3.1`) and holds intrinsic specs; per-provider routes live in `providers`, keyed by provider.
 
 ### Card shape
 
@@ -268,13 +314,13 @@ resolution **and** whether audio is generated, so the keys are the exact
 - Factual boundary: a model requires verified provider bindings and grounded
   rates. Service boundary: list it only after Grida can execute the offering;
   factual identity alone is not admission.
-- New model → add the canonical id to `VideoModelId` and a factual card with ≥1 binding. Separately define service membership and request presets; the chosen preset must be supported and priced by the route that executes it.
+- New model → add a factual card with ≥1 binding to `data/ai/facts.json` and update the handwritten `VideoModelId` union outside generated blocks. Separately define service membership and request presets in `data/ai/service.json`; the chosen preset must be supported and priced by the route that executes it.
 - New route for an existing model → add a `VideoProviderBinding` under its provider key, **only with a verified rate** (e.g. OpenRouter surfaces `$0/MTok` for video — not usable; leave it out).
 - New capability (e.g. text-to-video) → only when actually used. If a provider keys it into a separate id (fal), that's a new binding/id; revisit the single-`id` shape only then.
 
 ## Image Tool Models
 
-Live in `models.image_tools.models` in `packages/grida-ai-models/src/models.ts`. Flat `cost_usd` pricing via Replicate.
+Author in `data/ai/facts.json` under `image_tools.models`; the generated TS consumer exposes `models.image_tools.models`. Flat `cost_usd` pricing via Replicate.
 
 ## Hosted Usage Metering
 
@@ -295,12 +341,14 @@ credit. Unit: **mills** (1 mill = $0.001 USD).
 
 ## After Any Update
 
-- [ ] Facts and Grida membership/preferences were updated in their separate canonical homes
+- [ ] Facts, service choices and input schemas were edited in their respective `data/ai/` JSON sources; authored domain keys remain `lower_snake_case`
+- [ ] Generated TS literals, package schemas and Rust assets were regenerated together; `generate.mjs --bundle --check` passes
 - [ ] Optional defaults still resolve to active listed members; order is deliberate, partial, and duplicate-free
 - [ ] Existing explicit selections, runtime provider gates and installed schema-1 clients remain compatible
 - [ ] Every bundled model has a complete `release`; date semantics and source priority were followed
 - [ ] `models.dev` dates were treated as discovery hints and verified against authoritative sources
-- [ ] `pnpm tsc --noEmit` passes
+- [ ] Model/AI package tests pass (`pnpm --filter @grida/ai-models test` and `pnpm --filter @grida/ai test`); Rust catalogue/input tests pass (`cargo test -p grida-ai --locked`); repository typecheck passes
+- [ ] Catalogue/input contract changes pass the TS/Rust CLI contract gate; intentional baseline changes are reviewed, not blindly regenerated
 - [ ] `docs/models/index.md` matches the code
 - [ ] `/ai/models` page renders correctly
 - [ ] No stale model IDs remain (grep for old IDs)

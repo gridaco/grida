@@ -191,414 +191,359 @@ export namespace catalog {
     }
   }
 
-  export const definitions = own({
-    text: {
-      members: {
-        "openai/gpt-5.5": {
-          status: "listed",
-          legacy: true,
+  export const definitions = own(
+    /* generated:service:definitions:start */
+    {
+      text: {
+        members: {
+          "openai/gpt-5.5": { status: "listed", legacy: true },
+          "openai/gpt-5.5-pro": { status: "listed" },
+          "openai/gpt-5.6-sol": { status: "listed" },
+          "openai/gpt-5.6-terra": { status: "listed" },
+          "openai/gpt-5.6-luna": { status: "listed" },
+          "openai/gpt-6-astra": { status: "listed" },
+          "anthropic/claude-sonnet-5": { status: "listed" },
+          "anthropic/claude-fable-5.1": { status: "listed" },
+          "anthropic/claude-fable-5": { status: "listed", legacy: true },
+          "anthropic/claude-opus-5": { status: "listed" },
+          "anthropic/claude-opus-4.8": { status: "listed", legacy: true },
+          "google/gemini-3.8-flash": { status: "listed" },
+          "google/gemini-3.7-flash": { status: "listed", legacy: true },
+          "google/gemini-3.1-pro-preview": { status: "listed" },
         },
-        "openai/gpt-5.5-pro": {
-          status: "listed",
-        },
-        "openai/gpt-5.6-sol": {
-          status: "listed",
-        },
-        "openai/gpt-5.6-terra": {
-          status: "listed",
-        },
-        "openai/gpt-5.6-luna": {
-          status: "listed",
-        },
-        "openai/gpt-6-astra": {
-          status: "listed",
-        },
-        "anthropic/claude-sonnet-5": {
-          status: "listed",
-        },
-        "anthropic/claude-fable-5.1": {
-          status: "listed",
-        },
-        "anthropic/claude-fable-5": {
-          status: "listed",
-          legacy: true,
-        },
-        "anthropic/claude-opus-5": {
-          status: "listed",
-        },
-        "anthropic/claude-opus-4.8": {
-          status: "listed",
-          legacy: true,
-        },
-        "google/gemini-3.8-flash": {
-          status: "listed",
-        },
-        "google/gemini-3.7-flash": {
-          status: "listed",
-          legacy: true,
-        },
-        "google/gemini-3.1-pro-preview": {
-          status: "listed",
-        },
+        ...preferences["text"],
       },
-      ...preferences.text,
-    },
-    image: {
-      members: {
-        "openai/gpt-image-2": {
-          status: "listed",
-          legacy: true,
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
+      image: {
+        members: {
+          "openai/gpt-image-2": {
+            status: "listed",
+            legacy: true,
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "openai/gpt-image-2.5-flare": {
+            status: "listed",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "openai/gpt-image-2.5-sunburst": {
+            status: "listed",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "openai/gpt-image-1.5": {
+            status: "staged",
+            legacy: true,
+            reason: "Previous-generation model, superseded by GPT Image 2.",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "openai/gpt-image-1-mini": {
+            status: "staged",
+            reason:
+              "Cost-tier model, not part of the curated flagship/SOTA list.",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "google/gemini-3.1-flash-image-preview": {
+            status: "listed",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "google/gemini-3-pro-image": {
+            status: "listed",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "google/gemini-3.1-flash-lite-image": {
+            status: "staged",
+            reason:
+              "Cost-tier model, not part of the curated flagship/SOTA list.",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "bfl/flux-2-pro": {
+            status: "listed",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "bfl/flux-2-max": {
+            status: "listed",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "bfl/flux-kontext-max": {
+            status: "staged",
+            reason:
+              "Image-editing model; not on OpenRouter, so not universal (one-key) coverage.",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "bfl/flux-kontext-pro": {
+            status: "staged",
+            reason:
+              "Image-editing model; superseded by Flux 2 and not on OpenRouter, so not universal.",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "bfl/flux-pro-1.1": {
+            status: "staged",
+            reason: "Superseded by Flux 2 Pro; not universal.",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "bytedance/seedream-5.0-pro": {
+            status: "listed",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "bytedance/seedream-5.0-lite": {
+            status: "listed",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 2048,
+              height: 2048,
+              aspect_ratio: "1:1",
+            },
+          },
+          "bytedance/seedream-4.5": {
+            status: "staged",
+            legacy: true,
+            reason: "Previous-generation model, superseded by Seedream 5.0.",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "xai/grok-imagine-image-2.0": {
+            status: "listed",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "meta/muse-image-1.0": {
+            status: "staged",
+            reason:
+              "OpenRouter lists it without a serving endpoint, so not universal (one-key) coverage.",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "recraft/recraft-v4.1": {
+            status: "listed",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
+          },
+          "recraft/recraft-v3": {
+            status: "staged",
+            legacy: true,
+            reason: "Previous-generation model, superseded by Recraft V4.1.",
+            primary_provider: "vercel",
+            request_defaults: {
+              width: 1024,
+              height: 1024,
+              aspect_ratio: "1:1",
+            },
           },
         },
-        "openai/gpt-image-2.5-flare": {
-          status: "listed",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "openai/gpt-image-2.5-sunburst": {
-          status: "listed",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "openai/gpt-image-1.5": {
-          status: "staged",
-          legacy: true,
-          reason: "Previous-generation model, superseded by GPT Image 2.",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "openai/gpt-image-1-mini": {
-          status: "staged",
-          reason:
-            "Cost-tier model, not part of the curated flagship/SOTA list.",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "google/gemini-3.1-flash-image-preview": {
-          status: "listed",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "google/gemini-3-pro-image": {
-          status: "listed",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "google/gemini-3.1-flash-lite-image": {
-          status: "staged",
-          reason:
-            "Cost-tier model, not part of the curated flagship/SOTA list.",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "bfl/flux-2-pro": {
-          status: "listed",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "bfl/flux-2-max": {
-          status: "listed",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "bfl/flux-kontext-max": {
-          status: "staged",
-          reason:
-            "Image-editing model; not on OpenRouter, so not universal (one-key) coverage.",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "bfl/flux-kontext-pro": {
-          status: "staged",
-          reason:
-            "Image-editing model; superseded by Flux 2 and not on OpenRouter, so not universal.",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "bfl/flux-pro-1.1": {
-          status: "staged",
-          reason: "Superseded by Flux 2 Pro; not universal.",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "bytedance/seedream-5.0-pro": {
-          status: "listed",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "bytedance/seedream-5.0-lite": {
-          status: "listed",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 2048,
-            height: 2048,
-            aspect_ratio: "1:1",
-          },
-        },
-        "bytedance/seedream-4.5": {
-          status: "staged",
-          legacy: true,
-          reason: "Previous-generation model, superseded by Seedream 5.0.",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "xai/grok-imagine-image-2.0": {
-          status: "listed",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "meta/muse-image-1.0": {
-          status: "staged",
-          reason:
-            "OpenRouter lists it without a serving endpoint, so not universal (one-key) coverage.",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "recraft/recraft-v4.1": {
-          status: "listed",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
-        "recraft/recraft-v3": {
-          status: "staged",
-          legacy: true,
-          reason: "Previous-generation model, superseded by Recraft V4.1.",
-          primary_provider: "vercel",
-          request_defaults: {
-            width: 1024,
-            height: 1024,
-            aspect_ratio: "1:1",
-          },
-        },
+        ...preferences["image"],
       },
-      ...preferences.image,
-    },
-    "audio.music": {
-      members: {
-        "google/lyria-3": {
-          status: "listed",
+      "audio.music": {
+        members: {
+          "google/lyria-3": { status: "listed" },
+          "google/lyria-3-pro": { status: "listed" },
         },
-        "google/lyria-3-pro": {
-          status: "listed",
-        },
+        ...preferences["audio.music"],
       },
-      ...preferences["audio.music"],
-    },
-    "audio.sound_effects": {
-      members: {
-        eleven_text_to_sound_v2: {
-          status: "staged",
-        },
+      "audio.sound_effects": {
+        members: { eleven_text_to_sound_v2: { status: "staged" } },
+        ...preferences["audio.sound_effects"],
       },
-      ...preferences["audio.sound_effects"],
-    },
-    "audio.text_to_speech": {
-      members: {
-        eleven_v3: {
-          status: "staged",
-        },
+      "audio.text_to_speech": {
+        members: { eleven_v3: { status: "staged" } },
+        ...preferences["audio.text_to_speech"],
       },
-      ...preferences["audio.text_to_speech"],
-    },
-    three_d: {
-      members: {
-        "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d": {
-          status: "staged",
+      three_d: {
+        members: {
+          "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d": { status: "staged" },
+          "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d": { status: "staged" },
+          "fal-ai/trellis-2": { status: "staged" },
         },
-        "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d": {
-          status: "staged",
+        ...preferences["three_d"],
+      },
+      "three_d.rigging": {
+        members: {
+          "tripo/rig-v1.0": { status: "listed" },
+          "tripo/rig-v2.5": { status: "listed" },
         },
-        "fal-ai/trellis-2": {
-          status: "staged",
+        ...preferences["three_d.rigging"],
+      },
+      "three_d.model_generation": {
+        members: {
+          "tripo/h3.1": { status: "listed" },
+          "tripo/p1": { status: "listed" },
+          "tripo/p2": { status: "listed" },
         },
+        ...preferences["three_d.model_generation"],
       },
-      ...preferences["three_d"],
-    },
-    "three_d.rigging": {
-      members: {
-        "tripo/rig-v1.0": { status: "listed" },
-        "tripo/rig-v2.5": { status: "listed" },
-      },
-      ...preferences["three_d.rigging"],
-    },
-    "three_d.model_generation": {
-      members: {
-        "tripo/h3.1": { status: "listed" },
-        "tripo/p1": { status: "listed" },
-        "tripo/p2": { status: "listed" },
-      },
-      ...preferences["three_d.model_generation"],
-    },
-    video: {
-      members: {
-        "google/veo-3.1": {
-          status: "listed",
-          request_defaults: {
-            resolution: "1080p",
-            aspect_ratio: "16:9",
-            duration: 8,
-            audio: true,
+      video: {
+        members: {
+          "google/veo-3.1": {
+            status: "listed",
+            request_defaults: {
+              resolution: "1080p",
+              aspect_ratio: "16:9",
+              duration: 8,
+              audio: true,
+            },
+          },
+          "google/veo-3.1-fast": {
+            status: "listed",
+            request_defaults: {
+              resolution: "1080p",
+              aspect_ratio: "16:9",
+              duration: 8,
+              audio: true,
+            },
+          },
+          "google/veo-3.1-lite": {
+            status: "listed",
+            request_defaults: {
+              resolution: "1080p",
+              aspect_ratio: "16:9",
+              duration: 8,
+              audio: true,
+            },
+          },
+          "alibaba/wan-3.0": {
+            status: "listed",
+            request_defaults: {
+              resolution: "1080p",
+              aspect_ratio: "16:9",
+              duration: 5,
+              audio: true,
+            },
+          },
+          "bytedance/seedance-2.0": {
+            status: "listed",
+            request_defaults: {
+              resolution: "720p",
+              aspect_ratio: "16:9",
+              duration: 5,
+              audio: true,
+            },
+          },
+          "bytedance/seedance-2.5": {
+            status: "listed",
+            request_defaults: {
+              resolution: "720p",
+              aspect_ratio: "16:9",
+              duration: 5,
+              audio: true,
+            },
+          },
+          "xai/grok-imagine-video-1.5": {
+            status: "listed",
+            request_defaults: {
+              resolution: "720p",
+              aspect_ratio: "16:9",
+              duration: 5,
+              audio: true,
+            },
           },
         },
-        "google/veo-3.1-fast": {
-          status: "listed",
-          request_defaults: {
-            resolution: "1080p",
-            aspect_ratio: "16:9",
-            duration: 8,
-            audio: true,
-          },
-        },
-        "google/veo-3.1-lite": {
-          status: "listed",
-          request_defaults: {
-            resolution: "1080p",
-            aspect_ratio: "16:9",
-            duration: 8,
-            audio: true,
-          },
-        },
-        "alibaba/wan-3.0": {
-          status: "listed",
-          request_defaults: {
-            resolution: "1080p",
-            aspect_ratio: "16:9",
-            duration: 5,
-            audio: true,
-          },
-        },
-        "bytedance/seedance-2.0": {
-          status: "listed",
-          request_defaults: {
-            resolution: "720p",
-            aspect_ratio: "16:9",
-            duration: 5,
-            audio: true,
-          },
-        },
-        "bytedance/seedance-2.5": {
-          status: "listed",
-          request_defaults: {
-            resolution: "720p",
-            aspect_ratio: "16:9",
-            duration: 5,
-            audio: true,
-          },
-        },
-        "xai/grok-imagine-video-1.5": {
-          status: "listed",
-          request_defaults: {
-            resolution: "720p",
-            aspect_ratio: "16:9",
-            duration: 5,
-            audio: true,
-          },
-        },
+        ...preferences["video"],
       },
-      ...preferences["video"],
-    },
-    image_tools: {
-      members: {
-        "recraft-ai/recraft-remove-background": {
-          status: "listed",
+      image_tools: {
+        members: {
+          "recraft-ai/recraft-remove-background": { status: "listed" },
+          "851-labs/background-remover": { status: "listed" },
+          "bria/remove-background": { status: "listed" },
+          "nightmareai/real-esrgan": { status: "listed" },
         },
-        "851-labs/background-remover": {
-          status: "listed",
-        },
-        "bria/remove-background": {
-          status: "listed",
-        },
-        "nightmareai/real-esrgan": {
-          status: "listed",
-        },
+        ...preferences["image_tools"],
       },
-      ...preferences["image_tools"],
-    },
-  } as const satisfies {
-    text: policy.Definition<facts.text.CatalogId>;
-    image: policy.Definition<facts.image.ImageModelId, image.Member>;
-    video: policy.Definition<facts.video.VideoModelId, video.Member>;
-    "audio.music": policy.Definition<facts.audio.music.ModelId>;
-    "audio.sound_effects": policy.Definition<facts.audio.sound_effects.ModelId>;
-    "audio.text_to_speech": policy.Definition<facts.audio.text_to_speech.ModelId>;
-    three_d: policy.Definition<facts.three_d.ThreeDModelId>;
-    "three_d.rigging": policy.Definition<facts.three_d.rigging.ModelId>;
-    "three_d.model_generation": policy.Definition<facts.three_d.model_generation.ModelId>;
-    image_tools: policy.Definition<facts.image_tools.ImageToolModelId>;
-  });
+    } /* generated:service:definitions:end */ as const satisfies {
+      text: policy.Definition<facts.text.CatalogId>;
+      image: policy.Definition<facts.image.ImageModelId, image.Member>;
+      video: policy.Definition<facts.video.VideoModelId, video.Member>;
+      "audio.music": policy.Definition<facts.audio.music.ModelId>;
+      "audio.sound_effects": policy.Definition<facts.audio.sound_effects.ModelId>;
+      "audio.text_to_speech": policy.Definition<facts.audio.text_to_speech.ModelId>;
+      three_d: policy.Definition<facts.three_d.ThreeDModelId>;
+      "three_d.rigging": policy.Definition<facts.three_d.rigging.ModelId>;
+      "three_d.model_generation": policy.Definition<facts.three_d.model_generation.ModelId>;
+      image_tools: policy.Definition<facts.image_tools.ImageToolModelId>;
+    }
+  );
   export namespace text {
     export type ModelCostPerMillion = facts.text.ModelCostPerMillion;
     export type ImageInputMime = facts.text.ImageInputMime;

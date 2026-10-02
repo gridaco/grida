@@ -1,0 +1,58 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/.oxfmtrc.jsonc",
+        "$TURBO_ROOT$/packages/grida-ai/schemas/inputs.generated.json"
+      ]
+    },
+    "typecheck": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/.oxfmtrc.jsonc",
+        "$TURBO_ROOT$/packages/grida-ai/schemas/inputs.generated.json"
+      ]
+    },
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/.oxfmtrc.jsonc",
+        "$TURBO_ROOT$/packages/grida-ai/schemas/inputs.generated.json"
+      ]
+    },
+    "test:package": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/.oxfmtrc.jsonc",
+        "$TURBO_ROOT$/packages/grida-ai/schemas/inputs.generated.json"
+      ],
+      "dependsOn": ["^build"]
+    },
+    "generate": {
+      "cache": false,
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/.oxfmtrc.jsonc",
+        "$TURBO_ROOT$/packages/grida-ai/schemas/inputs.generated.json"
+      ]
+    },
+    "check:generated": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/packages/grida-ai/src/**",
+        "$TURBO_ROOT$/packages/grida-ai/schemas/**",
+        "$TURBO_ROOT$/crates/grida-ai/data/**",
+        "$TURBO_ROOT$/.oxfmtrc.jsonc"
+      ],
+      "dependsOn": ["build", "@grida/ai#build"]
+    }
+  }
+}

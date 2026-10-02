@@ -1,0 +1,2564 @@
+{
+  "text.catalog": {
+    "openai/gpt-5.5": {
+      "id": "openai/gpt-5.5",
+      "label": "GPT-5.5",
+      "release": {
+        "date": "2026-04-23",
+        "basis": "model",
+        "source_url": "https://openai.com/index/introducing-gpt-5-5/"
+      },
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif"
+      ],
+      "tool_call": true,
+      "context_window": 1050000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 5,
+        "output": 30,
+        "cache_read": 0.5,
+        "long_context": {
+          "input_tokens_above": 272000,
+          "input_multiplier": 2,
+          "output_multiplier": 1.5
+        }
+      }
+    },
+    "openai/gpt-5.5-pro": {
+      "id": "openai/gpt-5.5-pro",
+      "label": "GPT-5.5 Pro",
+      "release": {
+        "date": "2026-04-23",
+        "basis": "model",
+        "source_url": "https://openai.com/index/introducing-gpt-5-5/"
+      },
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif"
+      ],
+      "tool_call": true,
+      "context_window": 1050000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 30,
+        "output": 180
+      }
+    },
+    "openai/gpt-5.6-sol": {
+      "id": "openai/gpt-5.6-sol",
+      "label": "GPT-5.6 Sol",
+      "release": {
+        "date": "2026-07-09",
+        "basis": "model",
+        "source_url": "https://openai.com/index/gpt-5-6/"
+      },
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif"
+      ],
+      "tool_call": true,
+      "context_window": 1050000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 4,
+        "output": 20,
+        "cache_read": 0.4,
+        "cache_write": 5,
+        "long_context": {
+          "input_tokens_above": 272000,
+          "input_multiplier": 2,
+          "output_multiplier": 1.5
+        }
+      }
+    },
+    "openai/gpt-5.6-terra": {
+      "id": "openai/gpt-5.6-terra",
+      "label": "GPT-5.6 Terra",
+      "release": {
+        "date": "2026-07-09",
+        "basis": "model",
+        "source_url": "https://openai.com/index/gpt-5-6/"
+      },
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif"
+      ],
+      "tool_call": true,
+      "context_window": 1050000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 2,
+        "output": 12,
+        "cache_read": 0.2,
+        "cache_write": 2.5,
+        "long_context": {
+          "input_tokens_above": 272000,
+          "input_multiplier": 2,
+          "output_multiplier": 1.5
+        }
+      }
+    },
+    "openai/gpt-5.6-luna": {
+      "id": "openai/gpt-5.6-luna",
+      "label": "GPT-5.6 Luna",
+      "release": {
+        "date": "2026-07-09",
+        "basis": "model",
+        "source_url": "https://openai.com/index/gpt-5-6/"
+      },
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif"
+      ],
+      "tool_call": true,
+      "context_window": 1050000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 0.2,
+        "output": 1.2,
+        "cache_read": 0.02,
+        "cache_write": 0.25,
+        "long_context": {
+          "input_tokens_above": 272000,
+          "input_multiplier": 2,
+          "output_multiplier": 1.5
+        }
+      }
+    },
+    "openai/gpt-6-astra": {
+      "id": "openai/gpt-6-astra",
+      "label": "GPT-6 Astra",
+      "release": {
+        "date": "2026-09-04",
+        "basis": "provider_endpoint",
+        "source_url": "https://vercel.com/ai-gateway/models/gpt-6-astra"
+      },
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif"
+      ],
+      "tool_call": true,
+      "context_window": 1050000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 10,
+        "output": 50,
+        "cache_read": 1,
+        "cache_write": 12.5,
+        "long_context": {
+          "input_tokens_above": 272000,
+          "input_multiplier": 2,
+          "output_multiplier": 1.5
+        }
+      }
+    },
+    "anthropic/claude-sonnet-5": {
+      "id": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "release": {
+        "date": "2026-06-30",
+        "basis": "model",
+        "source_url": "https://platform.claude.com/docs/en/release-notes/overview"
+      },
+      "short_label": "Sonnet 5",
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp"
+      ],
+      "tool_call": true,
+      "context_window": 1000000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.2,
+        "cache_write": 2.5
+      }
+    },
+    "anthropic/claude-fable-5.1": {
+      "id": "anthropic/claude-fable-5.1",
+      "label": "Claude Fable 5.1",
+      "release": {
+        "date": "2026-09-01",
+        "basis": "model",
+        "source_url": "https://platform.claude.com/docs/en/models/fable-5-1/overview"
+      },
+      "short_label": "Fable 5.1",
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp"
+      ],
+      "tool_call": true,
+      "context_window": 1000000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 10,
+        "output": 50,
+        "cache_read": 0.25,
+        "cache_write": 12.5
+      }
+    },
+    "anthropic/claude-fable-5": {
+      "id": "anthropic/claude-fable-5",
+      "label": "Claude Fable 5",
+      "release": {
+        "date": "2026-06-09",
+        "basis": "model",
+        "source_url": "https://platform.claude.com/docs/en/release-notes/overview"
+      },
+      "short_label": "Fable 5",
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp"
+      ],
+      "tool_call": true,
+      "context_window": 1000000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 10,
+        "output": 50,
+        "cache_read": 1,
+        "cache_write": 12.5
+      }
+    },
+    "anthropic/claude-opus-5": {
+      "id": "anthropic/claude-opus-5",
+      "label": "Claude Opus 5",
+      "release": {
+        "date": "2026-07-24",
+        "basis": "model",
+        "source_url": "https://platform.claude.com/docs/en/release-notes/overview"
+      },
+      "short_label": "Opus 5",
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp"
+      ],
+      "tool_call": true,
+      "context_window": 1000000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25
+      }
+    },
+    "anthropic/claude-opus-4.8": {
+      "id": "anthropic/claude-opus-4.8",
+      "label": "Claude Opus 4.8",
+      "release": {
+        "date": "2026-05-28",
+        "basis": "model",
+        "source_url": "https://platform.claude.com/docs/en/release-notes/overview"
+      },
+      "short_label": "Opus 4.8",
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp"
+      ],
+      "tool_call": true,
+      "context_window": 1000000,
+      "output_limit": 128000,
+      "cost": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25
+      }
+    },
+    "google/gemini-3.8-flash": {
+      "id": "google/gemini-3.8-flash",
+      "label": "Gemini 3.8 Flash",
+      "release": {
+        "date": "2026-09-02",
+        "basis": "model",
+        "source_url": "https://ai.google.dev/gemini-api/docs/changelog"
+      },
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "tool_call": true,
+      "context_window": 1048576,
+      "output_limit": 65536,
+      "cost": {
+        "input": 1.5,
+        "output": 7.5,
+        "cache_read": 0.15
+      }
+    },
+    "google/gemini-3.7-flash": {
+      "id": "google/gemini-3.7-flash",
+      "label": "Gemini 3.7 Flash",
+      "release": {
+        "date": "2026-08-13",
+        "basis": "model",
+        "source_url": "https://ai.google.dev/gemini-api/docs/changelog"
+      },
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "tool_call": true,
+      "context_window": 1048576,
+      "output_limit": 65536,
+      "cost": {
+        "input": 1.5,
+        "output": 7.5,
+        "cache_read": 0.15
+      }
+    },
+    "google/gemini-3.1-pro-preview": {
+      "id": "google/gemini-3.1-pro-preview",
+      "label": "Gemini 3.1 Pro Preview",
+      "release": {
+        "date": "2026-02-19",
+        "basis": "model",
+        "source_url": "https://ai.google.dev/gemini-api/docs/changelog"
+      },
+      "short_label": "Gemini 3.1 Pro",
+      "multimodal": true,
+      "image_input_mimes": [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+      ],
+      "tool_call": true,
+      "context_window": 1048576,
+      "output_limit": 65536,
+      "cost": {
+        "input": 2,
+        "output": 12,
+        "cache_read": 0.2,
+        "long_context": {
+          "input_tokens_above": 200000,
+          "input_multiplier": 2,
+          "output_multiplier": 1.5
+        }
+      }
+    }
+  },
+  "image.models": {
+    "openai/gpt-image-2": {
+      "id": "openai/gpt-image-2",
+      "label": "GPT Image 2",
+      "release": {
+        "date": "2026-04-21",
+        "basis": "model",
+        "source_url": "https://developers.openai.com/api/docs/models/gpt-image-2"
+      },
+      "short_description": "Previous-generation image model. Superseded by GPT Image 2.5.",
+      "vendor": "openai",
+      "transparent_background": true,
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "openai/gpt-image-2",
+          "pricing": {
+            "type": "per_token",
+            "input": 5,
+            "output": 30
+          },
+          "avg_cost_usd": 0.053,
+          "transparent_background": null
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "openai/gpt-image-2",
+          "pricing": {
+            "type": "per_token",
+            "input": 8,
+            "output": 8
+          },
+          "avg_cost_usd": 0.05,
+          "url": "https://openrouter.ai/openai/gpt-image-2",
+          "transparent_background": false,
+          "references": {
+            "id": "openai/gpt-image-2",
+            "max": 16
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/gpt-image-2",
+          "pricing": {
+            "type": "per_image_tiered",
+            "tiers": {
+              "low/1024x1024": 0.006,
+              "medium/1024x1024": 0.053,
+              "high/1024x1024": 0.211
+            }
+          },
+          "avg_cost_usd": 0.053,
+          "url": "https://fal.ai/models/openai/gpt-image-2"
+        }
+      },
+      "speed_label": "medium",
+      "speed_max": "1m",
+      "styles": null,
+      "sizes": [
+        [1024, 1024, "1:1"],
+        [1024, 1536, "2:3"],
+        [1536, 1024, "3:2"]
+      ],
+      "constraints": {
+        "step": 16,
+        "max_edge": 3840,
+        "min_pixels": 655360,
+        "max_pixels": 8294400,
+        "aspect_ratio": {
+          "max": 3
+        }
+      },
+      "pricing": {
+        "type": "per_image_tiered",
+        "tiers": {
+          "low/1024x1024": 0.006,
+          "low/1024x1536": 0.005,
+          "low/1536x1024": 0.005,
+          "medium/1024x1024": 0.053,
+          "medium/1024x1536": 0.041,
+          "medium/1536x1024": 0.041,
+          "high/1024x1024": 0.211,
+          "high/1024x1536": 0.165,
+          "high/1536x1024": 0.165
+        },
+        "tokens": {
+          "input": 5,
+          "cached_input": 1.25,
+          "image_input": 8,
+          "cached_image_input": 2,
+          "output": 30
+        }
+      },
+      "avg_cost_usd": 0.053
+    },
+    "openai/gpt-image-2.5-flare": {
+      "id": "openai/gpt-image-2.5-flare",
+      "label": "GPT Image 2.5 Flare",
+      "release": {
+        "date": "2026-09-08",
+        "basis": "model",
+        "source_url": "https://openai.com/index/introducing-chatgpt-images-2-5/"
+      },
+      "short_description": "Fast image generation and reference-guided editing.",
+      "vendor": "openai",
+      "transparent_background": true,
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "openai/gpt-image-2.5-flare",
+          "pricing": {
+            "type": "per_token",
+            "input": 5,
+            "cached_input": 1.25,
+            "output": 30
+          },
+          "avg_cost_usd": 0.055,
+          "url": "https://vercel.com/ai-gateway/models/gpt-image-2.5-flare"
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "openai/gpt-image-2.5-flare",
+          "pricing": {
+            "type": "per_token",
+            "input": 5,
+            "image_input": 8,
+            "output": 30
+          },
+          "avg_cost_usd": 0.055,
+          "url": "https://openrouter.ai/openai/gpt-image-2.5-flare",
+          "transparent_background": false,
+          "references": {
+            "id": "openai/gpt-image-2.5-flare",
+            "max": 16
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "openai/gpt-image-2.5/flare/text-to-image",
+          "pricing": {
+            "type": "per_token",
+            "input": 5,
+            "cached_input": 1.25,
+            "image_input": 8,
+            "cached_image_input": 2,
+            "text_output": 10,
+            "output": 30
+          },
+          "avg_cost_usd": 0.055,
+          "url": "https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image",
+          "references": {
+            "id": "openai/gpt-image-2.5/flare/edit",
+            "max": 16
+          }
+        }
+      },
+      "speed_label": "fast",
+      "speed_max": "varies",
+      "styles": null,
+      "sizes": [
+        [1024, 1024, "1:1"],
+        [1024, 1536, "2:3"],
+        [1536, 1024, "3:2"]
+      ],
+      "constraints": {
+        "step": 16,
+        "max_edge": 3840,
+        "min_pixels": 655360,
+        "max_pixels": 8294400,
+        "aspect_ratio": {
+          "max": 3
+        }
+      },
+      "quality": {
+        "options": ["auto", "low", "medium", "high", "xhigh", "max"],
+        "default": "high"
+      },
+      "pricing": {
+        "type": "per_token",
+        "input": 5,
+        "cached_input": 1.25,
+        "output": 30
+      },
+      "avg_cost_usd": 0.055
+    },
+    "openai/gpt-image-2.5-sunburst": {
+      "id": "openai/gpt-image-2.5-sunburst",
+      "label": "GPT Image 2.5 Sunburst",
+      "release": {
+        "date": "2026-09-08",
+        "basis": "model",
+        "source_url": "https://openai.com/index/introducing-chatgpt-images-2-5/"
+      },
+      "short_description": "Detailed image generation and precise editing with longer generation times.",
+      "vendor": "openai",
+      "transparent_background": true,
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "openai/gpt-image-2.5-sunburst",
+          "pricing": {
+            "type": "per_token",
+            "input": 5,
+            "cached_input": 1.25,
+            "output": 30
+          },
+          "avg_cost_usd": 0.055,
+          "url": "https://vercel.com/ai-gateway/models/gpt-image-2.5-sunburst"
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "openai/gpt-image-2.5-sunburst",
+          "pricing": {
+            "type": "per_token",
+            "input": 5,
+            "image_input": 8,
+            "output": 30
+          },
+          "avg_cost_usd": 0.055,
+          "url": "https://openrouter.ai/openai/gpt-image-2.5-sunburst",
+          "transparent_background": false,
+          "references": {
+            "id": "openai/gpt-image-2.5-sunburst",
+            "max": 16
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "openai/gpt-image-2.5/sunburst/text-to-image",
+          "pricing": {
+            "type": "per_token",
+            "input": 5,
+            "cached_input": 1.25,
+            "image_input": 8,
+            "cached_image_input": 2,
+            "text_output": 10,
+            "output": 30
+          },
+          "avg_cost_usd": 0.055,
+          "url": "https://fal.ai/models/openai/gpt-image-2.5/sunburst/text-to-image",
+          "references": {
+            "id": "openai/gpt-image-2.5/sunburst/edit",
+            "max": 16
+          }
+        }
+      },
+      "speed_label": "slow",
+      "speed_max": "varies",
+      "styles": null,
+      "sizes": [
+        [1024, 1024, "1:1"],
+        [1024, 1536, "2:3"],
+        [1536, 1024, "3:2"]
+      ],
+      "constraints": {
+        "step": 16,
+        "max_edge": 3840,
+        "min_pixels": 655360,
+        "max_pixels": 8294400,
+        "aspect_ratio": {
+          "max": 3
+        }
+      },
+      "quality": {
+        "options": ["auto", "low", "medium", "high", "xhigh", "max"],
+        "default": "high"
+      },
+      "pricing": {
+        "type": "per_token",
+        "input": 5,
+        "cached_input": 1.25,
+        "output": 30
+      },
+      "avg_cost_usd": 0.055
+    },
+    "openai/gpt-image-1.5": {
+      "id": "openai/gpt-image-1.5",
+      "label": "GPT Image 1.5",
+      "release": {
+        "date": "2025-12-16",
+        "basis": "model",
+        "source_url": "https://openai.com/index/new-chatgpt-images-is-here/"
+      },
+      "short_description": "Previous-generation image model. Superseded by GPT Image 2.",
+      "vendor": "openai",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "openai/gpt-image-1.5",
+          "pricing": {
+            "type": "per_token",
+            "input": 5,
+            "output": 32
+          },
+          "avg_cost_usd": 0.034
+        }
+      },
+      "speed_label": "medium",
+      "speed_max": "1m",
+      "styles": null,
+      "sizes": [
+        [1024, 1024, "1:1"],
+        [1024, 1536, "2:3"],
+        [1536, 1024, "3:2"]
+      ],
+      "constraints": null,
+      "pricing": {
+        "type": "per_image_tiered",
+        "tiers": {
+          "low/1024x1024": 0.009,
+          "low/1024x1536": 0.013,
+          "low/1536x1024": 0.013,
+          "medium/1024x1024": 0.034,
+          "medium/1024x1536": 0.05,
+          "medium/1536x1024": 0.05,
+          "high/1024x1024": 0.133,
+          "high/1024x1536": 0.2,
+          "high/1536x1024": 0.2
+        },
+        "tokens": {
+          "input": 5,
+          "cached_input": 1.25,
+          "image_input": 8,
+          "cached_image_input": 2,
+          "output": 32
+        }
+      },
+      "avg_cost_usd": 0.034
+    },
+    "openai/gpt-image-1-mini": {
+      "id": "openai/gpt-image-1-mini",
+      "label": "GPT Image Mini",
+      "release": {
+        "date": "2025-10-06",
+        "basis": "model",
+        "source_url": "https://openai.com/devday/"
+      },
+      "short_description": "Cost-efficient image generation model",
+      "vendor": "openai",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "openai/gpt-image-1-mini",
+          "pricing": {
+            "type": "per_token",
+            "input": 2,
+            "output": 8
+          },
+          "avg_cost_usd": 0.011
+        }
+      },
+      "speed_label": "slow",
+      "speed_max": "1m",
+      "styles": null,
+      "sizes": [
+        [1024, 1024, "1:1"],
+        [1024, 1536, "2:3"],
+        [1536, 1024, "3:2"]
+      ],
+      "constraints": null,
+      "pricing": {
+        "type": "per_image_tiered",
+        "tiers": {
+          "low/1024x1024": 0.005,
+          "low/1024x1536": 0.006,
+          "low/1536x1024": 0.006,
+          "medium/1024x1024": 0.011,
+          "medium/1024x1536": 0.015,
+          "medium/1536x1024": 0.015,
+          "high/1024x1024": 0.036,
+          "high/1024x1536": 0.052,
+          "high/1536x1024": 0.052
+        },
+        "tokens": {
+          "input": 2,
+          "cached_input": 0.2,
+          "image_input": 2.5,
+          "cached_image_input": 0.25,
+          "output": 8
+        }
+      },
+      "avg_cost_usd": 0.011
+    },
+    "google/gemini-3.1-flash-image-preview": {
+      "id": "google/gemini-3.1-flash-image-preview",
+      "label": "Gemini 3.1 Flash Image",
+      "release": {
+        "date": "2026-02-26",
+        "basis": "model",
+        "source_url": "https://ai.google.dev/gemini-api/docs/changelog"
+      },
+      "short_description": "Fast, efficient multimodal model with native image generation",
+      "vendor": "google",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "google/gemini-3.1-flash-image",
+          "pricing": {
+            "type": "per_token",
+            "input": 0.5,
+            "output": 3
+          },
+          "avg_cost_usd": 0.004
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "google/gemini-3.1-flash-image",
+          "pricing": {
+            "type": "per_token",
+            "input": 0.5,
+            "output": 3
+          },
+          "avg_cost_usd": 0.004,
+          "url": "https://openrouter.ai/google/gemini-3.1-flash-image",
+          "references": {
+            "id": "google/gemini-3.1-flash-image",
+            "max": 14
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/nano-banana-2",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.08
+          },
+          "avg_cost_usd": 0.08,
+          "url": "https://fal.ai/models/fal-ai/nano-banana-2"
+        }
+      },
+      "speed_label": "fast",
+      "speed_max": "15s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "max_edge": 1536
+      },
+      "pricing": {
+        "type": "per_token",
+        "input": 0.5,
+        "output": 3
+      },
+      "avg_cost_usd": 0.004
+    },
+    "google/gemini-3-pro-image": {
+      "id": "google/gemini-3-pro-image",
+      "label": "Gemini 3 Pro Image",
+      "release": {
+        "date": "2025-11-20",
+        "basis": "model",
+        "source_url": "https://blog.google/innovation-and-ai/products/nano-banana-pro/"
+      },
+      "short_description": "High-quality multimodal model with native image generation",
+      "vendor": "google",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "google/gemini-3-pro-image",
+          "pricing": {
+            "type": "per_token",
+            "input": 2,
+            "output": 12
+          },
+          "avg_cost_usd": 0.015
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "google/gemini-3-pro-image-preview",
+          "pricing": {
+            "type": "per_token",
+            "input": 2,
+            "output": 12
+          },
+          "avg_cost_usd": 0.015,
+          "url": "https://openrouter.ai/google/gemini-3-pro-image-preview",
+          "references": {
+            "id": "google/gemini-3-pro-image-preview",
+            "max": 14
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/nano-banana-pro",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.15
+          },
+          "avg_cost_usd": 0.15,
+          "url": "https://fal.ai/models/fal-ai/nano-banana-pro"
+        }
+      },
+      "speed_label": "medium",
+      "speed_max": "30s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "max_edge": 1536
+      },
+      "pricing": {
+        "type": "per_token",
+        "input": 2,
+        "output": 12
+      },
+      "avg_cost_usd": 0.015
+    },
+    "google/gemini-3.1-flash-lite-image": {
+      "id": "google/gemini-3.1-flash-lite-image",
+      "label": "Gemini 3.1 Flash Lite Image",
+      "release": {
+        "date": "2026-06-30",
+        "basis": "model",
+        "source_url": "https://ai.google.dev/gemini-api/docs/changelog"
+      },
+      "short_description": "Fastest, most cost-efficient Gemini image model; 1K output only.",
+      "vendor": "google",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "google/gemini-3.1-flash-lite-image",
+          "pricing": {
+            "type": "per_token",
+            "input": 0.25,
+            "output": 1.5
+          },
+          "avg_cost_usd": 0.034
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "google/gemini-3.1-flash-lite-image",
+          "pricing": {
+            "type": "per_token",
+            "input": 0.25,
+            "output": 1.5
+          },
+          "avg_cost_usd": 0.034,
+          "url": "https://openrouter.ai/google/gemini-3.1-flash-lite-image"
+        }
+      },
+      "speed_label": "fastest",
+      "speed_max": "10s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "max_edge": 1024
+      },
+      "pricing": {
+        "type": "per_token",
+        "input": 0.25,
+        "output": 1.5
+      },
+      "avg_cost_usd": 0.034
+    },
+    "bfl/flux-2-pro": {
+      "id": "bfl/flux-2-pro",
+      "label": "Flux 2 Pro",
+      "release": {
+        "date": "2025-11-25",
+        "basis": "model",
+        "source_url": "https://bfl.ai/blog/flux-2"
+      },
+      "short_description": "Latest Flux model with best-in-class image quality and prompt adherence",
+      "vendor": "black-forest-labs",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "bfl/flux-2-pro",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.03
+          },
+          "avg_cost_usd": 0.03
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "black-forest-labs/flux.2-pro",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.03
+          },
+          "avg_cost_usd": 0.03,
+          "url": "https://openrouter.ai/black-forest-labs/flux.2-pro",
+          "references": {
+            "id": "black-forest-labs/flux.2-pro",
+            "max": 8
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/flux-2-pro",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.03
+          },
+          "avg_cost_usd": 0.03,
+          "url": "https://fal.ai/models/fal-ai/flux-2-pro"
+        }
+      },
+      "speed_label": "medium",
+      "speed_max": "30s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "min_edge": 256,
+        "max_edge": 1440
+      },
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.03
+      },
+      "avg_cost_usd": 0.03
+    },
+    "bfl/flux-2-max": {
+      "id": "bfl/flux-2-max",
+      "label": "Flux 2 Max",
+      "release": {
+        "date": "2025-12-16",
+        "basis": "model",
+        "source_url": "https://playground.bfl.ai/changelog"
+      },
+      "short_description": "Black Forest Labs' highest-fidelity Flux 2 — maximum prompt adherence and detail.",
+      "vendor": "black-forest-labs",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "bfl/flux-2-max",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.07
+          },
+          "avg_cost_usd": 0.07
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "black-forest-labs/flux.2-max",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.07
+          },
+          "avg_cost_usd": 0.07,
+          "url": "https://openrouter.ai/black-forest-labs/flux.2-max",
+          "references": {
+            "id": "black-forest-labs/flux.2-max",
+            "max": 8
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/flux-2-max",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.07
+          },
+          "avg_cost_usd": 0.07,
+          "url": "https://fal.ai/models/fal-ai/flux-2-max"
+        }
+      },
+      "speed_label": "slow",
+      "speed_max": "45s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "min_edge": 256,
+        "max_edge": 1440
+      },
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.07
+      },
+      "avg_cost_usd": 0.07
+    },
+    "bfl/flux-kontext-max": {
+      "id": "bfl/flux-kontext-max",
+      "label": "Flux Kontext Max",
+      "release": {
+        "date": "2025-05-29",
+        "basis": "model",
+        "source_url": "https://bfl.ai/blog/flux-1-kontext"
+      },
+      "short_description": "Highest quality Flux model for context-aware image generation and editing",
+      "vendor": "black-forest-labs",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "bfl/flux-kontext-max",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.08
+          },
+          "avg_cost_usd": 0.08
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/flux-pro/kontext/max",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.08
+          },
+          "avg_cost_usd": 0.08,
+          "url": "https://fal.ai/models/fal-ai/flux-pro/kontext/max"
+        }
+      },
+      "speed_label": "slow",
+      "speed_max": "30s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "max_edge": 1820
+      },
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.08
+      },
+      "avg_cost_usd": 0.08
+    },
+    "bfl/flux-kontext-pro": {
+      "id": "bfl/flux-kontext-pro",
+      "label": "Flux Kontext Pro",
+      "release": {
+        "date": "2025-05-29",
+        "basis": "model",
+        "source_url": "https://bfl.ai/blog/flux-1-kontext"
+      },
+      "short_description": "Fast context-aware image generation and editing",
+      "vendor": "black-forest-labs",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "bfl/flux-kontext-pro",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.04
+          },
+          "avg_cost_usd": 0.04
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/flux-pro/kontext",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.04
+          },
+          "avg_cost_usd": 0.04,
+          "url": "https://fal.ai/models/fal-ai/flux-pro/kontext"
+        }
+      },
+      "speed_label": "medium",
+      "speed_max": "20s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "max_edge": 1820
+      },
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.04
+      },
+      "avg_cost_usd": 0.04
+    },
+    "bfl/flux-pro-1.1": {
+      "id": "bfl/flux-pro-1.1",
+      "label": "Flux Pro 1.1",
+      "release": {
+        "date": "2024-10-02",
+        "basis": "model",
+        "source_url": "https://bfl.ai/blog/24-10-02-flux"
+      },
+      "short_description": "Faster, better FLUX Pro. Text-to-image model with excellent image quality and output diversity.",
+      "vendor": "black-forest-labs",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "bfl/flux-pro-1.1",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.04
+          },
+          "avg_cost_usd": 0.04
+        }
+      },
+      "speed_label": "slow",
+      "speed_max": "30s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "min_edge": 256,
+        "max_edge": 1440
+      },
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.04
+      },
+      "avg_cost_usd": 0.04
+    },
+    "bytedance/seedream-5.0-pro": {
+      "id": "bytedance/seedream-5.0-pro",
+      "label": "Seedream 5.0 Pro",
+      "release": {
+        "date": "2026-07-08",
+        "basis": "model",
+        "source_url": "https://seed.bytedance.com/en/blog/beyond-generation-it-understands-design-introducing-seedream-5-0-pro"
+      },
+      "short_description": "ByteDance's flagship image model — dense layouts, infographics and text-heavy compositions at 1K–2K.",
+      "vendor": "bytedance",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "bytedance/seedream-5.0-pro",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.035
+          },
+          "avg_cost_usd": 0.035
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "bytedance-seed/seedream-5-0-pro",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.045
+          },
+          "avg_cost_usd": 0.045,
+          "url": "https://openrouter.ai/bytedance-seed/seedream-5-0-pro",
+          "references": {
+            "id": "bytedance-seed/seedream-5-0-pro",
+            "max": 14
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "bytedance/seedream/v5/pro/text-to-image",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.0675
+          },
+          "avg_cost_usd": 0.0675,
+          "url": "https://fal.ai/models/bytedance/seedream/v5/pro/text-to-image"
+        }
+      },
+      "speed_label": "medium",
+      "speed_max": "30s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "min_pixels": 1048576,
+        "max_pixels": 4194304,
+        "aspect_ratio": {
+          "max": 16
+        }
+      },
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.035
+      },
+      "avg_cost_usd": 0.035
+    },
+    "bytedance/seedream-5.0-lite": {
+      "id": "bytedance/seedream-5.0-lite",
+      "label": "Seedream 5.0 Lite",
+      "release": {
+        "date": "2026-02-13",
+        "basis": "model",
+        "source_url": "https://seed.bytedance.com/en/blog/deeper-thinking-more-accurate-generation-introducing-seedream-5-0-lite"
+      },
+      "short_description": "ByteDance's fast 2K–4K image model — Seedream 5.0 quality at the 4.5 price point.",
+      "vendor": "bytedance",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "bytedance/seedream-5.0-lite",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.035
+          },
+          "avg_cost_usd": 0.035
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "bytedance-seed/seedream-5-0-lite",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.035
+          },
+          "avg_cost_usd": 0.035,
+          "url": "https://openrouter.ai/bytedance-seed/seedream-5-0-lite",
+          "references": {
+            "id": "bytedance-seed/seedream-5-0-lite",
+            "max": 14
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "bytedance/seedream/v5/lite/text-to-image",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.035
+          },
+          "avg_cost_usd": 0.035,
+          "url": "https://fal.ai/models/bytedance/seedream/v5/lite/text-to-image"
+        }
+      },
+      "speed_label": "fast",
+      "speed_max": "15s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "min_pixels": 3686400,
+        "max_pixels": 16777216
+      },
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.035
+      },
+      "avg_cost_usd": 0.035
+    },
+    "bytedance/seedream-4.5": {
+      "id": "bytedance/seedream-4.5",
+      "label": "Seedream 4.5",
+      "release": {
+        "date": "2025-12-03",
+        "basis": "model",
+        "source_url": "https://blog.fal.ai/seedream-4-5-is-now-available-on-fal/"
+      },
+      "short_description": "ByteDance's unified image generation and editing model.",
+      "vendor": "bytedance",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "bytedance/seedream-4.5",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.04
+          },
+          "avg_cost_usd": 0.04
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "bytedance-seed/seedream-4.5",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.04
+          },
+          "avg_cost_usd": 0.04,
+          "url": "https://openrouter.ai/bytedance-seed/seedream-4.5",
+          "references": {
+            "id": "bytedance-seed/seedream-4.5",
+            "max": 14
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/bytedance/seedream/v4.5/text-to-image",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.04
+          },
+          "avg_cost_usd": 0.04,
+          "url": "https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image"
+        }
+      },
+      "speed_label": "fast",
+      "speed_max": "15s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "max_edge": 4096
+      },
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.04
+      },
+      "avg_cost_usd": 0.04
+    },
+    "xai/grok-imagine-image-2.0": {
+      "id": "xai/grok-imagine-image-2.0",
+      "label": "Grok Imagine Image 2.0",
+      "release": {
+        "date": "2026-08-07",
+        "basis": "model",
+        "source_url": "https://x.ai/news/grok-imagine-image-2"
+      },
+      "short_description": "SpaceXAI's image model — fast 1K/2K generation with a low-cost quality tier.",
+      "vendor": "xai",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "spacexai/grok-imagine-image-2.0",
+          "pricing": {
+            "type": "per_image_tiered",
+            "tiers": {
+              "low/1024x1024": 0.04,
+              "medium/1024x1024": 0.06,
+              "low/2048x2048": 0.06,
+              "medium/2048x2048": 0.08
+            }
+          },
+          "avg_cost_usd": 0.06
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "x-ai/grok-imagine-image-2.0",
+          "pricing": {
+            "type": "per_image_tiered",
+            "tiers": {
+              "low/1024x1024": 0.04,
+              "medium/1024x1024": 0.06,
+              "low/2048x2048": 0.06,
+              "medium/2048x2048": 0.08
+            }
+          },
+          "avg_cost_usd": 0.06,
+          "url": "https://openrouter.ai/x-ai/grok-imagine-image-2.0",
+          "references": {
+            "id": "x-ai/grok-imagine-image-2.0",
+            "max": 3
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "xai/grok-imagine-image/v2.0/text-to-image",
+          "pricing": {
+            "type": "per_image_tiered",
+            "tiers": {
+              "low/1024x1024": 0.04,
+              "medium/1024x1024": 0.06,
+              "low/2048x2048": 0.06,
+              "medium/2048x2048": 0.08
+            }
+          },
+          "avg_cost_usd": 0.06,
+          "url": "https://fal.ai/models/xai/grok-imagine-image/v2.0/text-to-image"
+        }
+      },
+      "speed_label": "fast",
+      "speed_max": "15s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "max_edge": 2048
+      },
+      "pricing": {
+        "type": "per_image_tiered",
+        "tiers": {
+          "low/1024x1024": 0.04,
+          "medium/1024x1024": 0.06,
+          "low/2048x2048": 0.06,
+          "medium/2048x2048": 0.08
+        }
+      },
+      "avg_cost_usd": 0.06
+    },
+    "meta/muse-image-1.0": {
+      "id": "meta/muse-image-1.0",
+      "label": "Muse Image 1.0",
+      "release": {
+        "date": "2026-07-07",
+        "basis": "model",
+        "source_url": "https://about.fb.com/news/2026/07/introducing-muse-image-meta-ai/"
+      },
+      "short_description": "Meta's agentic image model — reasons before it renders; generates and edits from text and references.",
+      "vendor": "meta",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "meta/muse-image-1.0",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.01
+          },
+          "avg_cost_usd": 0.01
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "meta/muse-image/text-to-image",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.01
+          },
+          "avg_cost_usd": 0.01,
+          "url": "https://fal.ai/models/meta/muse-image/text-to-image"
+        }
+      },
+      "speed_label": "medium",
+      "speed_max": "30s",
+      "styles": null,
+      "sizes": null,
+      "constraints": null,
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.01
+      },
+      "avg_cost_usd": 0.01
+    },
+    "recraft/recraft-v4.1": {
+      "id": "recraft/recraft-v4.1",
+      "label": "Recraft V4.1",
+      "release": {
+        "date": "2026-05-14",
+        "basis": "model",
+        "source_url": "https://www.recraft.ai/blog/recraft-v4-1-more-beautiful-by-nature"
+      },
+      "short_description": "Design-first image model — sharper prompt control and production-ready raster for brand and editorial work.",
+      "vendor": "recraft-ai",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "recraft/recraft-v4.1",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.035
+          },
+          "avg_cost_usd": 0.035
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "recraft/recraft-v4.1",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.035
+          },
+          "avg_cost_usd": 0.035,
+          "url": "https://openrouter.ai/recraft/recraft-v4.1",
+          "references": {
+            "id": "recraft/recraft-v4.1",
+            "max": 1
+          }
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/recraft/v4.1/text-to-image",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.035
+          },
+          "avg_cost_usd": 0.035,
+          "url": "https://fal.ai/models/fal-ai/recraft/v4.1/text-to-image"
+        }
+      },
+      "speed_label": "medium",
+      "speed_max": "30s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "max_edge": 2048
+      },
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.035
+      },
+      "avg_cost_usd": 0.035
+    },
+    "recraft/recraft-v3": {
+      "id": "recraft/recraft-v3",
+      "label": "Recraft V3",
+      "release": {
+        "date": "2024-10-30",
+        "basis": "model",
+        "source_url": "https://www.recraft.ai/blog/recraft-introduces-a-revolutionary-ai-model-that-thinks-in-design-language"
+      },
+      "short_description": "Design-grade image model with strong text rendering and vector styles.",
+      "vendor": "recraft-ai",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "recraft/recraft-v3",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.04
+          },
+          "avg_cost_usd": 0.04
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "recraft/recraft-v3",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.04
+          },
+          "avg_cost_usd": 0.04,
+          "url": "https://openrouter.ai/recraft/recraft-v3"
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/recraft/v3/text-to-image",
+          "pricing": {
+            "type": "per_image_flat",
+            "usd": 0.04
+          },
+          "avg_cost_usd": 0.04,
+          "url": "https://fal.ai/models/fal-ai/recraft/v3/text-to-image"
+        }
+      },
+      "speed_label": "medium",
+      "speed_max": "30s",
+      "styles": null,
+      "sizes": null,
+      "constraints": {
+        "max_edge": 2048
+      },
+      "pricing": {
+        "type": "per_image_flat",
+        "usd": 0.04
+      },
+      "avg_cost_usd": 0.04
+    }
+  },
+  "video.models": {
+    "google/veo-3.1": {
+      "id": "google/veo-3.1",
+      "label": "Veo 3.1",
+      "release": {
+        "date": "2025-10-15",
+        "basis": "model",
+        "source_url": "https://ai.google.dev/gemini-api/docs/changelog"
+      },
+      "short_description": "Google's flagship video model — strong prompt adherence with native, synchronized audio.",
+      "vendor": "google",
+      "aspect_ratios": ["16:9", "9:16"],
+      "min_duration": 4,
+      "max_duration": 8,
+      "audio": true,
+      "speed_label": "slow",
+      "url": "https://deepmind.google/models/veo/",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "google/veo-3.1-generate-001",
+          "input": "text-or-image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "720p": {
+                "audio": 0.4,
+                "silent": 0.2
+              },
+              "1080p": {
+                "audio": 0.4,
+                "silent": 0.2
+              },
+              "4k": {
+                "audio": 0.6,
+                "silent": 0.4
+              }
+            }
+          },
+          "avg_cost_usd": 3.2,
+          "url": "https://vercel.com/ai-gateway/models/veo-3.1-generate-001"
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/veo3.1/image-to-video",
+          "input": "image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "720p": {
+                "audio": 0.4,
+                "silent": 0.2
+              },
+              "1080p": {
+                "audio": 0.4,
+                "silent": 0.2
+              },
+              "4k": {
+                "audio": 0.6,
+                "silent": 0.4
+              }
+            }
+          },
+          "avg_cost_usd": 3.2,
+          "url": "https://fal.ai/models/fal-ai/veo3.1/image-to-video"
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "google/veo-3.1",
+          "input": "text-or-image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "720p": {
+                "audio": 0.4
+              },
+              "1080p": {
+                "audio": 0.4
+              }
+            }
+          },
+          "avg_cost_usd": 3.2,
+          "url": "https://openrouter.ai/google/veo-3.1"
+        }
+      }
+    },
+    "google/veo-3.1-fast": {
+      "id": "google/veo-3.1-fast",
+      "label": "Veo 3.1 Fast",
+      "release": {
+        "date": "2025-10-15",
+        "basis": "model",
+        "source_url": "https://ai.google.dev/gemini-api/docs/changelog"
+      },
+      "short_description": "Faster, cheaper Veo 3.1 — the same envelope and native audio at a fraction of the price.",
+      "vendor": "google",
+      "aspect_ratios": ["16:9", "9:16"],
+      "min_duration": 4,
+      "max_duration": 8,
+      "audio": true,
+      "speed_label": "medium",
+      "url": "https://deepmind.google/models/veo/",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "google/veo-3.1-fast-generate-001",
+          "input": "text-or-image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "720p": {
+                "audio": 0.15,
+                "silent": 0.1
+              },
+              "1080p": {
+                "audio": 0.15,
+                "silent": 0.1
+              },
+              "4k": {
+                "audio": 0.35,
+                "silent": 0.3
+              }
+            }
+          },
+          "avg_cost_usd": 1.2,
+          "url": "https://vercel.com/ai-gateway/models/veo-3.1-fast-generate-001"
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/veo3.1/fast/image-to-video",
+          "input": "image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "720p": {
+                "audio": 0.15,
+                "silent": 0.1
+              },
+              "1080p": {
+                "audio": 0.15,
+                "silent": 0.1
+              },
+              "4k": {
+                "audio": 0.35,
+                "silent": 0.3
+              }
+            }
+          },
+          "avg_cost_usd": 1.2,
+          "url": "https://fal.ai/models/fal-ai/veo3.1/fast/image-to-video"
+        }
+      }
+    },
+    "google/veo-3.1-lite": {
+      "id": "google/veo-3.1-lite",
+      "label": "Veo 3.1 Lite",
+      "release": {
+        "date": "2026-03-31",
+        "basis": "model",
+        "source_url": "https://blog.google/innovation-and-ai/technology/ai/veo-3-1-lite/"
+      },
+      "short_description": "Budget Veo 3.1 — 720p/1080p clips with native audio for a few cents a second.",
+      "vendor": "google",
+      "aspect_ratios": ["16:9", "9:16"],
+      "min_duration": 4,
+      "max_duration": 8,
+      "audio": true,
+      "speed_label": "fast",
+      "url": "https://deepmind.google/models/veo/",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "google/veo-3.1-lite-generate-001",
+          "input": "text-or-image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "720p": {
+                "audio": 0.05,
+                "silent": 0.03
+              },
+              "1080p": {
+                "audio": 0.08,
+                "silent": 0.05
+              }
+            }
+          },
+          "avg_cost_usd": 0.64,
+          "url": "https://vercel.com/ai-gateway/models/veo-3.1-lite-generate-001"
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "fal-ai/veo3.1/lite/image-to-video",
+          "input": "image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "720p": {
+                "audio": 0.05,
+                "silent": 0.03
+              },
+              "1080p": {
+                "audio": 0.08,
+                "silent": 0.05
+              }
+            }
+          },
+          "avg_cost_usd": 0.64,
+          "url": "https://fal.ai/models/fal-ai/veo3.1/lite/image-to-video"
+        }
+      }
+    },
+    "alibaba/wan-3.0": {
+      "id": "alibaba/wan-3.0",
+      "label": "Wan 3.0",
+      "release": {
+        "date": "2026-08-06",
+        "basis": "model",
+        "source_url": "https://www.alibabacloud.com/help/en/model-studio/newly-released-models"
+      },
+      "short_description": "Alibaba's flagship video model — long clips (up to 30s) with bundled audio at the lowest per-second rates in the catalogue.",
+      "vendor": "alibaba",
+      "aspect_ratios": ["16:9", "4:3", "1:1", "3:4", "9:16"],
+      "min_duration": 2,
+      "max_duration": 30,
+      "audio": true,
+      "speed_label": "medium",
+      "url": "https://wan.video/",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "alibaba/wan-v3.0-video",
+          "input": "text-or-image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "480p": {
+                "audio": 0.05
+              },
+              "720p": {
+                "audio": 0.1
+              },
+              "1080p": {
+                "audio": 0.2
+              }
+            }
+          },
+          "avg_cost_usd": 1,
+          "url": "https://vercel.com/ai-gateway/models/wan-v3.0-video"
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "alibaba/wan-3.0/image-to-video",
+          "input": "image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "480p": {
+                "audio": 0.05
+              },
+              "720p": {
+                "audio": 0.1
+              },
+              "1080p": {
+                "audio": 0.2
+              }
+            }
+          },
+          "avg_cost_usd": 1,
+          "url": "https://fal.ai/models/alibaba/wan-3.0/image-to-video"
+        }
+      }
+    },
+    "bytedance/seedance-2.0": {
+      "id": "bytedance/seedance-2.0",
+      "label": "Seedance 2.0",
+      "release": {
+        "date": "2026-02-12",
+        "basis": "model",
+        "source_url": "https://seed.bytedance.com/en/blog/seedance-2-0-%E6%AD%A3%E5%BC%8F%E5%8F%91%E5%B8%83"
+      },
+      "short_description": "ByteDance's video model — image-to-video with reference modes, up to 4K, at roughly two-thirds the price of Seedance 2.5.",
+      "vendor": "bytedance",
+      "aspect_ratios": ["16:9", "9:16", "1:1"],
+      "min_duration": 5,
+      "max_duration": 15,
+      "audio": true,
+      "speed_label": "slow",
+      "url": "https://seed.bytedance.com/en/seedance2_0",
+      "providers": {
+        "fal": {
+          "provider": "fal",
+          "id": "bytedance/seedance-2.0/image-to-video",
+          "input": "image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "720p": {
+                "audio": 0.3034
+              },
+              "1080p": {
+                "audio": 0.682
+              }
+            }
+          },
+          "avg_cost_usd": 1.52,
+          "url": "https://fal.ai/models/bytedance/seedance-2.0/image-to-video"
+        },
+        "openrouter": {
+          "provider": "openrouter",
+          "id": "bytedance/seedance-2.0",
+          "input": "text-or-image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "480p": {
+                "audio": 0.06726
+              },
+              "720p": {
+                "audio": 0.06726
+              }
+            }
+          },
+          "avg_cost_usd": 0.34,
+          "url": "https://openrouter.ai/bytedance/seedance-2.0"
+        }
+      }
+    },
+    "bytedance/seedance-2.5": {
+      "id": "bytedance/seedance-2.5",
+      "label": "Seedance 2.5",
+      "release": {
+        "date": "2026-07-31",
+        "basis": "model",
+        "source_url": "https://seed.bytedance.com/en/blog/one-take-creation-flexible-referencing-introducing-seedance-2-5"
+      },
+      "short_description": "ByteDance's latest video model — up to 30-second clips with native audio, reference and editing modes.",
+      "vendor": "bytedance",
+      "aspect_ratios": ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9"],
+      "min_duration": 4,
+      "max_duration": 30,
+      "audio": true,
+      "speed_label": "slow",
+      "url": "https://seed.bytedance.com/en/seedance",
+      "providers": {
+        "fal": {
+          "provider": "fal",
+          "id": "bytedance/seedance-2.5/image-to-video",
+          "input": "image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "480p": {
+                "audio": 0.2205
+              },
+              "720p": {
+                "audio": 0.473
+              },
+              "1080p": {
+                "audio": 1.164
+              }
+            }
+          },
+          "avg_cost_usd": 2.37,
+          "url": "https://fal.ai/models/bytedance/seedance-2.5/image-to-video"
+        }
+      }
+    },
+    "xai/grok-imagine-video-1.5": {
+      "id": "xai/grok-imagine-video-1.5",
+      "label": "Grok Imagine Video 1.5",
+      "release": {
+        "date": "2026-06-03",
+        "basis": "model",
+        "source_url": "https://x.ai/news/grok-imagine-1-5"
+      },
+      "short_description": "SpaceXAI's image-to-video model — animates a still into cinematic video with native, lip-synced audio.",
+      "vendor": "xai",
+      "aspect_ratios": ["16:9", "9:16"],
+      "min_duration": 1,
+      "max_duration": 15,
+      "audio": true,
+      "speed_label": "fast",
+      "url": "https://docs.x.ai/developers/models/grok-imagine-video-1.5",
+      "providers": {
+        "vercel": {
+          "provider": "vercel",
+          "id": "spacexai/grok-imagine-video-1.5",
+          "input": "image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "480p": {
+                "audio": 0.08
+              },
+              "720p": {
+                "audio": 0.14
+              },
+              "1080p": {
+                "audio": 0.25
+              }
+            },
+            "usd_per_input_image": 0.01
+          },
+          "avg_cost_usd": 0.71,
+          "url": "https://vercel.com/ai-gateway/models/grok-imagine-video-1.5"
+        },
+        "fal": {
+          "provider": "fal",
+          "id": "xai/grok-imagine-video/v1.5/image-to-video",
+          "input": "image",
+          "pricing": {
+            "type": "per_second",
+            "usd_per_second": {
+              "480p": {
+                "audio": 0.08
+              },
+              "720p": {
+                "audio": 0.14
+              },
+              "1080p": {
+                "audio": 0.25
+              }
+            },
+            "usd_per_input_image": 0.01
+          },
+          "avg_cost_usd": 0.71,
+          "url": "https://fal.ai/models/xai/grok-imagine-video/v1.5/image-to-video"
+        }
+      }
+    }
+  },
+  "audio.music.models": {
+    "google/lyria-3": {
+      "id": "google/lyria-3",
+      "label": "Lyria 3",
+      "release": {
+        "date": "2026-02-18",
+        "basis": "model",
+        "source_url": "https://deepmind.google/models/model-cards/lyria-3/"
+      },
+      "short_description": "Generate 30-second 48kHz stereo music clips from text or images.",
+      "vendor": "google",
+      "provider": "replicate",
+      "input": {
+        "modalities": ["text", "image"],
+        "max_images": 10
+      },
+      "output": {
+        "default_format": "mp3",
+        "formats": ["mp3"],
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration": {
+          "mode": "fixed",
+          "seconds": 30
+        }
+      },
+      "duration_label": "30s",
+      "output_format": "mp3",
+      "sample_rate_label": "48 kHz stereo",
+      "speed_label": "fast",
+      "speed_max": "20s",
+      "pricing": {
+        "type": "per_run_flat",
+        "usd": 0.04
+      },
+      "avg_cost_usd": 0.04,
+      "url": "https://replicate.com/google/lyria-3"
+    },
+    "google/lyria-3-pro": {
+      "id": "google/lyria-3-pro",
+      "label": "Lyria 3 Pro",
+      "release": {
+        "date": "2026-03-25",
+        "basis": "model",
+        "source_url": "https://blog.google/innovation-and-ai/technology/developers-tools/lyria-3-developers/"
+      },
+      "short_description": "Generate full-length tracks up to ~3 minutes from text or images.",
+      "vendor": "google",
+      "provider": "replicate",
+      "input": {
+        "modalities": ["text", "image"],
+        "max_images": 10
+      },
+      "output": {
+        "default_format": "mp3",
+        "formats": ["mp3"],
+        "sample_rate_hz": 48000,
+        "channels": 2,
+        "duration": {
+          "mode": "up_to",
+          "max_seconds": 180
+        }
+      },
+      "duration_label": "up to 3m",
+      "output_format": "mp3",
+      "sample_rate_label": "48 kHz stereo",
+      "speed_label": "medium",
+      "speed_max": "60s",
+      "pricing": {
+        "type": "per_run_flat",
+        "usd": 0.08
+      },
+      "avg_cost_usd": 0.08,
+      "url": "https://replicate.com/google/lyria-3-pro"
+    }
+  },
+  "audio.sound_effects.models": {
+    "eleven_text_to_sound_v2": {
+      "id": "eleven_text_to_sound_v2",
+      "label": "Eleven Text to Sound v2",
+      "release": {
+        "date": "2025-09-02",
+        "basis": "model",
+        "source_url": "https://www.linkedin.com/posts/elevenlabsio_introducing-v2-of-our-sfx-model-generate-activity-7368680062662909953-aeBg"
+      },
+      "short_description": "Generate loopable sound effects up to 30 seconds from text.",
+      "vendor": "elevenlabs",
+      "provider": "elevenlabs",
+      "input": {
+        "type": "text"
+      },
+      "output": {
+        "default_format": "mp3",
+        "formats": ["mp3"],
+        "sample_rate_hz": 44100,
+        "duration": {
+          "mode": "automatic_or_fixed",
+          "min_seconds": 0.5,
+          "max_seconds": 30
+        }
+      },
+      "duration_label": "0.5–30s",
+      "output_format": "mp3",
+      "sample_rate_label": "44.1 kHz",
+      "pricing": {
+        "type": "provider_credits",
+        "automatic_duration_credits": 100,
+        "specified_duration_credits_per_second": 11
+      },
+      "avg_cost_usd": null,
+      "url": "https://elevenlabs.io/docs/api-reference/text-to-sound-effects/convert"
+    }
+  },
+  "audio.text_to_speech.models": {
+    "eleven_v3": {
+      "id": "eleven_v3",
+      "label": "Eleven v3",
+      "release": {
+        "date": "2025-06-03",
+        "basis": "model",
+        "source_url": "https://elevenlabs.io/blog/eleven-v3"
+      },
+      "short_description": "Generate expressive speech with bracketed audio and emotion tags.",
+      "vendor": "elevenlabs",
+      "provider": "elevenlabs",
+      "input": {
+        "type": "text",
+        "max_characters": 5000,
+        "audio_tags": true
+      },
+      "output": {
+        "default_format": "mp3",
+        "formats": ["mp3"],
+        "sample_rate_hz": 44100,
+        "bit_rate_kbps": 128
+      },
+      "output_format": "mp3",
+      "sample_rate_label": "44.1 kHz · 128 kbps",
+      "pricing": {
+        "type": "per_1000_characters",
+        "usd": 0.1
+      },
+      "url": "https://elevenlabs.io/docs/api-reference/text-to-speech/convert"
+    }
+  },
+  "three_d.models": {
+    "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d": {
+      "id": "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+      "label": "Hunyuan 3D v3.1 Pro — Text",
+      "release": {
+        "date": "2026-01-16",
+        "basis": "model",
+        "source_url": "https://cloud.tencent.com/document/product/1804/120694"
+      },
+      "short_description": "Generate a textured 3D asset from a text prompt.",
+      "vendor": "tencent",
+      "provider": "fal",
+      "category": "3d/text-to-3d",
+      "input": {
+        "type": "text",
+        "max_utf8_characters": 1024
+      },
+      "output": {
+        "primary": "glb",
+        "optional": ["fbx", "obj", "usdz"]
+      },
+      "pricing": {
+        "type": "per_generation_base_plus_surcharges",
+        "base_usd": 0.375,
+        "surcharges_usd": {
+          "pbr": 0.15,
+          "custom_face_count": 0.15
+        }
+      },
+      "avg_cost_usd": 0.375,
+      "url": "https://fal.ai/models/fal-ai/hunyuan-3d/v3.1/pro/text-to-3d"
+    },
+    "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d": {
+      "id": "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+      "label": "Hunyuan 3D v3.1 Pro — Image",
+      "release": {
+        "date": "2026-01-16",
+        "basis": "model",
+        "source_url": "https://cloud.tencent.com/document/product/1804/120694"
+      },
+      "short_description": "Generate a textured 3D asset from one image or up to eight views.",
+      "vendor": "tencent",
+      "provider": "fal",
+      "category": "3d/image-to-3d",
+      "input": {
+        "type": "image",
+        "min_images": 1,
+        "max_images": 8
+      },
+      "output": {
+        "primary": "glb",
+        "optional": ["fbx", "obj", "usdz"]
+      },
+      "pricing": {
+        "type": "per_generation_base_plus_surcharges",
+        "base_usd": 0.375,
+        "surcharges_usd": {
+          "pbr": 0.15,
+          "multi_view": 0.15,
+          "custom_face_count": 0.15
+        }
+      },
+      "avg_cost_usd": 0.375,
+      "url": "https://fal.ai/models/fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"
+    },
+    "fal-ai/trellis-2": {
+      "id": "fal-ai/trellis-2",
+      "label": "TRELLIS.2",
+      "release": {
+        "date": "2025-12-16",
+        "basis": "model",
+        "source_url": "https://huggingface.co/microsoft/TRELLIS.2-4B"
+      },
+      "short_description": "Generate a textured GLB asset from a single reference image.",
+      "vendor": "microsoft",
+      "provider": "fal",
+      "category": "3d/image-to-3d",
+      "input": {
+        "type": "image",
+        "min_images": 1,
+        "max_images": 1
+      },
+      "output": {
+        "primary": "glb",
+        "optional": []
+      },
+      "pricing": {
+        "type": "per_generation_by_resolution",
+        "default_resolution": "1024",
+        "usd_by_resolution": {
+          "512": 0.25,
+          "1024": 0.3,
+          "1536": 0.35
+        }
+      },
+      "avg_cost_usd": 0.3,
+      "url": "https://fal.ai/models/fal-ai/trellis-2"
+    }
+  },
+  "three_d.model_generation.models": {
+    "tripo/h3.1": {
+      "vendor": "tripo",
+      "provider": "tripo",
+      "feature": "model-generation",
+      "inputs": ["text", "image", "multiview"],
+      "output": {
+        "primary": "glb",
+        "compression": "none"
+      },
+      "texture_quality": ["standard", "detailed", "extreme"],
+      "id": "tripo/h3.1",
+      "label": "Tripo H3.1",
+      "binding_id": "v3.1-20260211",
+      "preview": false,
+      "release": {
+        "date": "2026-03-06",
+        "basis": "model",
+        "source_url": "https://www.tripo3d.ai/blog/introducing-hd-model-v3-1"
+      },
+      "short_description": "High-detail geometry with optional PBR textures.",
+      "face_limit": {
+        "min": 1,
+        "max": 1500000,
+        "detailed_max": 2000000
+      },
+      "geometry_quality": ["standard", "detailed"],
+      "pricing": {
+        "type": "per_generation_credits",
+        "usd_per_credit": 0.01,
+        "texture_credits": {
+          "standard": 10,
+          "detailed": 20,
+          "extreme": 30
+        },
+        "source_url": "https://developers.tripo3d.ai/en/pricing",
+        "base_credits": {
+          "text": 10,
+          "image": 20,
+          "multiview": 20
+        },
+        "detailed_geometry_credits": 20
+      },
+      "url": "https://developers.tripo3d.ai/en/docs/generation-text-to-model/standard"
+    },
+    "tripo/p1": {
+      "vendor": "tripo",
+      "provider": "tripo",
+      "feature": "model-generation",
+      "inputs": ["text", "image", "multiview"],
+      "output": {
+        "primary": "glb",
+        "compression": "none"
+      },
+      "texture_quality": ["standard", "detailed", "extreme"],
+      "id": "tripo/p1",
+      "label": "Tripo P1",
+      "binding_id": "P1-20260311",
+      "preview": false,
+      "release": {
+        "date": "2026-03-11",
+        "basis": "model",
+        "source_url": "https://www.tripo3d.ai/blog/introducing-smart-mesh-v1"
+      },
+      "short_description": "Low-poly generation with clean mesh topology.",
+      "face_limit": {
+        "min": 50,
+        "max": 20000
+      },
+      "pricing": {
+        "type": "per_generation_credits",
+        "usd_per_credit": 0.01,
+        "texture_credits": {
+          "standard": 10,
+          "detailed": 20,
+          "extreme": 30
+        },
+        "source_url": "https://developers.tripo3d.ai/en/pricing",
+        "base_credits": {
+          "text": 30,
+          "image": 40,
+          "multiview": 40
+        }
+      },
+      "url": "https://developers.tripo3d.ai/en/docs/generation-text-to-model/p"
+    },
+    "tripo/p2": {
+      "vendor": "tripo",
+      "provider": "tripo",
+      "feature": "model-generation",
+      "inputs": ["text", "image", "multiview"],
+      "output": {
+        "primary": "glb",
+        "compression": "none"
+      },
+      "texture_quality": ["standard", "detailed", "extreme"],
+      "id": "tripo/p2",
+      "label": "Tripo P2 Preview",
+      "binding_id": "P2-20260801",
+      "preview": true,
+      "release": {
+        "date": "2026-08-19",
+        "basis": "model",
+        "source_url": "https://www.tripo3d.ai/blog/tripo-p2-0-preview"
+      },
+      "short_description": "Preview of next-generation low-poly mesh generation.",
+      "face_limit": {
+        "min": 48,
+        "max": 50000
+      },
+      "pricing": {
+        "type": "per_generation_credits",
+        "usd_per_credit": 0.01,
+        "texture_credits": {
+          "standard": 10,
+          "detailed": 20,
+          "extreme": 30
+        },
+        "source_url": "https://developers.tripo3d.ai/en/pricing",
+        "base_credits": {
+          "text": 100,
+          "image": 100,
+          "multiview": 100
+        }
+      },
+      "url": "https://developers.tripo3d.ai/en/docs/generation-text-to-model/p"
+    }
+  },
+  "three_d.rigging.models": {
+    "tripo/rig-v1.0": {
+      "vendor": "tripo",
+      "provider": "tripo",
+      "feature": "rigging",
+      "specs": ["tripo", "mixamo"],
+      "input": {
+        "formats": ["glb", "gltf", "fbx", "obj", "stl"],
+        "max_bytes": 150000000
+      },
+      "output": {
+        "formats": ["glb", "fbx"]
+      },
+      "pricing": {
+        "type": "per_operation_credits",
+        "credits": 25,
+        "usd_per_credit": 0.01,
+        "source_url": "https://developers.tripo3d.ai/en/pricing"
+      },
+      "release": {
+        "date": null,
+        "basis": "provider_endpoint",
+        "source_url": "https://developers.tripo3d.ai/en/docs/animations-rig"
+      },
+      "url": "https://developers.tripo3d.ai/en/docs/animations-rig",
+      "id": "tripo/rig-v1.0",
+      "label": "Tripo Rig v1.0",
+      "binding_id": "v1.0-20240301",
+      "short_description": "Automatic skeleton rigging for humanoid characters.",
+      "rig_types": ["biped"]
+    },
+    "tripo/rig-v2.5": {
+      "vendor": "tripo",
+      "provider": "tripo",
+      "feature": "rigging",
+      "specs": ["tripo", "mixamo"],
+      "input": {
+        "formats": ["glb", "gltf", "fbx", "obj", "stl"],
+        "max_bytes": 150000000
+      },
+      "output": {
+        "formats": ["glb", "fbx"]
+      },
+      "pricing": {
+        "type": "per_operation_credits",
+        "credits": 25,
+        "usd_per_credit": 0.01,
+        "source_url": "https://developers.tripo3d.ai/en/pricing"
+      },
+      "release": {
+        "date": null,
+        "basis": "provider_endpoint",
+        "source_url": "https://developers.tripo3d.ai/en/docs/animations-rig"
+      },
+      "url": "https://developers.tripo3d.ai/en/docs/animations-rig",
+      "id": "tripo/rig-v2.5",
+      "label": "Tripo Rig v2.5",
+      "binding_id": "v2.5-20260210",
+      "short_description": "Automatic skeleton rigging for animals and other creatures.",
+      "rig_types": [
+        "quadruped",
+        "hexapod",
+        "octopod",
+        "avian",
+        "serpentine",
+        "aquatic"
+      ]
+    }
+  },
+  "three_d.rig_check.operation": {
+    "feature": "rig-check",
+    "provider": "tripo",
+    "binding_id": "rig-check",
+    "input": {
+      "formats": ["glb"],
+      "max_bytes": 150000000
+    },
+    "rig_types": [
+      "biped",
+      "quadruped",
+      "hexapod",
+      "octopod",
+      "avian",
+      "serpentine",
+      "aquatic"
+    ],
+    "pricing": {
+      "type": "per_operation_credits",
+      "credits": 0,
+      "usd_per_credit": 0.01,
+      "source_url": "https://developers.tripo3d.ai/en/pricing"
+    },
+    "url": "https://developers.tripo3d.ai/en/docs/animations-rig-check"
+  },
+  "image_tools.models": {
+    "recraft-ai/recraft-remove-background": {
+      "id": "recraft-ai/recraft-remove-background",
+      "label": "Recraft Remove Background",
+      "release": {
+        "date": null,
+        "basis": "provider_endpoint",
+        "source_url": "https://replicate.com/recraft-ai/recraft-remove-background/versions"
+      },
+      "url": "https://replicate.com/recraft-ai/recraft-remove-background",
+      "category": "image/tool/remove-background",
+      "cost_usd": 0.01
+    },
+    "851-labs/background-remover": {
+      "id": "851-labs/background-remover",
+      "label": "851 Labs Background Remover",
+      "release": {
+        "date": null,
+        "basis": "provider_endpoint",
+        "source_url": "https://replicate.com/851-labs/background-remover/versions"
+      },
+      "url": "https://replicate.com/851-labs/background-remover",
+      "category": "image/tool/remove-background",
+      "cost_usd": 0.00048
+    },
+    "bria/remove-background": {
+      "id": "bria/remove-background",
+      "label": "Bria Remove Background",
+      "release": {
+        "date": "2024-11-12",
+        "basis": "model",
+        "source_url": "https://bria.ai/blog/brias-new-state-of-the-art-remove-background-outperforms-the-competition"
+      },
+      "url": "https://replicate.com/bria/remove-background",
+      "category": "image/tool/remove-background",
+      "cost_usd": 0.018
+    },
+    "nightmareai/real-esrgan": {
+      "id": "nightmareai/real-esrgan",
+      "label": "Real-ESRGAN",
+      "release": {
+        "date": "2021-07-22",
+        "basis": "model",
+        "source_url": "https://github.com/xinntao/Real-ESRGAN/releases/tag/v0.1.0"
+      },
+      "url": "https://replicate.com/nightmareai/real-esrgan",
+      "category": "image/tool/upscale",
+      "cost_usd": 0.002
+    }
+  },
+  "embedding.models": {
+    "google/gemini-embedding-2": {
+      "id": "google/gemini-embedding-2",
+      "label": "Gemini Embedding 2",
+      "release": {
+        "date": "2026-03-10",
+        "basis": "model",
+        "source_url": "https://ai.google.dev/gemini-api/docs/changelog"
+      },
+      "deprecated": false,
+      "short_description": "Natively multimodal embedding (text + image into one space); 3072-d, MRL-truncatable.",
+      "vendor": "google",
+      "category": "embedding/multimodal",
+      "dimensions": 1536,
+      "normalized": true,
+      "multimodal": true,
+      "pricing": {
+        "type": "per_token_input",
+        "input": 0.15
+      },
+      "avg_cost_usd": 0.00002,
+      "url": "https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2-preview"
+    }
+  }
+}

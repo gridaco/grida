@@ -36,14 +36,22 @@ or headless login. Login requires terminal interaction.
 ## Inspect your session
 
 ```sh
-grida auth status --json
+grida auth status
 ```
 
 Status reads local metadata without contacting the server or displaying
-credentials. A saved session is not proof that the server still accepts it.
-Use [account view](./account.md) for an online check. Account commands refresh
-expired access when possible and otherwise ask you to log in again; they never
-start login automatically.
+credentials. A saved session is not proof that the server still accepts it;
+run [`grida account view`](./account.md) to verify it online. Account requests
+automatically refresh access when needed. If your session has ended, they ask
+you to log in again; they never start login automatically. Access expiry alone
+does not mean you need to sign in again.
+
+For diagnostics, JSON output includes the session `state` and, when a session
+is saved, its `identity` and `expiresAt`:
+
+```sh
+grida auth status --json
+```
 
 ## Choose credential storage
 
@@ -69,8 +77,10 @@ manually does not revoke a session or safely migrate its credentials.
 grida auth logout
 ```
 
-Logout removes this CLI's credentials and requests remote session revocation.
+Logout removes this CLI's credentials and requests revocation of this CLI session
+only. Other sessions, including browser and Desktop sessions, and provider API
+keys are left intact.
+
 Local removal still happens offline; unconfirmed revocation is reported with
 exit code `1`. When online, logout renews expired credentials if needed to revoke
-that session, without saving them again. Already signed out locally is a successful no-op. Logout leaves
-provider API keys intact.
+that session, without saving them again. Already signed out locally is a successful no-op.

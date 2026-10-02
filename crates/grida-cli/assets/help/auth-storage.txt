@@ -1,0 +1,8 @@
+Usage: grida auth storage <command>
+
+Commands:
+  show                      Inspect the credential backend
+  migrate <keyring|file>     Explicitly migrate this profile's credentials
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/auth

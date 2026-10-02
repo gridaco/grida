@@ -37,12 +37,14 @@
     }
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "node scripts/generate.mjs --check && tsdown",
+    "check:generated": "node scripts/generate.mjs --bundle --check",
     "dev": "tsdown --watch",
-    "prepack": "tsdown",
-    "test": "vitest run",
-    "test:package": "tsdown && node --test scripts/check-entries.mjs",
-    "typecheck": "tsc --noEmit"
+    "generate": "node scripts/generate.mjs",
+    "prepack": "node scripts/generate.mjs --check && tsdown",
+    "test": "node --test scripts/check-generation.mjs && vitest run",
+    "test:package": "node scripts/generate.mjs --check && tsdown && node --test scripts/check-entries.mjs",
+    "typecheck": "node scripts/generate.mjs --check && tsc --noEmit"
   },
   "devDependencies": {
     "tsdown": "^0.22.1",

@@ -3,15 +3,30 @@ name: Local OAuth proof
 
 on:
   workflow_call:
+    inputs:
+      native_candidate_artifact:
+        description: Exact native archives already built by the release matrix.
+        type: string
+        required: false
+        default: ""
   workflow_dispatch:
   pull_request:
     paths:
       - ".github/workflows/auth-local.yml"
       - "scripts/auth-local/**"
+      - "scripts/cli-local/**"
+      - "scripts/cli-release/**"
+      - "crates/grida-cli/**"
+      - "crates/grida-auth/**"
+      - "packages/grida-cli/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
       - "packages/grida-auth/**"
       - "packages/grida-account/**"
       - "packages/grida-home/**"
       - "packages/grida-ai-models/**"
+      - "data/ai/**"
       - "editor/lib/auth/**"
       - "editor/lib/gg/**"
       - "editor/lib/ai/openai-compat/**"
@@ -129,7 +144,24 @@ jobs:
           pnpm --filter @grida/auth typecheck
           pnpm --filter @grida/auth test
           node --test scripts/auth-local/guards.test.mjs scripts/auth-local/network.test.mjs
+          node --test scripts/cli-local/native-proof.test.mjs
           node_modules/.bin/vitest run --config editor/vitest.oauth.config.ts
+      - name: Build and pack the actual native host candidate
+        if: inputs.native_candidate_artifact == ''
+        run: |
+          rustup show active-toolchain
+          AUTH_NATIVE_CANDIDATE="$RUNNER_TEMP/grida-auth-native-candidate"
+          export AUTH_NATIVE_CANDIDATE
+          node --input-type=module <<'NODE'
+          import { buildHostFixture } from './scripts/cli-release/native-fixture.mjs';
+          await buildHostFixture(process.env.AUTH_NATIVE_CANDIDATE);
+          NODE
+      - name: Download the exact release candidate for real OAuth acceptance
+        if: inputs.native_candidate_artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.native_candidate_artifact }}
+          path: ${{ runner.temp }}/grida-auth-native-candidate
       - name: Install fixture browser
         env:
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/grida-auth-browsers
@@ -164,6 +196,7 @@ jobs:
         env:
           GRIDA_AUTH_TEST_STATE: ${{ steps.fixture.outputs.state }}
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/grida-auth-browsers
+          AUTH_NATIVE_CANDIDATE: ${{ runner.temp }}/grida-auth-native-candidate
         run: |
           node scripts/auth-local/editor.mjs --state "$GRIDA_AUTH_TEST_STATE" > "$RUNNER_TEMP/grida-auth-editor.log" 2>&1 &
           AUTH_EDITOR_PID=$!
@@ -179,6 +212,7 @@ jobs:
           done
           test "$AUTH_EDITOR_READY" = 1
           editor/node_modules/.bin/playwright test --config editor/playwright.auth.config.ts
+          node scripts/cli-local/native-proof.mjs --state "$GRIDA_AUTH_TEST_STATE" --candidate "$AUTH_NATIVE_CANDIDATE"
       - name: Stop only the owned local fixture
         if: ${{ always() && steps.fixture.outputs.state != '' }}
         env:

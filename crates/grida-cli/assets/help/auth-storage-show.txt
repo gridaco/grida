@@ -1,0 +1,6 @@
+Usage: grida auth storage show [--json] [--no-input]
+
+Show backend and migration metadata, without reading keyring credentials.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/auth

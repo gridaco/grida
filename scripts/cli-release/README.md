@@ -1,122 +1,216 @@
 # CLI package preparation and release
 
-For maintainers preparing the independently installed `grida` executable.
-Publication requires deployed account access, public documentation and release
-configuration. These scripts do not provision services or change the package's
-release metadata.
+The `grida` npm package contains a Node 24+ launcher and all eight native
+executables in one tarball. Installation has no dependencies, lifecycle scripts
+or binary downloads. The launcher selects `binaries/<platform-id>/grida`
+(`grida.exe` on Windows), distinguishing glibc and musl on Linux, and forwards
+arguments, inherited streams, exit status and termination signals. The native
+executable itself needs no Node runtime.
 
-The web server's [OAuth deployment reference](../../editor/lib/auth/README.md)
-owns the required environment variables, registration alignment, secret rotation
-and hosted verification. Supabase registration and green CI do not activate
-those settings in an existing Vercel deployment.
+## Platform policy
 
-## Local candidate
+The reviewed matrix lives in
+[`platforms.json`](../../packages/grida-cli/native/platforms.json):
 
-Use Node 24 and its bundled npm. Build before packing; choose a new absolute
-output directory whose parent already exists.
+| Platform ID      | Rust target                | Minimum runtime         |
+| ---------------- | -------------------------- | ----------------------- |
+| darwin-x64       | x86_64-apple-darwin        | macOS 11                |
+| darwin-arm64     | aarch64-apple-darwin       | macOS 11                |
+| linux-x64-gnu    | x86_64-unknown-linux-gnu   | glibc 2.28              |
+| linux-arm64-gnu  | aarch64-unknown-linux-gnu  | glibc 2.28              |
+| linux-x64-musl   | x86_64-unknown-linux-musl  | musl; static executable |
+| linux-arm64-musl | aarch64-unknown-linux-musl | musl; static executable |
+| win32-x64        | x86_64-pc-windows-msvc     | supported Windows x64   |
+| win32-arm64      | aarch64-pc-windows-msvc    | supported Windows arm64 |
+
+Every installation contains the complete platform matrix. Durable account and
+provider storage is supported on macOS/Linux; Windows retains the explicit
+environment and stdin provider-key workflow. Unsupported targets fail with a
+diagnostic. The launcher neither substitutes another architecture nor searches
+PATH for an executable. A missing bundled executable requires reinstalling Grida.
+
+GNU binaries build on their native architecture inside PyPA's
+[`manylinux_2_28` images](https://github.com/pypa/manylinux#manylinux_2_28-almalinux-8-based),
+with the exact Rust version from `rust-toolchain.toml`. The build executes the
+binary in that glibc 2.28 environment, rejects newer glibc symbol requirements,
+and rejects unexpected unbundled shared libraries. A newer Ubuntu runner does
+not raise the ABI minimum. musl builds compile native C dependencies with
+`musl-gcc` and link Rust's self-contained musl runtime with the host `cc` driver.
+Using the `musl-gcc` wrapper as Rust's linker can produce an x64 static-PIE binary
+that crashes at startup ([Rust issue 95926](https://github.com/rust-lang/rust/issues/95926)).
+Before execution and packaging, musl builds reject ELF interpreters and shared
+library dependencies; a static PIE's own dynamic section is permitted. Installed
+proofs run inside the official Alpine Node image. macOS sets deployment target 11.0.
+Windows uses its native architecture and MSVC target.
+
+## Preparing a candidate
+
+Use the pinned Rust toolchain, Node 24 and npm 11.5.1 or newer. Build each target
+on its matching OS and architecture; GNU builds additionally need Docker.
+Choose new absolute output directories.
 
 ```sh
-pnpm turbo run build --filter=grida...
-pnpm turbo run typecheck test --filter=grida...
-node --test scripts/cli-release/prepare.test.mjs
-node scripts/cli-release/prepare.mjs --out "$PWD/.cache/cli-candidate"
-node scripts/cli-release/prepare.mjs --verify --out "$PWD/.cache/cli-candidate"
-node scripts/cli-media-local/proof.mjs --archive "$PWD/.cache/cli-candidate/grida-0.1.0.tgz"
+node scripts/cli-release/native-build.mjs --target aarch64-apple-darwin --out "$PWD/.tmp/native-artifacts"
 ```
 
-Use the actual archive name from `candidate.json` after a version change. The
-output includes the archive SHA-256 and exact packed file list. Preparation
-copies only the bundled executable, package manifest, README, third-party
-notices and repository license into an isolated directory. Review the notice
-inventory whenever bundled dependencies change. npm runs offline with empty configuration,
-no ambient credentials and no lifecycle scripts. Verification reads the archive
-without extraction, checks its hash and file boundary, and compares the packed
-manifest with the checked-out revision. An existing output directory is refused.
+Collect all eight `<rust-target>/grida` (Windows: `grida.exe`) directories under
+one artifact root. The build records the version, source revision, lock hash,
+binary hash and GNU ABI checks alongside each executable. Refresh notices when
+the lockfile changes:
 
-The [installed media proof](../cli-media-local/README.md) installs that exact
-archive with optional dependencies omitted and exercises independent processes
-using synthetic providers and an owned local API. It proves operation without
-the optional keyring binding; the native-auth CI separately exercises custody
-and a disposable macOS keyring entry. Neither substitutes for hosted registration
-or real provider acceptance testing.
+```sh
+cargo fetch --locked
+cargo install cargo-about --version 0.8.2 --locked
+node scripts/cli-release/native-notices.mjs
+node scripts/cli-release/native-notices.mjs --check
+node scripts/cli-release/native.mjs --artifacts "$PWD/.tmp/native-artifacts" --out "$PWD/.tmp/native-candidate"
+node scripts/cli-release/native.mjs --verify --out "$PWD/.tmp/native-candidate"
+node scripts/cli-release/native-proof.mjs --out "$PWD/.tmp/native-candidate"
+node scripts/cli-contracts/installed.mjs --candidate "$PWD/.tmp/native-candidate"
+```
 
-## Independent release ownership
+`cargo-about` is a maintainer tool, not a CLI dependency. Its checked inventory
+covers the production dependency closure for all eight targets. The package
+includes the deterministic third-party license and notice texts, including
+original composite license files that SPDX classification alone cannot replace.
+The inventory records the Cargo.lock hash and preparation refuses stale notices.
+The single notice source is `packages/grida-cli/THIRD-PARTY-NOTICES.txt`; the
+generator also writes `packages/grida-cli/native/licenses.json`. The staged
+package copies that notice source.
 
-The existing [workspace publisher](../../.github/workflows/publish-packages.yml)
-is configured to release npm packages through Changesets and token authentication. The
-CLI follows its manual trigger, repository Node version and frozen pnpm install
-pattern, with a dedicated package artifact and trusted publishing identity.
+Preparation uses isolated npm configuration and cache, offline npm packing and
+no lifecycle scripts. It verifies binary format/architecture and the exact packed
+file boundary. `native-candidate.json` format 2 has one `package` record with its
+archive hash/file list and eight `binaries` records with platform, target, bundled
+path, binary hash and byte count. Verification reads the tarball without extraction
+and compares its manifest, launcher, notices and all eight binaries with the
+reviewed source and report. Windows archive reads use a validated basename and
+an explicit working directory, avoiding GNU tar's drive-colon remote syntax.
 
-CLI publication uses npm Trusted Publishing through GitHub Actions OIDC only.
-The existing token flow is historical precedent, not the authentication pattern
-to copy. Do not configure `NPM_TOKEN`, `NODE_AUTH_TOKEN` or a token fallback for
-CLI releases. Fix a failed trusted-publisher configuration before publishing.
+The candidate records the actual tarball and unpacked sizes. Shipping all eight
+executables increases each download; there is no separate platform-package
+resolution or publication step. Measure complete release builds rather than
+extrapolating from a local host fixture.
 
-The CLI is excluded from Changesets version planning by `ignore`. That setting
-does not control `changeset publish`: it can still publish an ignored public
-package. The repository's `pnpm publish-packages` command therefore uses an
-explicit [publisher wrapper](../publish-packages.mjs) to mark only the CLI private
-while Changesets runs, then restore its exact manifest bytes. A failed child also
-restores the manifest; an uncatchable interruption can leave it private, preventing
-publication. Use this repository command instead of invoking Changesets publication
-directly. The wrapper leaves other packages' publication and the existing
-private-package Git tagging policy unchanged; those tags do not authorize a CLI
-npm release. Its regression runs the installed Changesets CLI against a synthetic
-workspace with inert npm/pnpm/git commands, including an unwrapped positive control.
+For local development, `native-fixture.mjs --binary /absolute/grida --out /absolute/out`
+packs the real host executable with inert foreign image headers. The report marks
+the fixture targets and publication refuses them. Tests exercise a fresh owned
+npm registry with exactly one archive, verify that all eight binaries install,
+and execute the host binary through the real launcher and npm command shim.
+They also cover archive tampering, incomplete/retargeted binary records,
+argument/stream/exit/signal forwarding, missing bundled executable failure,
+ABI policy, immutable version collisions and release guards.
 
-The CLI version is reviewed explicitly in its manifest; `0.0.0` and
-`private: true` cannot pass the release guard. `cli-release.yml` does not edit
-the version or remove `private: true`; publication requires a reviewed manifest.
+## Source and release manifests
 
-`cli-verify.yml` checks the packed CLI on Linux and macOS and retains one Linux
-candidate. `cli-docs.yml` checks guides, examples and installed help. Both run on
-relevant PRs without production credentials. API and local OAuth workflows own
-their respective server and issuer proofs.
+The checked-out source manifest carries Rust build/test commands. Preparation
+stages the reviewed files and eight compiled binaries, then writes a published
+manifest without scripts or dependencies. Do not publish or pack the source
+directory directly: source checkouts do not contain the release binaries.
 
-`cli-release.yml` is a manual, main-only operation. It runs package, docs, API and
-local OAuth checks at the selected revision, then downloads and verifies the
-same candidate for publication. It does not rebuild between verification and
-publish. Reuse the `npm-publish` GitHub environment and its existing reviewer
-and branch protections. Its shared allowlist includes main and canary; the CLI's
-guard independently restricts this workflow to main. Define
-`CLI_NPM_RELEASE_ENABLED=true` only once release readiness has been reviewed.
-Keep that variable disabled when readiness is unknown. The workflow itself also
-refuses a missing or false value. The maintainer dispatches the release and
-approves the environment's deployment gate. A sole maintainer must keep
-self-review prevention disabled when relying on their own approval. See
-[GitHub environment protections](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
+Use `just cli-contracts` for the current native contract gate and see the
+[contract prerequisites](../cli-contracts/README.md) for custody tools and docs
+build requirements. The `native-*` commands above are the current release path.
 
-Before the first release, establish the final workflow filename on the default
-branch. A self-contained, non-publishing `workflow_dispatch` workflow can do this
-before the release implementation and its reusable workflows land. It needs no
-checkout, npm command, secret or OIDC permission. Replace its body with the
-verified release implementation later, keeping the filename stable. GitHub
-requires the default-branch workflow for [manual dispatch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
-Saving npm's publisher configuration does not validate that configuration or
-prove a publish will succeed; no placeholder package release is needed.
+## Release ownership
 
-Configure the npm package's trusted publisher for `gridaco/grida`, workflow file
-`cli-release.yml`, environment `npm-publish`, with permission to run `npm publish`.
-Use GitHub-hosted runners, Node 24 and npm 11.5.1 or newer. Publication uses OIDC
-and provenance; do not add a persistent npm token. New trusted publishers may
-default to staged publication only, so direct publishing must be explicitly
-allowed in npm. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
+[`cli-verify.yml`](../../.github/workflows/cli-verify.yml) calls
+[`cli-native.yml`](../../.github/workflows/cli-native.yml). That workflow builds all
+eight targets, stages one candidate, installs that same tarball on each target,
+and runs native OAuth/account/media proofs on macOS/Linux, including Alpine.
+[`cli-docs.yml`](../../.github/workflows/cli-docs.yml) checks installed help and
+schemas against the public guides with networking disabled by an OS perimeter.
+The local-Supabase/browser and API workflows remain separate release prerequisites.
+Synthetic transport checks do not prove hosted registration or real provider acceptance.
+
+The [OAuth deployment reference](../../editor/lib/auth/README.md) owns service
+configuration and hosted verification. Green CI does not deploy that configuration,
+activate Supabase registration or publish the documentation site. Verify those
+separately before authorizing publication.
+
+[`cli-release.yml`](../../.github/workflows/cli-release.yml) starts automatically
+when a push to `main` changes the version in `packages/grida-cli/package.json`.
+Stable versions publish under `latest`; prereleases publish under `next`.
+Manifest edits that leave the version unchanged skip release work. The guard
+compares against the push event's previous commit, including multi-commit merges,
+and refuses missing comparison history. Keep the npm manifest, CLI crate version,
+lockfile and generated notices aligned when preparing a version bump.
+
+Manual dispatch remains available from `main`, with an exact source version and
+explicit tag. Both triggers verify the non-placeholder version and native cutover marker,
+run the delivery/docs/auth/API workflows, and download the exact verified
+candidate and all eight installed reports. The publish job does not rebuild.
+`native-publish.mjs --dry-run --out /absolute/candidate --version VERSION --tag next`
+checks hashes and proofs, then prints the single publication record without contacting npm.
+
+Publication requires `CLI_NPM_RELEASE_ENABLED=true`, the `npm-publish` GitHub
+environment and its required-reviewer/branch protections, and npm Trusted Publishing
+through GitHub Actions OIDC. The trusted publisher for `grida` must authorize
+repository `gridaco/grida`, workflow `cli-release.yml`, environment `npm-publish`,
+and direct publication, not only staged publication. Keep the workflow filename
+stable on the default branch. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 and [provenance](https://docs.npmjs.com/generating-provenance-statements/).
+Do not configure `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or a token fallback.
+The automatic run waits for maintainer approval before publishing. Keep this
+release approval boundary: green contributor PR checks do not themselves grant
+publication authority. The npm trusted publisher must bind the environment as
+well as the workflow, so removing the environment from a workflow does not bypass
+approval. The workflow does not change these protections.
 
-Stable releases use the `latest` distribution tag, the workflow's default.
-The standalone CLI's first stable version is `0.1.0`, installed with
-`npm install -g grida`. Prereleases use `next` and cannot replace
-`latest`. Review the existing package's versions and tags before
-choosing a version; an old package name does not imply an empty release history.
-Successful CI is a prerequisite, not evidence that docs, OAuth or API changes
-have been deployed. Verify those separately before approving publication.
+`0.3.0-rc.1` was published using separate platform packages. Those immutable
+versions remain historical releases; `0.3.0-rc.2` introduces the bundled layout.
+No new `@grida/cli-*` versions or publisher setup are required for bundled releases.
+The stable `latest` tag changes only after a successful stable publication.
+Verify existing registry versions, tags and trusted-publisher authority before
+merging a release version bump or dispatching a release.
+
+The current workflow and publisher both enforce `main`, including releases under
+`next`. A PR can build and install the complete candidate matrix but cannot
+publish it through this path. Registry acceptance therefore follows merge.
+For a prerelease qualification cycle, merge a new prerelease version, test its
+exact registry version under `next`, and then prepare the stable version bump.
+Changing the version or executable requires fresh candidate proofs; a prerelease
+proof does not certify different stable bytes.
+
+There is one immutable archive publication. Stable releases use `latest`;
+prereleases use `next` and cannot replace `latest`. An already-published version
+is accepted only when its archive integrity and selected distribution tag match.
+Different bytes, changed tags, malformed registry metadata and read failures
+stop before publication. A failed publish is not retried or repaired by moving
+tags automatically.
+
+The CLI remains independently versioned and excluded from Changesets planning.
+Use the repository's [publisher wrapper](../publish-packages.mjs) for other
+packages: it temporarily makes only the source CLI private while Changesets runs.
+
+## After publication
+
+After publishing a new CLI version, complete this smoke test from a clean
+installation using the exact registry version. Local candidate tarballs do not
+satisfy this check.
+
+- [ ] Install `grida@<released-version>` from the public npm registry and record
+      the package version, bundled platform path and executable hash. Exercise
+      the supported release targets, including glibc and musl selection.
+- [ ] Check help, docs, model discovery and provider configuration/listing. Verify
+      that existing provider credentials remain usable without exposing key values.
+- [ ] Complete browser login, inspect status, restart the CLI, read identity,
+      organizations and credits, then log out. Confirm a separate existing session
+      remains usable and compare the results with the local installed-candidate proof.
+- [ ] With an explicit spending budget, save a representative BYOK artifact and
+      one GG artifact, validate their formats and receipt hashes, and confirm no paid
+      submission is retried automatically. Auth and discovery checks alone need no
+      generation spend.
+- [ ] Record results and any registry, platform, hosted-auth or provider failures;
+      revoke the test login and remove only test-owned profiles and outputs.
 
 ## Recovery
 
-Stop new publication by disabling the release environment. Identify the last
-verified compatible version before moving a distribution tag back to it;
-deprecate an affected version with a clear migration instruction when necessary.
-Both are registry mutations requiring maintainer authorization. Do not default
-to unpublishing or silently removing the old API: already installed clients
-remain in use. Ship a corrective version and retain compatible server behavior.
-See the [installed-client policy](https://grida.co/docs/wg/cli/v1#installed-client-compatibility).
+Disable the release environment to stop publication. Retain the exact candidate;
+retry only if an already-published version has the same archive integrity and tag.
+Never rebuild or overwrite an immutable version.
+
+A maintainer can explicitly move the `grida` distribution tag to a previously
+verified version and deprecate a broken version with a migration instruction.
+Each bundled version carries its own complete binary matrix. Registry recovery
+is never automatic.

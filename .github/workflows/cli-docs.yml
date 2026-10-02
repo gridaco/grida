@@ -9,15 +9,20 @@ on:
       - "docs/AGENTS.md"
       - "apps/docs/**"
       - "packages/grida-cli/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/**"
+      - "scripts/cli-contracts/**"
       - "packages/grida-ai/**"
       - "packages/grida-ai-models/**"
+      - "data/ai/**"
       - "packages/grida-auth/**"
       - "packages/grida-account/**"
       - "packages/grida-home/**"
       - "scripts/cli-docs/**"
       - "scripts/cli-release/**"
       - "scripts/npm.mjs"
-      - "scripts/cli-local/network.cjs"
       - "fixtures/images/checker.png"
       - "editor/next.config.ts"
       - ".github/workflows/cli-docs.yml"
@@ -28,8 +33,8 @@ on:
   workflow_dispatch:
   workflow_call:
     inputs:
-      archive_artifact:
-        description: Candidate artifact from CLI verification, containing candidate.json and its tarball.
+      native_candidate_artifact:
+        description: Exact native candidate artifact from the platform build matrix.
         type: string
         required: false
         default: ""
@@ -44,7 +49,7 @@ concurrency:
 jobs:
   docs:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,30 +62,29 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build current command and schema contracts
-        run: pnpm --filter grida... build
+        run: cargo build --locked -p grida-cli --features conformance --bin grida-conformance
       - name: Build documentation
         run: pnpm --filter docs build
       - name: Check example parsing and translation cleanup
         run: |
-          node --import tsx --test scripts/cli-docs/check.test.mjs
+          node --test scripts/cli-docs/check.test.mjs
           node --test apps/docs/scripts/docs-site-gen/copy-translations.test.cjs
-      - name: Download release candidate
-        if: inputs.archive_artifact != ''
+      - name: Check the current preview against its documentation
+        if: inputs.native_candidate_artifact == ''
+        env:
+          GRIDA_CLI_DOCS_SUDO_NETWORK: "1"
+        run: |
+          cargo build --locked -p grida-cli --bin grida
+          node scripts/cli-release/native-fixture.mjs --binary "$PWD/target/debug/grida" --out "$RUNNER_TEMP/grida-docs-native"
+          node scripts/cli-docs/check.mjs --native-candidate "$RUNNER_TEMP/grida-docs-native"
+      - name: Download exact native release candidate
+        if: inputs.native_candidate_artifact != ''
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.archive_artifact }}
-          path: .cache/cli-docs-candidate
-      - name: Check the release candidate against its documentation
-        if: inputs.archive_artifact != ''
-        run: |
-          node --import tsx --input-type=module <<'NODE'
-          import path from 'node:path';
-          import { CliRelease } from './scripts/cli-release/prepare.mjs';
-          import { CliDocs } from './scripts/cli-docs/check.mjs';
-          const root = path.resolve('.cache/cli-docs-candidate');
-          const candidate = await CliRelease.verify(root);
-          console.log(JSON.stringify(await CliDocs.run({ archive: path.join(root, candidate.archive) }), null, 2));
-          NODE
-      - name: Check the current preview against its documentation
-        if: inputs.archive_artifact == ''
-        run: node --import tsx scripts/cli-docs/check.mjs
+          name: ${{ inputs.native_candidate_artifact }}
+          path: ${{ runner.temp }}/grida-docs-native
+      - name: Check the installed native release against documentation with networking disabled
+        if: inputs.native_candidate_artifact != ''
+        env:
+          GRIDA_CLI_DOCS_SUDO_NETWORK: "1"
+        run: node scripts/cli-docs/check.mjs --native-candidate "$RUNNER_TEMP/grida-docs-native"

@@ -10,13 +10,13 @@ format: md
 
 # CLI documentation
 
-> **Status: implemented for Grida CLI 0.1.** Public guides and their currency
+> **Status: implemented for the Grida CLI preview.** Public guides and their currency
 > check accompany the npm release. Local validation does not establish deployment.
 
 ## Current position
 
 The [user guide](../../cli/index.md), installed help, and package README cover
-the 0.1 release line. `grida docs` links to the user guides. The
+the replacement CLI's command contract. `grida docs` links to the user guides. The
 [v1](./v1.md), [media](./media.md), and
 [credential custody](./credential-custody.md) documents retain contributor
 design and rationale.

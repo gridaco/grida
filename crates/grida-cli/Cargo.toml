@@ -1,0 +1,67 @@
+[package]
+name = "grida-cli"
+version = "0.3.0"
+description = "The native Grida command-line executable."
+default-run = "grida"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "grida"
+path = "src/main.rs"
+
+[[bin]]
+name = "grida-conformance"
+path = "src/bin/conformance.rs"
+required-features = ["conformance"]
+
+[features]
+conformance = []
+
+[dependencies]
+grida-ai = { path = "../grida-ai" }
+grida-auth = { path = "../grida-auth" }
+clap.workspace = true
+serde_json.workspace = true
+unicode-general-category.workspace = true
+bytes = "1"
+zeroize = "1"
+http = "1"
+http-body-util = "0.1"
+httparse = "1"
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+tokio = { version = "1", features = [
+  "net",
+  "io-util",
+  "io-std",
+  "time",
+  "rt-multi-thread",
+  "macros",
+  "sync",
+  "signal",
+  "fs",
+] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tokio-rustls = "0.26"
+rustls = "0.23"
+rustls-platform-verifier = "0.7"
+url = "2"
+ipnet = "2"
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
+time = { version = "0.3", features = ["formatting", "parsing"] }
+crossterm = "0.29"
+rustix = { version = "1", features = ["fs", "process", "termios"] }
+
+[dev-dependencies]
+rcgen = "0.14"
+tempfile = "3"
+
+[lints]
+workspace = true

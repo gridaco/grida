@@ -18,6 +18,167 @@ export namespace InputSchema {
   };
   type Fields = Record<string, Rule<unknown> & { optional?: boolean }>;
   type Shape<F extends Fields> = { [K in keyof F]: ReturnType<F[K]["parse"]> };
+  /** The checked-in vocabulary; the public JSON description stays unrestricted. */
+  type Definition = Schema & {
+    type?: string;
+    properties?: Record<string, Definition>;
+    required?: string[];
+    items?: Definition;
+    maxItems?: number;
+    enum?: (string | number)[];
+    const?: Json;
+    default?: Json;
+    pattern?: string;
+    minimum?: number;
+    maximum?: number;
+    exclusiveMinimum?: number;
+    maxLength?: number;
+    not?: Definition;
+    anyOf?: Definition[];
+    oneOf?: Definition[];
+    allOf?: Definition[];
+    if?: Definition;
+    then?: Definition;
+    "x-grida-decoded-max-bytes"?: number;
+    "x-grida-positive-pair"?: "safe-integer" | "finite-number";
+    "x-grida-url"?: {
+      schemes: string[];
+      fragments: boolean;
+      userinfo: boolean;
+    };
+    "x-grida-trim"?: boolean;
+    "x-grida-nonblank"?: boolean;
+    "x-grida-max-length"?: number;
+    "x-grida-length-unit"?: "codepoints" | "utf16";
+    "x-grida-uri-segment"?: boolean;
+  };
+  type ObjectDefinition = Definition & {
+    type: "object";
+    properties: Record<string, Definition>;
+    required: string[];
+  };
+
+  /** Admit a private mutable clone before specializing an object contract. */
+  export function mutableObject(schema: Schema): ObjectDefinition {
+    const s = schema as Definition;
+    if (
+      s.type !== "object" ||
+      !s.properties ||
+      typeof s.properties !== "object" ||
+      Array.isArray(s.properties) ||
+      !Array.isArray(s.required) ||
+      !s.required.every((name) => typeof name === "string")
+    )
+      throw new Error("unsupported object input schema");
+    return s as ObjectDefinition;
+  }
+
+  /** Compile the private, checked-in input vocabulary; not a general JSON Schema runtime. */
+  export function fromJson<T>(schema: Schema): Rule<T> {
+    let rule: Rule<unknown>;
+    const s = schema as Definition;
+    if (s.type === "object") {
+      const definition = mutableObject(s);
+      rule = object(
+        Object.fromEntries(
+          Object.entries(definition.properties).map(([name, child]) => {
+            const field = fromJson(child);
+            return [
+              name,
+              definition.required.includes(name)
+                ? field
+                : optional(field, child.default),
+            ];
+          })
+        )
+      );
+    } else if (s.type === "array") {
+      if (!s.items || typeof s.maxItems !== "number")
+        throw new Error("unsupported array input schema");
+      rule = array(fromJson(s.items), s.maxItems);
+    } else if (s.enum) rule = enumeration(s.enum);
+    else if (s["x-grida-decoded-max-bytes"])
+      rule = bytes(s["x-grida-decoded-max-bytes"]);
+    else if (s["x-grida-positive-pair"]) {
+      if (typeof s.pattern !== "string")
+        throw new Error("unsupported pair input schema");
+      rule = pair(
+        s.pattern.includes(":") ? ":" : "x",
+        s["x-grida-positive-pair"] === "safe-integer"
+      );
+    } else if (s["x-grida-url"])
+      rule = url(
+        s["x-grida-url"].schemes.includes("image-data"),
+        s["x-grida-url"].fragments
+      );
+    else if (s.type === "string")
+      rule = string({
+        trim: s["x-grida-trim"],
+        nonblank: s["x-grida-nonblank"],
+        max: s["x-grida-max-length"] ?? s.maxLength,
+        unit: s["x-grida-length-unit"],
+        voice: s["x-grida-uri-segment"],
+      });
+    else if (s.type === "boolean") rule = boolean;
+    else if (s.type === "integer" || s.type === "number")
+      rule = number({
+        integer: s.type === "integer",
+        min: s.minimum,
+        max: s.maximum,
+        exclusiveMin: s.exclusiveMinimum,
+        exclude: typeof s.not?.const === "number" ? s.not.const : undefined,
+      });
+    else throw new Error("unsupported input schema");
+    return {
+      schema: freeze(schema),
+      parse(value, json) {
+        const parsed = rule.parse(value, json);
+        if (!matches(schema, parsed)) throw 0;
+        return parsed as T;
+      },
+    };
+  }
+
+  function matches(schema: Schema, value: unknown): boolean {
+    const s = schema as Definition;
+    if (Object.hasOwn(s, "const") && s.const !== value) return false;
+    if (
+      s.enum &&
+      ((typeof value !== "string" && typeof value !== "number") ||
+        !s.enum.includes(value))
+    )
+      return false;
+    if (s.not && matches(s.not, value)) return false;
+    if ((s.required || s.properties) && (!value || typeof value !== "object"))
+      return false;
+    if (
+      typeof value === "number" &&
+      ((s.maximum !== undefined && value > s.maximum) ||
+        (s.minimum !== undefined && value < s.minimum))
+    )
+      return false;
+    if (
+      s.required?.some(
+        (key: string) => (value as Record<string, unknown>)[key] === undefined
+      )
+    )
+      return false;
+    if (s.properties)
+      for (const [key, child] of Object.entries(s.properties)) {
+        const entry = (value as Record<string, unknown>)[key];
+        if (entry !== undefined && !matches(child, entry)) return false;
+      }
+    if (s.anyOf && !s.anyOf.some((child: Schema) => matches(child, value)))
+      return false;
+    if (
+      s.oneOf &&
+      s.oneOf.filter((child: Schema) => matches(child, value)).length !== 1
+    )
+      return false;
+    if (s.allOf && !s.allOf.every((child: Schema) => matches(child, value)))
+      return false;
+    return !(s.if && matches(s.if, value) && s.then && !matches(s.then, value));
+  }
 
   export function freeze<T>(value: T): T {
     if (value && typeof value === "object" && !(value instanceof Uint8Array)) {

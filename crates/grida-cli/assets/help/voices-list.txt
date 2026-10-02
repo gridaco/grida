@@ -1,0 +1,6 @@
+Usage: grida voices list --provider elevenlabs [--key-stdin] [--json]
+
+List speech voices using the ElevenLabs credential. No Grida login.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/models

@@ -1,9 +1,7 @@
 // GRIDA-SEC-013 / GRIDA-SEC-014 — documentation examples are parsed, never dispatched with authority.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
-  cp,
   mkdir,
   mkdtemp,
   readFile,
@@ -13,24 +11,95 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { Cli } from "../../packages/grida-cli/src/cli.ts";
-import { MediaInput } from "../../packages/grida-cli/src/media-input.ts";
-import { CliRelease } from "../cli-release/prepare.mjs";
+import { installNative } from "../cli-release/native-proof.mjs";
+import { buildHostFixture } from "../cli-release/native-fixture.mjs";
 
 const repository = fileURLToPath(new URL("../../", import.meta.url));
-// Resolve the SDK's public package export in its actual consumer's dependency scope.
-const { MediaOperations } = createRequire(
-  new URL("../../packages/grida-cli/package.json", import.meta.url)
-)("@grida/ai");
 const execute = promisify(execFile);
-const digest = (value) => createHash("sha256").update(value).digest("hex");
 const route = (value) => value.replace(/\/$/, "");
+
+async function buildParser() {
+  const result = await execute(
+    "cargo",
+    [
+      "build",
+      "--locked",
+      "-p",
+      "grida-cli",
+      "--features",
+      "conformance",
+      "--bin",
+      "grida-conformance",
+      "--message-format=json",
+    ],
+    { cwd: repository, timeout: 10 * 60_000, maxBuffer: 16 * 1024 * 1024 }
+  );
+  const artifacts = result.stdout
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .filter(
+      (value) =>
+        value.reason === "compiler-artifact" &&
+        value.target.name === "grida-conformance" &&
+        value.executable
+    );
+  assert.equal(artifacts.length, 1, "Expected one native documentation parser");
+  return artifacts[0].executable;
+}
+
+async function offline(binary, args, { env, cwd }) {
+  // The same OS network perimeter contains installed reads and the feature-only
+  // parser/input validator. No JavaScript preload can constrain native code.
+  let executable, parameters;
+  if (process.platform === "darwin") {
+    executable = "/usr/bin/sandbox-exec";
+    parameters = [
+      "-p",
+      "(version 1)(allow default)(deny network*)",
+      binary,
+      ...args,
+    ];
+  } else if (process.platform === "linux") {
+    if (process.env.GRIDA_CLI_DOCS_SUDO_NETWORK === "1") {
+      executable = "/usr/bin/sudo";
+      parameters = [
+        "-n",
+        "/usr/bin/unshare",
+        "--net",
+        "/usr/bin/env",
+        "-i",
+        ...Object.entries(env).map(([key, value]) => `${key}=${value}`),
+        binary,
+        ...args,
+      ];
+    } else {
+      executable = "/usr/bin/unshare";
+      parameters = [
+        ...(process.getuid() === 0 ? [] : ["--user", "--map-root-user"]),
+        "--net",
+        binary,
+        ...args,
+      ];
+    }
+  } else {
+    throw new Error(
+      "The native offline documentation proof requires the macOS or Linux network perimeter"
+    );
+  }
+  const result = await execute(executable, parameters, {
+    cwd,
+    timeout: 45_000,
+    maxBuffer: 1024 * 1024,
+    env,
+  });
+  assert.equal(result.stderr, "", `Unexpected diagnostic: ${args.join(" ")}`);
+  return result.stdout;
+}
 
 export const CliDocs = {
   /** Check the emitted article links, not a sidebar that can mask a stale index link. */
@@ -138,11 +207,12 @@ export const CliDocs = {
     return { examples, files };
   },
 
-  async run({ archive } = {}) {
+  async run({ nativeCandidate = process.env.GRIDA_NATIVE_CANDIDATE } = {}) {
+    const parser = await buildParser();
+    if (nativeCandidate) assert(path.isAbsolute(nativeCandidate));
     const owned = await realpath(
       await mkdtemp(path.join(tmpdir(), "grida-cli-docs-"))
     );
-    const originalCwd = process.cwd();
     const report = {
       passed: false,
       topics: 0,
@@ -307,77 +377,30 @@ export const CliDocs = {
       };
       await writeFile(env.npm_config_userconfig, "");
       await writeFile(env.npm_config_globalconfig, "");
-      if (!archive) {
-        const destination = path.join(owned, "candidate");
-        const candidate = await CliRelease.prepare(destination);
-        archive = path.join(destination, candidate.archive);
+      if (!nativeCandidate) {
+        nativeCandidate = path.join(owned, "native-candidate");
+        await buildHostFixture(nativeCandidate);
       }
-      const bytes = await readFile(path.resolve(archive));
-      report.archive_sha256 = digest(bytes);
-      const copiedArchive = path.join(owned, "candidate.tgz");
-      await writeFile(copiedArchive, bytes);
-      const npm = await CliRelease.npm();
-      await execute(
-        process.execPath,
-        [
-          npm,
-          "install",
-          "--prefix",
-          runtime,
-          copiedArchive,
-          "--offline",
-          "--ignore-scripts",
-          "--omit=optional",
-          "--no-audit",
-          "--no-fund",
-          "--package-lock=false",
-        ],
-        { env, cwd: owned, timeout: 60_000, maxBuffer: 512 * 1024 }
+      const native = await installNative(nativeCandidate, runtime);
+      report.archive_sha256 = native.report.package.sha256;
+      const invoke = (args) =>
+        offline(native.executable, args, { env, cwd: runtime });
+      const topics = JSON.parse(
+        await offline(parser, ["--topics"], { env, cwd: runtime })
       );
-      const bin = path.join(runtime, "node_modules/grida/dist/bin.mjs");
-      const guard = path.join(owned, "network.cjs"),
-        guardReport = path.join(owned, "network.json");
-      await cp(path.join(repository, "scripts/cli-local/network.cjs"), guard);
-      const invoke = async (args) => {
-        const result = await execute(
-          process.execPath,
-          ["--require", guard, bin, ...args],
-          {
-            cwd: runtime,
-            timeout: 15_000,
-            maxBuffer: 1024 * 1024,
-            env: {
-              ...env,
-              GRIDA_CLI_PROOF_ROOT: owned,
-              GRIDA_CLI_PROOF_REPORT: guardReport,
-              GRIDA_CLI_PROOF_OFFLINE: "1",
-            },
-          }
-        );
-        assert.deepEqual(JSON.parse(await readFile(guardReport, "utf8")), {
-          denied: 0,
-          requests: [],
-        });
-        assert.equal(
-          result.stderr,
-          "",
-          `Unexpected diagnostic: ${args.join(" ")}`
-        );
-        return result.stdout;
-      };
       const covered = new Set();
-      for (const topic of Cli.topics) {
-        const expected = Cli.docsUrl(topic);
+      for (const topic of topics) {
+        const expected = topic.docs_url;
         const url = new URL(expected);
         assert.equal(url.origin, "https://grida.co");
         assert(
           active.has(route(url.pathname)),
-          `No active page for ${topic}: ${expected}`
+          `No active page for ${topic.name}: ${expected}`
         );
         covered.add(route(url.pathname));
-        const words = topic ? topic.split(" ") : [];
+        const words = topic.name ? topic.name.split(" ") : [];
         assert.equal((await invoke(["docs", ...words])).trim(), expected);
-        assert.equal(await invoke([...words, "--help"]), Cli.helpText(topic));
+        assert.equal(await invoke([...words, "--help"]), topic.help);
         report.topics++;
       }
       assert.deepEqual(
@@ -386,7 +409,6 @@ export const CliDocs = {
         "Every public CLI page needs a command owner"
       );
 
-      const operations = new MediaOperations();
       const asset = await readFile(
         path.join(repository, "fixtures/images/checker.png")
       );
@@ -403,22 +425,23 @@ export const CliDocs = {
         const { examples, files } = this.examples(text);
         for (const file of files)
           await writeFile(path.join(directory, file.name), file.body);
-        process.chdir(directory);
         for (const args of examples) {
-          let invocation;
-          try {
-            invocation = Cli.parse(args);
-          } catch {
-            throw new Error(
-              `Invalid guide command in ${source}: grida ${args.join(" ")}`
-            );
-          }
+          const checked = JSON.parse(
+            await offline(parser, ["--validate-example", ...args], {
+              env,
+              cwd: directory,
+            })
+          );
+          assert(
+            !checked.error,
+            `Invalid guide command in ${source}: grida ${args.join(" ")}: ${checked.error?.code}`
+          );
+          const { invocation, descriptor } = checked;
           report.examples++;
           if (
             invocation.command === "generate" ||
             invocation.command === "models inspect"
           ) {
-            const descriptor = MediaInput.inspect(operations, invocation);
             const args = [
               "models",
               "inspect",
@@ -438,20 +461,10 @@ export const CliDocs = {
               "Candidate schema differs from the checked guide contract"
             );
             if (invocation.command === "generate") {
-              const value = await MediaInput.read(
-                descriptor,
-                invocation,
-                new AbortController().signal,
-                Readable.from([])
-              );
-              operations.parseInput(
-                {
-                  kind: descriptor.kind,
-                  provider: descriptor.provider_id,
-                  model_id: descriptor.model_id,
-                  variant: descriptor.variant,
-                },
-                value
+              assert.equal(
+                checked.input_validated,
+                true,
+                "Generation example skipped native input validation"
               );
               report.generation_inputs++;
             }
@@ -462,10 +475,14 @@ export const CliDocs = {
         report.examples > 0 && report.generation_inputs > 0,
         "Guides must contain checked workflows"
       );
+      assert.deepEqual(
+        await readdir(home),
+        [],
+        "Documentation commands must not create credential state"
+      );
       report.passed = true;
       return report;
     } finally {
-      process.chdir(originalCwd);
       await rm(owned, { recursive: true, force: true });
     }
   },
@@ -477,9 +494,10 @@ if (
 ) {
   const args = process.argv.slice(2);
   assert(
-    args.length === 0 || (args.length === 2 && args[0] === "--archive"),
-    "Usage: node --import tsx scripts/cli-docs/check.mjs [--archive /absolute/candidate.tgz]"
+    args.length === 0 ||
+      (args.length === 2 && args[0] === "--native-candidate"),
+    "Usage: node scripts/cli-docs/check.mjs [--native-candidate /absolute/candidate-directory]"
   );
-  const report = await CliDocs.run({ archive: args[1] });
+  const report = await CliDocs.run({ nativeCandidate: args[1] });
   console.log(JSON.stringify(report, null, 2));
 }

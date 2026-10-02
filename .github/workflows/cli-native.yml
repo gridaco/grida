@@ -1,0 +1,127 @@
+name: Verify native CLI delivery
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-22.04
+    outputs:
+      targets: ${{ steps.targets.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - id: targets
+        run: echo "value=$(node scripts/cli-release/native.mjs --matrix | tr -d '\n')" >> "$GITHUB_OUTPUT"
+  build:
+    needs: matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix.outputs.targets) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Install musl C compiler
+        if: matrix.libc == 'musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      # GNU targets build inside native-architecture manylinux_2_28 containers;
+      # host Ubuntu versions must not raise the installed executable's ABI floor.
+      - name: Build and execute the target-native binary
+        shell: bash
+        run: node scripts/cli-release/native-build.mjs --target "${{ matrix.target }}" --out "$RUNNER_TEMP/grida-native-artifacts"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grida-native-${{ matrix.id }}
+          path: ${{ runner.temp }}/grida-native-artifacts/
+          if-no-files-found: error
+          retention-days: 7
+  candidate:
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: grida-native-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/grida-native-artifacts
+      - name: Verify the locked native license inventory
+        run: |
+          cargo fetch --locked
+          cargo install cargo-about --version 0.8.2 --locked
+          node scripts/cli-release/native-notices.mjs --check
+      - name: Test packaging and prepare the exact bundled candidate
+        env:
+          GRIDA_NATIVE_TEST_BINARY: ${{ runner.temp }}/grida-native-artifacts/x86_64-unknown-linux-gnu/grida
+        run: |
+          node --test scripts/cli-release/native.test.mjs scripts/cli-release/native-release.test.mjs
+          node scripts/cli-release/native.mjs --artifacts "$RUNNER_TEMP/grida-native-artifacts" --out "$RUNNER_TEMP/grida-native-candidate"
+          node scripts/cli-release/native.mjs --verify --out "$RUNNER_TEMP/grida-native-candidate"
+          node scripts/cli-release/native-proof.mjs --out "$RUNNER_TEMP/grida-native-candidate"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grida-native-candidate
+          path: |
+            ${{ runner.temp }}/grida-native-candidate/archives/
+            ${{ runner.temp }}/grida-native-candidate/native-candidate.json
+            ${{ runner.temp }}/grida-native-candidate/installed-*.json
+          if-no-files-found: error
+          retention-days: 7
+  installed:
+    needs: [matrix, candidate]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix.outputs.targets) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v4
+        with:
+          name: grida-native-candidate
+          path: ${{ runner.temp }}/grida-native-candidate
+      - name: Install and execute the exact native npm candidate
+        if: matrix.libc != 'musl'
+        shell: bash
+        run: node scripts/cli-release/native-proof.mjs --out "$RUNNER_TEMP/grida-native-candidate"
+      - name: Prove installed native OAuth, account and media over owned local HTTP
+        if: matrix.os != 'win32' && matrix.libc != 'musl'
+        shell: bash
+        run: node scripts/cli-contracts/installed.mjs --candidate "$RUNNER_TEMP/grida-native-candidate"
+      - name: Prove the bundled package selects and executes musl on Alpine
+        if: matrix.libc == 'musl'
+        shell: bash
+        run: |
+          docker run --rm --network none --user "$(id -u):$(id -g)" -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/grida-native-candidate:/candidate" -w /repo node:24-alpine node scripts/cli-release/native-proof.mjs --out /candidate
+          docker run --rm --network none --user "$(id -u):$(id -g)" -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/grida-native-candidate:/candidate" -w /repo node:24-alpine node scripts/cli-contracts/installed.mjs --candidate /candidate
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grida-native-installed-${{ matrix.id }}
+          path: ${{ runner.temp }}/grida-native-candidate/installed-${{ matrix.id }}.json
+          if-no-files-found: error
+          retention-days: 7

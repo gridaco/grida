@@ -1,0 +1,28 @@
+Usage: grida generate --provider <provider> --model <id> --out <new-directory> [inputs] [--kind <kind>] [--variant text|references|image|multiview] [--key-stdin] [--org <slug> | --org-id <id>] [--json]
+
+Inputs:
+  --prompt TEXT | --prompt-file FILE|-    Generation instructions
+  --text TEXT | --text-file FILE|-        Speech text (with --voice ID)
+  --reference FILE|HTTPS-URL              Image reference; repeat for more
+  --image FILE|HTTPS-URL                  Image input where supported
+  --param FIELD=VALUE                     Advertised scalar option; repeat
+  --input @file|-                         Full JSON instead of the flags above
+
+Example:
+  grida generate --provider openrouter --model openai/gpt-image-2 --prompt 'Restyle this image' --reference ./photo.png --out ./result
+
+File flags read explicit paths relative to the working directory. PNG/JPEG/static WebP
+images are limited to 8 MiB each; the assembled JSON input is limited to 16 MiB.
+Selected files are sent to the selected provider; GG Tripo uses signed uploads.
+Run grida models inspect for supported inputs. No raw provider passthrough.
+JSON mode never expands paths and cannot mix with request-building flags.
+Media flags select a compatible variant; a conflicting --variant is refused.
+Providers: openrouter, vercel, fal, elevenlabs, tripo, gg.
+--key-stdin cannot share stdin with JSON or text input. Key precedence: stdin,
+environment, shared credentials.toml. BYOK needs no Grida login. GG requires login.
+--out must name a new directory under an existing parent. Artifacts and
+receipt.json are written locally without overwriting files.
+No automatic generation retry. Interrupted requests may still be charged.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/generate

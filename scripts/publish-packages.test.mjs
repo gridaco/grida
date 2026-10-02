@@ -341,3 +341,14 @@ test("invalid CLI identity, implicit private flags and caller arguments fail bef
     assert.deepEqual(await records(), []);
   });
 });
+
+// This reads repository policy, independently of the synthetic workspace above.
+test("Changesets version planning ignores the independently versioned CLI", async () => {
+  const config = JSON.parse(
+    await readFile(
+      new URL("../.changeset/config.json", import.meta.url),
+      "utf8"
+    )
+  );
+  assert(config.ignore.includes("grida"));
+});

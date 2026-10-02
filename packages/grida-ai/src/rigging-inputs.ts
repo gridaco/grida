@@ -1,60 +1,59 @@
-// GRIDA-SEC-004 — rigging native/JSON validation before key lookup or upload.
-import { models } from "@grida/ai-models";
+// GRIDA-SEC-004 — neutral rigging contracts and portable GLB validation.
+import contracts from "../schemas/inputs.generated.json";
 import { InputSchema } from "./input-schema";
 import { TripoTransport } from "./tripo-transport";
 import type { RiggingClient } from "./rigging-client";
 
-/** Private shared contract for the two mesh operations. */
 export namespace RiggingInputs {
-  // Conservative simple-upload ceiling; larger provider uploads are a separate workflow.
   export const maxMeshBytes = 60_000_000;
-  const rawMesh = InputSchema.object({
-    data: InputSchema.bytes(maxMeshBytes),
-    media_type: InputSchema.enumeration(["model/gltf-binary"]),
-  });
-  const mesh: InputSchema.Rule<RiggingClient.Mesh> = {
-    schema: InputSchema.freeze({
-      ...rawMesh.schema,
-      "x-grida-portable-glb": true,
-    }),
-    parse(value, json) {
-      const parsed = rawMesh.parse(value, json);
-      TripoTransport.validateGlb(parsed.data);
-      return parsed;
-    },
-  };
-  export const check = InputSchema.object({ mesh });
-  const uploadedMesh = InputSchema.object({
-    file_token: {
-      schema: { type: "string" },
-      parse(value: unknown) {
-        return TripoTransport.identifier(value, "file");
+  function byteRule<T extends { mesh: RiggingClient.Mesh }>(
+    schema: InputSchema.Schema
+  ): InputSchema.Rule<T> {
+    const base = InputSchema.fromJson<T>(schema);
+    return {
+      schema: base.schema,
+      parse(value, json) {
+        const parsed = base.parse(value, json);
+        TripoTransport.validateGlb(parsed.mesh.data);
+        return parsed;
       },
-    },
-    media_type: InputSchema.enumeration(["model/gltf-binary"]),
-  });
-  export const uploadedCheck = InputSchema.object({ mesh: uploadedMesh });
+    };
+  }
+  export const check = byteRule<RiggingClient.CheckInput>(contracts.rig_check);
   export function rig<M extends RiggingClient.ModelId>(
     model: M
   ): InputSchema.Rule<RiggingClient.Input<M>> {
-    return build(model, mesh) as InputSchema.Rule<RiggingClient.Input<M>>;
+    return byteRule(contracts.rigging[model]);
   }
+  function uploaded<T extends { mesh: RiggingClient.UploadedMesh }>(
+    source: InputSchema.Schema
+  ): InputSchema.Rule<T> {
+    const schema = InputSchema.mutableObject(structuredClone(source));
+    schema.properties.mesh = {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        file_token: { type: "string" },
+        media_type: { type: "string", enum: ["model/gltf-binary"] },
+      },
+      required: ["file_token", "media_type"],
+    };
+    const base = InputSchema.fromJson<T>(schema);
+    return {
+      schema: base.schema,
+      parse(value, json) {
+        const parsed = base.parse(value, json);
+        TripoTransport.identifier(parsed.mesh.file_token, "file");
+        return parsed;
+      },
+    };
+  }
+  export const uploadedCheck = uploaded<RiggingClient.UploadedCheckInput>(
+    contracts.rig_check
+  );
   export function uploadedRig<M extends RiggingClient.ModelId>(
     model: M
   ): InputSchema.Rule<RiggingClient.UploadedInput<M>> {
-    return build(model, uploadedMesh) as InputSchema.Rule<
-      RiggingClient.UploadedInput<M>
-    >;
-  }
-  function build<M extends RiggingClient.ModelId, I>(
-    model: M,
-    mesh: InputSchema.Rule<I>
-  ) {
-    const card = models.three_d.rigging.models[model];
-    return InputSchema.object({
-      mesh,
-      rig_type: InputSchema.enumeration(card.rig_types),
-      spec: InputSchema.enumeration(card.specs),
-    });
+    return uploaded(contracts.rigging[model]);
   }
 }

@@ -13,17 +13,19 @@ format: md
 Discover models, generate media, and keep the files in your own workflow.
 Desktop does not need to be running.
 
-These guides describe Grida CLI 0.1. See
+These guides describe the replacement Grida CLI. See
 [npm's versions and tags](https://www.npmjs.com/package/grida?activeTab=versions)
 for published release availability.
 
 ## Install
 
-Use Node.js 24 or later:
+Install with Node.js 24 or later:
 
 ```sh grida-setup
 npm install -g grida
 ```
+
+Grida’s launcher selects the native executable for your platform. No Rust toolchain is required.
 
 Stored credentials currently support macOS and Linux. Windows users can supply
 BYOK through explicit environment variables or stdin; durable account login is

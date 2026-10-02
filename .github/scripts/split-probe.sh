@@ -5,8 +5,9 @@
 # The Rust engine moved to gridaco/nothing. A reference that reads as current
 # but describes the departed tree is worse than no reference: an absent doc
 # makes you look, a confidently wrong one makes you act. This probe fails when
-# a departed path/toolchain token appears in tracked files as if it were still
-# local to this repo.
+# a departed engine path/package appears in tracked files as if it were still
+# local to this repo. Application Rust now lives here again; generic Cargo
+# commands, rust-toolchain.toml and crates/ references are current, not departed.
 #
 # Deliberate cross-repo POINTERS are exempt: any line that names the engine
 # repo explicitly (github.com/gridaco/nothing) is a pointer, not a lie.
@@ -21,17 +22,19 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 TOKENS=(
-  'crates/'
+  # Exact departed crate directories from 12713094c^, before engine extraction.
+  # The boundary keeps grida-ai/auth/cli (and future application crates) local.
+  'crates/(csscascade|fonts|grida-canvas-wasm|grida|grida_dev|grida_editor|grida_wpt|math2)(/|[^[:alnum:]_-]|$)'
+  'crates/OPTIMIZATION_SIZE\.md'
+  'cargo (build|test|check|clippy|fmt|run)[^;]* (-p[ =]|--package[ =])(csscascade|fonts|grida-canvas-wasm|grida|grida_dev|grida_editor|grida_wpt|math2)([^[:alnum:]_-]|$)'
   'format/grida\.fbs'
   'bin/activate-flatc'
   'bin/activate-emsdk'
   'third_party/usvg'
   'third_party/externals'
   'packages/grida-reftest'
-  'rust-toolchain\.toml'
   'model-v2/'
   'grida_wpt'
-  'cargo (build|test|check|clippy|fmt|run)'
   # moved docs/wg clusters (feat-svg guarded against the staying feat-svg-editor)
   'docs/wg/(canvas|format|research)'
   'docs/wg/feat-(2d|crdt|css|fontgen|hash-nch|history|icu-uct|image-filters|layout|masks|painting|paragraph|resources|schema|text-editing|tray|vector-network)'
@@ -48,6 +51,7 @@ EXCLUDES=(
   ':!pnpm-lock.yaml'
   ':!.ref'
   ':!.github/scripts/split-probe.sh'
+  ':!.github/scripts/split-probe.test.mjs'
   ':!.github/scripts/split-probe-allow.txt'
 )
 
