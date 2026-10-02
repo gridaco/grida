@@ -141,7 +141,19 @@ describe.skipIf(!["darwin", "linux"].includes(process.platform))(
           })
         )
       );
-      expect(results.every((value) => value.ok)).toBe(true);
+      expect(
+        results.map(({ ok, code }, worker) => ({
+          worker,
+          ok,
+          code: code ?? null,
+        }))
+      ).toEqual(
+        Array.from({ length: 6 }, (_, worker) => ({
+          worker,
+          ok: true,
+          code: null,
+        }))
+      );
       expect((await run(home, { action: "list" })).result).toHaveLength(6);
       expect(
         (await run(home, { action: "read", provider: "example-2" })).result

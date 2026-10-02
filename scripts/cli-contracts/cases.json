@@ -59,6 +59,7 @@
       "stdout": {
         "includes": [
           "Usage: grida auth login [--storage keyring|file] [--no-browser]",
+          "Account requests refresh access automatically when needed.",
           "Documentation: https://grida.co/docs/cli/auth",
           "--no-input suppresses terminal interaction;"
         ]
@@ -85,6 +86,10 @@
       "stdout": {
         "includes": [
           "Usage: grida auth status [--json] [--no-input]",
+          "Read local session metadata without contacting the server.",
+          "Use grida account view to verify this session online.",
+          "--json includes session state, identity and access expiry for diagnostics.",
+          "Signed-out status exits 1. Credentials are never displayed.",
           "Documentation: https://grida.co/docs/cli/auth",
           "--no-input suppresses terminal interaction;"
         ]
@@ -111,6 +116,9 @@
       "stdout": {
         "includes": [
           "Usage: grida auth logout [--json] [--no-input]",
+          "Remove this CLI's credentials and request revocation of this CLI session only.",
+          "Other sessions and provider API keys are left intact.",
+          "Unconfirmed remote revocation exits 1; an already signed-out profile exits 0.",
           "Documentation: https://grida.co/docs/cli/auth",
           "--no-input suppresses terminal interaction;"
         ]

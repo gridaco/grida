@@ -5,6 +5,7 @@ File storage is an explicit alternative; the choice is saved per profile.
 Use auth storage migrate to change an existing profile's backend.
 --no-browser prints the sign-in URL for you to open on this machine.
 Requires interaction; --json and --no-input cannot start login.
+Account requests refresh access automatically when needed.
 
 --no-input suppresses terminal interaction; the OS keyring may still request access.
 Documentation: https://grida.co/docs/cli/auth

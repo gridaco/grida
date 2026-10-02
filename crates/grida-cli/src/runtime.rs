@@ -723,25 +723,13 @@ async fn auth_command(
                         &interrupted,
                     )
                     .map_err(account::failure)?;
-                status_output(status)?
+                status_output(status, StatusContext::Login)?
             }
-            Command::AuthStatus => status_output(client.status().map_err(account::failure)?)?,
-            Command::AuthLogout => {
-                let value = client.logout().map_err(account::failure)?;
-                let mut out = Output::new(
-                    json!(value),
-                    vec![
-                        "Signed out locally.".into(),
-                        format!("Remote revocation: {}.", value.revocation),
-                    ],
-                );
-                out.exit = if value.revocation == "unconfirmed" {
-                    1
-                } else {
-                    0
-                };
-                out
-            }
+            Command::AuthStatus => status_output(
+                client.status().map_err(account::failure)?,
+                StatusContext::Local,
+            )?,
+            Command::AuthLogout => logout_output(client.logout().map_err(account::failure)?),
             Command::AuthStorageShow | Command::AuthStorageMigrate(_) => {
                 let value = if let Command::AuthStorageMigrate(s) = command {
                     client.migrate(account::backend(s))
@@ -832,31 +820,46 @@ async fn auth_command(
     .await
     .map_err(|_| unavailable())?
 }
-fn status_output(status: grida_auth::Status) -> Result<Output> {
+enum StatusContext {
+    Login,
+    Local,
+}
+fn status_output(status: grida_auth::Status, context: StatusContext) -> Result<Output> {
     let value = json!(status);
     let signed_out = value["state"] == "signed-out";
     let lines = if signed_out {
         vec!["Signed out. Run grida auth login.".into()]
     } else {
         let identity = &value["identity"];
-        let date = iso_ms(value["expiresAt"].as_i64().ok_or_else(unavailable)?)?;
-        vec![
-            format!(
-                "{}: {}",
-                if value["state"] == "refresh-needed" {
-                    "Refresh needed"
-                } else {
-                    "Signed in"
-                },
-                identity["email"].as_str().unwrap_or(text(identity, "id"))
-            ),
-            format!("Account: {}", text(identity, "id")),
-            format!("Access expires: {date}"),
-        ]
+        // Keep timestamp admission unchanged; expiry remains available in JSON.
+        iso_ms(value["expiresAt"].as_i64().ok_or_else(unavailable)?)?;
+        let account = identity["email"]
+            .as_str()
+            .filter(|email| !email.trim().is_empty())
+            .unwrap_or(text(identity, "id"));
+        match context {
+            StatusContext::Login => vec![format!("Signed in as {account}.")],
+            StatusContext::Local => vec![
+                format!("Saved CLI session: {account}"),
+                "Not checked online. Run grida account view to verify access.".into(),
+            ],
+        }
     };
     let mut out = Output::new(value, lines);
     out.exit = u8::from(signed_out);
     Ok(out)
+}
+fn logout_output(value: grida_auth::Logout) -> Output {
+    let mut out = Output::new(
+        json!(value),
+        vec![
+            "Cleared this CLI session locally.".into(),
+            format!("Remote revocation: {}.", value.revocation),
+            "Other Grida sessions and provider API keys are unchanged.".into(),
+        ],
+    );
+    out.exit = u8::from(value.revocation == "unconfirmed");
+    out
 }
 pub fn iso_ms(ms: i64) -> Result<String> {
     let date = time::OffsetDateTime::from_unix_timestamp_nanos(i128::from(ms) * 1_000_000)
@@ -887,6 +890,104 @@ fn parse_date(value: &str) -> Result<i64> {
 mod tests {
     use super::*;
     use std::{collections::VecDeque, sync::Mutex};
+
+    #[test]
+    fn auth_presentation_distinguishes_login_from_local_status_without_changing_json() {
+        let identity = grida_auth::Identity {
+            id: "synthetic-account".into(),
+            email: Some("person@example.invalid".into()),
+            display_name: None,
+        };
+        for status in [
+            grida_auth::Status::SignedIn {
+                identity: identity.clone(),
+                expires_at: 1_800_000_000_000,
+            },
+            grida_auth::Status::RefreshNeeded {
+                identity: identity.clone(),
+                expires_at: 0,
+            },
+        ] {
+            let expected_json = json!(status);
+            let login = status_output(status.clone(), StatusContext::Login).unwrap();
+            let local = status_output(status, StatusContext::Local).unwrap();
+            assert_eq!(login.lines, ["Signed in as person@example.invalid."]);
+            assert_eq!(
+                local.lines,
+                [
+                    "Saved CLI session: person@example.invalid",
+                    "Not checked online. Run grida account view to verify access.",
+                ]
+            );
+            for out in [login, local] {
+                assert_eq!(out.value, expected_json);
+                assert_eq!(out.exit, 0);
+            }
+        }
+    }
+
+    #[test]
+    fn auth_presentation_uses_account_id_when_email_is_missing_or_blank() {
+        for email in [None, Some(String::new()), Some(" \t".into())] {
+            let status = grida_auth::Status::SignedIn {
+                identity: grida_auth::Identity {
+                    id: "synthetic-account".into(),
+                    email,
+                    display_name: Some("A display name is not an account ID".into()),
+                },
+                expires_at: 1_800_000_000_000,
+            };
+            let expected_json = json!(status);
+            let login = status_output(status.clone(), StatusContext::Login).unwrap();
+            let local = status_output(status, StatusContext::Local).unwrap();
+            assert_eq!(login.lines, ["Signed in as synthetic-account."]);
+            assert_eq!(local.lines[0], "Saved CLI session: synthetic-account");
+            assert_eq!(login.value, expected_json);
+            assert_eq!(local.value, expected_json);
+        }
+    }
+
+    #[test]
+    fn auth_presentation_preserves_signed_out_exit_and_timestamp_admission() {
+        for context in [StatusContext::Login, StatusContext::Local] {
+            let out = status_output(grida_auth::Status::SignedOut, context).unwrap();
+            assert_eq!(out.lines, ["Signed out. Run grida auth login."]);
+            assert_eq!(out.value, json!({"state":"signed-out"}));
+            assert_eq!(out.exit, 1);
+        }
+        let invalid = grida_auth::Status::SignedIn {
+            identity: grida_auth::Identity {
+                id: "synthetic-account".into(),
+                email: None,
+                display_name: None,
+            },
+            expires_at: i64::MAX,
+        };
+        assert!(status_output(invalid, StatusContext::Local).is_err());
+    }
+
+    #[test]
+    fn auth_presentation_preserves_logout_revocation_and_exit_status() {
+        for revocation in ["confirmed", "unconfirmed", "not-needed"] {
+            let out = logout_output(grida_auth::Logout {
+                state: "signed-out",
+                revocation,
+            });
+            assert_eq!(
+                out.value,
+                json!({"state":"signed-out", "revocation":revocation})
+            );
+            assert_eq!(out.exit, u8::from(revocation == "unconfirmed"));
+            assert_eq!(
+                out.lines,
+                [
+                    "Cleared this CLI session locally.",
+                    &format!("Remote revocation: {revocation}."),
+                    "Other Grida sessions and provider API keys are unchanged.",
+                ]
+            );
+        }
+    }
 
     struct RigCheckReplay(Mutex<VecDeque<Value>>);
     impl grida_ai::Transport for RigCheckReplay {

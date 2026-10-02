@@ -450,8 +450,18 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     const signed = await login.result;
     assert.equal(signed.code, 0, signed.stderr);
     assert(!signed.stdout.includes(account));
+    assert.equal(signed.stdout, `Signed in as ${identity.email}.\n`);
     checks.push("installed_oauth_pkce_callback");
-    assert.equal((await run(["auth", "status", "--json"])).state, "signed-in");
+    const beforeStatus = Object.fromEntries(counts);
+    const status = await run(["auth", "status", "--json"]);
+    assert.equal(status.state, "signed-in");
+    assert.deepEqual(status.identity, identity);
+    assert.equal(typeof status.expiresAt, "number");
+    assert.equal(
+      await run(["auth", "status"]),
+      `Saved CLI session: ${identity.email}\nNot checked online. Run grida account view to verify access.\n`
+    );
+    assert.deepEqual(Object.fromEntries(counts), beforeStatus);
     assert.deepEqual((await run(["account", "view", "--json"])).organizations, [
       organization,
     ]);
@@ -613,6 +623,14 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(
       (await run(["auth", "status", "--json"], { exit: 1 })).state,
       "signed-out"
+    );
+    assert.equal(
+      await run(["auth", "status"], { exit: 1 }),
+      "Signed out. Run grida auth login.\n"
+    );
+    assert.equal(
+      await run(["auth", "logout"]),
+      "Cleared this CLI session locally.\nRemote revocation: not-needed.\nOther Grida sessions and provider API keys are unchanged.\n"
     );
     checks.push("installed_logout_local_scope");
     if (failure) throw failure;
