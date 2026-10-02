@@ -1,8 +1,7 @@
-// GRIDA-SEC-010 / GRIDA-SEC-013 — mirrored syntax/output checks use no live authority.
+// GRIDA-SEC-010 / GRIDA-SEC-013 — native syntax/output checks use no live authority.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
-  cp,
   mkdtemp,
   mkdir,
   readFile,
@@ -12,9 +11,12 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { repository, referenceRoot } from "./baseline.mjs";
+import { fileURLToPath } from "node:url";
+
+export const repository = fileURLToPath(new URL("../../", import.meta.url));
 
 export function validateCases(cases) {
+  assert(Array.isArray(cases) && cases.length > 0, "No CLI contract cases");
   const ids = new Set();
   for (const value of cases) {
     assert.match(value.id, /^[a-z0-9]+(?:[.-][a-z0-9]+)+$/);
@@ -28,7 +30,6 @@ export function validateCases(cases) {
       Array.isArray(value.argv) &&
         value.argv.every((arg) => typeof arg === "string")
     );
-    assert(["pending", "complete"].includes(value.rust));
     assert(value.stdin === undefined || typeof value.stdin === "string");
     assert([0, 1, 2].includes(value.expected.exit));
     assert.equal(typeof value.expected.stderr, "string");
@@ -98,7 +99,9 @@ export function buildRust() {
     "cargo",
     [
       "build",
-      "--workspace",
+      "-p",
+      "grida-cli",
+      "--bins",
       "--locked",
       "--features",
       "conformance",
@@ -133,31 +136,16 @@ export function buildRust() {
 }
 
 /** Actual executables drive CLI cases; parser admission uses a feature-gated driver. */
-export async function runCase(implementation, test, binaries) {
+export async function runCase(test, binaries) {
   const parse = test.mode === "parse";
+  const command = binaries.get(parse ? "grida-conformance" : "grida");
+  assert(command, "Missing freshly built contract executable");
   const root = await realpath(
     await mkdtemp(path.join(tmpdir(), "grida-conformance-"))
   );
   try {
     const home = path.join(root, "home");
     await mkdir(home);
-    const report = path.join(root, "network.json");
-    if (implementation === "ts" && !parse) {
-      // The existing guard admits modules only inside the disposable tree.
-      await cp(
-        path.join(referenceRoot, "packages/grida-cli/dist"),
-        path.join(root, "dist"),
-        { recursive: true }
-      );
-      await cp(
-        path.join(referenceRoot, "scripts/cli-local/network.cjs"),
-        path.join(root, "network.cjs")
-      );
-      await cp(
-        path.join(repository, "scripts/conformance/offline.cjs"),
-        path.join(root, "offline.cjs")
-      );
-    }
     // No inherited credentials, NODE_OPTIONS, proxy configuration or real home.
     const env = {
       PATH: process.env.PATH,
@@ -173,38 +161,8 @@ export async function runCase(implementation, test, binaries) {
       NO_COLOR: "1",
       TERM: "dumb",
       LANG: "C.UTF-8",
-      GRIDA_CLI_PROOF_ROOT: root,
-      GRIDA_CLI_PROOF_REPORT: report,
-      GRIDA_CLI_PROOF_OFFLINE: "1",
     };
-    const command =
-      implementation === "ts"
-        ? process.execPath
-        : (binaries?.get(parse ? "grida-conformance" : "grida") ??
-          path.join(
-            repository,
-            "target/debug",
-            (parse ? "grida-conformance" : "grida") +
-              (process.platform === "win32" ? ".exe" : "")
-          ));
-    const args =
-      implementation === "ts"
-        ? parse
-          ? [
-              "--import",
-              import.meta.resolve("tsx"),
-              path.join(repository, "scripts/conformance/typescript.mjs"),
-            ]
-          : [
-              "--require",
-              path.join(root, "offline.cjs"),
-              path.join(root, "dist/bin.mjs"),
-              ...test.argv,
-            ]
-        : parse
-          ? []
-          : test.argv;
-    const result = spawnSync(command, args, {
+    const result = spawnSync(command, parse ? [] : test.argv, {
       cwd: root,
       env,
       encoding: "utf8",
@@ -215,15 +173,11 @@ export async function runCase(implementation, test, binaries) {
       killSignal: "SIGKILL",
       maxBuffer: 1024 * 1024,
     });
-    // Versions evolve independently; the historical implementation remains pinned.
-    // Only this explicit assertion uses package metadata, never process output.
+    // Bind version expectations to reviewed package metadata, never process output.
     const version = test.expected.stdout.version
       ? JSON.parse(
           await readFile(
-            path.join(
-              implementation === "ts" ? referenceRoot : repository,
-              "packages/grida-cli/package.json"
-            ),
+            path.join(repository, "packages/grida-cli/package.json"),
             "utf8"
           )
         ).version
@@ -235,21 +189,10 @@ export async function runCase(implementation, test, binaries) {
       `${test.id}: offline command mutated its home`
     );
     assert.deepEqual(
-      (await readdir(root)).sort(),
-      (implementation === "ts" && !parse
-        ? ["dist", "home", "network.cjs", "network.json", "offline.cjs"]
-        : ["home"]
-      ).sort(),
+      await readdir(root),
+      ["home"],
       `${test.id}: offline command created working-directory files`
     );
-    if (implementation === "ts" && !parse) {
-      const network = JSON.parse(await readFile(report, "utf8"));
-      assert.deepEqual(
-        network,
-        { denied: 0, requests: [] },
-        `${test.id}: unexpected host activity`
-      );
-    }
   } finally {
     await rm(root, { recursive: true, force: true });
   }

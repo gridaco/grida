@@ -67,8 +67,15 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 Rust builds do not need Node or compiled TypeScript packages. Native OS keyring
 adapters are linked into the binary; there is no optional keytar addon. npm
 candidates are staged by the release scripts, not by packing this source
-directory. The source manifest intentionally omits unpublished platform packages;
-the preparer supplies their exact versions in the published launcher manifest.
+directory. One published `grida` package contains the launcher and all eight
+native executables. The staged manifest has no dependencies or lifecycle
+scripts; installation does not download or resolve separate platform packages.
+
+After `pnpm install --frozen-lockfile`, run `just cli-contracts` for the reviewed
+CLI/provider fixtures, current TS/Rust shared custody, installed package and
+documentation checks. The [contract guide](https://github.com/gridaco/grida/blob/main/scripts/conformance/README.md)
+describes the native keyring prerequisites and focused zero-cost commands.
+No retired TypeScript CLI build is needed.
 
 Hosted custody uses `~/.grida/auth`, or the `auth` directory beneath an explicit
 absolute `GRIDA_HOME`; it remains separate from Desktop sessions and provider

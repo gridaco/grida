@@ -68,7 +68,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-          fetch-depth: 0
       - name: Install the pinned Rust toolchain
         run: rustup show active-toolchain
       - name: Check formatting
@@ -90,7 +89,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -101,15 +99,15 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y dbus-x11 gnome-keyring libsecret-1-dev
       - run: pnpm install --frozen-lockfile
-      - name: Build the pinned reference and Rust CLI
-        run: node scripts/conformance/prepare.mjs
+      - name: Build current TypeScript SDK consumers
+        run: pnpm exec turbo run build --filter=@grida/ai... --filter=@grida/auth...
       - name: Build documentation for installed guide checks
         run: pnpm --filter docs build
-      - name: Verify the complete migration contract
+      - name: Verify native CLI and shared contracts
         env:
           GRIDA_AUTH_KEYRING_SMOKE: "1"
           GRIDA_AUTH_MACOS_CI: ${{ runner.os == 'macOS' && '1' || '0' }}
           GRIDA_CLI_DOCS_SUDO_NETWORK: ${{ runner.os == 'Linux' && '1' || '0' }}
         run: |
           node --test scripts/conformance/cli.test.mjs scripts/conformance/catalogue-request.test.mjs
-          node scripts/conformance/run.mjs --suite target
+          node scripts/conformance/run.mjs

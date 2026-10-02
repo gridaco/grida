@@ -1,7 +1,12 @@
-// Capture the existing TypeScript public operations against synthetic provider wires.
+// Check current TypeScript public operations against reviewed synthetic provider wires.
 // No live provider or account is accessed. Rust replays these exact request/response pairs.
 import fs from "node:fs";
+import { parseArgs } from "node:util";
+const { values } = parseArgs({
+  options: { check: { type: "boolean", default: false } },
+});
 import { projectRequest } from "./catalogue-request.mjs";
+import { assertOperationVectors } from "./catalogue-vectors.mjs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
@@ -11,16 +16,7 @@ const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../.."
 );
-const reference = process.argv.includes("--reference");
-if (reference) await (await import("./baseline.mjs")).verifyBuild();
-const api = require(
-  path.join(
-    root,
-    reference
-      ? "target/conformance/reference/packages/grida-ai/dist/index.cjs"
-      : "packages/grida-ai/dist/index.cjs"
-  )
-);
+const api = require(path.join(root, "packages/grida-ai/dist/index.cjs"));
 const operations = new api.MediaOperations();
 const descriptors = [...operations.list(), ...operations.rigging.list()];
 const png = Buffer.from("iVBORw0KGgo=", "base64");
@@ -327,8 +323,18 @@ const bytes = execFileSync(
     encoding: "utf8",
   }
 );
-if (process.argv.includes("--check")) {
+if (values.check) {
+  const fixture = (name) =>
+    path.join(root, "crates/grida-ai/tests/fixtures", name);
+  const jsonl = (name) =>
+    fs.readFileSync(fixture(name), "utf8").trim().split("\n").map(JSON.parse);
+  assertOperationVectors(
+    descriptors,
+    JSON.parse(fs.readFileSync(target, "utf8")),
+    jsonl("input-vectors.jsonl"),
+    jsonl("error-vectors.jsonl")
+  );
   if (fs.readFileSync(target, "utf8") !== bytes)
     throw Error("Media wire fixture drift");
 } else fs.writeFileSync(target, bytes);
-console.log(`Verified ${samples.length} TypeScript operation wire baselines`);
+console.log(`Verified ${samples.length} TypeScript operation wire contracts`);

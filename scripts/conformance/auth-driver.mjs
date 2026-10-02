@@ -2,13 +2,9 @@
 import { createInterface } from "node:readline";
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
 import path from "node:path";
-import { referenceRoot, verifyBaseline } from "./baseline.mjs";
-
-await verifyBaseline();
 const source = (name) =>
-  pathToFileURL(path.join(referenceRoot, "packages/grida-auth/src", name));
+  new URL(`../../packages/grida-auth/src/${name}`, import.meta.url);
 const [
   { AuthClient },
   { CredentialStore },

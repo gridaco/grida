@@ -1,6 +1,7 @@
 // GRIDA-SEC-010 / GRIDA-SEC-014 — real mixed-language custody, synthetic transport.
 import assert from "node:assert/strict";
 import { before, test } from "node:test";
+import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import {
   mkdtemp,
@@ -9,13 +10,25 @@ import {
   readFile,
   rm,
   stat,
+  mkdir,
 } from "node:fs/promises";
 import { once } from "node:events";
 import { createInterface } from "node:readline";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { repository, verifyBaseline } from "./baseline.mjs";
+import { fileURLToPath } from "node:url";
+
+const repository = fileURLToPath(new URL("../../", import.meta.url));
+const custodyV1 = JSON.parse(
+  await readFile(
+    new URL(
+      "../../packages/grida-auth/fixtures/account-v1/custody.json",
+      import.meta.url
+    ),
+    "utf8"
+  )
+);
 
 const config = {
   clientId: "synthetic-conformance",
@@ -46,7 +59,6 @@ const pairs = [
 ];
 let rustExecutable;
 before(async () => {
-  await verifyBaseline();
   const build = spawnSync(
     "cargo",
     [
@@ -185,6 +197,46 @@ async function exchange(job, previous, next) {
     `Bearer synthetic-access-${next}`
   );
   return me;
+}
+
+for (const implementation of ["ts", "rust"]) {
+  test(`${implementation}: reads the frozen CLI 0.2.0 account file without losing its revision`, async (t) => {
+    assert.equal(
+      createHash("sha256").update(custodyV1.binding_preimage).digest("hex"),
+      custodyV1.profile_sha256
+    );
+    assert.equal(
+      JSON.stringify(custodyV1.file_metadata.binding),
+      custodyV1.binding_preimage
+    );
+    const home = await fixture(t);
+    const metadata = structuredClone(custodyV1.file_metadata);
+    metadata.binding.home = home;
+    const profile = createHash("sha256")
+      .update(JSON.stringify(metadata.binding))
+      .digest("hex");
+    const directory = path.join(home, "auth", profile);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    const filename = path.join(directory, "credentials.json");
+    await writeFile(filename, JSON.stringify(metadata), { mode: 0o600 });
+    assert.deepEqual(
+      await result(t, implementation, home, "snapshot"),
+      metadata.envelope
+    );
+    assert.deepEqual(await result(t, implementation, home, "storage-info"), {
+      backend: "file",
+      profile,
+      initialized: true,
+      migration: null,
+    });
+    const bytes = await readFile(filename, "utf8");
+    assert.deepEqual(JSON.parse(bytes), metadata);
+    await result(t, implementation, home, "logout");
+    const cleared = await result(t, implementation, home, "snapshot");
+    assert.equal(cleared.session, null);
+    assert.notEqual(cleared.revision, metadata.envelope.revision);
+    assert(!String(await readFile(filename)).includes("synthetic-access"));
+  });
 }
 
 for (const [first, second] of pairs) {

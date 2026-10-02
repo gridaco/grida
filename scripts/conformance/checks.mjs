@@ -1,13 +1,12 @@
-// Integration checks remain ordinary Cargo and node:test commands. The manifest
-// links their IDs into coverage; a completed checkbox cannot substitute for a run.
+// Durable integration checks use ordinary Cargo and node:test commands.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { repository } from "./baseline.mjs";
+import { fileURLToPath } from "node:url";
+const repository = fileURLToPath(new URL("../../", import.meta.url));
 
 export const checks = [
   {
     id: "proof.rust-workspace",
-    rust: "complete",
     description:
       "Native auth, callback, custody, provider, host, HTTP, file, input, and all provider operation tests",
     commands: [["cargo", "test", "--workspace", "--all-features", "--locked"]],
@@ -15,14 +14,12 @@ export const checks = [
   },
   {
     id: "proof.auth-mixed",
-    rust: "complete",
-    description: "Pinned TS/Rust real-process custody pairings",
+    description: "Current TS/Rust real-process custody pairings",
     commands: [["node", "--test", "scripts/conformance/auth-process.test.mjs"]],
     assertion: "node_tests",
   },
   {
     id: "proof.auth-native",
-    rust: "complete",
     description: "Native keytar interoperability on the current supported OS",
     commands: [
       ["node", "--test", "scripts/conformance/auth-macos.test.mjs"],
@@ -35,23 +32,9 @@ export const checks = [
     assertion: "node_tests",
   },
   {
-    id: "proof.catalogue-reference",
-    rust: "complete",
-    description:
-      "112 operation, input-boundary and provider-fault vectors checked against the pinned TS oracle",
-    commands: ["media", "inputs", "errors"].map((name) => [
-      "node",
-      `scripts/conformance/catalogue-${name}.mjs`,
-      "--reference",
-      "--check",
-    ]),
-    assertion: "vectors",
-  },
-  {
     id: "proof.catalogue-consumers",
-    rust: "complete",
     description:
-      "Current TS/web projections still satisfy the reference vectors; generated bundled assets are current",
+      "Current TS/web projections satisfy the reviewed contract vectors; generated bundled assets are current",
     commands: [
       ["pnpm", "exec", "turbo", "run", "build", "--filter=@grida/ai..."],
       ...["media", "inputs", "errors"].map((name) => [
@@ -68,24 +51,14 @@ export const checks = [
     ],
   },
   {
-    id: "proof.installed-reference",
-    rust: "complete",
-    description:
-      "Account/provider/media/cancellation scenarios first pass the pinned TS CLI",
-    commands: [["node", "scripts/conformance/installed.mjs", "--reference"]],
-    assertion: "json_proof",
-  },
-  {
     id: "proof.installed-native",
-    rust: "complete",
     description:
-      "The same local OAuth/account/provider/GG/artifact/signal scenarios through the npm-installed Rust binary",
+      "Local OAuth/account/provider/GG/artifact/signal scenarios through the npm-installed Rust binary",
     commands: [["node", "scripts/conformance/installed.mjs"]],
     assertion: "json_proof",
   },
   {
     id: "proof.npm-delivery",
-    rust: "complete",
     description:
       "Actual host npm installation, exact target/version selection, streams/signals, artifact and release guards",
     commands: [["node", "--test", "scripts/cli-release/native.test.mjs"]],
@@ -93,7 +66,6 @@ export const checks = [
   },
   {
     id: "proof.installed-docs",
-    rust: "complete",
     description:
       "Installed command/help/docs and guide examples match the built documentation",
     commands: [["node", "--import", "tsx", "scripts/conformance/docs.mjs"]],
@@ -109,8 +81,6 @@ export function assertCheck(check, output) {
     assert.match(output, /(?:#|ℹ) (?:tests|pass) [1-9]\d*/);
     assert.match(output, /(?:#|ℹ) fail 0/);
     assert.match(output, /(?:#|ℹ) skipped 0/);
-  } else if (check.assertion === "vectors") {
-    assert.match(output, /Verified [1-9]\d* /);
   } else if (check.assertion === "json_proof") {
     assert.equal(JSON.parse(output).passed, true);
   }

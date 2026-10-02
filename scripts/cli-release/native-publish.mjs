@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
-import { npmProgram, verifyNative } from "./native.mjs";
+import { npmProgram, platforms, verifyNative } from "./native.mjs";
 
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -15,10 +15,13 @@ export function releaseGuard(manifest, version, tag) {
   assert.equal(manifest.private, false);
   assert.equal(
     manifest.grida_native,
-    1,
+    2,
     "Source package is not configured for the native CLI"
   );
   assert.deepEqual(manifest.bin, { grida: "./native/bin.mjs" });
+  assert.equal(manifest.optionalDependencies, undefined);
+  assert.equal(manifest.dependencies, undefined);
+  assert(manifest.files.includes("binaries"));
   assert.equal(
     version,
     manifest.version,
@@ -49,21 +52,27 @@ export async function verifyInstalledMatrix(out, report) {
     !report.fixture_targets?.length,
     "Foreign fixture images cannot be released"
   );
-  for (const record of report.platforms) {
+  assert.equal(report.format, 2);
+  assert.deepEqual(
+    report.binaries.map((p) => p.platform),
+    platforms.map((p) => p.id)
+  );
+  for (const record of report.binaries) {
     const proof = JSON.parse(
       await readFile(
         path.join(out, `installed-${record.platform}.json`),
         "utf8"
       )
     );
+    assert.equal(proof.format, 2);
     assert.equal(proof.version, report.version);
     assert.equal(proof.platform, record.platform);
-    assert.equal(proof.archive_sha256, report.launcher.sha256);
-    assert.equal(proof.native_archive_sha256, record.sha256);
+    assert.equal(proof.archive_sha256, report.package.sha256);
     assert.equal(proof.binary_sha256, record.binary_sha256);
     for (const check of [
       "offline_npm_install",
-      "exact_optional_version",
+      "exact_package_version",
+      "bundled_platform_matrix",
       "installed_binary_hash",
       "version",
       "help",
@@ -78,44 +87,43 @@ export async function verifyInstalledMatrix(out, report) {
   }
 }
 
-// The caller must verify candidate archives, installed proofs and release authority first.
-export async function publishVerifiedArchives(
-  records,
+// The caller must verify the candidate, all eight installed proofs and release authority first.
+export async function publishVerifiedArchive(
+  record,
   { out, tag, invoke, log = (message) => process.stdout.write(message) }
 ) {
-  const prepared = [];
-  for (const record of records) {
-    const archive = path.join(out, "archives", record.archive);
-    const integrity =
-      "sha512-" +
-      createHash("sha512")
-        .update(await readFile(archive))
-        .digest("base64");
-    prepared.push({ ...record, archive, integrity });
-  }
-  async function alreadyPublished(record) {
-    let existing;
+  assert.equal(record.name, "grida");
+  assert(/^[A-Za-z0-9._-]+\.tgz$/.test(record.archive));
+  const archive = path.join(out, "archives", record.archive);
+  const integrity =
+    "sha512-" +
+    createHash("sha512")
+      .update(await readFile(archive))
+      .digest("base64");
+  let existing;
+  let absent = false;
+  try {
+    existing = JSON.parse(
+      (
+        await invoke([
+          "view",
+          `${record.name}@${record.version}`,
+          "dist.integrity",
+          "--json",
+          "--registry",
+          "https://registry.npmjs.org",
+        ])
+      ).stdout
+    );
+  } catch (error) {
+    let code;
     try {
-      existing = JSON.parse(
-        (
-          await invoke([
-            "view",
-            `${record.name}@${record.version}`,
-            "dist.integrity",
-            "--json",
-            "--registry",
-            "https://registry.npmjs.org",
-          ])
-        ).stdout
-      );
-    } catch (error) {
-      let code;
-      try {
-        code = JSON.parse(error.stdout).error?.code;
-      } catch {}
-      if (code === "E404") return false;
-      throw error;
-    }
+      code = JSON.parse(error.stdout).error?.code;
+    } catch {}
+    if (code === "E404") absent = true;
+    else throw error;
+  }
+  if (!absent) {
     assert.equal(
       typeof existing,
       "string",
@@ -123,10 +131,10 @@ export async function publishVerifiedArchives(
     );
     assert.equal(
       existing,
-      record.integrity,
+      integrity,
       `Existing immutable ${record.name}@${record.version} differs from this candidate`
     );
-    // A resume must not undo an operator's deliberate recovery tag change.
+    // An identical retry must not undo an operator's recovery tag change.
     const tagged = JSON.parse(
       (
         await invoke([
@@ -144,31 +152,24 @@ export async function publishVerifiedArchives(
       record.version,
       `Existing ${record.name} has a different ${tag} tag; review registry recovery before resuming`
     );
-    return true;
+    log(`Already published identical ${record.name}@${record.version}\n`);
+    return;
   }
-  // Reject known collisions anywhere in the set before the first registry write.
-  // npm has no multi-package transaction; recheck each record during publication
-  // so an intervening publication or recovery tag change still fails closed.
-  for (const record of prepared) await alreadyPublished(record);
-  for (const record of prepared) {
-    if (await alreadyPublished(record)) {
-      log(`Already published identical ${record.name}@${record.version}\n`);
-      continue;
-    }
-    await invoke([
-      "publish",
-      record.archive,
-      "--access",
-      "public",
-      "--provenance",
-      "--tag",
-      tag,
-      "--ignore-scripts",
-      "--registry",
-      "https://registry.npmjs.org",
-    ]);
-    log(`Published ${record.name}@${record.version}\n`);
-  }
+  // npm's immutable version write rejects an intervening collision. Never retry
+  // a failed publish or mutate a dist-tag to repair it implicitly.
+  await invoke([
+    "publish",
+    archive,
+    "--access",
+    "public",
+    "--provenance",
+    "--tag",
+    tag,
+    "--ignore-scripts",
+    "--registry",
+    "https://registry.npmjs.org",
+  ]);
+  log(`Published ${record.name}@${record.version}\n`);
 }
 
 async function main() {
@@ -193,18 +194,17 @@ async function main() {
   assert(values.out && path.isAbsolute(values.out));
   const report = await verifyNative(values.out);
   await verifyInstalledMatrix(values.out, report);
-  // Exact-version platform dependencies must exist before the launcher appears.
-  const records = [...report.platforms, report.launcher];
+  const record = report.package;
   if (values["dry-run"]) {
     process.stdout.write(
       JSON.stringify(
-        records.map((r) => ({
-          name: r.name,
-          version: r.version,
-          archive: r.archive,
-          sha256: r.sha256,
+        {
+          name: record.name,
+          version: record.version,
+          archive: record.archive,
+          sha256: record.sha256,
           tag: values.tag,
-        })),
+        },
         null,
         2
       ) + "\n"
@@ -253,7 +253,7 @@ async function main() {
           (npmVersion[1] > 5 || (npmVersion[1] === 5 && npmVersion[2] >= 1))),
       "npm 11.5.1+ is required for trusted publishing"
     );
-    await publishVerifiedArchives(records, {
+    await publishVerifiedArchive(record, {
       out: values.out,
       tag: values.tag,
       invoke,

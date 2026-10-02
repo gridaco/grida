@@ -33,7 +33,7 @@ async function proofStep(stage, operation) {
   }
 }
 
-/** Install the verified host pair into a caller-owned directory; caller cleans up. */
+/** Install the verified bundled package into a caller-owned directory; caller cleans up. */
 export async function installNative(out, runtime) {
   assert(path.isAbsolute(runtime));
   const report = await proofStep("candidate_verification", () =>
@@ -41,7 +41,7 @@ export async function installNative(out, runtime) {
   );
   const platform = selectPlatform();
   assert(platform, "Unsupported proof host");
-  const selected = report.platforms.find(
+  const selected = report.binaries.find(
     (item) => item.platform === platform.id
   );
   await mkdir(runtime, { recursive: true });
@@ -49,8 +49,7 @@ export async function installNative(out, runtime) {
     npmRun(
       [
         "install",
-        path.join(out, "archives", report.launcher.archive),
-        path.join(out, "archives", selected.archive),
+        path.join(out, "archives", report.package.archive),
         "--offline",
         "--ignore-scripts",
         "--no-audit",
@@ -62,13 +61,7 @@ export async function installNative(out, runtime) {
     )
   );
   const launcher = path.join(runtime, "node_modules/grida/native/bin.mjs");
-  const executable = path.join(
-    runtime,
-    "node_modules",
-    selected.name,
-    "bin",
-    platform.os === "win32" ? "grida.exe" : "grida"
-  );
+  const executable = path.join(runtime, "node_modules/grida", selected.path);
   const hash = createHash("sha256")
     .update(await readFile(executable))
     .digest("hex");
@@ -80,11 +73,20 @@ export async function installNative(out, runtime) {
     )
   );
   assert.equal(installed.version, report.version);
-  assert(
-    Object.values(installed.optionalDependencies).every(
-      (version) => version === report.version
-    )
-  );
+  assert.equal(installed.name, "grida");
+  assert.equal(installed.optionalDependencies, undefined);
+  assert.equal(installed.dependencies, undefined);
+  assert.equal(installed.scripts, undefined);
+  // Installation contains the complete reviewed matrix, even on a single host.
+  for (const binary of report.binaries) {
+    const bytes = await readFile(
+      path.join(runtime, "node_modules/grida", binary.path)
+    );
+    assert.equal(
+      createHash("sha256").update(bytes).digest("hex"),
+      binary.binary_sha256
+    );
+  }
   return {
     report,
     platform,
@@ -103,7 +105,6 @@ export async function proveNative(out) {
     const {
       report,
       platform,
-      selected,
       launcher,
       binary_sha256: hash,
     } = await installNative(out, scratch);
@@ -168,15 +169,15 @@ export async function proveNative(out) {
       assert.equal(invoked.stdout.trim(), `grida ${report.version}`);
     }
     const result = {
-      format: 1,
+      format: 2,
       version: report.version,
       platform: platform.id,
-      archive_sha256: report.launcher.sha256,
-      native_archive_sha256: selected.sha256,
+      archive_sha256: report.package.sha256,
       binary_sha256: hash,
       checks: [
         "offline_npm_install",
-        "exact_optional_version",
+        "exact_package_version",
+        "bundled_platform_matrix",
         "installed_binary_hash",
         "version",
         "help",

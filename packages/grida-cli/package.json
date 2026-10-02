@@ -1,6 +1,6 @@
 {
   "name": "grida",
-  "version": "0.3.0-rc.1",
+  "version": "0.3.0-rc.2",
   "private": false,
   "description": "The Grida command line: account access and tools, independent of Desktop.",
   "homepage": "https://grida.co/docs/cli",
@@ -13,7 +13,8 @@
     "native/bin.mjs",
     "native/platforms.json",
     "native/licenses.json",
-    "THIRD-PARTY-NOTICES.txt"
+    "THIRD-PARTY-NOTICES.txt",
+    "binaries"
   ],
   "type": "module",
   "scripts": {
@@ -24,5 +25,5 @@
   "engines": {
     "node": ">=24.0.0"
   },
-  "grida_native": 1
+  "grida_native": 2
 }

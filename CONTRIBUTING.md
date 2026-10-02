@@ -117,21 +117,23 @@ for multi-tenant and no-organization testing.
 The root Cargo workspace contains application crates, starting with the native
 CLI under `crates/grida-cli`, with `grida-auth` and `grida-ai` libraries. Install
 Rust through rustup; commands use the toolchain pinned in `rust-toolchain.toml`.
-The `grida` npm package launches a target-specific native executable.
+The `grida` npm package bundles all eight supported native executables and
+launches the one matching the user's platform.
 
 ```sh
 cargo build --workspace --locked
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-features --locked
-just cli-conformance
+just cli-contracts
 ```
 
-The [conformance guide](scripts/conformance/README.md) explains the pinned
-reference, shared cases, native fixtures and release acceptance boundaries.
-Ordinary Rust builds need no Node code generation. The complete mirrored gate
-needs the normal pnpm install, built documentation (`pnpm --filter docs build`)
-and native keyring dependencies described in that guide.
+The [contract guide](scripts/conformance/README.md) explains reviewed command and
+provider fixtures, current TS/Rust interoperability, and release acceptance
+boundaries. Ordinary Rust builds need no Node code generation. `just cli-contracts`
+builds current TS consumers and documentation after the normal pnpm install;
+the complete gate also needs the platform's native keyring setup described in
+that guide. It does not build the retired TypeScript CLI.
 
 The Rust rendering engine (canvas WASM) is developed in
 [gridaco/nothing](https://github.com/gridaco/nothing). The editor consumes the

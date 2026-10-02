@@ -709,6 +709,16 @@ fn snapshot(route: Route, target: &Url, request: &mut Request) -> Result<()> {
 }
 
 fn public_address(address: IpAddr) -> bool {
+    // RFC 6052's well-known DNS64 prefix carries an IPv4 destination. Validate
+    // that destination too: admitting the prefix alone would allow private IPs.
+    if let IpAddr::V6(ipv6) = address
+        && ipv6.segments()[..6] == [0x64, 0xff9b, 0, 0, 0, 0]
+    {
+        let bytes = ipv6.octets();
+        return public_address(IpAddr::V4(std::net::Ipv4Addr::new(
+            bytes[12], bytes[13], bytes[14], bytes[15],
+        )));
+    }
     const DENIED: &[&str] = &[
         "0.0.0.0/8",
         "10.0.0.0/8",

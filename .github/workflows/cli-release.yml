@@ -86,7 +86,7 @@ jobs:
           pattern: grida-native-installed-*
           merge-multiple: true
           path: ${{ runner.temp }}/grida-native-candidate
-      - name: Verify and publish the exact tested platform archives, then launcher, through npm OIDC
+      - name: Verify and publish the exact tested grida archive through npm OIDC
         env:
           CLI_VERSION: ${{ inputs.version }}
           CLI_TAG: ${{ inputs.tag }}

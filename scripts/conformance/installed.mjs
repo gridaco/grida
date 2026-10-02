@@ -64,25 +64,8 @@ async function close(server) {
   server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
 }
-export function assertInstalledStderr(
-  { stderr, pid },
-  typescriptReference = false
-) {
-  // Node 24 warns when the immutable TS custody owner loads node:sqlite. Admit
-  // only that exact runtime diagnostic from this child, never arbitrary warnings
-  // or extra output. The native implementation must still have empty stderr.
-  if (
-    typescriptReference &&
-    Number.isInteger(pid) &&
-    pid > 0 &&
-    stderr !== ""
-  ) {
-    assert.equal(
-      stderr,
-      `(node:${pid}) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n` +
-        "(Use `node --trace-warnings ...` to show where the warning was created)\n"
-    );
-  } else assert.equal(stderr, "");
+export function assertInstalledStderr({ stderr }) {
+  assert.equal(stderr, "");
 }
 export function startInstalledCommand(
   command,
@@ -171,12 +154,7 @@ export function startInstalledCommand(
   };
   return { child, result, closed, stop, stderr: () => stderr };
 }
-export async function proveInstalled({
-  binary,
-  launcher,
-  workdir,
-  typescriptReference = false,
-}) {
+export async function proveInstalled({ binary, launcher, workdir }) {
   const owned = await realpath(
     await mkdtemp(path.join(workdir ?? tmpdir(), "grida-native-contract-"))
   );
@@ -342,7 +320,7 @@ export async function proveInstalled({
     const r = await start(argv, stdin).result;
     assert.equal(r.signal, null);
     assert.equal(r.code, exit, r.stderr || r.stdout);
-    assertInstalledStderr(r, typescriptReference);
+    assertInstalledStderr(r);
     if (failure) throw failure;
     for (const secret of [account, refresh, grant])
       assert(!r.stdout.includes(secret));
@@ -370,7 +348,7 @@ export async function proveInstalled({
     assert.equal(result.code, 1);
     assert.equal(result.signal, null);
     assert.equal(JSON.parse(result.stdout).error.code, "cancelled");
-    assertInstalledStderr(result, typescriptReference);
+    assertInstalledStderr(result);
   }
 
   try {
@@ -658,30 +636,8 @@ async function main() {
       binary: { type: "string" },
       candidate: { type: "string" },
       direct: { type: "boolean" },
-      reference: { type: "boolean" },
     },
   });
-  if (values.reference) {
-    const { verifyBuild, referenceRoot } = await import("./baseline.mjs");
-    await verifyBuild();
-    process.stdout.write(
-      JSON.stringify(
-        {
-          ...(await proveInstalled({
-            typescriptReference: true,
-            launcher: path.join(
-              referenceRoot,
-              "packages/grida-cli/dist/bin.mjs"
-            ),
-          })),
-          mode: "typescript-reference",
-        },
-        null,
-        2
-      ) + "\n"
-    );
-    return;
-  }
   if (values.direct && values.binary) {
     process.stdout.write(
       JSON.stringify(

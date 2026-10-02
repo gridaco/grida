@@ -2120,7 +2120,9 @@ billing, and GG operations still need their own server authorization; identity
 verification supplies none implicitly. Organization pages observe current
 membership separately, without a snapshot guarantee across page requests.
 
-The former TypeScript CLI is retained only through the [pinned reference](scripts/conformance/baseline.json).
+The former TypeScript CLI remains in Git history. Reviewed golden CLI cases,
+current TypeScript SDK consumers and frozen custody fixtures retain the ongoing
+contracts without building or executing the retired CLI.
 The Node-preload proofs under `scripts/cli-local` and `scripts/cli-media-local`
 remain reference evidence; their preload guards do not constrain a Rust process.
 The [native installed proof](scripts/conformance/installed.mjs) exercises the
@@ -2145,6 +2147,10 @@ the independently provisioned OAuth service. Neither certifies hosted deployment
   [scripts/conformance/auth-linux.sh](scripts/conformance/auth-linux.sh),
   [scripts/conformance/auth-process.test.mjs](scripts/conformance/auth-process.test.mjs),
   [scripts/conformance/cli.mjs](scripts/conformance/cli.mjs).
+  The frozen [account-v1 contract](packages/grida-auth/fixtures/account-v1/README.md)
+  and [custody bytes](packages/grida-auth/fixtures/account-v1/custody.json) check
+  historical profile binding, file/keyring envelopes and logout tombstones
+  against the current owners without native credential access.
   These preserve this boundary. Rust conformance adapters, where present, are
   feature-gated and excluded from the distributed executable.
   The native keyring gate exercises the production logout tombstone and revision
@@ -2636,6 +2642,11 @@ generation receipts without a fixed projection.
    Authorization, cookie or provider-key header and follows no redirect; GG
    authority remains on the selected GG origin. No failed paid request is
    automatically resubmitted.
+   Standard DNS64 addresses under `64:ff9b::/96` are admitted only when their
+   embedded IPv4 address passes the same public-address rules. Translations of
+   loopback, private and other denied IPv4 ranges remain denied; one denied
+   address still rejects the whole DNS answer. Other translation prefixes gain
+   no exception.
 4. **Input and output preflight; publication.** Explicit UTF-8 JSON/text file/stdin
    input is bounded to 16 MiB. Selected local images have an 8 MiB per-file bound,
    a 16 MiB aggregate read bound, and structural PNG/JPEG/static WebP header checks.
@@ -2695,10 +2706,13 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
 - Native CLI [grammar](crates/grida-cli/src/grammar.rs),
   [safe failure types](crates/grida-cli/src/lib.rs),
   [entry](crates/grida-cli/src/main.rs) and
-  [output](crates/grida-cli/src/output.rs) — mirrored syntax and output gates
+  [output](crates/grida-cli/src/output.rs) — syntax and output gates
   before host work. The [conformance runner](scripts/conformance/cli.mjs),
-  [cases](scripts/conformance/cases.json) and
-  [offline listener guard](scripts/conformance/offline.cjs) exercise these gates.
+  [golden cases](scripts/conformance/cases.json) and
+  [native parser driver](crates/grida-cli/src/bin/conformance.rs) exercise these gates
+  with isolated homes, explicit child environments and mutation assertions.
+  The retired Node preload guard constrained only the former TypeScript CLI;
+  it was never a native network perimeter.
   [Input lowering](crates/grida-cli/src/input.rs), [file grants/publication](crates/grida-cli/src/files.rs),
   [credential selection](crates/grida-cli/src/credentials.rs), [domain errors](crates/grida-cli/src/error.rs)
   and [runtime](crates/grida-cli/src/runtime.rs) retain preflight, explicit authority and paid-result publication.
@@ -2740,6 +2754,11 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
   [launcher](packages/grida-cli/native/bin.mjs), and
   [contributor contract](packages/grida-cli/CONTRIBUTING.md) — safe presentation and the
   portable Rust SDK boundary. These retain GRIDA-SEC-010 for account commands.
+- [Documentation checker](scripts/cli-docs/check.mjs) and
+  [feature-only validation driver](crates/grida-cli/src/bin/conformance.rs) —
+  production grammar/input validation without host construction, credential
+  access, output reservation or command dispatch. Installed help/schema checks
+  use empty homes and the platform OS network-denial perimeter.
 - [Installed media proof](scripts/cli-media-local/proof.mjs),
   [its transport guard](scripts/cli-media-local/network.cjs),
   [guard tests](scripts/cli-media-local/network.test.mjs), and
@@ -2878,6 +2897,10 @@ processes, mixed ESM/CommonJS copies, restart and SIGKILL recovery. This is loca
 platform evidence, not Windows or cross-platform release certification.
 
 **Files bound by this id.**
+
+- [Documentation checker](scripts/cli-docs/check.mjs) and
+  [feature-only validation driver](crates/grida-cli/src/bin/conformance.rs) —
+  parse configuration examples without opening or mutating provider custody.
 
 - Native implementation and synthetic cross-language verification: [crates/grida-auth/README.md](crates/grida-auth/README.md),
   [crates/grida-auth/src/conformance.rs](crates/grida-auth/src/conformance.rs),

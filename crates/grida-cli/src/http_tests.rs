@@ -278,6 +278,38 @@ fn all_dns_answers_must_be_public_before_one_is_selected() {
 }
 
 #[test]
+fn dns64_destinations_require_a_public_embedded_ipv4_address() {
+    let translated: SocketAddr = "[64:ff9b::6812:260a]:443".parse().unwrap();
+    let ipv4: SocketAddr = "104.18.38.10:443".parse().unwrap();
+    assert_eq!(select_public(&[translated, ipv4]).unwrap(), translated);
+    assert_eq!(select_public(&[translated]).unwrap(), translated);
+    for address in [
+        "0.0.0.0",
+        "10.0.0.1",
+        "100.64.0.1",
+        "127.0.0.1",
+        "169.254.169.254",
+        "172.16.0.1",
+        "192.0.0.1",
+        "192.0.2.1",
+        "192.88.99.1",
+        "192.168.0.1",
+        "198.18.0.1",
+        "198.51.100.1",
+        "203.0.113.1",
+        "224.0.0.1",
+        "255.255.255.255",
+    ] {
+        let translated_private = format!("64:ff9b::{address}").parse().unwrap();
+        assert!(!public_address(translated_private), "{address}");
+        assert!(select_public(&[ipv4, SocketAddr::new(translated_private, 443)]).is_err());
+    }
+    for address in ["64:ff9b:1::101:101", "64:ff9b::1:101:101", "::ffff:1.1.1.1"] {
+        assert!(!public_address(address.parse().unwrap()), "{address}");
+    }
+}
+
+#[test]
 fn header_bounds_and_upload_body_kinds_are_checked_before_connecting() {
     let mut request = provider_request();
     let target = admitted_url(&request.url).unwrap();

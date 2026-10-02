@@ -23,7 +23,6 @@ on:
       - "scripts/cli-docs/**"
       - "scripts/cli-release/**"
       - "scripts/npm.mjs"
-      - "scripts/cli-local/network.cjs"
       - "fixtures/images/checker.png"
       - "editor/next.config.ts"
       - ".github/workflows/cli-docs.yml"
@@ -56,7 +55,6 @@ jobs:
         with:
           persist-credentials: false
           lfs: true
-          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -64,14 +62,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build current command and schema contracts
-        run: |
-          pnpm --filter @grida/ai... build
-          node scripts/conformance/prepare.mjs
+        run: cargo build --locked -p grida-cli --features conformance --bin grida-conformance
       - name: Build documentation
         run: pnpm --filter docs build
       - name: Check example parsing and translation cleanup
         run: |
-          node --import tsx --test scripts/cli-docs/check.test.mjs
+          node --test scripts/cli-docs/check.test.mjs
           node --test apps/docs/scripts/docs-site-gen/copy-translations.test.cjs
       - name: Check the current preview against its documentation
         if: inputs.native_candidate_artifact == ''
@@ -80,7 +76,7 @@ jobs:
         run: |
           cargo build --locked -p grida-cli --bin grida
           node scripts/cli-release/native-fixture.mjs --binary "$PWD/target/debug/grida" --out "$RUNNER_TEMP/grida-docs-native"
-          node --import tsx scripts/cli-docs/check.mjs --native-candidate "$RUNNER_TEMP/grida-docs-native"
+          node scripts/cli-docs/check.mjs --native-candidate "$RUNNER_TEMP/grida-docs-native"
       - name: Download exact native release candidate
         if: inputs.native_candidate_artifact != ''
         uses: actions/download-artifact@v4
@@ -91,4 +87,4 @@ jobs:
         if: inputs.native_candidate_artifact != ''
         env:
           GRIDA_CLI_DOCS_SUDO_NETWORK: "1"
-        run: node --import tsx scripts/cli-docs/check.mjs --native-candidate "$RUNNER_TEMP/grida-docs-native"
+        run: node scripts/cli-docs/check.mjs --native-candidate "$RUNNER_TEMP/grida-docs-native"

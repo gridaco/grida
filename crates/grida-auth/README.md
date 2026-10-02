@@ -32,6 +32,7 @@ Tests use temporary homes and synthetic credentials:
 
 ```sh
 cargo test -p grida-auth --all-features --locked
+pnpm exec turbo run build --filter=@grida/auth...
 node --test scripts/conformance/auth-process.test.mjs
 # Explicit native integration test: disposable entries and real logout custody.
 GRIDA_AUTH_KEYRING_SMOKE=1 node --test scripts/conformance/auth-keyring.test.mjs
@@ -39,12 +40,15 @@ GRIDA_AUTH_KEYRING_SMOKE=1 node --test scripts/conformance/auth-keyring.test.mjs
 sh scripts/conformance/auth-linux.sh
 ```
 
-The process suite checks all TypeScript/Rust combinations against the pinned
-reference. The `conformance` feature builds a fixture-only stdio driver; it is
+The process suite checks all current TypeScript/Rust combinations. The continuing
+TS provider credential owner is also used by Desktop; Desktop's browser account
+session remains separate. Frozen [account v1 fixtures](../../packages/grida-auth/fixtures/account-v1/README.md)
+preserve historical storage compatibility without retaining an old executable.
+The `conformance` feature builds a fixture-only stdio driver; it is
 not an npm executable and requires a marked disposable home. Platform keyring
 tests are separate from ordinary tests and never enumerate existing entries.
 They check exact native values and all four TypeScript/Rust writer/logout pairs,
 including restart reads, secret-free tombstones and empty-logout revision changes.
 The fixture creator removes its disposable entries after each test;
-cross-application deletion is not the shipped custody contract. Prepare the
-pinned TypeScript reference with `node scripts/conformance/prepare.mjs` first.
+cross-application deletion is not the shipped custody contract. Build the current
+TS package closure before process tests; no historical CLI checkout is required.

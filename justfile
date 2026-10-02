@@ -18,19 +18,12 @@ test:
     pnpm turbo test
     cargo test --workspace --all-features --locked
 
-# Build both CLI implementations and check the completed migration contracts.
-cli-conformance:
-    node scripts/conformance/prepare.mjs
+# Complete native CLI, current SDK, custody, installed-package and docs contracts.
+cli-contracts:
+    pnpm exec turbo run build --filter=@grida/ai... --filter=@grida/auth...
     pnpm --filter docs build
     node --test scripts/conformance/cli.test.mjs scripts/conformance/catalogue-request.test.mjs
     node scripts/conformance/run.mjs
-
-# Full migration target; fails until all required contracts are complete.
-cli-conformance-target:
-    node scripts/conformance/prepare.mjs
-    pnpm --filter docs build
-    node --test scripts/conformance/cli.test.mjs scripts/conformance/catalogue-request.test.mjs
-    node scripts/conformance/run.mjs --suite target
 
 # Provider contracts and native HTTP with synthetic data and local sockets only.
 cli-provider-contracts:

@@ -6,6 +6,9 @@ macro_rules! topics {
         pub enum Topic { $($variant),+ }
 
         impl Topic {
+            #[cfg(feature = "conformance")]
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+
             pub fn name(self) -> &'static str {
                 match self { $(Self::$variant => $name),+ }
             }

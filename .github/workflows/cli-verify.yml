@@ -60,5 +60,5 @@ jobs:
         run: |
           node --test scripts/publish-packages.test.mjs scripts/npm.test.mjs
           node --test scripts/cli-media-local/network.test.mjs scripts/cli-local/network.test.mjs
-      # The pinned TypeScript implementation remains a conformance oracle.
-      # Native delivery owns actual packed/installed executable verification.
+      # Retained Node guard tests qualify only their historical instrumentation.
+      # Native contracts and delivery verify the current packed executable.

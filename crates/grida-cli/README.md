@@ -1,7 +1,7 @@
 # grida-cli
 
 The Rust implementation of the independent `grida` executable. The npm launcher
-and platform package preparation live in
+and package metadata live in
 [`packages/grida-cli`](https://github.com/gridaco/grida/tree/main/packages/grida-cli).
 The crate implements auth and custody commands, account and organization reads,
 provider configuration, model/voice discovery, image/video/music/sound/speech/3D
@@ -58,27 +58,29 @@ Durable account/provider storage supports macOS/Linux. Windows supports explicit
 BYOK environment/stdin keys and fails closed for unsupported durable custody.
 
 The [release tooling](https://github.com/gridaco/grida/tree/main/scripts/cli-release)
-produces eight exact-version platform packages and one launcher package, verifies
-installed archives, and owns the glibc 2.28 baseline, bundled notices and publication
-order. Packing the source directory is not a release path.
+packs all eight supported executables into one `grida` npm archive, verifies its
+installation on each platform, and owns the glibc 2.28 baseline, bundled notices
+and publication. Installation needs no optional platform packages or binary
+downloads. Packing the source directory is not a release path.
 
-## Conformance
+## CLI contracts
 
 The `conformance` feature adds `grida-conformance`, a test-only process driver for
 the production parser, catalogue/input projections and bounded file behavior.
 It is not a second parser or public SDK. Normal builds omit the test driver.
 
 ```sh
-node scripts/conformance/prepare.mjs
-node scripts/conformance/run.mjs --implementation both --suite target
+pnpm install --frozen-lockfile
+just cli-contracts
 ```
 
-The preparer extracts and verifies the pinned TypeScript revision in its isolated
-reference directory, installs its exact dependency closure and builds the Rust
-drivers. The shared gate covers command and SDK contracts, mixed TS/Rust custody,
-installed npm execution, local OAuth/account/GG media, artifact safety and docs.
-The [conformance harness](https://github.com/gridaco/grida/tree/main/scripts/conformance)
-owns the reference digest, vectors, integration checks and coverage inventory.
+The gate builds current TypeScript consumers, documentation and Rust drivers.
+It covers reviewed command and SDK contracts, current TS/Rust custody, installed
+npm execution, synthetic local OAuth/account/GG media, artifact safety and docs.
+The [contract harness](https://github.com/gridaco/grida/tree/main/scripts/conformance)
+owns the golden vectors, operation coverage and integration checks. It does not
+fetch or build the retired TypeScript CLI. Its guide describes the explicit
+native keyring setup required for the complete gate.
 Update public help and reviewed expectations together when the contract changes.
 Synthetic local proofs do not replace actual Supabase/browser or hosted-provider
 release acceptance.

@@ -28,7 +28,7 @@ const json = (value) => JSON.stringify(value, null, 2) + "\n";
 const binaryName = (platform) =>
   platform.os === "win32" ? "grida.exe" : "grida";
 
-export function launcherManifest(sourceManifest) {
+export function packageManifest(sourceManifest) {
   assert.equal(sourceManifest.name, "grida");
   assert(
     /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/.test(
@@ -59,27 +59,10 @@ export function launcherManifest(sourceManifest) {
       "native/platforms.json",
       "native/licenses.json",
       "THIRD-PARTY-NOTICES.txt",
+      "binaries",
     ],
-    optionalDependencies: Object.fromEntries(
-      platforms.map((p) => [`@grida/cli-${p.id}`, version])
-    ),
     engines: { node: ">=24.0.0" },
-    grida_native: 1,
-  };
-}
-
-export function platformManifest(platform, version) {
-  return {
-    name: `@grida/cli-${platform.id}`,
-    version,
-    description: `Grida native executable for ${platform.id}.`,
-    license: "Apache-2.0",
-    repository: "https://github.com/gridaco/grida",
-    os: [platform.os],
-    cpu: [platform.cpu],
-    ...(platform.libc ? { libc: [platform.libc] } : {}),
-    files: [`bin/${binaryName(platform)}`, "THIRD-PARTY-NOTICES.txt"],
-    publishConfig: { access: "public" },
+    grida_native: 2,
   };
 }
 
@@ -194,24 +177,17 @@ export async function npmRun(args, scratch, options = {}) {
   });
 }
 
-function allowedFiles(record, manifest, platform) {
-  const expected = platform
-    ? [
-        "package.json",
-        "LICENSE",
-        "README.md",
-        `bin/${binaryName(platform)}`,
-        "THIRD-PARTY-NOTICES.txt",
-      ]
-    : [
-        "package.json",
-        "LICENSE",
-        "README.md",
-        "native/bin.mjs",
-        "native/platforms.json",
-        "native/licenses.json",
-        "THIRD-PARTY-NOTICES.txt",
-      ];
+function allowedFiles(record, manifest) {
+  const expected = [
+    "package.json",
+    "LICENSE",
+    "README.md",
+    "native/bin.mjs",
+    "native/platforms.json",
+    "native/licenses.json",
+    "THIRD-PARTY-NOTICES.txt",
+    ...platforms.map((platform) => bundledBinaryPath(platform)),
+  ];
   const names = record.files.map((item) => item.path);
   assert.deepEqual(
     names.slice().sort(),
@@ -221,7 +197,11 @@ function allowedFiles(record, manifest, platform) {
   assert.equal(new Set(names).size, names.length);
 }
 
-async function pack(directory, archives, scratch, manifest, platform) {
+export function bundledBinaryPath(platform) {
+  return `binaries/${platform.id}/${binaryName(platform)}`;
+}
+
+async function pack(directory, archives, scratch, manifest) {
   const { stdout } = await npmRun(
     [
       "pack",
@@ -238,7 +218,7 @@ async function pack(directory, archives, scratch, manifest, platform) {
   assert.equal(record.name, manifest.name);
   assert.equal(record.version, manifest.version);
   assert.equal(path.basename(record.filename), record.filename);
-  allowedFiles(record, manifest, platform);
+  allowedFiles(record, manifest);
   const bytes = await readFile(path.join(archives, record.filename));
   return {
     name: record.name,
@@ -252,7 +232,6 @@ async function pack(directory, archives, scratch, manifest, platform) {
       size,
       mode,
     })),
-    ...(platform ? { target: platform.target, platform: platform.id } : {}),
   };
 }
 
@@ -261,7 +240,7 @@ export async function prepareNative({ artifacts, out }) {
     path.isAbsolute(artifacts) && path.isAbsolute(out),
     "Use absolute artifact/output directories"
   );
-  const manifest = launcherManifest(
+  const manifest = packageManifest(
     JSON.parse(await readFile(path.join(source, "package.json"), "utf8"))
   );
   const licenses = JSON.parse(
@@ -277,12 +256,10 @@ export async function prepareNative({ artifacts, out }) {
   try {
     await mkdir(out, { mode: 0o700 });
     created = true;
-    const packages = path.join(out, "packages");
+    const main = path.join(out, "package");
     const archives = path.join(out, "archives");
-    await mkdir(packages);
-    await mkdir(archives);
-    const main = path.join(packages, "grida");
     await mkdir(path.join(main, "native"), { recursive: true });
+    await mkdir(archives);
     await writeFile(path.join(main, "package.json"), json(manifest));
     for (const file of ["bin.mjs", "platforms.json", "licenses.json"])
       await copyFile(
@@ -290,31 +267,10 @@ export async function prepareNative({ artifacts, out }) {
         path.join(main, "native", file)
       );
     await chmod(path.join(main, "native/bin.mjs"), 0o755);
-    await copyFile(
-      path.join(source, "README.md"),
-      path.join(main, "README.md")
-    );
-    await copyFile(
-      path.join(source, "THIRD-PARTY-NOTICES.txt"),
-      path.join(main, "THIRD-PARTY-NOTICES.txt")
-    );
+    for (const file of ["README.md", "THIRD-PARTY-NOTICES.txt"])
+      await copyFile(path.join(source, file), path.join(main, file));
     await copyFile(path.join(root, "LICENSE"), path.join(main, "LICENSE"));
-    const records = [];
-    const comparison = path.join(scratch, "comparison");
-    await mkdir(comparison);
-    await writeFile(
-      path.join(comparison, "package.json"),
-      json({
-        name: "grida-native-size-comparison",
-        version: manifest.version,
-        private: true,
-        files: ["bin", "THIRD-PARTY-NOTICES.txt"],
-      })
-    );
-    await copyFile(
-      path.join(source, "THIRD-PARTY-NOTICES.txt"),
-      path.join(comparison, "THIRD-PARTY-NOTICES.txt")
-    );
+    const binaries = [];
     for (const platform of platforms) {
       const binary = path.join(
         artifacts,
@@ -323,76 +279,30 @@ export async function prepareNative({ artifacts, out }) {
       );
       const stat = await lstat(binary);
       assert(
-        stat.isFile() && stat.size <= 256 * 1024 * 1024,
+        stat.isFile() && stat.size > 0 && stat.size <= 256 * 1024 * 1024,
         "Expected a bounded regular executable"
       );
       const bytes = await readFile(binary);
       binaryHeader(bytes, platform);
-      const directory = path.join(packages, `grida-cli-${platform.id}`);
-      await mkdir(path.join(directory, "bin"), { recursive: true });
-      const pm = platformManifest(platform, manifest.version);
-      await writeFile(path.join(directory, "package.json"), json(pm));
-      await copyFile(binary, path.join(directory, "bin", binaryName(platform)));
-      await chmod(path.join(directory, "bin", binaryName(platform)), 0o755);
-      await copyFile(
-        path.join(root, "LICENSE"),
-        path.join(directory, "LICENSE")
-      );
-      await copyFile(
-        path.join(source, "THIRD-PARTY-NOTICES.txt"),
-        path.join(directory, "THIRD-PARTY-NOTICES.txt")
-      );
-      await writeFile(
-        path.join(directory, "README.md"),
-        `# ${pm.name}\n\nPlatform executable for grida@${manifest.version}. Install grida, which selects this package automatically.\n`
-      );
-      const record = await pack(directory, archives, scratch, pm, platform);
-      records.push({
-        ...record,
+      const filename = bundledBinaryPath(platform);
+      await mkdir(path.dirname(path.join(main, filename)), { recursive: true });
+      await copyFile(binary, path.join(main, filename));
+      await chmod(path.join(main, filename), 0o755);
+      binaries.push({
+        platform: platform.id,
+        target: platform.target,
+        path: filename,
         binary_sha256: sha256(bytes),
         binary_bytes: bytes.length,
       });
-      await mkdir(path.join(comparison, "bin", platform.id), {
-        recursive: true,
-      });
-      await copyFile(
-        binary,
-        path.join(comparison, "bin", platform.id, binaryName(platform))
-      );
     }
-    const launcher = await pack(main, archives, scratch, manifest);
-    const combined = JSON.parse(
-      (
-        await npmRun(
-          [
-            "pack",
-            comparison,
-            "--pack-destination",
-            scratch,
-            "--json",
-            "--offline",
-            "--ignore-scripts",
-          ],
-          scratch
-        )
-      ).stdout
-    )[0];
+    const record = await pack(main, archives, scratch, manifest);
     const report = {
-      format: 1,
+      format: 2,
       name: manifest.name,
       version: manifest.version,
-      launcher,
-      platforms: records,
-      size_comparison: {
-        all_binary_tgz_bytes: combined.size,
-        all_binary_unpacked_bytes: combined.unpackedSize,
-        selected_install_tgz_bytes: Object.fromEntries(
-          records.map((record) => [
-            record.platform,
-            record.bytes + launcher.bytes,
-          ])
-        ),
-      },
+      package: record,
+      binaries,
     };
     await writeFile(path.join(out, "native-candidate.json"), json(report), {
       mode: 0o600,
@@ -419,97 +329,83 @@ export async function verifyNative(out) {
   const report = JSON.parse(
     await readFile(path.join(out, "native-candidate.json"), "utf8")
   );
-  assert.equal(report.format, 1);
-  const manifest = launcherManifest(
+  assert.equal(report.format, 2);
+  const manifest = packageManifest(
     JSON.parse(await readFile(path.join(source, "package.json"), "utf8"))
   );
   assert.equal(report.version, manifest.version);
   assert.equal(report.name, manifest.name);
   assert.deepEqual(
-    report.platforms.map((p) => p.platform),
+    report.binaries.map((p) => p.platform),
     platforms.map((p) => p.id)
   );
-  for (const record of [...report.platforms, report.launcher]) {
-    assert(/^[A-Za-z0-9._-]+\.tgz$/.test(record.archive));
-    const archive = path.join(out, "archives", record.archive);
-    const stat = await lstat(archive);
-    assert(stat.isFile() && stat.size > 0 && stat.size <= 256 * 1024 * 1024);
-    const bytes = await readFile(archive);
-    assert.equal(bytes.length, record.bytes);
-    assert.equal(sha256(bytes), record.sha256);
-    // GNU tar interprets a Windows drive colon in -f as a remote host.
-    // The validated basename stays local with both GNU and BSD tar.
-    const options = {
-      cwd: path.dirname(archive),
-      timeout: 20_000,
-      maxBuffer: 1024 * 1024,
-    };
-    const listing = (
-      await exec("tar", ["-tzf", record.archive], options)
+  const record = report.package;
+  assert.equal(record.name, manifest.name);
+  assert.equal(record.version, manifest.version);
+  assert(/^[A-Za-z0-9._-]+\.tgz$/.test(record.archive));
+  const archive = path.join(out, "archives", record.archive);
+  const stat = await lstat(archive);
+  assert(stat.isFile() && stat.size > 0 && stat.size <= 256 * 1024 * 1024);
+  const bytes = await readFile(archive);
+  assert.equal(bytes.length, record.bytes);
+  assert.equal(sha256(bytes), record.sha256);
+  // GNU tar interprets a Windows drive colon in -f as a remote host.
+  // The validated basename stays local with both GNU and BSD tar.
+  const options = {
+    cwd: path.dirname(archive),
+    timeout: 20_000,
+    maxBuffer: 1024 * 1024,
+  };
+  const listing = (await exec("tar", ["-tzf", record.archive], options)).stdout
+    .trim()
+    .split("\n");
+  assert(listing.every((name) => name.startsWith("package/")));
+  assert.deepEqual(
+    listing.map((name) => name.slice(8)).sort(),
+    record.files.map((file) => file.path).sort()
+  );
+  allowedFiles(record, manifest);
+  const packedManifest = JSON.parse(
+    (
+      await exec(
+        "tar",
+        ["-xOzf", record.archive, "package/package.json"],
+        options
+      )
     ).stdout
-      .trim()
-      .split("\n");
-    assert(listing.every((name) => name.startsWith("package/")));
-    assert.deepEqual(
-      listing.map((name) => name.slice(8)).sort(),
-      record.files.map((file) => file.path).sort()
-    );
-    const packedManifest = JSON.parse(
-      (
-        await exec(
-          "tar",
-          ["-xOzf", record.archive, "package/package.json"],
-          options
-        )
-      ).stdout
-    );
-    const platform = platforms.find((p) => p.id === record.platform);
-    const expected = platform
-      ? platformManifest(platform, manifest.version)
-      : manifest;
-    assert.deepEqual(packedManifest, expected);
-    allowedFiles(record, expected, platform);
-    assert.equal(record.name, expected.name);
-    assert.equal(record.version, expected.version);
-    assert.equal(
-      (
-        await exec(
-          "tar",
-          ["-xOzf", record.archive, "package/THIRD-PARTY-NOTICES.txt"],
-          options
-        )
-      ).stdout,
-      await readFile(path.join(source, "THIRD-PARTY-NOTICES.txt"), "utf8")
-    );
-    if (platform) {
-      assert.equal(record.target, platform.target);
-      const binary = (
-        await exec(
-          "tar",
-          ["-xOzf", record.archive, `package/bin/${binaryName(platform)}`],
-          { ...options, encoding: "buffer", maxBuffer: 256 * 1024 * 1024 }
-        )
-      ).stdout;
-      binaryHeader(binary, platform);
-      assert.equal(binary.length, record.binary_bytes);
-      assert.equal(sha256(binary), record.binary_sha256);
-    } else {
-      for (const file of [
-        "README.md",
-        "native/bin.mjs",
-        "native/platforms.json",
-        "native/licenses.json",
-      ]) {
-        const packed = (
-          await exec(
-            "tar",
-            ["-xOzf", record.archive, `package/${file}`],
-            options
-          )
-        ).stdout;
-        assert.equal(packed, await readFile(path.join(source, file), "utf8"));
-      }
-    }
+  );
+  assert.deepEqual(packedManifest, manifest);
+  for (const file of [
+    "README.md",
+    "THIRD-PARTY-NOTICES.txt",
+    "native/bin.mjs",
+    "native/platforms.json",
+    "native/licenses.json",
+  ]) {
+    const packed = (
+      await exec("tar", ["-xOzf", record.archive, `package/${file}`], options)
+    ).stdout;
+    assert.equal(packed, await readFile(path.join(source, file), "utf8"));
+  }
+  assert.equal(
+    (await exec("tar", ["-xOzf", record.archive, "package/LICENSE"], options))
+      .stdout,
+    await readFile(path.join(root, "LICENSE"), "utf8")
+  );
+  for (const [index, platform] of platforms.entries()) {
+    const binary = report.binaries[index];
+    assert.equal(binary.target, platform.target);
+    assert.equal(binary.path, bundledBinaryPath(platform));
+    const packed = (
+      await exec("tar", ["-xOzf", record.archive, `package/${binary.path}`], {
+        ...options,
+        encoding: "buffer",
+        maxBuffer: 256 * 1024 * 1024,
+      })
+    ).stdout;
+    binaryHeader(packed, platform);
+    assert.equal(packed.length, binary.binary_bytes);
+    assert.equal(sha256(packed), binary.binary_sha256);
   }
   return report;
 }

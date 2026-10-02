@@ -338,8 +338,7 @@ export async function proveNativeLocal({ statePath, candidate }) {
       );
       Object.assign(report, {
         version: installed.report.version,
-        archive_sha256: installed.report.launcher.sha256,
-        native_archive_sha256: installed.selected.sha256,
+        archive_sha256: installed.report.package.sha256,
         binary_sha256: installed.binary_sha256,
         candidate_kind: installed.report.fixture_targets?.length
           ? "host-only fixture; not publishable"

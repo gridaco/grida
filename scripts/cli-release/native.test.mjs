@@ -19,17 +19,16 @@ import test from "node:test";
 import { promisify } from "node:util";
 import {
   binaryHeader,
-  launcherManifest,
+  packageManifest,
   npmRun,
   platforms,
-  prepareNative,
   verifyNative,
 } from "./native.mjs";
 import { proveNative } from "./native-proof.mjs";
-import { fixtureBinary } from "./native-fixture.mjs";
+import { fixtureBinary, prepareHostFixture } from "./native-fixture.mjs";
 import { verifyGlibcBaseline, verifyMuslStatic } from "./native-abi.mjs";
 import {
-  publishVerifiedArchives,
+  publishVerifiedArchive,
   releaseGuard,
   verifyInstalledMatrix,
 } from "./native-publish.mjs";
@@ -132,7 +131,7 @@ test("Windows checkout filters preserve byte-verified native release sources", a
 async function rootOnlyInstall(out, report, runtime) {
   const metadata = new Map();
   const archives = new Map();
-  for (const record of [report.launcher, ...report.platforms]) {
+  for (const record of [report.package]) {
     const filename = path.join(out, "archives", record.archive);
     const bytes = await readFile(filename);
     const manifest = JSON.parse(
@@ -193,8 +192,7 @@ async function rootOnlyInstall(out, report, runtime) {
   origin = `http://127.0.0.1:${registry.address().port}`;
   try {
     await mkdir(runtime);
-    // Install only the public package. In particular, do not name a native
-    // tarball here: npm must resolve and filter all eight optional packages.
+    // The public registry contract is one package and one archive request.
     // npmRun supplies an empty per-test cache/configuration, with audit off.
     await npmRun(
       [
@@ -213,22 +211,19 @@ async function rootOnlyInstall(out, report, runtime) {
     );
     assert.deepEqual(unexpected, []);
     const host = selectPlatform();
-    const selected = report.platforms.find((p) => p.platform === host.id);
+    const selected = report.binaries.find((p) => p.platform === host.id);
     assert.deepEqual(
-      (await readdir(path.join(runtime, "node_modules/@grida"))).sort(),
-      [`cli-${host.id}`]
+      (await readdir(path.join(runtime, "node_modules")))
+        .filter((name) => name !== ".package-lock.json")
+        .sort(),
+      [".bin", "grida"]
     );
+    assert.deepEqual(requestedArchives, [report.package.archive]);
     assert.deepEqual(
-      requestedArchives.sort(),
-      [report.launcher.archive, selected.archive].sort()
+      (await readdir(path.join(runtime, "node_modules/grida/binaries"))).sort(),
+      platforms.map((p) => p.id).sort()
     );
-    const executable = path.join(
-      runtime,
-      "node_modules",
-      selected.name,
-      "bin",
-      host.os === "win32" ? "grida.exe" : "grida"
-    );
+    const executable = path.join(runtime, "node_modules/grida", selected.path);
     assert.equal(
       createHash("sha256")
         .update(await readFile(executable))
@@ -254,15 +249,16 @@ async function publicationFixture(t) {
   );
   t.after(() => rm(out, { recursive: true, force: true }));
   await mkdir(path.join(out, "archives"));
-  const records = [...platforms.map((p) => `@grida/cli-${p.id}`), "grida"].map(
-    (name, i) => ({ name, version: "0.3.0-rc.1", archive: `${i}.tgz` })
-  );
+  const record = {
+    name: "grida",
+    version: "0.3.0-rc.2",
+    archive: "grida-0.3.0-rc.2.tgz",
+  };
   const registry = new Map();
   const calls = [];
   const integrity = (record) =>
     "sha512-" + createHash("sha512").update(record.name).digest("base64");
-  for (const record of records)
-    await writeFile(path.join(out, "archives", record.archive), record.name);
+  await writeFile(path.join(out, "archives", record.archive), record.name);
   async function invoke(args) {
     calls.push(args);
     if (args[0] === "publish") return { stdout: "" };
@@ -282,7 +278,7 @@ async function publicationFixture(t) {
     registry.set(record.name, { "dist-tags.next": record.version });
   }
   return {
-    records,
+    record,
     out,
     tag: "next",
     invoke,
@@ -293,13 +289,13 @@ async function publicationFixture(t) {
   };
 }
 
-test("a launcher version collision fails before any platform publication", async (t) => {
+test("an immutable package version collision fails before publication", async (t) => {
   const fixture = await publicationFixture(t);
-  fixture.published(fixture.records.at(-1), {
+  fixture.published(fixture.record, {
     "dist.integrity": "sha512-different",
   });
   await assert.rejects(
-    publishVerifiedArchives(fixture.records, fixture),
+    publishVerifiedArchive(fixture.record, fixture),
     /Existing immutable grida/
   );
   assert.equal(
@@ -308,13 +304,13 @@ test("a launcher version collision fails before any platform publication", async
   );
 });
 
-test("a changed resume tag fails before any new package publication", async (t) => {
+test("an identical archive with a changed tag fails without registry writes", async (t) => {
   const fixture = await publicationFixture(t);
-  const last = fixture.records.at(-1);
+  const last = fixture.record;
   fixture.published(last);
   fixture.registry.set(last.name, { "dist-tags.next": "0.2.0" });
   await assert.rejects(
-    publishVerifiedArchives(fixture.records, fixture),
+    publishVerifiedArchive(fixture.record, fixture),
     /different next tag/
   );
   assert.equal(
@@ -323,43 +319,36 @@ test("a changed resume tag fails before any new package publication", async (t) 
   );
 });
 
-test("publication preflights the whole set, then publishes platforms before the launcher", async (t) => {
+test("publication sends only the reviewed grida archive with provenance", async (t) => {
   const fixture = await publicationFixture(t);
-  await publishVerifiedArchives(fixture.records, fixture);
-  assert(
-    fixture.calls
-      .slice(0, fixture.records.length)
-      .every(([operation]) => operation === "view")
-  );
-  const publishes = fixture.calls.filter(
-    ([operation]) => operation === "publish"
-  );
+  await publishVerifiedArchive(fixture.record, fixture);
+  assert.equal(fixture.calls[0][0], "view");
   assert.deepEqual(
-    publishes.map((args) => path.basename(args[1])),
-    fixture.records.map((record) => record.archive)
+    fixture.calls.filter(([operation]) => operation === "publish"),
+    [
+      [
+        "publish",
+        path.join(fixture.out, "archives", fixture.record.archive),
+        "--access",
+        "public",
+        "--provenance",
+        "--tag",
+        "next",
+        "--ignore-scripts",
+        "--registry",
+        "https://registry.npmjs.org",
+      ],
+    ]
   );
-  for (const args of publishes)
-    assert.deepEqual(args.slice(2), [
-      "--access",
-      "public",
-      "--provenance",
-      "--tag",
-      "next",
-      "--ignore-scripts",
-      "--registry",
-      "https://registry.npmjs.org",
-    ]);
 });
 
-test("an identical partial release resumes without republishing existing bytes", async (t) => {
+test("an identical single-package release retry performs no registry writes", async (t) => {
   const fixture = await publicationFixture(t);
-  for (const record of fixture.records.slice(0, 3)) fixture.published(record);
-  await publishVerifiedArchives(fixture.records, fixture);
-  assert.deepEqual(
-    fixture.calls
-      .filter(([operation]) => operation === "publish")
-      .map((args) => path.basename(args[1])),
-    fixture.records.slice(3).map((record) => record.archive)
+  fixture.published(fixture.record);
+  await publishVerifiedArchive(fixture.record, fixture);
+  assert.equal(
+    fixture.calls.filter(([operation]) => operation === "publish").length,
+    0
   );
 });
 
@@ -375,14 +364,14 @@ test("registry read failures and malformed metadata never become permission to p
   ]) {
     const fixture = await publicationFixture(t);
     const invoke = async (args) => {
-      if (args[1] === `grida@${fixture.records.at(-1).version}`) {
+      if (args[1] === `grida@${fixture.record.version}`) {
         if (failure instanceof Error) throw failure;
         return failure;
       }
       return fixture.invoke(args);
     };
     await assert.rejects(
-      publishVerifiedArchives(fixture.records, { ...fixture, invoke })
+      publishVerifiedArchive(fixture.record, { ...fixture, invoke })
     );
     assert.equal(
       fixture.calls.filter(([operation]) => operation === "publish").length,
@@ -391,25 +380,22 @@ test("registry read failures and malformed metadata never become permission to p
   }
 });
 
-test("publication rechecks a package after preflight instead of overwriting a race", async (t) => {
+test("a failed immutable publication is not retried or repaired by moving tags", async (t) => {
   const fixture = await publicationFixture(t);
-  let views = 0;
+  let publishes = 0;
   const invoke = async (args) => {
-    if (args[0] === "view" && ++views > fixture.records.length) {
-      fixture.published(fixture.records[0], {
-        "dist.integrity": "sha512-concurrent",
-      });
+    if (args[0] === "publish") {
+      publishes++;
+      throw new Error("Concurrent immutable version collision");
     }
     return fixture.invoke(args);
   };
   await assert.rejects(
-    publishVerifiedArchives(fixture.records, { ...fixture, invoke }),
-    /Existing immutable/
+    publishVerifiedArchive(fixture.record, { ...fixture, invoke }),
+    /immutable version collision/
   );
-  assert.equal(
-    fixture.calls.filter(([operation]) => operation === "publish").length,
-    0
-  );
+  assert.equal(publishes, 1);
+  assert(fixture.calls.every(([operation]) => operation === "view"));
 });
 
 test("musl artifacts reject interpreters and shared dependencies while allowing static PIE", () => {
@@ -466,13 +452,13 @@ test("GNU packages reject newer glibc symbols and unbundled libraries", () => {
 });
 
 test("release requires the native manifest, stable tag policy and real installed proofs", async (t) => {
-  const manifest = launcherManifest({
+  const manifest = packageManifest({
     name: "grida",
     version: "0.2.0",
     private: false,
   });
   releaseGuard(manifest, "0.2.0", "latest");
-  releaseGuard({ ...manifest, version: "0.3.0-rc.1" }, "0.3.0-rc.1", "next");
+  releaseGuard({ ...manifest, version: "0.3.0-rc.2" }, "0.3.0-rc.2", "next");
   assert.throws(() =>
     releaseGuard({ ...manifest, grida_native: undefined }, "0.2.0", "latest")
   );
@@ -487,16 +473,17 @@ test("release requires the native manifest, stable tag policy and real installed
   t.after(() => rm(out, { recursive: true, force: true }));
   const report = {
     version: "0.2.0",
-    launcher: { sha256: "launcher" },
-    platforms: platforms.map((p) => ({
+    format: 2,
+    package: { sha256: "package" },
+    binaries: platforms.map((p) => ({
       platform: p.id,
-      sha256: p.id,
       binary_sha256: `${p.id}-binary`,
     })),
   };
   const checks = [
     "offline_npm_install",
-    "exact_optional_version",
+    "exact_package_version",
+    "bundled_platform_matrix",
     "installed_binary_hash",
     "version",
     "help",
@@ -504,14 +491,14 @@ test("release requires the native manifest, stable tag policy and real installed
     "usage_exit_2",
     "npm_bin_shim",
   ];
-  for (const p of report.platforms)
+  for (const p of report.binaries)
     await writeFile(
       path.join(out, `installed-${p.platform}.json`),
       JSON.stringify({
+        format: 2,
         version: report.version,
         platform: p.platform,
-        archive_sha256: "launcher",
-        native_archive_sha256: p.sha256,
+        archive_sha256: "package",
         binary_sha256: p.binary_sha256,
         checks,
       })
@@ -522,7 +509,7 @@ test("release requires the native manifest, stable tag policy and real installed
     /cannot be released/
   );
   await writeFile(
-    path.join(out, `installed-${report.platforms[0].platform}.json`),
+    path.join(out, `installed-${report.binaries[0].platform}.json`),
     JSON.stringify({ version: "0.1.0" })
   );
   await assert.rejects(verifyInstalledMatrix(out, report));
@@ -531,10 +518,11 @@ test("release requires the native manifest, stable tag policy and real installed
 test("platform metadata is exact, libc-specific and never guesses another architecture", () => {
   assert.equal(platforms.length, 8);
   assert.equal(new Set(platforms.map((p) => p.target)).size, 8);
-  const manifest = launcherManifest({ name: "grida", version: "0.2.0" });
-  assert(
-    Object.values(manifest.optionalDependencies).every((v) => v === "0.2.0")
-  );
+  const manifest = packageManifest({ name: "grida", version: "0.2.0" });
+  assert.equal(manifest.optionalDependencies, undefined);
+  assert.equal(manifest.dependencies, undefined);
+  assert.equal(manifest.scripts, undefined);
+  assert(manifest.files.includes("binaries"));
   assert.equal(
     selectPlatform("linux", "x64", { header: { glibcVersionRuntime: "2.35" } })
       .id,
@@ -558,15 +546,13 @@ test("platform metadata is exact, libc-specific and never guesses another archit
 });
 
 test(
-  "actual host binary packs, verifies and installs through npm, including root-only optional dependency resolution",
+  "one bundled archive packs all eight binaries and installs from a fresh npm registry",
   { timeout: 120_000 },
   async (t) => {
     const scratch = await mkdtemp(
       path.join(tmpdir(), "grida-native-proof-test-")
     );
     t.after(() => rm(scratch, { recursive: true, force: true }));
-    const artifacts = path.join(scratch, "artifacts");
-    await mkdir(artifacts);
     const host = selectPlatform();
     assert(host);
     const binary =
@@ -576,27 +562,41 @@ test(
         "target/debug",
         process.platform === "win32" ? "grida.exe" : "grida"
       );
-    for (const p of platforms) {
-      const directory = path.join(artifacts, p.target);
-      await mkdir(directory);
-      const name = path.join(
-        directory,
-        p.os === "win32" ? "grida.exe" : "grida"
-      );
-      if (p.id === host.id) await copyFile(binary, name);
-      else await writeFile(name, fixtureBinary(p));
-    }
     const out = path.join(scratch, "candidate");
-    const report = await prepareNative({ artifacts, out });
+    const report = await prepareHostFixture(binary, out);
+    await assert.rejects(
+      verifyInstalledMatrix(out, report),
+      /cannot be released/
+    );
     assert.equal((await verifyNative(out)).version, report.version);
     const proof = await proveNative(out);
     assert.equal(proof.platform, host.id);
     assert(proof.checks.includes("installed_binary_hash"));
     await rootOnlyInstall(out, report, path.join(scratch, "root-only-install"));
-    // These bytes are useful only for fixture regression; release measurements
-    // must come from eight real matrix artifacts, not multiplied host estimates.
-    assert(report.size_comparison.all_binary_tgz_bytes > 0);
-    const archive = path.join(out, "archives", report.launcher.archive);
+    assert.equal(report.format, 2);
+    assert.equal(report.binaries.length, 8);
+    assert.equal((await readdir(path.join(out, "archives"))).length, 1);
+    const reportFile = path.join(out, "native-candidate.json");
+    for (const changed of [
+      { ...report, binaries: report.binaries.slice(1) },
+      {
+        ...report,
+        binaries: report.binaries.map((binary, index) =>
+          index ? binary : { ...binary, path: "../outside" }
+        ),
+      },
+      {
+        ...report,
+        binaries: report.binaries.map((binary, index) =>
+          index ? binary : { ...binary, binary_sha256: "bad" }
+        ),
+      },
+    ]) {
+      await writeFile(reportFile, JSON.stringify(changed));
+      await assert.rejects(verifyNative(out));
+    }
+    await writeFile(reportFile, JSON.stringify(report));
+    const archive = path.join(out, "archives", report.package.archive);
     await writeFile(
       archive,
       Buffer.concat([await readFile(archive), Buffer.from("tamper")])
@@ -619,21 +619,12 @@ async function launcherFixture(scratch) {
       path.join(root, "packages/grida-cli/native", file),
       path.join(directory, "native", file)
     );
-  const installed = path.join(
-    directory,
-    "node_modules/@grida",
-    `cli-${platform.id}`
-  );
-  await mkdir(path.join(installed, "bin"), { recursive: true });
-  await writeFile(
-    path.join(installed, "package.json"),
-    JSON.stringify({ name: `@grida/cli-${platform.id}`, version })
-  );
+  const installed = path.join(directory, "binaries", platform.id);
+  await mkdir(installed, { recursive: true });
   // A real native executable (Node) exposes argv/stdin/signal behavior without
   // invoking credentials, providers, or network from the Grida application.
   const executable = path.join(
     installed,
-    "bin",
     process.platform === "win32" ? "grida.exe" : "grida"
   );
   if (process.platform === "win32")
@@ -679,21 +670,6 @@ test("launcher preserves arguments, stdin, stdout, stderr and exit status", asyn
   assert.equal(value.code, 7, JSON.stringify(value));
   assert.equal(value.stderr, "diagnostic");
   assert.deepEqual(JSON.parse(value.stdout), { args, stdin: "stdin bytes\n" });
-  await writeFile(
-    path.join(installed, "package.json"),
-    JSON.stringify({
-      name: `@grida/cli-${selectPlatform().id}`,
-      version: "0.1.0",
-    })
-  );
-  const wrong = spawn(process.execPath, [launcher, "--version"], {
-    stdio: "pipe",
-  });
-  wrong.stdin.end();
-  const failed = await childResult(wrong);
-  assert.equal(failed.code, 1);
-  assert.equal(failed.stdout, "");
-  assert.match(failed.stderr, /version does not match/);
   await rm(installed, { recursive: true });
   const missing = spawn(process.execPath, [launcher, "--version"], {
     stdio: "pipe",
@@ -701,7 +677,8 @@ test("launcher preserves arguments, stdin, stdout, stderr and exit status", asyn
   missing.stdin.end();
   const absent = await childResult(missing);
   assert.equal(absent.code, 1);
-  assert.match(absent.stderr, /--include=optional/);
+  assert.equal(absent.stdout, "");
+  assert.match(absent.stderr, /bundled executable is missing/);
 });
 
 test(

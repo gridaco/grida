@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { readFileSync, realpathSync } from "node:fs";
-import { createRequire } from "node:module";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { constants } from "node:os";
-import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const platforms = JSON.parse(
@@ -32,30 +30,15 @@ export function binaryPath() {
     throw new Error(
       `Grida does not support ${process.platform}/${process.arch}.`
     );
-  const own = JSON.parse(
-    readFileSync(new URL("../package.json", import.meta.url), "utf8")
+  const executable = fileURLToPath(
+    new URL(
+      `../binaries/${selected.id}/${selected.os === "win32" ? "grida.exe" : "grida"}`,
+      import.meta.url
+    )
   );
-  const name = `@grida/cli-${selected.id}`;
-  let manifestPath;
-  try {
-    manifestPath = createRequire(import.meta.url).resolve(
-      `${name}/package.json`
-    );
-  } catch {
-    throw new Error(
-      `Grida's native package ${name}@${own.version} is missing. Reinstall with npm install --include=optional grida@${own.version}.`
-    );
-  }
-  const installed = JSON.parse(readFileSync(manifestPath, "utf8"));
-  if (installed.name !== name || installed.version !== own.version)
-    throw new Error(
-      "Grida's native package version does not match the launcher. Reinstall Grida."
-    );
-  return path.join(
-    path.dirname(manifestPath),
-    "bin",
-    selected.os === "win32" ? "grida.exe" : "grida"
-  );
+  if (!existsSync(executable))
+    throw new Error("Grida's bundled executable is missing. Reinstall Grida.");
+  return executable;
 }
 
 export function launch(args = process.argv.slice(2)) {

@@ -1,6 +1,6 @@
 [package]
 name = "grida-cli"
-version = "0.3.0-rc.1"
+version = "0.3.0-rc.2"
 description = "The native Grida command-line executable."
 default-run = "grida"
 edition.workspace = true

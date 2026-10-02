@@ -18,11 +18,11 @@ For the current CLI, use the
 node scripts/conformance/installed.mjs --candidate /absolute/native-candidate
 ```
 
-The candidate must already contain the verified native npm archive set. The
-complete `just cli-conformance-target` gate also requires a frozen workspace
-install and a current docs build; its prerequisites are in the conformance README.
-It rebuilds the pinned TypeScript reference independently of the retired workspace
-source. Node guard tests remain useful for that reference:
+The candidate must already contain the verified `grida` npm archive with all
+eight native executables. The complete `just cli-contracts` gate builds current
+TS consumers and documentation after a frozen workspace install; its native
+custody prerequisites are in the contract guide. It does not rebuild the retired
+TypeScript CLI. Node guard tests remain useful for the retained instrumentation:
 
 ```sh
 node --test scripts/cli-media-local/network.test.mjs scripts/cli-local/network.test.mjs

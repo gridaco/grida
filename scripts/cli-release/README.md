@@ -1,17 +1,18 @@
 # CLI package preparation and release
 
-The native `grida` npm package is a small Node 24+ launcher with eight exact-version
-optional platform packages. The executable itself needs no Node runtime. npm's
-`os`, `cpu` and `libc` filters select the platform package; installation runs no
-lifecycle scripts and downloads no binary outside npm. The launcher forwards
-arguments, inherited streams, exit status and termination signals.
+The `grida` npm package contains a Node 24+ launcher and all eight native
+executables in one tarball. Installation has no dependencies, lifecycle scripts
+or binary downloads. The launcher selects `binaries/<platform-id>/grida`
+(`grida.exe` on Windows), distinguishing glibc and musl on Linux, and forwards
+arguments, inherited streams, exit status and termination signals. The native
+executable itself needs no Node runtime.
 
 ## Platform policy
 
 The reviewed matrix lives in
 [`platforms.json`](../../packages/grida-cli/native/platforms.json):
 
-| npm suffix       | Rust target                | Minimum runtime         |
+| Platform ID      | Rust target                | Minimum runtime         |
 | ---------------- | -------------------------- | ----------------------- |
 | darwin-x64       | x86_64-apple-darwin        | macOS 11                |
 | darwin-arm64     | aarch64-apple-darwin       | macOS 11                |
@@ -22,11 +23,11 @@ The reviewed matrix lives in
 | win32-x64        | x86_64-pc-windows-msvc     | supported Windows x64   |
 | win32-arm64      | aarch64-pc-windows-msvc    | supported Windows arm64 |
 
-Each platform package is named `@grida/cli-<suffix>`. Durable account and provider
-storage is supported on macOS/Linux; Windows retains the explicit environment
-and stdin provider-key workflow. Unsupported targets fail with a diagnostic;
-the launcher does not choose another architecture or search PATH for a substitute.
-A missing optional package explains how to reinstall with optional dependencies.
+Every installation contains the complete platform matrix. Durable account and
+provider storage is supported on macOS/Linux; Windows retains the explicit
+environment and stdin provider-key workflow. Unsupported targets fail with a
+diagnostic. The launcher neither substitutes another architecture nor searches
+PATH for an executable. A missing bundled executable requires reinstalling Grida.
 
 GNU binaries build on their native architecture inside PyPA's
 [`manylinux_2_28` images](https://github.com/pypa/manylinux#manylinux_2_28-almalinux-8-based),
@@ -69,57 +70,54 @@ node scripts/conformance/installed.mjs --candidate "$PWD/.tmp/native-candidate"
 ```
 
 `cargo-about` is a maintainer tool, not a CLI dependency. Its checked inventory
-covers the production dependency closure for all eight targets. Every package
+covers the production dependency closure for all eight targets. The package
 includes the deterministic third-party license and notice texts, including
 original composite license files that SPDX classification alone cannot replace.
 The inventory records the Cargo.lock hash and preparation refuses stale notices.
 The single notice source is `packages/grida-cli/THIRD-PARTY-NOTICES.txt`; the
-generator also writes `packages/grida-cli/native/licenses.json`. All staged
-packages copy that same notice source.
+generator also writes `packages/grida-cli/native/licenses.json`. The staged
+package copies that notice source.
 
 Preparation uses isolated npm configuration and cache, offline npm packing and
 no lifecycle scripts. It verifies binary format/architecture and the exact packed
-file boundary. `native-candidate.json` records all nine archive hashes, file lists
-and binary hashes. Verification reads tarballs without extraction and compares
-manifests, launcher files and notices with the checked-out source.
+file boundary. `native-candidate.json` format 2 has one `package` record with its
+archive hash/file list and eight `binaries` records with platform, target, bundled
+path, binary hash and byte count. Verification reads the tarball without extraction
+and compares its manifest, launcher, notices and all eight binaries with the
+reviewed source and report. Windows archive reads use a validated basename and
+an explicit working directory, avoiding GNU tar's drive-colon remote syntax.
 
-The candidate also records actual compressed sizes for an all-binary comparison
-archive and the launcher plus each selected platform archive. Compare these
-measurements from a complete matrix build; they quantify the download saved by
-platform selection. Do not extrapolate from one host binary or use fixture sizes
-as release measurements. The all-binary comparison is never published.
+The candidate records the actual tarball and unpacked sizes. Shipping all eight
+executables increases each download; there is no separate platform-package
+resolution or publication step. Measure complete release builds rather than
+extrapolating from a local host fixture.
 
 For local development, `native-fixture.mjs --binary /absolute/grida --out /absolute/out`
-packs the real host executable with inert foreign image headers. This exercises
-npm package selection, archive verification and installation without pretending
-to have compiled other architectures. Its report marks the fixture targets and
-publication refuses them. `node --test scripts/cli-release/native.test.mjs` uses
-this approach and additionally proves argument/stream/exit/signal forwarding,
-missing/version-mismatched dependency failure, ABI policy and release guards.
+packs the real host executable with inert foreign image headers. The report marks
+the fixture targets and publication refuses them. Tests exercise a fresh owned
+npm registry with exactly one archive, verify that all eight binaries install,
+and execute the host binary through the real launcher and npm command shim.
+They also cover archive tampering, incomplete/retargeted binary records,
+argument/stream/exit/signal forwarding, missing bundled executable failure,
+ABI policy, immutable version collisions and release guards.
 
 ## Source and release manifests
 
-The checked-out source manifest and published manifest have different roles.
-The CLI source package carries the Rust build/test commands and does not depend
-on unpublished platform packages. The pinned reference installs its own reviewed
-TypeScript dependency closure in its isolated directory. The native preparer writes
-the eight exact-version optional dependencies into the packed launcher manifest.
-Do not publish or pack the source directory directly.
+The checked-out source manifest carries Rust build/test commands. Preparation
+stages the reviewed files and eight compiled binaries, then writes a published
+manifest without scripts or dependencies. Do not publish or pack the source
+directory directly: source checkouts do not contain the release binaries.
 
-The shared target gate, including `just cli-conformance-target`, requires a frozen
-workspace install and a current docs build (`pnpm --filter docs build`). See the
-[conformance prerequisites](../conformance/README.md) for native custody tools.
-The former TypeScript CLI is extracted from its pinned Git revision into the
-isolated reference directory; it is no longer a workspace implementation.
-The old `prepare.mjs` and Node-preload proofs describe the TypeScript archive
-boundary and are retained reference tooling. They cannot prepare or verify a
-native release; use the `native-*` commands above.
+Use `just cli-contracts` for the current native contract gate and see the
+[conformance prerequisites](../conformance/README.md) for custody tools and docs
+build requirements. The old `prepare.mjs` describes the retired TypeScript archive
+boundary and cannot prepare a native release; use the `native-*` commands above.
 
 ## Release ownership
 
 [`cli-verify.yml`](../../.github/workflows/cli-verify.yml) calls
 [`cli-native.yml`](../../.github/workflows/cli-native.yml). That workflow builds all
-eight targets, stages one candidate, installs those same tarballs on each target,
+eight targets, stages one candidate, installs that same tarball on each target,
 and runs native OAuth/account/media proofs on macOS/Linux, including Alpine.
 [`cli-docs.yml`](../../.github/workflows/cli-docs.yml) checks installed help and
 schemas against the public guides with networking disabled by an OS perimeter.
@@ -136,25 +134,23 @@ It verifies the reviewed non-placeholder source version and native cutover marke
 runs the delivery/docs/auth/API workflows, and downloads the exact verified
 candidate and all eight installed reports. The publish job does not rebuild.
 `native-publish.mjs --dry-run --out /absolute/candidate --version VERSION --tag next`
-checks hashes and proofs, then prints publication order without contacting npm.
+checks hashes and proofs, then prints the single publication record without contacting npm.
 
 Publication requires `CLI_NPM_RELEASE_ENABLED=true`, the `npm-publish` GitHub
 environment and its reviewer/branch protections, and npm Trusted Publishing
-through GitHub Actions OIDC. Configure the trusted publisher for **all nine
-package names**: `grida` and the eight `@grida/cli-<suffix>` names. Each must authorize
+through GitHub Actions OIDC. The trusted publisher for `grida` must authorize
 repository `gridaco/grida`, workflow `cli-release.yml`, environment `npm-publish`,
 and direct publication, not only staged publication. Keep the workflow filename
 stable on the default branch. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 and [provenance](https://docs.npmjs.com/generating-provenance-statements/).
 Do not configure `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or a token fallback.
 
-Before the first native release, a package maintainer must establish the eight
-platform packages and their publisher permissions. A public registry 404 is not
-proof of name availability or publish authority. npm requires an existing package
-before a trusted publisher can be configured; the release workflow cannot
-bootstrap those permissions itself. Resolve initial publication with the
-maintainer, then verify trust for all nine package names before dispatching a
-release. See [npm trust prerequisites](https://docs.npmjs.com/cli/v12/commands/npm-trust/#prerequisites).
+`0.3.0-rc.1` was published using separate platform packages. Those immutable
+versions remain historical releases; `0.3.0-rc.2` introduces the bundled layout.
+No new `@grida/cli-*` versions or publisher setup are required for bundled releases.
+The stable `latest` tag remains on `0.2.0` until a separately approved stable
+release. Verify existing registry versions, tags and trusted-publisher authority
+before dispatching a release.
 
 The current workflow and publisher both enforce `main`, including releases under
 `next`. A PR can build and install the complete candidate matrix but cannot
@@ -164,18 +160,16 @@ a separately reviewed release path is introduced. Publish a new prerelease to
 Changing the version or executable requires fresh candidate proofs; a prerelease
 proof does not certify different stable bytes.
 
-The platform packages publish first; the launcher publishes last, after all
-exact-version dependencies exist. Stable releases use `latest`; prereleases use
-`next` and cannot replace `latest`. Existing identical immutable versions can
-resume an interrupted release; changed archive bytes fail. A changed distribution
-tag also fails and requires explicit maintainer recovery instead of silently
-undoing that change. Review the registry's existing versions and tags before
-choosing a new version. No package names are assumed to have empty history.
+There is one immutable archive publication. Stable releases use `latest`;
+prereleases use `next` and cannot replace `latest`. An already-published version
+is accepted only when its archive integrity and selected distribution tag match.
+Different bytes, changed tags, malformed registry metadata and read failures
+stop before publication. A failed publish is not retried or repaired by moving
+tags automatically.
 
 The CLI remains independently versioned and excluded from Changesets planning.
 Use the repository's [publisher wrapper](../publish-packages.mjs) for other
 packages: it temporarily makes only the source CLI private while Changesets runs.
-Platform packages are generated release outputs, never workspace packages.
 
 ## After publication
 
@@ -184,8 +178,8 @@ installation using the exact registry version. Local candidate tarballs do not
 satisfy this check.
 
 - [ ] Install `grida@<released-version>` from the public npm registry and record
-      the launcher version, resolved platform package and executable hash. Exercise
-      the supported release targets, including npm's Linux libc selection.
+      the package version, bundled platform path and executable hash. Exercise
+      the supported release targets, including glibc and musl selection.
 - [ ] Check help, docs, model discovery and provider configuration/listing. Verify
       that existing provider credentials remain usable without exposing key values.
 - [ ] Complete browser login, inspect status, restart the CLI, read identity,
@@ -200,16 +194,11 @@ satisfy this check.
 
 ## Recovery
 
-Disable the release environment to stop new publication. A failure before the
-launcher publishes leaves the previously released launcher intact. Retain the
-exact candidate and resume only if already published archive integrity matches.
-Do not rebuild the same version or overwrite immutable platform packages.
+Disable the release environment to stop publication. Retain the exact candidate;
+retry only if an already-published version has the same archive integrity and tag.
+Never rebuild or overwrite an immutable version.
 
-To roll back, a maintainer can move the `grida` distribution tag to a previously
-verified version. Its exact optional dependencies select the matching older
-binaries; platform tags do not choose the installed executable. Deprecate the
-affected launcher version with a clear migration instruction when appropriate.
-These are explicit registry mutations, not automatic recovery actions. Already
-installed clients remain installed; ship a corrective version and preserve their
-server compatibility. Do not default to unpublishing. See the
-[installed-client policy](https://grida.co/docs/wg/cli/v1#installed-client-compatibility).
+A maintainer can explicitly move the `grida` distribution tag to a previously
+verified version and deprecate a broken version with a migration instruction.
+Each bundled version carries its own complete binary matrix. Registry recovery
+is never automatic.

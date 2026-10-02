@@ -1,4 +1,4 @@
-// Always inspect the native candidate, even before the source manifest cutover.
+// Inspect the installed native candidate against current documentation contracts.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";

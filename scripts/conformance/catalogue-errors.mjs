@@ -1,19 +1,17 @@
-// Fault injection over pinned provider transcripts: error codes, receipts and no replay.
+// Fault injection over reviewed provider transcripts: error codes, receipts and no replay.
 import fs from "node:fs";
+import { parseArgs } from "node:util";
+const { values } = parseArgs({
+  options: { check: { type: "boolean", default: false } },
+});
 import assert from "node:assert/strict";
 import { expectedFaultRequest, projectRequest } from "./catalogue-request.mjs";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { repository, referenceRoot, verifyBuild } from "./baseline.mjs";
+import { fileURLToPath } from "node:url";
+const repository = fileURLToPath(new URL("../../", import.meta.url));
 const require = createRequire(import.meta.url);
-const reference = process.argv.includes("--reference");
-if (reference) await verifyBuild();
-const api = require(
-  path.join(
-    reference ? referenceRoot : repository,
-    "packages/grida-ai/dist/index.cjs"
-  )
-);
+const api = require(path.join(repository, "packages/grida-ai/dist/index.cjs"));
 const operations = new api.MediaOperations();
 const wires = JSON.parse(
   fs.readFileSync(
@@ -216,7 +214,7 @@ const file = path.join(
   "crates/grida-ai/tests/fixtures/error-vectors.jsonl"
 );
 const text = vectors.map((v) => JSON.stringify(v)).join("\n") + "\n";
-if (process.argv.includes("--check")) {
+if (values.check) {
   if (fs.readFileSync(file, "utf8") !== text)
     throw Error("Error fixture drift");
 } else fs.writeFileSync(file, text);

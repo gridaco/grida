@@ -474,6 +474,57 @@ mod tests {
         );
     }
     #[test]
+    fn frozen_v1_file_and_keyring_records_survive_current_readers() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../packages/grida-auth/fixtures/account-v1/custody.json"
+        ))
+        .unwrap();
+        let binding: Binding =
+            serde_json::from_value(fixture["file_metadata"]["binding"].clone()).unwrap();
+        let preimage = serde_json::to_string(&binding).unwrap();
+        assert_eq!(preimage, fixture["binding_preimage"]);
+        let digest = Sha256::digest(preimage.as_bytes())
+            .iter()
+            .map(|v| format!("{v:02x}"))
+            .collect::<String>();
+        assert_eq!(digest, fixture["profile_sha256"]);
+        let config = Config {
+            issuer: binding.issuer,
+            api_origin: binding.api_origin,
+            client_id: binding.client_id,
+            publishable_key: "sb_publishable_synthetic".into(),
+            redirect_uris: vec!["http://127.0.0.1:47902/callback".into()],
+        };
+        for (backend, metadata_name, record_name) in [
+            (Backend::File, "file_metadata", "keyring_record"),
+            (Backend::Keyring, "keyring_metadata", "keyring_record"),
+            (Backend::Keyring, "keyring_metadata", "keyring_tombstone"),
+        ] {
+            let temp = tempfile::tempdir().unwrap();
+            let home = std::fs::canonicalize(temp.path()).unwrap();
+            let keyring = Arc::new(MemoryKeyring::default());
+            let store =
+                Store::with_keyring(&config, home.clone(), Some(backend), keyring.clone()).unwrap();
+            let mut metadata = fixture[metadata_name].clone();
+            metadata["binding"]["home"] = serde_json::json!(home);
+            native::atomic_write(&store.filename, &serde_json::to_vec(&metadata).unwrap()).unwrap();
+            let mut record = fixture[record_name].clone();
+            record["binding"]["home"] = serde_json::json!(home);
+            *keyring.value.lock().unwrap() = Some(record.to_string());
+            let envelope = store.exclusive(|tx| tx.read()).unwrap();
+            assert_eq!(envelope.revision, record["revision"]);
+            assert_eq!(
+                serde_json::to_value(&envelope.session).unwrap(),
+                record["session"]
+            );
+            let before = envelope.revision;
+            store.exclusive(|tx| tx.write(None)).unwrap();
+            let cleared = store.exclusive(|tx| tx.read()).unwrap();
+            assert!(cleared.session.is_none());
+            assert_ne!(before, cleared.revision);
+        }
+    }
+    #[test]
     fn file_keyring_migration_erases_plaintext_and_keeps_tombstone() {
         let (_temp, store, keyring) = setup();
         store.exclusive(|tx| tx.write(Some(session()))).unwrap();

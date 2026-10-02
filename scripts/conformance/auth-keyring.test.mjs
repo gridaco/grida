@@ -8,9 +8,10 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, realpath, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { repository, verifyBaseline } from "./baseline.mjs";
+import { fileURLToPath } from "node:url";
 import { MacosKeychainFixture } from "./auth-macos.mjs";
 
+const repository = fileURLToPath(new URL("../../", import.meta.url));
 let macosFixture;
 
 const require = createRequire(
@@ -53,7 +54,6 @@ before(async () => {
     "macOS keyring checks require explicit opt-in: GRIDA_AUTH_KEYRING_SMOKE=1. Only disposable entries are used; a locked keychain may request authorization."
   );
   macosFixture = MacosKeychainFixture.load();
-  await verifyBaseline();
   const built = spawnSync(
     "cargo",
     [

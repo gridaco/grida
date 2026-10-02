@@ -16,16 +16,16 @@ bypassing validation. `verify` and `voices` are explicitly networked operations.
 
 Normal Cargo builds require neither Node nor schema generation. See
 [data/README.md](data/README.md) for generated asset ownership and
-[tests/fixtures/README.md](tests/fixtures/README.md) for the TypeScript oracle.
+[tests/fixtures/README.md](tests/fixtures/README.md) for the shared provider contracts.
 
 ```sh
 cargo test -p grida-ai
 cargo clippy -p grida-ai --all-targets -- -D warnings
 ```
 
-The pinned Vercel video serializer drops zero seeds. This migration preserves
-the existing input rejection of `seed: 0`; changing that behavior requires a
-separate contract decision.
+The existing Vercel video contract rejects `seed: 0`, preserving behavior from
+the TypeScript serializer that dropped zero seeds. Changing that behavior
+requires a separate contract decision.
 
 ## Provider contract baseline
 
@@ -49,8 +49,8 @@ Never regenerate them just to make a failing implementation pass. Review the
 intended contract change, adjust the smallest relevant expectation, and retain a
 regression for the old failure. New Rust behavior should gain a small independent
 test here; it need not grow a second implementation or a shared testing crate.
-See the [fixture policy](tests/fixtures/README.md) for normalization and immutable
-TypeScript verification.
+See the [fixture policy](tests/fixtures/README.md) for normalization and checks
+against the continuing TypeScript SDK consumers.
 
 This follows the approach inspected in Zed's injectable
 [HTTP client](https://github.com/zed-industries/zed/blob/74c134a3c12418cc095122fff938ef1c2504ae06/crates/http_client/src/http_client.rs)

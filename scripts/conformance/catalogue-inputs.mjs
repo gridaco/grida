@@ -1,16 +1,16 @@
-// Differential JSON input vectors produced by the pinned TypeScript parser.
+// Reviewed JSON input vectors checked against the current TypeScript parser.
 import fs from "node:fs";
+import { parseArgs } from "node:util";
+const { values } = parseArgs({
+  options: { check: { type: "boolean", default: false } },
+});
 import path from "node:path";
 import { createRequire } from "node:module";
-import { repository, referenceRoot, verifyBuild } from "./baseline.mjs";
+import { fileURLToPath } from "node:url";
+const repository = fileURLToPath(new URL("../../", import.meta.url));
 const require = createRequire(import.meta.url);
-const reference = process.argv.includes("--reference");
-if (reference) await verifyBuild();
 const { MediaOperations } = require(
-  path.join(
-    reference ? referenceRoot : repository,
-    "packages/grida-ai/dist/index.cjs"
-  )
+  path.join(repository, "packages/grida-ai/dist/index.cjs")
 );
 const operations = new MediaOperations();
 const wires = JSON.parse(
@@ -107,7 +107,7 @@ const target = path.join(
   "crates/grida-ai/tests/fixtures/input-vectors.jsonl"
 );
 const bytes = vectors.map((v) => JSON.stringify(v)).join("\n") + "\n";
-if (process.argv.includes("--check")) {
+if (values.check) {
   if (fs.readFileSync(target, "utf8") !== bytes)
     throw Error("Input fixture drift");
 } else fs.writeFileSync(target, bytes);

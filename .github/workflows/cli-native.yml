@@ -70,7 +70,7 @@ jobs:
           cargo fetch --locked
           cargo install cargo-about --version 0.8.2 --locked
           node scripts/cli-release/native-notices.mjs --check
-      - name: Test packaging and prepare the exact nine-archive candidate
+      - name: Test packaging and prepare the exact bundled candidate
         env:
           GRIDA_NATIVE_TEST_BINARY: ${{ runner.temp }}/grida-native-artifacts/x86_64-unknown-linux-gnu/grida
         run: |
@@ -113,7 +113,7 @@ jobs:
         if: matrix.os != 'win32' && matrix.libc != 'musl'
         shell: bash
         run: node scripts/conformance/installed.mjs --candidate "$RUNNER_TEMP/grida-native-candidate"
-      - name: Prove npm selects and executes the musl package on Alpine
+      - name: Prove the bundled package selects and executes musl on Alpine
         if: matrix.libc == 'musl'
         shell: bash
         run: |
