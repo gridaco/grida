@@ -10,6 +10,12 @@ owned stack using that harness's `prepare`, `start` and `bootstrap` commands.
 Do not use a developer stack or a hosted project. The two proofs share the
 fixed `grida_auth_test` fixture identity and must run serially on one machine.
 
+The `.mts` scripts run directly on Node.js 24, using erasable TypeScript syntax
+and explicit import extensions. No extra runtime or build step is required.
+Run their strict typecheck from this directory with `pnpm exec tsc --noEmit`;
+the Forms proof workflow owns that check. The existing `clients.ts` subprocess
+uses the repository's installed `tsx` to load editor aliases and TSX imports.
+
 ```sh
 pnpm turbo build --filter='@grida/api^...'
 pnpm turbo typecheck test --filter='@grida/api^...'
@@ -18,8 +24,8 @@ pnpm --filter @grida/api test
 pnpm --filter @grida/api build:local
 pnpm --filter @grida/api build
 pnpm --filter @grida/api check:vercel
-node --test scripts/auth-local/guards.test.mjs scripts/forms-local/network.test.mjs
-node scripts/forms-local/proof.mjs --state /absolute/fixture/fixture.json
+node --test scripts/auth-local/guards.test.mjs scripts/forms-local/network.test.mts
+node scripts/forms-local/proof.mts --state /absolute/fixture/fixture.json
 node scripts/auth-local/stack.mjs stop --state /absolute/fixture/fixture.json
 ```
 
@@ -51,10 +57,10 @@ The snapshot adds a fixture-only error observer that records stack frames in the
 private log, without error messages or request/provider data. Product diagnostics
 remain unchanged; the observer does not change responses or operation behavior.
 
-`fixtures.mjs` creates fresh projects under the canonical seed's two
+`fixtures.mts` creates fresh projects under the canonical seed's two
 organizations, small Forms records, inventory, a public response bucket and a
 real connected table. Run-specific identifiers isolate repeated attempts without
-resetting previous data. `scenarios.mjs` imports no application operation or
+resetting previous data. `scenarios.mts` imports no application operation or
 validator: it checks public responses against independent persisted rows,
 associations, inventory and downloaded bytes. Authenticated seed personas and an
 anonymous caller exercise the actual migrated RLS and RPC privileges. Separate
@@ -106,7 +112,7 @@ uploaded bytes in the same disposable fixture. Its private `forms-carryover.json
 lives beside the fixture state. When that prepared state is available, run:
 
 ```sh
-node scripts/forms-local/proof.mjs --state /absolute/fixture/fixture.json --resume-carryover
+node scripts/forms-local/proof.mts --state /absolute/fixture/fixture.json --resume-carryover
 ```
 
 This submits the existing session and uploaded object through the new API,

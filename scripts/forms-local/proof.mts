@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { createHash, randomUUID, type BinaryLike } from "node:crypto";
 import {
   copyFile,
   lstat,
@@ -20,7 +20,39 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { readState } from "../auth-local/stack.mjs";
 import { guards } from "../auth-local/guards.mjs";
-import { createProviders } from "./providers.mjs";
+import { createProviders } from "./providers.mts";
+import type { FixtureSetup } from "./fixtures.mts";
+import type {
+  runFormsScenarios,
+  runTransportScenarios,
+  runClientScenarios,
+} from "./scenarios.mts";
+
+type SourceHash = { path: string; sha256: string };
+type Exit = { code: number | null; signal: NodeJS.Signals | null };
+type OwnedProcess = {
+  child: ChildProcessWithoutNullStreams;
+  done: Promise<Exit>;
+  log(): string;
+  wait(timeout?: number): Promise<string>;
+  stop(): Promise<void>;
+};
+type ProofReport = {
+  mode: string;
+  node: string;
+  nitro: string;
+  backend: string;
+  passed: boolean;
+  sources: SourceHash[];
+  databaseSources: SourceHash[];
+  harness?: SourceHash[];
+  scenarios?: Awaited<ReturnType<typeof runFormsScenarios>>;
+  transport?: Awaited<ReturnType<typeof runTransportScenarios>>;
+  clients?: Awaited<ReturnType<typeof runClientScenarios>>;
+  carryoverResumed?: boolean;
+  phase?: string;
+  cleanup?: string;
+};
 
 const scripts = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(scripts, "../..");
@@ -28,15 +60,24 @@ const require = createRequire(path.join(repository, "apps/api/package.json"));
 const nitroPackage = require.resolve("nitropack/package.json");
 const nitro = path.join(path.dirname(nitroPackage), "dist/cli/index.mjs");
 const tsx = require.resolve("tsx");
-const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const children = new Set();
+const hash = (bytes: BinaryLike) =>
+  createHash("sha256").update(bytes).digest("hex");
+const children = new Set<OwnedProcess>();
 
-async function put(filename, text) {
+async function put(filename: string, text: string) {
   await mkdir(path.dirname(filename), { recursive: true, mode: 0o700 });
   await writeFile(filename, text, { mode: 0o600 });
 }
 
-function launch(binary, args, { cwd, env, input } = {}) {
+function launch(
+  binary: string,
+  args: string[],
+  {
+    cwd,
+    env,
+    input,
+  }: { cwd?: string; env?: NodeJS.ProcessEnv; input?: string } = {}
+): OwnedProcess {
   const child = spawn(binary, args, {
     cwd,
     env,
@@ -50,17 +91,25 @@ function launch(binary, args, { cwd, env, input } = {}) {
       output = (output + chunk).slice(-2 * 1024 * 1024);
     });
   }
-  const done = new Promise((resolve, reject) => {
+  const done = new Promise<Exit>((resolve, reject) => {
     child.once("error", reject);
     child.once("exit", (code, signal) => resolve({ code, signal }));
   });
-  const kill = (signal) => {
-    if (child.exitCode !== null || child.signalCode !== null) return;
+  const kill = (signal: NodeJS.Signals) => {
+    if (
+      child.exitCode !== null ||
+      child.signalCode !== null ||
+      child.pid === undefined
+    )
+      return;
     try {
       if (process.platform === "win32") child.kill(signal);
       else process.kill(-child.pid, signal);
     } catch (error) {
-      if (error.code !== "ESRCH") throw error;
+      if (
+        !(error instanceof Error && "code" in error && error.code === "ESRCH")
+      )
+        throw error;
     }
   };
   const running = {
@@ -99,8 +148,8 @@ function launch(binary, args, { cwd, env, input } = {}) {
   return running;
 }
 
-async function files(directory) {
-  const result = [];
+async function files(directory: string): Promise<string[]> {
+  const result: string[] = [];
   for (const entry of await readdir(path.join(repository, directory), {
     withFileTypes: true,
   })) {
@@ -113,7 +162,7 @@ async function files(directory) {
   return result.sort();
 }
 
-async function snapshot(workspace) {
+async function snapshot(workspace: string) {
   const application = [
     "apps/api/package.json",
     "apps/api/tsconfig.json",
@@ -194,19 +243,22 @@ export default defineNitroPlugin((nitro) => {
   return hashes;
 }
 
-async function reserve(port) {
+async function reserve(port: number) {
   const server = createServer();
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(port, "127.0.0.1", resolve);
   });
+  const address = server.address();
+  assert(address && typeof address !== "string");
   return {
-    port: server.address().port,
-    release: () => new Promise((resolve) => server.close(resolve)),
+    port: address.port,
+    release: () =>
+      new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }
 
-async function ready(server, origin) {
+async function ready(server: OwnedProcess, origin: string) {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     assert(
@@ -233,7 +285,7 @@ async function main() {
     (args.length === 2 ||
       (args.length === 3 && args[2] === "--resume-carryover")) &&
       args[0] === "--state",
-    "Usage: node scripts/forms-local/proof.mjs --state ABSOLUTE_FIXTURE_STATE [--resume-carryover]"
+    "Usage: node scripts/forms-local/proof.mts --state ABSOLUTE_FIXTURE_STATE [--resume-carryover]"
   );
   assert(Number(process.versions.node.split(".")[0]) >= 24, "Node24+ required");
   const state = await readState(args[1]);
@@ -242,7 +294,9 @@ async function main() {
     "bootstrapped",
     "Use a fresh bootstrapped owned local fixture"
   );
-  const setup = JSON.parse(await readFile(state.setupPath, "utf8"));
+  const setup = JSON.parse(
+    await readFile(state.setupPath, "utf8")
+  ) as FixtureSetup & { publishableKey: string };
   assert.equal(setup.apiUrl, "http://127.0.0.1:55431");
   const cache = path.join(repository, ".cache/forms-local");
   await mkdir(cache, { recursive: true, mode: 0o700 });
@@ -255,7 +309,7 @@ async function main() {
   );
   const workspace = await mkdtemp(path.join(cache, "nitro-"));
   const reportPath = path.join(cache, `result-${randomUUID()}.json`);
-  const report = {
+  const report: ProofReport = {
     mode: "extracted-nitro",
     node: process.version,
     nitro: require("nitropack/package.json").version,
@@ -265,9 +319,9 @@ async function main() {
     databaseSources: state.sources,
   };
   let phase = "snapshot";
-  let provider;
-  let releasePort;
-  const logs = [];
+  let provider: Awaited<ReturnType<typeof createProviders>> | undefined;
+  let releasePort: (() => Promise<void>) | undefined;
+  const logs: string[] = [];
   const tick = setInterval(
     () => console.log(`Forms proof: ${phase} in progress.`),
     30_000
@@ -285,11 +339,11 @@ async function main() {
     provider = await createProviders();
     report.harness = await Promise.all(
       [
-        "proof.mjs",
+        "proof.mts",
         "clients.ts",
-        "fixtures.mjs",
-        "scenarios.mjs",
-        "providers.mjs",
+        "fixtures.mts",
+        "scenarios.mts",
+        "providers.mts",
         "network.cjs",
       ].map(async (name) => ({
         path: `scripts/forms-local/${name}`,
@@ -343,7 +397,7 @@ async function main() {
       await build.stop();
     }
     phase = "fixture overlay";
-    const { createFixtures } = await import("./fixtures.mjs");
+    const { createFixtures } = await import("./fixtures.mts");
     const fixture = await createFixtures({
       setup,
       executeSql: async (sql) => {
@@ -395,7 +449,7 @@ async function main() {
         runTransportScenarios,
         runClientScenarios,
         resumeCarryover,
-      } = await import("./scenarios.mjs");
+      } = await import("./scenarios.mts");
       report.scenarios = await runFormsScenarios({
         origin,
         webOrigin,

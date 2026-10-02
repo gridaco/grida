@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -8,15 +9,15 @@ import { fileURLToPath } from "node:url";
 const guard = fileURLToPath(new URL("./network.cjs", import.meta.url));
 
 test("Forms network guard admits only owned loopback and exact recorded providers", async () => {
-  const paths = [];
+  const paths: (string | undefined)[] = [];
   const server = createServer((req, res) => {
     paths.push(req.url);
     if (req.url === "/redirect")
       res.writeHead(302, { location: "https://example.invalid/" });
     res.end("fixture");
   });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const port = server.address().port;
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as AddressInfo).port;
   try {
     const code = `
       const assert = require('node:assert/strict');
@@ -44,7 +45,7 @@ test("Forms network guard admits only owned loopback and exact recorded provider
       stdio: "ignore",
     });
     assert.equal(
-      await new Promise((resolve, reject) => {
+      await new Promise<number | null>((resolve, reject) => {
         child.once("error", reject);
         child.once("exit", resolve);
       }),
@@ -53,6 +54,6 @@ test("Forms network guard admits only owned loopback and exact recorded provider
     assert.deepEqual(paths, ["/owned", "/resend/emails", "/redirect"]);
   } finally {
     server.closeAllConnections();
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });

@@ -6,8 +6,24 @@ import { fileURLToPath } from "node:url";
 
 const app = fileURLToPath(new URL("../", import.meta.url));
 const output = path.join(app, ".vercel/output");
-const json = async (filename) => JSON.parse(await readFile(filename, "utf8"));
-const input = await json(path.join(app, "vercel.json"));
+async function json<T>(filename: string): Promise<T> {
+  return JSON.parse(await readFile(filename, "utf8")) as T;
+}
+type ServiceConfig = {
+  services: Record<string, { root: string; framework: string }>;
+  rewrites: unknown[];
+};
+type OutputRoute = { dest?: string };
+type OutputConfig = { version: number; routes: OutputRoute[] };
+type FunctionConfig = {
+  runtime: string;
+  maxDuration: number;
+  launcherType: string;
+  supportsResponseStreaming: boolean;
+  handler: string;
+};
+
+const input = await json<ServiceConfig>(path.join(app, "vercel.json"));
 assert.deepEqual(Object.keys(input.services), ["api"]);
 assert.equal(input.services.api.root, ".");
 assert.equal(input.services.api.framework, "nitro");
@@ -15,9 +31,11 @@ assert.deepEqual(input.rewrites, [
   { source: "/(.*)", destination: { service: "api" } },
 ]);
 
-const config = await json(path.join(output, "config.json"));
+const config = await json<OutputConfig>(path.join(output, "config.json"));
 assert.equal(config.version, 3);
-const routes = config.routes.filter((route) => route.dest);
+const routes = config.routes.filter(
+  (route): route is OutputRoute & { dest: string } => !!route.dest
+);
 const destinations = [
   "/health",
   "/v1/[id]",
@@ -46,19 +64,23 @@ for (const route of routes) {
     "Every route must reach the same API implementation"
   );
 }
-const fn = await json(path.join(bundle, ".vc-config.json"));
+const fn = await json<FunctionConfig>(path.join(bundle, ".vc-config.json"));
 assert.equal(fn.runtime, "nodejs24.x");
 assert.equal(fn.maxDuration, 60);
 assert.equal(fn.launcherType, "Nodejs");
 assert.equal(fn.supportsResponseStreaming, true);
 assert((await stat(path.join(bundle, fn.handler))).isFile());
 const dependencies = Object.keys(
-  (await json(path.join(bundle, "package.json"))).dependencies
+  (
+    await json<{ dependencies: Record<string, string> }>(
+      path.join(bundle, "package.json")
+    )
+  ).dependencies
 );
 assert(!dependencies.some((name) => name === "next" || name === "editor"));
 
-async function routeChunks(directory) {
-  const chunks = [];
+async function routeChunks(directory: string): Promise<string[]> {
+  const chunks: string[] = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const filename = path.join(directory, entry.name);
     if (entry.isDirectory()) chunks.push(...(await routeChunks(filename)));

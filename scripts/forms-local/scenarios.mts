@@ -2,9 +2,131 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import {
   createFixtureClient,
+  type Fixture,
+  type FixtureSetup,
   FILE_BYTES,
   RESPONSE_BUCKET,
-} from "./fixtures.mjs";
+} from "./fixtures.mts";
+import type { Provider } from "./providers.mts";
+
+type Log = (message: string) => void;
+type FormIdentity = { id: string };
+interface ScenarioOptions {
+  origin: string;
+  fixture: Fixture;
+  log?: Log;
+}
+interface RequestOptions {
+  method?: string;
+  json?: unknown;
+  body?: BodyInit;
+  headers?: Record<string, string>;
+}
+interface HttpResult {
+  status: number;
+  ok: boolean;
+  data: unknown;
+  headers: Headers;
+}
+interface Envelope<T> {
+  data: T;
+  error: unknown;
+}
+interface SessionData {
+  id: string;
+  form_id: string;
+}
+interface SubmissionData {
+  id: string;
+  customer_id: string | null;
+}
+interface UploadData {
+  signedUrl: string;
+  path: string;
+  token: string;
+}
+interface ChallengeState {
+  state: string;
+  customer_uid: string | null;
+  challenge_id: string;
+  email: string;
+}
+interface ChallengeResponse {
+  challenge_id: string;
+  state: ChallengeState;
+}
+interface LoadResponse {
+  data: {
+    title: string;
+    is_open: boolean;
+    session_id: string;
+    fields: { id: string; [key: string]: unknown }[];
+    blocks: unknown[];
+    tree: unknown;
+    required_hidden_fields: unknown;
+    default_values: Record<string, unknown>;
+    customer_access: { customer: { uid: string } | null };
+  };
+  error: { code: string; missing_required_hidden_fields?: unknown } | null;
+}
+interface SessionRow {
+  id: string;
+  form_id: string;
+  customer_id: string | null;
+  raw: Record<string, unknown>;
+}
+interface ResponseRow {
+  id: string;
+  form_id: string;
+  session_id: string | null;
+  customer_id: string | null;
+  raw: Record<string, unknown>;
+  geo: unknown;
+  x_ipinfo: unknown;
+  platform_powered_by: string;
+}
+interface ResponseFieldRow {
+  response_id: string;
+  form_id: string;
+  form_field_id: string;
+  value: unknown;
+  form_field_option_id: string | null;
+  form_field_option_ids: string[] | null;
+  storage_object_paths: string[];
+  challenge_state: ChallengeState;
+}
+interface ConnectedRow {
+  id: string;
+  full_name: string;
+  attachment: string | null;
+  checkboxes: string[];
+  toggles: string[];
+}
+interface ClientProofInput {
+  apiOrigin: string;
+  storageOrigin: string;
+  sdk: { formId: string; sessionId: string; values: Record<string, string> };
+  manual: { formId: string; sessionId: string; values: Record<string, string> };
+  missingFormId: string;
+  file: {
+    sessionId: string;
+    fieldId: string;
+    name: string;
+    bytesBase64: string;
+  };
+  challenge: { sessionId: string; fieldId: string; email: string };
+}
+interface ClientProofOutput {
+  sdk: SubmissionData;
+  manual: { completed: boolean };
+  denied: { sdk: boolean; manual: boolean };
+  file: { path: string; publicUrl: string };
+  challenge: {
+    challengeId: string;
+    state: string;
+    invalidVerifyRejected: boolean;
+  };
+}
 
 // Independent HTTP/SQL outcomes, shared by the pre-move Next artifact and the
 // extracted API. No imports of route functions or application validators.
@@ -15,6 +137,10 @@ export async function runFormsScenarios({
   fixture: f,
   provider,
   log = () => {},
+}: ScenarioOptions & {
+  webOrigin?: string;
+  publicContract?: boolean;
+  provider: Provider;
 }) {
   const base = new URL(origin);
   assert.equal(base.hostname, "127.0.0.1");
@@ -22,21 +148,21 @@ export async function runFormsScenarios({
   const web = new URL(webOrigin);
   assert(["127.0.0.1", "localhost"].includes(web.hostname));
   assert.equal(web.protocol, "http:");
-  const completed = [];
-  const done = (name) => {
+  const completed: string[] = [];
+  const done = (name: string) => {
     completed.push(name);
     log(`forms: ${name}`);
   };
-  const sessionPath = (session, field) =>
+  const sessionPath = (session: string, field: string) =>
     `/v1/session/${session}/field/${field}`;
 
   async function request(
-    path,
-    { method = "GET", json, body, headers = {} } = {}
-  ) {
+    path: string,
+    { method = "GET", json, body, headers = {} }: RequestOptions = {}
+  ): Promise<HttpResult> {
     const target = new URL(path, base);
     assert.equal(target.origin, base.origin);
-    const options = {
+    const options: RequestInit = {
       method,
       redirect: "manual",
       signal: AbortSignal.timeout(15_000),
@@ -56,7 +182,7 @@ export async function runFormsScenarios({
     }
     const response = await fetch(target, options);
     const text = await response.text();
-    let data;
+    let data: unknown;
     try {
       data = text ? JSON.parse(text) : null;
     } catch {
@@ -69,23 +195,23 @@ export async function runFormsScenarios({
       headers: response.headers,
     };
   }
-  function success(result, label) {
+  function success<T = unknown>(result: HttpResult, label: string): T {
     assert.equal(
       result.status,
       200,
       `${label}: expected HTTP 200, got ${result.status}`
     );
     assert(result.data !== null, `${label}: expected JSON`);
-    return result.data;
+    return result.data as T;
   }
-  function denied(result, label) {
+  function denied(result: HttpResult, label: string) {
     assert(
       [400, 401, 403, 404].includes(result.status),
       `${label}: expected explicit client denial, got ${result.status}`
     );
   }
-  async function session(form) {
-    const envelope = success(
+  async function session(form: FormIdentity) {
+    const envelope = success<Envelope<SessionData>>(
       await request(`/v1/${form.id}/session`),
       "create session"
     );
@@ -98,29 +224,41 @@ export async function runFormsScenarios({
     assert.match(data.id, /^[a-f0-9-]{36}$/);
     return data.id;
   }
-  const sessionRow = (id) =>
-    f.one("grida_forms", "response_session", `id=eq.${id}`);
-  const responseRows = (form) =>
-    f.rows("grida_forms", "response", `form_id=eq.${form.id}&order=id`);
+  const sessionRow = (id: string) =>
+    f.one<SessionRow>("grida_forms", "response_session", `id=eq.${id}`);
+  const responseRows = (form: FormIdentity) =>
+    f.rows<ResponseRow>(
+      "grida_forms",
+      "response",
+      `form_id=eq.${form.id}&order=id`
+    );
   const inventory = () =>
     f.one("grida_commerce", "inventory_item", `id=eq.${f.a.inventory.itemId}`);
-  function submission(sessionId, values = {}) {
+  function submission(
+    sessionId: string | null,
+    values: Record<string, string | Blob> = {}
+  ) {
     const body = new FormData();
     if (sessionId) body.set("__gf_session", sessionId);
     body.set("__gf_utc_offset", "0");
     for (const [key, value] of Object.entries(values)) body.set(key, value);
     return body;
   }
-  const submit = (form, sessionId, values, headers) =>
+  const submit = (
+    form: FormIdentity,
+    sessionId: string | null,
+    values: Record<string, string | Blob>,
+    headers?: Record<string, string>
+  ) =>
     request(`/v1/submit/${form.id}`, {
       method: "POST",
       body: submission(sessionId, values),
       headers,
     });
-  const fileDto = (name) => ({
+  const fileDto = (name: string) => ({
     file: { name, size: f.bytes.length, type: "image/png", lastModified: 0 },
   });
-  async function uploadBytes(upload) {
+  async function uploadBytes(upload: UploadData) {
     const url = new URL(upload.signedUrl);
     assert.equal(url.origin, f.apiUrl, "Signed upload escaped owned Storage");
     const response = await fetch(url, {
@@ -140,7 +278,10 @@ export async function runFormsScenarios({
   provider.reset();
   // Public Forms session IDs remain the respondent capability. Member JWTs are
   // tested separately against database RLS; these anonymous calls need no login.
-  const load = success(await request(`/v1/${f.a.id}`), "load native form");
+  const load = success<LoadResponse>(
+    await request(`/v1/${f.a.id}`),
+    "load native form"
+  );
   assert.equal(load.error, null);
   assert.equal(load.data.title, `Forms baseline native ${f.run}`);
   assert.equal(load.data.is_open, true);
@@ -150,11 +291,11 @@ export async function runFormsScenarios({
   assert.equal((await sessionRow(aSession)).form_id, f.a.id);
   const bSession = await session(f.b);
   if (publicContract) {
-    const identified = success(
+    const identified = success<LoadResponse>(
       await request(
         `/v1/${f.b.id}?${new URLSearchParams({
           __gf_session: bSession,
-          __gf_customer_uuid: f.b.customer.uuid,
+          __gf_customer_uuid: f.b.customer.uuid!,
         })}`
       ),
       "public customer projection"
@@ -192,7 +333,7 @@ export async function runFormsScenarios({
       "forged server challenge state",
     ],
     ["__gf_customer_email", f.b.customer.email, "reserved identity key"],
-  ]) {
+  ] as const) {
     denied(
       await request(sessionPath(aSession, key), {
         method: "PATCH",
@@ -237,7 +378,7 @@ export async function runFormsScenarios({
   done("partial data and reserved/cross-resource denial");
 
   const filePath = sessionPath(aSession, f.a.fields.file.id);
-  const upload = success(
+  const upload = success<Envelope<UploadData>>(
     await request(`${filePath}/file/upload/signed-url`, {
       method: "POST",
       json: fileDto("pixel.png"),
@@ -247,7 +388,7 @@ export async function runFormsScenarios({
   assert.equal(upload.error, null);
   assert(upload.data.path.startsWith(`tmp/${aSession}/${f.a.fields.file.id}/`));
   await uploadBytes(upload.data);
-  const preview = success(
+  const preview = success<Envelope<{ publicUrl: string }>>(
     await request(
       `${filePath}/file/preview/public-url?${new URLSearchParams({ path: upload.data.path })}`
     ),
@@ -285,8 +426,10 @@ export async function runFormsScenarios({
 
   const challengePath = `${sessionPath(aSession, f.a.fields.challenge.id)}/challenge/email`;
   assert.equal(
-    success(await request(`${challengePath}/state`), "initial challenge").state
-      .state,
+    success<ChallengeResponse>(
+      await request(`${challengePath}/state`),
+      "initial challenge"
+    ).state.state,
     "idle"
   );
   const deniedBefore = await responseRows(f.a);
@@ -299,7 +442,7 @@ export async function runFormsScenarios({
   );
   assert.deepEqual(await responseRows(f.a), deniedBefore);
   assert.equal((await inventory()).available, 2);
-  const started = success(
+  const started = success<ChallengeResponse>(
     await request(`${challengePath}/start`, {
       method: "POST",
       json: { email: f.a.email },
@@ -308,7 +451,7 @@ export async function runFormsScenarios({
   );
   assert.equal(started.state.state, "challenge-session-started");
   const email = await provider.awaitEmail({ to: f.a.email });
-  assert.match(email.otp, /^\d{6}$/);
+  assert.match(email.otp!, /^\d{6}$/);
   const issuedBeforeCooldown = await f.otpChallengeCount(
     f.projectA.id,
     f.a.email
@@ -386,7 +529,7 @@ export async function runFormsScenarios({
     emailsBeforeConcurrent + 1
   );
   const concurrentMail = await provider.awaitEmail({ to: concurrentEmail });
-  assert.match(concurrentMail.otp, /^\d{6}$/);
+  assert.match(concurrentMail.otp!, /^\d{6}$/);
   for (const [index, result] of concurrentIssuance.entries()) {
     const persisted = await sessionRow(concurrentSessions[index]);
     assert.equal(persisted.customer_id, null);
@@ -395,7 +538,11 @@ export async function runFormsScenarios({
       assert.deepEqual(persisted, concurrentBefore[index]);
     } else {
       assert.equal(
-        persisted.raw[`__challenge_email__${f.a.fields.challenge.id}`].state,
+        (
+          persisted.raw[
+            `__challenge_email__${f.a.fields.challenge.id}`
+          ] as ChallengeState
+        ).state,
         "challenge-session-started"
       );
     }
@@ -422,7 +569,7 @@ export async function runFormsScenarios({
     ),
     "foreign challenge field"
   );
-  const verified = success(
+  const verified = success<ChallengeResponse>(
     await request(`${challengePath}/verify`, {
       method: "POST",
       json: { challenge_id: started.challenge_id, otp: email.otp },
@@ -437,8 +584,10 @@ export async function runFormsScenarios({
   assert.equal(customer.email, f.a.email);
   assert.equal(customer.is_email_verified, true);
   assert.equal(
-    success(await request(`${challengePath}/state`), "verified state").state
-      .state,
+    success<ChallengeResponse>(
+      await request(`${challengePath}/state`),
+      "verified state"
+    ).state.state,
     "challenge-success"
   );
   const verifiedSession = await sessionRow(aSession);
@@ -458,7 +607,7 @@ export async function runFormsScenarios({
   const exhaustedSession = await session(f.b);
   const exhaustedPath = `${sessionPath(exhaustedSession, f.b.fields.challenge.id)}/challenge/email`;
   const exhaustedEmail = `attempt-limit-${f.run}@example.com`;
-  const exhaustedStart = success(
+  const exhaustedStart = success<ChallengeResponse>(
     await request(`${exhaustedPath}/start`, {
       method: "POST",
       json: { email: exhaustedEmail },
@@ -503,7 +652,11 @@ export async function runFormsScenarios({
   const exhaustedRow = await sessionRow(exhaustedSession);
   assert.equal(exhaustedRow.customer_id, null);
   assert.equal(
-    exhaustedRow.raw[`__challenge_email__${f.b.fields.challenge.id}`].state,
+    (
+      exhaustedRow.raw[
+        `__challenge_email__${f.b.fields.challenge.id}`
+      ] as ChallengeState
+    ).state,
     "challenge-failed"
   );
   const exhaustedCustomer = await f.one(
@@ -517,7 +670,7 @@ export async function runFormsScenarios({
   );
 
   const foreignUploadSession = await session(f.a);
-  const foreignUpload = success(
+  const foreignUpload = success<Envelope<UploadData>>(
     await request(
       `${sessionPath(foreignUploadSession, f.a.fields.file.id)}/file/upload/signed-url`,
       {
@@ -568,7 +721,7 @@ export async function runFormsScenarios({
   assert.equal((await responseRows(f.a)).length, 0);
   assert.equal((await inventory()).available, 2);
 
-  const accepted = success(
+  const accepted = success<Envelope<SubmissionData>>(
     await submit(f.a, aSession, {
       full_name: "Ada Fixture",
       contact_email: f.a.provisionalEmail,
@@ -580,7 +733,7 @@ export async function runFormsScenarios({
   );
   if (publicContract) assertPublicSubmission(accepted);
   assert(accepted.data?.id, "Submit did not return persisted response ID");
-  const response = await f.one(
+  const response = await f.one<ResponseRow>(
     "grida_forms",
     "response",
     `id=eq.${accepted.data.id}`
@@ -591,7 +744,7 @@ export async function runFormsScenarios({
   assert.equal(response.raw.full_name, "Ada Fixture");
   assert.equal((await responseRows(f.a)).length, 1);
   assert.equal((await responseRows(f.b)).length, 0);
-  const fields = await f.rows(
+  const fields = await f.rows<ResponseFieldRow>(
     "grida_forms",
     "response_field",
     `response_id=eq.${response.id}`
@@ -600,20 +753,20 @@ export async function runFormsScenarios({
   assert(fields.every((field) => field.form_id === f.a.id));
   const textField = fields.find(
     (field) => field.form_field_id === f.a.fields.name.id
-  );
+  )!;
   assert.equal(textField.value, "Ada Fixture");
   const optionField = fields.find(
     (field) => field.form_field_id === f.a.fields.choice.id
-  );
+  )!;
   assert.equal(optionField.form_field_option_id, f.a.inventory.optionId);
   const challengeField = fields.find(
     (field) => field.form_field_id === f.a.fields.challenge.id
-  );
+  )!;
   assert.equal(challengeField.challenge_state.state, "challenge-success");
   assert.equal(challengeField.challenge_state.customer_uid, customerId);
   const fileField = fields.find(
     (field) => field.form_field_id === f.a.fields.file.id
-  );
+  )!;
   assert.equal(fileField.storage_object_paths.length, 1);
   const committedPath = fileField.storage_object_paths[0];
   assert(
@@ -684,7 +837,7 @@ export async function runFormsScenarios({
     ["insider", [f.a.id]],
     ["alice", []],
     ["outsider", []],
-  ]) {
+  ] as const) {
     const visible = await f.rows(
       "grida_forms",
       "form",
@@ -696,7 +849,7 @@ export async function runFormsScenarios({
       expected,
       `${name} Forms RLS`
     );
-    const responses = await f.rows(
+    const responses = await f.rows<ResponseRow>(
       "grida_forms",
       "response",
       `id=eq.${response.id}&select=id`,
@@ -734,7 +887,7 @@ export async function runFormsScenarios({
 
   const connectedSession = await session(f.connected);
   if (publicContract) {
-    const connectedLoad = success(
+    const connectedLoad = success<LoadResponse>(
       await request(`/v1/${f.connected.id}?__gf_session=${connectedSession}`),
       "connected public projection"
     );
@@ -746,7 +899,7 @@ export async function runFormsScenarios({
       )
     );
   }
-  const meta = success(
+  const meta = success<{ meta: unknown }>(
     await request(
       `${sessionPath(connectedSession, f.connected.fields.name.id)}/search/meta`
     ),
@@ -765,7 +918,7 @@ export async function runFormsScenarios({
     ),
     "foreign reference metadata"
   );
-  const connectedUpload = success(
+  const connectedUpload = success<Envelope<UploadData>>(
     await request(
       `${sessionPath(connectedSession, f.connected.fields.file.id)}/file/upload/signed-url`,
       {
@@ -776,7 +929,7 @@ export async function runFormsScenarios({
     "connected staged upload"
   ).data;
   await uploadBytes(connectedUpload);
-  const connectedResult = success(
+  const connectedResult = success<Envelope<SubmissionData>>(
     await submit(f.connected, connectedSession, {
       full_name: "Connected Fixture",
       attachment: connectedUpload.path,
@@ -785,7 +938,10 @@ export async function runFormsScenarios({
   );
   if (publicContract) assertPublicSubmission(connectedResult);
   assert(connectedResult.data?.id);
-  const connectedRows = await f.rows("public", f.connected.targetTable);
+  const connectedRows = await f.rows<ConnectedRow>(
+    "public",
+    f.connected.targetTable
+  );
   assert.equal(connectedRows.length, 1);
   assert.equal(connectedRows[0].full_name, "Connected Fixture");
   assert.match(connectedRows[0].id, /^[a-f0-9-]{36}$/);
@@ -815,19 +971,27 @@ export async function runFormsScenarios({
     (await request(`/v1/submit/${f.connected.id}?${conflicting}`)).status,
     400
   );
-  assert.equal((await f.rows("public", f.connected.targetTable)).length, 1);
+  assert.equal(
+    (await f.rows<ConnectedRow>("public", f.connected.targetTable)).length,
+    1
+  );
   assert.equal((await responseRows(f.connected)).length, 1);
   const identical = new URLSearchParams({ __gf_session: duplicateSession });
   identical.append("full_name", "GET Fixture");
   identical.append("full_name", "GET Fixture");
-  const getResult = success(
+  const getResult = success<Envelope<SubmissionData>>(
     await request(`/v1/submit/${f.connected.id}?${identical}`),
     "GET submit with coherent duplicates"
   );
   if (publicContract) assertPublicSubmission(getResult);
   assert.equal(
-    (await f.one("grida_forms", "response", `id=eq.${getResult.data.id}`)).raw
-      .full_name,
+    (
+      await f.one<ResponseRow>(
+        "grida_forms",
+        "response",
+        `id=eq.${getResult.data.id}`
+      )
+    ).raw.full_name,
     "GET Fixture"
   );
   assert.equal(
@@ -848,7 +1012,7 @@ export async function runFormsScenarios({
     { Accept: "text/html" }
   );
   assert.equal(html.status, 302);
-  const destination = new URL(html.headers.get("location"));
+  const destination = new URL(html.headers.get("location")!);
   assert.equal(
     destination.origin,
     web.origin,
@@ -856,22 +1020,34 @@ export async function runFormsScenarios({
   );
   assert(destination.pathname.includes(f.connected.id));
   assert(destination.searchParams.get("rid"));
-  assert.equal((await f.rows("public", f.connected.targetTable)).length, 3);
+  assert.equal(
+    (await f.rows<ConnectedRow>("public", f.connected.targetTable)).length,
+    3
+  );
   assert.equal((await responseRows(f.connected)).length, 3);
   done("GET duplicate policy and native HTML redirect transport");
 
   await f.patch("grida_forms", "form", `id=eq.${f.connected.id}`, {
     is_force_closed: true,
   });
-  const closed = success(await request(`/v1/${f.connected.id}`), "closed load");
+  const closed = success<LoadResponse>(
+    await request(`/v1/${f.connected.id}`),
+    "closed load"
+  );
   assert.equal(closed.data.is_open, false);
-  assert.equal(closed.error.code, "FORM_FORCE_CLOSED");
+  assert.equal(closed.error!.code, "FORM_FORCE_CLOSED");
   const closedSubmit = await submit(f.connected, closed.data.session_id, {
     full_name: "Closed Fixture",
   });
   assert.equal(closedSubmit.status, 403);
-  assert.equal(closedSubmit.data.error, "FORM_CLOSED_WHILE_RESPONDING");
-  assert.equal((await f.rows("public", f.connected.targetTable)).length, 3);
+  assert.equal(
+    (closedSubmit.data as { error: unknown }).error,
+    "FORM_CLOSED_WHILE_RESPONDING"
+  );
+  assert.equal(
+    (await f.rows<ConnectedRow>("public", f.connected.targetTable)).length,
+    3
+  );
   assert.equal((await responseRows(f.connected)).length, 3);
   await f.patch("grida_forms", "form", `id=eq.${f.connected.id}`, {
     is_force_closed: false,
@@ -885,12 +1061,15 @@ export async function runFormsScenarios({
     },
   });
   assert.equal((await inventory()).available, 0);
-  const soldOut = success(await request(`/v1/${f.a.id}`), "sold-out load");
+  const soldOut = success<LoadResponse>(
+    await request(`/v1/${f.a.id}`),
+    "sold-out load"
+  );
   assert.equal(soldOut.data.is_open, false);
-  assert.equal(soldOut.error.code, "FORM_SOLD_OUT");
+  assert.equal(soldOut.error!.code, "FORM_SOLD_OUT");
   const soldOutChallenge = `${sessionPath(soldOut.data.session_id, f.a.fields.challenge.id)}/challenge/email`;
   const soldOutEmail = `sold-out-${f.run}@example.com`;
-  const soldOutStarted = success(
+  const soldOutStarted = success<ChallengeResponse>(
     await request(`${soldOutChallenge}/start`, {
       method: "POST",
       json: { email: soldOutEmail },
@@ -911,7 +1090,10 @@ export async function runFormsScenarios({
     ticket: f.a.inventory.optionId,
   });
   assert.equal(soldOutSubmit.status, 403);
-  assert.equal(soldOutSubmit.data.error, "FORM_SOLD_OUT");
+  assert.equal(
+    (soldOutSubmit.data as { error: unknown }).error,
+    "FORM_SOLD_OUT"
+  );
   assert.equal((await responseRows(f.a)).length, 1);
   assert.equal((await inventory()).available, 0);
   done("closed and sold-out access prevents retained writes");
@@ -951,7 +1133,7 @@ export async function runFormsScenarios({
   const completionForm = f.completionFailure;
   const completionSession = await session(completionForm);
   const completionChallenge = `${sessionPath(completionSession, completionForm.fields.challenge.id)}/challenge/email`;
-  const completionStarted = success(
+  const completionStarted = success<ChallengeResponse>(
     await request(`${completionChallenge}/start`, {
       method: "POST",
       json: { email: completionForm.email },
@@ -961,7 +1143,7 @@ export async function runFormsScenarios({
   const completionMail = await provider.awaitEmail({
     to: completionForm.email,
   });
-  const completionVerified = success(
+  const completionVerified = success<ChallengeResponse>(
     await request(`${completionChallenge}/verify`, {
       method: "POST",
       json: {
@@ -1001,7 +1183,7 @@ export async function runFormsScenarios({
     (await sessionRow(completionSession)).raw[completionForm.fields.name.id],
     "Accepted before receipt failure"
   );
-  const retainedFields = await f.rows(
+  const retainedFields = await f.rows<ResponseFieldRow>(
     "grida_forms",
     "response_field",
     `response_id=eq.${retained[0].id}`
@@ -1032,7 +1214,7 @@ export async function runFormsScenarios({
   // The staged-path cases above do not exercise multipart File parsing. Send
   // actual bytes in one native submission and observe the resulting object.
   const directSession = await session(f.directFile);
-  const directAccepted = success(
+  const directAccepted = success<Envelope<SubmissionData>>(
     await submit(f.directFile, directSession, {
       full_name: "Direct multipart bytes",
       attachment: new File([f.bytes], "direct.png", { type: "image/png" }),
@@ -1040,7 +1222,7 @@ export async function runFormsScenarios({
     "direct multipart file submission"
   );
   if (publicContract) assertPublicSubmission(directAccepted);
-  const directResponse = await f.one(
+  const directResponse = await f.one<ResponseRow>(
     "grida_forms",
     "response",
     `id=eq.${directAccepted.data.id}`
@@ -1049,7 +1231,7 @@ export async function runFormsScenarios({
   assert.equal(directResponse.session_id, directSession);
   assert.equal(directResponse.raw.full_name, "Direct multipart bytes");
   assert.equal((await responseRows(f.directFile)).length, 1);
-  const directFileField = await f.one(
+  const directFileField = await f.one<ResponseFieldRow>(
     "grida_forms",
     "response_field",
     `response_id=eq.${directResponse.id}&form_field_id=eq.${f.directFile.fields.file.id}`
@@ -1080,7 +1262,12 @@ export async function runFormsScenarios({
     "x-vercel-ip-latitude": "37.5665",
     "x-vercel-ip-longitude": "126.9780",
   };
-  const geoCases = [
+  const geoCases: {
+    name: string;
+    headers: Record<string, string>;
+    geo: Record<string, string> | null;
+    platform: string;
+  }[] = [
     {
       name: "Vercel visitor metadata",
       headers: vercelHeaders,
@@ -1133,7 +1320,7 @@ export async function runFormsScenarios({
   const providerCallsBeforeGeo = provider.calls.length;
   for (const scenario of geoCases) {
     const geoSession = await session(f.directFile);
-    const accepted = success(
+    const accepted = success<Envelope<SubmissionData>>(
       await submit(
         f.directFile,
         geoSession,
@@ -1143,7 +1330,7 @@ export async function runFormsScenarios({
       scenario.name
     );
     if (publicContract) assertPublicSubmission(accepted);
-    const persisted = await f.one(
+    const persisted = await f.one<ResponseRow>(
       "grida_forms",
       "response",
       `id=eq.${accepted.data.id}`
@@ -1193,14 +1380,14 @@ export async function runFormsScenarios({
     for (const value of checkboxValues) body.append("checkboxes", value);
     for (const value of packed ? [toggleIds.join(",")] : toggleIds)
       body.append("toggles", value);
-    const result = success(
+    const result = success<Envelope<SubmissionData>>(
       method === "POST"
         ? await request(`/v1/submit/${choices.id}`, { method, body })
         : await request(`/v1/submit/${choices.id}?${body}`),
       label
     );
     if (publicContract) assertPublicSubmission(result);
-    const response = await f.one(
+    const response = await f.one<ResponseRow>(
       "grida_forms",
       "response",
       `id=eq.${result.data.id}`
@@ -1217,7 +1404,7 @@ export async function runFormsScenarios({
       toggleIds,
       `${label}: raw toggle references`
     );
-    const fields = await f.rows(
+    const fields = await f.rows<ResponseFieldRow>(
       "grida_forms",
       "response_field",
       `response_id=eq.${response.id}`
@@ -1225,7 +1412,7 @@ export async function runFormsScenarios({
     for (const [key, values, ids] of [
       ["checkboxes", checkboxValues, checkboxIds],
       ["toggles", toggleValues, toggleIds],
-    ]) {
+    ] as const) {
       const field = fields.find(
         (entry) => entry.form_field_id === choices.fields[key].id
       );
@@ -1303,7 +1490,7 @@ export async function runFormsScenarios({
         ],
       ],
     ],
-  ]) {
+  ] satisfies [string, "GET" | "POST", [string, string][]][]) {
     const choiceSession = await session(choices);
     const beforeSession = await sessionRow(choiceSession);
     const customerUuid = randomUUID();
@@ -1379,14 +1566,17 @@ export async function runFormsScenarios({
   };
 }
 
-function carryoverHttp(origin) {
+function carryoverHttp(origin: string) {
   const base = new URL(origin);
   assert.equal(base.protocol, "http:");
   assert.equal(base.hostname, "127.0.0.1");
-  return async (path, { method = "GET", json, body } = {}) => {
+  return async <T,>(
+    path: string,
+    { method = "GET", json, body }: RequestOptions = {}
+  ): Promise<T> => {
     const url = new URL(path, base);
     assert.equal(url.origin, base.origin);
-    const options = {
+    const options: RequestInit = {
       method,
       redirect: "error",
       signal: AbortSignal.timeout(15_000),
@@ -1410,7 +1600,7 @@ function carryoverHttp(origin) {
   };
 }
 
-function assertPublicSubmission(envelope) {
+function assertPublicSubmission(envelope: Envelope<SubmissionData>) {
   assert.equal(envelope.error, null);
   assert.deepEqual(Object.keys(envelope.data).sort(), ["customer_id", "id"]);
   assert.equal(typeof envelope.data.id, "string");
@@ -1422,7 +1612,7 @@ function assertPublicSubmission(envelope) {
   assert.equal(Object.hasOwn(envelope, "response_field"), false);
 }
 
-function assertPublicRender(envelope) {
+function assertPublicRender(envelope: LoadResponse) {
   // Deliberately independent of the production projector. Walk fields and both
   // render representations, including nested options, data and section children.
   const internal = new Set([
@@ -1443,7 +1633,7 @@ function assertPublicRender(envelope) {
     "service_role_key",
     "internal_fixture",
   ]);
-  function walk(value) {
+  function walk(value: unknown): void {
     if (!value || typeof value !== "object") return;
     if (Array.isArray(value)) return value.forEach(walk);
     for (const [key, child] of Object.entries(value)) {
@@ -1451,7 +1641,12 @@ function assertPublicRender(envelope) {
       walk(child);
     }
   }
-  for (const key of ["fields", "required_hidden_fields", "blocks", "tree"]) {
+  for (const key of [
+    "fields",
+    "required_hidden_fields",
+    "blocks",
+    "tree",
+  ] as const) {
     walk(envelope.data[key]);
   }
   walk(envelope.error?.missing_required_hidden_fields);
@@ -1459,17 +1654,23 @@ function assertPublicRender(envelope) {
 
 // The returned session ID is a respondent capability. Keep this metadata in the
 // owned stack's private directory; do not put it in the safe execution report.
-export async function prepareCarryover({ origin, fixture: f, log = () => {} }) {
+export async function prepareCarryover({
+  origin,
+  fixture: f,
+  log = () => {},
+}: ScenarioOptions) {
   const request = carryoverHttp(origin);
   const form = f.connected;
-  const { data: session } = await request(`/v1/${form.id}/session`);
+  const { data: session } = await request<Envelope<SessionData>>(
+    `/v1/${form.id}/session`
+  );
   assert.equal(session.form_id, form.id);
   const draft = "Carryover draft";
   await request(`/v1/session/${session.id}/field/${form.fields.name.id}`, {
     method: "PATCH",
     json: { value: draft },
   });
-  const { data: upload } = await request(
+  const { data: upload } = await request<Envelope<UploadData>>(
     `/v1/session/${session.id}/field/${form.fields.file.id}/file/upload/signed-url`,
     {
       method: "PUT",
@@ -1505,14 +1706,23 @@ export async function prepareCarryover({ origin, fixture: f, log = () => {} }) {
   assert.equal(staged.status, 200);
   assert.deepEqual(Buffer.from(await staged.arrayBuffer()), f.bytes);
   assert.equal(
-    (await f.one("grida_forms", "response_session", `id=eq.${session.id}`)).raw[
-      form.fields.name.id
-    ],
+    (
+      await f.one<SessionRow>(
+        "grida_forms",
+        "response_session",
+        `id=eq.${session.id}`
+      )
+    ).raw[form.fields.name.id],
     draft
   );
   assert.equal(
-    (await f.rows("grida_forms", "response", `session_id=eq.${session.id}`))
-      .length,
+    (
+      await f.rows<ResponseRow>(
+        "grida_forms",
+        "response",
+        `session_id=eq.${session.id}`
+      )
+    ).length,
     0
   );
   log(
@@ -1535,7 +1745,11 @@ export async function prepareCarryover({ origin, fixture: f, log = () => {} }) {
     sha256: createHash("sha256").update(f.bytes).digest("hex"),
     byteLength: f.bytes.length,
     responseCountBefore: (
-      await f.rows("grida_forms", "response", `form_id=eq.${form.id}`)
+      await f.rows<ResponseRow>(
+        "grida_forms",
+        "response",
+        `form_id=eq.${form.id}`
+      )
     ).length,
     targetCountBefore: (await f.rows("public", form.targetTable)).length,
   };
@@ -1546,6 +1760,11 @@ export async function resumeCarryover({
   setup,
   carryover: c,
   log = () => {},
+}: {
+  origin: string;
+  setup: FixtureSetup;
+  carryover: Carryover;
+  log?: Log;
 }) {
   assert.equal(c.version, 1);
   for (const id of [c.formId, c.sessionId, c.nameFieldId, c.fileFieldId])
@@ -1561,7 +1780,7 @@ export async function resumeCarryover({
   const form = await db.one("grida_forms", "form", `id=eq.${c.formId}`);
   assert.equal(form.project_id, c.projectId);
   assert.equal(form.is_force_closed, false);
-  const session = await db.one(
+  const session = await db.one<SessionRow>(
     "grida_forms",
     "response_session",
     `id=eq.${c.sessionId}`
@@ -1569,11 +1788,18 @@ export async function resumeCarryover({
   assert.equal(session.form_id, c.formId);
   assert.equal(session.raw[c.nameFieldId], c.draft);
   assert.equal(
-    (await db.rows("grida_forms", "response", `session_id=eq.${c.sessionId}`))
-      .length,
+    (
+      await db.rows<ResponseRow>(
+        "grida_forms",
+        "response",
+        `session_id=eq.${c.sessionId}`
+      )
+    ).length,
     0
   );
-  const loaded = await request(`/v1/${c.formId}?__gf_session=${c.sessionId}`);
+  const loaded = await request<LoadResponse>(
+    `/v1/${c.formId}?__gf_session=${c.sessionId}`
+  );
   assertPublicRender(loaded);
   assert.equal(loaded.data.session_id, c.sessionId);
   assert.equal(loaded.data.default_values.full_name, c.draft);
@@ -1582,12 +1808,15 @@ export async function resumeCarryover({
   payload.set("__gf_utc_offset", "0");
   payload.set("full_name", c.finalName);
   payload.set("attachment", c.stagedPath);
-  const accepted = await request(`/v1/submit/${c.formId}`, {
-    method: "POST",
-    body: payload,
-  });
+  const accepted = await request<Envelope<SubmissionData>>(
+    `/v1/submit/${c.formId}`,
+    {
+      method: "POST",
+      body: payload,
+    }
+  );
   assertPublicSubmission(accepted);
-  const response = await db.one(
+  const response = await db.one<ResponseRow>(
     "grida_forms",
     "response",
     `id=eq.${accepted.data.id}`
@@ -1596,7 +1825,13 @@ export async function resumeCarryover({
   assert.equal(response.session_id, c.sessionId);
   assert.equal(response.raw.full_name, c.finalName);
   assert.equal(
-    (await db.rows("grida_forms", "response", `form_id=eq.${c.formId}`)).length,
+    (
+      await db.rows<ResponseRow>(
+        "grida_forms",
+        "response",
+        `form_id=eq.${c.formId}`
+      )
+    ).length,
     c.responseCountBefore + 1
   );
   const target = await db.one(
@@ -1609,7 +1844,7 @@ export async function resumeCarryover({
     c.targetCountBefore + 1
   );
   assert.equal(target.attachment, `connected/${c.run}/${target.id}/pixel.png`);
-  const file = await db.one(
+  const file = await db.one<ResponseFieldRow>(
     "grida_forms",
     "response_field",
     `response_id=eq.${response.id}&form_field_id=eq.${c.fileFieldId}`
@@ -1634,8 +1869,13 @@ export async function resumeCarryover({
   assert.notEqual(staged.status, 200);
   await staged.arrayBuffer();
   assert.equal(
-    (await db.one("grida_forms", "response_session", `id=eq.${c.sessionId}`))
-      .raw[c.nameFieldId],
+    (
+      await db.one<SessionRow>(
+        "grida_forms",
+        "response_session",
+        `id=eq.${c.sessionId}`
+      )
+    ).raw[c.nameFieldId],
     c.finalName
   );
   log(
@@ -1651,21 +1891,27 @@ export async function resumeCarryover({
   };
 }
 
-export async function runTransportScenarios({ origin, fixture: f, webOrigin }) {
+export type Carryover = Awaited<ReturnType<typeof prepareCarryover>>;
+
+export async function runTransportScenarios({
+  origin,
+  fixture: f,
+  webOrigin,
+}: ScenarioOptions & { webOrigin: string }) {
   const base = new URL(origin);
   assert.equal(base.hostname, "127.0.0.1");
   assert.equal(base.protocol, "http:");
   const expectedOrigin = new URL(webOrigin).origin;
   const requestId = "client-chosen-id-must-not-be-trusted";
   const path = `/v1/${f.connected.id}/session`;
-  const observedIds = new Set();
-  const headerValues = (value) =>
+  const observedIds = new Set<string>();
+  const headerValues = (value: string | null) =>
     (value ?? "")
       .toLowerCase()
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
-  function transport(response) {
+  function transport(response: Response) {
     assert.equal(response.headers.get("access-control-allow-origin"), "*");
     assert.equal(
       response.headers.get("access-control-allow-credentials"),
@@ -1693,18 +1939,18 @@ export async function runTransportScenarios({ origin, fixture: f, webOrigin }) {
     assert.equal(response.headers.get("set-cookie"), null);
     return id;
   }
-  async function json(response) {
+  async function json<T>(response: Response): Promise<T> {
     assert(
       response.headers
         .get("content-type")
         ?.toLowerCase()
         .startsWith("application/json")
     );
-    const value = await response.json();
+    const value: unknown = await response.json();
     assert(value && typeof value === "object");
     assert.equal(Object.hasOwn(value, "stack"), false);
     assert.equal(Object.hasOwn(value, "cause"), false);
-    return value;
+    return value as T;
   }
   const simple = await fetch(new URL(path, base), {
     headers: { Origin: expectedOrigin, "x-request-id": requestId },
@@ -1713,7 +1959,7 @@ export async function runTransportScenarios({ origin, fixture: f, webOrigin }) {
   });
   assert.equal(simple.status, 200);
   transport(simple);
-  const session = (await json(simple)).data;
+  const session = (await json<Envelope<SessionData>>(simple)).data;
   assert.deepEqual(Object.keys(session).sort(), ["form_id", "id"]);
   assert.equal(session.form_id, f.connected.id);
 
@@ -1770,13 +2016,16 @@ export async function runTransportScenarios({ origin, fixture: f, webOrigin }) {
   );
   assert.equal(missing.status, 404);
   const missingRequestId = transport(missing);
-  const missingBody = await json(missing);
+  const missingBody = await json<{
+    error: { code: string; message: string };
+    request_id: string;
+  }>(missing);
   assert.equal(typeof missingBody.error?.code, "string");
   assert.equal(typeof missingBody.error?.message, "string");
   assert.equal(missingBody.request_id, missingRequestId);
   assert.equal(Object.hasOwn(missingBody.error, "stack"), false);
 
-  const before = await f.one(
+  const before = await f.one<SessionRow>(
     "grida_forms",
     "response_session",
     `id=eq.${session.id}`
@@ -1800,10 +2049,14 @@ export async function runTransportScenarios({ origin, fixture: f, webOrigin }) {
   );
   assert.equal(malformed.status, 400);
   transport(malformed);
-  const malformedBody = await json(malformed);
+  const malformedBody = await json<{ error: unknown }>(malformed);
   assert(malformedBody.error);
   assert.deepEqual(
-    await f.one("grida_forms", "response_session", `id=eq.${session.id}`),
+    await f.one<SessionRow>(
+      "grida_forms",
+      "response_session",
+      `id=eq.${session.id}`
+    ),
     before
   );
   return {
@@ -1827,12 +2080,17 @@ export async function runClientScenarios({
   provider,
   runClient,
   log = () => {},
+}: ScenarioOptions & {
+  provider: Provider;
+  runClient: (input: ClientProofInput) => Promise<ClientProofOutput>;
 }) {
   assert.equal(typeof runClient, "function");
   const request = carryoverHttp(origin);
   const form = f.directFile;
-  async function createSession(target) {
-    const result = await request(`/v1/${target.id}/session`);
+  async function createSession(target: FormIdentity) {
+    const result = await request<Envelope<SessionData>>(
+      `/v1/${target.id}/session`
+    );
     assert.equal(result.error, null);
     assert.deepEqual(Object.keys(result.data).sort(), ["form_id", "id"]);
     assert.equal(result.data.form_id, target.id);
@@ -1842,12 +2100,12 @@ export async function runClientScenarios({
   const manualSession = await createSession(form);
   const fileSession = await createSession(form);
   const challengeSession = await createSession(f.b);
-  const before = await f.rows(
+  const before = await f.rows<ResponseRow>(
     "grida_forms",
     "response",
     `form_id=eq.${form.id}`
   );
-  const foreignBefore = await f.rows(
+  const foreignBefore = await f.rows<ResponseRow>(
     "grida_forms",
     "response",
     `form_id=eq.${f.b.id}`
@@ -1884,11 +2142,11 @@ export async function runClientScenarios({
   assert.deepEqual(result.denied, { sdk: true, manual: true });
   assert.equal(result.manual.completed, true);
   assert.deepEqual(Object.keys(result.sdk).sort(), ["customer_id", "id"]);
-  assert.match(result.sdk.customer_id, /^[a-f0-9-]{36}$/);
+  assert.match(result.sdk.customer_id!, /^[a-f0-9-]{36}$/);
 
   const accepted = [];
   for (const context of [payload.sdk, payload.manual]) {
-    const response = await f.one(
+    const response = await f.one<ResponseRow>(
       "grida_forms",
       "response",
       `form_id=eq.${context.formId}&session_id=eq.${context.sessionId}`
@@ -1902,14 +2160,14 @@ export async function runClientScenarios({
     assert.equal(customer.project_id, f.projectA.id);
     assert.equal(customer.is_email_verified, false);
     assert.equal(response.raw.full_name, context.values.full_name);
-    const field = await f.one(
+    const field = await f.one<ResponseFieldRow>(
       "grida_forms",
       "response_field",
       `response_id=eq.${response.id}&form_field_id=eq.${form.fields.name.id}`
     );
     assert.equal(field.form_id, form.id);
     assert.equal(field.value, context.values.full_name);
-    const session = await f.one(
+    const session = await f.one<SessionRow>(
       "grida_forms",
       "response_session",
       `id=eq.${context.sessionId}`
@@ -1921,12 +2179,18 @@ export async function runClientScenarios({
   assert.equal(accepted[0].customer_id, result.sdk.customer_id);
   assert.notEqual(accepted[0].id, accepted[1].id);
   assert.equal(
-    (await f.rows("grida_forms", "response", `form_id=eq.${form.id}`)).length,
+    (
+      await f.rows<ResponseRow>(
+        "grida_forms",
+        "response",
+        `form_id=eq.${form.id}`
+      )
+    ).length,
     before.length + 2
   );
   assert.equal(
     (
-      await f.rows(
+      await f.rows<ResponseRow>(
         "grida_forms",
         "response",
         `form_id=eq.${payload.missingFormId}`
@@ -1956,23 +2220,29 @@ export async function runClientScenarios({
   assert.equal(bytes.status, 200);
   assert.deepEqual(Buffer.from(await bytes.arrayBuffer()), f.bytes);
   assert.equal(
-    (await f.rows("grida_forms", "response", `session_id=eq.${fileSession}`))
-      .length,
+    (
+      await f.rows<ResponseRow>(
+        "grida_forms",
+        "response",
+        `session_id=eq.${fileSession}`
+      )
+    ).length,
     0
   );
   log("forms: actual file uploader/resolver preserves real Storage bytes");
 
   assert.equal(result.challenge.state, "challenge-session-started");
   assert.equal(result.challenge.invalidVerifyRejected, true);
-  const challengeRow = await f.one(
+  const challengeRow = await f.one<SessionRow>(
     "grida_forms",
     "response_session",
     `id=eq.${challengeSession}`
   );
   assert.equal(challengeRow.form_id, f.b.id);
   assert.equal(challengeRow.customer_id, null);
-  const state =
-    challengeRow.raw[`__challenge_email__${f.b.fields.challenge.id}`];
+  const state = challengeRow.raw[
+    `__challenge_email__${f.b.fields.challenge.id}`
+  ] as ChallengeState;
   assert.equal(state.state, "challenge-session-started");
   assert.equal(state.challenge_id, result.challenge.challengeId);
   assert.equal(state.email, payload.challenge.email);
@@ -1984,9 +2254,13 @@ export async function runClientScenarios({
   );
   assert.equal(customer.is_email_verified, false);
   const mail = await provider.awaitEmail({ to: payload.challenge.email });
-  assert.match(mail.otp, /^\d{6}$/);
+  assert.match(mail.otp!, /^\d{6}$/);
   assert.deepEqual(
-    await f.rows("grida_forms", "response", `form_id=eq.${f.b.id}`),
+    await f.rows<ResponseRow>(
+      "grida_forms",
+      "response",
+      `form_id=eq.${f.b.id}`
+    ),
     foreignBefore
   );
   log("forms: actual challenge client cannot verify an unrelated challenge");

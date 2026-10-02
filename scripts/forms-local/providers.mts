@@ -1,15 +1,27 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
+
+export type RecordedEmail = {
+  to?: string | string[];
+  subject?: string;
+  html?: string;
+  text?: string;
+  otp?: string;
+  [key: string]: unknown;
+};
+
+export type Provider = Awaited<ReturnType<typeof createProviders>>;
 
 /** Records real provider HTTP payloads after SDK serialization/template rendering. */
 export async function createProviders() {
-  const emails = [];
-  const calls = [];
+  const emails: RecordedEmail[] = [];
+  const calls: { method: string | undefined; path: string }[] = [];
   let failEmails = false;
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url, "http://127.0.0.1");
-    const reply = (status, body) => {
+    const url = new URL(req.url!, "http://127.0.0.1");
+    const reply = (status: number, body: unknown) => {
       res.writeHead(status, { "content-type": "application/json" });
       res.end(JSON.stringify(body));
     };
@@ -25,7 +37,7 @@ export async function createProviders() {
           req.headers.authorization,
           "Bearer re_forms_local_fixture"
         );
-        const email = JSON.parse(body);
+        const email = JSON.parse(body) as RecordedEmail;
         if (failEmails)
           return reply(503, {
             name: "application_error",
@@ -43,12 +55,12 @@ export async function createProviders() {
       reply(500, { error: "Invalid fixture provider request" });
     }
   });
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", resolve);
   });
   return {
-    origin: `http://127.0.0.1:${server.address().port}`,
+    origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
     get emails() {
       return emails;
     },
@@ -60,10 +72,10 @@ export async function createProviders() {
       calls.length = 0;
       failEmails = false;
     },
-    failEmails(value) {
+    failEmails(value: boolean) {
       failEmails = value;
     },
-    async awaitEmail({ to }) {
+    async awaitEmail({ to }: { to: string }) {
       const deadline = Date.now() + 10_000;
       while (Date.now() < deadline) {
         const email = emails.findLast((item) => [item.to].flat().includes(to));
@@ -74,7 +86,7 @@ export async function createProviders() {
     },
     async close() {
       server.closeAllConnections();
-      await new Promise((resolve) => server.close(resolve));
+      await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };
 }

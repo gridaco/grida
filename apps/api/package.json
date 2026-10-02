@@ -6,7 +6,7 @@
   "scripts": {
     "build": "nitro build",
     "build:local": "nitro build --preset node-server",
-    "check:vercel": "node scripts/check-vercel-output.mjs",
+    "check:vercel": "node scripts/check-vercel-output.mts",
     "dev": "nitro dev --port 4000",
     "start": "node .output/server/index.mjs",
     "test": "vitest run",

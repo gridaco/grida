@@ -16,6 +16,7 @@
     "nitro.config.ts",
     "server/**/*.ts",
     "server/**/*.tsx",
+    "scripts/**/*.mts",
     "tests/**/*.ts"
   ]
 }

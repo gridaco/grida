@@ -59,7 +59,10 @@ jobs:
           pnpm --filter @grida/api build
           pnpm --filter @grida/api check:vercel
       - name: Check fixture ownership and network containment
-        run: node --test scripts/auth-local/guards.test.mjs scripts/forms-local/network.test.mjs
+        run: node --test scripts/auth-local/guards.test.mjs scripts/forms-local/network.test.mts
+      - name: Typecheck the Forms proof
+        working-directory: scripts/forms-local
+        run: pnpm exec tsc --noEmit
       - name: Acquire verified Supabase release bundle
         id: cli
         run: |
@@ -89,7 +92,7 @@ jobs:
       - name: Prove Forms HTTP behavior against real local services
         env:
           GRIDA_FORMS_TEST_STATE: ${{ steps.fixture.outputs.state }}
-        run: node scripts/forms-local/proof.mjs --state "$GRIDA_FORMS_TEST_STATE"
+        run: node scripts/forms-local/proof.mts --state "$GRIDA_FORMS_TEST_STATE"
       - name: Stop only the owned local fixture
         if: ${{ always() && steps.fixture.outputs.state != '' }}
         env:
