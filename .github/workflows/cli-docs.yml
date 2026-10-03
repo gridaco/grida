@@ -2,37 +2,12 @@ name: CLI documentation
 
 on:
   pull_request:
-    paths:
-      - "docs/cli/**"
-      - "docs/index.md"
-      - "docs/translations/**/index.md"
-      - "docs/AGENTS.md"
-      - "apps/docs/**"
-      - "packages/grida-cli/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - "crates/**"
-      - "scripts/cli-contracts/**"
-      - "packages/grida-ai/**"
-      - "packages/grida-ai-models/**"
-      - "data/ai/**"
-      - "packages/grida-auth/**"
-      - "packages/grida-account/**"
-      - "packages/grida-home/**"
-      - "scripts/cli-docs/**"
-      - "scripts/cli-release/**"
-      - "scripts/npm.mjs"
-      - "fixtures/images/checker.png"
-      - "editor/next.config.ts"
-      - ".github/workflows/cli-docs.yml"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - ".nvmrc"
   workflow_dispatch:
   workflow_call:
     inputs:
+      force_full:
+        type: boolean
+        default: true
       native_candidate_artifact:
         description: Exact native candidate artifact from the platform build matrix.
         type: string
@@ -47,7 +22,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/ci-changes.yml
+    with:
+      force_full: ${{ inputs.force_full == true || github.event_name == 'workflow_dispatch' }}
   docs:
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -88,3 +69,16 @@ jobs:
         env:
           GRIDA_CLI_DOCS_SUDO_NETWORK: "1"
         run: node scripts/cli-docs/check.mjs --native-candidate "$RUNNER_TEMP/grida-docs-native"
+  verify:
+    name: CLI documentation verification
+    if: always()
+    needs: [changes, docs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require successful selected checks
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: node .github/scripts/ci-changes.mjs --verify docs=docs

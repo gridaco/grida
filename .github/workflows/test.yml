@@ -27,12 +27,15 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - name: Test CI change selection
+        run: node --test .github/scripts/ci-changes.test.mjs
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
       - name: Build Packages
-        run: pnpm turbo build --filter='./packages/*'
+        # Dedicated Rust CI owns the CLI's Cargo tasks.
+        run: pnpm turbo build --filter='./packages/*' --filter='!grida'
       - name: Run Typecheck
-        run: pnpm typecheck
+        run: pnpm turbo typecheck --filter='!grida'
       - name: Run Lint
         run: pnpm lint
       - name: Verify independent AI package exports, types and authority
@@ -40,4 +43,4 @@ jobs:
       - name: Run Tests
         # Each package starts its own parallel test workers. Limit CPU and memory
         # contention between package worker pools on the shared runner.
-        run: pnpm turbo test --concurrency=2
+        run: pnpm turbo test --filter='!grida' --concurrency=2

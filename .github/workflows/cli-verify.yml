@@ -3,34 +3,11 @@ name: Verify CLI package
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      force_full:
+        type: boolean
+        default: true
   pull_request:
-    paths:
-      - ".github/workflows/cli-*.yml"
-      - ".gitattributes"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - "crates/**"
-      - "scripts/cli-contracts/**"
-      - ".changeset/config.json"
-      - "packages/grida-cli/**"
-      - "packages/grida-auth/**"
-      - "packages/grida-account/**"
-      - "packages/grida-home/**"
-      - "packages/grida-ai/**"
-      - "packages/grida-ai-models/**"
-      - "data/ai/**"
-      - "scripts/cli-release/**"
-      - "scripts/cli-local/**"
-      - "scripts/npm*.mjs"
-      - "scripts/publish-packages*.mjs"
-      - ".github/workflows/publish-packages.yml"
-      - "LICENSE"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "turbo.json"
-      - ".nvmrc"
 
 permissions:
   contents: read
@@ -40,9 +17,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/ci-changes.yml
+    with:
+      force_full: ${{ inputs.force_full == true || github.event_name == 'workflow_dispatch' }}
   delivery:
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     uses: ./.github/workflows/cli-native.yml
   tooling:
+    needs: changes
+    if: needs.changes.outputs.tooling == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -58,3 +43,16 @@ jobs:
       - name: Verify independent package publication
         run: |
           node --test scripts/publish-packages.test.mjs scripts/npm.test.mjs scripts/cli-release/native-release.test.mjs
+  verify:
+    name: CLI package verification
+    if: always()
+    needs: [changes, delivery, tooling]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require successful selected checks
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: node .github/scripts/ci-changes.mjs --verify native=delivery tooling=tooling
