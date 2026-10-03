@@ -2,50 +2,15 @@ name: Rust
 
 on:
   workflow_call:
+    inputs:
+      force_full:
+        description: Reusable callers (including releases) verify every input by default.
+        type: boolean
+        default: true
   workflow_dispatch:
   pull_request:
-    paths:
-      - ".github/workflows/rust.yml"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - ".cargo/**"
-      - "crates/**"
-      - "scripts/cli-contracts/**"
-      - "packages/grida-cli/**"
-      - "packages/grida-auth/**"
-      - "packages/grida-account/**"
-      - "packages/grida-home/**"
-      - "packages/grida-ai/**"
-      - "packages/grida-ai-models/**"
-      - "data/ai/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "turbo.json"
-      - ".nvmrc"
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/rust.yml"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - ".cargo/**"
-      - "crates/**"
-      - "scripts/cli-contracts/**"
-      - "packages/grida-cli/**"
-      - "packages/grida-auth/**"
-      - "packages/grida-account/**"
-      - "packages/grida-home/**"
-      - "packages/grida-ai/**"
-      - "packages/grida-ai-models/**"
-      - "data/ai/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "turbo.json"
-      - ".nvmrc"
 
 permissions:
   contents: read
@@ -55,7 +20,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/ci-changes.yml
+    with:
+      force_full: ${{ inputs.force_full == true || github.event_name == 'workflow_dispatch' }}
   check:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -77,6 +48,8 @@ jobs:
       - name: Build
         run: cargo build --workspace --locked
   conformance:
+    needs: changes
+    if: needs.changes.outputs.conformance == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -109,3 +82,16 @@ jobs:
         run: |
           node --test scripts/cli-contracts/cli.test.mjs scripts/cli-contracts/catalogue-request.test.mjs
           node scripts/cli-contracts/run.mjs
+  verify:
+    name: Rust verification
+    if: always()
+    needs: [changes, check, conformance]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require successful selected checks
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: node .github/scripts/ci-changes.mjs --verify rust=check conformance=conformance

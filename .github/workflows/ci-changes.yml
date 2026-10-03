@@ -1,0 +1,46 @@
+name: Select CI inputs
+
+on:
+  workflow_call:
+    inputs:
+      force_full:
+        type: boolean
+        default: false
+    outputs:
+      rust:
+        value: ${{ jobs.changes.outputs.rust }}
+      conformance:
+        value: ${{ jobs.changes.outputs.conformance }}
+      native:
+        value: ${{ jobs.changes.outputs.native }}
+      docs:
+        value: ${{ jobs.changes.outputs.docs }}
+      tooling:
+        value: ${{ jobs.changes.outputs.tooling }}
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.select.outputs.rust }}
+      conformance: ${{ steps.select.outputs.conformance }}
+      native: ${{ steps.select.outputs.native }}
+      docs: ${{ steps.select.outputs.docs }}
+      tooling: ${{ steps.select.outputs.tooling }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Test the change selector
+        run: node --test .github/scripts/ci-changes.test.mjs
+      - id: select
+        env:
+          CI_FORCE_FULL: ${{ inputs.force_full }}
+        run: node .github/scripts/ci-changes.mjs

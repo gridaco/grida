@@ -18,10 +18,12 @@ on:
       - "scripts/cli-release/**"
       - "crates/grida-cli/**"
       - "crates/grida-auth/**"
+      - "crates/grida-ai/**"
       - "packages/grida-cli/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
+      - ".cargo/**"
       - "packages/grida-auth/**"
       - "packages/grida-account/**"
       - "packages/grida-home/**"
@@ -35,9 +37,16 @@ on:
       - "editor/lib/billing/**"
       - "editor/lib/supabase/**"
       - "editor/lib/tenant/**"
+      - "editor/lib/platform/**"
+      - "editor/lib/domains/**"
+      - "editor/lib/desktop/auth-deeplink.ts"
+      - "editor/lib/__tests__/server-only.shim.ts"
       - "editor/host/auth/**"
+      - "editor/host/url.ts"
       - "editor/app/(untracked)/oauth/**"
       - "editor/app/(untracked)/layout.tsx"
+      - "editor/app/editor.css"
+      - "editor/components/theme-provider.tsx"
       - "editor/app/(api)/private/oauth/**"
       - "editor/app/(api)/(public)/api/v1/auth/**"
       - "editor/app/(api)/(public)/api/v1/account/**"
@@ -50,11 +59,16 @@ on:
       - "editor/vitest.api.config.ts"
       - "editor/proxy.ts"
       - "editor/next.config.ts"
+      - "editor/env.ts"
+      - "editor/tsconfig.json"
+      - "editor/postcss.config.mjs"
       - "editor/package.json"
       - "supabase/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "package.json"
+      - "turbo.json"
+      - ".npmrc"
       - ".nvmrc"
 
 permissions:
@@ -138,7 +152,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build shared packages
-        run: pnpm turbo build --filter='./packages/*'
+        # The native candidate is built explicitly below or supplied by release CI.
+        run: pnpm turbo build --filter='./packages/*' --filter='!grida'
       - name: Check native producer and offline contracts
         run: |
           pnpm --filter @grida/auth typecheck
