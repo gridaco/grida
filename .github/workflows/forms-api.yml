@@ -1,0 +1,112 @@
+name: Forms API proof
+
+on:
+  workflow_dispatch:
+  # Deliberately conservative: shared contracts and editor callers can change
+  # outside the API directory. Narrow this only with an enforced dependency map.
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forms-api-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  forms:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build and check shared producers
+        run: |
+          pnpm --filter @grida/tokens build
+          pnpm --filter @workspace/utils build
+          pnpm --filter @workspace/utils typecheck
+          pnpm --filter @workspace/utils test
+          pnpm --filter @workspace/translations build
+          pnpm --filter @workspace/translations typecheck
+          pnpm --filter @workspace/translations test
+          pnpm --filter @workspace/emails build
+          pnpm --filter @workspace/emails typecheck
+          pnpm --filter @workspace/emails test
+          pnpm --filter @grida/postgrest build
+          pnpm --filter @grida/postgrest typecheck
+          pnpm --filter @grida/postgrest test
+          pnpm --filter @app/database typecheck
+          pnpm --filter @app/database test
+          pnpm --filter @grida/forms build
+          pnpm --filter @grida/forms typecheck
+          pnpm --filter @grida/forms test
+      - name: Check the API and both deployment outputs
+        run: |
+          pnpm --filter @grida/api typecheck
+          pnpm --filter @grida/api test
+          pnpm --filter @grida/api build:local
+          pnpm --filter @grida/api build
+          pnpm --filter @grida/api check:vercel
+      - name: Check fixture ownership and network containment
+        run: node --test scripts/auth-local/guards.test.mjs scripts/forms-local/network.test.mts
+      - name: Typecheck the Forms proof
+        working-directory: scripts/forms-local
+        run: pnpm exec tsc --noEmit
+      - name: Acquire verified Supabase release bundle
+        id: cli
+        run: |
+          FORMS_TOOLS=$(mktemp -d "$RUNNER_TEMP/grida-forms-tools-XXXXXX")
+          curl --disable --fail --location --silent --show-error \
+            https://github.com/supabase/cli/releases/download/v2.116.0/supabase_2.116.0_linux_amd64.tar.gz \
+            --output "$FORMS_TOOLS/release.tar.gz"
+          echo "5b3031cb297d51b25be4c284e4c852254460ec722ec221d3b81b07d55acfd158  $FORMS_TOOLS/release.tar.gz" | sha256sum --check
+          tar -xzf "$FORMS_TOOLS/release.tar.gz" -C "$FORMS_TOOLS"
+          echo "bin=$FORMS_TOOLS/supabase" >> "$GITHUB_OUTPUT"
+      - name: Prepare isolated local fixture
+        id: fixture
+        env:
+          FORMS_BIN: ${{ steps.cli.outputs.bin }}
+        run: |
+          node scripts/auth-local/stack.mjs prepare \
+            --supabase-bin "$FORMS_BIN" \
+            --docker-socket /var/run/docker.sock > "$RUNNER_TEMP/forms-prepare.json"
+          FORMS_STATE=$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).statePath" "$RUNNER_TEMP/forms-prepare.json")
+          echo "state=$FORMS_STATE" >> "$GITHUB_OUTPUT"
+      - name: Start and bootstrap local Supabase
+        env:
+          GRIDA_FORMS_TEST_STATE: ${{ steps.fixture.outputs.state }}
+        run: |
+          node scripts/auth-local/stack.mjs start --state "$GRIDA_FORMS_TEST_STATE"
+          node scripts/auth-local/stack.mjs bootstrap --state "$GRIDA_FORMS_TEST_STATE"
+      - name: Prove Forms HTTP behavior against real local services
+        env:
+          GRIDA_FORMS_TEST_STATE: ${{ steps.fixture.outputs.state }}
+        run: node scripts/forms-local/proof.mts --state "$GRIDA_FORMS_TEST_STATE"
+      - name: Stop only the owned local fixture
+        if: ${{ always() && steps.fixture.outputs.state != '' }}
+        env:
+          GRIDA_FORMS_TEST_STATE: ${{ steps.fixture.outputs.state }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawnSync } from 'node:child_process';
+          import { readState } from './scripts/auth-local/stack.mjs';
+          const statePath = process.env.GRIDA_FORMS_TEST_STATE;
+          const state = await readState(statePath);
+          if (['starting', 'started', 'bootstrapped'].includes(state.phase)) {
+            const result = spawnSync(process.execPath, ['scripts/auth-local/stack.mjs', 'stop', '--state', statePath], { stdio: 'inherit' });
+            process.exitCode = result.status ?? 1;
+          }
+          NODE
+      # The fixture, logs and carryover metadata contain local credentials or
+      # respondent capabilities. Do not upload them as CI artifacts.

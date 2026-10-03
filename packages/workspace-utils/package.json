@@ -1,0 +1,24 @@
+{
+  "name": "@workspace/utils",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Small shared request and server primitives with explicit entrypoints",
+  "sideEffects": false,
+  "exports": {
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "import": "./dist/http.mjs",
+      "require": "./dist/http.js"
+    },
+    "./otp": {
+      "types": "./dist/otp.d.ts",
+      "import": "./dist/otp.mjs",
+      "require": "./dist/otp.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  }
+}

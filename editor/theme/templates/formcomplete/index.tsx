@@ -1,3 +1,4 @@
+import type { i18n } from "i18next";
 import { TemplateVariables } from "@/lib/templating";
 import FormCompletePageTemplate_receipt01 from "@/theme/templates/formcomplete/receipt01";
 import FormCompletePageDefault from "@/theme/templates/formcomplete/default";
@@ -7,7 +8,9 @@ export function EndingPageWithContext({
   template_id,
   overrides,
   context,
+  t,
 }: {
+  t: i18n["t"];
   template_id: string | null;
   overrides: EndingPageI18nOverrides | null;
   context: TemplateVariables.FormResponseContext;
@@ -19,6 +22,7 @@ export function EndingPageWithContext({
         <FormCompletePageTemplate_receipt01
           overrides={has_override ? overrides?.overrides : undefined}
           context={context}
+          t={t}
         />
       );
     case "default":
@@ -29,6 +33,7 @@ export function EndingPageWithContext({
         <FormCompletePageDefault
           overrides={has_override ? overrides?.overrides : undefined}
           context={context}
+          t={t}
         />
       );
   }

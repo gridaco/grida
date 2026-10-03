@@ -25,7 +25,7 @@ const media_col_sort_fn = (a: FormFieldDefinition, b: FormFieldDefinition) => {
   return media_col_sort_priority(a) - media_col_sort_priority(b);
 };
 
-const devonly_types = new Set<PGSupportedColumnType>([
+const devonly_types = new Set<string>([
   "uuid",
   "json",
   "jsonb",
@@ -41,7 +41,7 @@ const devonly_types = new Set<PGSupportedColumnType>([
   "tstzrange",
   "tsvector",
   "xml",
-]);
+] satisfies PGSupportedColumnType[]);
 
 export function analyze({
   definition,

@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  FormsApiPaths,
+  type EmailChallengeState,
+  type EmailChallengeSessionState,
+  type EmailChallengeProvider as HttpEmailChallengeProvider,
+} from "@grida/forms";
+
 import * as React from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { CheckIcon } from "lucide-react";
@@ -50,40 +57,12 @@ const defaultEmailChallengeI18nEn: EmailChallengeI18n = {
 /**
  * Email challenge state type
  */
-export type EmailChallengeState =
-  | "idle"
-  | "challenge-session-started"
-  | "challenge-expired"
-  | "challenge-failed"
-  | "challenge-success"
-  | "error";
 
-export type EmailChallengeSessionState = {
-  state: EmailChallengeState;
-  email: string | null;
-  challenge_id: string | null;
-  expires_at: string | null;
-  verified_at: string | null;
-  customer_uid: string | null;
-};
-
-export type EmailChallengeProvider = {
-  getState(args: {
-    sessionId: string;
-    fieldId: string;
-  }): Promise<EmailChallengeSessionState>;
-  start(args: {
-    sessionId: string;
-    fieldId: string;
-    email: string;
-  }): Promise<EmailChallengeSessionState>;
-  verify(args: {
-    sessionId: string;
-    fieldId: string;
-    challengeId: string;
-    otp: string;
-  }): Promise<EmailChallengeSessionState>;
-};
+export type {
+  EmailChallengeState,
+  EmailChallengeSessionState,
+} from "@grida/forms";
+export type EmailChallengeProvider = HttpEmailChallengeProvider;
 
 const EmailChallengeProviderContext =
   React.createContext<EmailChallengeProvider | null>(null);
@@ -100,14 +79,14 @@ export function EmailChallengeProvider({
 }
 
 export function createHttpEmailChallengeProvider({
-  base = `${Env.web.HOST}/v1`,
+  origin = Env.forms.API_ORIGIN,
 }: {
   /**
-   * Base URL for the public v1 API. Defaults to `${Env.web.HOST}/v1`.
+   * API origin without a path. Defaults to `Env.forms.API_ORIGIN`.
    * Using the canonical host is important because some renderers can run on
    * non-API origins (e.g. embeds/custom domains).
    */
-  base?: string;
+  origin?: string;
 }): EmailChallengeProvider {
   async function json<T>(res: Response): Promise<T> {
     const t = await res.json().catch(() => null);
@@ -126,21 +105,18 @@ export function createHttpEmailChallengeProvider({
   return {
     async getState({ sessionId, fieldId }) {
       const res = await fetch(
-        `${base}/session/${encodeURIComponent(sessionId)}/field/${encodeURIComponent(
-          fieldId
-        )}/challenge/email/state`,
-        { method: "GET" }
+        `${origin}${FormsApiPaths.emailChallengeState(sessionId, fieldId)}`,
+        { method: "GET", credentials: "omit" }
       );
       const data = await json<{ state: EmailChallengeSessionState }>(res);
       return data.state;
     },
     async start({ sessionId, fieldId, email }) {
       const res = await fetch(
-        `${base}/session/${encodeURIComponent(sessionId)}/field/${encodeURIComponent(
-          fieldId
-        )}/challenge/email/start`,
+        `${origin}${FormsApiPaths.emailChallengeStart(sessionId, fieldId)}`,
         {
           method: "POST",
+          credentials: "omit",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ email }),
         }
@@ -150,11 +126,10 @@ export function createHttpEmailChallengeProvider({
     },
     async verify({ sessionId, fieldId, challengeId, otp }) {
       const res = await fetch(
-        `${base}/session/${encodeURIComponent(sessionId)}/field/${encodeURIComponent(
-          fieldId
-        )}/challenge/email/verify`,
+        `${origin}${FormsApiPaths.emailChallengeVerify(sessionId, fieldId)}`,
         {
           method: "POST",
+          credentials: "omit",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ challenge_id: challengeId, otp }),
         }

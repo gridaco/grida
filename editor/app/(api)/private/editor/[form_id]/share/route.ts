@@ -1,4 +1,5 @@
 import { Env } from "@/env";
+import { FormsApiPaths } from "@grida/forms";
 import { service_role } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,7 +18,7 @@ export async function GET(
     url: `${Env.web.HOST}/d/e/${form_id}`,
     url_tenant: `${baseUrl}/d/e/${form_id}`,
     embed: `${Env.web.HOST}/v1/embed/${form_id}`,
-    submit: `${Env.web.HOST}/v1/submit/${form_id}`,
+    submit: `${Env.forms.API_ORIGIN}${FormsApiPaths.submit(form_id)}`,
   });
 }
 

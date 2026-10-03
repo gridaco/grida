@@ -22,11 +22,7 @@ export type UserProfile = {
   avatar_path: string | null;
 };
 
-export type PlatformPoweredBy =
-  | "api"
-  | "grida_forms"
-  | "web_client"
-  | "simulator";
+export type { PlatformPoweredBy } from "@grida/forms";
 
 /**
  * @deprecated not used

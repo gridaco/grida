@@ -7,11 +7,11 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_SESSION_KEY,
 } from "@/k/system";
-import type { EditorApiResponse } from "@/types/private/api";
-import type {
-  FormAgentPrefetchData,
-  FormClientFetchResponseError,
-} from "@/app/(api)/(public)/v1/[id]/route";
+import {
+  FormsApiPaths,
+  type FormSessionResponse,
+  type FormClientFetchResponse,
+} from "@grida/forms";
 import { Env } from "@/env";
 
 export function useRequestFormSession(form_id: string) {
@@ -32,8 +32,10 @@ export function useRequestFormSession(form_id: string) {
     }
 
     // console.log("fetching session");
-    fetch(`${Env.web.HOST}/v1/${form_id}/session`).then((res) => {
-      res.json().then(({ data }: EditorApiResponse<{ id: string }>) => {
+    fetch(`${Env.forms.API_ORIGIN}${FormsApiPaths.session(form_id)}`, {
+      credentials: "omit",
+    }).then((res) => {
+      res.json().then(({ data }: FormSessionResponse) => {
         if (data?.id) {
           set_session(data.id);
           sessionStorage.setItem(storekey, data.id);
@@ -74,7 +76,7 @@ function makeurl_forminit({
     params[SYSTEM_GF_FINGERPRINT_VISITORID_KEY] = fingerprint.visitorId;
   }
 
-  return Env.web.HOST + `/v1/${form_id}?${new URLSearchParams(params)}`;
+  return `${Env.forms.API_ORIGIN}${FormsApiPaths.form(form_id)}?${new URLSearchParams(params)}`;
 }
 
 export function useFormSession(
@@ -127,12 +129,10 @@ export function useFormSession(
     }
   }
 
-  return useSWR<
-    EditorApiResponse<FormAgentPrefetchData, FormClientFetchResponseError>
-  >(
+  return useSWR<FormClientFetchResponse>(
     req_url,
     async (url: string) => {
-      const res = await fetch(url);
+      const res = await fetch(url, { credentials: "omit" });
       return res.json();
     },
     {

@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { useFormAgentState } from "@/grida-forms/formstate";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { Env } from "@/env";
+import { FormsApiPaths } from "@grida/forms";
 
 export function SessionDataSyncProvider({
   session_id,
@@ -23,13 +24,17 @@ export function SessionDataSyncProvider({
       value: string | number | boolean | string[] | undefined | null
     ) => {
       try {
-        fetch(`${Env.web.HOST}/v1/session/${session_id}/field/${field_id}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ value: value }),
-        });
+        fetch(
+          `${Env.forms.API_ORIGIN}${FormsApiPaths.field(session_id, field_id)}`,
+          {
+            method: "PATCH",
+            credentials: "omit",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ value: value }),
+          }
+        );
       } catch {}
     };
 

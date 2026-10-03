@@ -1,0 +1,42 @@
+{
+  "name": "@grida/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nitro build",
+    "build:local": "nitro build --preset node-server",
+    "check:vercel": "node scripts/check-vercel-output.mts",
+    "dev": "nitro dev --port 4000",
+    "start": "node .output/server/index.mjs",
+    "test": "vitest run",
+    "typecheck": "nitro prepare && tsc --noEmit"
+  },
+  "dependencies": {
+    "@app/database": "workspace:*",
+    "@grida/forms": "workspace:*",
+    "@grida/postgrest": "workspace:*",
+    "@supabase/supabase-js": "^2.90.1",
+    "@vercel/functions": "^1.6.0",
+    "@workspace/emails": "workspace:*",
+    "@workspace/translations": "workspace:*",
+    "@workspace/utils": "workspace:*",
+    "h3": "^1.15.4",
+    "react": "^19",
+    "react-dom": "^19",
+    "resend": "^4.5.1",
+    "validator": "^13.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/react": "19.2.8",
+    "@types/react-dom": "19.2.3",
+    "@types/validator": "^13.12.0",
+    "nitropack": "2.13.4",
+    "typescript": "^6",
+    "vitest": "^4"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

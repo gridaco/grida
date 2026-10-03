@@ -1,0 +1,36 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".nitro/**", ".vercel/output/**"],
+      "env": ["NITRO_PRESET", "VERCEL", "VERCEL_ENV", "VERCEL_REGION"]
+    },
+    "build:local": {
+      "dependsOn": ["^build"],
+      "outputs": [".nitro/**", ".output/**"]
+    },
+    "typecheck": { "dependsOn": ["^build", "^typecheck"] },
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/editor/**/*.{js,ts,mjs,mts,cjs,cts,jsx,tsx}",
+        "!$TURBO_ROOT$/editor/**/node_modules/**",
+        "!$TURBO_ROOT$/editor/**/dist/**",
+        "!$TURBO_ROOT$/editor/**/.*/**",
+        "!$TURBO_ROOT$/editor/**/.*"
+      ]
+    },
+    "dev": {
+      "passThroughEnv": [
+        "GRIDA_OPEN_API_ORIGIN",
+        "GRIDA_WEB_ORIGIN",
+        "SUPABASE_URL",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_PUBLISHABLE_KEY",
+        "RESEND_API_KEY"
+      ]
+    }
+  }
+}

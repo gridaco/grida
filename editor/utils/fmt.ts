@@ -8,18 +8,7 @@ export function fmt_snake_case_to_human_text(input: string) {
   return capitalCase(snakeCase(input)).toLowerCase();
 }
 
-/**
- * Returns a hashed local id with at least 3 digits, prefixed by #.
- * This ensures the output string is always at least four characters long, including the #.
- * Examples:
- * - 1 -> #001
- * - 12 -> #012
- * - 123 -> #123
- * - 1234 -> #1234
- */
-export function fmt_local_index(local_index: number): string {
-  return "#" + pad_number(local_index, 3);
-}
+export { formatResponseIndex as fmt_local_index } from "@grida/forms";
 
 /**
  * Pads the given number with leading zeros up to the specified total length.

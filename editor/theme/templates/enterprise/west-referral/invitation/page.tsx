@@ -36,7 +36,7 @@ import {
 import { Skeleton } from "@app/ui/components/skeleton";
 import { submitFormToDefaultEndpoint } from "@/grida-forms-hosted/internal-sdk/submit";
 
-/** Form submit error codes returned by POST /v1/submit/:id (when Accept: application/json). */
+/** Form submit error codes returned by POST /v1/forms/submit/:id (when Accept: application/json). */
 type FormSubmitErrorCode =
   | "INTERNAL_SERVER_ERROR"
   | "MISSING_REQUIRED_HIDDEN_FIELDS"
@@ -396,9 +396,7 @@ function SignUpForm({
     e.preventDefault();
 
     const formdata = new FormData(e.target as HTMLFormElement);
-    const submit_json = await submitFormToDefaultEndpoint<{
-      customer_id?: string | null;
-    }>(form_id, formdata);
+    const submit_json = await submitFormToDefaultEndpoint(form_id, formdata);
 
     const resError = submit_json && (submit_json as { error?: string }).error;
     const resMessage =

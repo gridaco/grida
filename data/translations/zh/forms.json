@@ -1,0 +1,71 @@
+{
+  "next": "下一步",
+  "back": "上一步",
+  "submit": "提交",
+  "pay": "支付",
+  "home": "首页",
+  "verify": "验证",
+  "resend": "重新发送",
+  "retry": "重试",
+  "sending": "发送中",
+  "email_challenge": {
+    "verify_code": "验证",
+    "enter_verification_code": "输入验证码",
+    "code_sent": "验证码已发送到您的邮箱。",
+    "didnt_receive_code": "没有收到验证码？",
+    "code_expired": "验证码已过期。",
+    "incorrect_code": "验证码不正确，请重试。",
+    "error_occurred": "发生错误，请稍后再试。"
+  },
+  "left_in_stock": "剩余{{available}}件",
+  "sold_out": "售罄",
+  "support_metadata": "支持元数据",
+  "support_metadata_no_share": "请勿与支持团队之外的任何人分享此信息。",
+  "formclosed": {
+    "default": {
+      "title": "表格已关闭",
+      "description": "此表格不再接受回应。"
+    },
+    "while_responding": {
+      "title": "表格已关闭",
+      "description": "如果您认为这是一个错误，请及时联系支持团队。"
+    }
+  },
+  "formsoldout": {
+    "default": {
+      "title": "售罄",
+      "description": "库存已全部售罄，我们不再接受新的订单。"
+    }
+  },
+  "formoptionsoldout": {
+    "default": {
+      "title": "选项售罄",
+      "description": "所选选项已售罄，不再提供。"
+    }
+  },
+  "formcomplete": {
+    "default": {
+      "h1": "{{form_title}}",
+      "p": "感谢您的回应。",
+      "button": "首页",
+      "href": "/"
+    },
+    "receipt01": {
+      "h1": "{{response.idx}}",
+      "h2": "收据已确认 - {{form_title}}",
+      "p": "考虑截图此页面以备记录。"
+    }
+  },
+  "alreadyresponded": {
+    "default": {
+      "title": "已经回应",
+      "description": "您已经提交过此表格。如果您认为这是一个错误，请联系支持。"
+    }
+  },
+  "badrequest": {
+    "default": {
+      "title": "发生错误",
+      "description": "您的请求无法处理。可能是因为在提交过程中表格被修改了或者您使用的是旧版本的应用程序。如果问题仍然存在，请联系支持团队寻求帮助。"
+    }
+  }
+}

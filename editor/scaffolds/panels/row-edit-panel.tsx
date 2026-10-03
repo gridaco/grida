@@ -43,6 +43,7 @@ import {
   useRequestFormSession,
 } from "@/grida-forms-hosted/e/load";
 import { toast } from "sonner";
+import { createRow } from "./row-create";
 
 type ResponseRow = TVirtualRow<FormResponseField, FormResponse>;
 
@@ -89,24 +90,19 @@ export function RowEditPanel({
               )}
               <EditRowForm
                 onSubmit={(data) => {
-                  const promise = fetch(`/v1/submit/${table_id}`, {
-                    method: "POST",
-                    body: data,
-                  });
-
-                  toast.promise(promise, {
-                    loading: "Saving...",
-                    success: "Saved!",
-                    error: "Failed to save.",
-                  });
-
-                  promise.then(() => {
+                  const promise = createRow(table_id, data).then(() => {
                     props.onOpenChange?.(false);
 
                     // refresh data once saved
                     dispatch({
                       type: "data/query/refresh",
                     });
+                  });
+
+                  toast.promise(promise, {
+                    loading: "Saving...",
+                    success: "Saved!",
+                    error: "Failed to save.",
                   });
                 }}
               />
@@ -366,15 +362,20 @@ function SectionResponseMetadataJson({
 function ResponseCustomerMetaTable({
   customer_id,
   platform_powered_by,
+  geo,
   x_ipinfo,
   x_useragent,
 }: Pick<
   FormResponse,
-  "x_useragent" | "customer_id" | "platform_powered_by" | "x_ipinfo"
+  "x_useragent" | "customer_id" | "platform_powered_by" | "geo" | "x_ipinfo"
 >) {
   const ua = useMemo(() => {
     return x_useragent ? new UAParser(x_useragent).getResult() : undefined;
   }, []);
+  const location =
+    [geo?.country || x_ipinfo?.country, geo?.city || x_ipinfo?.city]
+      .filter(Boolean)
+      .join(" / ") || "—";
 
   return (
     <Table>
@@ -434,9 +435,7 @@ function ResponseCustomerMetaTable({
             <code>location</code>
           </TableCell>
           <TableCell>
-            <pre>
-              {x_ipinfo?.country} / {x_ipinfo?.city}
-            </pre>
+            <pre>{location}</pre>
           </TableCell>
         </TableRow>
       </TableBody>

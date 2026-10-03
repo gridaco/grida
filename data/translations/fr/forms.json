@@ -1,0 +1,71 @@
+{
+  "next": "Suivant",
+  "back": "Précédent",
+  "submit": "Soumettre",
+  "pay": "Payer",
+  "home": "Accueil",
+  "verify": "Vérifier",
+  "resend": "Renvoyer",
+  "retry": "Réessayer",
+  "sending": "Envoi en cours",
+  "email_challenge": {
+    "verify_code": "Vérifier",
+    "enter_verification_code": "Entrez le code de vérification",
+    "code_sent": "Un code de vérification a été envoyé à votre adresse e-mail.",
+    "didnt_receive_code": "Vous n'avez pas reçu de code ?",
+    "code_expired": "Le code de vérification a expiré.",
+    "incorrect_code": "Code incorrect. Veuillez réessayer.",
+    "error_occurred": "Une erreur est survenue. Veuillez réessayer plus tard."
+  },
+  "left_in_stock": "{{available}} restants",
+  "sold_out": "Épuisé",
+  "support_metadata": "Métadonnées de support",
+  "support_metadata_no_share": "Veuillez ne pas partager ces informations avec quiconque sauf le support.",
+  "formclosed": {
+    "default": {
+      "title": "Formulaire Fermé",
+      "description": "Ce formulaire n'accepte plus de réponses."
+    },
+    "while_responding": {
+      "title": "Formulaire Fermé",
+      "description": "Merci de votre intérêt. Malheureusement, le formulaire a été fermé pendant que vous répondiez. Si vous pensez que c'est une erreur, veuillez contacter le support."
+    }
+  },
+  "formsoldout": {
+    "default": {
+      "title": "Épuisé",
+      "description": "Nous sommes en rupture de stock et n'acceptons plus de commandes."
+    }
+  },
+  "formoptionsoldout": {
+    "default": {
+      "title": "Option Épuisée",
+      "description": "L'option sélectionnée est épuisée et n'est plus disponible."
+    }
+  },
+  "formcomplete": {
+    "default": {
+      "h1": "{{form_title}}",
+      "p": "Merci pour votre réponse.",
+      "button": "Accueil",
+      "href": "/"
+    },
+    "receipt01": {
+      "h1": "{{response.idx}}",
+      "h2": "Reçu Confirmé - {{form_title}}",
+      "p": "Envisagez de prendre une capture d'écran de cette page pour vos dossiers."
+    }
+  },
+  "alreadyresponded": {
+    "default": {
+      "title": "Déjà répondu",
+      "description": "Vous avez déjà soumis ce formulaire. Si vous pensez que c'est une erreur, veuillez contacter le support."
+    }
+  },
+  "badrequest": {
+    "default": {
+      "title": "Quelque chose s'est mal passé",
+      "description": "Votre demande n'a pas pu être traitée. Cela peut être dû au fait que le formulaire a été modifié pendant le processus de soumission ou que vous utilisez une version obsolète de l'application. Si le problème persiste, veuillez contacter notre équipe de support pour obtenir de l'aide."
+    }
+  }
+}

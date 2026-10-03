@@ -1,5 +1,4 @@
-import resources from "@/i18n";
-import i18next from "i18next";
+import { createFormsTranslator } from "@workspace/translations/forms";
 import FormCompletePageTemplate_receipt01 from "@/theme/templates/formcomplete/receipt01";
 
 const mock = {
@@ -19,16 +18,12 @@ export default async function Component({
 }) {
   const { lng } = await params;
   const { title = mock.title } = await searchParams;
-  await i18next.init({
-    lng: lng,
-    fallbackLng: "en",
-    debug: false,
-    resources: resources,
-  });
+  const t = await createFormsTranslator(lng);
 
   return (
     <main className="flex items-center justify-center min-h-screen">
       <FormCompletePageTemplate_receipt01
+        t={t}
         context={{
           title: title,
           form_title: title,

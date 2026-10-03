@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader } from "@app/ui/components/card";
-import i18next from "i18next";
+import type { i18n } from "i18next";
 import { TemplateVariables } from "@/lib/templating";
 import { getPropTypes, getRenderedTexts } from "@/lib/templating/template";
 import resources from "@/i18n";
@@ -8,8 +8,10 @@ import { render } from "@/lib/templating/template";
 export default function FormCompletePageTemplate_receipt01({
   overrides,
   context,
+  t,
 }: {
   overrides?: Record<string, string>;
+  t: i18n["t"];
   context: TemplateVariables.FormResponseContext;
 }) {
   const texts = getRenderedTexts({
@@ -18,7 +20,7 @@ export default function FormCompletePageTemplate_receipt01({
     config: {
       context,
       i18n: {
-        t: i18next.t,
+        t,
         basePath: `formcomplete.receipt01`,
       },
       renderer: render,

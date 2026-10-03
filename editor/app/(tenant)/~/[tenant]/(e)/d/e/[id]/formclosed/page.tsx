@@ -9,7 +9,6 @@ import {
 import { Button } from "@app/ui/components/button";
 import { FORM_CLOSED_WHILE_RESPONDING } from "@/k/error";
 import Link from "next/link";
-import i18next from "i18next";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
 import type { FormLinkURLParams } from "@/host/url";
 
@@ -24,7 +23,7 @@ export default async function FormClosedPage({
 }) {
   const { id: form_id } = await params;
   const { oops } = await searchParams;
-  await ssr_page_init_i18n({ form_id });
+  const t = await ssr_page_init_i18n({ form_id });
 
   return (
     <main className="container mx-auto flex items-center justify-center w-dvw min-h-dvh">
@@ -34,26 +33,26 @@ export default async function FormClosedPage({
           {oops === FORM_CLOSED_WHILE_RESPONDING.code ? (
             <>
               <CardTitle className="text-lg font-bold tracking-tight">
-                {i18next.t("formclosed.while_responding.title")}
+                {t("formclosed.while_responding.title")}
               </CardTitle>
               <CardDescription>
-                {i18next.t("formclosed.while_responding.description")}
+                {t("formclosed.while_responding.description")}
               </CardDescription>
             </>
           ) : (
             <>
               <CardTitle className="text-lg font-bold tracking-tight">
-                {i18next.t("formclosed.default.title")}
+                {t("formclosed.default.title")}
               </CardTitle>
               <CardDescription>
-                {i18next.t("formclosed.default.description")}
+                {t("formclosed.default.description")}
               </CardDescription>
             </>
           )}
         </CardHeader>
         <CardFooter className="flex w-full">
           <Link className="w-full" href="#">
-            <Button className="w-full">{i18next.t("home")}</Button>
+            <Button className="w-full">{t("home")}</Button>
           </Link>
         </CardFooter>
       </Card>

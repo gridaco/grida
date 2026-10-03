@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "api": {
+      "root": ".",
+      "framework": "nitro",
+      "buildCommand": "pnpm --filter @grida/api... build"
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": { "service": "api" } }]
+}

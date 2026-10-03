@@ -1,3 +1,4 @@
+import type { FormPaletteName } from "@grida/forms";
 import blue from "./blue";
 import gray from "./gray";
 import green from "./green";
@@ -101,6 +102,6 @@ const palettes = {
   ...highcontrast,
   ...saturation,
   ...ryu,
-};
+} satisfies Record<FormPaletteName, unknown>;
 
 export default palettes;
