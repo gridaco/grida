@@ -1,5 +1,10 @@
 import { service_role } from "../../db";
-import { loadChallengeEmailContext } from "./context";
+import { SYSTEM_GF_CUSTOMER_EMAIL_KEY } from "@grida/forms";
+import {
+  challengeEmailStateKey,
+  loadChallengeEmailContext,
+  readChallengeStateFromRaw,
+} from "./context";
 
 type Params = { session: string; field: string };
 
@@ -40,25 +45,71 @@ export async function POST(req: Request, params: Params) {
     );
   }
 
-  // The database rechecks session/field/project and latest challenge authority.
-  // Consumption, identity binding and success state are one transaction.
-  const { data: verified, error: verifyError } = await service_role.forms.rpc(
-    "verify_email_otp",
-    {
-      p_session_id: sessionId,
-      p_field_id: fieldId,
-      p_challenge_id: challenge_id,
-      p_otp: otp,
-    }
-  );
+  const key = challengeEmailStateKey(fieldId);
+  const prior = readChallengeStateFromRaw(ctx.session.raw, key);
 
-  if (verifyError) {
-    return Response.json({ error: "internal error" }, { status: 500 });
-  }
-  if (!verified?.length) {
-    // A denial commits the failed-guess count and failure state in the RPC.
+  // If we previously started, only allow verification for the latest issued challenge id.
+  if (prior.challenge_id && prior.challenge_id !== challenge_id) {
     return Response.json({ error: "invalid or expired OTP" }, { status: 401 });
   }
 
-  return Response.json({ state: verified[0].state });
+  const { data: verified, error: verifyErr } = await service_role.ciam.rpc(
+    "verify_customer_otp_and_create_session",
+    {
+      p_challenge_id: challenge_id,
+      p_otp: otp,
+      // legacy parameter, retained by the DB function signature
+      p_session_ttl_seconds: 0,
+    }
+  );
+
+  if (verifyErr || !verified || verified.length === 0) {
+    const failState = {
+      ...prior,
+      state: "challenge-failed" as const,
+    };
+    await service_role.forms.rpc("set_response_session_field_value", {
+      session_id: sessionId,
+      key,
+      value: failState,
+    });
+
+    return Response.json({ error: "invalid or expired OTP" }, { status: 401 });
+  }
+
+  const { customer_uid, project_id } = verified[0];
+  if (!customer_uid || !project_id) {
+    return Response.json({ error: "invalid or expired OTP" }, { status: 401 });
+  }
+
+  const expectedProjectId = ctx.form.project_id;
+  if (Number(project_id) !== expectedProjectId) {
+    return Response.json({ error: "internal error" }, { status: 500 });
+  }
+
+  // Only the system identity key is allowed to bind a response_session to a customer.
+  if (ctx.field.name === SYSTEM_GF_CUSTOMER_EMAIL_KEY) {
+    const { error: bindErr } = await service_role.forms
+      .from("response_session")
+      .update({ customer_id: customer_uid })
+      .eq("id", sessionId);
+    if (bindErr) {
+      // Do not fail verification; session raw still reflects success.
+    }
+  }
+
+  const successState = {
+    ...prior,
+    state: "challenge-success" as const,
+    verified_at: new Date().toISOString(),
+    customer_uid,
+  };
+
+  await service_role.forms.rpc("set_response_session_field_value", {
+    session_id: sessionId,
+    key,
+    value: successState,
+  });
+
+  return Response.json({ state: successState });
 }

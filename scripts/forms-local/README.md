@@ -77,13 +77,10 @@ Conflicting scalar input and unsupported multiple inventory selections must fail
 before customer, session, response, target or inventory writes. File uploads keep
 their existing raw representation and separate byte-processing assertions.
 
-OTP cases check that the normalized project/email cooldown applies across casing
-and respondent sessions, returns `429` with `Retry-After: 60`, and creates neither
-another challenge nor another provider request. Eight wrong guesses must persist
-their attempt count; a subsequent correct code and a consumed-code replay are
-denied. Fixture-owned SQL reads inspect private challenge counters and consumed
-state without exposing OTP hashes or salts. SQL transaction rollback on an
-injected binding failure is covered by the separate database pgTAP contract.
+OTP cases cover issuance, recorded delivery, wrong-code and cross-field denial,
+verified customer/session state, required-field gating and best-effort delivery
+failures. They use the existing CIAM RPCs and application-owned session updates;
+the API extraction introduces no OTP database migration.
 
 `clients.ts` runs the real editor submission, upload/resolver and email-challenge
 clients in a separate process against that same API. Its input and output files

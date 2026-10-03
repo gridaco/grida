@@ -452,104 +452,6 @@ export async function runFormsScenarios({
   assert.equal(started.state.state, "challenge-session-started");
   const email = await provider.awaitEmail({ to: f.a.email });
   assert.match(email.otp!, /^\d{6}$/);
-  const issuedBeforeCooldown = await f.otpChallengeCount(
-    f.projectA.id,
-    f.a.email
-  );
-  assert.equal(issuedBeforeCooldown, 1);
-  const emailsBeforeCooldown = provider.calls.filter(
-    (call) => call.path === "/resend/emails"
-  ).length;
-  const cooldownSession = await session(f.a);
-  for (const [targetSession, address] of [
-    [aSession, f.a.email.toUpperCase()],
-    [cooldownSession, f.a.email],
-  ]) {
-    const before = await sessionRow(targetSession);
-    const cooldown = await request(
-      `${sessionPath(targetSession, f.a.fields.challenge.id)}/challenge/email/start`,
-      {
-        method: "POST",
-        json: { email: address },
-      }
-    );
-    assert.equal(
-      cooldown.status,
-      429,
-      "OTP cooldown is project/email scoped, including case aliases and new sessions"
-    );
-    assert.equal(cooldown.headers.get("retry-after"), "60");
-    assert.deepEqual(
-      await sessionRow(targetSession),
-      before,
-      "Cooldown must not replace session state"
-    );
-    assert.equal(
-      await f.otpChallengeCount(f.projectA.id, f.a.email),
-      issuedBeforeCooldown
-    );
-    assert.equal(
-      provider.calls.filter((call) => call.path === "/resend/emails").length,
-      emailsBeforeCooldown
-    );
-  }
-  done(
-    "normalized email cooldown prevents issuance and delivery across sessions"
-  );
-  const concurrentEmail = `concurrent-${f.run}@example.com`;
-  const concurrentSessions = await Promise.all([session(f.a), session(f.a)]);
-  const concurrentBefore = await Promise.all(
-    concurrentSessions.map(sessionRow)
-  );
-  assert.equal(await f.otpChallengeCount(f.projectA.id, concurrentEmail), 0);
-  const emailsBeforeConcurrent = provider.calls.filter(
-    (call) => call.path === "/resend/emails"
-  ).length;
-  const concurrentIssuance = await Promise.all(
-    concurrentSessions.map((sessionId, index) =>
-      request(
-        `${sessionPath(sessionId, f.a.fields.challenge.id)}/challenge/email/start`,
-        {
-          method: "POST",
-          json: {
-            email:
-              index === 0 ? concurrentEmail : concurrentEmail.toUpperCase(),
-          },
-        }
-      )
-    )
-  );
-  assert.deepEqual(
-    concurrentIssuance.map((result) => result.status).sort(),
-    [200, 429]
-  );
-  assert.equal(await f.otpChallengeCount(f.projectA.id, concurrentEmail), 1);
-  assert.equal(
-    provider.calls.filter((call) => call.path === "/resend/emails").length,
-    emailsBeforeConcurrent + 1
-  );
-  const concurrentMail = await provider.awaitEmail({ to: concurrentEmail });
-  assert.match(concurrentMail.otp!, /^\d{6}$/);
-  for (const [index, result] of concurrentIssuance.entries()) {
-    const persisted = await sessionRow(concurrentSessions[index]);
-    assert.equal(persisted.customer_id, null);
-    if (result.status === 429) {
-      assert.equal(result.headers.get("retry-after"), "60");
-      assert.deepEqual(persisted, concurrentBefore[index]);
-    } else {
-      assert.equal(
-        (
-          persisted.raw[
-            `__challenge_email__${f.a.fields.challenge.id}`
-          ] as ChallengeState
-        ).state,
-        "challenge-session-started"
-      );
-    }
-  }
-  done(
-    "concurrent normalized OTP issuance admits one challenge and one provider email"
-  );
   const wrongOtp = email.otp === "000000" ? "000001" : "000000";
   denied(
     await request(`${challengePath}/verify`, {
@@ -590,84 +492,7 @@ export async function runFormsScenarios({
     ).state.state,
     "challenge-success"
   );
-  const verifiedSession = await sessionRow(aSession);
-  assert.equal(
-    (
-      await request(`${challengePath}/verify`, {
-        method: "POST",
-        json: { challenge_id: started.challenge_id, otp: email.otp },
-      })
-    ).status,
-    401,
-    "A consumed OTP cannot be replayed"
-  );
-  assert.deepEqual(await sessionRow(aSession), verifiedSession);
   done("real OTP challenge, verified customer and cross-field denial");
-
-  const exhaustedSession = await session(f.b);
-  const exhaustedPath = `${sessionPath(exhaustedSession, f.b.fields.challenge.id)}/challenge/email`;
-  const exhaustedEmail = `attempt-limit-${f.run}@example.com`;
-  const exhaustedStart = success<ChallengeResponse>(
-    await request(`${exhaustedPath}/start`, {
-      method: "POST",
-      json: { email: exhaustedEmail },
-    }),
-    "limited OTP start"
-  );
-  const exhaustedMail = await provider.awaitEmail({ to: exhaustedEmail });
-  const alwaysWrong = exhaustedMail.otp === "000000" ? "000001" : "000000";
-  for (let attempt = 1; attempt <= 8; attempt++) {
-    assert.equal(
-      (
-        await request(`${exhaustedPath}/verify`, {
-          method: "POST",
-          json: { challenge_id: exhaustedStart.challenge_id, otp: alwaysWrong },
-        })
-      ).status,
-      401,
-      `Wrong OTP attempt ${attempt} must be denied`
-    );
-    assert.deepEqual(await f.otpState(exhaustedStart.challenge_id), {
-      attempts: attempt,
-      consumed: false,
-    });
-  }
-  assert.equal(
-    (
-      await request(`${exhaustedPath}/verify`, {
-        method: "POST",
-        json: {
-          challenge_id: exhaustedStart.challenge_id,
-          otp: exhaustedMail.otp,
-        },
-      })
-    ).status,
-    401,
-    "A correct OTP must fail after eight wrong guesses"
-  );
-  assert.deepEqual(await f.otpState(exhaustedStart.challenge_id), {
-    attempts: 8,
-    consumed: false,
-  });
-  const exhaustedRow = await sessionRow(exhaustedSession);
-  assert.equal(exhaustedRow.customer_id, null);
-  assert.equal(
-    (
-      exhaustedRow.raw[
-        `__challenge_email__${f.b.fields.challenge.id}`
-      ] as ChallengeState
-    ).state,
-    "challenge-failed"
-  );
-  const exhaustedCustomer = await f.one(
-    "public",
-    "customer",
-    `project_id=eq.${f.projectB.id}&email=eq.${exhaustedEmail}`
-  );
-  assert.equal(exhaustedCustomer.is_email_verified, false);
-  done(
-    "wrong OTP attempts persist and exhaust before customer/session authority"
-  );
 
   const foreignUploadSession = await session(f.a);
   const foreignUpload = success<Envelope<UploadData>>(
@@ -1068,15 +893,14 @@ export async function runFormsScenarios({
   assert.equal(soldOut.data.is_open, false);
   assert.equal(soldOut.error!.code, "FORM_SOLD_OUT");
   const soldOutChallenge = `${sessionPath(soldOut.data.session_id, f.a.fields.challenge.id)}/challenge/email`;
-  const soldOutEmail = `sold-out-${f.run}@example.com`;
   const soldOutStarted = success<ChallengeResponse>(
     await request(`${soldOutChallenge}/start`, {
       method: "POST",
-      json: { email: soldOutEmail },
+      json: { email: f.a.email },
     }),
     "sold-out OTP start"
   );
-  const soldOutMail = await provider.awaitEmail({ to: soldOutEmail });
+  const soldOutMail = await provider.awaitEmail({ to: f.a.email });
   success(
     await request(`${soldOutChallenge}/verify`, {
       method: "POST",
@@ -1086,7 +910,7 @@ export async function runFormsScenarios({
   );
   const soldOutSubmit = await submit(f.a, soldOut.data.session_id, {
     full_name: "Sold out",
-    __gf_customer_email: soldOutEmail,
+    __gf_customer_email: f.a.email,
     ticket: f.a.inventory.optionId,
   });
   assert.equal(soldOutSubmit.status, 403);

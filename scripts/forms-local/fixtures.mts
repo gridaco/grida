@@ -22,7 +22,6 @@ export type FixtureResponse<T = unknown> = {
   ok: boolean;
   data: T | null;
 };
-export type OtpState = { attempts: number; consumed: boolean };
 type Schema = keyof Database;
 type Table<S extends Schema> = keyof Database[S]["Tables"] & string;
 type TableShape<
@@ -681,37 +680,6 @@ export async function createFixtures({
     inventory: choiceInventory,
   };
 
-  // CIAM's private challenge table is deliberately absent from PostgREST.
-  // Inspect only counters/terminal state through the runner-owned SQL channel;
-  // neither OTP hashes/salts nor challenge capabilities enter its output.
-  async function otpState(challengeId: string): Promise<OtpState> {
-    assert.match(challengeId, /^[a-f0-9-]{36}$/);
-    const state: unknown = JSON.parse(
-      (
-        await executeSql(`
-      SELECT json_build_object('attempts', attempt_count, 'consumed', consumed_at IS NOT NULL)
-      FROM grida_ciam.customer_otp_challenge WHERE id = '${challengeId}'::uuid;
-    `)
-      ).trim()
-    );
-    return state as OtpState;
-  }
-  async function otpChallengeCount(
-    projectId: number,
-    email: string
-  ): Promise<number> {
-    assert(Number.isSafeInteger(projectId));
-    assert.match(email, /^[a-z0-9-]+@example\.com$/);
-    return Number(
-      (
-        await executeSql(`
-      SELECT count(*) FROM grida_ciam.customer_otp_challenge
-      WHERE project_id = ${projectId} AND email = '${email}';
-    `)
-      ).trim()
-    );
-  }
-
   return {
     run,
     a,
@@ -727,8 +695,6 @@ export async function createFixtures({
     rows,
     one,
     patch,
-    otpState,
-    otpChallengeCount,
     apiUrl: setup.apiUrl,
     anonKey: setup.anonKey,
     bytes: FILE_BYTES,

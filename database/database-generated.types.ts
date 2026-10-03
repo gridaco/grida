@@ -1970,17 +1970,6 @@ export type Database = {
         Args: { key: string; session_id: string; value: Json }
         Returns: undefined
       }
-      verify_email_otp: {
-        Args: {
-          p_challenge_id: string
-          p_field_id: string
-          p_otp: string
-          p_session_id: string
-        }
-        Returns: {
-          state: Json
-        }[]
-      }
     }
     Enums: {
       form_block_type:

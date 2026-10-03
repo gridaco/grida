@@ -53,12 +53,12 @@ vi.mock("../server/forms/handlers/challenge/context", async (original) => ({
 
 import { POST } from "../server/forms/handlers/challenge/start";
 
-function start() {
+function start(email: unknown = "respondent@example.test") {
   return POST(
     new Request("http://localhost/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "respondent@example.test" }),
+      body: JSON.stringify({ email }),
     }),
     { session: "session", field: "field" }
   );
@@ -93,14 +93,23 @@ beforeEach(() => {
   });
 });
 
-test("recipient cooldown returns retry guidance without sending or replacing state", async () => {
-  mocks.issue.mockResolvedValue({ data: null, error: { code: "PT429" } });
+test("issuance failure does not send email or replace state", async () => {
+  mocks.issue.mockResolvedValue({ data: null, error: { code: "P0001" } });
   const response = await start();
-  expect(response.status).toBe(429);
-  expect(response.headers.get("Retry-After")).toBe("60");
+  expect(response.status).toBe(500);
+  expect(await response.json()).toEqual({ error: "unable to start challenge" });
   expect(mocks.send).not.toHaveBeenCalled();
   expect(mocks.persist).not.toHaveBeenCalled();
 });
+
+test.each([null, [], 123456])(
+  "rejects non-string email input",
+  async (email) => {
+    expect((await start(email)).status).toBe(400);
+    expect(mocks.issue).not.toHaveBeenCalled();
+    expect(mocks.send).not.toHaveBeenCalled();
+  }
+);
 
 test("a failed state write cannot be reported as a started challenge", async () => {
   mocks.persist.mockResolvedValue({

@@ -19,8 +19,7 @@ type Params = { session: string; field: string };
 export async function POST(req: Request, params: Params) {
   const { session: sessionId, field: fieldId } = params;
 
-  // The database enforces a recipient cooldown across sessions and callers.
-  // Deployment ingress must separately limit abuse across recipients/IPs.
+  // TODO(security): add rate limiting / abuse protection for OTP start.
   const { data: ctx, error } = await loadChallengeEmailContext({
     sessionId,
     fieldId,
@@ -90,12 +89,6 @@ export async function POST(req: Request, params: Params) {
     });
 
   if (challenge_error || !challenge_id) {
-    if (challenge_error?.code === "PT429") {
-      return Response.json(
-        { error: "please wait before requesting another code" },
-        { status: 429, headers: { "Retry-After": "60" } }
-      );
-    }
     // Generic failure (do not enumerate)
     return Response.json(
       { error: "unable to start challenge" },

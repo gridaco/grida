@@ -161,9 +161,7 @@ We keep the public surface RPC-based so internal tables aren’t directly expose
 
 ### Operational notes / pitfalls
 
-- **OTP attempt counting**: `verify_customer_otp_and_create_session` returns zero rows for denial, including invalid or null codes. Failed guesses increment the stored counter; eight failures exhaust the challenge. A denial must not raise after incrementing, because the exception would roll back the counter. Despite its legacy name, this verifier returns customer/project scope and does not create a session.
-- **Recipient cooldown**: `create_customer_otp_challenge` permits one issuance per normalized email and project in 60 seconds. A transaction advisory lock serializes concurrent starts under the API's default `READ COMMITTED` isolation; an indexed lookup enforces the interval. A repeat raises `PT429` before inserting or sending another challenge. This applies to Forms and portal issuance; portal HTTP responses continue concealing whether a customer exists. It does not replace IP or bulk-recipient abuse controls.
-- **Forms verification**: the service-only `grida_forms.verify_email_otp` derives scope from the stored session and field, requires the currently attached challenge and email, and commits OTP consumption, customer verification, identity-field binding and challenge state together. Wrong guesses persist failed state and return zero rows. Unexpected write errors roll back consumption so the same code remains retryable. See [the Forms reference](./grida_forms.sql) and [the CIAM reference](./grida_ciam.sql).
+- **OTP attempt counting**: PL/pgSQL exceptions roll back changes in the same transaction; track attempts accordingly if you need strict accounting.
 
 ---
 
