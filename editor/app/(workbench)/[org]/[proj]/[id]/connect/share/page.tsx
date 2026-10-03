@@ -72,8 +72,8 @@ export default function WithLink() {
         <SectorHeader>
           <SectorHeading>Headless usage</SectorHeading>
           <SectorDescription>
-            Using <code className="font-mono">/v1/submit</code> api, you can
-            start collecting forms without the need of backend
+            Use the Forms submission API to collect responses from your own
+            frontend without running a backend.
           </SectorDescription>
         </SectorHeader>
         <SectorBlocks>

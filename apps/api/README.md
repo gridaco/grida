@@ -5,6 +5,11 @@ The first product module is Forms. Grida's own interfaces use the same public
 HTTP contract. Private editor endpoints, account authentication, billing, West
 administration and Toss payment callbacks remain in `editor/`.
 
+The origin is shared by future product modules. Forms operations live only under
+`/v1/forms`; there are no aliases at the old unqualified `/v1` paths. The shared
+`@grida/forms` package owns pure `FormsApiPaths` builders. Callers supply the API
+origin separately; origins must never include the product path.
+
 The API shares the existing Supabase project, identities, organizations, projects,
 buckets and migration stream. There is no new database or account system.
 `supabase/` remains the sole migration authority. Shared producers have explicit
@@ -87,25 +92,29 @@ is introduced.
 
 ## HTTP contract
 
-| Method    | Path                                                        | Capability                                                    |
-| --------- | ----------------------------------------------------------- | ------------------------------------------------------------- |
-| GET       | `/v1/:id`                                                   | Load the published form and render contract                   |
-| GET       | `/v1/:id/session`                                           | Create a respondent session (existing method retained)        |
-| GET, POST | `/v1/submit/:id`                                            | Submit a response; JSON or existing browser redirect behavior |
-| PATCH     | `/v1/session/:session/field/:field`                         | Save a field draft                                            |
-| POST, PUT | `/v1/session/:session/field/:field/file/upload/signed-url`  | Prepare a Storage upload                                      |
-| GET       | `/v1/session/:session/field/:field/file/preview/public-url` | Resolve a staged file preview                                 |
-| POST      | `/v1/session/:session/field/:field/challenge/email/start`   | Start email verification                                      |
-| GET       | `/v1/session/:session/field/:field/challenge/email/state`   | Read verification state                                       |
-| POST      | `/v1/session/:session/field/:field/challenge/email/verify`  | Verify the challenge                                          |
-| GET       | `/v1/session/:session/field/:field/search/meta`             | Load reference-field metadata                                 |
+| Method    | Path                                                              | Capability                                                    |
+| --------- | ----------------------------------------------------------------- | ------------------------------------------------------------- |
+| GET       | `/v1/forms/:id`                                                   | Load the published form and render contract                   |
+| GET       | `/v1/forms/:id/session`                                           | Create a respondent session (existing method retained)        |
+| GET, POST | `/v1/forms/submit/:id`                                            | Submit a response; JSON or existing browser redirect behavior |
+| PATCH     | `/v1/forms/session/:session/field/:field`                         | Save a field draft                                            |
+| POST, PUT | `/v1/forms/session/:session/field/:field/file/upload/signed-url`  | Prepare a Storage upload                                      |
+| GET       | `/v1/forms/session/:session/field/:field/file/preview/public-url` | Resolve a staged file preview                                 |
+| POST      | `/v1/forms/session/:session/field/:field/challenge/email/start`   | Start email verification                                      |
+| GET       | `/v1/forms/session/:session/field/:field/challenge/email/state`   | Read verification state                                       |
+| POST      | `/v1/forms/session/:session/field/:field/challenge/email/verify`  | Verify the challenge                                          |
+| GET       | `/v1/forms/session/:session/field/:field/search/meta`             | Load reference-field metadata                                 |
 
 Session IDs are bearer capabilities. The server binds each supplied session to
 its form, field and staged objects. Member cookies are not authority for these
-operations. CORS permits anonymous browser callers (`*`, no credentials), with
+operations. Forms CORS permits anonymous browser callers (`*`, no credentials), with
 explicit content and existing simulator/geo headers. These metadata headers do
-not confer authorization. Responses are not cached. `x-request-id` correlates
-requests without logging session URLs, request bodies or provider responses.
+not confer authorization. That policy and its preflight response apply only to
+the `/v1/forms` namespace, including its slash-bound descendants. They do not
+apply to `/health`, unqualified legacy routes or other product namespaces.
+Platform middleware supplies common security headers, no-store and a generated
+`x-request-id` without importing Forms policy. Request IDs correlate requests
+without logging session URLs, request bodies or provider responses.
 
 Respondent location comes from Vercel request geolocation, with the existing
 developer/simulator header overrides. The API maps Vercel's `countryRegion` to
@@ -163,9 +172,13 @@ Before production cutover:
 
 1. Hold automatic editor promotion. Record the previous editor release and the
    candidate API/editor revisions and environment pairing.
-2. Verify paired hosted previews against an isolated nonproduction backend using
-   the existing database contract; this extraction requires no database migration.
-   Exercise real ingress, CORS, payloads, sessions, uploads and required effects.
+2. Verify the hosted API and matching editor configuration using the existing
+   database contract; this extraction requires no database migration. Use paired
+   previews with an isolated backend when available. For a production/local-only
+   setup, the operator explicitly approves API activation and performs controlled
+   functional checks before editor promotion; agents use only data-independent
+   health/preflight probes. Exercise real ingress, CORS, payloads, sessions,
+   uploads and required effects. Local proof does not certify hosted behavior.
    Confirm effective abuse controls on the new API origin, including OTP requests
    across recipients/IPs; controls attached to the editor project do not carry
    over automatically. Runner-local loopback URLs are not a hosted preview backend.

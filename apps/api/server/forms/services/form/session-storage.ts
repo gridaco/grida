@@ -1,6 +1,6 @@
 import assert from "assert";
 import { GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER } from "../../k/env";
-import { UniqueFileNameGenerator } from "@grida/forms";
+import { FormsApiPaths, UniqueFileNameGenerator } from "@grida/forms";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { config } from "../../config";
 
@@ -10,10 +10,10 @@ interface SessionStoragePath {
 }
 
 export const requesterurl = ({ session_id, field_id }: SessionStoragePath) =>
-  `${config.apiOrigin()}/v1/session/${session_id}/field/${field_id}/file/upload/signed-url`;
+  `${config.apiOrigin()}${FormsApiPaths.fieldUploadSignedUrl(session_id, field_id)}`;
 
 export const resolverurl = ({ session_id, field_id }: SessionStoragePath) =>
-  `${config.apiOrigin()}/v1/session/${session_id}/field/${field_id}/file/preview/public-url`;
+  `${config.apiOrigin()}${FormsApiPaths.fieldPreviewPublicUrl(session_id, field_id)}`;
 
 /**
  * build the path for the temporary storage object

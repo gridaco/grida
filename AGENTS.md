@@ -98,7 +98,7 @@ grida.co and \[tenant\].grida.site domains are connected.
 
 - `/editor`
   - `/app` the nextjs app directory, no shared root layout, each has its own root layout.
-    - `(api)/(public)/v1` retains legacy integrations/payment routes. The Forms Open API is owned by [`apps/api`](./apps/api/README.md).
+    - `(api)/(public)/v1` retains legacy integrations/payment routes. [`apps/api`](./apps/api/README.md) owns Grida's shared Open API host; its first product module is Forms at `/v1/forms`.
     - `(api)/private` contains the private, editor only api routes.
     - `(auth)` contains the auth specific flow routes. do not modify.
     - `(insiders)` contains the insiders, local-only routes. e.g. Grida does not allow email signups, the insiders locally can.

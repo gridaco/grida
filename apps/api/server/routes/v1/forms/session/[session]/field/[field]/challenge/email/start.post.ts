@@ -1,8 +1,8 @@
 import { defineEventHandler, getRouterParam, toWebRequest } from "h3";
-import { PATCH } from "../../../../../forms/handlers/partial";
+import { POST } from "../../../../../../../../../forms/handlers/challenge/start";
 
 export default defineEventHandler((event) =>
-  PATCH(toWebRequest(event), {
+  POST(toWebRequest(event), {
     session: getRouterParam(event, "session")!,
     field: getRouterParam(event, "field")!,
   })

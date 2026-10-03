@@ -1,9 +1,9 @@
-import { FormsRequestHeaders } from "@grida/forms";
-import { randomUUID } from "node:crypto";
+import { FormsApiPaths, FormsRequestHeaders } from "@grida/forms";
 import {
   createError,
   defineEventHandler,
   getRequestHeader,
+  getRequestURL,
   sendNoContent,
   setResponseHeaders,
 } from "h3";
@@ -16,20 +16,13 @@ const headers = [
 ];
 
 export default defineEventHandler((event) => {
-  // Generate our own ID. Never log the URL: session paths are capabilities.
-  const requestId = randomUUID();
-  event.context.publicApi = { requestId, started: performance.now() };
-  event.node.req.headers["x-request-id"] = requestId;
+  if (!FormsApiPaths.isPath(getRequestURL(event).pathname)) return;
+
+  // Forms uses respondent capabilities, never browser member cookies.
   setResponseHeaders(event, {
-    "x-request-id": requestId,
-    "cache-control": "no-store",
-    "x-content-type-options": "nosniff",
-    "referrer-policy": "no-referrer",
     "access-control-allow-origin": "*",
     "access-control-expose-headers": "x-request-id",
   });
-
-  // These endpoints use respondent capabilities, never browser member cookies.
   if (event.method === "OPTIONS") {
     const method = getRequestHeader(event, "access-control-request-method");
     const requested = getRequestHeader(event, "access-control-request-headers")

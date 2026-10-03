@@ -207,7 +207,7 @@ describe("form/session resource binding", () => {
     });
     const response = await load(
       new NextRequest(
-        `http://localhost:3000/v1/${formId}?__gf_session=${sessionId}`
+        `http://localhost:3000/v1/forms/${formId}?__gf_session=${sessionId}`
       ),
       params
     );
@@ -222,7 +222,7 @@ describe("form/session resource binding", () => {
     const body = new FormData();
     body.set("__gf_session", sessionId);
     const response = await submit(
-      new NextRequest(`http://localhost:3000/v1/submit/${formId}`, {
+      new NextRequest(`http://localhost:3000/v1/forms/submit/${formId}`, {
         method: "POST",
         headers: { Accept: "application/json" },
         body,
@@ -240,7 +240,7 @@ describe("form/session resource binding", () => {
     });
     const response = await submitQuery(
       new NextRequest(
-        `http://localhost:3000/v1/submit/${formId}?full_name=First&full_name=Different`,
+        `http://localhost:3000/v1/forms/submit/${formId}?full_name=First&full_name=Different`,
         { headers: { Accept: "application/json" } }
       ),
       params
@@ -267,7 +267,7 @@ describe("form/session resource binding", () => {
           : JSON.stringify({ src: `grida-tmp://${path}?grida-tmp=true` })
       );
       const response = await submit(
-        new NextRequest(`http://localhost:3000/v1/submit/${formId}`, {
+        new NextRequest(`http://localhost:3000/v1/forms/submit/${formId}`, {
           method: "POST",
           headers: { Accept: "application/json" },
           body,

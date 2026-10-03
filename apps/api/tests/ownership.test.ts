@@ -309,23 +309,47 @@ test("producer guard distinguishes code from copy and rejects actual escape path
   ).toContain("forbidden Node import node:fs");
 });
 
-test("API route surface contains no internal completion or editor endpoint", () => {
+test("API route inventory reserves Forms to its product namespace without aliases", () => {
   const routes = sources(path.join(app, "server/routes"))
     .map((filename) => path.relative(path.join(app, "server/routes"), filename))
     .sort();
   expect(routes).toEqual([
     "health.get.ts",
-    "v1/[id].get.ts",
-    "v1/[id]/session.get.ts",
-    "v1/session/[session]/field/[field].patch.ts",
-    "v1/session/[session]/field/[field]/challenge/email/start.post.ts",
-    "v1/session/[session]/field/[field]/challenge/email/state.get.ts",
-    "v1/session/[session]/field/[field]/challenge/email/verify.post.ts",
-    "v1/session/[session]/field/[field]/file/preview/public-url.get.ts",
-    "v1/session/[session]/field/[field]/file/upload/signed-url.post.ts",
-    "v1/session/[session]/field/[field]/file/upload/signed-url.put.ts",
-    "v1/session/[session]/field/[field]/search/meta.get.ts",
-    "v1/submit/[id].get.ts",
-    "v1/submit/[id].post.ts",
+    "v1/forms/[id].get.ts",
+    "v1/forms/[id]/session.get.ts",
+    "v1/forms/session/[session]/field/[field].patch.ts",
+    "v1/forms/session/[session]/field/[field]/challenge/email/start.post.ts",
+    "v1/forms/session/[session]/field/[field]/challenge/email/state.get.ts",
+    "v1/forms/session/[session]/field/[field]/challenge/email/verify.post.ts",
+    "v1/forms/session/[session]/field/[field]/file/preview/public-url.get.ts",
+    "v1/forms/session/[session]/field/[field]/file/upload/signed-url.post.ts",
+    "v1/forms/session/[session]/field/[field]/file/upload/signed-url.put.ts",
+    "v1/forms/session/[session]/field/[field]/search/meta.get.ts",
+    "v1/forms/submit/[id].get.ts",
+    "v1/forms/submit/[id].post.ts",
   ]);
+});
+
+test("platform HTTP defaults and diagnostics do not import Forms policy", () => {
+  const files = [
+    "server/middleware/00-platform-http.ts",
+    "server/error-handler.ts",
+    "server/plugins/diagnostics.ts",
+    "server/routes/health.get.ts",
+  ];
+  for (const filename of files) {
+    const imports = ts.preProcessFile(
+      readFileSync(path.join(app, filename), "utf8"),
+      true,
+      true
+    ).importedFiles;
+    expect(
+      imports
+        .filter(
+          ({ fileName }) =>
+            fileName === "@grida/forms" || fileName.includes("/forms/")
+        )
+        .map(({ fileName }) => `${filename}: ${fileName}`)
+    ).toEqual([]);
+  }
 });

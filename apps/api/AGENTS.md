@@ -5,6 +5,10 @@ This application owns public, user-facing product operations. Start with the
 
 - Do not import editor source or Next request context, including type imports.
 - Keep HTTP adapters thin; domain operations and privileged clients live here.
+- The API host serves multiple products. Forms owns only `/v1/forms` and its
+  descendants, with paths supplied by `@grida/forms`. Do not add aliases at
+  unqualified `/v1` paths. Platform middleware owns request IDs and common
+  security headers; Forms CORS/preflight policy must stay inside its namespace.
 - Use the shared producers listed in the README: `@grida/forms` for contracts,
   `@grida/postgrest` for schema interpretation, `@workspace/utils` for explicit
   HTTP/OTP primitives, and `@workspace/translations` / `@workspace/emails` for

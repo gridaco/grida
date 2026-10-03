@@ -154,7 +154,7 @@ export async function runFormsScenarios({
     log(`forms: ${name}`);
   };
   const sessionPath = (session: string, field: string) =>
-    `/v1/session/${session}/field/${field}`;
+    `/v1/forms/session/${session}/field/${field}`;
 
   async function request(
     path: string,
@@ -212,7 +212,7 @@ export async function runFormsScenarios({
   }
   async function session(form: FormIdentity) {
     const envelope = success<Envelope<SessionData>>(
-      await request(`/v1/${form.id}/session`),
+      await request(`/v1/forms/${form.id}/session`),
       "create session"
     );
     const data = envelope.data;
@@ -250,7 +250,7 @@ export async function runFormsScenarios({
     values: Record<string, string | Blob>,
     headers?: Record<string, string>
   ) =>
-    request(`/v1/submit/${form.id}`, {
+    request(`/v1/forms/submit/${form.id}`, {
       method: "POST",
       body: submission(sessionId, values),
       headers,
@@ -279,7 +279,7 @@ export async function runFormsScenarios({
   // Public Forms session IDs remain the respondent capability. Member JWTs are
   // tested separately against database RLS; these anonymous calls need no login.
   const load = success<LoadResponse>(
-    await request(`/v1/${f.a.id}`),
+    await request(`/v1/forms/${f.a.id}`),
     "load native form"
   );
   assert.equal(load.error, null);
@@ -293,7 +293,7 @@ export async function runFormsScenarios({
   if (publicContract) {
     const identified = success<LoadResponse>(
       await request(
-        `/v1/${f.b.id}?${new URLSearchParams({
+        `/v1/forms/${f.b.id}?${new URLSearchParams({
           __gf_session: bSession,
           __gf_customer_uuid: f.b.customer.uuid!,
         })}`
@@ -305,7 +305,7 @@ export async function runFormsScenarios({
     });
     assertPublicRender(identified);
   }
-  denied(await request(`/v1/${randomUUID()}`), "unknown form");
+  denied(await request(`/v1/forms/${randomUUID()}`), "unknown form");
   done("load and real respondent sessions");
 
   const aFieldPath = sessionPath(aSession, f.a.fields.name.id);
@@ -369,7 +369,7 @@ export async function runFormsScenarios({
   assert.deepEqual((await sessionRow(aSession)).raw, rawBefore);
   const foreignBefore = await sessionRow(bSession);
   denied(
-    await request(`/v1/${f.a.id}?__gf_session=${bSession}`),
+    await request(`/v1/forms/${f.a.id}?__gf_session=${bSession}`),
     "load cannot rebind foreign session"
   );
   assert.deepEqual(await sessionRow(bSession), foreignBefore);
@@ -647,7 +647,7 @@ export async function runFormsScenarios({
     "notification-respondent-email",
   ]) {
     denied(
-      await request(`/v1/submit/${f.a.id}/hooks/${hook}`, {
+      await request(`/v1/forms/submit/${f.a.id}/hooks/${hook}`, {
         method: "POST",
         json: { response_id: response.id, session_id: aSession },
       }),
@@ -713,7 +713,9 @@ export async function runFormsScenarios({
   const connectedSession = await session(f.connected);
   if (publicContract) {
     const connectedLoad = success<LoadResponse>(
-      await request(`/v1/${f.connected.id}?__gf_session=${connectedSession}`),
+      await request(
+        `/v1/forms/${f.connected.id}?__gf_session=${connectedSession}`
+      ),
       "connected public projection"
     );
     assertPublicRender(connectedLoad);
@@ -793,7 +795,7 @@ export async function runFormsScenarios({
   conflicting.append("full_name", "First value");
   conflicting.append("full_name", "Conflicting value");
   assert.equal(
-    (await request(`/v1/submit/${f.connected.id}?${conflicting}`)).status,
+    (await request(`/v1/forms/submit/${f.connected.id}?${conflicting}`)).status,
     400
   );
   assert.equal(
@@ -805,7 +807,7 @@ export async function runFormsScenarios({
   identical.append("full_name", "GET Fixture");
   identical.append("full_name", "GET Fixture");
   const getResult = success<Envelope<SubmissionData>>(
-    await request(`/v1/submit/${f.connected.id}?${identical}`),
+    await request(`/v1/forms/submit/${f.connected.id}?${identical}`),
     "GET submit with coherent duplicates"
   );
   if (publicContract) assertPublicSubmission(getResult);
@@ -856,7 +858,7 @@ export async function runFormsScenarios({
     is_force_closed: true,
   });
   const closed = success<LoadResponse>(
-    await request(`/v1/${f.connected.id}`),
+    await request(`/v1/forms/${f.connected.id}`),
     "closed load"
   );
   assert.equal(closed.data.is_open, false);
@@ -887,7 +889,7 @@ export async function runFormsScenarios({
   });
   assert.equal((await inventory()).available, 0);
   const soldOut = success<LoadResponse>(
-    await request(`/v1/${f.a.id}`),
+    await request(`/v1/forms/${f.a.id}`),
     "sold-out load"
   );
   assert.equal(soldOut.data.is_open, false);
@@ -1206,8 +1208,8 @@ export async function runFormsScenarios({
       body.append("toggles", value);
     const result = success<Envelope<SubmissionData>>(
       method === "POST"
-        ? await request(`/v1/submit/${choices.id}`, { method, body })
-        : await request(`/v1/submit/${choices.id}?${body}`),
+        ? await request(`/v1/forms/submit/${choices.id}`, { method, body })
+        : await request(`/v1/forms/submit/${choices.id}?${body}`),
       label
     );
     if (publicContract) assertPublicSubmission(result);
@@ -1325,8 +1327,8 @@ export async function runFormsScenarios({
     for (const [name, value] of values) body.append(name, value);
     const result =
       method === "POST"
-        ? await request(`/v1/submit/${choices.id}`, { method, body })
-        : await request(`/v1/submit/${choices.id}?${body}`);
+        ? await request(`/v1/forms/submit/${choices.id}`, { method, body })
+        : await request(`/v1/forms/submit/${choices.id}?${body}`);
     assert.equal(result.status, 400, `${label}: expected safe client denial`);
     assert.deepEqual(
       await sessionRow(choiceSession),
@@ -1486,16 +1488,19 @@ export async function prepareCarryover({
   const request = carryoverHttp(origin);
   const form = f.connected;
   const { data: session } = await request<Envelope<SessionData>>(
-    `/v1/${form.id}/session`
+    `/v1/forms/${form.id}/session`
   );
   assert.equal(session.form_id, form.id);
   const draft = "Carryover draft";
-  await request(`/v1/session/${session.id}/field/${form.fields.name.id}`, {
-    method: "PATCH",
-    json: { value: draft },
-  });
+  await request(
+    `/v1/forms/session/${session.id}/field/${form.fields.name.id}`,
+    {
+      method: "PATCH",
+      json: { value: draft },
+    }
+  );
   const { data: upload } = await request<Envelope<UploadData>>(
-    `/v1/session/${session.id}/field/${form.fields.file.id}/file/upload/signed-url`,
+    `/v1/forms/session/${session.id}/field/${form.fields.file.id}/file/upload/signed-url`,
     {
       method: "PUT",
       json: {
@@ -1622,7 +1627,7 @@ export async function resumeCarryover({
     0
   );
   const loaded = await request<LoadResponse>(
-    `/v1/${c.formId}?__gf_session=${c.sessionId}`
+    `/v1/forms/${c.formId}?__gf_session=${c.sessionId}`
   );
   assertPublicRender(loaded);
   assert.equal(loaded.data.session_id, c.sessionId);
@@ -1633,7 +1638,7 @@ export async function resumeCarryover({
   payload.set("full_name", c.finalName);
   payload.set("attachment", c.stagedPath);
   const accepted = await request<Envelope<SubmissionData>>(
-    `/v1/submit/${c.formId}`,
+    `/v1/forms/submit/${c.formId}`,
     {
       method: "POST",
       body: payload,
@@ -1727,7 +1732,7 @@ export async function runTransportScenarios({
   assert.equal(base.protocol, "http:");
   const expectedOrigin = new URL(webOrigin).origin;
   const requestId = "client-chosen-id-must-not-be-trusted";
-  const path = `/v1/${f.connected.id}/session`;
+  const path = `/v1/forms/${f.connected.id}/session`;
   const observedIds = new Set<string>();
   const headerValues = (value: string | null) =>
     (value ?? "")
@@ -1735,20 +1740,12 @@ export async function runTransportScenarios({
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
-  function transport(response: Response) {
-    assert.equal(response.headers.get("access-control-allow-origin"), "*");
-    assert.equal(
-      response.headers.get("access-control-allow-credentials"),
-      null
-    );
-    assert(
-      headerValues(
-        response.headers.get("access-control-expose-headers")
-      ).includes("x-request-id")
-    );
+  function platformTransport(response: Response) {
     assert(
       headerValues(response.headers.get("cache-control")).includes("no-store")
     );
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(response.headers.get("referrer-policy"), "no-referrer");
     const id = response.headers.get("x-request-id");
     assert(
       id && id.length >= 16,
@@ -1762,6 +1759,28 @@ export async function runTransportScenarios({
     observedIds.add(id);
     assert.equal(response.headers.get("set-cookie"), null);
     return id;
+  }
+  function transport(response: Response) {
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+    assert.equal(
+      response.headers.get("access-control-allow-credentials"),
+      null
+    );
+    assert(
+      headerValues(
+        response.headers.get("access-control-expose-headers")
+      ).includes("x-request-id")
+    );
+    return platformTransport(response);
+  }
+  function outsideForms(response: Response) {
+    platformTransport(response);
+    for (const name of response.headers.keys()) {
+      assert(
+        !name.startsWith("access-control-"),
+        `Forms policy escaped its namespace: ${name}`
+      );
+    }
   }
   async function json<T>(response: Response): Promise<T> {
     assert(
@@ -1831,7 +1850,7 @@ export async function runTransportScenarios({
   assert.equal(await preflight.text(), "");
 
   const missing = await fetch(
-    new URL("/v1/not-a-real-operation/absent", base),
+    new URL("/v1/forms/not-a-real-operation/absent", base),
     {
       headers: { Origin: expectedOrigin, "x-request-id": requestId },
       redirect: "error",
@@ -1856,7 +1875,7 @@ export async function runTransportScenarios({
   );
   const malformed = await fetch(
     new URL(
-      `/v1/session/${session.id}/field/${f.connected.fields.name.id}`,
+      `/v1/forms/session/${session.id}/field/${f.connected.fields.name.id}`,
       base
     ),
     {
@@ -1883,14 +1902,80 @@ export async function runTransportScenarios({
     ),
     before
   );
+
+  const health = await fetch(new URL("/health", base), {
+    headers: { Origin: expectedOrigin, "x-request-id": requestId },
+    redirect: "error",
+    signal: AbortSignal.timeout(15_000),
+  });
+  assert.equal(health.status, 200);
+  outsideForms(health);
+  assert.deepEqual(await json(health), { status: "ok" });
+
+  // Keep these independent literals: importing the client's producer here would
+  // let a matching client/server regression conceal the old public contract.
+  const oldField = `/v1/session/${session.id}/field/${f.connected.fields.name.id}`;
+  const retired: [string, string][] = [
+    ["GET", `/v1/${f.connected.id}`],
+    ["GET", `/v1/${f.connected.id}/session`],
+    ["GET", `/v1/submit/${f.connected.id}`],
+    ["POST", `/v1/submit/${f.connected.id}`],
+    ["PATCH", oldField],
+    ["POST", `${oldField}/file/upload/signed-url`],
+    ["PUT", `${oldField}/file/upload/signed-url`],
+    ["GET", `${oldField}/file/preview/public-url`],
+    ["POST", `${oldField}/challenge/email/start`],
+    ["POST", `${oldField}/challenge/email/verify`],
+    ["GET", `${oldField}/challenge/email/state`],
+    ["GET", `${oldField}/search/meta`],
+  ];
+  async function assertOutsideNamespace(
+    method: string,
+    pathname: string,
+    status = 404
+  ) {
+    const response = await fetch(new URL(pathname, base), {
+      method,
+      headers: {
+        Origin: expectedOrigin,
+        "x-request-id": requestId,
+        ...(method === "OPTIONS"
+          ? { "Access-Control-Request-Method": "POST" }
+          : {}),
+      },
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+    assert.equal(response.status, status, `${method} ${pathname}`);
+    outsideForms(response);
+    await json(response);
+  }
+  for (const [method, pathname] of retired) {
+    await assertOutsideNamespace(method, pathname);
+  }
+  for (const pathname of new Set(retired.map(([, pathname]) => pathname))) {
+    await assertOutsideNamespace("OPTIONS", pathname);
+  }
+  for (const pathname of [
+    "/v1/storage/buckets",
+    "/v1/forms-other/test",
+    "/v1/formsfoo",
+  ]) {
+    await assertOutsideNamespace("GET", pathname);
+    await assertOutsideNamespace("OPTIONS", pathname);
+  }
+  await assertOutsideNamespace("OPTIONS", "/health", 405);
   return {
-    count: 5,
+    count: 8,
     scenarios: [
       "public CORS response",
       "HEAD without response body",
       "explicit preflight headers and methods",
       "correlated sanitized JSON 404",
       "malformed JSON 400 without writes",
+      "platform health without Forms CORS",
+      "all unqualified Forms operations and preflights return 404",
+      "unrelated namespaces receive no Forms policy",
     ],
     credentials: false,
     cache: "no-store",
@@ -1913,7 +1998,7 @@ export async function runClientScenarios({
   const form = f.directFile;
   async function createSession(target: FormIdentity) {
     const result = await request<Envelope<SessionData>>(
-      `/v1/${target.id}/session`
+      `/v1/forms/${target.id}/session`
     );
     assert.equal(result.error, null);
     assert.deepEqual(Object.keys(result.data).sort(), ["form_id", "id"]);

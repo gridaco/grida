@@ -24,7 +24,7 @@ describe("manual row creation", () => {
     await createRow("form", data).then(onSaved);
 
     expect(request).toHaveBeenCalledWith(
-      "https://api.example.com/v1/submit/form",
+      "https://api.example.com/v1/forms/submit/form",
       {
         method: "POST",
         credentials: "omit",

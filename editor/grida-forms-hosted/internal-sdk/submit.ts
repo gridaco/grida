@@ -1,14 +1,15 @@
 "use client";
 
 import { Env } from "@/env";
-import type {
-  FormSubmitResponseData,
-  FormsApiResponse,
-  FormSubmitDiagnostics,
+import {
+  FormsApiPaths,
+  type FormSubmitResponseData,
+  type FormsApiResponse,
+  type FormSubmitDiagnostics,
 } from "@grida/forms";
 
 /**
- * Minimal, stable shape from `POST /v1/submit/:form_id` JSON response.
+ * Minimal, stable shape from `POST /v1/forms/submit/:form_id` JSON response.
  *
  * Submission returns its response ID and customer ID; database row metadata
  * is not part of the public result.
@@ -20,7 +21,7 @@ export type DefaultFormSubmitResponse<
 > = FormsApiResponse<TData, string> & Partial<FormSubmitDiagnostics>;
 
 /**
- * Submits a form to the default Grida forms endpoint (`/v1/submit/:form_id`)
+ * Submits a form to the default Grida Forms endpoint (`/v1/forms/submit/:form_id`)
  * and returns the JSON response.
  */
 export async function submitFormToDefaultEndpoint<
@@ -40,7 +41,7 @@ export async function submitFormToDefaultEndpoint<
 ): Promise<DefaultFormSubmitResponse<TData>> {
   const host = opts?.host ?? Env.forms.API_ORIGIN;
 
-  const res = await fetch(`${host}/v1/submit/${form_id}`, {
+  const res = await fetch(`${host}${FormsApiPaths.submit(form_id)}`, {
     method: "POST",
     credentials: "omit",
     body: formdata,
@@ -56,7 +57,7 @@ export async function submitFormToDefaultEndpoint<
 /**
  * A small helper to build a submit handler that:
  * - Prevents default form submission
- * - Posts to `/v1/submit/:form_id`
+ * - Posts to `/v1/forms/submit/:form_id`
  * - Calls caller-provided callbacks
  */
 export function createDefaultFormSubmitHandler<

@@ -118,7 +118,8 @@ async function main() {
   );
 
   phase = "file upload and resolution";
-  const filePath = `${apiOrigin}/v1/session/${encodeURIComponent(input.file.sessionId)}/field/${encodeURIComponent(input.file.fieldId)}/file`;
+  // Independent wire contract; these clients consume URLs supplied by the API.
+  const filePath = `${apiOrigin}/v1/forms/session/${encodeURIComponent(input.file.sessionId)}/field/${encodeURIComponent(input.file.fieldId)}/file`;
   const upload = makeUploader({
     type: "requesturl",
     request_url: `${filePath}/upload/signed-url`,

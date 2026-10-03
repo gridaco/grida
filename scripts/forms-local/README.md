@@ -53,6 +53,12 @@ environment, private HOME and fresh output, then starts that output and makes re
 Separate typechecks, contract tests and the Vercel build remain required; the
 local HTTP proof does not exercise Vercel ingress.
 
+The HTTP contract is pinned independently at `/v1/forms`. The proof checks that
+the old unqualified Forms routes return 404, and that Forms CORS/preflight policy
+does not apply to platform health or unrelated product paths. Client checks use
+the actual shared path producer; wire-level scenarios keep literal paths so a
+matching client/server namespace regression cannot make the proof pass.
+
 The snapshot adds a fixture-only error observer that records stack frames in the
 private log, without error messages or request/provider data. Product diagnostics
 remain unchanged; the observer does not change responses or operation behavior.

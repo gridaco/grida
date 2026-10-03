@@ -36,7 +36,7 @@ import {
 import { Skeleton } from "@app/ui/components/skeleton";
 import { submitFormToDefaultEndpoint } from "@/grida-forms-hosted/internal-sdk/submit";
 
-/** Form submit error codes returned by POST /v1/submit/:id (when Accept: application/json). */
+/** Form submit error codes returned by POST /v1/forms/submit/:id (when Accept: application/json). */
 type FormSubmitErrorCode =
   | "INTERNAL_SERVER_ERROR"
   | "MISSING_REQUIRED_HIDDEN_FIELDS"

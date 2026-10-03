@@ -1,9 +1,10 @@
 "use client";
 
-import type {
-  EmailChallengeState,
-  EmailChallengeSessionState,
-  EmailChallengeProvider as HttpEmailChallengeProvider,
+import {
+  FormsApiPaths,
+  type EmailChallengeState,
+  type EmailChallengeSessionState,
+  type EmailChallengeProvider as HttpEmailChallengeProvider,
 } from "@grida/forms";
 
 import * as React from "react";
@@ -78,14 +79,14 @@ export function EmailChallengeProvider({
 }
 
 export function createHttpEmailChallengeProvider({
-  base = `${Env.forms.API_ORIGIN}/v1`,
+  origin = Env.forms.API_ORIGIN,
 }: {
   /**
-   * Base URL for the public v1 API. Defaults to `${Env.forms.API_ORIGIN}/v1`.
+   * API origin without a path. Defaults to `Env.forms.API_ORIGIN`.
    * Using the canonical host is important because some renderers can run on
    * non-API origins (e.g. embeds/custom domains).
    */
-  base?: string;
+  origin?: string;
 }): EmailChallengeProvider {
   async function json<T>(res: Response): Promise<T> {
     const t = await res.json().catch(() => null);
@@ -104,9 +105,7 @@ export function createHttpEmailChallengeProvider({
   return {
     async getState({ sessionId, fieldId }) {
       const res = await fetch(
-        `${base}/session/${encodeURIComponent(sessionId)}/field/${encodeURIComponent(
-          fieldId
-        )}/challenge/email/state`,
+        `${origin}${FormsApiPaths.emailChallengeState(sessionId, fieldId)}`,
         { method: "GET", credentials: "omit" }
       );
       const data = await json<{ state: EmailChallengeSessionState }>(res);
@@ -114,9 +113,7 @@ export function createHttpEmailChallengeProvider({
     },
     async start({ sessionId, fieldId, email }) {
       const res = await fetch(
-        `${base}/session/${encodeURIComponent(sessionId)}/field/${encodeURIComponent(
-          fieldId
-        )}/challenge/email/start`,
+        `${origin}${FormsApiPaths.emailChallengeStart(sessionId, fieldId)}`,
         {
           method: "POST",
           credentials: "omit",
@@ -129,9 +126,7 @@ export function createHttpEmailChallengeProvider({
     },
     async verify({ sessionId, fieldId, challengeId, otp }) {
       const res = await fetch(
-        `${base}/session/${encodeURIComponent(sessionId)}/field/${encodeURIComponent(
-          fieldId
-        )}/challenge/email/verify`,
+        `${origin}${FormsApiPaths.emailChallengeVerify(sessionId, fieldId)}`,
         {
           method: "POST",
           credentials: "omit",

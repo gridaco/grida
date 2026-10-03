@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { useFormAgentState } from "@/grida-forms/formstate";
-import type { FormReferenceSearchMetaResponse } from "@grida/forms";
+import {
+  FormsApiPaths,
+  type FormReferenceSearchMetaResponse,
+} from "@grida/forms";
 import { SearchInput } from "@/components/extension/search-input";
 import { InputSkeleton } from "@/components/extension/input-skeleton";
 import { FormsSecureXSBSQLForeignKeySearchInput } from "./xsb-secured";
@@ -26,7 +29,7 @@ function useSearchMeta({
 }) {
   return useSWR<FormReferenceSearchMetaResponse>(
     session_id
-      ? `${Env.forms.API_ORIGIN}/v1/session/${session_id}/field/${field_id}/search/meta`
+      ? `${Env.forms.API_ORIGIN}${FormsApiPaths.fieldSearchMeta(session_id, field_id)}`
       : undefined,
     async (url: string) => {
       const res = await fetch(url, { credentials: "omit" });

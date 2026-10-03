@@ -16,9 +16,10 @@ import { TooltipProvider } from "@app/ui/components/tooltip";
 import { useRequestFormSession, useFormSession } from "./load";
 import { Env } from "@/env";
 import { AgentPagesFlow } from "@/grida-forms/formstate/core/flow";
-import type {
-  FormAgentPrefetchData,
-  FormClientFetchResponse,
+import {
+  FormsApiPaths,
+  type FormAgentPrefetchData,
+  type FormClientFetchResponse,
 } from "@grida/forms";
 import { FormAgentGeo } from "@/grida-forms/formstate/core/geo";
 
@@ -256,7 +257,7 @@ function FormPage({
     }
   }
 
-  const submit_action = `${Env.forms.API_ORIGIN}/v1/submit/${form_id}`;
+  const submit_action = `${Env.forms.API_ORIGIN}${FormsApiPaths.submit(form_id)}`;
 
   return (
     <main className="min-h-screen flex flex-col items-center pt-10 md:pt-16">

@@ -1,5 +1,5 @@
 import { defineEventHandler, getRouterParam, toWebRequest } from "h3";
-import { PUT } from "../../../../../../../../forms/handlers/upload";
+import { PUT } from "../../../../../../../../../forms/handlers/upload";
 
 export default defineEventHandler((event) =>
   PUT(toWebRequest(event), {

@@ -7,9 +7,10 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_SESSION_KEY,
 } from "@/k/system";
-import type {
-  FormSessionResponse,
-  FormClientFetchResponse,
+import {
+  FormsApiPaths,
+  type FormSessionResponse,
+  type FormClientFetchResponse,
 } from "@grida/forms";
 import { Env } from "@/env";
 
@@ -31,7 +32,7 @@ export function useRequestFormSession(form_id: string) {
     }
 
     // console.log("fetching session");
-    fetch(`${Env.forms.API_ORIGIN}/v1/${form_id}/session`, {
+    fetch(`${Env.forms.API_ORIGIN}${FormsApiPaths.session(form_id)}`, {
       credentials: "omit",
     }).then((res) => {
       res.json().then(({ data }: FormSessionResponse) => {
@@ -75,7 +76,7 @@ function makeurl_forminit({
     params[SYSTEM_GF_FINGERPRINT_VISITORID_KEY] = fingerprint.visitorId;
   }
 
-  return Env.forms.API_ORIGIN + `/v1/${form_id}?${new URLSearchParams(params)}`;
+  return `${Env.forms.API_ORIGIN}${FormsApiPaths.form(form_id)}?${new URLSearchParams(params)}`;
 }
 
 export function useFormSession(

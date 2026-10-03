@@ -8,6 +8,24 @@ The root entry exports field models and public response projections, value conve
 
 Public error contracts permit omitted `data` and structured infrastructure errors. Inspect errors and HTTP status before treating a response as successful. Provisional contacts are string candidates from persisted response fields, deduplicated in encounter order; challenge emails require persisted `challenge-success`. This helper neither establishes identity nor validates addresses.
 
+`FormsApiPaths` owns the `/v1/forms` product namespace on the shared Grida API.
+It returns origin-free paths for `form(formId)`, `session(formId)`,
+`submit(formId)`, and the session/field operations `field`, `fieldSearchMeta`,
+`fieldUploadSignedUrl`, `fieldPreviewPublicUrl`, `emailChallengeStart`,
+`emailChallengeVerify` and `emailChallengeState`. Each session/field operation
+takes `(sessionId, fieldId)`. Pass raw identifiers: every segment is URI-encoded
+once, including an input percent sign. Empty identifiers and literal `.` or `..`
+are rejected because URL normalization would change their path structure.
+Identifier validity and resource access remain the caller's responsibility.
+
+The caller supplies its API origin separately, for example
+`new URL(FormsApiPaths.submit(formId), apiOrigin)`. `FormsApiPaths.prefix` is a
+pathname, never an origin or configurable base URL. `isPath(pathname)` accepts
+the exact namespace or a slash-bounded descendant; pass a parsed URL pathname.
+It neither decodes aliases nor validates routes, methods or authorization.
+Unqualified `/v1/...` Forms aliases are outside this contract. Website links
+from `formlink` and `formerrorlink` remain a separate surface.
+
 `FormValue.parseEntries(entries, options)` normalizes every submitted entry for
 one field into `{ ok: true, raw, parsed, option_ids }`, or returns
 `{ ok: false, error: "ambiguous-scalar" }` for conflicting scalar entries. Pass

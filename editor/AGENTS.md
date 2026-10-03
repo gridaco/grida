@@ -8,7 +8,7 @@ This package is the Next.js app that powers **`grida.co`** and tenant domains (e
 ## Key rules (things that bite later)
 
 - **Auth is special**: `app/(auth)` is security-critical. **Do not modify** routes/flows there.
-- **Forms Open API has a separate owner**: public Forms operations live in [`../apps/api`](../apps/api/README.md). Use `NEXT_PUBLIC_GRIDA_OPEN_API_ORIGIN` for those calls; never import its privileged implementation. Remaining `app/(api)/(public)/v1` integrations/payment routes stay here and retain their compatibility policy.
+- **Forms Open API has a separate owner**: public Forms operations live in [`../apps/api`](../apps/api/README.md) under `/v1/forms`. Compose `NEXT_PUBLIC_GRIDA_OPEN_API_ORIGIN` with the public `FormsApiPaths` builders from `@grida/forms`; never import the API's privileged implementation. Remaining `app/(api)/(public)/v1` integrations/payment routes stay here and retain their compatibility policy.
 - **Machine APIs have enforced bindings**: `/api/v1` is distinct from legacy `/v1`.
   Read [`lib/api/README.md`](lib/api/README.md) before adding or changing its routes,
   request policy, or Next redirects. Run `pnpm test:api` and `pnpm test:api:http`.

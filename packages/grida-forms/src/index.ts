@@ -12,5 +12,6 @@ export * from "./links";
 export * from "./utils";
 export * from "./projection";
 export * from "./protocol";
+export * from "./api-paths";
 export * from "./response-contacts";
 export * from "./response-index";

@@ -38,16 +38,16 @@ const routes = config.routes.filter(
 );
 const destinations = [
   "/health",
-  "/v1/[id]",
-  "/v1/[id]/session",
-  "/v1/submit/[id]",
-  "/v1/session/[session]/field/[field]",
-  "/v1/session/[session]/field/[field]/file/upload/signed-url",
-  "/v1/session/[session]/field/[field]/file/preview/public-url",
-  "/v1/session/[session]/field/[field]/challenge/email/start",
-  "/v1/session/[session]/field/[field]/challenge/email/state",
-  "/v1/session/[session]/field/[field]/challenge/email/verify",
-  "/v1/session/[session]/field/[field]/search/meta",
+  "/v1/forms/[id]",
+  "/v1/forms/[id]/session",
+  "/v1/forms/submit/[id]",
+  "/v1/forms/session/[session]/field/[field]",
+  "/v1/forms/session/[session]/field/[field]/file/upload/signed-url",
+  "/v1/forms/session/[session]/field/[field]/file/preview/public-url",
+  "/v1/forms/session/[session]/field/[field]/challenge/email/start",
+  "/v1/forms/session/[session]/field/[field]/challenge/email/state",
+  "/v1/forms/session/[session]/field/[field]/challenge/email/verify",
+  "/v1/forms/session/[session]/field/[field]/search/meta",
   "/__fallback",
 ];
 assert.deepEqual(routes.map((route) => route.dest).sort(), destinations.sort());

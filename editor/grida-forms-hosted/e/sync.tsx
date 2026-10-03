@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { useFormAgentState } from "@/grida-forms/formstate";
 import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 import { Env } from "@/env";
+import { FormsApiPaths } from "@grida/forms";
 
 export function SessionDataSyncProvider({
   session_id,
@@ -24,7 +25,7 @@ export function SessionDataSyncProvider({
     ) => {
       try {
         fetch(
-          `${Env.forms.API_ORIGIN}/v1/session/${session_id}/field/${field_id}`,
+          `${Env.forms.API_ORIGIN}${FormsApiPaths.field(session_id, field_id)}`,
           {
             method: "PATCH",
             credentials: "omit",
