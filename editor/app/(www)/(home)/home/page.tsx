@@ -3,8 +3,9 @@ import HomePage from "../_home";
 
 // grida.co/home
 export const metadata = {
-  title: "Grida",
-  description: "Grida is a Free & Open Canvas",
+  title: "An open canvas to design and create — Grida",
+  description:
+    "An open-source design canvas. Create images, slides, and designs with AI in Grida Desktop for macOS, Windows, and Linux.",
   alternates: {
     canonical: "/",
   },

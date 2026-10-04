@@ -111,7 +111,7 @@ export namespace sitemap {
     canvas: {
       icon: "palette",
       title: "Canvas",
-      href: links.canvas,
+      href: "/index/canvas",
       description: "Design Components and Websites",
     } satisfies Item,
     slides: {

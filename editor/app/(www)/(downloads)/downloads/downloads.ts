@@ -1,6 +1,7 @@
 import { Octokit, type RestEndpointMethodTypes } from "@octokit/rest";
 import { unstable_cache } from "next/cache";
 import assert from "assert";
+import { desktopPlatform } from "@/www/desktop-platform";
 
 export namespace downloads {
   type GithubReleaseAssets =
@@ -91,10 +92,7 @@ export namespace downloads {
   export function getDesktopOS(
     userAgent: string
   ): "windows" | "mac" | "linux" | null {
-    if (userAgent.includes("Win")) return "windows";
-    if (userAgent.includes("Mac")) return "mac";
-    if (userAgent.includes("Linux")) return "linux";
-    return null;
+    return desktopPlatform.detect(userAgent);
   }
 
   export async function getLinks(): Promise<DownloadLinks> {
