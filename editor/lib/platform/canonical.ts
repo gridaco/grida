@@ -35,6 +35,14 @@ const exactKeys = (value: Record<string, unknown>, keys: string[]) =>
 // Same receiving-key contract as infra/packages/go/workloadauth. Configuration
 // contains hashes only; environment and audience never come from the caller.
 export function canonicalVerifier(config: CanonicalConfig, now = Date.now()) {
+  return workloadVerifier(config, audience, now);
+}
+
+export function workloadVerifier(
+  config: CanonicalConfig,
+  audience: string,
+  now = Date.now()
+) {
   if (
     !identity.test(config.environment) ||
     !Array.isArray(config.keys) ||
@@ -148,7 +156,7 @@ function reply(status: number, data: unknown) {
     },
   });
 }
-async function boundedJSON(request: Request): Promise<unknown> {
+export async function boundedJSON(request: Request): Promise<unknown> {
   if (
     request.headers.get("content-type")?.split(";")[0].trim() !==
     "application/json"

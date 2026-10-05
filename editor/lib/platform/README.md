@@ -65,8 +65,8 @@ again. A crash after dispatch remains unknown until trustworthy evidence is
 reconciled. Completion and the usage outbox commit together, including after
 canonical deletion; identical retries are harmless and conflicting evidence is
 rejected. `platform_product_usage_page` / `platform_product_usage_ack` preserve
-permanent receipt evidence. These are producer custody, not financial journals
-or proof that the later product adapters/admission/cutover are implemented.
+permanent receipt evidence. These are producer custody, not financial journals. The candidate product adapter
+and explicit ownership fence are described below; production cutover remains separate.
 
 Verification, from the Grida root:
 
@@ -75,3 +75,70 @@ node node_modules/vitest/vitest.mjs run --config editor/vitest.api.config.ts edi
 # Use only a dedicated local fixture with the full migration history and seed:
 supabase test db supabase/tests/platform_canonical_foundation_test.sql --workdir <dedicated-local-fixture>
 ```
+
+## Candidate billing owner and product delivery (M3)
+
+The production default remains `GRIDA_BILLING_OWNER=grida` (also the default
+when unset). The additive source ownership table starts at `grida`, epoch `1`.
+The local M3 candidate uses `GRIDA_BILLING_OWNER=infra` only after the explicit
+SQL ownership fence has been activated in its isolated synthetic database.
+Missing/mismatched ownership fails closed; a platform failure never selects the
+old financial writer as a fallback.
+
+The paid AI seam now supports fresh platform admission, a permanent local claim,
+one dispatch transition and a completion receipt/outbox. Synchronous results and
+stream finish evidence await local receipt commit. Cancelled/interrupted streams
+without reliable final usage retain a dispatched unknown outcome; they never
+fabricate zero usage or receive another dispatch grant. A later billing outage
+cannot delete or change a committed receipt. Native `cost_mills` remains an exact
+decimal string, including up to 18 fractional digits, separate from GG money.
+Raw prompts and result bodies are not stored in the receipt; it records the
+pricing evidence digest. Unknown provider outcomes require reconciliation.
+
+Source-side environment for the candidate:
+
+- `GRIDA_BILLING_OWNER=infra` and `GRIDA_PLATFORM_BILLING_ORIGIN`: exact platform origin.
+- `GRIDA_PLATFORM_USAGE_KEY_ID` / `GRIDA_PLATFORM_USAGE_TOKEN`: sending credential,
+  fixed receiving audience `platform.billing.usage`.
+- `GRIDA_PLATFORM_ALLOW_LOCAL=1`: permits explicit loopback HTTP in local fixtures.
+- `GRIDA_PLATFORM_RECEIPTS_ENVIRONMENT` / `GRIDA_PLATFORM_RECEIPTS_WORKLOAD_KEYS`:
+  receiving verifier manifest for the separate `grida.product-receipts` audience.
+
+`POST /internal/platform/products/receipts` accepts only `{limit:1..100}` and
+returns `{source_instance,source_epoch,events:[{event_id,producer,execution_id,receipt}]}`.
+`POST /internal/platform/products/receipts/ack` accepts only `{event_ids:[UUID]}`.
+The consumer commits durable destination custody before ACK, even if financial
+application is disabled or delayed. Neither endpoint accepts customer credentials,
+producer selectors or arbitrary RPC names. IDs and receipts remain permanently
+in source after ACK; no sequence-cursor delivery can skip concurrent commits.
+
+A restricted operator SQL function
+`grida_platform.transfer_billing_ownership(expected_epoch bigint, manifest_hash text)`
+performs the one-way source fence. It requires the reviewed manifest digest,
+waits for active financial SQL transactions, increments the epoch exactly once,
+stops source financial onboarding and preserves source financial archives through
+canonical organization deletion. All six financial tables reject DML/TRUNCATE
+through direct service-role access and old definer RPCs afterward. Product changes
+to the former `is_enterprise` commercial flag also fail after transfer. This
+function is not executable by `service_role`, authenticated users or anonymous
+clients and is not an HTTP administration endpoint.
+
+Legacy Stripe/Metronome SDKs check the source owner at the actual HTTP boundary,
+and legacy AI gating verifies source ownership before consulting cached credit.
+These checks cannot recall a provider request already in flight. The M5 handoff
+must still drain existing writers, revoke/remove their provider credentials,
+reconcile the transfer and separately activate the target. M3 local primitives
+are not production cutover authorization or a complete migration tool.
+
+The dedicated no-env regression lane is:
+
+```sh
+node node_modules/vitest/vitest.mjs run --config editor/vitest.platform.config.ts
+```
+
+For the paired local real-SDK proof only, `GRIDA_PLATFORM_AI_FIXTURE_ORIGIN` may
+be exactly `http://127.0.0.1:56746`, with `GRIDA_PLATFORM_ALLOW_LOCAL=1`, a
+non-production process and `GG_VERCEL_AI_GATEWAY_API_KEY=grida-local-ai-fixture`.
+It routes the billed SDK provider to `/v3/ai` on that external simulator. Production,
+other URLs/ports, real keys or a concurrent BYOK language provider are rejected.
+This fixture is not an arbitrary provider override and never changes BYOK routes.

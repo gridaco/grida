@@ -15,6 +15,10 @@
  */
 
 import { withAiAuth, isByokActive, type AiActionResult } from "@/lib/ai/server";
+import {
+  billingOwner,
+  platformProductBilling,
+} from "@/lib/platform/billing-owner";
 import { getEntitlement } from "@/lib/billing/metronome";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSessionOrganizationId } from "@/lib/auth/organization";
@@ -58,6 +62,14 @@ const EMPTY: AiCreditsPreload = {
 export async function preloadAiCredits(
   orgId: number
 ): Promise<AiCreditsPreload> {
+  if (billingOwner() === "infra") {
+    const observed = await platformProductBilling().entitlement(orgId);
+    return {
+      cents: observed.provisioned ? observed.balance_cents : null,
+      allowed: observed.allowed,
+      byok: isByokActive(),
+    };
+  }
   const ent = await getEntitlement(orgId);
   // Unprovisioned orgs return `cachedBalanceCents: 0` from getEntitlement;
   // surface as `null` so the chip renders "—" instead of "$0.00".

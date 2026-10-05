@@ -1,3 +1,8 @@
+import {
+  assertSourceBillingConfiguration,
+  assertSourceBillingAuthority,
+  sourceBillingFetch,
+} from "../platform/billing-owner";
 // GRIDA-EE: billing — Metronome integration, client and service layer.
 //
 //   Metronome: source of truth for credit balance + drain order.
@@ -31,12 +36,13 @@ import {
 let _client: Metronome | null = null;
 
 function getClient(): Metronome {
+  assertSourceBillingConfiguration();
   if (_client) return _client;
   const token = process.env.METRONOME_API_TOKEN;
   if (!token) {
     throw new Error("METRONOME_API_TOKEN is required.");
   }
-  _client = new Metronome({ bearerToken: token });
+  _client = new Metronome({ bearerToken: token, fetch: sourceBillingFetch });
   return _client;
 }
 
@@ -934,6 +940,7 @@ export type Entitlement = credits.Entitlement;
 export async function getEntitlement(
   organizationId: number
 ): Promise<Entitlement> {
+  await assertSourceBillingAuthority();
   const account = await getAccount(organizationId);
   return credits.gate(
     account

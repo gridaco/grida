@@ -73,7 +73,10 @@ export async function proxy(req: NextRequest) {
 
   // Canonical source bridge authenticates its dedicated workload in the route.
   // No browser session refresh, tenant routing or cookie authority applies.
-  if (req.nextUrl.pathname.startsWith("/internal/platform/accounts/")) {
+  if (
+    req.nextUrl.pathname.startsWith("/internal/platform/accounts/") ||
+    req.nextUrl.pathname.startsWith("/internal/platform/products/")
+  ) {
     return NextResponse.next({ request: req });
   }
 

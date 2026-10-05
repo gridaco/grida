@@ -7,7 +7,7 @@ const { rpc } = vi.hoisted(() => ({
       name: string,
       input: unknown
     ) => Promise<{
-      data: unknown[] | null;
+      data: unknown;
       error: { message: string } | null;
     }>
   >(),
@@ -24,7 +24,13 @@ vi.mock("@metronome/sdk", () => ({
 import { getEntitlement } from "./metronome";
 
 describe("getEntitlement compatibility", () => {
-  beforeEach(() => rpc.mockReset());
+  beforeEach(() => {
+    rpc.mockReset();
+    rpc.mockResolvedValueOnce({
+      data: { owner: "grida", epoch: "1" },
+      error: null,
+    });
+  });
   it.each([
     { customer: null, balance: 100, entitled: true, reason: "not_provisioned" },
     { customer: "", balance: 100, entitled: true, reason: "not_provisioned" },
@@ -67,12 +73,34 @@ describe("getEntitlement compatibility", () => {
         cachedBalanceCents: customer ? balance : 0,
         cachedAt: null,
       });
-      expect(rpc).toHaveBeenCalledExactlyOnceWith(
+      expect(rpc).toHaveBeenNthCalledWith(
+        2,
         "fn_billing_get_metronome_account",
         { p_org: 42 }
       );
     }
   );
+  it("stale Grida-mode process cannot admit positive cached credit after SQL transfer", async () => {
+    rpc.mockReset();
+    rpc.mockResolvedValueOnce({
+      data: { owner: "infra", epoch: "2" },
+      error: null,
+    });
+    rpc.mockResolvedValue({
+      data: [
+        {
+          metronome_customer_id: "old",
+          cached_balance_cents: 10000,
+          customer_entitled: true,
+        },
+      ],
+      error: null,
+    });
+    await expect(getEntitlement(42)).rejects.toMatchObject({
+      code: "billing_unavailable",
+    });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("platform_billing_owner");
+  });
   it("keeps missing account behavior", async () => {
     rpc.mockResolvedValue({ data: [], error: null });
     expect(await getEntitlement(42)).toEqual({

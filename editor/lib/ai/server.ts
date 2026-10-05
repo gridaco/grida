@@ -1,5 +1,13 @@
 // GRIDA-GG: gateway — generation seam methods used by metered GG routes (docs/wg/platform/hosted-ai.md)
 import "server-only";
+import {
+  billingOwner,
+  platformProductBilling,
+} from "@/lib/platform/billing-owner";
+import {
+  productDigest,
+  ProductBillingError,
+} from "@/lib/platform/product-billing";
 
 /**
  * AI credit usage seam — single server-only entry point.
@@ -82,6 +90,8 @@ export interface GridaCallContext {
   model_id: string;
   /** Optional pre-allocated transaction id (idempotency on retry). */
   transactionId?: string;
+  /** Digest of the actual provider input, required for durable paid execution. */
+  requestDigest?: string;
   /**
    * If true, block on the ingest call (Metronome event + local cache
    * debit RPC) before returning. Default `false` — ingest is
@@ -208,6 +218,13 @@ function logIngestFailure(
  */
 export async function checkGate(ctx: GridaCallContext): Promise<void> {
   assertOrgId(ctx.organizationId);
+  if (billingOwner() === "infra") {
+    const decision = await platformProductBilling().entitlement(
+      ctx.organizationId
+    );
+    if (!decision.allowed) throw new ProductBillingError("blocked");
+    return;
+  }
   const e = await getEntitlement(ctx.organizationId);
   if (!e.allowed) {
     throw new BillingMetronomeError(
@@ -227,6 +244,19 @@ export async function withTransaction<T>(
   ctx: GridaCallContext,
   op: (transactionId: string) => Promise<{ result: T; costMills: number }>
 ): Promise<T> {
+  if (billingOwner() === "infra") {
+    if (!ctx.requestDigest) throw new ProductBillingError();
+    const billing = platformProductBilling();
+    const execution = await billing.begin({
+      ...ctx,
+      requestDigest: ctx.requestDigest,
+    });
+    // Failure/cancellation after dispatch remains durable unknown; it never
+    // receives a second dispatch grant or a fabricated zero-cost receipt.
+    const { result, costMills } = await op(execution.id);
+    await billing.complete(execution, costMills, { result, costMills });
+    return result;
+  }
   await checkGate(ctx);
 
   const transactionId = ctx.transactionId ?? crypto.randomUUID();
@@ -386,7 +416,10 @@ const languageModelMiddleware: LanguageModelMiddleware = {
   specificationVersion: "v3",
 
   wrapGenerate: async ({ doGenerate, params, model }) => {
-    const ctx = extractContext(model.modelId, params.providerOptions);
+    const ctx = {
+      ...extractContext(model.modelId, params.providerOptions),
+      requestDigest: productDigest(params),
+    };
     return withTransaction(ctx, async () => {
       const result = await doGenerate();
       const costMills = costMillsFromTokenUsage(ctx.model_id, result.usage);
@@ -395,28 +428,39 @@ const languageModelMiddleware: LanguageModelMiddleware = {
   },
 
   wrapStream: async ({ doStream, params, model }) => {
-    const ctx = extractContext(model.modelId, params.providerOptions);
+    const ctx = {
+      ...extractContext(model.modelId, params.providerOptions),
+      requestDigest: productDigest(params),
+    };
     // Gate fires synchronously before the upstream connection opens.
     // Ingest is deferred to the `finish` part — partial-stream
     // abandonment still ingests observed usage (input tokens are
     // burned regardless).
-    await checkGate(ctx);
-    const transactionId = ctx.transactionId ?? crypto.randomUUID();
+    const billing =
+      billingOwner() === "infra" ? platformProductBilling() : null;
+    const execution = billing ? await billing.begin(ctx) : null;
+    if (!billing) await checkGate(ctx);
+    const transactionId =
+      execution?.id ?? ctx.transactionId ?? crypto.randomUUID();
     const upstream = await doStream();
     let finalCostMills: number | null = null;
     const tapped = upstream.stream.pipeThrough(
       new TransformStream({
-        transform(part: { type: string; usage?: unknown }, controller) {
+        async transform(part: { type: string; usage?: unknown }, controller) {
           if (part.type === "finish" && part.usage) {
             finalCostMills = costMillsFromTokenUsage(
               ctx.model_id,
               part.usage as Parameters<typeof costMillsFromTokenUsage>[1]
             );
+            if (billing && execution)
+              await billing.complete(execution, finalCostMills, {
+                usage: part.usage,
+              });
           }
           controller.enqueue(part);
         },
         flush() {
-          if (finalCostMills !== null) {
+          if (!billing && finalCostMills !== null) {
             void ingestUsageEvent(ctx.organizationId, finalCostMills, {
               transactionId,
             }).catch(logIngestFailure(ctx, transactionId));
@@ -436,7 +480,10 @@ const imageModelMiddleware: ImageModelMiddleware = {
   // without a receipt; aggregate image token counts cannot price mixed inputs.
   // https://vercel.com/academy/ai-gateway/ai-gateway-pricing
   wrapGenerate: async ({ doGenerate, params, model }) => {
-    const ctx = extractContext(model.modelId, params.providerOptions);
+    const ctx = {
+      ...extractContext(model.modelId, params.providerOptions),
+      requestDigest: productDigest(params),
+    };
     if (typeof ctx.costMills !== "number") {
       console.warn(
         `[ai-seam] image call missing providerOptions.grida.costMills (model=${ctx.model_id}, feature=${ctx.feature}); no fallback estimate`
@@ -591,15 +638,18 @@ export async function runPrediction(
   ctx: ReplicateCallContext,
   input: Record<string, unknown>
 ): Promise<string> {
-  return withTransaction(ctx, async () => {
-    const replicate = getReplicateClient();
-    const modelId = ctx.model_id as `${string}/${string}`;
-    const output = await replicate.run(modelId, { input });
-    return {
-      result: normalizeReplicateOutput(output),
-      costMills: ctx.costMills,
-    };
-  });
+  return withTransaction(
+    { ...ctx, requestDigest: productDigest(input) },
+    async () => {
+      const replicate = getReplicateClient();
+      const modelId = ctx.model_id as `${string}/${string}`;
+      const output = await replicate.run(modelId, { input });
+      return {
+        result: normalizeReplicateOutput(output),
+        costMills: ctx.costMills,
+      };
+    }
+  );
 }
 
 /**
@@ -609,12 +659,15 @@ export async function runPredictionRaw<T = unknown>(
   ctx: ReplicateCallContext,
   input: Record<string, unknown>
 ): Promise<T> {
-  return withTransaction(ctx, async () => {
-    const replicate = getReplicateClient();
-    const modelId = ctx.model_id as `${string}/${string}`;
-    const output = (await replicate.run(modelId, { input })) as T;
-    return { result: output, costMills: ctx.costMills };
-  });
+  return withTransaction(
+    { ...ctx, requestDigest: productDigest(input) },
+    async () => {
+      const replicate = getReplicateClient();
+      const modelId = ctx.model_id as `${string}/${string}`;
+      const output = (await replicate.run(modelId, { input })) as T;
+      return { result: output, costMills: ctx.costMills };
+    }
+  );
 }
 
 // ===========================================================================
@@ -891,7 +944,12 @@ export namespace methods {
     }
 
     return withTransaction(
-      { organizationId, feature: "v1/ai/video", model_id: card.id },
+      {
+        organizationId,
+        feature: "v1/ai/video",
+        model_id: card.id,
+        requestDigest: productDigest(req),
+      },
       async () => {
         const generation = await experimental_generateVideo({
           model: vercelAiGateway.videoModel(binding.id),
@@ -1030,8 +1088,13 @@ export async function withAiAuth<T extends Record<string, unknown>>(
   // recover. We log loudly so the failure is visible.
   let balanceCents = -1;
   try {
-    const { cents } = await refreshBalance(orgId);
-    balanceCents = cents;
+    if (billingOwner() === "infra") {
+      const observed = await platformProductBilling().entitlement(orgId);
+      balanceCents = observed.balance_cents;
+    } else {
+      const { cents } = await refreshBalance(orgId);
+      balanceCents = cents;
+    }
   } catch (err) {
     console.error(
       `[ai-seam] post-fn refreshBalance failed for org=${orgId} scope=${scope}:`,
