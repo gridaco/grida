@@ -151,11 +151,20 @@ BEGIN
   ELSE ids := ARRAY[OLD.organization_id, NEW.organization_id]; END IF;
   -- Missing parent means cascading organization deletion; the organization
   -- trigger emits the permanent tombstone. Lock order is stable for moves.
-  FOR org IN SELECT id, name, display_name FROM public.organization WHERE id = ANY(ids) ORDER BY id LOOP
+  -- Lock the canonical row before reading metadata so a concurrent rename cannot
+  -- commit and then be overwritten in the state table by this older observation.
+  FOR org IN SELECT id, name, display_name FROM public.organization WHERE id = ANY(ids) ORDER BY id FOR SHARE LOOP
     PERFORM grida_platform.emit_state(org.id, org.name, org.display_name, 'active', 'membership.changed');
   END LOOP;
   RETURN NULL;
 END $$;
+CREATE FUNCTION grida_platform.reject_canonical_truncate() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  RAISE EXCEPTION 'canonical lifecycle requires row mutations' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER platform_no_truncate BEFORE TRUNCATE ON public.organization FOR EACH STATEMENT EXECUTE FUNCTION grida_platform.reject_canonical_truncate();
+CREATE TRIGGER platform_no_truncate BEFORE TRUNCATE ON public.organization_member FOR EACH STATEMENT EXECUTE FUNCTION grida_platform.reject_canonical_truncate();
 -- Bootstrap at the migration's transaction boundary before future writers can
 -- reach these triggers. The source epoch is retained across process restarts.
 LOCK TABLE public.organization, public.organization_member IN SHARE ROW EXCLUSIVE MODE;

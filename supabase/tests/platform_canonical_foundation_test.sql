@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(75);
+SELECT plan(77);
 CREATE TEMP TABLE platform_signatures(signature text PRIMARY KEY, user_callable boolean);
 INSERT INTO platform_signatures VALUES
  ('public.platform_account_context(text)',true),('public.platform_organizations_page(text)',true),
@@ -83,5 +83,8 @@ RESET ROLE;
 SELECT is((SELECT count(*)::integer FROM grida_platform.usage_outbox WHERE producer='local.grida.test'),1,'ack retains permanent receipt rather than deleting evidence');
 SET LOCAL ROLE service_role;
 SELECT is(public.platform_lifecycle_ack(ARRAY[(public.platform_lifecycle_page(100)->'events'->0->>'event_id')::uuid])->>'acknowledged','true','lifecycle ACK is explicit after receipt');
+RESET ROLE;
+SELECT throws_ok('TRUNCATE public.organization CASCADE','23514',NULL,'truncate cannot bypass organization tombstones');
+SELECT throws_ok('TRUNCATE public.organization_member CASCADE','23514',NULL,'truncate cannot bypass membership lifecycle');
 SELECT * FROM finish();
 ROLLBACK;
