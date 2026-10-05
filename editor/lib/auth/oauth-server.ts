@@ -13,6 +13,7 @@ export namespace oauthServer {
     Readonly<{
       origin: string;
       redirectUris: readonly string[];
+      consoleClient: Readonly<{ id: string; redirectUri: string }> | null;
       secret: Uint8Array;
     }>;
 
@@ -124,7 +125,32 @@ export namespace oauthServer {
         throw new Failure("not_configured");
       }
     }
-    return { ...base, origin: webOrigin, redirectUris, secret };
+    let consoleClient: ConsentConfig["consoleClient"] = null;
+    const consoleId = process.env.GRIDA_PLATFORM_CONSOLE_OAUTH_CLIENT_ID;
+    if (consoleId !== undefined) {
+      const consoleOrigin = process.env.GRIDA_PLATFORM_CONSOLE_ORIGIN;
+      const url = parseUrl(consoleOrigin);
+      if (
+        !uuid(consoleId) ||
+        base.clientIds.includes(consoleId) ||
+        !url ||
+        url.protocol !== "https:" ||
+        url.origin !== consoleOrigin ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash ||
+        url.pathname !== "/"
+      ) {
+        throw new Failure("not_configured");
+      }
+      // Keep confidential console authority out of the released native API allowlist.
+      consoleClient = {
+        id: consoleId,
+        redirectUri: `${url.origin}/auth/callback`,
+      };
+    }
+    return { ...base, origin: webOrigin, redirectUris, consoleClient, secret };
   }
 
   function list(value: string | undefined): string[] {

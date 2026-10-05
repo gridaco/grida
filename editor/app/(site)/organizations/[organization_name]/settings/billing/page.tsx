@@ -2,7 +2,8 @@
 
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import BillingView from "./_view";
+import { billingOwner } from "@/lib/platform/billing-consumer";
+import { billingHandoff } from "@/lib/platform/billing-handoff";
 
 type Params = { organization_name: string };
 
@@ -12,6 +13,11 @@ export default async function OrganizationBillingPage({
   params: Promise<Params>;
 }) {
   const { organization_name } = await params;
+  if (billingOwner() === "infra") {
+    await billingHandoff(organization_name, "billing");
+    return null;
+  }
+  const { default: BillingView } = await import("./_view");
   const client = await createClient();
   const { data: auth } = await client.auth.getUser();
   if (!auth.user) return redirect("/sign-in");

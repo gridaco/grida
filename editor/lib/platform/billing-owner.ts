@@ -1,11 +1,9 @@
 import { service_role } from "../supabase/server";
 import { ProductBilling, ProductBillingError } from "./product-billing";
 
-export function billingOwner(): "grida" | "infra" {
-  const owner = process.env.GRIDA_BILLING_OWNER ?? "grida";
-  if (owner !== "grida" && owner !== "infra") throw new ProductBillingError();
-  return owner;
-}
+import { billingOwner } from "./billing-consumer";
+export { billingOwner } from "./billing-consumer";
+
 export function assertSourceBillingConfiguration() {
   if (billingOwner() !== "grida") throw new ProductBillingError();
 }

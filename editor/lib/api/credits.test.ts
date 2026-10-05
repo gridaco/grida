@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 // GRIDA-EE: billing
 // GRIDA-SEC-010 / GRIDA-SEC-012 — cached credits require current native membership.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,6 +21,7 @@ const orgs = [
 const handlers = accountApi.bind("account.credits");
 let visible: Record<string, typeof orgs>;
 let databaseStatus: number;
+let platformStatus: number;
 let creditRow: Record<string, unknown>;
 
 async function token(user = users[0], claims: Record<string, unknown> = {}) {
@@ -46,17 +48,55 @@ function request(value?: string, method = "GET", query = "?organization_id=1") {
 }
 const fetcher = vi.fn<typeof fetch>(async (target, init) => {
   const headers = new Headers(init?.headers);
+  const url = new URL(String(target));
+  if (url.origin === "https://platform.example.test") {
+    assert.equal(url.pathname, "/platform/v1/billing/organizations/1/credits");
+    assert.equal(headers.get("authorization"), `Bearer ${"p".repeat(43)}`);
+    assert.equal(headers.get("x-grida-workload-key-id"), "m4-ssr");
+    assert.equal(headers.has("x-grida-account-token"), false);
+    assert.equal(headers.has("apikey"), false);
+    assert.equal(headers.has("cookie"), false);
+    const { payload } = await jwtVerify(
+      headers.get("x-grida-native-token")!,
+      key,
+      { issuer, audience: "authenticated" }
+    );
+    assert.equal(payload.sub, users[0]);
+    if (platformStatus !== 200)
+      return new Response("private billing diagnostics", {
+        status: platformStatus,
+      });
+    return Response.json({
+      organization_id: "1",
+      account_present: true,
+      state: "uncached",
+      source: "cache",
+      currency: "USD",
+      balance_cents: null,
+      cache_updated_at: null,
+      billing_gate: { allowed: false, reason: "no_balance" },
+    });
+  }
   const { payload } = await jwtVerify(
     headers.get("authorization")!.slice(7),
     key,
     { issuer, audience: "authenticated" }
   );
-  const url = new URL(String(target));
   if (url.href === `${issuer}/oauth/userinfo`) {
     return Response.json({
       sub: payload.sub,
       name: "Verified User",
       email: null,
+    });
+  }
+  if (url.origin === dataOrigin && url.pathname === "/rest/v1/organization") {
+    assert.equal(headers.get("apikey"), "synthetic-public-key");
+    assert.equal(headers.has("cookie"), false);
+    assert.equal(url.searchParams.get("select"), "id,name,display_name");
+    const id = Number(url.searchParams.get("id")?.slice(3));
+    const rows = visible[payload.sub!].filter((row) => row.id === id);
+    return Response.json(rows, {
+      headers: { "content-range": rows.length ? "0-0/1" : "*/0" },
     });
   }
   if (
@@ -90,6 +130,8 @@ const fetcher = vi.fn<typeof fetch>(async (target, init) => {
 
 beforeEach(() => {
   databaseStatus = 200;
+  platformStatus = 200;
+  vi.stubEnv("GRIDA_BILLING_OWNER", "grida");
   creditRow = {
     account_present: true,
     credits_provisioned: true,
@@ -270,4 +312,70 @@ describe("native credits operation", () => {
       expect(fetcher).not.toHaveBeenCalled();
     }
   );
+});
+
+describe("infra-owned published native credits operation", () => {
+  beforeEach(() => {
+    vi.stubEnv("GRIDA_BILLING_OWNER", "infra");
+    vi.stubEnv(
+      "GRIDA_PLATFORM_BILLING_ORIGIN",
+      "https://platform.example.test"
+    );
+    vi.stubEnv("GRIDA_PLATFORM_SSR_KEY_ID", "m4-ssr");
+    vi.stubEnv("GRIDA_PLATFORM_SSR_TOKEN", "p".repeat(43));
+  });
+  it("retains the published DTO and original native authority without reading source finance", async () => {
+    const credential = await token();
+    const response = await handlers.GET(request(credential));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      organization: orgs[0],
+      account_present: true,
+      state: "uncached",
+      source: "cache",
+      currency: "USD",
+      balance_cents: null,
+      cache_updated_at: null,
+      billing_gate: { allowed: false, reason: "no_balance" },
+    });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.has("set-cookie")).toBe(false);
+    expect(
+      fetcher.mock.calls.map(([url]) => new URL(String(url)).pathname)
+    ).toEqual([
+      "/auth/v1/oauth/userinfo",
+      "/rest/v1/organization",
+      "/platform/v1/billing/organizations/1/credits",
+    ]);
+    const head = await handlers.HEAD(request(credential, "HEAD"));
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe("");
+  });
+  it("fails closed after membership revocation with no financial fallback", async () => {
+    const credential = await token();
+    expect((await handlers.GET(request(credential))).status).toBe(200);
+    visible[users[0]] = [];
+    fetcher.mockClear();
+    expect((await handlers.GET(request(credential))).status).toBe(403);
+    expect(
+      fetcher.mock.calls.map(([url]) => new URL(String(url)).pathname)
+    ).toEqual(["/auth/v1/oauth/userinfo", "/rest/v1/organization"]);
+  });
+  it("keeps identity/listing independent of billing setup and reports a billing outage opaquely", async () => {
+    const credential = await token();
+    platformStatus = 503;
+    const failed = await handlers.GET(request(credential));
+    expect(failed.status).toBe(503);
+    expect(await failed.text()).not.toContain("private");
+    vi.stubEnv("GRIDA_PLATFORM_BILLING_ORIGIN", "");
+    const identity = await accountApi.bind("auth.me").GET(
+      new Request("http://127.0.0.1:3041/api/v1/auth/me", {
+        headers: { authorization: `Bearer ${credential}` },
+      })
+    );
+    expect(identity.status).toBe(200);
+    expect(
+      fetcher.mock.calls.some(([url]) => String(url).includes("v_billing"))
+    ).toBe(false);
+  });
 });

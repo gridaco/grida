@@ -15,10 +15,7 @@
  */
 
 import { withAiAuth, isByokActive, type AiActionResult } from "@/lib/ai/server";
-import {
-  billingOwner,
-  platformProductBilling,
-} from "@/lib/platform/billing-owner";
+import { billingOwner, platformBilling } from "@/lib/platform/billing-consumer";
 import { getEntitlement } from "@/lib/billing/metronome";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSessionOrganizationId } from "@/lib/auth/organization";
@@ -46,15 +43,10 @@ const EMPTY: AiCreditsPreload = {
  * server `page.tsx` or route-group `layout.tsx` that has already resolved
  * an `orgId`.
  *
- * Reads `grida_billing.account` (sub-100ms RPC, never touches Metronome).
- * The cache is the source of truth for first-paint chip rendering;
- * webhooks (Stripe + Metronome) keep it fresh, and `useAiCredits().refresh()`
- * re-syncs from Metronome on demand if a user wants the absolute latest.
- *
- * Tradeoff: a chip rendered immediately after a balance change (top-up,
- * spend) may be a few seconds stale until the webhook lands. Acceptable —
- * the post-action `withAiAuth` envelope's `balanceCents` updates the chip
- * via the controller, and the explicit refresh button covers manual cases.
+ * Reads only the selected owner's cached projection. With infra ownership,
+ * failures leave the display unavailable and never consult source financial
+ * tables. Each paid execution obtains a separate fresh admission; this chip
+ * cannot authorize work. The post-action envelope updates it after a request.
  *
  * Returns `{cents: null, allowed: false}` for unauth visitors; the caller
  * decides whether to invoke this at all.
@@ -63,12 +55,24 @@ export async function preloadAiCredits(
   orgId: number
 ): Promise<AiCreditsPreload> {
   if (billingOwner() === "infra") {
-    const observed = await platformProductBilling().entitlement(orgId);
-    return {
-      cents: observed.provisioned ? observed.balance_cents : null,
-      allowed: observed.allowed,
-      byok: isByokActive(),
-    };
+    // Display only: paid execution separately acquires fresh admission. An
+    // unavailable balance must not prevent unrelated product pages rendering.
+    try {
+      const client = await createClient();
+      const { data } = await client.auth.getSession();
+      if (!data.session?.access_token) return EMPTY;
+      const observed = await platformBilling().credits(
+        orgId,
+        data.session.access_token
+      );
+      return {
+        cents: observed.balance_cents,
+        allowed: observed.billing_gate.allowed,
+        byok: isByokActive(),
+      };
+    } catch {
+      return EMPTY;
+    }
   }
   const ent = await getEntitlement(orgId);
   // Unprovisioned orgs return `cachedBalanceCents: 0` from getEntitlement;

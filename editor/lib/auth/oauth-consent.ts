@@ -84,7 +84,10 @@ export namespace oauthConsent {
     if (
       typeof value !== "string" ||
       value.split("?")[0] !== base ||
-      !config.redirectUris.includes(base)
+      !(
+        config.redirectUris.includes(base) ||
+        config.consoleClient?.redirectUri === base
+      )
     )
       throw new oauthServer.Failure("forbidden");
     const entries = [...url.searchParams.entries()];
@@ -127,8 +130,9 @@ export namespace oauthConsent {
       const data = await this.get(authorizationId(id), browser);
       if (oauthServer.record(data) && "redirect_url" in data) {
         // Prior consent may auto-approve at the issuer and omit client details.
-        // Only configured native callbacks are accepted; bearer APIs still
-        // independently verify the OAuth client on every request.
+        // Only exact registered callbacks are accepted. The receiving console
+        // still verifies its one-use state, code exchange and PKCE; native APIs
+        // independently verify their separate client allowlist on every request.
         return {
           kind: "redirect",
           url: issuerRedirect(data.redirect_url, this.config),
@@ -249,9 +253,13 @@ export namespace oauthConsent {
         data.authorization_id !== id ||
         data.user.id !== browser.id ||
         typeof data.client.id !== "string" ||
-        !this.config.clientIds.includes(data.client.id) ||
         typeof data.redirect_uri !== "string" ||
-        !this.config.redirectUris.includes(data.redirect_uri) ||
+        !(
+          (this.config.clientIds.includes(data.client.id) &&
+            this.config.redirectUris.includes(data.redirect_uri)) ||
+          (this.config.consoleClient?.id === data.client.id &&
+            this.config.consoleClient.redirectUri === data.redirect_uri)
+        ) ||
         typeof data.scope !== "string"
       ) {
         throw new oauthServer.Failure("forbidden");

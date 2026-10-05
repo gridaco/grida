@@ -110,7 +110,7 @@ export function exactCostMills(value: number | string): string {
     throw new ProductBillingError("invalid_cost");
   const [whole, fraction = ""] = text.split(".");
   if (
-    BigInt(whole!) > 9223372036854775807n ||
+    BigInt(whole!) > BigInt("9223372036854775807") ||
     (whole === "9223372036854775807" && /[1-9]/.test(fraction))
   )
     throw new ProductBillingError("invalid_cost");

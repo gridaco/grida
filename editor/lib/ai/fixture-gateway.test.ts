@@ -25,3 +25,30 @@ it.each([
     "invalid local AI fixture"
   )
 );
+
+it("keeps the M4 simulator in its separate explicit local profile", () => {
+  expect(
+    fixtureGateway({
+      ...valid,
+      GRIDA_PLATFORM_FIXTURE_PROFILE: "m4",
+      GRIDA_PLATFORM_AI_FIXTURE_ORIGIN: "http://127.0.0.1:56846",
+    })
+  ).toEqual({
+    baseURL: "http://127.0.0.1:56846/v3/ai",
+    apiKey: "grida-local-ai-fixture",
+  });
+});
+it.each([
+  { GRIDA_PLATFORM_FIXTURE_PROFILE: "unknown" },
+  { GRIDA_PLATFORM_FIXTURE_PROFILE: "m4" },
+  { GRIDA_PLATFORM_AI_FIXTURE_ORIGIN: "http://127.0.0.1:56846" },
+  {
+    GRIDA_PLATFORM_FIXTURE_PROFILE: "m4",
+    GRIDA_PLATFORM_AI_FIXTURE_ORIGIN: "http://127.0.0.1:56846",
+    NODE_ENV: "production",
+  },
+])("rejects crossed or unsafe fixture profiles %j", (change) =>
+  expect(() => fixtureGateway({ ...valid, ...change })).toThrow(
+    "invalid local AI fixture"
+  )
+);

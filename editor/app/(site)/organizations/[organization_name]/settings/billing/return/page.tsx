@@ -1,9 +1,15 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import BillingReturnView from "./_view";
+import Link from "next/link";
+import { billingOwner } from "@/lib/platform/billing-consumer";
+import {
+  billingHandoff,
+  type BillingReturnSearch,
+} from "@/lib/platform/billing-handoff";
+import { Button } from "@app/ui/components/button";
 
 type Params = { organization_name: string };
-type Search = { intent?: string };
+type Search = BillingReturnSearch;
 
 export default async function BillingReturnPage({
   params,
@@ -13,7 +19,25 @@ export default async function BillingReturnPage({
   searchParams: Promise<Search>;
 }) {
   const { organization_name } = await params;
-  const { intent: rawIntent } = await searchParams;
+  const search = await searchParams;
+  if (billingOwner() === "infra") {
+    const handoff = await billingHandoff(organization_name, "return", search);
+    return (
+      <main className="mx-auto w-full max-w-lg space-y-4 px-6 py-16">
+        <h1 className="text-xl font-semibold">Check payment status</h1>
+        <p className="text-muted-foreground">
+          Open billing to check payment status for {handoff.name}.
+        </p>
+        <Button asChild>
+          <Link href={handoff.url} prefetch={false}>
+            Open billing
+          </Link>
+        </Button>
+      </main>
+    );
+  }
+  const { default: BillingReturnView } = await import("./_view");
+  const { intent: rawIntent } = search;
 
   const client = await createClient();
   const { data: auth } = await client.auth.getUser();

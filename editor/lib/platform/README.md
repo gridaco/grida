@@ -2,8 +2,9 @@
 
 Grida retains Supabase identity, canonical organizations/memberships and product
 execution custody. Infra consumes org-only source capabilities. Project identity
-is product-local. This additive foundation does not cut over current billing
-writers, billing pages, webhooks, native contracts or auth flows.
+is product-local. The default deployment remains source-owned. Candidate consumer behavior is
+selected explicitly after the isolated ownership fence; it does not move auth
+flows or change the published native DTOs.
 
 The private Node route `/internal/platform/accounts/[...operation]` supports only:
 
@@ -142,3 +143,67 @@ non-production process and `GG_VERCEL_AI_GATEWAY_API_KEY=grida-local-ai-fixture`
 It routes the billed SDK provider to `/v3/ai` on that external simulator. Production,
 other URLs/ports, real keys or a concurrent BYOK language provider are rejected.
 This fixture is not an arbitrary provider override and never changes BYOK routes.
+
+## Candidate billing consumers (M4)
+
+With `GRIDA_BILLING_OWNER=infra`, published organization billing and upgrade
+pages resolve current source membership and redirect to the configured shared
+console at `/organizations/{canonical-id}/billing[/upgrade]`. Source sign-in
+retains the complete source destination. A return with a validated `purchase_id`
+opens that exact organization's `/billing/purchases/{uuid}`. Released returns
+that contain only an `intent` cannot identify a purchase: they offer an explicit
+billing link without reporting success or guessing a recent payment.
+
+The source uses `GRIDA_PLATFORM_CONSOLE_ORIGIN` for links and
+`GRIDA_PLATFORM_BILLING_ORIGIN` for the fixed server API. Both are exact configured
+origins, not caller inputs. `GRIDA_PLATFORM_SSR_KEY_ID` / `GRIDA_PLATFORM_SSR_TOKEN`
+are a dedicated sending credential for the `platform.grida-ssr` audience.
+They are not provider keys and are never included in console URLs. Explicit
+nonproduction loopback HTTP also requires `GRIDA_PLATFORM_ALLOW_LOCAL=1`.
+
+Desktop keeps `/desktop/billing/summary` and its existing ready/signed-out/no-org
+DTO, including the source `manage_path`. It combines current canonical source
+identity with cached platform plan and credit projections. A best-effort,
+bounded owner refresh may update an existing credit account; a denied or failed
+refresh preserves the cache and its timestamp. Unknown credit remains `null`.
+The source performs no financial-view or Stripe/Metronome reads in this branch.
+
+The native `/api/v1/account/credits?organization_id=N` route retains its exact
+numeric organization and credit DTO. Original native authority is revalidated
+by the issuer and forwarded only to the platform's passive `GET /credits`
+projection as `X-Grida-Native-Token`; browser SSR calls instead use
+`X-Grida-Account-Token`. Identity, membership and billing failures stay opaque.
+There is no privileged source fallback and no provider call on native reads.
+
+Configuration is lazy: identity/listing operations and the independent Forms
+API do not require billing credentials. Cached display eligibility is never
+paid-execution admission. The default source-owner paths remain available until
+an explicit transfer, rather than acting as a fallback after infra failures.
+
+Run the no-env consumer contract lane from the repository root:
+
+```sh
+node node_modules/vitest/vitest.mjs run --config editor/vitest.platform-consumers.config.ts
+```
+
+These focused tests exercise boundary transports and failures. Actual paired
+Supabase/platform HTTP and browser proof is owned by infra's M4 fixture; passing
+these unit tests does not claim a live provider or production migration test.
+
+The separate M4 paired fixture selects `GRIDA_PLATFORM_FIXTURE_PROFILE=m4`
+and only `http://127.0.0.1:56846` as its AI simulator origin, with the same
+synthetic key, local opt-in and nonproduction guards above. The unchanged M3
+profile uses port 56746. A profile cannot select the other's port or any host.
+
+`/gateway/manage` is the reverse handoff into canonical Grida management. It
+accepts only `intent=organization|settings|create-organization`, typed `return_to`
+and, for existing organizations, the matching canonical `org_id`. Current
+Supabase membership is required; settings requires the current owner. It reuses
+the source member/profile views and existing organization-creation form/writer.
+A visible Back to console link retains the exact resource. Signed-out users
+resume the complete handoff after source sign-in. The hidden form continuation
+is revalidated for same-origin submission and current membership before a write;
+creation returns the retained destination, never a guessed newest organization.
+Ordinary source forms without that explicit continuation retain their behavior.
+The parser and reviewed fixture in this directory mirror infra's versioned
+`contracts/platform/destinations.json`; keep that fixture identical on changes.

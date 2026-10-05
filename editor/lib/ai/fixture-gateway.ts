@@ -4,8 +4,15 @@ export function fixtureGateway(
 ): { baseURL: string; apiKey: string } | null {
   const origin = env.GRIDA_PLATFORM_AI_FIXTURE_ORIGIN;
   if (origin === undefined) return null;
+  const profile = env.GRIDA_PLATFORM_FIXTURE_PROFILE ?? "m3";
+  const expectedOrigin =
+    profile === "m3"
+      ? "http://127.0.0.1:56746"
+      : profile === "m4"
+        ? "http://127.0.0.1:56846"
+        : null;
   if (
-    origin !== "http://127.0.0.1:56746" ||
+    origin !== expectedOrigin ||
     env.GRIDA_PLATFORM_ALLOW_LOCAL !== "1" ||
     env.NODE_ENV === "production" ||
     env.GG_VERCEL_AI_GATEWAY_API_KEY !== "grida-local-ai-fixture" ||

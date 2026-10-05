@@ -2,7 +2,8 @@
 
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import UpgradeView from "../../upgrade/_view";
+import { billingOwner } from "@/lib/platform/billing-consumer";
+import { billingHandoff } from "@/lib/platform/billing-handoff";
 import { BillingModal } from "../../_modal-shell";
 
 type Params = { organization_name: string };
@@ -13,6 +14,11 @@ export default async function UpgradeModalIntercept({
   params: Promise<Params>;
 }) {
   const { organization_name } = await params;
+  if (billingOwner() === "infra") {
+    await billingHandoff(organization_name, "upgrade");
+    return null;
+  }
+  const { default: UpgradeView } = await import("../../upgrade/_view");
   const client = await createClient();
   const { data: auth } = await client.auth.getUser();
   if (!auth.user) return redirect("/sign-in");

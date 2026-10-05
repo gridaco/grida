@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "description": "Exact current organization-rooted console destinations. Canonical positive signed-bigint IDs and finite per-route filters; links confer no authority.",
+  "valid": [
+    {
+      "input": "/",
+      "canonical": "/"
+    },
+    {
+      "input": "/organizations/42/billing",
+      "canonical": "/organizations/42/billing"
+    },
+    {
+      "input": "/organizations/42/billing/upgrade",
+      "canonical": "/organizations/42/billing/upgrade"
+    },
+    {
+      "input": "/organizations/42/billing/purchases/11111111-1111-4111-8111-111111111111",
+      "canonical": "/organizations/42/billing/purchases/11111111-1111-4111-8111-111111111111"
+    },
+    {
+      "input": "/organizations/9223372036854775807/gateway",
+      "canonical": "/organizations/9223372036854775807/gateway"
+    },
+    {
+      "input": "/organizations/42/gateway/keys",
+      "canonical": "/organizations/42/gateway/keys"
+    },
+    {
+      "input": "/organizations/42/gateway/keys/key_test1234",
+      "canonical": "/organizations/42/gateway/keys/key_test1234"
+    },
+    {
+      "input": "/organizations/42/gateway/byok/byok_test1234",
+      "canonical": "/organizations/42/gateway/byok/byok_test1234"
+    },
+    {
+      "input": "/organizations/42/gateway/requests/req_test1234",
+      "canonical": "/organizations/42/gateway/requests/req_test1234"
+    },
+    {
+      "input": "/organizations/42/gateway/media/job_test1234",
+      "canonical": "/organizations/42/gateway/media/job_test1234"
+    },
+    {
+      "input": "/organizations/42/gateway/models",
+      "canonical": "/organizations/42/gateway/models"
+    },
+    {
+      "input": "/organizations/42/gateway/operations",
+      "canonical": "/organizations/42/gateway/operations"
+    },
+    {
+      "input": "/organizations/42/gateway/requests?operation=chat.completions&funding_mode=grida",
+      "canonical": "/organizations/42/gateway/requests?funding_mode=grida&operation=chat.completions"
+    },
+    {
+      "input": "/organizations/42/gateway/usage?range=7d&bucket=hour&group_by=operation&compare=true",
+      "canonical": "/organizations/42/gateway/usage?bucket=hour&compare=true&group_by=operation&range=7d"
+    },
+    {
+      "input": "/organizations/42/gateway/usage?from=2026-10-05T09%3A00%3A00%2B09%3A00&to=2026-10-06T09%3A00%3A00%2B09%3A00",
+      "canonical": "/organizations/42/gateway/usage?from=2026-10-05T00%3A00%3A00Z&to=2026-10-06T00%3A00%3A00Z"
+    },
+    {
+      "input": "/organizations/42/gateway/requests?key_id=key_test1234",
+      "canonical": "/organizations/42/gateway/requests?key_id=key_test1234"
+    },
+    {
+      "input": "/organizations/42/gateway/usage?from=2024-02-29T09%3A00%3A00.123456789%2B09%3A00&to=2024-03-01T00%3A00%3A00Z",
+      "canonical": "/organizations/42/gateway/usage?from=2024-02-29T00%3A00%3A00.123456789Z&to=2024-03-01T00%3A00%3A00Z"
+    }
+  ],
+  "invalid": [
+    "https://evil.test/",
+    "//evil.test/",
+    "/\\evil.test/",
+    "/%2f%2fevil.test/",
+    "/?org_id=42",
+    "/byok?org_id=42",
+    "/billing",
+    "/organizations/01/billing",
+    "/organizations/0/billing",
+    "/organizations/-1/billing",
+    "/organizations/9223372036854775808/billing",
+    "/organizations/42/billing?org_id=43",
+    "/organizations/42/gateway/keys?api_key=secret",
+    "/organizations/42/gateway/keys/key_test1234?next=/",
+    "/organizations/42/gateway/keys/byok_test1234",
+    "/organizations/42/gateway/usage?range=7d&range=14d",
+    "/organizations/42/gateway/usage?next=https://evil.test",
+    "/organizations/42/gateway/usage?range=%2537d",
+    "/organizations/42/gateway/usage#secret",
+    "/organizations/%34%32/billing",
+    "/organizations/42/gateway/usage?range=forever",
+    "/organizations/42/gateway/usage?bucket=week",
+    "/organizations/42/gateway/usage?group_by=project",
+    "/organizations/42/gateway/usage?compare=yes",
+    "/organizations/42/gateway/usage?project_id=7",
+    "/organizations/42/gateway/usage?range=7d?next=/keys",
+    "/organizations/42/gateway/requests?bucket=hour",
+    "/organizations/42/billing/upgrade?range=7d",
+    "/organizations/42/gateway/usage?from=2026-10-06T00:00:00Z&to=2026-10-05T00:00:00Z",
+    "/auth/start",
+    "/auth/callback",
+    "/switch-account",
+    "/organizations/42/gateway/media/op_test1234",
+    "/organizations/42/gateway/usage?status=paid",
+    "/organizations/42/gateway/usage?funding_mode=unknown",
+    "/organizations/42/billing/",
+    "/organizations/42//billing",
+    "/organizations/42/../43/billing",
+    "/organizations/42/billing?x=1;next=/",
+    "/organizations/42/gateway/requests?key_id=byok_test1234",
+    "/organizations/42/gateway/requests?key_id=key_short",
+    "/organizations/42/gateway/usage?from=2026-02-30T00:00:00Z",
+    "/organizations/42/gateway/usage?from=2025-02-29T00:00:00Z",
+    "/organizations/42/gateway/usage?from=2026-13-01T00:00:00Z",
+    "/organizations/42/gateway/usage?from=2026-10-05T24:00:00Z",
+    "/organizations/42/gateway/usage?from=2026-10-05T00:00:00%2B24:00",
+    "/organizations/42/gateway/usage?from=2026-10-05T00:00:00%2B09:60",
+    "/organizations/42/gateway/usage?from=2026-10-05T00:00:00.1234567890Z",
+    "/organizations/42/gateway/usage?from=2026-01-01T00:00:00Z&to=2026-05-01T00:00:00Z",
+    "/organizations/42/gateway/usage?from=2026-10-05T00:00:00Z&to=2026-10-05T00:00:00Z",
+    "/organizations/42/gateway/keys/req_test1234",
+    "/organizations/42/gateway/byok/key_test1234",
+    "/organizations/42/gateway/requests/job_test1234",
+    "/organizations/42/gateway/usage?range=7d%09"
+  ]
+}

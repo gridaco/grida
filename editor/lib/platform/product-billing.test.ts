@@ -104,34 +104,37 @@ describe("product admission boundary", () => {
     expect(f.transport).toHaveBeenCalledTimes(1);
   });
   it.each([
-    ["nonce", (d: Record<string, unknown>) => (d.observation_id = "different")],
+    [
+      "nonce",
+      (d: Record<string, unknown>): unknown => (d.observation_id = "different"),
+    ],
     [
       "expired",
-      (d: Record<string, unknown>) =>
+      (d: Record<string, unknown>): unknown =>
         (d.expires_at = new Date(Date.now() - 1).toISOString()),
     ],
     [
       "renewed cache",
-      (d: Record<string, unknown>) =>
+      (d: Record<string, unknown>): unknown =>
         (d.financial_observed_at = new Date(Date.now() - 61000).toISOString()),
     ],
     [
       "extended deadline",
-      (d: Record<string, unknown>) =>
+      (d: Record<string, unknown>): unknown =>
         (d.expires_at = new Date(Date.now() + 61000).toISOString()),
     ],
     [
       "wrong org",
-      (d: Record<string, unknown>) =>
+      (d: Record<string, unknown>): unknown =>
         ((d.claim as Record<string, unknown>).organization_id = "999"),
     ],
     [
       "missing component",
-      (d: Record<string, unknown>) => delete d.lifecycle_observed_at,
+      (d: Record<string, unknown>): unknown => delete d.lifecycle_observed_at,
     ],
     [
       "forged source",
-      (d: Record<string, unknown>) => (d.source_epoch = "unknown"),
+      (d: Record<string, unknown>): unknown => (d.source_epoch = "unknown"),
     ],
   ] as const)("rejects %s before local dispatch", async (_name, change) => {
     const f = setup(change);
