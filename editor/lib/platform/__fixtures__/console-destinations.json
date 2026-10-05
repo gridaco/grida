@@ -84,6 +84,7 @@
     "/organizations/-1/billing",
     "/organizations/9223372036854775808/billing",
     "/organizations/42/billing?org_id=43",
+    "/organizations/42/billing/purchases/AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
     "/organizations/42/gateway/keys?api_key=secret",
     "/organizations/42/gateway/keys/key_test1234?next=/",
     "/organizations/42/gateway/keys/byok_test1234",
