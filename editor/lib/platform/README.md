@@ -207,3 +207,19 @@ creation returns the retained destination, never a guessed newest organization.
 Ordinary source forms without that explicit continuation retain their behavior.
 The parser and reviewed fixture in this directory mirror infra's versioned
 `contracts/platform/destinations.json`; keep that fixture identical on changes.
+
+`/gateway/account` completes the shared console's different-account handoff.
+It accepts exactly one opaque 43-character continuation and resolves it through
+`POST /platform/v1/continuations/resolve` using the existing SSR workload key,
+without user, native or console-session headers. Returned navigation must match
+the configured console origin, exact continuation endpoint and typed cancel
+destination. An expired or unavailable request cannot select a fallback identity.
+
+The page shows the current verified Grida web identity. Continue returns to the
+console's browser-bound OAuth flow; any different identity still requires its
+explicit candidate confirmation. Cancel keeps the original console session and
+exact destination. Use another account posts to the source's same-origin
+`/gateway/account/change`, revalidates the continuation, and signs out only the
+current Grida web session with Supabase local scope. The existing source sign-in
+flow preserves the complete chooser continuation. It never logs out console or
+all other sessions, trusts an identity in the URL, or adds a separate auth issuer.

@@ -186,32 +186,55 @@ export class BillingConsumer {
       (family === "native" && operation !== "credits")
     )
       throw new BillingConsumerError();
+    return this.workloadJSON(
+      `/platform/v1/billing/organizations/${organizationId}/${operation === "refresh" ? "credits/refresh" : operation}`,
+      {
+        [family === "native"
+          ? "X-Grida-Native-Token"
+          : "X-Grida-Account-Token"]: bearer,
+      },
+      operation === "refresh" ? "POST" : "GET",
+      operation === "refresh" ? "{}" : undefined,
+      timeoutMs
+    );
+  }
+  /** Resolve only the browser-bound opaque switch request; it carries no user authority. */
+  async resolveContinuation(continuation: string): Promise<unknown> {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(continuation))
+      throw new BillingConsumerError();
+    return this.workloadJSON(
+      "/platform/v1/continuations/resolve",
+      {},
+      "POST",
+      JSON.stringify({ continuation })
+    );
+  }
+  private async workloadJSON(
+    path: string,
+    authority: Record<string, string>,
+    method: "GET" | "POST",
+    body?: string,
+    timeoutMs = 5_000
+  ): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let response: Response | undefined;
     try {
-      response = await this.fetcher(
-        `${this.config.origin}/platform/v1/billing/organizations/${organizationId}/${operation === "refresh" ? "credits/refresh" : operation}`,
-        {
-          method: operation === "refresh" ? "POST" : "GET",
-          headers: {
-            authorization: `Bearer ${this.config.token}`,
-            "X-Grida-Workload-Key-ID": this.config.keyId,
-            [family === "native"
-              ? "X-Grida-Native-Token"
-              : "X-Grida-Account-Token"]: bearer,
-            accept: "application/json",
-            ...(operation === "refresh"
-              ? { "content-type": "application/json" }
-              : {}),
-          },
-          ...(operation === "refresh" ? { body: "{}" } : {}),
-          redirect: "error",
-          credentials: "omit",
-          cache: "no-store",
-          signal: controller.signal,
-        }
-      );
+      response = await this.fetcher(`${this.config.origin}${path}`, {
+        method,
+        headers: {
+          authorization: `Bearer ${this.config.token}`,
+          "X-Grida-Workload-Key-ID": this.config.keyId,
+          accept: "application/json",
+          ...authority,
+          ...(body === undefined ? {} : { "content-type": "application/json" }),
+        },
+        ...(body === undefined ? {} : { body }),
+        redirect: "error",
+        credentials: "omit",
+        cache: "no-store",
+        signal: controller.signal,
+      });
       if (response.redirected || response.status !== 200) {
         if (response.status === 401)
           throw new BillingConsumerError("unauthorized");
