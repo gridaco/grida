@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from "@app/ui/components/card";
 import { ChangeAccountForm } from "./change-account-form";
+import { changeAccount } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -68,8 +69,8 @@ export default async function AccountPage({
                   </Link>
                 </Button>
                 <ChangeAccountForm
-                  continuation={continuation}
-                  signInURL={signInURL}
+                  action={changeAccount.bind(null, continuation)}
+                  permalink={accountPath(continuation)}
                 />
               </>
             ) : (

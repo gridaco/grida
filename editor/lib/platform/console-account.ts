@@ -63,39 +63,14 @@ export async function resolveAccountContinuation(
     throw new BillingConsumerError();
   return { returnURL: expectedReturn, cancelURL: data.cancel_url };
 }
-/** Only the source's own form may clear its current web session. */
-export async function accountChangeInput(request: Request): Promise<string> {
+/** Raw request authority for the source web session mutation, independent of proxy URLs. */
+export function accountChangeOrigin(headers: Pick<Headers, "get">): string {
   const origin = configuredOrigin(process.env.GRIDA_OAUTH_ORIGIN, process.env);
   if (
-    request.headers.get("origin") !== origin ||
-    request.headers.get("host") !== new URL(origin).host ||
-    new URL(request.url).search ||
-    !/^application\/x-www-form-urlencoded(?:;|$)/i.test(
-      request.headers.get("content-type") ?? ""
-    ) ||
-    (request.headers.has("sec-fetch-site") &&
-      request.headers.get("sec-fetch-site") !== "same-origin")
+    headers.get("origin") !== origin ||
+    headers.get("host") !== new URL(origin).host ||
+    headers.get("sec-fetch-site") !== "same-origin"
   )
     throw new BillingConsumerError("forbidden");
-  if (!request.body) throw new BillingConsumerError("forbidden");
-  const reader = request.body.getReader();
-  let text = "",
-    size = 0;
-  const decoder = new TextDecoder("utf-8", { fatal: true });
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      size += chunk.value.byteLength;
-      if (size > 256) throw new BillingConsumerError("forbidden");
-      text += decoder.decode(chunk.value, { stream: true });
-    }
-    text += decoder.decode();
-  } finally {
-    await reader.cancel().catch(() => undefined);
-  }
-  const fields = new URLSearchParams(text);
-  if ([...fields.keys()].length !== 1)
-    throw new BillingConsumerError("forbidden");
-  return accountContinuation(Object.fromEntries(fields));
+  return origin;
 }

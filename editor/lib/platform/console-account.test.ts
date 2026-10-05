@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
     email: string;
   } | null,
   userError: null as { name: string } | null,
+  requestHeaders: {} as Record<string, string>,
   signOut:
     vi.fn<
       (options: {
@@ -32,7 +33,13 @@ vi.mock("@/lib/supabase/server", () => ({
     },
   }),
 }));
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers(state.requestHeaders),
+}));
 vi.mock("next/navigation", () => ({
+  redirect: (url: string) => {
+    throw new Error(`redirect:${url}`);
+  },
   notFound: () => {
     throw new Error("not_found");
   },
@@ -42,7 +49,7 @@ vi.mock("next/link", () => ({
     React.createElement("a", props),
 }));
 import AccountPage from "@/app/(site)/gateway/account/page";
-import { POST } from "@/app/(site)/gateway/account/change/route";
+import { changeAccount } from "@/app/(site)/gateway/account/actions";
 import { resolve_next } from "@/host/url";
 
 const continuation = "A".repeat(43),
@@ -64,6 +71,11 @@ beforeEach(() => {
   vi.stubEnv("GRIDA_PLATFORM_SSR_TOKEN", "w".repeat(43));
   state.user = { id: "source-user", email: "alice@example.test" };
   state.userError = null;
+  state.requestHeaders = {
+    origin: source,
+    host: new URL(source).host,
+    "sec-fetch-site": "same-origin",
+  };
   state.signOut.mockReset().mockResolvedValue({ error: null });
   transport = vi.fn<typeof fetch>(async () => Response.json(resolved));
   vi.stubGlobal("fetch", transport);
@@ -73,22 +85,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function request(
-  body = new URLSearchParams({ continuation }).toString(),
-  headers: Record<string, string> = {}
-) {
-  return new Request(source + "/gateway/account/change", {
-    method: "POST",
-    headers: {
-      host: "grida.example.test",
-      origin: source,
-      "sec-fetch-site": "same-origin",
-      "content-type": "application/x-www-form-urlencoded",
-      ...headers,
-    },
-    body,
-  });
-}
 describe("source account continuation", () => {
   it("resolves an opaque request without forwarding any user or browser authority", async () => {
     expect(await resolveAccountContinuation(continuation)).toEqual({
@@ -260,67 +256,91 @@ describe("actual account chooser page", () => {
   });
 });
 
-describe("source web account change", () => {
-  it("revalidates the exact continuation then signs out only the current source session", async () => {
+describe("progressive source account change action", () => {
+  it("revalidates the exact bound continuation, signs out locally, and redirects on the public source", async () => {
     const order: string[] = [];
     transport.mockImplementation(async () => {
       order.push("resolve");
       return Response.json(resolved);
     });
-    state.signOut.mockImplementation(async (opts) => {
+    state.signOut.mockImplementation(async () => {
       order.push("local sign-out");
-      return { error: null, opts };
+      return { error: null };
     });
-    const response = await POST(request());
-    expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-store");
-    await expect(response.json()).resolves.toEqual({ ready: true });
+    await expect(
+      changeAccount(continuation, { error: null }, new FormData())
+    ).rejects.toThrow("redirect:" + source + accountSignInPath(continuation));
     expect(state.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
     expect(order).toEqual(["resolve", "local sign-out"]);
   });
   it.each<Record<string, string>>([
     { origin: "https://foreign.test" },
     { origin: "" },
+    { origin: source + ",https://foreign.test" },
     { host: "foreign.test" },
+    { host: "localhost:56841", "x-forwarded-host": "grida.example.test" },
     { "sec-fetch-site": "cross-site" },
-    { "content-type": "application/json" },
+    { "sec-fetch-site": "" },
   ])(
-    "rejects invalid form origin/type before sign-out: %j",
+    "rejects invalid raw request authority before resolving or signing out: %j",
     async (headers) => {
-      expect((await POST(request(undefined, headers))).status).toBe(403);
+      Object.assign(state.requestHeaders, headers);
+      await expect(
+        changeAccount(continuation, { error: null }, new FormData())
+      ).resolves.toEqual({
+        error: "Unable to change accounts. Please try again.",
+      });
       expect(state.signOut).not.toHaveBeenCalled();
       expect(transport).not.toHaveBeenCalled();
     }
   );
-  it.each([
-    `continuation=${continuation}&continuation=${continuation}`,
-    `continuation=${continuation}&return_to=/`,
-    "continuation=" + "x".repeat(257),
-    "continuation=x",
-  ])(
-    "rejects duplicated, additional and oversized form fields: %s",
-    async (body) => {
-      expect((await POST(request(body))).status).toBe(403);
+  it.each(["", "A".repeat(42), "A".repeat(44), "A".repeat(42) + "/"])(
+    "revalidates malformed action-bound continuation: %s",
+    async (token) => {
+      await expect(
+        changeAccount(token, { error: null }, new FormData())
+      ).resolves.toEqual({
+        error: "Unable to change accounts. Please try again.",
+      });
       expect(state.signOut).not.toHaveBeenCalled();
       expect(transport).not.toHaveBeenCalled();
     }
   );
-  it("an expired continuation cannot clear the source session", async () => {
-    transport.mockImplementation(
-      async () => new Response(null, { status: 401 })
-    );
-    expect((await POST(request())).status).toBe(403);
-    expect(state.signOut).not.toHaveBeenCalled();
-  });
-  it("a failed local sign-out stays unavailable and never redirects as success", async () => {
+  it.each([401, 403, 503])(
+    "resolver HTTP%s returns inline error state without logout",
+    async (status) => {
+      transport.mockImplementation(
+        async () => new Response("private resolver detail", { status })
+      );
+      await expect(
+        changeAccount(continuation, { error: null }, new FormData())
+      ).resolves.toEqual({
+        error: "Unable to change accounts. Please try again.",
+      });
+      expect(state.signOut).not.toHaveBeenCalled();
+    }
+  );
+  it("local logout failure returns opaque inline state instead of redirecting", async () => {
     state.signOut.mockResolvedValue({
       error: { message: "private Auth details" },
     });
-    const response = await POST(request());
-    expect(response.status).toBe(503);
-    expect(response.headers.get("location")).toBeNull();
-    await expect(response.json()).resolves.toEqual({
-      error: "account_change_unavailable",
+    await expect(
+      changeAccount(continuation, { error: "caller state" }, new FormData())
+    ).resolves.toEqual({
+      error: "Unable to change accounts. Please try again.",
     });
+    expect(state.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+  });
+  it("submitted form fields cannot replace the bound continuation or public return", async () => {
+    const form = new FormData();
+    form.set("continuation", "B".repeat(43));
+    form.set("next", "https://foreign.test/");
+    await expect(
+      changeAccount(continuation, { error: null }, form)
+    ).rejects.toThrow("redirect:" + source + accountSignInPath(continuation));
+    expect(transport.mock.calls[0][1]?.body).toBe(
+      JSON.stringify({ continuation })
+    );
+    expect(state.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
   });
 });

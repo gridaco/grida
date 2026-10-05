@@ -218,8 +218,11 @@ destination. An expired or unavailable request cannot select a fallback identity
 The page shows the current verified Grida web identity. Continue returns to the
 console's browser-bound OAuth flow; any different identity still requires its
 explicit candidate confirmation. Cancel keeps the original console session and
-exact destination. Use another account posts to the source's same-origin
-`/gateway/account/change`, revalidates the continuation, and signs out only the
-current Grida web session with Supabase local scope. The existing source sign-in
-flow preserves the complete chooser continuation. It never logs out console or
+exact destination. Use another account is a progressive Next server-action form
+bound to the opaque continuation, with an exact chooser permalink and inline
+pending/error feedback. It checks the raw source Origin, Host and same-origin
+Fetch Metadata, revalidates the continuation, and signs out only the current
+Grida web session with Supabase local scope. It works before hydration. The
+server redirects to the configured public Grida sign-in origin with an absolute
+chooser continuation, independently of a proxy's internal request URL. It never logs out console or
 all other sessions, trusts an identity in the URL, or adds a separate auth issuer.

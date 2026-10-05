@@ -1,61 +1,42 @@
 "use client";
-import React, { useState } from "react";
+import React, { useActionState } from "react";
 import { Button } from "@app/ui/components/button";
 import { Alert, AlertDescription } from "@app/ui/components/alert";
+import type { AccountChangeState } from "./actions";
 
 export function ChangeAccountForm({
-  continuation,
-  signInURL,
+  action,
+  permalink,
 }: {
-  continuation: string;
-  signInURL: string;
+  action: (
+    state: AccountChangeState,
+    formData: FormData
+  ) => Promise<AccountChangeState>;
+  permalink: string;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  const [state, formAction, pending] = useActionState(
+    action,
+    { error: null },
+    permalink
+  );
   return (
-    <form
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (busy) return;
-        setBusy(true);
-        setError(false);
-        try {
-          const response = await fetch("/gateway/account/change", {
-            method: "POST",
-            credentials: "same-origin",
-            cache: "no-store",
-            redirect: "error",
-            headers: { "content-type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({ continuation }),
-          });
-          if (!response.ok || (await response.json()).ready !== true)
-            throw new Error("Account change unavailable");
-          window.location.assign(signInURL);
-        } catch {
-          setError(true);
-          setBusy(false);
-        }
-      }}
-      className="space-y-3"
-    >
+    <form action={formAction} className="space-y-3">
       <p className="text-sm text-muted-foreground">
         To choose another account, sign out of Grida in this browser. Your
         console session stays active until you confirm a change.
       </p>
-      {error && (
+      {state.error && (
         <Alert variant="destructive">
-          <AlertDescription>
-            Unable to change accounts. Please try again.
-          </AlertDescription>
+          <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       )}
       <Button
         type="submit"
         variant="outline"
         className="w-full"
-        disabled={busy}
+        disabled={pending}
       >
-        {busy ? "Opening sign-in…" : "Use another account"}
+        {pending ? "Opening sign-in…" : "Use another account"}
       </Button>
     </form>
   );
