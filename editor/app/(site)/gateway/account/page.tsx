@@ -24,7 +24,8 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Choose an account",
   robots: { index: false, follow: false },
-  referrer: "no-referrer" as const,
+  // Native form POSTs retain Origin without sharing the continuation cross-origin.
+  referrer: "same-origin" as const,
 };
 
 export default async function AccountPage({

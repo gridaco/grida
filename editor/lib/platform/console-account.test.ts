@@ -48,7 +48,7 @@ vi.mock("next/link", () => ({
   default: ({ prefetch: _prefetch, ...props }: { prefetch?: boolean }) =>
     React.createElement("a", props),
 }));
-import AccountPage from "@/app/(site)/gateway/account/page";
+import AccountPage, { metadata } from "@/app/(site)/gateway/account/page";
 import { changeAccount } from "@/app/(site)/gateway/account/actions";
 import { resolve_next } from "@/host/url";
 
@@ -201,6 +201,9 @@ describe("source account continuation", () => {
 });
 
 describe("actual account chooser page", () => {
+  it("preserves native form Origin without sending the continuation in cross-origin referrers", () => {
+    expect(metadata.referrer).toBe("same-origin");
+  });
   it("shows verified source identity and only resolved return/cancel URLs without changing either session", async () => {
     const html = renderToStaticMarkup(
       await AccountPage({ searchParams: Promise.resolve({ continuation }) })
@@ -276,6 +279,7 @@ describe("progressive source account change action", () => {
   it.each<Record<string, string>>([
     { origin: "https://foreign.test" },
     { origin: "" },
+    { origin: "null" },
     { origin: source + ",https://foreign.test" },
     { host: "foreign.test" },
     { host: "localhost:56841", "x-forwarded-host": "grida.example.test" },

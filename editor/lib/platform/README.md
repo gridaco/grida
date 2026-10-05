@@ -222,7 +222,11 @@ exact destination. Use another account is a progressive Next server-action form
 bound to the opaque continuation, with an exact chooser permalink and inline
 pending/error feedback. It checks the raw source Origin, Host and same-origin
 Fetch Metadata, revalidates the continuation, and signs out only the current
-Grida web session with Supabase local scope. It works before hydration. The
-server redirects to the configured public Grida sign-in origin with an absolute
-chooser continuation, independently of a proxy's internal request URL. It never logs out console or
-all other sessions, trusts an identity in the URL, or adds a separate auth issuer.
+Grida web session with Supabase local scope. The chooser uses the `same-origin`
+referrer policy so native form POSTs preserve their Origin while cross-origin
+requests do not disclose the continuation in a referrer. `no-referrer` would
+make a native POST send `Origin: null`, which the server intentionally rejects.
+The form works before hydration. The server redirects to the configured public
+Grida sign-in origin with an absolute chooser continuation, independently of a
+proxy's internal request URL. It never logs out console or all other sessions,
+trusts an identity in the URL, or adds a separate auth issuer.
