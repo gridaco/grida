@@ -43,6 +43,7 @@ vi.mock("next/link", () => ({
 }));
 import AccountPage from "@/app/(site)/gateway/account/page";
 import { POST } from "@/app/(site)/gateway/account/change/route";
+import { resolve_next } from "@/host/url";
 
 const continuation = "A".repeat(43),
   source = "https://grida.example.test",
@@ -113,9 +114,37 @@ describe("source account continuation", () => {
     });
     expect(transport).toHaveBeenCalledTimes(1);
     expect(accountSignInPath(continuation)).toBe(
-      "/sign-in?next=" + encodeURIComponent(accountPath(continuation))
+      "/sign-in?next=" + encodeURIComponent(source + accountPath(continuation))
     );
   });
+  it.each(["https://grida.co", "https://grida.m4.grida.test:56851"])(
+    "keeps the exact public account return when Auth receives an internal proxy origin: %s",
+    (publicOrigin) => {
+      vi.stubEnv("GRIDA_OAUTH_ORIGIN", publicOrigin);
+      const signIn = new URL(accountSignInPath(continuation), publicOrigin);
+      expect(signIn.pathname).toBe("/sign-in");
+      expect(signIn.origin).toBe(publicOrigin);
+      expect([...signIn.searchParams.keys()]).toEqual(["next"]);
+      const next = signIn.searchParams.get("next");
+      expect(next).toBe(publicOrigin + accountPath(continuation));
+      // This is the existing source sign-in resolver that exposed localhost.
+      expect(resolve_next("http://localhost:56841", next)).toBe(
+        publicOrigin + accountPath(continuation)
+      );
+      expect(new URL(next!).searchParams.getAll("continuation")).toEqual([
+        continuation,
+      ]);
+    }
+  );
+  it.each(["", "https://grida.co/path", "https://grida.co#fragment"])(
+    "invalid public source configuration cannot fall back to an internal/browser host: %s",
+    (origin) => {
+      vi.stubEnv("GRIDA_OAUTH_ORIGIN", origin);
+      expect(() => accountSignInPath(continuation)).toThrow(
+        "Billing is unavailable."
+      );
+    }
+  );
   it.each([
     {},
     { continuation: "x" },

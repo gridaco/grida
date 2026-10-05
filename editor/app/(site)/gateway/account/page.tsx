@@ -39,6 +39,7 @@ export default async function AccountPage({
   }
   try {
     const resolved = await resolveAccountContinuation(continuation);
+    const signInURL = accountSignInPath(continuation);
     const client = await createClient();
     const {
       data: { user },
@@ -66,11 +67,14 @@ export default async function AccountPage({
                     Continue as {user.email ?? "current account"}
                   </Link>
                 </Button>
-                <ChangeAccountForm continuation={continuation} />
+                <ChangeAccountForm
+                  continuation={continuation}
+                  signInURL={signInURL}
+                />
               </>
             ) : (
               <Button asChild className="w-full">
-                <Link href={accountSignInPath(continuation)} prefetch={false}>
+                <Link href={signInURL} prefetch={false}>
                   Sign in
                 </Link>
               </Button>

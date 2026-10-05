@@ -20,7 +20,10 @@ export function accountPath(continuation: string): string {
   return `/gateway/account?${new URLSearchParams({ continuation: accountContinuation({ continuation }) })}`;
 }
 export function accountSignInPath(continuation: string): string {
-  return `/sign-in?${new URLSearchParams({ next: accountPath(continuation) })}`;
+  // Auth handlers may see a reverse proxy's internal origin. Bind their next
+  // destination to the configured public source instead of resolving a relative path.
+  const origin = configuredOrigin(process.env.GRIDA_OAUTH_ORIGIN, process.env);
+  return `/sign-in?${new URLSearchParams({ next: origin + accountPath(continuation) })}`;
 }
 export async function resolveAccountContinuation(
   continuation: string

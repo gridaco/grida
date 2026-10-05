@@ -3,7 +3,13 @@ import React, { useState } from "react";
 import { Button } from "@app/ui/components/button";
 import { Alert, AlertDescription } from "@app/ui/components/alert";
 
-export function ChangeAccountForm({ continuation }: { continuation: string }) {
+export function ChangeAccountForm({
+  continuation,
+  signInURL,
+}: {
+  continuation: string;
+  signInURL: string;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   return (
@@ -24,8 +30,7 @@ export function ChangeAccountForm({ continuation }: { continuation: string }) {
           });
           if (!response.ok || (await response.json()).ready !== true)
             throw new Error("Account change unavailable");
-          const next = `/gateway/account?${new URLSearchParams({ continuation })}`;
-          window.location.assign(`/sign-in?${new URLSearchParams({ next })}`);
+          window.location.assign(signInURL);
         } catch {
           setError(true);
           setBusy(false);
