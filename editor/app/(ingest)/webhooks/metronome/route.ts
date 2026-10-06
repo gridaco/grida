@@ -1,3 +1,4 @@
+import { sourceWebhook } from "@/lib/platform/webhook-forwarding";
 /**
  * Metronome webhook receiver.
  *
@@ -51,6 +52,8 @@ const REFRESH_TRIGGERS = new Set<string>([
 ]);
 
 export async function POST(req: NextRequest) {
+  const forwarded = await sourceWebhook(req, "metronome");
+  if (forwarded) return forwarded;
   const dateHeader = req.headers.get("date");
   const sigHeader = req.headers.get("metronome-webhook-signature");
   const rawBody = await req.text();

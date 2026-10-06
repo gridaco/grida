@@ -42,7 +42,11 @@ function getClient(): Metronome {
   if (!token) {
     throw new Error("METRONOME_API_TOKEN is required.");
   }
-  _client = new Metronome({ bearerToken: token, fetch: sourceBillingFetch });
+  _client = new Metronome({
+    bearerToken: token,
+    fetch: sourceBillingFetch,
+    maxRetries: 0,
+  });
   return _client;
 }
 

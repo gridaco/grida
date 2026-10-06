@@ -36,6 +36,20 @@ vi.mock("@/lib/billing/metronome", () => ({
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
+  service_role: {
+    workspace: {
+      rpc: async (name: string, args: Record<string, unknown>) => {
+        if (name === "platform_source_work_begin")
+          return { data: { created: true, id: args.work_id }, error: null };
+        if (
+          name === "platform_source_work_capture" ||
+          name === "platform_source_work_finish"
+        )
+          return { data: { accepted: true }, error: null };
+        throw new Error("unexpected source RPC: " + name);
+      },
+    },
+  },
   createLibraryClient: vi.fn<(...args: never[]) => unknown>(),
 }));
 

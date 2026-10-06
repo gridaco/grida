@@ -41,6 +41,8 @@ function getStripe(): Stripe {
   }
   _stripe = new Stripe(stripeKey, {
     apiVersion: STRIPE_API_VERSION,
+    // Ambiguous responses stay in source custody; SDK retries cannot redispatch.
+    maxNetworkRetries: 0,
     httpClient: Stripe.createFetchHttpClient(sourceBillingFetch),
     typescript: true,
   });
@@ -56,6 +58,25 @@ export const stripe = new Proxy({} as Stripe, {
   },
 });
 export type { Stripe };
+
+// Verification requires only the endpoint signing secret, independently of the
+// source financial owner and its retired outbound Stripe API credentials.
+const signatures = new Stripe("sk_test_signature_verification_only").webhooks;
+export async function verifyStripeWebhook(
+  body: Buffer,
+  signature: string,
+  secret: string,
+  receivedAt: number
+) {
+  return signatures.constructEventAsync(
+    body,
+    signature,
+    secret,
+    300,
+    undefined,
+    receivedAt
+  );
+}
 
 // `grida_billing` is locked down — all access goes through `fn_billing_*`
 // RPCs and `v_billing_*` views on `public`. We piggy-back on the project's

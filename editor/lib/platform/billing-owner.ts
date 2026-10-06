@@ -1,5 +1,6 @@
 import { service_role } from "../supabase/server";
 import { ProductBilling, ProductBillingError } from "./product-billing";
+import { SourceWork } from "./source-work";
 
 import { billingOwner } from "./billing-consumer";
 export { billingOwner } from "./billing-consumer";
@@ -12,15 +13,21 @@ export async function sourceBillingFetch(
   input: RequestInfo | URL,
   init?: RequestInit
 ) {
-  await assertSourceBillingAuthority();
-  return fetch(input, init);
+  assertSourceBillingConfiguration();
+  return sourceWork().fetch(input, init);
 }
 export async function assertSourceBillingAuthority() {
   assertSourceBillingConfiguration();
   const { data, error } = await service_role.workspace.rpc(
     "platform_billing_owner" as never
   );
-  if (error || !data || (data as { owner?: string }).owner !== "grida")
+  if (
+    error ||
+    !data ||
+    (data as { owner?: string }).owner !== "grida" ||
+    (data as { phase?: string }).phase !== "active" ||
+    (data as { quarantined?: boolean }).quarantined !== false
+  )
     throw new ProductBillingError();
 }
 export function platformProductBilling() {
@@ -32,6 +39,13 @@ export function platformProductBilling() {
       token: process.env.GRIDA_PLATFORM_USAGE_TOKEN ?? "",
       development: process.env.GRIDA_PLATFORM_ALLOW_LOCAL === "1",
     },
+    async (name, args) =>
+      await service_role.workspace.rpc(name as never, args as never)
+  );
+}
+
+export function sourceWork() {
+  return new SourceWork(
     async (name, args) =>
       await service_role.workspace.rpc(name as never, args as never)
   );

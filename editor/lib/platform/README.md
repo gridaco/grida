@@ -106,7 +106,7 @@ Source-side environment for the candidate:
   receiving verifier manifest for the separate `grida.product-receipts` audience.
 
 `POST /internal/platform/products/receipts` accepts only `{limit:1..100}` and
-returns `{source_instance,source_epoch,events:[{event_id,producer,execution_id,receipt}]}`.
+returns `{source_instance,source_epoch,events:[{source_instance,source_epoch,event_id,producer,execution_id,receipt}]}`. The page describes current authority; every event retains its original execution namespace across a restore.
 `POST /internal/platform/products/receipts/ack` accepts only `{event_ids:[UUID]}`.
 The consumer commits durable destination custody before ACK, even if financial
 application is disabled or delayed. Neither endpoint accepts customer credentials,
@@ -230,3 +230,69 @@ The form works before hydration. The server redirects to the configured public
 Grida sign-in origin with an absolute chooser continuation, independently of a
 proxy's internal request URL. It never logs out console or all other sessions,
 trusts an identity in the URL, or adds a separate auth issuer.
+
+## Source handoff custody (M5)
+
+The additive handoff migration preserves the default owner until an operator
+explicitly starts maintenance. `grida_platform.begin_billing_maintenance(epoch,
+preparation_hash)` commits a short `active` → `draining` transition after existing
+financial SQL transactions finish. Ordinary direct table writes, old privileged
+RPCs, new paid AI admissions and cached outbound billing SDKs then fail closed.
+This is separate from `transfer_billing_ownership`: relation locks are acquired
+in a fixed order (canonical organization first, then financial tables) before
+the transfer takes the owner row. Transfer uses NOWAIT locks: incidental busy
+readers produce retryable SQLSTATE55P03 with no partial handoff, leaving committed
+maintenance in place. Unknown provider outcomes do not expire.
+
+Every old-owner billing HTTP attempt records its original request and permanent
+work ID before network dispatch. Authorization/cookie headers are excluded;
+private custody retains request bytes, idempotency identity, response bytes and
+provider request identity. A successful HTTP response remains unresolved until
+its financial effect and parent projection are reconciled. It is not proof that
+a later source SQL write succeeded. The private `admitted_work` registry and
+append-only `admitted_work_evidence` hold this evidence. Each evidence row binds
+the original work ID and a SHA-256 digest; late evidence never rewrites an
+already exported operator disposition.
+
+Old-owner AI records admission before its provider call and exact `cost_mills`
+completion before attempting the original Metronome ingest. Already accepted AI
+may finish that original delivery during maintenance; a lost ACK keeps custody
+and never causes blind provider redispatch. These historical receipts are not
+new target-admitted executions and must not be replayed through target usage.
+An operator can classify a reviewed work item using
+`reconcile_source_work(id,evidence_hash,disposition)`, where disposition is
+`no_external_effect`, `provider_effect_verified` or `target_custody`. The last
+means retained unresolved responsibility, not permission for target activation.
+Infra must independently resolve ambiguous effects before activation. Transfer
+rejects every unclassified `admitted` or `captured` item; it never times one out.
+
+Both released webhook routes first verify and archive the exact raw body and
+original signature headers. Active source ownership then uses the released
+processor. During maintenance, after transfer, or while source authority is
+quarantined, the route forwards to the fixed platform capture-only endpoint:
+`POST /platform/v1/billing/ingress/source/{stripe|metronome}`. Required sending
+configuration is `GRIDA_PLATFORM_INGRESS_KEY_ID` /
+`GRIDA_PLATFORM_INGRESS_TOKEN` with audience `platform.billing.ingress`, plus the
+existing configured platform origin. Source endpoint verification keeps using
+`STRIPE_WEBHOOK_SECRET` / `METRONOME_WEBHOOK_SECRET`; these are distinct from
+new target webhook endpoint secrets. No caller scope or provider credentials
+are forwarded. Source ACK follows target durable capture; network/capture/ACK
+failure returns an error without invoking the retired financial processor.
+Expired signed requests remain previously verified private archive evidence
+for reviewed import, never newly signed vendor events.
+
+Restore control is private operator SQL, not an HTTP or service-role capability:
+`quarantine_source_restore(previous_epoch,new_epoch,manifest_hash)` retains the
+same source instance and a never-reused epoch. Fresh canonical authority and
+paid dispatch fail until `reconcile_source_restore(new_epoch,manifest_hash)`
+verifies the reviewed recovery record and already transferred financial owner.
+Accepted completions and webhook custody remain writable. Existing product
+execution/receipt IDs and their original epochs remain immutable, including
+late completions. Reconciliation never reopens old source financial ownership.
+
+The independent M5 simulator profile is `GRIDA_PLATFORM_FIXTURE_PROFILE=m5`
+with exactly `http://127.0.0.1:56946`; all existing synthetic-key, explicit-local
+and nonproduction restrictions still apply. Source unit tests use injected
+external transports. `platform_handoff_custody_test.sql` requires the complete
+migration history and a dedicated local database; unit success alone does not
+claim real SQL locking, vendor sandbox validation or production cutover.

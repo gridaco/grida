@@ -1,7 +1,8 @@
 BEGIN;
-SELECT plan(80);
+SELECT plan(95);
 CREATE TEMP TABLE platform_signatures(signature text PRIMARY KEY, user_callable boolean);
 INSERT INTO platform_signatures VALUES
+ ('public.platform_source_work_begin(uuid, text, jsonb, uuid)',false),('public.platform_source_work_capture(uuid, jsonb)',false),('public.platform_source_work_finish(uuid)',false),('public.platform_source_webhook_capture(text, text, bytea, jsonb)',false),('public.platform_source_webhook_ack(text, text, text)',false),
  ('public.platform_billing_owner()',false),('public.platform_account_context(text)',true),('public.platform_organizations_page(text)',true),
  ('public.platform_gg_account_snapshots(jsonb, text)',false),('public.platform_lifecycle_page(integer)',false),('public.platform_lifecycle_ack(uuid[])',false),
  ('public.platform_product_execution_claim(text, text, jsonb)',false),('public.platform_product_execution_dispatch(text, text)',false),
@@ -11,7 +12,7 @@ SELECT ok(NOT has_function_privilege('anon',to_regprocedure(signature),'EXECUTE'
 SELECT is(has_function_privilege('authenticated',to_regprocedure(signature),'EXECUTE'),user_callable,'authenticated contract '||signature) FROM platform_signatures ORDER BY signature;
 SELECT is(has_function_privilege('service_role',to_regprocedure(signature),'EXECUTE'),NOT user_callable,'service contract '||signature) FROM platform_signatures ORDER BY signature;
 SELECT ok(NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) a WHERE (n.nspname='grida_platform' OR n.nspname='public' AND p.proname LIKE 'platform_%') AND a.grantee=0 AND a.privilege_type='EXECUTE'),'no new function PUBLIC execute');
-SELECT is((SELECT count(*)::integer FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='grida_platform' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity),8,'all private tables force RLS');
+SELECT is((SELECT count(*)::integer FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='grida_platform' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity),12,'all private tables force RLS');
 SELECT ok(NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN (VALUES('anon'),('authenticated'),('service_role')) role(name) WHERE n.nspname='grida_platform' AND c.relkind='r' AND has_table_privilege(role.name,c.oid,'SELECT,INSERT,UPDATE,DELETE')),'no client or service direct read/write on any private table');
 DO $$ BEGIN
   PERFORM set_config('test.owner',(SELECT id::text FROM auth.users WHERE email='insider@grida.co'),true);

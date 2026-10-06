@@ -52,3 +52,27 @@ it.each([
     "invalid local AI fixture"
   )
 );
+
+it("keeps M5 independent from previous fixture ports", () => {
+  expect(
+    fixtureGateway({
+      ...valid,
+      GRIDA_PLATFORM_FIXTURE_PROFILE: "m5",
+      GRIDA_PLATFORM_AI_FIXTURE_ORIGIN: "http://127.0.0.1:56946",
+    })
+  ).toEqual({
+    baseURL: "http://127.0.0.1:56946/v3/ai",
+    apiKey: "grida-local-ai-fixture",
+  });
+  expect(() =>
+    fixtureGateway({ ...valid, GRIDA_PLATFORM_FIXTURE_PROFILE: "m5" })
+  ).toThrow("invalid local AI fixture");
+  expect(() =>
+    fixtureGateway({
+      ...valid,
+      GRIDA_PLATFORM_FIXTURE_PROFILE: "m5",
+      GRIDA_PLATFORM_AI_FIXTURE_ORIGIN: "http://127.0.0.1:56946",
+      NODE_ENV: "production",
+    })
+  ).toThrow("invalid local AI fixture");
+});

@@ -10,7 +10,9 @@ export function fixtureGateway(
       ? "http://127.0.0.1:56746"
       : profile === "m4"
         ? "http://127.0.0.1:56846"
-        : null;
+        : profile === "m5"
+          ? "http://127.0.0.1:56946"
+          : null;
   if (
     origin !== expectedOrigin ||
     env.GRIDA_PLATFORM_ALLOW_LOCAL !== "1" ||

@@ -2,6 +2,7 @@
 import "server-only";
 import {
   billingOwner,
+  sourceWork,
   platformProductBilling,
 } from "@/lib/platform/billing-owner";
 import {
@@ -25,7 +26,7 @@ import {
  *   - `methods.upscale` / `methods.removeBackground` / `methods.generateMusic`
  *     — named business-logic wrappers.
  *
- * Per call: gate-check → run → fire-and-forget ingest. See
+ * Per call: gate-check → durable admission → run → durable usage custody. See
  * [docs/wg/platform/billing/ai-credits.md](../../../docs/wg/platform/billing/ai-credits.md).
  *
  * `organizationId` MUST come from `requireOrganizationId` —
@@ -93,13 +94,9 @@ export interface GridaCallContext {
   /** Digest of the actual provider input, required for durable paid execution. */
   requestDigest?: string;
   /**
-   * If true, block on the ingest call (Metronome event + local cache
-   * debit RPC) before returning. Default `false` — ingest is
-   * fire-and-forget so AI latency isn't tied to billing.
-   *
-   * Set to `true` when the caller needs to read back a debited balance
-   * in the same request (e.g. UIs that display "remaining credit"
-   * after a sync chat call). The local-debit RPC is sub-100ms.
+   * Retained caller option. Paid calls now always commit durable usage custody
+   * and await the original ingest attempt before returning. An ingest failure
+   * leaves the exact receipt for reconciliation instead of retrying dispatch.
    */
   awaitIngest?: boolean;
 }
@@ -198,18 +195,6 @@ function assertOrgId(orgId: unknown): asserts orgId is number {
   }
 }
 
-function logIngestFailure(
-  ctx: GridaCallContext,
-  transactionId: string
-): (err: unknown) => void {
-  return (err) => {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(
-      `[ai-seam] ingest failed org=${ctx.organizationId} model=${ctx.model_id} feature=${ctx.feature} tx=${transactionId}: ${msg}`
-    );
-  };
-}
-
 /**
  * Gate-check only. Used by the streaming path where ingest is deferred
  * to the `finish` part — denial must fire up front. Unconditional on
@@ -237,8 +222,8 @@ export async function checkGate(ctx: GridaCallContext): Promise<void> {
 
 /**
  * The shared billing seam. Wraps any provider call in the
- * gate → run → ingest envelope. Ingest is fire-and-forget — failures
- * are logged but never surfaced (webhook + cron reconcile the cache).
+ * admission → run → durable receipt envelope. Legacy ingest failures retain
+ * exact original custody for reconciliation; provider dispatch is never retried.
  */
 export async function withTransaction<T>(
   ctx: GridaCallContext,
@@ -259,26 +244,14 @@ export async function withTransaction<T>(
   }
   await checkGate(ctx);
 
-  const transactionId = ctx.transactionId ?? crypto.randomUUID();
+  const custody = sourceWork();
+  const work = await custody.beginAI(ctx);
+  const transactionId = work.transactionID;
   const { result, costMills } = await op(transactionId);
 
-  // Default to `awaitIngest:true` — the common path is `withAiAuth`
-  // which reads back the balance after `fn` resolves. Streaming
-  // callers (canvas agent route) don't go through `withTransaction`
-  // for their ingest, so this default doesn't add latency there. Set
-  // `ctx.awaitIngest = false` explicitly to opt back into
-  // fire-and-forget.
-  const awaitIngest = ctx.awaitIngest ?? true;
-
-  if (awaitIngest) {
-    await ingestUsageEvent(ctx.organizationId, costMills, {
-      transactionId,
-    }).catch(logIngestFailure(ctx, transactionId));
-  } else {
-    void ingestUsageEvent(ctx.organizationId, costMills, {
-      transactionId,
-    }).catch(logIngestFailure(ctx, transactionId));
-  }
+  await custody.completeAI(work, costMills, { result, costMills }, () =>
+    ingestUsageEvent(ctx.organizationId, costMills, { transactionId })
+  );
 
   return result;
 }
@@ -398,10 +371,8 @@ function extractContext(
         typeof g.costMills === "number" && g.costMills >= 0
           ? g.costMills
           : undefined,
-      // Preserve `undefined` so `withTransaction`'s `?? true` default
-      // applies. Coercing to `false` would silently flip non-streaming
-      // calls to fire-and-forget ingest, leaving `withAiAuth`'s
-      // post-call `balanceCents` read stale.
+      // Preserve the published caller option; durable custody is now required
+      // for every paid call regardless of this display-oriented preference.
       awaitIngest:
         typeof g.awaitIngest === "boolean" ? g.awaitIngest : undefined,
     };
@@ -440,8 +411,8 @@ const languageModelMiddleware: LanguageModelMiddleware = {
       billingOwner() === "infra" ? platformProductBilling() : null;
     const execution = billing ? await billing.begin(ctx) : null;
     if (!billing) await checkGate(ctx);
-    const transactionId =
-      execution?.id ?? ctx.transactionId ?? crypto.randomUUID();
+    const custody = billing ? null : sourceWork();
+    const legacyWork = custody ? await custody.beginAI(ctx) : null;
     const upstream = await doStream();
     let finalCostMills: number | null = null;
     const tapped = upstream.stream.pipeThrough(
@@ -456,15 +427,18 @@ const languageModelMiddleware: LanguageModelMiddleware = {
               await billing.complete(execution, finalCostMills, {
                 usage: part.usage,
               });
+            else if (custody && legacyWork)
+              await custody.completeAI(
+                legacyWork,
+                finalCostMills,
+                { usage: part.usage },
+                () =>
+                  ingestUsageEvent(ctx.organizationId, finalCostMills!, {
+                    transactionId: legacyWork.transactionID,
+                  })
+              );
           }
           controller.enqueue(part);
-        },
-        flush() {
-          if (!billing && finalCostMills !== null) {
-            void ingestUsageEvent(ctx.organizationId, finalCostMills, {
-              transactionId,
-            }).catch(logIngestFailure(ctx, transactionId));
-          }
         },
       })
     );

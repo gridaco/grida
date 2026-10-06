@@ -14,6 +14,7 @@ SELECT is(public.platform_billing_owner()->>'epoch','1','service can observe aut
 SELECT lives_ok('UPDATE grida_billing.account SET customer_entitled=customer_entitled','source writer remains valid before transfer');
 SELECT throws_ok($$SELECT grida_platform.transfer_billing_ownership(1,repeat('a',64))$$,'42501',NULL,'service cannot invoke transfer');
 RESET ROLE;
+DO $$ BEGIN PERFORM grida_platform.begin_billing_maintenance(1,repeat('a',64)); END $$;
 SELECT is(grida_platform.transfer_billing_ownership(1,repeat('a',64))->>'owner','infra','operator transfers locally with retained manifest');
 SELECT is(grida_platform.transfer_billing_ownership(1,repeat('a',64))->>'epoch','2','identical handoff retry retains epoch');
 SELECT throws_ok($$SELECT grida_platform.transfer_billing_ownership(1,repeat('b',64))$$,'23505',NULL,'different manifest cannot reuse transfer');

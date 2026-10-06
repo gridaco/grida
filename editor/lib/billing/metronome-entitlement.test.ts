@@ -27,7 +27,7 @@ describe("getEntitlement compatibility", () => {
   beforeEach(() => {
     rpc.mockReset();
     rpc.mockResolvedValueOnce({
-      data: { owner: "grida", epoch: "1" },
+      data: { owner: "grida", epoch: "1", phase: "active", quarantined: false },
       error: null,
     });
   });
