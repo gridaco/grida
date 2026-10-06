@@ -1,0 +1,265 @@
+.page {
+  min-height: 100svh;
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.hero {
+  width: min(1120px, calc(100% - 80px));
+  margin-inline: auto;
+  padding-block: 160px 100px;
+}
+
+.intro {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  align-items: center;
+  gap: 80px;
+}
+
+.wordmark {
+  width: max-content;
+  user-select: none;
+}
+
+.grida {
+  display: block;
+  margin-left: 20px;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+}
+
+.fx {
+  display: block;
+  font-family: "Times New Roman", Times, serif;
+  font-size: clamp(160px, 21vw, 280px);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 0.86;
+  letter-spacing: -0.095em;
+}
+
+.copy h2 {
+  font-size: clamp(36px, 4.2vw, 58px);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.065em;
+}
+
+.copy p {
+  max-width: 380px;
+  margin-top: 24px;
+  font-size: 19px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+  text-wrap: balance;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 32px;
+  font-size: 14px;
+}
+
+.actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  border-radius: 999px;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.actions svg {
+  width: 16px;
+  height: 16px;
+}
+
+.download {
+  padding-inline: 22px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.download:hover {
+  background: color-mix(in oklab, var(--primary) 90%, var(--background));
+}
+
+.models {
+  color: var(--muted-foreground);
+}
+
+.models:hover {
+  color: var(--foreground);
+}
+
+.actions a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 5px;
+}
+
+.workflow {
+  position: relative;
+  display: grid;
+  grid-template-columns: 300px 1fr 420px;
+  align-items: center;
+  column-gap: 48px;
+  margin-top: 100px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.connection {
+  position: absolute;
+  grid-column: 1 / -1;
+  grid-row: 1 / 2;
+  inset: 0 0 auto;
+  width: 100%;
+  height: calc(100% - 32px);
+  pointer-events: none;
+}
+
+.connection path {
+  stroke: color-mix(in oklab, var(--foreground) 16%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.connection .flow {
+  stroke: var(--muted-foreground);
+  stroke-dasharray: 18 750;
+  animation: flow 9s linear infinite;
+}
+
+.reference,
+.result {
+  position: relative;
+}
+
+.referenceArt,
+.resultArt {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  isolation: isolate;
+}
+
+.referenceArt {
+  aspect-ratio: 1;
+}
+
+.resultArt {
+  aspect-ratio: 1;
+}
+
+.workflow img {
+  object-fit: cover;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.label {
+  display: block;
+  margin-top: 16px;
+  color: var(--muted-foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.function {
+  position: relative;
+  justify-self: center;
+  margin-top: -32px;
+  padding: 16px;
+  background: var(--background);
+  font-family: "Times New Roman", Times, serif;
+  font-size: clamp(48px, 6.4vw, 86px);
+  font-style: italic;
+  line-height: 1;
+  letter-spacing: -0.1em;
+}
+
+.parenthesis {
+  color: var(--muted-foreground);
+}
+
+.caption {
+  grid-column: 1 / -1;
+  margin-top: 60px;
+  text-align: center;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  color: var(--muted-foreground);
+}
+
+@keyframes flow {
+  from {
+    stroke-dashoffset: 768;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (max-width: 1100px) {
+  .intro {
+    gap: 48px;
+  }
+  .workflow {
+    grid-template-columns: minmax(0, 1fr) 0.65fr minmax(0, 1.35fr);
+    column-gap: 24px;
+  }
+}
+
+@media (max-width: 700px) {
+  .hero {
+    width: calc(100% - 40px);
+    padding-block: 120px 64px;
+  }
+  .intro {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+  .grida {
+    margin-left: 12px;
+  }
+  .copy p {
+    font-size: 17px;
+    margin-top: 16px;
+  }
+  .workflow {
+    margin-top: 64px;
+    column-gap: 12px;
+    grid-template-columns: 1fr 0.4fr 1fr;
+  }
+  .function {
+    font-size: 30px;
+    padding: 6px;
+  }
+  .referenceArt,
+  .resultArt {
+    border-radius: 10px;
+  }
+  .label {
+    font-size: 9px;
+  }
+  .caption {
+    margin-top: 36px;
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connection .flow {
+    animation: none;
+  }
+  .actions a {
+    transition: none;
+  }
+}

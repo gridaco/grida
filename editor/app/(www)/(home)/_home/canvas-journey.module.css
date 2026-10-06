@@ -1,0 +1,849 @@
+.track {
+  position: relative;
+  height: 285svh;
+  background: #111111;
+}
+.stage {
+  --content-width: min(1200px, calc(100vw - 160px));
+  --frame-width: calc(var(--content-width) * 0.5875);
+  --frame-height: calc(var(--frame-width) / 1.24);
+  --frame-left: calc(
+    (100vw - var(--content-width)) / 2 + var(--content-width) * 0.4125
+  );
+  --frame-top: calc((100svh - var(--frame-height)) / 2);
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: clip;
+  isolation: isolate;
+}
+.tabs {
+  display: block !important;
+  height: 100%;
+}
+.copy {
+  position: absolute;
+  top: 50%;
+  left: calc((100vw - var(--content-width)) / 2);
+  width: calc(var(--content-width) * 0.3525);
+  transform: translateY(-50%);
+}
+.copy h2 {
+  font-size: clamp(54px, 5.7vw, 78px);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.058em;
+}
+.frame {
+  --world-open: 0;
+  position: absolute;
+  left: var(--frame-left);
+  top: var(--frame-top);
+  width: var(--frame-width);
+  height: var(--frame-height);
+  border-radius: 24px;
+  contain: layout style;
+}
+.windowSurface {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #f0f1f2;
+  pointer-events: none;
+}
+.designPanel,
+.generatePanel {
+  position: absolute;
+  inset: 0;
+  margin: 0 !important;
+  border-radius: inherit;
+  outline: none;
+}
+.designPanel {
+  z-index: 2;
+}
+.designPanel > div {
+  height: 100%;
+}
+/* Automate stays mounted for scroll assembly, so animate activation rather
+   than mounting, using the same entrance as Design and Present. */
+.generatePanel[data-state="active"] {
+  animation: previewEnter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.generatePanel[data-state="inactive"] {
+  visibility: hidden;
+  pointer-events: none;
+}
+.designPanel:focus-visible,
+.generatePanel:focus-visible {
+  outline: 2px solid #6b70d6;
+  outline-offset: 6px;
+}
+.windowChrome {
+  position: absolute;
+  top: 20px;
+  left: 23px;
+  right: 23px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #929292;
+  font-size: clamp(7px, 0.75vw, 10px);
+}
+.windowChrome > span:last-child {
+  margin-left: auto;
+}
+.worldArtwork {
+  --art-left: calc(var(--frame-width) * 0.395);
+  --art-top: calc(var(--frame-height) * 0.24);
+  --art-width: calc(var(--frame-width) * 0.56);
+  --art-height: calc(var(--frame-height) * 0.53);
+  position: absolute;
+  left: calc(
+    var(--art-left) - (var(--frame-left) + var(--art-left)) * var(--world-open)
+  );
+  top: calc(
+    var(--art-top) - (var(--frame-top) + var(--art-top)) * var(--world-open)
+  );
+  width: calc(
+    var(--art-width) + (100vw - var(--art-width)) * var(--world-open)
+  );
+  height: calc(
+    var(--art-height) + (100svh - var(--art-height)) * var(--world-open)
+  );
+  overflow: visible;
+  border-radius: calc(14px * (1 - var(--world-open)));
+}
+.worldImage {
+  --layer-spread: 1;
+  --layer-tilt: 0;
+  --layer-hud-opacity: 1;
+  position: absolute;
+  inset: 0;
+  perspective: 1600px;
+  user-select: none;
+  pointer-events: none;
+}
+/* Keep the resting planes flat. Their layout expands into the full scene;
+   perspective is introduced only while they assemble. */
+.worldLayer {
+  position: absolute;
+  left: calc(var(--layer-spread) * var(--layer-x));
+  top: calc(var(--layer-spread) * var(--layer-y));
+  width: calc(100% - var(--layer-spread) * (100% - var(--layer-size)));
+  height: calc(100% - var(--layer-spread) * (100% - var(--layer-size)));
+  background-repeat: repeat-x;
+  background-size: var(--tile-width, auto) var(--tile-height, 100%);
+  background-position: calc(50% - var(--layer-travel, 0px)) 50%;
+  border-radius: calc(14px * (1 - var(--world-open)));
+  transform: none;
+}
+/* An editorial arrangement: atmosphere above, terrain below, with a tree
+   study offset to the right. Each plane returns to the same canvas on join. */
+.worldLayer[data-canvas-world-layer="sky"] {
+  --layer-x: -6%;
+  --layer-y: -20%;
+  --layer-size: 64%;
+}
+.worldLayer[data-canvas-world-layer="hills"] {
+  --layer-x: -13%;
+  --layer-y: -3%;
+  --layer-size: 66%;
+}
+.worldLayer[data-canvas-world-layer="trees"] {
+  --layer-x: 45%;
+  --layer-y: 15%;
+  --layer-size: 49%;
+}
+.worldLayer[data-canvas-world-layer="ground"] {
+  --layer-x: -6%;
+  --layer-y: 21%;
+  --layer-size: 78%;
+}
+.worldLayer[data-canvas-world-layer="foreground"] {
+  --layer-x: 28%;
+  --layer-y: 48%;
+  --layer-size: 64%;
+}
+.worldImage[data-assembling="true"] .worldLayer {
+  transform: rotateY(calc(var(--layer-tilt) * -12deg));
+}
+.layerSelection {
+  position: absolute;
+  /* Project the artwork's visible bounds through the same cover sizing and
+     centered crop as its background. The image itself keeps its full canvas. */
+  top: clamp(
+    0px,
+    calc(
+      (100% - var(--tile-height, 100%)) / 2 + var(--tile-height, 100%) *
+        var(--content-top)
+    ),
+    100%
+  );
+  bottom: clamp(
+    0px,
+    calc(
+      (100% - var(--tile-height, 100%)) / 2 + var(--tile-height, 100%) *
+        var(--content-bottom)
+    ),
+    100%
+  );
+  left: clamp(
+    0px,
+    calc(
+      (100% - var(--tile-width, 100%)) / 2 + var(--tile-width, 100%) *
+        var(--content-left)
+    ),
+    100%
+  );
+  right: clamp(
+    0px,
+    calc(
+      (100% - var(--tile-width, 100%)) / 2 + var(--tile-width, 100%) *
+        var(--content-right)
+    ),
+    100%
+  );
+  border: 1.5px solid #777ce4;
+  opacity: var(--layer-hud-opacity);
+  pointer-events: none;
+}
+.layerSelection > i {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border: 1.5px solid #777ce4;
+}
+.layerSelection > i:nth-child(1) {
+  top: -4.75px;
+  left: -4.75px;
+}
+.layerSelection > i:nth-child(2) {
+  top: -4.75px;
+  right: -4.75px;
+}
+.layerSelection > i:nth-child(3) {
+  bottom: -4.75px;
+  right: -4.75px;
+}
+.layerSelection > i:nth-child(4) {
+  bottom: -4.75px;
+  left: -4.75px;
+}
+.landscape {
+  object-fit: cover;
+  object-position: center;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.worldShade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(transparent 50%, #111111 100%);
+}
+.worldTitle {
+  position: absolute;
+  z-index: 3;
+  left: max(48px, calc((100vw - 1200px) / 2));
+  bottom: 8%;
+  color: #fff;
+  pointer-events: none;
+  text-shadow: 0 2px 35px #0006;
+}
+.worldTitle > span,
+.staticWorld > div > span {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+.worldTitle h2,
+.staticWorld h2 {
+  font-size: clamp(42px, 5.5vw, 80px);
+  letter-spacing: -0.055em;
+  font-weight: 500;
+  line-height: 1.05;
+  margin-top: 20px;
+}
+.progress {
+  position: absolute;
+  top: calc(100% + 22px);
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  height: 2px;
+}
+.progress > span {
+  background: #e8e8e8;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress > span > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #888888;
+  transform-origin: left;
+}
+.staticWorld {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .stage {
+    --content-width: calc(100vw - 80px);
+  }
+  .copy h2 {
+    font-size: 56px;
+  }
+}
+@media (max-width: 700px), (prefers-reduced-motion: reduce) {
+  .track {
+    height: auto;
+    background: #fafafa;
+  }
+  .stage {
+    position: relative;
+    height: auto;
+    overflow: visible;
+    padding: 60px 32px 90px;
+    background: #fafafa !important;
+  }
+  .tabs {
+    display: grid !important;
+    grid-template-columns: 0.85fr 1.4fr;
+    align-items: center;
+    gap: 40px !important;
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+  .copy {
+    position: static;
+    transform: none;
+    width: auto;
+    opacity: 1 !important;
+  }
+  .frame {
+    --world-open: 0 !important;
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1.24;
+  }
+  .worldArtwork {
+    inset: 24% 4.5% 23% 39.5%;
+    width: auto;
+    height: auto;
+  }
+  .windowSurface,
+  .windowChrome,
+  .workflowSteps {
+    opacity: 1 !important;
+  }
+  .worldImage {
+    transform: none !important;
+  }
+  .progress,
+  .worldTitle,
+  .worldShade {
+    display: none;
+  }
+  .staticWorld {
+    display: block;
+    position: relative;
+    min-height: 650px;
+    height: 80svh;
+    background: #111;
+    color: #fff;
+    overflow: hidden;
+  }
+  .staticWorld::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(transparent 55%, #111);
+  }
+  .staticWorld > div {
+    position: absolute;
+    z-index: 1;
+    left: max(40px, calc((100vw - 1200px) / 2));
+    bottom: 9%;
+  }
+}
+@media (max-width: 700px) {
+  .stage {
+    padding-inline: 26px;
+  }
+  .tabs {
+    grid-template-columns: 1fr;
+  }
+  .copy h2 {
+    font-size: 58px;
+  }
+  .copy h2 br {
+    display: none;
+  }
+  .frame {
+    margin-top: 10px;
+  }
+  .staticWorld {
+    min-height: 500px;
+    height: 75svh;
+  }
+  .staticWorld > div {
+    left: 26px;
+  }
+}
+
+/* These are layered product illustrations, not flattened screenshots. */
+.designPreview,
+.presentPreview,
+.workflowSteps {
+  container-type: inline-size;
+  user-select: none;
+}
+.designPreview,
+.presentPreview {
+  position: relative;
+  overflow: hidden;
+  border-radius: inherit;
+  background: #f0f1f2;
+  animation: previewEnter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.previewHeader {
+  position: absolute;
+  top: 5%;
+  left: 5%;
+  right: 5%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #8a8d90;
+  font-size: 1.45cqw;
+}
+.previewProject {
+  color: #53585b;
+}
+.previewProject > span {
+  color: #bbbfc1;
+  padding-inline: 0.6em;
+}
+.previewHeader > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.previewHeader svg {
+  width: 1.5cqw;
+  height: 1.5cqw;
+}
+.poster {
+  position: absolute;
+  inset: 14% 6% 13% 35%;
+  overflow: visible;
+  background: #bdaecd;
+  box-shadow: 0 18px 35px #2222220b;
+}
+.poster > img {
+  object-position: 56% center;
+}
+.posterEdition,
+.posterFooter {
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  display: flex;
+  justify-content: space-between;
+  color: #382933;
+}
+.posterEdition {
+  top: 5%;
+  font-size: 1.05cqw;
+  letter-spacing: 0.07em;
+}
+.posterTitle {
+  position: absolute;
+  left: 6%;
+  top: 13%;
+  width: 88%;
+  color: #302830;
+  font-size: 7.8cqw;
+  letter-spacing: -0.07em;
+  font-weight: 500;
+  line-height: 0.95;
+  padding: 0.025em 0.04em 0.08em;
+  outline: 1px solid #6f72e2;
+}
+.posterTitle em {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.065em;
+}
+.posterTitle i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: white;
+  border: 1px solid #6f72e2;
+}
+.posterTitle i:nth-of-type(1) {
+  left: -3px;
+  top: -3px;
+}
+.posterTitle i:nth-of-type(2) {
+  right: -3px;
+  top: -3px;
+}
+.posterTitle i:nth-of-type(3) {
+  left: -3px;
+  bottom: -3px;
+}
+.posterTitle i:nth-of-type(4) {
+  right: -3px;
+  bottom: -3px;
+}
+.posterFooter {
+  bottom: 5%;
+  font-size: 1.25cqw;
+  line-height: 1.3;
+}
+.posterFooter > span:last-child {
+  font-size: 4cqw;
+  line-height: 1;
+}
+.typeSpecimen {
+  position: absolute;
+  left: 5%;
+  top: 24%;
+  width: 33%;
+  padding: 3.2%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #36333a;
+  transform: rotate(-5deg);
+  box-shadow: 0 10px 26px #00000004;
+}
+.typeSpecimen > small {
+  font-size: 1.05cqw;
+  color: #929094;
+  letter-spacing: 0.06em;
+}
+.typeSpecimen > strong {
+  font-size: 11cqw;
+  font-weight: 400;
+  letter-spacing: -0.09em;
+  line-height: 1.25;
+}
+.typeSpecimen > span {
+  font-size: 2.7cqw;
+  letter-spacing: -0.045em;
+  line-height: 1.14;
+}
+.typeRule {
+  height: 1px;
+  background: #efedef;
+  margin-block: 12%;
+}
+.typeSpecimen > small:last-child {
+  display: flex;
+  justify-content: space-between;
+  letter-spacing: 0;
+}
+.colorPalette {
+  position: absolute;
+  left: 7%;
+  bottom: 17%;
+  display: flex;
+  width: 22%;
+  height: 6%;
+  border-radius: 4px;
+  overflow: hidden;
+  transform: rotate(-5deg);
+}
+.colorPalette span {
+  flex: 1;
+  background: #393039;
+}
+.colorPalette span:nth-child(2) {
+  background: #ef7850;
+}
+.colorPalette span:nth-child(3) {
+  background: #b5a3cb;
+}
+.colorPalette span:nth-child(4) {
+  background: #fff;
+}
+.designToolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2.6cqw;
+  border-radius: 12px;
+  padding: 1.15cqw 1.6cqw;
+  background: white;
+  color: #777;
+  box-shadow: 0 4px 20px #00000007;
+}
+.designToolbar svg {
+  width: 1.9cqw;
+  height: 1.9cqw;
+  stroke-width: 1.4;
+}
+.designToolbar > span {
+  display: grid;
+  place-items: center;
+  background: #ededf7;
+  color: #5053a8;
+  padding: 0.8cqw;
+  border-radius: 5px;
+}
+.presentationSlide {
+  position: absolute;
+  inset: 16% 6% 25%;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  background: #fcfcfc;
+  overflow: hidden;
+  box-shadow: 0 18px 35px #20333a0a;
+}
+.slideEditorial {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10% 9%;
+  color: #244348;
+}
+.slideEditorial > small {
+  font-size: 1cqw;
+  letter-spacing: 0.08em;
+}
+.slideEditorial > strong {
+  font-family: Georgia, serif;
+  font-size: 7.5cqw;
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+  margin-top: auto;
+}
+.slideEditorial > span {
+  font-size: 1.55cqw;
+  margin-block: 6% auto;
+}
+.slideEditorial > small:last-child {
+  display: flex;
+  justify-content: space-between;
+  color: #89999b;
+}
+.slidePhotograph {
+  position: relative;
+}
+.slidePhotograph img {
+  object-position: 48% center;
+}
+.presentationStrip {
+  position: absolute;
+  left: 25%;
+  right: 25%;
+  top: 80%;
+  height: 11%;
+  display: flex;
+  gap: 8%;
+}
+.presentationStrip > div {
+  position: relative;
+  width: 28%;
+  overflow: hidden;
+  border-radius: 3px;
+}
+.thumbnailSelected {
+  background: #fff;
+  color: #244348;
+  outline: 1.5px solid #7f979b;
+  outline-offset: 3px;
+  padding: 1.3cqw 1cqw;
+}
+.thumbnailSelected strong {
+  display: block;
+  position: relative;
+  z-index: 1;
+  font-family: Georgia, serif;
+  font-size: 1.3cqw;
+  font-weight: 400;
+  line-height: 1;
+}
+.thumbnailSelected > span {
+  position: absolute;
+  inset: 0 0 0 60%;
+  background: #9bbbc5;
+}
+.thumbnailType {
+  background: #234247;
+  color: #e6eeef;
+  padding: 1cqw;
+}
+.thumbnailType small {
+  display: block;
+  font-size: 0.5cqw;
+  margin-bottom: 6%;
+}
+.thumbnailType strong {
+  display: block;
+  font-family: Georgia, serif;
+  font-size: 1.7cqw;
+  font-weight: 400;
+  line-height: 1;
+}
+.thumbnailPalette {
+  display: flex;
+  background: #fff;
+  padding: 1cqw;
+  gap: 5%;
+}
+.thumbnailPalette i {
+  width: 28%;
+  height: 58%;
+  background: #b6cfd6;
+}
+.thumbnailPalette i:nth-child(2) {
+  background: #d5dfe0;
+}
+.thumbnailPalette i:nth-child(3) {
+  background: #244348;
+}
+.thumbnailPalette > span {
+  position: absolute;
+  bottom: 12%;
+  left: 10%;
+  font-size: 0.65cqw;
+  color: #53676b;
+}
+.slidePagination {
+  position: absolute;
+  bottom: 3%;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2cqw;
+  color: #a0a6a7;
+  font-size: 1.1cqw;
+}
+.slidePagination svg {
+  width: 1.4cqw;
+  height: 1.4cqw;
+}
+.workflowSteps {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.workflowWires {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.workflowWires path {
+  fill: none;
+  stroke: #a5b3a5;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.workflowWires circle {
+  fill: #8fa58b;
+}
+.promptNode,
+.modelNode {
+  position: absolute;
+  left: 6.5%;
+  width: 26.3%;
+  padding: 2.2%;
+  border-radius: 10px;
+  background: white;
+  color: #41494a;
+  box-shadow: 0 8px 24px #15241e06;
+}
+.promptNode {
+  top: 19%;
+}
+.modelNode {
+  top: 59.3%;
+}
+.nodeHeading {
+  display: flex;
+  align-items: center;
+  gap: 0.8cqw;
+  font-size: 1.35cqw;
+  font-weight: 500;
+}
+.nodeHeading svg {
+  width: 1.6cqw;
+  height: 1.6cqw;
+  color: #8c9b87;
+}
+.promptNode p {
+  font-size: 1.85cqw;
+  letter-spacing: -0.025em;
+  line-height: 1.55;
+  margin-block: 14% 3%;
+}
+.nodeSettings {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 1.15cqw;
+  color: #a0a6a1;
+  margin-top: 12%;
+}
+.workflowFoot {
+  position: absolute;
+  bottom: 8%;
+  left: 6.5%;
+  right: 4.5%;
+  display: flex;
+  justify-content: space-between;
+  color: #99a09c;
+  font-size: 1.2cqw;
+}
+.workflowFoot > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b766e;
+}
+.workflowFoot svg {
+  width: 1.4cqw;
+  height: 1.4cqw;
+}
+.fxMark {
+  font-family: Georgia, serif;
+  font-style: italic;
+  color: #5e6860;
+  font-size: 18px;
+}
+@keyframes previewEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .designPreview,
+  .presentPreview,
+  .generatePanel[data-state="active"] {
+    animation: none;
+  }
+}

@@ -52,6 +52,18 @@ export default function Footer({ className }: { className?: string }) {
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Product</h3>
                 <Link
+                  href={sitemap.items.fx.href}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  {sitemap.items.fx.title}
+                </Link>
+                <Link
+                  href={sitemap.items.ai_gateway.href}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  {sitemap.items.ai_gateway.title}
+                </Link>
+                <Link
                   href={sitemap.links.svg}
                   className="text-xs md:text-sm text-muted-foreground"
                 >

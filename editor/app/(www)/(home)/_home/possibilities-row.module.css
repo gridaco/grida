@@ -1,0 +1,348 @@
+.section {
+  max-width: 1200px;
+  margin: 72px auto 0;
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 32px;
+}
+.heading h3 {
+  font-size: 20px;
+  line-height: 1.4;
+  letter-spacing: -0.025em;
+  font-weight: 400;
+  color: #666;
+}
+.controls {
+  display: flex;
+  gap: 12px;
+}
+.controls button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #333;
+}
+.controls button:hover {
+  background: #eee;
+}
+.controls button:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.controls svg {
+  width: 19px;
+  height: 19px;
+}
+.row {
+  --edge-space: clamp(24px, 6vw, 96px);
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  margin-inline: calc(-1 * var(--edge-space));
+  padding: 0 var(--edge-space) 4px;
+  scroll-padding-inline: var(--edge-space);
+  --edge-mask: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 4%) calc(var(--edge-space) * 0.15),
+    rgb(0 0 0 / 16%) calc(var(--edge-space) * 0.3),
+    rgb(0 0 0 / 50%) calc(var(--edge-space) * 0.5),
+    rgb(0 0 0 / 84%) calc(var(--edge-space) * 0.7),
+    rgb(0 0 0 / 96%) calc(var(--edge-space) * 0.85),
+    #000 var(--edge-space),
+    #000 calc(100% - var(--edge-space)),
+    rgb(0 0 0 / 96%) calc(100% - var(--edge-space) * 0.85),
+    rgb(0 0 0 / 84%) calc(100% - var(--edge-space) * 0.7),
+    rgb(0 0 0 / 50%) calc(100% - var(--edge-space) * 0.5),
+    rgb(0 0 0 / 16%) calc(100% - var(--edge-space) * 0.3),
+    rgb(0 0 0 / 4%) calc(100% - var(--edge-space) * 0.15),
+    transparent
+  );
+  mask-image: var(--edge-mask);
+  -webkit-mask-image: var(--edge-mask);
+}
+.row::-webkit-scrollbar {
+  display: none;
+}
+.row:focus-visible,
+.controls button:focus-visible {
+  outline: 2px solid #888;
+  outline-offset: 5px;
+}
+.topic {
+  flex: 0 0 30%;
+  min-width: 330px;
+  height: 560px;
+  position: relative;
+  background: #efefef;
+  border-radius: 20px;
+  overflow: hidden;
+  padding: 32px;
+  scroll-snap-align: start;
+}
+.topic h4 {
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  font-weight: 500;
+}
+.topic > p {
+  color: #666;
+  font-size: 15px;
+  line-height: 1.65;
+  margin-top: 16px;
+}
+.topic > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  margin-top: 18px;
+  border-radius: 4px;
+}
+.topic > a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.topic > a svg {
+  width: 13px;
+  height: 13px;
+}
+.visual {
+  position: absolute;
+  left: 32px;
+  right: -20px;
+  bottom: -20px;
+  height: 290px;
+  user-select: none;
+  pointer-events: none;
+}
+.visual img {
+  object-fit: cover;
+  -webkit-user-drag: none;
+}
+.window {
+  position: relative;
+  min-height: 290px;
+  padding: 22px;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 12px 50px #0000000c;
+  overflow: hidden;
+}
+.chrome {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: #777;
+  margin-bottom: 22px;
+}
+.terminal {
+  background: #222;
+  color: #f5f5f5;
+  font-family: monospace;
+}
+.terminal .chrome {
+  color: #aaa;
+}
+.terminal > p {
+  font-size: 12px;
+  margin-block: 10px;
+}
+.terminal > p > span {
+  color: #a8cbbf;
+}
+.dim {
+  color: #aaa;
+}
+.asset {
+  position: relative;
+  height: 140px;
+  margin: 18px 0 10px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.window small {
+  display: block;
+  font-size: 10px;
+  color: #888;
+}
+.provider {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  padding: 17px 0;
+}
+.provider code {
+  color: #aaa;
+  font-size: 10px;
+}
+.smallNote {
+  color: #888;
+  font-size: 11px;
+  margin-top: 20px;
+}
+.chatgpt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+}
+.openai {
+  width: 34px;
+  height: 34px;
+}
+.chatgpt strong {
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.chatgpt p {
+  font-size: 12px;
+  color: #888;
+}
+.connect,
+.submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  border-radius: 999px;
+  background: #222;
+  color: white;
+  font-size: 11px;
+}
+.formTitle {
+  display: block;
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  margin-bottom: 16px;
+}
+.field {
+  background: #f4f4f4;
+  padding: 12px;
+  border-radius: 6px;
+  color: #999;
+  font-size: 11px;
+  margin: 8px 0;
+}
+.submit {
+  margin-top: 10px;
+}
+.database {
+  width: 440px;
+}
+.table {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 0.6fr;
+  font-size: 11px;
+}
+.table > div {
+  padding: 10px 8px;
+  background: #f2f2f2;
+  color: #888;
+}
+.table > span {
+  padding: 15px 8px;
+  color: #666;
+}
+.slideIllustration {
+  height: 100%;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #fafafa;
+}
+.slideIllustration img {
+  object-fit: contain;
+}
+@media (max-width: 800px) {
+  .topic {
+    flex-basis: 80%;
+    min-width: 280px;
+  }
+  .section {
+    margin-top: 72px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    scroll-behavior: auto;
+  }
+}
+
+.agentLogos {
+  display: flex;
+  gap: 22px;
+  margin-bottom: 22px;
+  font-family: sans-serif;
+}
+.agentLogos > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.agentLogos svg {
+  width: 25px;
+  height: 25px;
+  color: #eee;
+}
+.agentLogos svg * {
+  fill: currentColor;
+}
+.localRequest {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  padding-block: 20px;
+}
+.localRequest > span {
+  padding: 12px;
+  background: #f3f3f3;
+  border-radius: 10px;
+}
+.retention {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 12px;
+  color: #666;
+  padding-block: 12px;
+}
+
+.library {
+  padding: 20px 16px;
+}
+.library .chrome {
+  padding-right: 20px;
+  margin-bottom: 18px;
+}
+.libraryFree {
+  margin-left: auto;
+  color: #9a9a9a;
+  font-size: 9px;
+}
+.libraryCollection {
+  columns: 2;
+  column-gap: 10px;
+}
+.libraryCollection > div {
+  position: relative;
+  break-inside: avoid;
+  margin-bottom: 10px;
+  overflow: hidden;
+  border-radius: 8px;
+}

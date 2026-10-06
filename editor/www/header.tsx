@@ -37,6 +37,8 @@ type Item = {
 
 const features: Item[] = [
   sitemap.items.canvas,
+  sitemap.items.fx,
+  sitemap.items.ai_gateway,
   sitemap.items.slides,
   sitemap.items.svg,
   sitemap.items.forms,
