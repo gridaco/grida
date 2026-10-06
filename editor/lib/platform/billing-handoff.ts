@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "../supabase/server";
 import {
   BillingConsumerError,
+  configuredOrigin,
   consoleBillingUrl,
   type BillingDestination,
 } from "./billing-consumer";
@@ -59,8 +60,15 @@ export async function billingHandoff(
   const { data: auth, error: authError } = await client.auth.getUser();
   if (authError && authError.name !== "AuthSessionMissingError")
     throw new BillingConsumerError();
-  if (!auth.user)
-    return redirect(`/sign-in?next=${encodeURIComponent(source)}`);
+  if (!auth.user) {
+    // The auth handler may observe the proxy's private origin. Keep the exact
+    // validated resource on the configured public source across sign-in.
+    const origin = configuredOrigin(
+      process.env.GRIDA_OAUTH_ORIGIN,
+      process.env
+    );
+    return redirect(`/sign-in?next=${encodeURIComponent(origin + source)}`);
+  }
   const { data: org, error } = await client
     .from("organization")
     .select("id,name")
