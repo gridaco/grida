@@ -5,6 +5,7 @@ import { Button } from "@app/ui/components/button";
 import { AppleLogo, WindowsLogo, LinuxLogo } from "@grida/react-icons/logos";
 import { DownloadIcon } from "@radix-ui/react-icons";
 import { macarch } from "./mac-arch";
+import { desktopPlatform } from "@/www/desktop-platform";
 
 type OS = "mac" | "windows" | "linux";
 
@@ -31,6 +32,10 @@ interface PrimaryDownloadButtonProps {
   fallbackUrl: string;
   /** Intel DMG; ignored unless client-side detection reports x64 (issue #954). */
   macX64Url: string | null;
+  className?: string;
+  variant?: React.ComponentProps<typeof Button>["variant"];
+  showShortcut?: boolean;
+  fallbackLabel?: string;
 }
 
 export function PrimaryDownloadButton({
@@ -38,11 +43,23 @@ export function PrimaryDownloadButton({
   defaultUrl,
   fallbackUrl,
   macX64Url,
+  className,
+  variant = "default",
+  showShortcut = true,
+  fallbackLabel = "Download",
 }: PrimaryDownloadButtonProps) {
   const anchorRef = useRef<HTMLAnchorElement>(null);
   const [macArch, setMacArch] = useState<macarch.Arch | null>(null);
+  const [detectedOS, setDetectedOS] = useState(os);
 
   useEffect(() => {
+    setDetectedOS(
+      desktopPlatform.detect(navigator.userAgent, navigator.maxTouchPoints)
+    );
+  }, [os]);
+
+  useEffect(() => {
+    if (!showShortcut) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "d" && e.key !== "D") return;
       const tag = (e.target as HTMLElement)?.tagName ?? "";
@@ -59,15 +76,15 @@ export function PrimaryDownloadButton({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [showShortcut]);
 
   useEffect(() => {
-    if (os !== "mac") return;
+    if (detectedOS !== "mac") return;
     setMacArch(macarch.classifyRenderer(macarch.readWebGLRenderer()));
-  }, [os]);
+  }, [detectedOS]);
 
   const href = macarch.pickHeroUrl({
-    os,
+    os: detectedOS,
     defaultUrl,
     fallbackUrl,
     macX64Url,
@@ -75,21 +92,24 @@ export function PrimaryDownloadButton({
   });
 
   return (
-    <a ref={anchorRef} href={href}>
-      <Button size="lg">
-        {os ? (
+    <Button asChild size="lg" variant={variant} className={className}>
+      <a ref={anchorRef} href={href}>
+        {detectedOS ? (
           <>
-            <OSIcon os={os} className="size-4" /> Download for {oslabel[os]}
+            <OSIcon os={detectedOS} className="size-4" /> Download for{" "}
+            {oslabel[detectedOS]}
           </>
         ) : (
           <>
-            <DownloadIcon className="size-4" /> Download
+            <DownloadIcon className="size-4" /> {fallbackLabel}
           </>
         )}
-        <kbd className="pointer-events-none ml-2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:flex">
-          D
-        </kbd>
-      </Button>
-    </a>
+        {showShortcut && (
+          <kbd className="pointer-events-none ml-2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:flex">
+            D
+          </kbd>
+        )}
+      </a>
+    </Button>
   );
 }

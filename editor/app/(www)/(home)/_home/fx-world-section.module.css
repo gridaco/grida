@@ -1,0 +1,324 @@
+.section {
+  --world-breakout: 0;
+  --world-layer-reveal: 1;
+  --world-scene: 1;
+  --world-reference-opacity: 0;
+  --world-guide-opacity: 0;
+  --world-result-opacity: 1;
+  --preview-height: min(22vw, 32svh, 300px);
+  --scene-height: min(49.5vw, 54svh, 560px);
+  position: relative;
+  background: #111;
+  color: #f6f6f6;
+}
+.stage {
+  position: relative;
+  height: 100svh;
+  min-height: 760px;
+  overflow: clip;
+  isolation: isolate;
+}
+.intro {
+  position: absolute;
+  z-index: 10;
+  top: clamp(40px, 6svh, 72px);
+  left: max(40px, calc((100vw - 1200px) / 2));
+  right: 40px;
+}
+.intro h2 {
+  font-size: clamp(36px, 3.6vw, 56px);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+}
+.intro h2 span {
+  display: block;
+}
+.intro p {
+  color: #999;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  margin-top: 18px;
+}
+.visual {
+  position: absolute;
+  inset: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+.visual img {
+  -webkit-user-drag: none;
+}
+.reference {
+  position: absolute;
+  left: calc(50% - var(--world-layer-reveal) * 30%);
+  top: 57%;
+  width: min(38vw, 520px);
+  translate: -50% -50%;
+  transform: scale(calc(1 - var(--world-layer-reveal) * 0.4));
+  opacity: var(--world-reference-opacity);
+}
+.referenceArt {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 16px;
+}
+.referenceArt img {
+  object-fit: cover;
+}
+.reference figcaption {
+  margin-top: 18px;
+  text-align: center;
+  color: #93969c;
+  font-size: 16px;
+}
+.connection {
+  position: absolute;
+  left: 38%;
+  top: 57%;
+  translate: -50% -50%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  opacity: calc(var(--world-layer-reveal) * var(--world-reference-opacity));
+}
+.connection span {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 24px;
+  letter-spacing: -0.06em;
+  color: #c3c6cb;
+}
+.connection i {
+  width: clamp(12px, 2vw, 28px);
+  height: 1px;
+  background: #41444a;
+}
+.world {
+  position: absolute;
+  left: calc(65% - var(--world-scene) * 15%);
+  top: 57%;
+  height: calc(
+    var(--preview-height) + var(--world-scene) *
+      (var(--scene-height) - var(--preview-height))
+  );
+  aspect-ratio: 16 / 9;
+  translate: -50% -50%;
+  perspective: 1600px;
+  opacity: var(--world-layer-reveal);
+}
+.section[data-phase="playback"] .world {
+  pointer-events: auto;
+  touch-action: pan-y;
+  cursor: grab;
+}
+.section[data-dragging="true"] .world {
+  cursor: grabbing;
+}
+.world:focus-visible {
+  outline: 2px solid #aaaeb8;
+  outline-offset: 6px;
+  border-radius: 16px;
+}
+.plane {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  transform: translate(
+      calc(var(--world-breakout) * var(--layer-offset) * 28px),
+      calc(var(--world-breakout) * var(--layer-offset) * 42px)
+    )
+    rotateY(calc(var(--world-breakout) * -24deg));
+}
+.layerArtwork {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background-image: var(--layer-image);
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+  background-position: calc(var(--layer-travel, 0px) * -1) 50%;
+}
+.layerName {
+  position: absolute;
+  top: 50%;
+  right: -14px;
+  translate: 100% -50%;
+  color: #a2a7af;
+  font-size: 12px;
+  opacity: var(--world-breakout);
+}
+.steps {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #696d73;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: var(--world-guide-opacity);
+}
+.steps i {
+  width: 24px;
+  height: 1px;
+  background: #34373c;
+}
+.section[data-phase="reference"] [data-step="reference"],
+.section[data-phase="layers"] [data-step="layers"],
+.section[data-phase="assemble"] [data-step="assemble"],
+.section[data-phase="playback"] [data-step="playback"] {
+  color: #e3e5e9;
+}
+.controls {
+  display: none;
+  position: absolute;
+  z-index: 10;
+  bottom: 44px;
+  left: 50%;
+  translate: -50% 0;
+  align-items: center;
+  gap: 24px;
+  opacity: var(--world-result-opacity);
+}
+.section[data-phase="playback"] .controls {
+  display: flex;
+}
+.playButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 136px;
+  height: 44px;
+  padding-inline: 18px;
+  border-radius: 999px;
+  background: #25272b;
+  color: #eee;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.playButton:hover {
+  background: #373a40;
+}
+.playButton:focus-visible,
+.speed input:focus-visible {
+  outline: 2px solid #aaaeb8;
+  outline-offset: 4px;
+}
+.pauseIcon,
+.section[data-playback="playing"] .playIcon {
+  display: none;
+}
+.section[data-playback="playing"] .pauseIcon {
+  display: block;
+}
+.speed {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #969ba3;
+  font-size: 12px;
+}
+.speed input {
+  width: 100px;
+  height: 4px;
+  accent-color: #cccfd5;
+  cursor: pointer;
+}
+@media (min-width: 901px) and (min-height: 700px) and (prefers-reduced-motion: no-preference) {
+  .section[data-animated="true"] {
+    height: 280svh;
+  }
+  .section[data-animated="true"] .stage {
+    position: sticky;
+    top: 0;
+    min-height: 0;
+  }
+}
+@media (max-width: 900px) {
+  /* A compact, interactive scene replaces the pinned desktop timeline. */
+  .stage {
+    height: auto;
+    min-height: 0;
+    padding: 64px 28px 52px;
+  }
+  .intro {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+  }
+  .intro h2 {
+    font-size: clamp(36px, 6vw, 48px);
+  }
+  .intro p {
+    max-width: 360px;
+    line-height: 1.5;
+  }
+  .visual {
+    position: relative;
+    inset: auto;
+    margin-block: 32px 24px;
+    aspect-ratio: 16 / 10;
+  }
+  .world {
+    position: relative;
+    left: 50%;
+    top: 50%;
+    width: calc(100% - var(--world-breakout) * 28%);
+    height: calc(100% - var(--world-breakout) * 25%);
+    aspect-ratio: auto;
+    translate: -50% -50%;
+  }
+  .plane {
+    transform: translate(
+        calc(var(--world-breakout) * var(--layer-offset) * 14px),
+        calc(var(--world-breakout) * var(--layer-offset) * 12px)
+      )
+      rotateY(calc(var(--world-breakout) * -18deg));
+  }
+  .layerArtwork {
+    border-radius: 14px;
+  }
+  .reference,
+  .connection,
+  .layerName,
+  .steps {
+    display: none;
+  }
+  .controls {
+    display: flex;
+    min-height: 44px;
+    pointer-events: none;
+    position: relative;
+    bottom: auto;
+    left: auto;
+    translate: none;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .section[data-phase="playback"] .controls {
+    pointer-events: auto;
+  }
+  .speed input {
+    width: 70px;
+  }
+}
+@media (max-width: 600px) {
+  .stage {
+    padding-inline: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .playButton {
+    transition: none;
+  }
+}

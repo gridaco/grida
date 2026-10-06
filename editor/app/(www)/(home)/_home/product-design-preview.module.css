@@ -1,0 +1,288 @@
+.stage {
+  container-type: inline-size;
+  margin-top: 32px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.stage img,
+.stage svg {
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+.intro {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 14px;
+}
+.intro h3 {
+  font-size: 23px;
+  font-weight: 400;
+  letter-spacing: -0.045em;
+}
+.intro p {
+  color: #898b8d;
+  font-size: 13px;
+}
+.composition {
+  position: relative;
+  aspect-ratio: 2.12;
+}
+.workflow {
+  position: absolute;
+  left: 0;
+  top: 15%;
+  width: 16%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.source,
+.process {
+  width: 100%;
+  padding: 1.05cqw;
+  background: #222426;
+  border-radius: 12px;
+}
+.nodeLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.55cqw;
+  font-size: 0.85cqw;
+  color: #d9dcde;
+}
+.nodeLabel svg {
+  width: 1cqw;
+  height: 1cqw;
+  color: #a0a5a9;
+}
+.sketch {
+  position: relative;
+  background: #e8e9e7;
+  border-radius: 6px;
+  margin-top: 0.85cqw;
+  color: #555b60;
+}
+.sketch svg {
+  width: 100%;
+  aspect-ratio: 1.2;
+  padding: 4%;
+}
+.sketch > span {
+  display: block;
+  padding: 0 8% 7%;
+  font-size: 0.5cqw;
+  letter-spacing: 0.13em;
+  color: #909590;
+}
+.nodeGap {
+  height: 30px;
+}
+.process p {
+  font-size: 0.85cqw;
+  line-height: 1.65;
+  color: #999fa4;
+  margin-top: 1cqw;
+}
+.swatches {
+  display: flex;
+  gap: 0.5cqw;
+  margin: 1cqw 0;
+}
+.swatches i {
+  width: 1.4cqw;
+  height: 1.4cqw;
+  border-radius: 50%;
+  background: repeating-linear-gradient(85deg, #b5946e 0 1px, #c7aa83 2px 4px);
+}
+.swatches i:nth-child(2) {
+  background: linear-gradient(
+    120deg,
+    #a4aeb2,
+    #e7edef 40%,
+    #929a9e 75%,
+    #c4cbd1
+  );
+}
+.swatches i:nth-child(3) {
+  background: linear-gradient(135deg, #94b4c5, #486573);
+}
+.ready {
+  display: flex;
+  gap: 0.4cqw;
+  align-items: center;
+  color: #959e95;
+  font-size: 0.65cqw;
+}
+.ready svg {
+  width: 0.9cqw;
+  height: 0.9cqw;
+}
+.studies {
+  position: absolute;
+  inset: 0 0 0 23%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5cqw;
+  align-items: center;
+}
+.studies figure {
+  margin: 0;
+  min-width: 0;
+  animation: arrive 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.studies figure:nth-child(2) {
+  animation-delay: 85ms;
+}
+.studies figure:nth-child(3) {
+  animation-delay: 170ms;
+}
+.studyArt {
+  position: relative;
+  aspect-ratio: 1/1.6;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #e7e8e8;
+}
+.studyArt img {
+  position: absolute;
+  width: 300%;
+  max-width: none;
+  height: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.number {
+  position: absolute;
+  top: 6%;
+  left: 9%;
+  font-size: 0.7cqw;
+  color: #717775;
+}
+.studies figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4cqw;
+  padding: 1cqw 0.15cqw 0;
+  font-size: 0.95cqw;
+  color: #bdc1c4;
+}
+.studies figcaption span:last-child {
+  font-size: 0.75cqw;
+  color: #747b7f;
+}
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 600px) {
+  .stage {
+    min-width: 0;
+    margin-top: 28px;
+  }
+  .intro {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .intro h3 {
+    font-size: 22px;
+  }
+  .intro p {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .composition {
+    display: grid;
+    gap: 32px;
+    aspect-ratio: auto;
+  }
+  .workflow {
+    position: relative;
+    left: auto;
+    top: auto;
+    width: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+    align-items: center;
+  }
+  .source,
+  .process {
+    min-width: 0;
+    padding: 12px;
+  }
+  .nodeGap {
+    display: none;
+  }
+  .nodeLabel {
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .nodeLabel svg {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+  }
+  .process p {
+    margin-top: 12px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .ready {
+    gap: 4px;
+    font-size: 9px;
+    line-height: 1.4;
+  }
+  .ready svg {
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
+  }
+  .sketch {
+    margin-top: 10px;
+  }
+  .sketch > span {
+    font-size: 7px;
+  }
+  .swatches {
+    gap: 6px;
+    margin-block: 12px;
+  }
+  .swatches i {
+    width: 16px;
+    height: 16px;
+  }
+  .studies {
+    position: relative;
+    inset: auto;
+    gap: 12px;
+    align-items: start;
+  }
+  .studies figcaption {
+    gap: 4px;
+    padding-top: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .studies figcaption span:last-child {
+    font-size: 10px;
+  }
+  .number {
+    font-size: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studies figure {
+    animation: none;
+  }
+}

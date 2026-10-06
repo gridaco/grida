@@ -1,0 +1,302 @@
+.section {
+  --portrait-workspace-reveal: 1;
+  --portrait-states-reveal: 0;
+  --portrait-branches-spread: 0;
+  --portrait-assemble: 1;
+  --portrait-guide-opacity: 0;
+  --portrait-result-opacity: 1;
+  --portrait-original-opacity: 0;
+  --portrait-size: clamp(320px, 46svh, 500px);
+  --workspace-size: clamp(160px, 15.2vw, 220px);
+  --state-gap-x: clamp(60px, 5.4vw, 78px);
+  position: relative;
+  background: #111;
+  color: #f6f6f6;
+}
+.stage {
+  position: relative;
+  height: 100svh;
+  min-height: 760px;
+  overflow: clip;
+  isolation: isolate;
+}
+.intro {
+  position: absolute;
+  z-index: 5;
+  top: clamp(48px, 7svh, 84px);
+  left: max(40px, calc((100vw - 1200px) / 2));
+}
+.intro h2 {
+  font-size: clamp(40px, 4.4vw, 64px);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+}
+.intro h2 span {
+  display: block;
+}
+.intro p {
+  color: #999;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  margin-top: 20px;
+}
+.visual {
+  position: absolute;
+  inset: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+.visual img,
+.visual svg {
+  -webkit-user-drag: none;
+}
+.source {
+  position: absolute;
+  top: 57%;
+  left: 24%;
+  width: auto;
+  height: min(58svh, 550px);
+  aspect-ratio: 506 / 900;
+  translate: -50% -50%;
+  opacity: var(--portrait-original-opacity);
+  transform: translateX(calc((1 - var(--portrait-original-opacity)) * -28px));
+}
+.source > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.source > span {
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  translate: -50% 0;
+  color: #777;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.faceFocus {
+  position: absolute;
+  left: 29%;
+  top: 11%;
+  width: 40%;
+  height: 20%;
+  stroke: #9499a8;
+  stroke-width: 0.8;
+  opacity: calc(
+    var(--portrait-workspace-reveal) * var(--portrait-guide-opacity)
+  );
+}
+.connections {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  stroke: #52565e;
+  stroke-width: 1;
+  opacity: calc(
+    var(--portrait-workspace-reveal) * var(--portrait-guide-opacity)
+  );
+}
+.portrait {
+  position: absolute;
+  z-index: 3;
+  left: calc(58% - var(--portrait-assemble) * 8%);
+  top: calc(57% + var(--portrait-assemble) * 2%);
+  width: calc(
+    var(--workspace-size) + var(--portrait-assemble) *
+      (var(--portrait-size) - var(--workspace-size))
+  );
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  opacity: var(--portrait-workspace-reveal);
+}
+.workspace,
+.livePortrait {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 20px;
+}
+.workspace {
+  opacity: calc(1 - var(--portrait-assemble));
+}
+.livePortrait {
+  opacity: var(--portrait-assemble);
+}
+.workspaceLabel {
+  position: absolute;
+  left: 50%;
+  bottom: -28px;
+  translate: -50% 0;
+  font-size: 11px;
+  color: #777;
+  white-space: nowrap;
+  opacity: calc(1 - var(--portrait-assemble));
+}
+.rig {
+  position: absolute;
+  inset: 0;
+}
+.rig > img {
+  object-fit: fill;
+}
+.patch {
+  position: absolute;
+  opacity: 0;
+}
+.patch > img {
+  object-fit: fill;
+}
+.patch[data-enabled="true"],
+.section[data-eye-left="half"]
+  [data-live-portrait]
+  [data-feature="left"][data-expression="half"],
+.section[data-eye-left="closed"]
+  [data-live-portrait]
+  [data-feature="left"][data-expression="closed"],
+.section[data-eye-right="half"]
+  [data-live-portrait]
+  [data-feature="right"][data-expression="half"],
+.section[data-eye-right="closed"]
+  [data-live-portrait]
+  [data-feature="right"][data-expression="closed"],
+.section[data-mouth="o"]
+  [data-live-portrait]
+  [data-feature="mouth"][data-expression="o"],
+.section[data-mouth="a"]
+  [data-live-portrait]
+  [data-feature="mouth"][data-expression="a"] {
+  opacity: 1;
+}
+.expressions {
+  position: absolute;
+  top: calc(57% + var(--portrait-assemble) * 2%);
+  left: calc(79% - var(--portrait-assemble) * 29%);
+  width: 260px;
+  height: 290px;
+  translate: -50% -50%;
+  opacity: calc(var(--portrait-states-reveal) * (1 - var(--portrait-assemble)));
+}
+.expression {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(92px, 8vw, 118px);
+  translate: -50% -50%;
+  transform: translate(
+    calc(var(--portrait-branches-spread) * var(--state-x) * var(--state-gap-x)),
+    calc(var(--portrait-branches-spread) * var(--state-y) * 92px)
+  );
+}
+.expressionArt {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #1e2025;
+}
+.expressionArt > .rig {
+  transform: scale(1.35) translateY(-4%);
+}
+.expression figcaption {
+  margin-top: 10px;
+  color: #95989f;
+  text-align: center;
+  font-size: 11px;
+  opacity: var(--portrait-branches-spread);
+}
+.steps {
+  position: absolute;
+  bottom: 62px;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: #696c72;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: var(--portrait-guide-opacity);
+}
+.steps i {
+  width: 20px;
+  height: 1px;
+  background: #36383e;
+}
+.section[data-phase="source"] [data-step="source"],
+.section[data-phase="workspace"] [data-step="workspace"],
+.section[data-phase="states"] [data-step="states"],
+.section[data-phase="portrait"] [data-step="portrait"] {
+  color: #dddfe3;
+}
+.result {
+  position: absolute;
+  z-index: 5;
+  bottom: 62px;
+  left: 50%;
+  translate: -50% 0;
+  opacity: var(--portrait-result-opacity);
+}
+.controls {
+  display: none;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 999px;
+  background: #24262b;
+}
+.section[data-phase="portrait"] .controls {
+  display: flex;
+}
+.controls button {
+  height: 36px;
+  min-width: 72px;
+  padding-inline: 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #b1b4ba;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+.controls button:hover,
+.controls button[aria-pressed="true"] {
+  background: #454850;
+  color: #fff;
+}
+.controls button:focus-visible {
+  outline: 2px solid #a5abb9;
+  outline-offset: 3px;
+}
+@media (min-width: 901px) and (min-height: 700px) and (prefers-reduced-motion: no-preference) {
+  .section[data-animated="true"] {
+    height: 260svh;
+  }
+  .section[data-animated="true"] .stage {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    min-height: 0;
+  }
+}
+@media (max-width: 900px) {
+  .intro {
+    left: 28px;
+    right: 28px;
+    top: 40px;
+  }
+  .intro h2 {
+    font-size: clamp(36px, 7vw, 56px);
+  }
+  .portrait {
+    width: min(76vw, 420px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .controls button {
+    transition: none;
+  }
+}
