@@ -7,6 +7,7 @@ export { default as BlackForestLabsLogo } from "./blackforestlabs";
 export { default as BlenderLogo } from "./blender";
 export { default as ByteDanceLogo } from "./bytedance";
 export { default as ClaudeLogo } from "./claude";
+export { default as CodexLogo } from "./codex";
 export { default as ElevenLabsLogo } from "./elevenlabs";
 export { default as FalLogo } from "./fal";
 export { default as GodotLogo } from "./godot";

@@ -1,7 +1,7 @@
 # Logo sources and attribution
 
 For consumers and maintainers of `@grida/react-icons/logos`. These notices
-cover the four marks listed below; third-party artwork and trademarks are
+cover the marks listed below; third-party artwork and trademarks are
 not relicensed by the package's MIT license.
 
 ## Blender
@@ -48,3 +48,39 @@ Games, Inc. in the United States of America and elsewhere.
 
 All four components accept native SVG props and use intrinsic dimensions
 for convenient rendering. Retrieved October 4, 2026.
+
+## Codex
+
+- Component: `CodexLogo` (`src/logos/codex.tsx`).
+- Source: [LobeHub Codex SVG](https://github.com/lobehub/lobe-icons/blob/63c800e3db6427b3f156f7b88d426ccb3f7277a1/packages/static-svg/icons/codex.svg),
+  pinned to revision `63c800e3db6427b3f156f7b88d426ccb3f7277a1`.
+- Collection license: [MIT, Copyright (c) 2023 LobeHub](https://github.com/lobehub/lobe-icons/blob/master/LICENSE).
+- The Codex name and mark are OpenAI trademarks. The collection's license
+  does not grant trademark rights; see [OpenAI's brand guidelines](https://openai.com/brand/).
+- Conversion: retained the 24 × 24 viewBox and exact path geometry;
+  removed the title and layout styles, added native SVG props, and used
+  `currentColor` for monochrome rendering. Retrieved October 4, 2026.
+
+### LobeHub license notice
+
+MIT License
+
+Copyright (c) 2023 LobeHub
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
