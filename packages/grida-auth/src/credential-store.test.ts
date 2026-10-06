@@ -337,6 +337,8 @@ describe.skipIf(process.platform === "win32")("durable native custody", () => {
     );
   });
 
+  // These durable operations each spawn macOS ACL checks. Allow CI scheduling
+  // overhead in these tests; production storage and lock deadlines stay unchanged.
   it("migrates keyring to file and clears the old keyring credential", async () => {
     const { store, values } = await setup();
     await save(store);
@@ -346,10 +348,8 @@ describe.skipIf(process.platform === "win32")("durable native custody", () => {
     });
     expect((await snapshot(store)).session).toEqual(session);
     expect([...values.values()].join()).not.toContain(session.refreshToken);
-  });
+  }, 15_000);
 
-  // Several durable operations each spawn macOS ACL checks. Allow CI scheduling
-  // overhead in this test; production storage and lock deadlines stay unchanged.
   it("keeps a failed migration explicit and resumable without reviving old custody", async () => {
     const { store, directory, keyring } = await setup();
     await save(store);
@@ -387,7 +387,7 @@ describe.skipIf(process.platform === "win32")("durable native custody", () => {
     });
     expect(await store.migrate("keyring")).toMatchObject({ migration: null });
     expect((await snapshot(store)).session).toEqual(session);
-  });
+  }, 15_000);
 
   it("exposes safe native storage controls and validates config before disk access", async () => {
     const { directory } = await setup("file");
@@ -420,5 +420,5 @@ describe.skipIf(process.platform === "win32")("durable native custody", () => {
     expect(await readdir(directory)).not.toContain(
       "invalid-sink-must-not-exist"
     );
-  });
+  }, 15_000);
 });
