@@ -1,3 +1,5 @@
+<img src="./.readme/cover.png" alt="Grida" width="100%"/>
+
 # Grida
 
 **An open-source canvas for design and creative work.**
