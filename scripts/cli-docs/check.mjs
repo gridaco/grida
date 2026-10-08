@@ -436,11 +436,6 @@ export const CliDocs = {
             !checked.error,
             `Invalid guide command in ${source}: grida ${args.join(" ")}: ${checked.error?.code}`
           );
-          // Legacy root spellings still parse; guides must teach the canonical path.
-          assert(
-            !checked.legacy_path,
-            `Legacy command path in ${source}: grida ${args.join(" ")}`
-          );
           const { invocation, descriptor } = checked;
           report.examples++;
           if (

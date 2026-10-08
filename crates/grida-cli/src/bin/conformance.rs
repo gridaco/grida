@@ -2,7 +2,7 @@
 use std::io::{self, BufRead, Read, Write};
 use std::process::ExitCode;
 
-use grida_cli::{Command, CommandPath, GenerationSource, Topic, input};
+use grida_cli::{Command, GenerationSource, Topic, input};
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 
@@ -18,17 +18,13 @@ fn topics() -> Value {
 }
 
 async fn validate_example(argv: &[String]) -> Value {
-    let (invocation, path) = match grida_cli::parse_path(argv) {
-        Ok(parsed) => parsed,
+    let invocation = match grida_cli::parse(argv) {
+        Ok(invocation) => invocation,
         Err(error) => {
             return json!({"error": {"code": error.code.as_str(), "message": error.message}});
         }
     };
     let mut result = json!({"invocation": grida_cli::conformance::project(&invocation)});
-    // Guides must show canonical paths even though legacy spellings still parse.
-    if path == CommandPath::Legacy {
-        result["legacy_path"] = json!(true);
-    }
     let catalog = grida_ai::Catalog::bundled();
     let checked = async {
         match &invocation.command {
@@ -292,20 +288,6 @@ mod tests {
             validate_example(&argv(&["unknown-command"])).await["error"]["code"],
             "invalid_usage"
         );
-    }
-
-    #[tokio::test]
-    async fn documentation_examples_report_legacy_paths() {
-        for (request, legacy) in [
-            (argv(&["ai", "providers", "list"]), false),
-            (argv(&["providers", "list"]), true),
-            (argv(&["docs", "ai", "generate"]), false),
-            (argv(&["docs", "generate"]), true),
-            (argv(&["auth", "status"]), false),
-        ] {
-            let result = validate_example(&request).await;
-            assert_eq!(result.get("legacy_path").is_some(), legacy, "{result}");
-        }
     }
 
     #[test]

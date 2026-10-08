@@ -15,7 +15,7 @@ format: md
 
 **Discover by modality. Invoke one exact operation through a provider.**
 `providers`, `models`, `voices`, `generate` and `rigging` are grouped under
-`grida ai`; their preview root paths remain silent aliases. Desktop does
+`grida ai`. Desktop does
 not need to run, and no Grida agent or Canvas is involved.
 
 ## Immediate: list, inspect, generate

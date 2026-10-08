@@ -398,11 +398,6 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     );
     env.ELEVENLABS_API_KEY = "synthetic-env-key";
     assert.equal((await providerState()).source, "environment");
-    // The legacy root spelling remains a silent alias of the grouped command.
-    assert.deepEqual(
-      await run(["providers", "list", "--json"]),
-      await run(["ai", "providers", "list", "--json"])
-    );
     await run(["ai", "providers", "remove", "elevenlabs", "--json"]);
     assert.equal((await providerState()).configured, true);
     delete env.ELEVENLABS_API_KEY;

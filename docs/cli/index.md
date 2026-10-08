@@ -53,8 +53,7 @@ describe the separate account path required by GG.
 ## Find the right command
 
 Account commands sit at the root. AI tools (provider keys, models, voices,
-generation and rigging) are grouped under `grida ai`. Scripts written for
-earlier preview paths, such as `grida generate`, keep working.
+generation and rigging) are grouped under `grida ai`.
 
 | Task                                   | Guide                       |
 | -------------------------------------- | --------------------------- |

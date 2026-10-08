@@ -1,5 +1,4 @@
 use crate::Failure;
-use crate::grammar::AI_COMMANDS;
 
 macro_rules! topics {
     ($($variant:ident => ($name:literal, $file:literal, $page:literal)),+ $(,)?) => {
@@ -20,18 +19,6 @@ macro_rules! topics {
                 match self { $(Self::$variant => concat!("https://grida.co/docs/cli", $page)),+ }
             }
             pub(crate) fn parse(value: &str) -> Result<Self, Failure> {
-                // Legacy root spellings of grouped commands name the same topic.
-                let grouped;
-                let value = if value
-                    .split(' ')
-                    .next()
-                    .is_some_and(|word| AI_COMMANDS.contains(&word))
-                {
-                    grouped = format!("ai {value}");
-                    grouped.as_str()
-                } else {
-                    value
-                };
                 match value {
                     $($name => Ok(Self::$variant)),+,
                     _ => {
@@ -84,40 +71,4 @@ topics! {
     RiggingCheck => ("ai rigging check", "rigging-check", "/generate"),
     RiggingRun => ("ai rigging run", "rigging-run", "/generate"),
     Docs => ("docs", "docs", ""),
-}
-
-#[cfg(all(test, feature = "conformance"))]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn help_names_grouped_commands_by_their_canonical_path() {
-        for topic in Topic::ALL {
-            for word in AI_COMMANDS {
-                assert!(
-                    !topic.help().contains(&format!("grida {word}")),
-                    "{} help shows a legacy path: grida {word}",
-                    topic.name()
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn legacy_topic_names_resolve_to_the_canonical_topic() {
-        for topic in Topic::ALL {
-            if let Some(legacy) = topic.name().strip_prefix("ai ") {
-                assert_eq!(Topic::parse(legacy), Ok(*topic));
-            }
-        }
-        assert_eq!(
-            Topic::parse("providers configure fal"),
-            Ok(Topic::ProvidersConfigure)
-        );
-        assert_eq!(
-            Topic::parse("ai providers remove tripo"),
-            Ok(Topic::ProvidersRemove)
-        );
-        assert!(Topic::parse("ai auth").is_err());
-    }
 }

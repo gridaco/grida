@@ -57,9 +57,7 @@ and which failures can have incurred a charge.
 
 `grida docs [command...]` continues to print a URL without fetching it or opening
 a browser. Every supported topic maps to its owning public page or explicit
-section; `grida ai` maps to the entry page, and its commands keep the pages
-above, whichever path names them. Guide examples use canonical command paths;
-the check rejects an example that parses only through a legacy alias. Installed help remains authoritative for the installed version;
+section; `grida ai` maps to the entry page. Installed help remains authoritative for the installed version;
 hosted pages describe the latest released version and mark newer examples with
 a minimum version when needed.
 No bundled guide tree or separate agent-only

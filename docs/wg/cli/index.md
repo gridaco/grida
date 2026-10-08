@@ -75,11 +75,6 @@ keys belong to the family because only AI operations use them; where a command
 sits does not decide who stores its data. Command depth does not determine
 package ownership.
 
-Moving a command keeps its previous path as a silent alias: the same
-invocation, output, and exit status, without a notice. Help and guides show
-only the canonical path. Removing an alias is an explicit compatibility change
-in a release.
-
 Products can arrive or retire independently. Removing a command removes its
 adapter and distribution dependency; its capability owner stays intact. A
 public command's removal is still an explicit compatibility change in a release.
