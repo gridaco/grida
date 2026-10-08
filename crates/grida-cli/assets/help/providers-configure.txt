@@ -1,4 +1,4 @@
-Usage: grida providers configure <provider> [--key-stdin] [--json] [--no-input]
+Usage: grida ai providers configure <provider> [--key-stdin] [--json] [--no-input]
 
 Save an API key in shared plaintext credentials.toml with private permissions.
 Desktop and CLI use the same stored keys. No Grida login required.

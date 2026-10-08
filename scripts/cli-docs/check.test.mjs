@@ -36,10 +36,11 @@ test("rendered landing links reach the canonical guide without a sidebar masking
 
 test("literal guide parsing preserves quoted prompts, escaped quotes, false and continuation", () => {
   const { examples, files } = CliDocs.examples(
-    '```sh\ngrida generate --prompt "a gentle light" \\\n --param generate_audio=false --out ./video\n```\n```text title="prompt.txt"\nkeep this whitespace  \n```'
+    '```sh\ngrida ai generate --prompt "a gentle light" \\\n --param generate_audio=false --out ./video\n```\n```text title="prompt.txt"\nkeep this whitespace  \n```'
   );
   assert.deepEqual(examples, [
     [
+      "ai",
       "generate",
       "--prompt",
       "a gentle light",

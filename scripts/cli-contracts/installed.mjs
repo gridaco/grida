@@ -358,13 +358,13 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     checks.push("installed_version");
     const providerKey = "synthetic-elevenlabs-key";
     const configured = await run(
-      ["providers", "configure", "elevenlabs", "--key-stdin", "--json"],
+      ["ai", "providers", "configure", "elevenlabs", "--key-stdin", "--json"],
       { stdin: providerKey + "\n" }
     );
     assert.equal(configured.stored, true);
     assert.deepEqual(configured.verification, { status: "not_supported" });
     const providerState = async () =>
-      (await run(["providers", "list", "--json"])).providers.find(
+      (await run(["ai", "providers", "list", "--json"])).providers.find(
         (p) => p.provider === "elevenlabs"
       );
     assert.equal((await providerState()).source, "file");
@@ -376,7 +376,14 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(
       (
         await run(
-          ["providers", "configure", "elevenlabs", "--key-stdin", "--json"],
+          [
+            "ai",
+            "providers",
+            "configure",
+            "elevenlabs",
+            "--key-stdin",
+            "--json",
+          ],
           { stdin: " \n", exit: 1 }
         )
       ).error.code,
@@ -391,7 +398,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     );
     env.ELEVENLABS_API_KEY = "synthetic-env-key";
     assert.equal((await providerState()).source, "environment");
-    await run(["providers", "remove", "elevenlabs", "--json"]);
+    await run(["ai", "providers", "remove", "elevenlabs", "--json"]);
     assert.equal((await providerState()).configured, true);
     delete env.ELEVENLABS_API_KEY;
     assert.equal((await providerState()).configured, false);
@@ -476,6 +483,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(credits.account_present, true);
     checks.push("installed_account_and_zero_credits");
     await cancelAt("/api/v1/account/credits?organization_id=1", [
+      "ai",
       "models",
       "list",
       "--provider",
@@ -485,6 +493,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     ]);
     const grantsBeforeCancellation = counts.get("/api/v1/auth/gg") ?? 0;
     await cancelAt("/api/v1/account/organizations", [
+      "ai",
       "generate",
       "--provider",
       "gg",
@@ -501,6 +510,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(
       (
         await run([
+          "ai",
           "models",
           "list",
           "--provider",
@@ -517,6 +527,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       (
         await run(
           [
+            "ai",
             "generate",
             "--provider",
             "gg",
@@ -536,6 +547,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(counts.get("/api/v1/auth/gg") ?? 0, before);
     checks.push("installed_preflight_before_grant");
     const generate = [
+      "ai",
       "generate",
       "--provider",
       "gg",
@@ -570,6 +582,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     env.OPENROUTER_API_KEY = " ";
     const referenced = await run(
       [
+        "ai",
         "generate",
         "--provider",
         "openrouter",

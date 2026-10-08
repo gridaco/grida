@@ -1,4 +1,4 @@
-Usage: grida rigging check --provider tripo|gg (--mesh FILE | --input @file|-) [--key-stdin] [--json]
+Usage: grida ai rigging check --provider tripo|gg (--mesh FILE | --input @file|-) [--key-stdin] [--json]
 
 Upload a GLB and return riggable, rig_type and a task receipt.
 This never starts paid rigging or writes a generated artifact.

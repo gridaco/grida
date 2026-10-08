@@ -143,9 +143,9 @@ api_key = "..."
 Configure a connection once, then use it from either client:
 
 ```sh
-grida providers configure fal
-grida providers list
-grida providers remove fal
+grida ai providers configure fal
+grida ai providers list
+grida ai providers remove fal
 ```
 
 `configure` uses hidden terminal input. Automation supplies `--key-stdin`;
@@ -168,7 +168,7 @@ claims about a provider's key length. The
 [shared provider policy](https://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md)
 owns the exact rules, upstream references and authenticated check endpoints.
 
-`providers configure` checks a newly entered OpenRouter, Vercel AI Gateway or fal key once
+`ai providers configure` checks a newly entered OpenRouter, Vercel AI Gateway or fal key once
 before saving, including when input comes from `--key-stdin`. A rejected,
 permission-denied, timed-out or inconclusive check does not replace the old key.
 ElevenLabs has no suitable permission-neutral check; its key is saved with static

@@ -176,6 +176,7 @@ mod tests {
         )
         .unwrap();
         let request = argv(&[
+            "ai",
             "generate",
             "--provider",
             "openrouter",
@@ -212,6 +213,7 @@ mod tests {
             "/../../fixtures/images/checker.png"
         );
         let mut request = argv(&[
+            "ai",
             "generate",
             "--provider",
             "openrouter",
@@ -246,8 +248,15 @@ mod tests {
         for (request, command) in [
             (argv(&["auth", "login"]), "auth login"),
             (
-                argv(&["providers", "configure", "fal", "--key-stdin", "--no-input"]),
-                "providers configure",
+                argv(&[
+                    "ai",
+                    "providers",
+                    "configure",
+                    "fal",
+                    "--key-stdin",
+                    "--no-input",
+                ]),
+                "ai providers configure",
             ),
             (
                 argv(&["account", "credits", "--org", "synthetic"]),
@@ -261,6 +270,7 @@ mod tests {
         }
         for flag in ["--input", "--prompt-file"] {
             let result = validate_example(&argv(&[
+                "ai",
                 "generate",
                 "--provider",
                 "openrouter",

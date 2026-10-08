@@ -5,11 +5,7 @@ Usage: grida <command>
 Commands:
   auth       Sign in and manage this CLI's session
   account    Read your identity, organizations and credits
-  models     Discover executable models and input schemas
-  providers  Manage shared provider API keys
-  generate   Generate media into a new local directory
-  voices     List available speech voices
-  rigging    Check mesh eligibility and create a rigged GLB
+  ai         Manage provider keys, discover models and generate media
   docs       Print canonical documentation URLs
 
 Options: --help, --version

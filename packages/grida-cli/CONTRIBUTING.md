@@ -110,8 +110,8 @@ machine. Signals cancel login; an in-flight credential write is allowed to settl
 
 ## Media access and files
 
-`grida models list` and `models inspect` are offline and credential-free.
-Listing shows accepted local-image flags; `models list --local-image` keeps only
+`grida ai models list` and `ai models inspect` are offline and credential-free.
+Listing shows accepted local-image flags; `ai models list --local-image` keeps only
 operations accepting `--reference FILE` or `--image FILE`. The column, JSON
 `local_image_flags`, filter and inspection guidance derive from the SDK schema.
 The [media contract](https://grida.co/docs/wg/cli/media) owns examples, schemas,
@@ -119,8 +119,8 @@ variants, availability and result rules. Installed help stays minimal.
 
 BYOK saves keys to `~/.grida/providers/credentials.toml`, or
 `$GRIDA_HOME/providers/credentials.toml` when `GRIDA_HOME` is an absolute path,
-without Grida login. `providers configure <provider>` stores a key using hidden input
-or `--key-stdin`; `providers remove <provider>` removes the shared stored key.
+without Grida login. `ai providers configure <provider>` stores a key using hidden input
+or `--key-stdin`; `ai providers remove <provider>` removes the shared stored key.
 All selected keys (file, environment or stdin) pass cheap static validation through
 [the shared provider policy](https://github.com/gridaco/grida/blob/main/packages/grida-ai/README.md).
 `configure` additionally checks OpenRouter, Vercel AI Gateway, fal and Tripo once before saving;
@@ -129,7 +129,7 @@ has no suitable permission-neutral check and saves with `verification.status` se
 to `not_supported`. Successful supported checks report `accepted`, which proves
 only that read was accepted now. Verification is never stored or repeated by
 listing, availability, voice discovery or generation.
-`providers list` shows presence, source and plaintext storage mode, not verified
+`ai providers list` shows presence, source and plaintext storage mode, not verified
 access. Rust and Desktop's TypeScript owner implement the same versioned custody
 protocol and coordinate through the same process lock, independently of app lifetime.
 Environment keys or `--key-stdin` override storage without opening it or persisting
@@ -146,21 +146,21 @@ For manual file configuration, follow the
 [provider file format and editing instructions](https://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md).
 Stop Desktop and other Grida processes using this home before editing; keep
 the `providers` directory at `0700`, the file at `0600`, and preserve version
-and migration metadata. `grida providers --help` also prints the location and
+and migration metadata. `grida ai providers --help` also prints the location and
 format link without opening the credential store.
 
-`generate` accepts `--prompt`/`--prompt-file`, `--text`/`--text-file` with `--voice`
+`ai generate` accepts `--prompt`/`--prompt-file`, `--text`/`--text-file` with `--voice`
 for speech, ordered `--reference` inputs and a single `--image`. `--param FIELD=VALUE`
 sets advertised scalar fields; complex requests retain the exclusive `--input @file|-`
 mode. Both lower to the same SDK input parser. Media flags select a compatible
-variant; they never switch provider, model or billing route. Human `models inspect`
+variant; they never switch provider, model or billing route. Human `ai models inspect`
 shows inputs and an example; `--json` keeps the full descriptor.
 The fal Veo 3.1 Lite route accepts `--param generate_audio=false` for silent video;
 omission retains the provider's audio-enabled default. Unadvertised routes refuse it.
 
 Tripo model generation uses `--provider tripo` for BYOK or `--provider gg` for
 Grida credits, independently of fal's 3D routes.
-`models list --provider tripo` lists its executable models and variants. Text uses
+`ai models list --provider tripo` lists its executable models and variants. Text uses
 `--prompt`; a supported single-image variant uses `--image` with a local PNG/JPEG.
 Multiview uses `--variant multiview --input @input.json` with the advertised inline
 image schema. JSON does not expand paths or read referenced local files. With
@@ -171,16 +171,16 @@ safe local receipt and never performs an automatic generation retry.
 Mesh eligibility and rigging use a separate command group:
 
 ```sh
-grida rigging list --provider tripo
-grida rigging inspect --provider tripo --feature rig-check --json
-grida rigging inspect --provider tripo --feature rigging --model tripo/rig-v1.0 --json
-grida rigging check --provider tripo --mesh ./character.glb --json
-grida rigging run --provider tripo --model tripo/rig-v1.0 --mesh ./character.glb --rig-type biped --spec mixamo --out ./rigged --json
+grida ai rigging list --provider tripo
+grida ai rigging inspect --provider tripo --feature rig-check --json
+grida ai rigging inspect --provider tripo --feature rigging --model tripo/rig-v1.0 --json
+grida ai rigging check --provider tripo --mesh ./character.glb --json
+grida ai rigging run --provider tripo --model tripo/rig-v1.0 --mesh ./character.glb --rig-type biped --spec mixamo --out ./rigged --json
 ```
 
 Listing and inspection are offline. Eligibility has no model identity and returns
 `riggable`, `rig_type` and a provider task receipt; a negative eligibility result
-is a successful check (exit 0). Checking never starts rigging. `rigging run`
+is a successful check (exit 0). Checking never starts rigging. `ai rigging run`
 explicitly submits paid rigging and saves the returned GLB with feature, model,
 binding, hashes and safe task ID/consumed-credit metadata in `receipt.json`.
 The model's SDK schema determines accepted rig types and specifications. These
@@ -190,8 +190,8 @@ Grida login and `--org` / `--org-id` organization selector. GG does not inspect
 BYOK keys, accept `--key-stdin`, or fall back to the Tripo account.
 
 ```sh
-grida rigging check --provider gg --org studio --mesh ./character.glb --json
-grida rigging run --provider gg --org studio --model tripo/rig-v1.0 --mesh ./character.glb --rig-type biped --spec mixamo --out ./funded-rigged --json
+grida ai rigging check --provider gg --org studio --mesh ./character.glb --json
+grida ai rigging run --provider gg --org studio --model tripo/rig-v1.0 --mesh ./character.glb --rig-type biped --spec mixamo --out ./funded-rigged --json
 ```
 
 GG obtains a signed upload receipt using the selected organization, uploads
@@ -219,7 +219,7 @@ No arbitrary JSON string is a file grant; no input URL is fetched by this host.
 Inline input support belongs to the selected operation's public schema. See the
 [media contract](https://grida.co/docs/wg/cli/media) for current route coverage.
 
-`generate` validates input and probes a fresh output directory before authority
+`ai generate` validates input and probes a fresh output directory before authority
 or paid submission. It saves artifacts and a safe receipt with local paths and
 hashes. Existing files are never replaced. A failed save reports already
 published files; no paid operation is automatically replayed. Signals abort
