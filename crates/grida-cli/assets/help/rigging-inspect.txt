@@ -1,4 +1,4 @@
-Usage: grida rigging inspect --provider tripo|gg --feature rig-check|rigging [--model <id>] [--json]
+Usage: grida ai rigging inspect --provider tripo|gg --feature rig-check|rigging [--model <id>] [--json]
 
 Print the selected operation's input and output schema.
 Rigging requires a model; rig-check has no model identity.

@@ -1,4 +1,4 @@
-Usage: grida models inspect --provider <provider> --model <id> [--kind <kind>] [--variant text|references|image|multiview] [--json]
+Usage: grida ai models inspect --provider <provider> --model <id> [--kind <kind>] [--variant text|references|image|multiview] [--json]
 
 Show accepted inputs and a command example; --json prints the full schema.
 Kinds: image, video, music, sound-effect, text-to-speech, three-d.

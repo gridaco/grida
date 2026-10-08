@@ -14,18 +14,19 @@ format: md
 > and detached jobs remain proposals below.
 
 **Discover by modality. Invoke one exact operation through a provider.**
-`models`, `providers`, `voices` and `generate` are root commands. Desktop does
+`providers`, `models`, `voices`, `generate` and `rigging` are grouped under
+`grida ai`; their preview root paths remain silent aliases. Desktop does
 not need to run, and no Grida agent or Canvas is involved.
 
 ## Immediate: list, inspect, generate
 
 ```sh
-grida models list --modality image
-grida models list --modality audio
-grida models list --modality video --local-image
-grida models inspect --provider gg --model openai/gpt-image-2 --json
+grida ai models list --modality image
+grida ai models list --modality audio
+grida ai models list --modality video --local-image
+grida ai models inspect --provider gg --model openai/gpt-image-2 --json
 
-grida generate --provider gg --model openai/gpt-image-2 \
+grida ai generate --provider gg --model openai/gpt-image-2 \
   --org studio --prompt "A blue ceramic teapot" --out ./images
 ```
 
@@ -41,7 +42,7 @@ choosing inputs; a catalogue card does not promise an executable operation.
 | `text-to-speech` | ElevenLabs speech with an explicit voice.                                |
 | `three-d`        | Exact fal text/image contracts returning a primary GLB.                  |
 
-`models list` presents bundled executable operations. `--modality` accepts
+`ai models list` presents bundled executable operations. `--modality` accepts
 `image`, `video`, `audio` or `3d`; `--kind` distinguishes the audio operations.
 Staged models remain marked `staged`. Listing and inspection use no credentials,
 network, account storage or provider probes.
@@ -65,9 +66,9 @@ select another advertised variant explicitly. Media flags select their compatibl
 variant automatically and reject a conflicting explicit `--variant`:
 
 ```sh
-grida models inspect --provider fal --model google/veo-3.1 \
+grida ai models inspect --provider fal --model google/veo-3.1 \
   --variant image --json
-grida generate --provider fal --model google/veo-3.1 \
+grida ai generate --provider fal --model google/veo-3.1 \
   --variant image --input @video.json --out ./video
 ```
 
@@ -98,20 +99,20 @@ result is a local file receipt, not JSON pretending to contain native bytes.
 Simple requests need no JSON file:
 
 ```sh
-grida generate --provider openrouter --model openai/gpt-image-2 \
+grida ai generate --provider openrouter --model openai/gpt-image-2 \
   --prompt "Restyle the header while preserving the supplied mark" \
   --reference ./header.png --reference ./mark.png \
   --param quality=high --out ./header
 
-grida generate --provider fal --model fal-ai/trellis-2 \
+grida ai generate --provider fal --model fal-ai/trellis-2 \
   --image ./object.png --out ./object-3d
 
-grida generate --provider fal --model google/veo-3.1-lite \
+grida ai generate --provider fal --model google/veo-3.1-lite \
   --prompt "A gentle camera move" --image ./scene.png \
   --param duration=4 --param resolution=1280x720 \
   --param generate_audio=false --out ./clip
 
-grida generate --provider elevenlabs --model eleven_v3 \
+grida ai generate --provider elevenlabs --model eleven_v3 \
   --text-file ./narration.txt --voice YOUR_VOICE_ID --out ./speech
 ```
 
@@ -157,7 +158,7 @@ same normative operation parser.
 ## Immediate: supply access explicitly
 
 BYOK needs no Grida login. Configure a shared key with
-`grida providers configure fal`, or supply an invocation-only environment key
+`grida ai providers configure fal`, or supply an invocation-only environment key
 or `--key-stdin`. Desktop and CLI share `providers/credentials.toml` under Grida
 home; the [custody contract](./credential-custody.md#provider-credentials) owns
 configuration, removal, platform support and migration. GG requires a separate
@@ -170,13 +171,13 @@ native CLI login and organization.
 | `fal`        | `FAL_KEY`                 |
 | `elevenlabs` | `ELEVENLABS_API_KEY`      |
 
-`providers list` reports key presence and source after cheap static validation,
+`ai providers list` reports key presence and source after cheap static validation,
 never contents. It does not verify provider access. Precedence is stdin, environment,
 then the shared file. An explicit key bypasses file access and never persists;
 a blank or malformed override fails.
 `--key-stdin` cannot share stdin with `--input -`, `--prompt-file -` or
 `--text-file -`. Keys are never literal command
-arguments. `providers remove <provider>` removes the shared stored key for both
+arguments. `ai providers remove <provider>` removes the shared stored key for both
 clients; environment overrides remain effective. Grida logout leaves provider
 keys intact. `configure` performs the custody contract's supported registration
 check once before saving; ordinary reads and generation never add a key-check
@@ -185,9 +186,9 @@ request. Provider formats and probes have one owner in the shared AI layer.
 Speech needs a provider voice in addition to its model:
 
 ```sh
-grida voices list --provider elevenlabs --json
-grida models inspect --provider elevenlabs --model eleven_v3 --json
-grida generate --provider elevenlabs --model eleven_v3 \
+grida ai voices list --provider elevenlabs --json
+grida ai models inspect --provider elevenlabs --model eleven_v3 --json
+grida ai generate --provider elevenlabs --model eleven_v3 \
   --input @speech.json --out ./speech
 ```
 
@@ -200,8 +201,8 @@ Unfiltered discovery reports `access.checked: false`. An explicit availability
 filter requires a provider:
 
 ```sh
-grida models list --provider fal --available
-grida models list --provider gg --org studio --available
+grida ai models list --provider fal --available
+grida ai models list --provider gg --org studio --available
 ```
 
 For BYOK, `--available` includes routes with a configured key. For GG, it reads
@@ -254,8 +255,8 @@ After exporting existing Desktop operations, extend the same command to an
 explicit provider-native path:
 
 ```sh
-grida models inspect --provider fal --model your-team/custom-app --json
-grida generate --provider fal --model your-team/custom-app \
+grida ai models inspect --provider fal --model your-team/custom-app --json
+grida ai generate --provider fal --model your-team/custom-app \
   --input @request.json --out ./result
 ```
 
@@ -268,7 +269,7 @@ The provider adapter owns authentication, endpoint addressing, submission,
 status, and results; the endpoint owner owns its inputs and outputs.
 The first native fal adapter targets JSON queue operations. Other provider
 protocols, such as streaming or administrative APIs, need their own support;
-the key alone does not make them operations of `generate`.
+the key alone does not make them operations of `ai generate`.
 
 fal explicitly supports calling custom deployed apps through the same client
 and queue interface as marketplace models. It also documents direct OpenAPI

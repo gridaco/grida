@@ -103,7 +103,7 @@ Save as UTF-8 without a BOM, with correct TOML escaping. Keep keys on one line.
 
 For an existing file, preserve its version, migration metadata, deletion
 tombstones, and other provider entries. Change only the intended key. Use
-`grida providers remove <provider>` for deletion and `grida providers configure
+`grida ai providers remove <provider>` for deletion and `grida ai providers configure
 <provider>` to restore an ID listed in `migration.removed`; these commands retain
 the migration guarantees. If migration is `pending`, let updated Desktop finish
 its cleanup before editing. Do not change the state to bypass it.

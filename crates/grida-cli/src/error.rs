@@ -44,7 +44,7 @@ impl Error {
                     "Cannot read the explicit input. GLB files are limited to 60,000,000 bytes; JSON input to 16 MiB."
                 }
                 "invalid_input" => {
-                    "Supply a GLB file or a JSON object matching grida rigging inspect. Input URLs are not fetched."
+                    "Supply a GLB file or a JSON object matching grida ai rigging inspect. Input URLs are not fetched."
                 }
                 "save_failed" => {
                     "Rigging returned bytes, but saving failed. Inspect the output before retrying; rigging was not repeated."
@@ -56,13 +56,13 @@ impl Error {
             }),
             Origin::Ai if mesh => Some(match code {
                 "invalid_input" => {
-                    "Input does not match this operation. Run grida rigging inspect for its schema."
+                    "Input does not match this operation. Run grida ai rigging inspect for its schema."
                 }
                 "operation_unavailable" => {
-                    "This rigging operation is unavailable. Run grida rigging list."
+                    "This rigging operation is unavailable. Run grida ai rigging list."
                 }
                 "provider_key_required" => {
-                    "Configure Tripo with grida providers configure tripo, or supply TRIPO_API_KEY or --key-stdin."
+                    "Configure Tripo with grida ai providers configure tripo, or supply TRIPO_API_KEY or --key-stdin."
                 }
                 "insufficient_credits" => {
                     "Credits are insufficient for the selected funding account."
@@ -117,13 +117,13 @@ impl From<grida_ai::Failure> for Error {
     fn from(e: grida_ai::Failure) -> Self {
         let message = match e.code.as_str() {
             "invalid_input" => {
-                "Input does not match the selected operation. Run grida models inspect for its schema."
+                "Input does not match the selected operation. Run grida ai models inspect for its schema."
             }
             "operation_unavailable" => {
-                "This provider/model/input variant has no supported operation. Run grida models list."
+                "This provider/model/input variant has no supported operation. Run grida ai models list."
             }
             "provider_key_required" => {
-                "Configure the selected provider with grida providers configure, or supply its environment key or --key-stdin."
+                "Configure the selected provider with grida ai providers configure, or supply its environment key or --key-stdin."
             }
             "insufficient_credits" => "Credits are insufficient for the selected funding account.",
             _ => {

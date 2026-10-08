@@ -2673,7 +2673,7 @@ generation receipts without a fixed projection.
    metadata have terminal controls escaped. Credentials and GG authority remain invocation-owned and are dropped on completion;
    the binary uses exit codes without forcing exit
    through a pending custody or file write.
-6. **Explicit credential checks before registration.** CLI `providers configure`
+6. **Explicit credential checks before registration.** CLI `ai providers configure`
    validates the entered key through the shared AI owner, then invokes that owner's
    single authenticated GET before opening custody. The host permits only OpenRouter's
    `/api/v1/key`, Vercel AI Gateway's `/v1/credits`, fal's `/v1/models/pricing` with exactly
@@ -2771,8 +2771,8 @@ The CLI rigging entry and its boundary tests are
 They consume the neutral rigging SDK with explicit CLI file grants and a chosen
 BYOK or GG funding source. GG requires explicit organization selection and the
 existing native account exchange into invocation-only scoped authority; it never
-inspects BYOK keys or falls back to them. `rigging check` returns structured
-eligibility; `rigging run` is the explicit paid submission and publishes GLB bytes through the existing safe
+inspects BYOK keys or falls back to them. `ai rigging check` returns structured
+eligibility; `ai rigging run` is the explicit paid submission and publishes GLB bytes through the existing safe
 output directory. `--mesh` snapshots one regular file under the SDK's
 60,000,000-byte bound; JSON input retains its 16 MiB limit. Syntax, mesh/options
 and output publication preflight run before key access. Direct Tripo rigging

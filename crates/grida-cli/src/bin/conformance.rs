@@ -2,7 +2,7 @@
 use std::io::{self, BufRead, Read, Write};
 use std::process::ExitCode;
 
-use grida_cli::{Command, GenerationSource, Topic, input};
+use grida_cli::{Command, CommandPath, GenerationSource, Topic, input};
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 
@@ -18,13 +18,17 @@ fn topics() -> Value {
 }
 
 async fn validate_example(argv: &[String]) -> Value {
-    let invocation = match grida_cli::parse(argv) {
-        Ok(invocation) => invocation,
+    let (invocation, path) = match grida_cli::parse_path(argv) {
+        Ok(parsed) => parsed,
         Err(error) => {
             return json!({"error": {"code": error.code.as_str(), "message": error.message}});
         }
     };
     let mut result = json!({"invocation": grida_cli::conformance::project(&invocation)});
+    // Guides must show canonical paths even though legacy spellings still parse.
+    if path == CommandPath::Legacy {
+        result["legacy_path"] = json!(true);
+    }
     let catalog = grida_ai::Catalog::bundled();
     let checked = async {
         match &invocation.command {
@@ -176,6 +180,7 @@ mod tests {
         )
         .unwrap();
         let request = argv(&[
+            "ai",
             "generate",
             "--provider",
             "openrouter",
@@ -212,6 +217,7 @@ mod tests {
             "/../../fixtures/images/checker.png"
         );
         let mut request = argv(&[
+            "ai",
             "generate",
             "--provider",
             "openrouter",
@@ -246,8 +252,15 @@ mod tests {
         for (request, command) in [
             (argv(&["auth", "login"]), "auth login"),
             (
-                argv(&["providers", "configure", "fal", "--key-stdin", "--no-input"]),
-                "providers configure",
+                argv(&[
+                    "ai",
+                    "providers",
+                    "configure",
+                    "fal",
+                    "--key-stdin",
+                    "--no-input",
+                ]),
+                "ai providers configure",
             ),
             (
                 argv(&["account", "credits", "--org", "synthetic"]),
@@ -261,6 +274,7 @@ mod tests {
         }
         for flag in ["--input", "--prompt-file"] {
             let result = validate_example(&argv(&[
+                "ai",
                 "generate",
                 "--provider",
                 "openrouter",
@@ -278,6 +292,20 @@ mod tests {
             validate_example(&argv(&["unknown-command"])).await["error"]["code"],
             "invalid_usage"
         );
+    }
+
+    #[tokio::test]
+    async fn documentation_examples_report_legacy_paths() {
+        for (request, legacy) in [
+            (argv(&["ai", "providers", "list"]), false),
+            (argv(&["providers", "list"]), true),
+            (argv(&["docs", "ai", "generate"]), false),
+            (argv(&["docs", "generate"]), true),
+            (argv(&["auth", "status"]), false),
+        ] {
+            let result = validate_example(&request).await;
+            assert_eq!(result.get("legacy_path").is_some(), legacy, "{result}");
+        }
     }
 
     #[test]

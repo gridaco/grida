@@ -1,4 +1,4 @@
-Usage: grida rigging list [--provider tripo|gg] [--feature rig-check|rigging] [--json]
+Usage: grida ai rigging list [--provider tripo|gg] [--feature rig-check|rigging] [--json]
 
 Discover supported mesh operations without credentials or network access.
 

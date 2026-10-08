@@ -17,8 +17,8 @@ explicit availability checks described below.
 ## Find models
 
 ```sh
-grida models list --modality image
-grida models list --provider fal --modality video --local-image
+grida ai models list --modality image
+grida ai models list --provider fal --modality video --local-image
 ```
 
 Rows identify provider, model, input variant, status, and accepted local-image
@@ -30,8 +30,8 @@ Use `--json` for structured rows and `--kind` for operations such as `music`,
 ## Check your access route
 
 ```sh
-grida models list --provider fal --available
-grida models list --provider openrouter --modality image --available --json
+grida ai models list --provider fal --available
+grida ai models list --provider openrouter --modality image --available --json
 ```
 
 `--available` requires a provider. For BYOK it checks effective key presence
@@ -44,9 +44,9 @@ configured provider.
 ## Inspect accepted inputs
 
 ```sh
-grida models inspect --provider openrouter --model openai/gpt-image-2 --variant references
-grida models inspect --provider fal --model google/veo-3.1-lite --variant image
-grida models inspect --provider fal --model google/veo-3.1-lite --variant image --json
+grida ai models inspect --provider openrouter --model openai/gpt-image-2 --variant references
+grida ai models inspect --provider fal --model google/veo-3.1-lite --variant image
+grida ai models inspect --provider fal --model google/veo-3.1-lite --variant image --json
 ```
 
 Human output shows types, required fields, limits, and an example. `--json`
@@ -61,7 +61,7 @@ or automatic provider fallback.
 ## Find speech voices
 
 ```sh
-grida voices list --provider elevenlabs
+grida ai voices list --provider elevenlabs
 ```
 
 Voice discovery uses your ElevenLabs key and needs a connection. Pass a returned

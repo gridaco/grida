@@ -19,7 +19,7 @@ uses the selected provider account and may incur charges.
 Place your own PNG, JPEG, or static WebP at `./reference.png`:
 
 ```sh
-grida generate --provider openrouter --model openai/gpt-image-2 \
+grida ai generate --provider openrouter --model openai/gpt-image-2 \
   --prompt "An abstract graphite sculpture inspired by the reference, no text" \
   --reference ./reference.png --param size=1536x864 --out ./image
 ```
@@ -37,7 +37,7 @@ replaced. Use the printed path for your next step.
 When the first step saved `./image/output-1.png`, pass it directly:
 
 ```sh
-grida generate --provider fal --model google/veo-3.1-lite \
+grida ai generate --provider fal --model google/veo-3.1-lite \
   --prompt "Slow camera drift and a gentle moving light, preserve the composition" \
   --image ./image/output-1.png --param duration=4 --param resolution=1280x720 \
   --param generate_audio=false --out ./video
@@ -51,17 +51,17 @@ rather than assuming equivalent inputs.
 ## Audio and 3D
 
 Speech uses text and a voice ID. Replace `YOUR_VOICE_ID` with a result from
-`voices list`. Sound effects use a prompt:
+`ai voices list`. Sound effects use a prompt:
 
 ```sh
-grida generate --provider elevenlabs --model eleven_v3 \
+grida ai generate --provider elevenlabs --model eleven_v3 \
   --text "Welcome to the studio." --voice YOUR_VOICE_ID --out ./speech
-grida generate --provider elevenlabs --model eleven_text_to_sound_v2 \
+grida ai generate --provider elevenlabs --model eleven_text_to_sound_v2 \
   --prompt "A soft mechanical click" --param duration_seconds=2 \
   --param loop=false --out ./sound-effect
 ```
 
-Use `models list --kind music` or `models list --kind three-d` for other
+Use `ai models list --kind music` or `ai models list --kind three-d` for other
 operations. Inspect their signatures: 3D capabilities vary by model, and input
 or output formats are not interchangeable.
 
@@ -74,7 +74,7 @@ A calm abstract composition with charcoal textures and a violet rim light.
 ```
 
 ```sh
-grida generate --provider openrouter --model openai/gpt-image-2 \
+grida ai generate --provider openrouter --model openai/gpt-image-2 \
   --prompt-file ./prompt.txt --out ./long-prompt
 ```
 
@@ -93,7 +93,7 @@ For complex input, save the full object as `request.json`:
 ```
 
 ```sh
-grida generate --provider openrouter --model openai/gpt-image-2 \
+grida ai generate --provider openrouter --model openai/gpt-image-2 \
   --input @request.json --out ./structured --json
 ```
 

@@ -1,4 +1,4 @@
-Usage: grida providers remove <provider> [--json] [--no-input]
+Usage: grida ai providers remove <provider> [--json] [--no-input]
 
 Remove the stored key for Desktop and CLI. Environment keys remain effective.
 This does not revoke the key at its provider or sign out of Grida.

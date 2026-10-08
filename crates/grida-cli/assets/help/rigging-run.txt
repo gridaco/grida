@@ -1,4 +1,4 @@
-Usage: grida rigging run --provider tripo|gg --model <id> --out <new-directory> (--mesh FILE --rig-type <type> --spec tripo|mixamo | --input @file|-) [--key-stdin] [--json]
+Usage: grida ai rigging run --provider tripo|gg --model <id> --out <new-directory> (--mesh FILE --rig-type <type> --spec tripo|mixamo | --input @file|-) [--key-stdin] [--json]
 
 Explicitly submit a paid rigging operation and save its GLB and task receipt.
 Run rigging check first to inspect eligibility; check and run are separate commands.
