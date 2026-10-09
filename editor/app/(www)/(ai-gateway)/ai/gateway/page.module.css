@@ -1,0 +1,318 @@
+.page {
+  min-height: 100svh;
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.main {
+  width: min(1200px, calc(100% - 80px));
+  margin-inline: auto;
+  padding-block: 180px 100px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  align-items: center;
+  gap: 72px;
+  min-height: 520px;
+}
+
+.eyebrow {
+  margin-bottom: 24px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.intro h1 {
+  font-size: clamp(48px, 4.8vw, 68px);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -0.065em;
+}
+
+.description {
+  max-width: 390px;
+  margin-top: 28px;
+  color: var(--muted-foreground);
+  font-size: 18px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+  margin-top: 32px;
+  font-size: 14px;
+}
+
+.actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 46px;
+  border-radius: 999px;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease;
+}
+
+.actions svg {
+  width: 15px;
+  height: 15px;
+}
+.actions a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 5px;
+}
+.primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  padding-inline: 22px;
+}
+.primary:hover {
+  background: color-mix(in oklab, var(--primary) 90%, var(--background));
+}
+.secondary {
+  color: var(--muted-foreground);
+}
+.secondary:hover {
+  color: var(--foreground);
+}
+
+.diagram {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: color-mix(in oklab, var(--muted) 35%, var(--background));
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.diagramHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 24px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.diagramHeader svg {
+  width: 14px;
+  height: 14px;
+}
+
+.routing {
+  position: relative;
+  height: 280px;
+}
+
+.connections {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.connections path {
+  stroke: color-mix(in oklab, var(--foreground) 16%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.connections .flow {
+  stroke: var(--muted-foreground);
+  stroke-dasharray: 24 480;
+  animation: request 7s linear infinite;
+}
+
+.application,
+.gateway {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 14px;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.application {
+  left: 12.5%;
+}
+.gateway {
+  left: 42.5%;
+}
+
+.appIcon,
+.gatewaySymbol {
+  display: grid;
+  place-items: center;
+  background: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.appIcon {
+  width: 52px;
+  height: 52px;
+}
+.appIcon svg {
+  width: 22px;
+  height: 22px;
+}
+.gatewaySymbol {
+  width: 80px;
+  height: 80px;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.07em;
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+
+.providers {
+  position: absolute;
+  inset-block: 0;
+  left: 76.5625%;
+  display: grid;
+  grid-template-rows: repeat(5, 1fr);
+}
+.provider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.provider svg {
+  width: 20px;
+  height: 20px;
+  background: var(--background);
+  filter: grayscale(1);
+  opacity: 0.8;
+}
+
+.diagramFooter {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.capabilities {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 40px;
+  margin-top: 100px;
+}
+.capabilities h2 {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.capabilities p {
+  margin-top: 16px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+}
+
+@keyframes request {
+  from {
+    stroke-dashoffset: 504;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (max-width: 1100px) {
+  .hero {
+    gap: 32px;
+    grid-template-columns: 0.85fr 1.15fr;
+  }
+  .providers {
+    left: 72%;
+  }
+  .provider span {
+    font-size: 10px;
+  }
+  .capabilities {
+    gap: 24px;
+  }
+}
+
+@media (max-width: 800px) {
+  .main {
+    width: calc(100% - 40px);
+    padding-block: 128px 64px;
+  }
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 56px;
+  }
+  .description {
+    max-width: 440px;
+    font-size: 17px;
+  }
+  .capabilities {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 64px;
+    gap: 36px;
+  }
+}
+
+@media (max-width: 420px) {
+  .diagramHeader {
+    padding-inline: 18px;
+  }
+  .routing {
+    height: 240px;
+  }
+  .gatewaySymbol {
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
+    font-size: 22px;
+  }
+  .appIcon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+  .providers {
+    left: 76.5625%;
+  }
+  .provider {
+    gap: 0;
+  }
+  .provider span {
+    display: none;
+  }
+  .diagramFooter {
+    gap: 20px;
+    padding-inline: 16px;
+    font-size: 10px;
+  }
+  .capabilities {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connections .flow {
+    animation: none;
+  }
+  .actions a {
+    transition: none;
+  }
+}

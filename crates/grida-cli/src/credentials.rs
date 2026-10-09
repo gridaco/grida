@@ -24,7 +24,7 @@ fn failure(code: &str) -> Error {
         code,
         match code {
             "invalid_credentials" => {
-                "Provider key has an invalid format or is a placeholder. Check the provider key format in grida providers --help."
+                "Provider key has an invalid format or is a placeholder. Check the provider key format in grida ai providers --help."
             }
             "cancelled" => "Provider credential input was cancelled.",
             _ => "Provider credential input could not be read.",

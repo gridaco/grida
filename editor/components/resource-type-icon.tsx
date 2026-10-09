@@ -32,6 +32,7 @@ import {
   GlobeIcon,
   PaletteIcon,
   ShapesIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "@grida/react-icons/logos";
 
@@ -73,6 +74,7 @@ export type ResourceTypeIconName =
   | "v0_canvas"
   | "palette"
   | "shapes"
+  | "workflow"
   | "v0_schema"
   | "v0_campaign_referral"
   | "slides";
@@ -140,6 +142,8 @@ export function ResourceTypeIcon({
       return <PaletteIcon {...props} />;
     case "shapes":
       return <ShapesIcon {...props} />;
+    case "workflow":
+      return <WorkflowIcon {...props} />;
     case "slides":
       return <PresentationIcon {...props} />;
     case "form-x-supabase":

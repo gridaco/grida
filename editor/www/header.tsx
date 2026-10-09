@@ -37,6 +37,8 @@ type Item = {
 
 const features: Item[] = [
   sitemap.items.canvas,
+  sitemap.items.fx,
+  sitemap.items.ai_gateway,
   sitemap.items.slides,
   sitemap.items.svg,
   sitemap.items.forms,
@@ -49,7 +51,6 @@ const resources: Item[] = [
   sitemap.items.fonts,
   sitemap.items.icons,
   sitemap.items.tools,
-  sitemap.items.downloads,
   sitemap.items.brand,
   sitemap.items.docs,
   sitemap.items.thebundle,
@@ -62,112 +63,142 @@ export default function Header({ className }: { className?: string }) {
     <div className={cn("absolute top-0 left-0 right-0 z-50", className)}>
       <header className="container mx-auto py-4 px-4 xl:py-8">
         {/* desktop */}
-        <div className="hidden md:flex justify-between items-center">
-          <Link href="/home" className="flex items-center justify-center gap-2">
+        <div className="hidden lg:grid grid-cols-[1fr_auto_1fr] items-center gap-8">
+          <Link
+            href="/home"
+            aria-label="Grida home"
+            className="flex items-center justify-center justify-self-start"
+          >
             <GridaLogo className="size-5" />
-            <span className="text-lg font-bold">Grida</span>
           </Link>
-          <div className="flex gap-4 lg:gap-12 items-center">
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger className=" bg-transparent font-normal">
-                    Features
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="flex flex-col w-[320px] p-3">
-                      {features.map((component) => (
-                        <ListItem
-                          key={component.title}
-                          icon={
-                            component.icon ? (
-                              <ResourceTypeIcon
-                                type={component.icon}
-                                className="size-4"
-                              />
-                            ) : undefined
-                          }
-                          title={component.title}
-                          href={component.href}
-                        >
-                          {component.description}
-                        </ListItem>
-                      ))}
-                    </ul>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger className="bg-transparent font-normal">
-                    Resources
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="flex flex-col w-[320px] p-3">
-                      {resources.map((component) => (
-                        <ListItem
-                          key={component.title}
-                          title={component.title}
-                          href={component.href}
-                        >
-                          {component.description}
-                        </ListItem>
-                      ))}
-                    </ul>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink
-                    asChild
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      "bg-transparent"
-                    )}
-                  >
-                    <Link href={sitemap.links.pricing}>
-                      <p className="font-normal">Pricing </p>
-                    </Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <Link
-                    href={sitemap.links.github_grida}
-                    target="_blank"
-                    aria-label="GitHub"
-                  >
-                    <Button variant="ghost" size="icon">
-                      <GitHubLogoIcon className="text-foreground size-5" />
-                    </Button>
+          <NavigationMenu className="[&_[data-slot=navigation-menu-viewport]]:rounded-2xl">
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className="rounded-full bg-transparent font-normal [&>svg]:hidden">
+                  Features
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="flex flex-col w-[320px] p-3">
+                    {features.map((component) => (
+                      <ListItem
+                        key={component.title}
+                        icon={
+                          component.icon ? (
+                            <ResourceTypeIcon
+                              type={component.icon}
+                              className="size-4"
+                            />
+                          ) : undefined
+                        }
+                        title={component.title}
+                        href={component.href}
+                      >
+                        {component.description}
+                      </ListItem>
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className="rounded-full bg-transparent font-normal [&>svg]:hidden">
+                  Resources
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="flex flex-col w-[320px] p-3">
+                    {resources.map((component) => (
+                      <ListItem
+                        key={component.title}
+                        title={component.title}
+                        href={component.href}
+                      >
+                        {component.description}
+                      </ListItem>
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuLink
+                  asChild
+                  className={cn(
+                    navigationMenuTriggerStyle(),
+                    "rounded-full bg-transparent font-normal"
+                  )}
+                >
+                  <Link href={sitemap.links.pricing}>
+                    <p className="font-normal">Pricing</p>
                   </Link>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuLink
+                  asChild
+                  className={cn(
+                    navigationMenuTriggerStyle(),
+                    "rounded-full bg-transparent font-normal"
+                  )}
+                >
+                  <Link href={sitemap.items.downloads.href}>
+                    <p className="font-normal">Download</p>
+                  </Link>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
+          <div className="flex items-center gap-2 justify-self-end">
+            <Link
+              href={sitemap.links.github_grida}
+              target="_blank"
+              aria-label="GitHub"
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full font-normal"
+              >
+                <GitHubLogoIcon className="text-foreground size-5" />
+              </Button>
+            </Link>
             <HeaderCTA />
           </div>
         </div>
         {/* mobile */}
-        <div className="md:hidden flex justify-between items-center">
-          <Link href="/home" className="flex items-center justify-center gap-2">
+        <div className="lg:hidden flex justify-between items-center">
+          <Link
+            href="/home"
+            aria-label="Grida home"
+            className="flex items-center justify-center"
+          >
             <GridaLogo className="size-5" />
-            <span className="text-lg font-bold">Grida</span>
           </Link>
           <Drawer>
             <DrawerTrigger asChild>
-              <Button size="icon" variant="ghost">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="rounded-full font-normal"
+                aria-label="Open navigation menu"
+              >
                 <HamburgerMenuIcon />
               </Button>
             </DrawerTrigger>
-            <DrawerContent className="min-h-96 flex flex-col justify-between">
-              <DrawerTitle className="sr-only">Navigation menu</DrawerTitle>
-              <div className="w-full px-4 space-y-8 mb-10">
+            <DrawerContent className="h-[80dvh] overflow-hidden">
+              <DrawerTitle className="sr-only font-normal">
+                Navigation menu
+              </DrawerTitle>
+              {/* Keep links scrollable inside the bounded drawer (see test/www-navigation-mobile-drawer-scroll.md). */}
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-8">
                 <section className="grid gap-2">
                   <Link href="/home">Home</Link>
                   <Link href={sitemap.links.pricing}>Pricing</Link>
+                  <Link href={sitemap.items.downloads.href}>Download</Link>
                   <Link href={sitemap.links.github} target="_blank">
                     GitHub
                   </Link>
                 </section>
                 <section className="grid gap-2">
                   <span>
-                    <span className="font-semibold">Features</span>
+                    <span className="font-normal">Features</span>
                   </span>
                   <div className="grid gap-2">
                     {features.map((component, i) => (
@@ -181,7 +212,7 @@ export default function Header({ className }: { className?: string }) {
                 </section>
                 <section className="grid gap-2">
                   <span>
-                    <span className="font-semibold">Resources</span>
+                    <span className="font-normal">Resources</span>
                   </span>
                   <div className="grid gap-2">
                     {resources.map((component, i) => (
@@ -194,14 +225,20 @@ export default function Header({ className }: { className?: string }) {
                   </div>
                 </section>
               </div>
-              <div className="w-full px-4 py-4 border-t flex flex-col gap-2">
+              <div className="w-full shrink-0 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t flex flex-col gap-2">
                 <Link href={sitemap.links.signin} className="w-full">
-                  <Button variant="outline" className="w-full">
-                    Sign in
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-full font-normal"
+                  >
+                    Log in
                   </Button>
                 </Link>
-                <Link href={sitemap.links.cta} className="w-full">
-                  <Button className="font-normal w-full">Get Started</Button>
+                {/* Temporarily hidden during the marketing site renewal. */}
+                <Link href={sitemap.links.cta} className="hidden w-full">
+                  <Button className="rounded-full font-normal w-full">
+                    Get Started
+                  </Button>
                 </Link>
               </div>
             </DrawerContent>
@@ -224,7 +261,7 @@ const ListItem = React.forwardRef<
         <a
           ref={ref}
           className={cn(
-            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+            "block select-none font-normal space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
             className
           )}
           {...props}

@@ -1,0 +1,92 @@
+{
+  "canvas": {
+    "height": 720,
+    "width": 1280
+  },
+  "layers": [
+    {
+      "file": "/www/2026-10/wind-garden-repaint/sky.webp",
+      "height": 720,
+      "id": "sky",
+      "offset_y": 0,
+      "order": 0,
+      "parallax": 0.08,
+      "width": 1280,
+      "name": "Sky",
+      "content_bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 720
+      }
+    },
+    {
+      "file": "/www/2026-10/wind-garden-repaint/hills.webp",
+      "height": 720,
+      "id": "hills",
+      "offset_y": 0,
+      "order": 1,
+      "parallax": 0.22,
+      "width": 1280,
+      "name": "Hills",
+      "content_bounds": {
+        "x": 0,
+        "y": 329,
+        "width": 1280,
+        "height": 391
+      }
+    },
+    {
+      "file": "/www/2026-10/wind-garden-repaint/trees.webp",
+      "height": 720,
+      "id": "trees",
+      "offset_y": 0,
+      "order": 2,
+      "parallax": 0.45,
+      "width": 1280,
+      "name": "Trees",
+      "content_bounds": {
+        "x": 0,
+        "y": 19,
+        "width": 1280,
+        "height": 606
+      }
+    },
+    {
+      "file": "/www/2026-10/wind-garden-repaint/ground.webp",
+      "height": 720,
+      "id": "ground",
+      "offset_y": 0,
+      "order": 3,
+      "parallax": 0.75,
+      "width": 1280,
+      "name": "Ground",
+      "content_bounds": {
+        "x": 0,
+        "y": 442,
+        "width": 1280,
+        "height": 278
+      }
+    },
+    {
+      "file": "/www/2026-10/wind-garden-repaint/foreground.webp",
+      "height": 720,
+      "id": "foreground",
+      "offset_y": 0,
+      "order": 4,
+      "parallax": 1,
+      "width": 1280,
+      "name": "Foreground",
+      "content_bounds": {
+        "x": 0,
+        "y": 511,
+        "width": 1280,
+        "height": 209
+      }
+    }
+  ],
+  "method": "seam_repaint",
+  "seamless": true,
+  "reference": "/www/2026-10/wind-garden-repaint/source.webp",
+  "preview": "/www/2026-10/wind-garden-repaint/preview.webp"
+}

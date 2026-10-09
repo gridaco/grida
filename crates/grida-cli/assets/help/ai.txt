@@ -1,0 +1,11 @@
+Usage: grida ai <command>
+
+Commands:
+  providers  Manage shared provider API keys
+  models     Discover executable models and input schemas
+  generate   Generate media into a new local directory
+  voices     List available speech voices
+  rigging    Check mesh eligibility and create a rigged GLB
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli

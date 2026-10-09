@@ -15,7 +15,8 @@
   "author": "Grida",
   "repository": "https://github.com/gridaco/grida",
   "files": [
-    "dist"
+    "dist",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

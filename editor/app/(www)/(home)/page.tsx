@@ -6,8 +6,9 @@ import type { Metadata } from "next";
 
 // grida.co/
 export const metadata: Metadata = {
-  title: "Grida",
-  description: "Grida is a Free & Open Canvas",
+  title: "An open canvas to design and create — Grida",
+  description:
+    "An open-source design canvas. Create images, slides, and designs with AI in Grida Desktop for macOS, Windows, and Linux.",
 };
 
 export default async function WWWIndex() {

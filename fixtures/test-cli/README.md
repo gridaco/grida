@@ -34,7 +34,7 @@ Use only the approved credential home and providers. Missing providers are norma
 do not require every supported key or switch billing routes silently.
 
 All generated image, video, audio and 3D outputs in these exercises come through
-`grida generate`. The external harness owns sequencing, visual judgment, prompt
+`grida ai generate`. The external harness owns sequencing, visual judgment, prompt
 writing and local file work. A shell, JSON/base64 utility or local compositor can
 connect artifacts; label that work separately from model generation. If a handoff
 is unsupported, report it instead of bypassing the CLI with a raw provider SDK or

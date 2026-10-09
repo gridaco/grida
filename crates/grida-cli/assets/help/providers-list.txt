@@ -1,4 +1,4 @@
-Usage: grida providers list [--json]
+Usage: grida ai providers list [--json]
 
 Show key presence and source after static validation, never key contents.
 No login or probes; configured does not mean provider-verified.

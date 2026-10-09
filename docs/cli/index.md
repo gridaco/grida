@@ -36,9 +36,9 @@ not supported there yet.
 Bring an OpenRouter API key and enter it at the hidden prompt:
 
 ```sh
-grida providers configure openrouter
-grida models list --provider openrouter --modality image --available
-grida generate --provider openrouter --model openai/gpt-image-2 \
+grida ai providers configure openrouter
+grida ai models list --provider openrouter --modality image --available
+grida ai generate --provider openrouter --model openai/gpt-image-2 \
   --prompt "A blue ceramic teapot on a warm neutral background" --out ./image
 ```
 
@@ -52,6 +52,9 @@ describe the separate account path required by GG.
 
 ## Find the right command
 
+Account commands sit at the root. AI tools (provider keys, models, voices,
+generation and rigging) are grouped under `grida ai`.
+
 | Task                                   | Guide                       |
 | -------------------------------------- | --------------------------- |
 | Sign in and manage a Grida session     | [Auth](./auth.md)           |
@@ -63,7 +66,7 @@ describe the separate account path required by GG.
 ```sh
 grida --version
 grida --help
-grida docs generate
+grida docs ai generate
 ```
 
 `--help` describes your installed version and works offline. `docs` prints a

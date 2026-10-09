@@ -1,4 +1,4 @@
-Usage: grida providers <command>
+Usage: grida ai providers <command>
 
 Commands:
   list                    Show key presence and effective source

@@ -9,13 +9,14 @@ import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import { XLogo, SlackLogo } from "@grida/react-icons/logos";
 import Link from "next/link";
 import { sitemap } from "./data/sitemap";
+import { cn } from "@app/ui/lib/utils";
 
-export default function Footer() {
+export default function Footer({ className }: { className?: string }) {
   return (
     <div>
       <footer className="w-full px-4 container mx-auto">
         <div className="mx-auto max-w-container">
-          <_Footer className="border-t pt-8 bg-transparent">
+          <_Footer className={cn("border-t pt-8 bg-transparent", className)}>
             <FooterContent className="sm:grid-cols-2 md:grid-cols-3">
               <FooterColumn className="col-span-2 flex-row items-center justify-between gap-8 pb-8 md:col-span-1 md:flex-col md:items-start md:justify-start">
                 <Link href="/home">
@@ -50,6 +51,18 @@ export default function Footer() {
               </FooterColumn>
               <FooterColumn>
                 <h3 className="text-md pt-1 font-semibold">Product</h3>
+                <Link
+                  href={sitemap.items.fx.href}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  {sitemap.items.fx.title}
+                </Link>
+                <Link
+                  href={sitemap.items.ai_gateway.href}
+                  className="text-xs md:text-sm text-muted-foreground"
+                >
+                  {sitemap.items.ai_gateway.title}
+                </Link>
                 <Link
                   href={sitemap.links.svg}
                   className="text-xs md:text-sm text-muted-foreground"

@@ -94,18 +94,18 @@ pub fn project(invocation: &Invocation) -> Value {
             selector(&mut object, value);
             "account credits"
         }
-        Command::ProvidersList => "providers list",
+        Command::ProvidersList => "ai providers list",
         Command::ProvidersConfigure {
             provider,
             key_stdin,
         } => {
             put(&mut object, "provider", provider.as_str());
             put(&mut object, "keyStdin", *key_stdin);
-            "providers configure"
+            "ai providers configure"
         }
         Command::ProvidersRemove(provider) => {
             put(&mut object, "provider", provider.as_str());
-            "providers remove"
+            "ai providers remove"
         }
         Command::ModelsList {
             provider,
@@ -121,11 +121,11 @@ pub fn project(invocation: &Invocation) -> Value {
             put(&mut object, "available", *available);
             put(&mut object, "localImage", *local_image);
             selector(&mut object, value);
-            "models list"
+            "ai models list"
         }
         Command::ModelsInspect(value) => {
             model(&mut object, value);
-            "models inspect"
+            "ai models inspect"
         }
         Command::Generate {
             model: value,
@@ -142,17 +142,17 @@ pub fn project(invocation: &Invocation) -> Value {
             put(&mut object, "out", out.as_str());
             put(&mut object, "keyStdin", *key_stdin);
             selector(&mut object, selected);
-            "generate"
+            "ai generate"
         }
         Command::VoicesList { key_stdin } => {
             put(&mut object, "provider", "elevenlabs");
             put(&mut object, "keyStdin", *key_stdin);
-            "voices list"
+            "ai voices list"
         }
         Command::RiggingList { provider, feature } => {
             optional(&mut object, "provider", provider.map(|v| v.as_str()));
             optional(&mut object, "feature", feature.map(|v| v.as_str()));
-            "rigging list"
+            "ai rigging list"
         }
         Command::RiggingInspect {
             provider,
@@ -166,7 +166,7 @@ pub fn project(invocation: &Invocation) -> Value {
                     put(&mut object, "model", model.as_str());
                 }
             }
-            "rigging inspect"
+            "ai rigging inspect"
         }
         Command::RiggingCheck {
             provider,
@@ -181,7 +181,7 @@ pub fn project(invocation: &Invocation) -> Value {
                 MeshSource::Mesh(path) => put(&mut object, "mesh", path.as_str()),
                 MeshSource::Json(input) => put(&mut object, "input", input.as_str()),
             }
-            "rigging check"
+            "ai rigging check"
         }
         Command::RiggingRun {
             provider,
@@ -208,7 +208,7 @@ pub fn project(invocation: &Invocation) -> Value {
                 }
                 RiggingSource::Json(input) => put(&mut object, "input", input.as_str()),
             }
-            "rigging run"
+            "ai rigging run"
         }
     };
     put(&mut object, "command", name);

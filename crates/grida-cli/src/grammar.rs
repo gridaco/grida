@@ -337,10 +337,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
         "auth",
         "account",
         "auth storage",
-        "models",
-        "providers",
-        "voices",
-        "rigging",
+        "ai",
+        "ai models",
+        "ai providers",
+        "ai voices",
+        "ai rigging",
     ]
     .contains(&topic.as_str())
     {
@@ -348,7 +349,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
         return invocation(Command::Help(Topic::parse(&topic)?));
     }
     let command = match topic.as_str() {
-        "rigging list" => {
+        "ai rigging list" => {
             tokens.allowed(true, &["provider", "feature"])?;
             Command::RiggingList {
                 provider: tokens
@@ -361,7 +362,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
                     .transpose()?,
             }
         }
-        "rigging inspect" => {
+        "ai rigging inspect" => {
             tokens.allowed(true, &["provider", "feature", "model"])?;
             let provider = MeshProvider::parse(tokens.required("provider")?)?;
             let operation = match MeshFeature::parse(tokens.required("feature")?)? {
@@ -376,7 +377,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
                 operation,
             }
         }
-        "rigging check" | "rigging run" => parse_rigging(&tokens, topic == "rigging run")?,
+        "ai rigging check" | "ai rigging run" => parse_rigging(&tokens, topic == "ai rigging run")?,
         "auth login" => {
             tokens.allowed(true, &["storage", "no-browser"])?;
             if options.json || options.no_input {
@@ -394,11 +395,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
             tokens.allowed(true, &["org", "org-id"])?;
             Command::AccountCredits(tokens.organization()?)
         }
-        "providers list" => {
+        "ai providers list" => {
             tokens.allowed(true, &[])?;
             Command::ProvidersList
         }
-        "models list" => {
+        "ai models list" => {
             tokens.allowed(
                 true,
                 &[
@@ -430,7 +431,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
                 selector,
             }
         }
-        "voices list" => {
+        "ai voices list" => {
             tokens.allowed(true, &["provider", "key-stdin"])?;
             if tokens.value("provider") != Some("elevenlabs") {
                 return Err(Failure::usage());
@@ -439,7 +440,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
                 key_stdin: tokens.flag("key-stdin"),
             }
         }
-        "models inspect" | "generate" => parse_media(&tokens, topic == "generate")?,
+        "ai models inspect" | "ai generate" => parse_media(&tokens, topic == "ai generate")?,
         "auth status" | "auth logout" | "auth storage show" | "account view" => {
             tokens.allowed(true, &[])?;
             match topic.as_str() {
@@ -455,7 +456,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
             .collect::<Vec<_>>()
             .as_slice()
         {
-            ["providers", action @ ("configure" | "remove"), provider] => {
+            [
+                "ai",
+                "providers",
+                action @ ("configure" | "remove"),
+                provider,
+            ] => {
                 let configure = *action == "configure";
                 tokens.allowed(true, if configure { &["key-stdin"] } else { &[] })?;
                 let provider = Provider::parse(provider)?;
@@ -700,6 +706,7 @@ mod tests {
     #[test]
     fn options_can_precede_follow_and_interrupt_command_words() {
         let expected = parsed(&[
+            "ai",
             "models",
             "inspect",
             "--provider",
@@ -711,6 +718,7 @@ mod tests {
         assert_eq!(
             parsed(&[
                 "--json",
+                "ai",
                 "models",
                 "--provider=fal",
                 "inspect",
@@ -722,6 +730,7 @@ mod tests {
             parsed(&[
                 "--provider=fal",
                 "--model=model",
+                "ai",
                 "models",
                 "inspect",
                 "--json"
@@ -729,7 +738,7 @@ mod tests {
             expected
         );
         assert_eq!(
-            parsed(&["help", "providers", "configure", "tripo"]).command,
+            parsed(&["help", "ai", "providers", "configure", "tripo"]).command,
             Command::Help(Topic::ProvidersConfigure)
         );
     }
@@ -737,6 +746,7 @@ mod tests {
     #[test]
     fn repeated_request_values_retain_order_and_values() {
         let invocation = parsed(&[
+            "ai",
             "generate",
             "--provider=fal",
             "--model=model",
@@ -775,7 +785,7 @@ mod tests {
         for values in [
             vec!["--help", "-h"],
             vec!["auth", "status", "--json", "--json"],
-            vec!["models", "list", "--provider=fal", "--provider=tripo"],
+            vec!["ai", "models", "list", "--provider=fal", "--provider=tripo"],
         ] {
             assert_eq!(parse(&args(&values)).unwrap_err(), Failure::usage());
         }
@@ -812,7 +822,7 @@ mod tests {
 
     #[test]
     fn model_bound_counts_utf16_and_rejects_unicode_control_categories() {
-        let prefix = args(&["models", "inspect", "--provider=fal", "--model"]);
+        let prefix = args(&["ai", "models", "inspect", "--provider=fal", "--model"]);
         for (model, accepted) in [
             ("雪".repeat(256), true),
             ("雪".repeat(257), false),
@@ -831,6 +841,7 @@ mod tests {
     #[test]
     fn stdin_and_input_alternatives_are_owned_by_one_source() {
         let prefix = [
+            "ai",
             "generate",
             "--provider=tripo",
             "--model=model",
@@ -859,6 +870,7 @@ mod tests {
     #[test]
     fn rigging_sources_and_provider_custody_are_explicit() {
         let check = parsed(&[
+            "ai",
             "rigging",
             "check",
             "--provider=gg",
@@ -876,6 +888,7 @@ mod tests {
         ));
         for argv in [
             vec![
+                "ai",
                 "rigging",
                 "check",
                 "--provider=gg",
@@ -883,14 +896,16 @@ mod tests {
                 "--key-stdin",
             ],
             vec![
+                "ai",
                 "rigging",
                 "check",
                 "--provider=tripo",
                 "--mesh=mesh.glb",
                 "--org=studio",
             ],
-            vec!["rigging", "check", "--provider=tripo", "--mesh=-"],
+            vec!["ai", "rigging", "check", "--provider=tripo", "--mesh=-"],
             vec![
+                "ai",
                 "rigging",
                 "run",
                 "--provider=tripo",
@@ -900,6 +915,7 @@ mod tests {
                 "--spec=tripo",
             ],
             vec![
+                "ai",
                 "rigging",
                 "inspect",
                 "--provider=tripo",
@@ -911,6 +927,7 @@ mod tests {
         }
         assert!(matches!(
             parsed(&[
+                "ai",
                 "rigging",
                 "run",
                 "--provider=tripo",
@@ -932,7 +949,13 @@ mod tests {
             vec!["secret-token"],
             vec!["--secret-token"],
             vec!["auth", "status", "--provider=secret-token"],
-            vec!["models", "inspect", "--provider=secret-token", "--model=m"],
+            vec![
+                "ai",
+                "models",
+                "inspect",
+                "--provider=secret-token",
+                "--model=m",
+            ],
         ] {
             let error = parse(&args(&argv)).unwrap_err();
             assert_eq!(error, Failure::usage());
@@ -944,5 +967,33 @@ mod tests {
                 .code,
             FailureCode::InteractionRequired
         );
+    }
+
+    #[test]
+    fn ai_tools_exist_only_under_ai() {
+        assert_eq!(parsed(&["ai"]).command, Command::Help(Topic::Ai));
+        assert_eq!(
+            parsed(&["ai", "providers", "list"]).command,
+            Command::ProvidersList
+        );
+        for argv in [
+            vec!["providers", "list"],
+            vec![
+                "generate",
+                "--provider=fal",
+                "--model=m",
+                "--prompt=p",
+                "--out=o",
+            ],
+            vec!["ai", "auth", "status"],
+            vec!["ai", "ai", "models", "list"],
+            vec!["ai", "--version"],
+        ] {
+            assert_eq!(
+                parse(&args(&argv)).unwrap_err(),
+                Failure::usage(),
+                "{argv:?}"
+            );
+        }
     }
 }

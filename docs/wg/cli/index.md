@@ -31,8 +31,8 @@ Desktop as ordinary CLI operations:
 ```sh
 grida auth login
 grida account credits --org studio
-grida models list --modality image
-grida generate --provider gg --model openai/gpt-image-2 \
+grida ai models list --modality image
+grida ai generate --provider gg --model openai/gpt-image-2 \
   --org studio --input @image.json --out ./images
 ```
 
@@ -61,8 +61,18 @@ services and media tools retain independent owners, reusable by Desktop and
 other clients. The CLI translates arguments into their operations and presents
 the results.
 
-Use `grida models` and `grida generate` at the root. An `ai` prefix adds no
-useful distinction to these operations today. Command depth does not determine
+The root holds Grida's own identity (`auth`, `account`), one entry per
+capability family, and meta commands (`docs`, `help`). `grida ai` is the AI
+tools family: provider credentials, model discovery, and direct single
+operations against catalogued models. Products that orchestrate those
+operations, such as an agent or workflow runner, are root siblings rather than
+`ai` children.
+
+An `ai` prefix added nothing while AI tools were the only capability. It now
+separates that family from identity and from future products, and names what
+these commands are: calls to AI models, not general media tooling. Provider
+keys belong to the family because only AI operations use them; where a command
+sits does not decide who stores its data. Command depth does not determine
 package ownership.
 
 Products can arrive or retire independently. Removing a command removes its

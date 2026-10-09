@@ -1,4 +1,4 @@
-Usage: grida models <list|inspect>
+Usage: grida ai models <list|inspect>
 
 Discover bundled executable operations without credentials or network access.
 

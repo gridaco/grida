@@ -1,4 +1,4 @@
-Usage: grida rigging <list|inspect|check|run>
+Usage: grida ai rigging <list|inspect|check|run>
 
 Discover mesh operations, check eligibility, or explicitly create a rigged GLB.
 Checking never starts rigging. Select Tripo BYOK or Grida credits explicitly.

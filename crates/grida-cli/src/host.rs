@@ -301,7 +301,7 @@ pub fn provider_error(e: grida_auth::Error) -> Error {
                 "Provider credentials are busy in another process. Retry after it finishes."
             }
             "invalid_store" => {
-                "credentials.toml is not a valid Grida provider credential file. Check its TOML syntax and required fields; run grida providers --help for the format. No alternate stored key was selected."
+                "credentials.toml is not a valid Grida provider credential file. Check its TOML syntax and required fields; run grida ai providers --help for the format. No alternate stored key was selected."
             }
             "unsupported_version" => {
                 "credentials.toml uses an unsupported format version. Update Grida to a compatible version; do not change the version field to bypass this check."
@@ -310,7 +310,7 @@ pub fn provider_error(e: grida_auth::Error) -> Error {
                 "Invalid provider credential input or storage location. Check the provider name and use an absolute GRIDA_HOME if set."
             }
             _ => {
-                "Cannot access or lock provider credential storage. Check filesystem or sandbox access, ownership and private permissions for the Grida home; run grida providers --help for its location. No alternate stored key was selected."
+                "Cannot access or lock provider credential storage. Check filesystem or sandbox access, ownership and private permissions for the Grida home; run grida ai providers --help for its location. No alternate stored key was selected."
             }
         },
     )

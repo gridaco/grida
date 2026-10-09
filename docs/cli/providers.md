@@ -17,9 +17,9 @@ GG uses a separate [Grida session](./auth.md) and organization.
 ## Configure a provider
 
 ```sh
-grida providers configure openrouter
-grida providers configure fal
-grida providers list
+grida ai providers configure openrouter
+grida ai providers configure fal
+grida ai providers list
 ```
 
 Enter your key at the hidden prompt. Every selected key passes static validation.
@@ -32,7 +32,7 @@ An accepted check proves only that the metadata read succeeded at that moment.
 It does not guarantee model access, credit, or generation success. Listing and
 generation do not repeat that check.
 
-For automation, `providers configure` accepts `--key-stdin --no-input`. Supply
+For automation, `ai providers configure` accepts `--key-stdin --no-input`. Supply
 the key on stdin; literal key arguments are never accepted. Configuration still
 performs supported verification before saving.
 
@@ -52,7 +52,7 @@ keys. Do not commit it or share it in logs.
 For manual editing, stop Desktop and other Grida processes using the same home,
 then follow the canonical
 [TOML file format](https://github.com/gridaco/grida/blob/main/packages/grida-auth/PROVIDER-CREDENTIALS-V1.md).
-Preserve version and migration fields. `grida providers --help` prints the
+Preserve version and migration fields. `grida ai providers --help` prints the
 location and format link without opening the credential store.
 
 ## Override a stored key
@@ -75,7 +75,7 @@ is not supported there yet. Provider keys and Grida sessions are separate.
 ## Remove a key
 
 ```sh
-grida providers remove fal
+grida ai providers remove fal
 ```
 
 This removes the shared stored key for CLI and Desktop. It does not revoke the

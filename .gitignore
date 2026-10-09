@@ -243,3 +243,6 @@ __screenshots__/
 # Generated artwork-station demo output (regenerable from
 # fixtures/prompts/artwork-station-prompts.txt) — heavy binaries, not a test fixture
 fixtures/test-canvas/artwork.canvas/outputs/
+
+# Local asset creation inputs, workflows, scripts and run records
+/.artifacts/

@@ -13,7 +13,9 @@ export default function HeaderCTA() {
     <div className="flex gap-2">
       {!session && (
         <Link href={sitemap.links.signin} className="hidden md:block">
-          <Button variant="ghost">Sign in</Button>
+          <Button variant="ghost" className="rounded-full font-normal">
+            Log in
+          </Button>
         </Link>
       )}
       <CTA isSignedIn={!!session} />
@@ -25,14 +27,15 @@ function CTA({ isSignedIn }: { isSignedIn: boolean }) {
   if (isSignedIn) {
     return (
       <Link href={sitemap.links.dashboard}>
-        <Button className="font-normal">Dashboard</Button>
+        <Button className="rounded-full font-normal">Dashboard</Button>
       </Link>
     );
   }
 
   return (
-    <Link href={sitemap.links.cta}>
-      <Button className="font-normal">Get Started</Button>
+    // Temporarily hidden during the marketing site renewal.
+    <Link href={sitemap.links.cta} className="hidden">
+      <Button className="rounded-full font-normal">Get Started</Button>
     </Link>
   );
 }

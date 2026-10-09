@@ -137,7 +137,7 @@ export async function proveNative(out) {
     stage = "docs";
     const docs = await exec(
       process.execPath,
-      [launcher, "docs", "providers"],
+      [launcher, "docs", "ai", "providers"],
       options
     );
     assert(docs.stdout.startsWith("https://grida.co/docs/cli"));

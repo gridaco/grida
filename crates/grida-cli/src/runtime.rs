@@ -303,7 +303,7 @@ async fn execute(
         }
         Command::VoicesList { key_stdin } => {
             let c = Credentials::open(&env, Some("elevenlabs"), key_stdin, &token).await?;
-            let key=c.key("elevenlabs").ok_or_else(||Error::new("provider_key_required","Configure the selected provider with grida providers configure, or supply its environment key or --key-stdin."))?;
+            let key=c.key("elevenlabs").ok_or_else(||Error::new("provider_key_required","Configure the selected provider with grida ai providers configure, or supply its environment key or --key-stdin."))?;
             let voices = media_client(None, &token)?
                 .voices(
                     key,
@@ -531,7 +531,7 @@ async fn authority(
         let key = credentials.key(provider).ok_or_else(|| {
             Error::new(
                 "provider_key_required",
-                "Configure the selected provider with grida providers configure, or supply its environment key or --key-stdin.",
+                "Configure the selected provider with grida ai providers configure, or supply its environment key or --key-stdin.",
             )
             .origin(Origin::Ai)
         })?;
@@ -1109,11 +1109,11 @@ mod tests {
         for (mesh, message) in [
             (
                 true,
-                "Configure Tripo with grida providers configure tripo, or supply TRIPO_API_KEY or --key-stdin.",
+                "Configure Tripo with grida ai providers configure tripo, or supply TRIPO_API_KEY or --key-stdin.",
             ),
             (
                 false,
-                "Configure the selected provider with grida providers configure, or supply its environment key or --key-stdin.",
+                "Configure the selected provider with grida ai providers configure, or supply its environment key or --key-stdin.",
             ),
         ] {
             let error = authority("tripo", false, None, &env, &CancellationToken::new())

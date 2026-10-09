@@ -28,12 +28,12 @@ pub fn inspect(
     if kinds.is_empty() {
         return Err(Error::new(
             "operation_unavailable",
-            "This provider/model/input variant has no supported operation. Run grida models list.",
+            "This provider/model/input variant has no supported operation. Run grida ai models list.",
         ));
     }
     if kinds.len() != 1 {
         return Err(Error::usage(
-            "Choose the operation with --kind; run grida models list.",
+            "Choose the operation with --kind; run grida ai models list.",
         ));
     }
     let kind = *kinds.iter().next().unwrap();
@@ -76,7 +76,7 @@ pub fn inspect(
             "text"
         }
     });
-    let d=candidates.iter().find(|d|d["variant"]==variant).ok_or_else(||Error::new("operation_unavailable","This provider/model/input variant has no supported operation. Run grida models list."))?;
+    let d=candidates.iter().find(|d|d["variant"]==variant).ok_or_else(||Error::new("operation_unavailable","This provider/model/input variant has no supported operation. Run grida ai models list."))?;
     Ok(catalog.inspect(&selector(d))?)
 }
 pub fn selector(d: &Value) -> Selector {
@@ -113,7 +113,7 @@ fn claim<'a>(
 ) -> Result<&'a Value> {
     let schema = properties.get(field).ok_or_else(|| {
         Error::usage(format!(
-            "{flag} is not supported by this operation. Run grida models inspect for its inputs."
+            "{flag} is not supported by this operation. Run grida ai models inspect for its inputs."
         ))
     })?;
     if !claimed.insert(field.into()) {
@@ -136,12 +136,12 @@ fn scalar(value: &str, schema: &Value, field: &str) -> Result<Value> {
                 return Ok(Value::Number(n));
             }
             Err(Error::usage(format!(
-                "The {field} field needs a {} value. Run grida models inspect for its schema.",
+                "The {field} field needs a {} value. Run grida ai models inspect for its schema.",
                 text(schema, "type")
             )))
         }
         Some("boolean") => Err(Error::usage(format!(
-            "The {field} field needs a boolean value. Run grida models inspect for its schema."
+            "The {field} field needs a boolean value. Run grida ai models inspect for its schema."
         ))),
         _ => Err(Error::usage(format!(
             "The {field} field needs structured input; use --input @file|- and the model schema."
@@ -335,7 +335,7 @@ async fn read_flags(d: &Value, r: &Request, token: &CancellationToken) -> Result
                 .is_some_and(|types| !types.iter().any(|t| t == &asset.media_type))
             {
                 return Err(Error::usage(
-                    "--image has a media type this operation does not accept. Run grida models inspect for accepted types.",
+                    "--image has a media type this operation does not accept. Run grida ai models inspect for accepted types.",
                 ));
             }
             value.insert(
@@ -353,7 +353,7 @@ async fn read_flags(d: &Value, r: &Request, token: &CancellationToken) -> Result
             .collect();
         if !missing.is_empty() {
             return Err(Error::usage(format!(
-                "Missing required input: {}. Run grida models inspect for an example.",
+                "Missing required input: {}. Run grida ai models inspect for an example.",
                 missing.join(", ")
             )));
         }
@@ -442,7 +442,7 @@ pub fn describe(d: &Value) -> Vec<String> {
     }
     let quote = |s: &str| format!("'{}'", s.replace('\'', "'\\''"));
     let mut example = vec![
-        "grida generate".into(),
+        "grida ai generate".into(),
         "--provider".into(),
         quote(text(d, "provider_id")),
         "--model".into(),

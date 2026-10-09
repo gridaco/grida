@@ -1,4 +1,4 @@
-Usage: grida voices list --provider elevenlabs [--key-stdin] [--json]
+Usage: grida ai voices list --provider elevenlabs [--key-stdin] [--json]
 
 List speech voices using the ElevenLabs credential. No Grida login.
 
