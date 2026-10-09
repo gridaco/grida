@@ -10,7 +10,10 @@
  * card so price updates don't rot the test.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { SourceWorkRPC } from "@/lib/platform/source-work";
 import { catalog as ai_models } from "@grida/ai-models/grida";
+
+const sourceRpc = vi.hoisted(() => vi.fn<SourceWorkRPC>());
 
 vi.mock("@/lib/billing/metronome", () => ({
   getEntitlement: vi.fn<(...args: never[]) => unknown>(),
@@ -27,6 +30,7 @@ vi.mock("@/lib/billing/metronome", () => ({
   },
 }));
 vi.mock("@/lib/supabase/server", () => ({
+  service_role: { workspace: { rpc: sourceRpc } },
   createLibraryClient: vi.fn<(...args: never[]) => unknown>(),
 }));
 vi.mock("@/lib/auth/organization", () => ({
@@ -63,6 +67,17 @@ function stubGeneration() {
 }
 
 beforeEach(() => {
+  sourceRpc.mockReset();
+  sourceRpc.mockImplementation(async (name, args) => {
+    if (name === "platform_source_work_begin")
+      return { data: { created: true, id: args.work_id }, error: null };
+    if (
+      name === "platform_source_work_capture" ||
+      name === "platform_source_work_finish"
+    )
+      return { data: { accepted: true }, error: null };
+    throw new Error("Unexpected source RPC: " + name);
+  });
   mockedGenerate.mockReset();
   mockedGetEntitlement.mockReset();
   mockedIngest.mockReset();
@@ -97,6 +112,30 @@ describe("methods.generateVideo", () => {
     expect(mockedIngest).toHaveBeenCalledTimes(1);
     expect(mockedIngest.mock.calls[0]![0]).toBe(ORG);
     expect(mockedIngest.mock.calls[0]![1]).toBe(expectedMills);
+    expect(sourceRpc.mock.calls.map(([name]) => name)).toEqual([
+      "platform_source_work_begin",
+      "platform_source_work_capture",
+      "platform_source_work_finish",
+    ]);
+    const [begin, capture, finish] = sourceRpc.mock.calls;
+    expect(begin![1]).toMatchObject({
+      work_kind: "legacy_ai",
+      request: { organization_id: String(ORG), product: "grida-ai" },
+    });
+    expect(capture![1]).toMatchObject({
+      work_id: begin![1].work_id,
+      evidence: { quantity: String(expectedMills), outcome: "succeeded" },
+    });
+    expect(finish![1]).toEqual({ work_id: begin![1].work_id });
+    expect(sourceRpc.mock.invocationCallOrder[0]).toBeLessThan(
+      mockedGenerate.mock.invocationCallOrder[0]!
+    );
+    expect(sourceRpc.mock.invocationCallOrder[1]).toBeLessThan(
+      mockedIngest.mock.invocationCallOrder[0]!
+    );
+    expect(mockedIngest.mock.invocationCallOrder[0]).toBeLessThan(
+      sourceRpc.mock.invocationCallOrder[2]!
+    );
 
     const args = mockedGenerate.mock.calls[0]![0] as {
       prompt: unknown;
@@ -159,6 +198,19 @@ describe("methods.generateVideo", () => {
     expect(mockedGenerate).not.toHaveBeenCalled();
   });
 
+  it("does not dispatch or ingest when durable admission fails", async () => {
+    sourceRpc.mockResolvedValueOnce({
+      data: null,
+      error: { code: "unavailable" },
+    });
+    await expect(
+      methods.generateVideo(ORG, { model_id: MODEL_ID, prompt: "x" })
+    ).rejects.toMatchObject({ code: "billing_unavailable" });
+    expect(sourceRpc).toHaveBeenCalledTimes(1);
+    expect(mockedGenerate).not.toHaveBeenCalled();
+    expect(mockedIngest).not.toHaveBeenCalled();
+  });
+
   it("blocked orgs never reach the provider", async () => {
     mockedGetEntitlement.mockResolvedValue({
       allowed: false,
@@ -169,6 +221,7 @@ describe("methods.generateVideo", () => {
     await expect(
       methods.generateVideo(ORG, { model_id: MODEL_ID, prompt: "x" })
     ).rejects.toMatchObject({ code: "blocked" });
+    expect(sourceRpc).not.toHaveBeenCalled();
     expect(mockedGenerate).not.toHaveBeenCalled();
   });
 });
