@@ -462,6 +462,37 @@ describe("separate confidential console consent", () => {
       consoleClient: { id: consoleId, redirectUri },
     });
     expect(oauthServer.config().clientIds).toEqual([clientId]);
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("GRIDA_PLATFORM_ALLOW_LOCAL", "1");
+    vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", "http://127.0.0.1:56842");
+    expect(oauthServer.consentConfig().consoleClient).toEqual({
+      id: consoleId,
+      redirectUri: "http://127.0.0.1:56842/auth/callback",
+    });
+    for (const mode of ["production", "test", ""]) {
+      vi.stubEnv("NODE_ENV", mode);
+      expect(() => oauthServer.consentConfig()).toThrow(oauthServer.Failure);
+    }
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("GRIDA_PLATFORM_ALLOW_LOCAL", "0");
+    expect(() => oauthServer.consentConfig()).toThrow(oauthServer.Failure);
+    vi.stubEnv("GRIDA_PLATFORM_ALLOW_LOCAL", "1");
+    for (const target of [
+      "http://localhost:56842",
+      "http://example.test:56842",
+      "http://127.0.0.1",
+      "http://127.0.0.1:80",
+      "http://127.0.0.1:56842/",
+      "http://127.0.0.1:56842/path",
+      "http://127.0.0.1:56842?x=y",
+      "http://127.0.0.1:56842#fragment",
+      "http://user@127.0.0.1:56842",
+    ]) {
+      vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", target);
+      expect(() => oauthServer.consentConfig()).toThrow(oauthServer.Failure);
+    }
+    vi.stubEnv("GRIDA_PLATFORM_ALLOW_LOCAL", "0");
+    vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", consoleOrigin);
     for (const [name, value] of [
       ["GRIDA_PLATFORM_CONSOLE_OAUTH_CLIENT_ID", clientId],
       ["GRIDA_PLATFORM_CONSOLE_OAUTH_CLIENT_ID", ""],

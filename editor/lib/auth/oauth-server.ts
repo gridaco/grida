@@ -134,7 +134,15 @@ export namespace oauthServer {
         !uuid(consoleId) ||
         base.clientIds.includes(consoleId) ||
         !url ||
-        url.protocol !== "https:" ||
+        !(
+          url.protocol === "https:" ||
+          (process.env.GRIDA_PLATFORM_ALLOW_LOCAL === "1" &&
+            process.env.NODE_ENV === "development" &&
+            url.protocol === "http:" &&
+            url.hostname === "127.0.0.1" &&
+            url.port &&
+            Number(url.port) >= 1024)
+        ) ||
         url.origin !== consoleOrigin ||
         url.username ||
         url.password ||

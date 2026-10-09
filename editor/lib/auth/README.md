@@ -56,6 +56,12 @@ exact HTTPS `GRIDA_PLATFORM_CONSOLE_ORIGIN`. The only accepted callback is that
 origin plus `/auth/callback`; Supabase must register the same client/callback.
 The client secret stays in infra, not in the Grida source application.
 
+For a disposable local preview only, `NODE_ENV=development` together with
+`GRIDA_PLATFORM_ALLOW_LOCAL=1` permits a canonical HTTP Console origin on
+`127.0.0.1` with an explicit port at least 1024. Production and test runtimes
+retain the HTTPS requirement. The exact client/callback and consent-proof
+checks still apply; this does not bypass sign-in or authorize another client.
+
 Do not add this client to `GRIDA_OAUTH_CLIENT_IDS` or its callback to
 `GRIDA_OAUTH_REDIRECT_URIS`: those remain the native API/loopback allowlists.
 Consent requires the exact console client/callback pair, binds it into the
