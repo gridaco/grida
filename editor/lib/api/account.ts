@@ -7,6 +7,8 @@ import { accountData } from "../supabase/account-data";
 // GRIDA-EE: billing — host composition; account/identity owners remain independent.
 import { credits } from "../billing/credits";
 import { creditsData } from "../supabase/credits-data";
+import { billingOwner } from "../platform/billing-consumer";
+import { nativeCredits } from "../platform/native-credits";
 
 export namespace accountApi {
   export function bind(
@@ -35,6 +37,8 @@ export namespace accountApi {
             input
           );
         try {
+          if (billingOwner() === "infra")
+            return await nativeCredits(authorization, config, input!, fetcher);
           return await credits.read(
             creditsData.forBearer(authorization, config, fetcher),
             input!

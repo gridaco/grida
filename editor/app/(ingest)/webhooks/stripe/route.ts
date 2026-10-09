@@ -1,3 +1,4 @@
+import { sourceWebhook } from "@/lib/platform/webhook-forwarding";
 /**
  * Stripe webhook receiver — single endpoint for all event types.
  *
@@ -54,6 +55,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const forwarded = await sourceWebhook(req, "stripe");
+  if (forwarded) return forwarded;
   const sig = req.headers.get("stripe-signature");
   if (!sig) {
     return NextResponse.json(

@@ -1,3 +1,4 @@
+import { fixtureGateway } from "./fixture-gateway";
 /**
  * Editor-side AI provider seam — `GRIDA-SEC-003` carve-out.
  *
@@ -86,6 +87,7 @@ export const vercelAiGateway = createVercelAiGateway({
   // which belongs to the vendor/native-user contract, not funded authority.
   apiKey: process.env.GG_VERCEL_AI_GATEWAY_API_KEY?.trim() ?? "",
   headers: VERCEL_AI_GATEWAY_ATTRIBUTION_HEADERS,
+  ...fixtureGateway(process.env),
 });
 
 // ---------------------------------------------------------------------------

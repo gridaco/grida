@@ -36,6 +36,7 @@ export namespace apiAudit {
     "lib/api/policy.ts",
     "lib/auth/oauth-server.ts",
     "lib/gg/config.ts",
+    "lib/platform/billing-consumer.ts",
   ]);
   // New funded media routes use a fixed GG binding, not another legacy exception.
   const GG_MEDIA = {

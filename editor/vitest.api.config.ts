@@ -17,6 +17,7 @@ export default defineConfig({
     include: [
       "lib/api/**/*.test.ts",
       "lib/account/**/*.test.ts",
+      "lib/platform/**/*.test.ts",
       "lib/supabase/account-data.test.ts",
       "lib/supabase/credits-data.test.ts",
       "lib/supabase/gg-data.test.ts",

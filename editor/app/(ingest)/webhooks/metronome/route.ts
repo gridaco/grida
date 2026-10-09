@@ -1,3 +1,4 @@
+import { sourceWebhook } from "@/lib/platform/webhook-forwarding";
 /**
  * Metronome webhook receiver.
  *
@@ -51,6 +52,8 @@ const REFRESH_TRIGGERS = new Set<string>([
 ]);
 
 export async function POST(req: NextRequest) {
+  const forwarded = await sourceWebhook(req, "metronome");
+  if (forwarded) return forwarded;
   const dateHeader = req.headers.get("date");
   const sigHeader = req.headers.get("metronome-webhook-signature");
   const rawBody = await req.text();
@@ -130,7 +133,9 @@ export async function POST(req: NextRequest) {
       | null;
     error: { message: string } | null;
   }>;
-  const rpc = service_role.workspace.rpc as unknown as RpcFn;
+  const rpc = service_role.workspace.rpc.bind(
+    service_role.workspace
+  ) as unknown as RpcFn;
 
   const { data, error } = await rpc("fn_billing_apply_metronome_event", {
     p_event_id: event.id,
@@ -173,7 +178,9 @@ export async function POST(req: NextRequest) {
           name: string,
           params: Record<string, unknown>
         ) => Promise<{ data: number | string | null; error: unknown }>;
-        const resolveRpc = service_role.workspace.rpc as unknown as ResolveRpc;
+        const resolveRpc = service_role.workspace.rpc.bind(
+          service_role.workspace
+        ) as unknown as ResolveRpc;
         const { data: orgIdRaw } = await resolveRpc(
           "fn_billing_resolve_org_by_metronome_customer",
           { p_customer_id: customerId }

@@ -1,3 +1,7 @@
+import {
+  assertSourceBillingConfiguration,
+  sourceBillingFetch,
+} from "../platform/billing-owner";
 // Stripe billing for Grida orgs: clients, auth, redirect validation, data
 // helpers, and webhook projector dispatch. All projection logic lives in
 // `public.fn_billing_apply_stripe_event`; TS only signs/parses/dispatches.
@@ -21,6 +25,7 @@ const STRIPE_API_VERSION = "2026-04-22.dahlia" as const;
 // (where the env var IS available at runtime).
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
+  assertSourceBillingConfiguration();
   if (_stripe) return _stripe;
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
@@ -36,7 +41,9 @@ function getStripe(): Stripe {
   }
   _stripe = new Stripe(stripeKey, {
     apiVersion: STRIPE_API_VERSION,
-    httpClient: Stripe.createFetchHttpClient(),
+    // Ambiguous responses stay in source custody; SDK retries cannot redispatch.
+    maxNetworkRetries: 0,
+    httpClient: Stripe.createFetchHttpClient(sourceBillingFetch),
     typescript: true,
   });
   return _stripe;
@@ -51,6 +58,25 @@ export const stripe = new Proxy({} as Stripe, {
   },
 });
 export type { Stripe };
+
+// Verification requires only the endpoint signing secret, independently of the
+// source financial owner and its retired outbound Stripe API credentials.
+const signatures = new Stripe("sk_test_signature_verification_only").webhooks;
+export async function verifyStripeWebhook(
+  body: Buffer,
+  signature: string,
+  secret: string,
+  receivedAt: number
+) {
+  return signatures.constructEventAsync(
+    body,
+    signature,
+    secret,
+    300,
+    undefined,
+    receivedAt
+  );
+}
 
 // `grida_billing` is locked down — all access goes through `fn_billing_*`
 // RPCs and `v_billing_*` views on `public`. We piggy-back on the project's

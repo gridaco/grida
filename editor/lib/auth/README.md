@@ -48,6 +48,28 @@ CLI's durable credential profile identity; already installed binaries retain
 their shipped registration. Coordinate server allowlists, Supabase registration
 and client releases before changing them.
 
+## Shared console consent
+
+The confidential infra console is an additional, separately registered OAuth
+client. To enable it, configure `GRIDA_PLATFORM_CONSOLE_OAUTH_CLIENT_ID` and the
+exact HTTPS `GRIDA_PLATFORM_CONSOLE_ORIGIN`. The only accepted callback is that
+origin plus `/auth/callback`; Supabase must register the same client/callback.
+The client secret stays in infra, not in the Grida source application.
+
+For a disposable local preview only, `NODE_ENV=development` together with
+`GRIDA_PLATFORM_ALLOW_LOCAL=1` permits a canonical HTTP Console origin on
+`127.0.0.1` with an explicit port at least 1024. Production and test runtimes
+retain the HTTPS requirement. The exact client/callback and consent-proof
+checks still apply; this does not bypass sign-in or authorize another client.
+
+Do not add this client to `GRIDA_OAUTH_CLIENT_IDS` or its callback to
+`GRIDA_OAUTH_REDIRECT_URIS`: those remain the native API/loopback allowlists.
+Consent requires the exact console client/callback pair, binds it into the
+browser proof and revalidates it before sending the decision. Native clients
+cannot select the console callback, and the console client cannot select a
+native callback. Existing native configuration works unchanged when the console
+client setting is absent. No request input selects the configured console origin.
+
 ## Production and local use
 
 Supabase must have its OAuth server enabled and a public native client registered

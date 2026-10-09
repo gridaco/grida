@@ -1,3 +1,4 @@
+import { sourceBillingFetch } from "../../lib/platform/billing-owner";
 // Sandbox smoke tests. Each is independently runnable and demonstrates one
 // flow end-to-end against your sandbox accounts. Run via `cli.ts smoke <name>`.
 //
@@ -167,7 +168,10 @@ export async function autoReload(): Promise<void> {
   requireEnv("METRONOME_API_TOKEN");
 
   const Stripe = (await import("stripe")).default;
-  const stripe = new Stripe(sk, { apiVersion: "2026-04-22.dahlia" as never });
+  const stripe = new Stripe(sk, {
+    apiVersion: "2026-04-22.dahlia" as never,
+    httpClient: Stripe.createFetchHttpClient(sourceBillingFetch),
+  });
   const { metronome, getSubstrate, COMMIT_PRIORITY, hourFloor, FAR_FUTURE } =
     await import("../../lib/billing/metronome");
   const sub = await getSubstrate();

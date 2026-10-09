@@ -55,9 +55,14 @@ pagination is not a transaction snapshot across requests. A cursor grants no acc
 
 `GET /api/v1/account/credits?organization_id=1` reads the selected organization's
 cached AI credits. The ID is required and must be a canonical positive safe
-integer. The same verified bearer queries `public.v_billing_credits`, a
-`security_invoker` view anchored on current membership; unknown and invisible
-organizations both return 403. An earlier organization selection grants no access.
+integer. Under the default Grida owner, the same verified bearer queries
+`public.v_billing_credits`, a `security_invoker` view anchored on current
+membership. With explicit infra ownership, the fixed
+[consumer adapter](../platform/native-credits.ts) reads only canonical source
+organization identity and the platform's passive cached credit projection with
+the original native bearer plus a separate workload credential. It never falls
+back to the source financial view. Unknown and invisible organizations both
+return 403. An earlier organization selection grants no access.
 
 The response identifies the organization and contains `account_present`,
 `state` (`not_provisioned`, `uncached`, or `cached`), `source: "cache"`,

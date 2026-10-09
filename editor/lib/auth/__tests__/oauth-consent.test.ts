@@ -14,6 +14,7 @@ const config: oauthServer.ConsentConfig = {
   clientIds: [clientId],
   origin: "http://127.0.0.1:3041",
   redirectUris: [callback, "http://127.0.0.1:55436/callback"],
+  consoleClient: null,
   secret: new Uint8Array(32).fill(19),
 };
 const browser = { id: userId, access_token: "test-browser-access-token" };
@@ -346,6 +347,168 @@ describe("server-owned configuration", () => {
       vi.stubEnv(key!, value!);
       expect(() => oauthServer.consentConfig()).toThrow(oauthServer.Failure);
       vi.stubEnv(key!, previous);
+    }
+  });
+});
+
+describe("separate confidential console consent", () => {
+  const consoleId = "33333333-3333-4333-8333-333333333333";
+  const consoleOrigin = "https://console.m4.grida.test:56850";
+  const redirectUri = `${consoleOrigin}/auth/callback`;
+  const consoleConfig: oauthServer.ConsentConfig = {
+    ...config,
+    consoleClient: { id: consoleId, redirectUri },
+  };
+  const consoleDetails = {
+    ...details,
+    client: { id: consoleId, name: "Grida Console" },
+    redirect_uri: redirectUri,
+  };
+  it("approves only the registered confidential client/callback and preserves native registration", async () => {
+    const transport = vi.fn<typeof fetch>(async (_url, init) =>
+      Response.json(
+        init?.method === "POST"
+          ? {
+              redirect_url: `${redirectUri}?code=console-code&state=console-state`,
+            }
+          : consoleDetails
+      )
+    );
+    const service = new oauthConsent.Service(consoleConfig, transport);
+    const value = await proof(service);
+    expect(await service.decide(decision(value), browser)).toBe(
+      `${redirectUri}?code=console-code&state=console-state`
+    );
+    expect(consoleConfig.clientIds).toEqual([clientId]);
+    expect(
+      oauthConsent.issuerRedirect(
+        `${callback}?code=native&state=s`,
+        consoleConfig
+      )
+    ).toContain(callback);
+  });
+  it.each([
+    { ...consoleDetails, client: { id: clientId } },
+    { ...consoleDetails, client: { id: userId } },
+    { ...consoleDetails, redirect_uri: callback },
+    { ...consoleDetails, redirect_uri: `${redirectUri}/` },
+    { ...consoleDetails, redirect_uri: `${redirectUri}?next=x` },
+    {
+      ...consoleDetails,
+      redirect_uri: `${consoleOrigin}/other/../auth/callback`,
+    },
+    { ...consoleDetails, redirect_uri: "https://other.invalid/auth/callback" },
+  ])(
+    "refuses an unregistered or cross-family console authorization %#",
+    async (data) => {
+      const service = new oauthConsent.Service(consoleConfig, async () =>
+        Response.json(data)
+      );
+      await expect(service.load(id, browser)).rejects.toMatchObject({
+        code: "forbidden",
+      });
+    }
+  );
+  it("rejects a callback/client change after the consent form was rendered", async () => {
+    let current = consoleDetails;
+    const transport = vi.fn<typeof fetch>(async () => Response.json(current));
+    const service = new oauthConsent.Service(consoleConfig, transport);
+    const value = await proof(service);
+    current = {
+      ...consoleDetails,
+      client: { id: clientId, name: "Native" },
+      redirect_uri: callback,
+    };
+    await expect(
+      service.decide(decision(value), browser)
+    ).rejects.toMatchObject({ code: "forbidden" });
+    expect(
+      transport.mock.calls.some(([, init]) => init?.method === "POST")
+    ).toBe(false);
+  });
+  it("bounds prior-consent redirects to the one exact console callback", async () => {
+    const service = new oauthConsent.Service(consoleConfig, async () =>
+      Response.json({ redirect_url: `${redirectUri}?code=c&state=s` })
+    );
+    expect(await service.load(id, browser)).toEqual({
+      kind: "redirect",
+      url: `${redirectUri}?code=c&state=s`,
+    });
+    for (const target of [
+      `${consoleOrigin}/auth/callback/?code=c&state=s`,
+      `${consoleOrigin}/x/../auth/callback?code=c&state=s`,
+      `${redirectUri}?code=c&state=s&redirect_uri=${callback}`,
+    ])
+      expect(() => oauthConsent.issuerRedirect(target, consoleConfig)).toThrow(
+        oauthServer.Failure
+      );
+  });
+  it("requires an explicit distinct client and canonical HTTPS console origin", () => {
+    vi.stubEnv("GRIDA_OAUTH_ISSUER", config.issuer);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", config.dataOrigin);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", config.publishableKey);
+    vi.stubEnv("GRIDA_OAUTH_CLIENT_IDS", clientId);
+    vi.stubEnv("GRIDA_OAUTH_ORIGIN", config.origin);
+    vi.stubEnv("GRIDA_OAUTH_REDIRECT_URIS", config.redirectUris.join(","));
+    vi.stubEnv(
+      "GRIDA_OAUTH_CONSENT_SECRET",
+      "synthetic-consent-secret-at-least-32-bytes"
+    );
+    vi.stubEnv("GRIDA_PLATFORM_CONSOLE_OAUTH_CLIENT_ID", consoleId);
+    vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", consoleOrigin);
+    expect(oauthServer.consentConfig()).toMatchObject({
+      clientIds: [clientId],
+      redirectUris: config.redirectUris,
+      consoleClient: { id: consoleId, redirectUri },
+    });
+    expect(oauthServer.config().clientIds).toEqual([clientId]);
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("GRIDA_PLATFORM_ALLOW_LOCAL", "1");
+    vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", "http://127.0.0.1:56842");
+    expect(oauthServer.consentConfig().consoleClient).toEqual({
+      id: consoleId,
+      redirectUri: "http://127.0.0.1:56842/auth/callback",
+    });
+    for (const mode of ["production", "test", ""]) {
+      vi.stubEnv("NODE_ENV", mode);
+      expect(() => oauthServer.consentConfig()).toThrow(oauthServer.Failure);
+    }
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("GRIDA_PLATFORM_ALLOW_LOCAL", "0");
+    expect(() => oauthServer.consentConfig()).toThrow(oauthServer.Failure);
+    vi.stubEnv("GRIDA_PLATFORM_ALLOW_LOCAL", "1");
+    for (const target of [
+      "http://localhost:56842",
+      "http://example.test:56842",
+      "http://127.0.0.1",
+      "http://127.0.0.1:80",
+      "http://127.0.0.1:56842/",
+      "http://127.0.0.1:56842/path",
+      "http://127.0.0.1:56842?x=y",
+      "http://127.0.0.1:56842#fragment",
+      "http://user@127.0.0.1:56842",
+    ]) {
+      vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", target);
+      expect(() => oauthServer.consentConfig()).toThrow(oauthServer.Failure);
+    }
+    vi.stubEnv("GRIDA_PLATFORM_ALLOW_LOCAL", "0");
+    vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", consoleOrigin);
+    for (const [name, value] of [
+      ["GRIDA_PLATFORM_CONSOLE_OAUTH_CLIENT_ID", clientId],
+      ["GRIDA_PLATFORM_CONSOLE_OAUTH_CLIENT_ID", ""],
+      ["GRIDA_PLATFORM_CONSOLE_ORIGIN", `${consoleOrigin}/`],
+      ["GRIDA_PLATFORM_CONSOLE_ORIGIN", `${consoleOrigin}/auth/callback`],
+      ["GRIDA_PLATFORM_CONSOLE_ORIGIN", `${consoleOrigin}?x=y`],
+      [
+        "GRIDA_PLATFORM_CONSOLE_ORIGIN",
+        "https://user@console.m4.grida.test:56850",
+      ],
+      ["GRIDA_PLATFORM_CONSOLE_ORIGIN", "http://127.0.0.1:56842"],
+    ]) {
+      const original = process.env[name!];
+      vi.stubEnv(name!, value!);
+      expect(() => oauthServer.consentConfig()).toThrow(oauthServer.Failure);
+      vi.stubEnv(name!, original);
     }
   });
 });

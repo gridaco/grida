@@ -1,3 +1,4 @@
+import { productDigest } from "@/lib/platform/product-billing";
 // GRIDA-GG: gateway — organization-funded Tripo features through the AI billing seam.
 // GRIDA-SEC-003 / GRIDA-SEC-006 — the API supplies verified org and authenticated upload refs.
 import "server-only";
@@ -143,7 +144,10 @@ export namespace GgThreeD {
     if (!catalog.three_d.model_generation.is_model_id(model_id))
       throw new Failure("model_unavailable");
     return meter(
-      context(organizationId, "model-generation", model_id),
+      {
+        ...context(organizationId, "model-generation", model_id),
+        requestDigest: productDigest({ variant, input }),
+      },
       catalog.three_d.model_generation.models[model_id].pricing.usd_per_credit,
       async (key) => {
         const operation = await new TripoClient({
@@ -166,7 +170,10 @@ export namespace GgThreeD {
     input: unknown
   ): Promise<RiggingClient.CheckResult> {
     return meter(
-      context(organizationId, "rig-check", "tripo/rig-check"),
+      {
+        ...context(organizationId, "rig-check", "tripo/rig-check"),
+        requestDigest: productDigest(input),
+      },
       catalog.three_d.rig_check.operation.pricing.usd_per_credit,
       async (key) => {
         const operation = await new RiggingClient({
@@ -186,7 +193,10 @@ export namespace GgThreeD {
     if (!catalog.three_d.rigging.is_model_id(model_id))
       throw new Failure("model_unavailable");
     return meter(
-      context(organizationId, "rigging", model_id),
+      {
+        ...context(organizationId, "rigging", model_id),
+        requestDigest: productDigest(input),
+      },
       catalog.three_d.rigging.models[model_id].pricing.usd_per_credit,
       async (key) => {
         const operation = await new RiggingClient({

@@ -1,5 +1,14 @@
 // GRIDA-GG: gateway — generation seam methods used by metered GG routes (docs/wg/platform/hosted-ai.md)
 import "server-only";
+import {
+  billingOwner,
+  sourceWork,
+  platformProductBilling,
+} from "@/lib/platform/billing-owner";
+import {
+  productDigest,
+  ProductBillingError,
+} from "@/lib/platform/product-billing";
 
 /**
  * AI credit usage seam — single server-only entry point.
@@ -17,7 +26,7 @@ import "server-only";
  *   - `methods.upscale` / `methods.removeBackground` / `methods.generateMusic`
  *     — named business-logic wrappers.
  *
- * Per call: gate-check → run → fire-and-forget ingest. See
+ * Per call: gate-check → durable admission → run → durable usage custody. See
  * [docs/wg/platform/billing/ai-credits.md](../../../docs/wg/platform/billing/ai-credits.md).
  *
  * `organizationId` MUST come from `requireOrganizationId` —
@@ -82,14 +91,12 @@ export interface GridaCallContext {
   model_id: string;
   /** Optional pre-allocated transaction id (idempotency on retry). */
   transactionId?: string;
+  /** Digest of the actual provider input, required for durable paid execution. */
+  requestDigest?: string;
   /**
-   * If true, block on the ingest call (Metronome event + local cache
-   * debit RPC) before returning. Default `false` — ingest is
-   * fire-and-forget so AI latency isn't tied to billing.
-   *
-   * Set to `true` when the caller needs to read back a debited balance
-   * in the same request (e.g. UIs that display "remaining credit"
-   * after a sync chat call). The local-debit RPC is sub-100ms.
+   * Retained caller option. Paid calls now always commit durable usage custody
+   * and await the original ingest attempt before returning. An ingest failure
+   * leaves the exact receipt for reconciliation instead of retrying dispatch.
    */
   awaitIngest?: boolean;
 }
@@ -188,18 +195,6 @@ function assertOrgId(orgId: unknown): asserts orgId is number {
   }
 }
 
-function logIngestFailure(
-  ctx: GridaCallContext,
-  transactionId: string
-): (err: unknown) => void {
-  return (err) => {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(
-      `[ai-seam] ingest failed org=${ctx.organizationId} model=${ctx.model_id} feature=${ctx.feature} tx=${transactionId}: ${msg}`
-    );
-  };
-}
-
 /**
  * Gate-check only. Used by the streaming path where ingest is deferred
  * to the `finish` part — denial must fire up front. Unconditional on
@@ -208,6 +203,13 @@ function logIngestFailure(
  */
 export async function checkGate(ctx: GridaCallContext): Promise<void> {
   assertOrgId(ctx.organizationId);
+  if (billingOwner() === "infra") {
+    const decision = await platformProductBilling().entitlement(
+      ctx.organizationId
+    );
+    if (!decision.allowed) throw new ProductBillingError("blocked");
+    return;
+  }
   const e = await getEntitlement(ctx.organizationId);
   if (!e.allowed) {
     throw new BillingMetronomeError(
@@ -220,35 +222,36 @@ export async function checkGate(ctx: GridaCallContext): Promise<void> {
 
 /**
  * The shared billing seam. Wraps any provider call in the
- * gate → run → ingest envelope. Ingest is fire-and-forget — failures
- * are logged but never surfaced (webhook + cron reconcile the cache).
+ * admission → run → durable receipt envelope. Legacy ingest failures retain
+ * exact original custody for reconciliation; provider dispatch is never retried.
  */
 export async function withTransaction<T>(
   ctx: GridaCallContext,
   op: (transactionId: string) => Promise<{ result: T; costMills: number }>
 ): Promise<T> {
+  if (billingOwner() === "infra") {
+    if (!ctx.requestDigest) throw new ProductBillingError();
+    const billing = platformProductBilling();
+    const execution = await billing.begin({
+      ...ctx,
+      requestDigest: ctx.requestDigest,
+    });
+    // Failure/cancellation after dispatch remains durable unknown; it never
+    // receives a second dispatch grant or a fabricated zero-cost receipt.
+    const { result, costMills } = await op(execution.id);
+    await billing.complete(execution, costMills, { result, costMills });
+    return result;
+  }
   await checkGate(ctx);
 
-  const transactionId = ctx.transactionId ?? crypto.randomUUID();
+  const custody = sourceWork();
+  const work = await custody.beginAI(ctx);
+  const transactionId = work.transactionID;
   const { result, costMills } = await op(transactionId);
 
-  // Default to `awaitIngest:true` — the common path is `withAiAuth`
-  // which reads back the balance after `fn` resolves. Streaming
-  // callers (canvas agent route) don't go through `withTransaction`
-  // for their ingest, so this default doesn't add latency there. Set
-  // `ctx.awaitIngest = false` explicitly to opt back into
-  // fire-and-forget.
-  const awaitIngest = ctx.awaitIngest ?? true;
-
-  if (awaitIngest) {
-    await ingestUsageEvent(ctx.organizationId, costMills, {
-      transactionId,
-    }).catch(logIngestFailure(ctx, transactionId));
-  } else {
-    void ingestUsageEvent(ctx.organizationId, costMills, {
-      transactionId,
-    }).catch(logIngestFailure(ctx, transactionId));
-  }
+  await custody.completeAI(work, costMills, { result, costMills }, () =>
+    ingestUsageEvent(ctx.organizationId, costMills, { transactionId })
+  );
 
   return result;
 }
@@ -368,10 +371,8 @@ function extractContext(
         typeof g.costMills === "number" && g.costMills >= 0
           ? g.costMills
           : undefined,
-      // Preserve `undefined` so `withTransaction`'s `?? true` default
-      // applies. Coercing to `false` would silently flip non-streaming
-      // calls to fire-and-forget ingest, leaving `withAiAuth`'s
-      // post-call `balanceCents` read stale.
+      // Preserve the published caller option; durable custody is now required
+      // for every paid call regardless of this display-oriented preference.
       awaitIngest:
         typeof g.awaitIngest === "boolean" ? g.awaitIngest : undefined,
     };
@@ -386,7 +387,10 @@ const languageModelMiddleware: LanguageModelMiddleware = {
   specificationVersion: "v3",
 
   wrapGenerate: async ({ doGenerate, params, model }) => {
-    const ctx = extractContext(model.modelId, params.providerOptions);
+    const ctx = {
+      ...extractContext(model.modelId, params.providerOptions),
+      requestDigest: productDigest(params),
+    };
     return withTransaction(ctx, async () => {
       const result = await doGenerate();
       const costMills = costMillsFromTokenUsage(ctx.model_id, result.usage);
@@ -395,32 +399,46 @@ const languageModelMiddleware: LanguageModelMiddleware = {
   },
 
   wrapStream: async ({ doStream, params, model }) => {
-    const ctx = extractContext(model.modelId, params.providerOptions);
+    const ctx = {
+      ...extractContext(model.modelId, params.providerOptions),
+      requestDigest: productDigest(params),
+    };
     // Gate fires synchronously before the upstream connection opens.
     // Ingest is deferred to the `finish` part — partial-stream
     // abandonment still ingests observed usage (input tokens are
     // burned regardless).
-    await checkGate(ctx);
-    const transactionId = ctx.transactionId ?? crypto.randomUUID();
+    const billing =
+      billingOwner() === "infra" ? platformProductBilling() : null;
+    const execution = billing ? await billing.begin(ctx) : null;
+    if (!billing) await checkGate(ctx);
+    const custody = billing ? null : sourceWork();
+    const legacyWork = custody ? await custody.beginAI(ctx) : null;
     const upstream = await doStream();
     let finalCostMills: number | null = null;
     const tapped = upstream.stream.pipeThrough(
       new TransformStream({
-        transform(part: { type: string; usage?: unknown }, controller) {
+        async transform(part: { type: string; usage?: unknown }, controller) {
           if (part.type === "finish" && part.usage) {
             finalCostMills = costMillsFromTokenUsage(
               ctx.model_id,
               part.usage as Parameters<typeof costMillsFromTokenUsage>[1]
             );
+            if (billing && execution)
+              await billing.complete(execution, finalCostMills, {
+                usage: part.usage,
+              });
+            else if (custody && legacyWork)
+              await custody.completeAI(
+                legacyWork,
+                finalCostMills,
+                { usage: part.usage },
+                () =>
+                  ingestUsageEvent(ctx.organizationId, finalCostMills!, {
+                    transactionId: legacyWork.transactionID,
+                  })
+              );
           }
           controller.enqueue(part);
-        },
-        flush() {
-          if (finalCostMills !== null) {
-            void ingestUsageEvent(ctx.organizationId, finalCostMills, {
-              transactionId,
-            }).catch(logIngestFailure(ctx, transactionId));
-          }
         },
       })
     );
@@ -436,7 +454,10 @@ const imageModelMiddleware: ImageModelMiddleware = {
   // without a receipt; aggregate image token counts cannot price mixed inputs.
   // https://vercel.com/academy/ai-gateway/ai-gateway-pricing
   wrapGenerate: async ({ doGenerate, params, model }) => {
-    const ctx = extractContext(model.modelId, params.providerOptions);
+    const ctx = {
+      ...extractContext(model.modelId, params.providerOptions),
+      requestDigest: productDigest(params),
+    };
     if (typeof ctx.costMills !== "number") {
       console.warn(
         `[ai-seam] image call missing providerOptions.grida.costMills (model=${ctx.model_id}, feature=${ctx.feature}); no fallback estimate`
@@ -591,15 +612,18 @@ export async function runPrediction(
   ctx: ReplicateCallContext,
   input: Record<string, unknown>
 ): Promise<string> {
-  return withTransaction(ctx, async () => {
-    const replicate = getReplicateClient();
-    const modelId = ctx.model_id as `${string}/${string}`;
-    const output = await replicate.run(modelId, { input });
-    return {
-      result: normalizeReplicateOutput(output),
-      costMills: ctx.costMills,
-    };
-  });
+  return withTransaction(
+    { ...ctx, requestDigest: productDigest(input) },
+    async () => {
+      const replicate = getReplicateClient();
+      const modelId = ctx.model_id as `${string}/${string}`;
+      const output = await replicate.run(modelId, { input });
+      return {
+        result: normalizeReplicateOutput(output),
+        costMills: ctx.costMills,
+      };
+    }
+  );
 }
 
 /**
@@ -609,12 +633,15 @@ export async function runPredictionRaw<T = unknown>(
   ctx: ReplicateCallContext,
   input: Record<string, unknown>
 ): Promise<T> {
-  return withTransaction(ctx, async () => {
-    const replicate = getReplicateClient();
-    const modelId = ctx.model_id as `${string}/${string}`;
-    const output = (await replicate.run(modelId, { input })) as T;
-    return { result: output, costMills: ctx.costMills };
-  });
+  return withTransaction(
+    { ...ctx, requestDigest: productDigest(input) },
+    async () => {
+      const replicate = getReplicateClient();
+      const modelId = ctx.model_id as `${string}/${string}`;
+      const output = (await replicate.run(modelId, { input })) as T;
+      return { result: output, costMills: ctx.costMills };
+    }
+  );
 }
 
 // ===========================================================================
@@ -891,7 +918,12 @@ export namespace methods {
     }
 
     return withTransaction(
-      { organizationId, feature: "v1/ai/video", model_id: card.id },
+      {
+        organizationId,
+        feature: "v1/ai/video",
+        model_id: card.id,
+        requestDigest: productDigest(req),
+      },
       async () => {
         const generation = await experimental_generateVideo({
           model: vercelAiGateway.videoModel(binding.id),
@@ -1030,8 +1062,13 @@ export async function withAiAuth<T extends Record<string, unknown>>(
   // recover. We log loudly so the failure is visible.
   let balanceCents = -1;
   try {
-    const { cents } = await refreshBalance(orgId);
-    balanceCents = cents;
+    if (billingOwner() === "infra") {
+      const observed = await platformProductBilling().entitlement(orgId);
+      balanceCents = observed.balance_cents;
+    } else {
+      const { cents } = await refreshBalance(orgId);
+      balanceCents = cents;
+    }
   } catch (err) {
     console.error(
       `[ai-seam] post-fn refreshBalance failed for org=${orgId} scope=${scope}:`,

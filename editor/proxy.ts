@@ -71,6 +71,15 @@ export async function proxy(req: NextRequest) {
     return apiPolicy.respond(req) ?? NextResponse.next({ request: req });
   }
 
+  // Canonical source bridge authenticates its dedicated workload in the route.
+  // No browser session refresh, tenant routing or cookie authority applies.
+  if (
+    req.nextUrl.pathname.startsWith("/internal/platform/accounts/") ||
+    req.nextUrl.pathname.startsWith("/internal/platform/products/")
+  ) {
+    return NextResponse.next({ request: req });
+  }
+
   // Check if the request path starts with /dev/ and NODE_ENV is not development
   if (req.nextUrl.pathname.startsWith("/dev/") && !IS_DEV) {
     return new NextResponse("Not Found", { status: 404 });

@@ -24,12 +24,14 @@ type SettingsCategory = { href: string; label: string };
 export default function SettingsShell({
   orgName,
   plan,
-  isCustom,
+  isCustom = false,
+  externalBilling = false,
   children,
 }: {
   orgName: string;
-  plan: string;
-  isCustom: boolean;
+  plan?: string;
+  isCustom?: boolean;
+  externalBilling?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -39,7 +41,7 @@ export default function SettingsShell({
   const categories: ReadonlyArray<SettingsCategory> = [
     { href: `${settingsBase}/profile`, label: "Profile" },
     { href: `${settingsBase}/billing`, label: "Billing" },
-    ...(isPaidPlan || isCustom
+    ...(isPaidPlan || isCustom || externalBilling
       ? []
       : [{ href: `${settingsBase}/billing/upgrade`, label: "Upgrade plan" }]),
   ];
