@@ -2,9 +2,11 @@
 // GRIDA-GG: gateway — provider selection through the real billing seam.
 // GRIDA-EE: billing — entitlement and usage calls stay in the shared seam.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { SourceWorkRPC } from "@/lib/platform/source-work";
 
 const h = vi.hoisted(() => ({
   events: [] as string[],
+  sourceRpc: vi.fn<SourceWorkRPC>(),
   replicateOptions: vi.fn<(options: unknown) => void>(),
   run: vi.fn<
     (
@@ -66,6 +68,7 @@ vi.mock("@/lib/billing/metronome", () => ({
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
+  service_role: { workspace: { rpc: h.sourceRpc } },
   createLibraryClient:
     vi.fn<typeof import("@/lib/supabase/server").createLibraryClient>(),
 }));
@@ -80,6 +83,21 @@ beforeEach(() => {
   vi.resetModules();
   vi.resetAllMocks();
   h.events.length = 0;
+  h.sourceRpc.mockImplementation(async (name, args) => {
+    if (name === "platform_source_work_begin") {
+      h.events.push("begin");
+      return { data: { created: true, id: args.work_id }, error: null };
+    }
+    if (name === "platform_source_work_capture") {
+      h.events.push("capture");
+      return { data: { accepted: true }, error: null };
+    }
+    if (name === "platform_source_work_finish") {
+      h.events.push("finish");
+      return { data: { accepted: true }, error: null };
+    }
+    throw new Error("Unexpected source RPC: " + name);
+  });
   for (const key of [
     "GG_REPLICATE_API_TOKEN",
     "REPLICATE_API_TOKEN",
@@ -141,7 +159,24 @@ describe("funded Replicate credential admission", () => {
     expect(h.ingestUsageEvent).toHaveBeenCalledExactlyOnceWith(7, 40, {
       transactionId: expect.any(String),
     });
-    expect(h.events).toEqual(["gate", "provider", "ingest"]);
+    expect(h.events).toEqual([
+      "gate",
+      "begin",
+      "provider",
+      "capture",
+      "ingest",
+      "finish",
+    ]);
+    const [begin, capture, finish] = h.sourceRpc.mock.calls;
+    expect(begin![1]).toMatchObject({
+      work_kind: "legacy_ai",
+      request: { organization_id: "7", product: "grida-ai" },
+    });
+    expect(capture![1]).toMatchObject({
+      work_id: begin![1].work_id,
+      evidence: { quantity: "40", outcome: "succeeded" },
+    });
+    expect(finish![1]).toEqual({ work_id: begin![1].work_id });
   });
 
   it.each([
@@ -184,7 +219,9 @@ describe("funded Replicate credential admission", () => {
       expect(h.replicateOptions).not.toHaveBeenCalled();
       expect(h.run).not.toHaveBeenCalled();
       expect(h.ingestUsageEvent).not.toHaveBeenCalled();
-      expect(h.events).toEqual(["gate"]);
+      // Admission remains unresolved; a failed dispatch must not invent usage.
+      expect(h.events).toEqual(["gate", "begin"]);
+      expect(h.sourceRpc).toHaveBeenCalledTimes(1);
     }
   );
 
@@ -202,6 +239,7 @@ describe("funded Replicate credential admission", () => {
     ).rejects.toMatchObject({ code: "blocked", status: 402 });
 
     expect(h.getEntitlement).toHaveBeenCalledExactlyOnceWith(7);
+    expect(h.sourceRpc).not.toHaveBeenCalled();
     expect(h.replicateOptions).not.toHaveBeenCalled();
     expect(h.run).not.toHaveBeenCalled();
     expect(h.ingestUsageEvent).not.toHaveBeenCalled();
@@ -224,6 +262,7 @@ describe("funded Replicate credential admission", () => {
     expect(h.replicateOptions).not.toHaveBeenCalled();
     expect(h.run).not.toHaveBeenCalled();
     expect(h.getEntitlement).not.toHaveBeenCalled();
+    expect(h.sourceRpc).not.toHaveBeenCalled();
     expect(h.ingestUsageEvent).not.toHaveBeenCalled();
   });
 });
