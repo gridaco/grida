@@ -304,7 +304,11 @@ export const CliDocs = {
         active.add(meta.url);
         sources.push({ source, text, meta, html });
       }
-      assert.equal(active.size, 6, "The public CLI guide has six owning pages");
+      assert.equal(
+        active.size,
+        7,
+        "The public CLI guide has seven owning pages"
+      );
 
       // Root and translated entry pages link to the one canonical English guide.
       // Check actual emitted hrefs: localized Markdown can leave a literal .md URL

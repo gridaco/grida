@@ -83,6 +83,7 @@ jobs:
           name: grida-native-candidate
           path: |
             ${{ runner.temp }}/grida-native-candidate/archives/
+            ${{ runner.temp }}/grida-native-candidate/dependencies/
             ${{ runner.temp }}/grida-native-candidate/native-candidate.json
             ${{ runner.temp }}/grida-native-candidate/installed-*.json
           if-no-files-found: error

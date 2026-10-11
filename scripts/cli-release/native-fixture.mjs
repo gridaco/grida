@@ -1,12 +1,20 @@
 // Test-only foreign image headers. These are never executable release artifacts.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
-import { platforms, prepareNative } from "./native.mjs";
+import { FX, fxVersion, npmRun, platforms, prepareNative } from "./native.mjs";
 import { selectPlatform } from "../../packages/grida-cli/native/bin.mjs";
 
 export async function buildHostFixture(out) {
@@ -60,6 +68,61 @@ export function fixtureBinary(platform) {
   return bytes;
 }
 
+/**
+ * A stand-in @grida/fx at the pinned version: `@grida/fx/cli` with host contract 1, whose
+ * `launch` answers `--version` as the engine does and refuses everything else. It has no engine
+ * packages; the candidate marks it, and publication refuses it.
+ */
+export async function fixtureFx(directory, scratch) {
+  const root = fileURLToPath(new URL("../../", import.meta.url));
+  const version = fxVersion(
+    JSON.parse(
+      await readFile(path.join(root, "packages/grida-cli/package.json"), "utf8")
+    )
+  );
+  const source = path.join(scratch, "fx-fixture");
+  await mkdir(source, { recursive: true });
+  await writeFile(
+    path.join(source, "package.json"),
+    JSON.stringify({
+      name: FX,
+      version,
+      type: "module",
+      exports: { "./cli": "./cli.js" },
+      files: ["cli.js"],
+    })
+  );
+  await writeFile(
+    path.join(source, "cli.js"),
+    [
+      "export const HOST_CONTRACT = 1;",
+      "export function launch(argv, { invoker } = {}) {",
+      `  if (invoker === "grida" && argv.length === 1 && argv[0] === "--version") {`,
+      `    process.stdout.write("grida-fx ${version}\\n");`,
+      "    return;",
+      "  }",
+      '  process.stderr.write("grida fx: test fixture of Grida FX\\n");',
+      "  process.exitCode = 1;",
+      "}",
+      "",
+    ].join("\n")
+  );
+  await chmod(path.join(source, "cli.js"), 0o644);
+  const { stdout } = await npmRun(
+    [
+      "pack",
+      source,
+      "--pack-destination",
+      directory,
+      "--json",
+      "--offline",
+      "--ignore-scripts",
+    ],
+    scratch
+  );
+  return path.join(directory, JSON.parse(stdout)[0].filename);
+}
+
 export async function prepareHostFixture(binary, out) {
   assert(path.isAbsolute(binary) && path.isAbsolute(out));
   const host = selectPlatform();
@@ -76,7 +139,12 @@ export async function prepareHostFixture(binary, out) {
       if (platform.id === host.id) await copyFile(binary, file);
       else await writeFile(file, fixtureBinary(platform));
     }
-    const report = await prepareNative({ artifacts: scratch, out });
+    const fx = await fixtureFx(scratch, scratch);
+    const report = await prepareNative({
+      artifacts: scratch,
+      out,
+      fxArchives: [fx],
+    });
     report.fixture_targets = platforms
       .filter((p) => p.id !== host.id)
       .map((p) => p.id);

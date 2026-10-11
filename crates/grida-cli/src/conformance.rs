@@ -70,6 +70,7 @@ pub fn project(invocation: &Invocation) -> Value {
             "help"
         }
         Command::Version => "version",
+        Command::Fx => "fx",
         Command::Docs(topic) => {
             put(&mut object, "topic", topic.name());
             "docs"

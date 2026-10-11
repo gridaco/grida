@@ -105,6 +105,9 @@ pub enum Command {
     Help(Topic),
     Version,
     Docs(Topic),
+    /// `grida fx …`: Grida FX's command line. The npm launcher hands it to `@grida/fx` before
+    /// this executable runs; its arguments belong to FX and are not read here.
+    Fx,
     AuthLogin {
         storage: Option<Storage>,
         no_browser: bool,
@@ -306,6 +309,19 @@ impl Tokens {
 
 /// Parse only syntax. This function never opens storage, browsers or connections.
 pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
+    if argv.first().is_some_and(|word| word == "fx") {
+        let options = Options {
+            json: false,
+            no_input: false,
+        };
+        // Through the launcher, `grida fx --help` is FX's own help; run directly, this
+        // executable describes how `grida fx` is reached.
+        let command = match &argv[1..] {
+            [flag] if flag == "--help" || flag == "-h" => Command::Help(Topic::Fx),
+            _ => Command::Fx,
+        };
+        return Ok(Invocation { options, command });
+    }
     let tokens = Tokens::parse(argv)?;
     let options = Options {
         json: tokens.flag("json"),
@@ -701,6 +717,28 @@ mod tests {
     }
     fn parsed(values: &[&str]) -> Invocation {
         parse(&args(values)).unwrap()
+    }
+
+    #[test]
+    fn fx_belongs_to_grida_fx_and_its_arguments_are_not_read() {
+        for argv in [
+            vec!["fx"],
+            vec!["fx", "--help", "run"],
+            vec!["fx", "run", "--help"],
+            vec!["fx", "run", "case", "--live", "--max-usd", "2", "--json"],
+            vec!["fx", "--definitely-not-a-grida-flag", "secret-token"],
+        ] {
+            let invocation = parsed(&argv);
+            assert_eq!(invocation.command, Command::Fx);
+            assert!(!invocation.options.json && !invocation.options.no_input);
+        }
+        assert_eq!(parsed(&["help", "fx"]).command, Command::Help(Topic::Fx));
+        assert_eq!(parsed(&["fx", "--help"]).command, Command::Help(Topic::Fx));
+        assert_eq!(parsed(&["fx", "-h"]).command, Command::Help(Topic::Fx));
+        assert_eq!(parsed(&["docs", "fx"]).command, Command::Docs(Topic::Fx));
+        // Only the first word selects FX.
+        assert_eq!(parse(&args(&["ai", "fx"])).unwrap_err(), Failure::usage());
+        assert_eq!(Failure::launcher_required().code.exit_code(), 1);
     }
 
     #[test]

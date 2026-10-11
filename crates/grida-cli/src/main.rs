@@ -15,6 +15,14 @@ fn run() -> io::Result<u8> {
             return output::failure(e, json, &mut io::stdout().lock(), &mut io::stderr().lock());
         }
     };
+    if matches!(invocation.command, Command::Fx) {
+        return output::failure(
+            Failure::launcher_required(),
+            json,
+            &mut io::stdout().lock(),
+            &mut io::stderr().lock(),
+        );
+    }
     if matches!(
         invocation.command,
         Command::Help(_) | Command::Version | Command::Docs(_)

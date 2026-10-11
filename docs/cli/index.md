@@ -62,6 +62,7 @@ generation and rigging) are grouped under `grida ai`.
 | Configure your own provider keys       | [Providers](./providers.md) |
 | Discover models and accepted inputs    | [Models](./models.md)       |
 | Generate media and chain local files   | [Generate](./generate.md)   |
+| Plan and run FX workflows              | [FX](./fx.md)               |
 
 ```sh
 grida --version
@@ -72,6 +73,14 @@ grida docs ai generate
 `--help` describes your installed version and works offline. `docs` prints a
 guide URL without opening a browser; reading the guide needs a connection.
 Agent, render, and MCP commands are deferred.
+
+## Updates
+
+When a newer `grida` is on npm, commands print one line on stderr naming it,
+including `grida fx`, which updates with `grida`. Grida checks npm's public
+release tags at most once a day, in the background; the request carries
+nothing about you or your command. There is no check or notice in CI, with
+`--json`, when stderr is not a terminal, or with `GRIDA_NO_UPDATE_CHECK=1`.
 
 ## Use Grida in scripts
 

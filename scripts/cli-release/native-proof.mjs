@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
-import { npmRun, verifyNative } from "./native.mjs";
+import { FX, npmRun, verifyNative } from "./native.mjs";
 import { selectPlatform } from "../../packages/grida-cli/native/bin.mjs";
 
 const exec = promisify(execFile);
@@ -33,7 +33,27 @@ async function proofStep(stage, operation) {
   }
 }
 
-/** Install the verified bundled package into a caller-owned directory; caller cleans up. */
+/** The engine package npm would install with @grida/fx on this host, if Grida FX has one. */
+export function fxEngine(dependencies, host = process) {
+  const libc = host.report?.getReport().header.glibcVersionRuntime
+    ? "glibc"
+    : "musl";
+  return (
+    dependencies
+      .slice(1)
+      .find(
+        (record) =>
+          record.os?.includes(host.platform) &&
+          record.cpu?.includes(host.arch) &&
+          (host.platform !== "linux" ||
+            !record.libc ||
+            record.libc.includes(libc))
+      ) ?? null
+  );
+}
+
+/** Install the verified bundled package into a caller-owned directory; caller cleans up.
+ * @grida/fx and this host's engine package (if any) come from the candidate's own archives. */
 export async function installNative(out, runtime) {
   assert(path.isAbsolute(runtime));
   const report = await proofStep("candidate_verification", () =>
@@ -45,11 +65,16 @@ export async function installNative(out, runtime) {
     (item) => item.platform === platform.id
   );
   await mkdir(runtime, { recursive: true });
+  const engine = fxEngine(report.dependencies);
+  const fxArchives = [report.dependencies[0], ...(engine ? [engine] : [])].map(
+    (record) => path.join(out, "dependencies", record.archive)
+  );
   await proofStep("offline_npm_install", () =>
     npmRun(
       [
         "install",
         path.join(out, "archives", report.package.archive),
+        ...fxArchives,
         "--offline",
         "--ignore-scripts",
         "--no-audit",
@@ -75,8 +100,17 @@ export async function installNative(out, runtime) {
   assert.equal(installed.version, report.version);
   assert.equal(installed.name, "grida");
   assert.equal(installed.optionalDependencies, undefined);
-  assert.equal(installed.dependencies, undefined);
+  assert.deepEqual(installed.dependencies, {
+    [FX]: report.dependencies[0].version,
+  });
   assert.equal(installed.scripts, undefined);
+  const fx = JSON.parse(
+    await readFile(
+      path.join(runtime, "node_modules", FX, "package.json"),
+      "utf8"
+    )
+  );
+  assert.equal(fx.version, report.dependencies[0].version);
   // Installation contains the complete reviewed matrix, even on a single host.
   for (const binary of report.binaries) {
     const bytes = await readFile(
@@ -94,6 +128,7 @@ export async function installNative(out, runtime) {
     launcher,
     executable,
     binary_sha256: hash,
+    fx_engine: engine,
   };
 }
 
@@ -107,6 +142,7 @@ export async function proveNative(out) {
       platform,
       launcher,
       binary_sha256: hash,
+      fx_engine: engine,
     } = await installNative(out, scratch);
     const options = {
       cwd: scratch,
@@ -147,6 +183,26 @@ export async function proveNative(out) {
       (error) =>
         error.code === 2 && error.stdout === "" && error.stderr.length > 0
     );
+    // `grida fx` reaches Grida FX: its engine where FX has one for this host, else FX's own
+    // explanation (spec/distribution.md in gridaco/fx). A fixture FX answers everywhere.
+    stage = "fx_dispatch";
+    const fxVersion = report.dependencies[0].version;
+    if (engine || report.fixture_dependencies) {
+      const fx = await exec(
+        process.execPath,
+        [launcher, "fx", "--version"],
+        options
+      );
+      assert.equal(fx.stdout, `grida-fx ${fxVersion}\n`);
+    } else {
+      await assert.rejects(
+        exec(process.execPath, [launcher, "fx", "--version"], options),
+        (error) =>
+          error.code === 1 &&
+          error.stdout === "" &&
+          error.stderr.startsWith("grida fx: ")
+      );
+    }
     stage = "npm_bin_shim";
     if (process.platform !== "win32") {
       const shim = await exec(
@@ -174,8 +230,15 @@ export async function proveNative(out) {
       platform: platform.id,
       archive_sha256: report.package.sha256,
       binary_sha256: hash,
+      fx: {
+        version: report.dependencies[0].version,
+        sha256: report.dependencies[0].sha256,
+        engine: engine && { name: engine.name, sha256: engine.sha256 },
+      },
       checks: [
         "offline_npm_install",
+        "exact_fx_dependency",
+        "fx_dispatch",
         "exact_package_version",
         "bundled_platform_matrix",
         "installed_binary_hash",

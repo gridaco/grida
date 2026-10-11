@@ -1,11 +1,48 @@
 # CLI package preparation and release
 
 The `grida` npm package contains a Node 24+ launcher and all eight native
-executables in one tarball. Installation has no dependencies, lifecycle scripts
-or binary downloads. The launcher selects `binaries/<platform-id>/grida`
+executables in one tarball. Installation has no lifecycle scripts or binary
+downloads. The launcher selects `binaries/<platform-id>/grida`
 (`grida.exe` on Windows), distinguishing glibc and musl on Linux, and forwards
 arguments, inherited streams, exit status and termination signals. The native
 executable itself needs no Node runtime.
+
+## Grida FX, the one dependency
+
+`grida fx …` runs [Grida FX](https://github.com/gridaco/fx). The package's one
+dependency is `@grida/fx` at exactly one version; npm installs it with the
+engine package FX publishes for the machine, as FX's own optional dependency.
+The launcher hands `fx` and everything after it to `@grida/fx/cli` under FX's
+[host contract](https://github.com/gridaco/fx/blob/main/spec/distribution.md);
+no other command loads it. The native executable answers `fx` with
+`launcher_required` (exit 1), since only the launcher can find FX.
+
+`packageManifest` refuses anything else: another dependency, a version range,
+optional, peer or bundled dependencies. Preparation packs `@grida/fx` at the
+pin and every engine package it pins from the public registry, checked against
+the registry's integrity, into the candidate's `dependencies/` folder, and
+refuses an archive with dependencies of its own or an install script.
+Verification checks those archives' bytes as it checks the package's. Installed
+proofs install the package with `@grida/fx` and this host's engine package (if
+FX has one) offline, and check `grida fx --version` names the pinned FX, or,
+where FX has no engine (Windows, musl), that `grida fx` explains so with exit 1.
+Host fixtures use a stand-in `@grida/fx` that publication refuses.
+
+FX releases first. To move `grida` to a new FX: once `@grida/fx` is on npm, pin
+it in `packages/grida-cli/package.json`, bump `grida`'s version, refresh
+`pnpm-lock.yaml`, and merge; the usual release follows. A pin naming an
+unpublished FX cannot prepare a candidate.
+
+## Update notice
+
+The launcher names a newer `grida` on stderr before a command runs, from a
+local record (`$GRIDA_HOME/cli/update.json`, default `~/.grida`). A detached
+process refreshes the record at most daily with one anonymous GET of
+`https://registry.npmjs.org/-/package/grida/dist-tags`; the command never
+waits for it and failures are silent. It is off in CI, with `--json`, when
+stderr is not a terminal, with `GRIDA_NO_UPDATE_CHECK=1`, and when
+`GRIDA_HOME` is set but not absolute. `grida fx` is covered because the FX pin
+moves with `grida`'s version; `@grida/fx` alone has no notice.
 
 ## Platform policy
 
@@ -105,7 +142,7 @@ ABI policy, immutable version collisions and release guards.
 
 The checked-out source manifest carries Rust build/test commands. Preparation
 stages the reviewed files and eight compiled binaries, then writes a published
-manifest without scripts or dependencies. Do not publish or pack the source
+manifest without scripts, whose only dependency is the pinned `@grida/fx`. Do not publish or pack the source
 directory directly: source checkouts do not contain the release binaries.
 
 Use `just cli-contracts` for the current native contract gate and see the

@@ -2646,6 +2646,13 @@ generation receipts without a fixed projection.
    without a request. Acceptance is transient metadata; it is neither stored nor
    consulted as future authorization. Ordinary reads and generation never invoke
    checks. Future custom endpoints require their own credential/destination policy.
+7. **Launcher scope.** The npm launcher holds no credential. It hands `fx` and
+   the arguments after it unchanged to the exactly pinned `@grida/fx`, a separate
+   product with its own key loader; FX receives no CLI credential, custody path or
+   GG grant. Its update check is one credential-free GET of npm's public `grida`
+   dist-tags, at most daily, from a detached process with an empty environment. It
+   sends no identifier, writes only its own record under the Grida home, and never
+   changes a command's input, output or exit status.
 
 **Limits and verification.** The executable, SDK dependencies, runtime, OS trust
 store, process environment and same-user code are trusted. This is not an OS
@@ -2663,6 +2670,9 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
 
 **Files bound by this id.**
 
+- npm [launcher](packages/grida-cli/native/bin.mjs), [update notice](packages/grida-cli/native/update.mjs)
+  and [launcher tests](scripts/cli-release/native.test.mjs) — executable selection, the `fx`
+  handoff to the pinned `@grida/fx`, and the credential-free update check.
 - Native CLI [grammar](crates/grida-cli/src/grammar.rs),
   [safe failure types](crates/grida-cli/src/lib.rs),
   [entry](crates/grida-cli/src/main.rs) and
