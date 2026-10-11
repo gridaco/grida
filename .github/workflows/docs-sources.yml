@@ -70,6 +70,10 @@ jobs:
           app-id: ${{ vars.DOCS_SOURCES_APP_ID }}
           private-key: ${{ secrets.DOCS_SOURCES_APP_PRIVATE_KEY }}
           owner: gridaco
+          # this repo, plus every source repo in apps/docs/sources.json
+          repositories: |
+            grida
+            fx
       - uses: actions/checkout@v4
         with:
           persist-credentials: false

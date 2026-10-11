@@ -106,7 +106,10 @@ pnpm sources:verify          # what CI runs on PRs here
   otherwise).
 - **Adding a source.** Declare it in `sources.json`, run
   `pnpm sources:sync <id>`, add it to [`sidebars.js`](./sidebars.js) if it
-  needs a sidebar entry, and add the reusable check to the source repo's CI.
+  needs a sidebar entry (guarded with `from_source`), add its repo to the App
+  token's `repositories` in
+  [`docs-sources.yml`](../../.github/workflows/docs-sources.yml), and add the
+  reusable check to the source repo's CI.
   Its pages may not take a path a page in `/docs` already has.
 - **Local clones.** `DOCS_SOURCES_LOCAL="gridaco/fx=../fx" pnpm content:setup`
   (paths from the repo root) previews a source from a local clone instead of

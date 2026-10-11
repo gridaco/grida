@@ -1,3 +1,12 @@
+const fs = require("fs");
+const path = require("path");
+
+// A docs source's pages exist only once fetched (apps/docs/sources.json);
+// `pnpm install` fetches them best-effort, so an offline install has none.
+// Docusaurus rejects an empty category, so list one only when it exists.
+const from_source = (dir, category) =>
+  fs.existsSync(path.join(__dirname, "docs", dir)) ? [category] : [];
+
 const _flags_items = [
   {
     type: "category",
@@ -228,7 +237,7 @@ const docs = [
       },
     ],
   },
-  {
+  ...from_source("fx", {
     type: "category",
     label: "FX",
     collapsed: true,
@@ -238,7 +247,7 @@ const docs = [
         dirName: "fx",
       },
     ],
-  },
+  }),
   {
     type: "category",
     label: "With Figma",
