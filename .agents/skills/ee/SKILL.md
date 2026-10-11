@@ -37,8 +37,8 @@ Three surfaces today:
 - **Custom domains (BYOD)** — user-owned apex + subdomain mapping on
   Vercel. See [multi-tenant-custom-domain-vercel](https://grida.co/docs/wg/platform/multi-tenant-custom-domain-vercel).
 - **Billing** — subscriptions, AI credit, the entitlement gate
-  primitive. Platform in the paired infra repository owns the financial
-  engine and policy. Grida retains its integration consumers; see
+  primitive. Platform billing handles the financial engine and policy.
+  Grida retains its integration consumers; see
   [`ee-billing`](../ee-billing/SKILL.md) for that workflow.
 
 ## The `GRIDA-EE` marker
@@ -88,7 +88,7 @@ Co-locate by surface so the grep doesn't have to do all the work.
   inside.
 - **Database** — namespaced schema. Existing examples:
   `grida_hosted`. Historical `grida_billing` tables are retained financial
-  archives; new Platform financial DDL belongs in infra. Don't bleed EE columns into
+  archives; new financial definitions belong to Platform billing. Don't bleed EE columns into
   OSS-relevant tables. Schema-design rules live in the
   [`database`](../database/SKILL.md) skill / `supabase/AGENTS.md`;
   consult those.

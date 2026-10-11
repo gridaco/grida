@@ -79,7 +79,7 @@ export async function GET(
       );
     }
   } catch {
-    // Public contributors can use their workspace without private billing config.
+    // Contributors can use their workspace without a configured billing integration.
   }
 
   return NextResponse.json({

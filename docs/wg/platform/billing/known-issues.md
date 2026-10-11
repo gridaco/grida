@@ -11,9 +11,8 @@ format: md
 Platform owns shared billing triage; Grida retains its product pricing and receipt
 obligations. These IDs and headings preserve the existing public issue links.
 Retiring the former financial engine does not itself close an economic issue.
-The [full original register](https://github.com/gridaco/grida/blob/c39e8d79d845cf60dbad7cbc2ae6fddcb9706bf5/docs/wg/platform/billing/known-issues.md)
-retains discovery, cause, historical behavior, mitigation, planned work, and
-original code/PR/manual-case references.
+Earlier discovery, behavior, mitigation, planned work, and code/PR/manual-case
+references remain in this page's revision history.
 
 ## KI-BILL-001 — Silent auto-recharge runs at-cost (markup gap)
 

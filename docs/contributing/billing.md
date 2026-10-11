@@ -17,8 +17,8 @@ not run a second financial engine.
 Follow the repository's [authenticated local development guide](https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md#authenticated-local-development).
 Use local Supabase and `NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH=1`, then sign in with
 the seeded `insider@grida.co` / `password` account. Ordinary editor, Forms,
-identity, and contributor text development require no private infra checkout,
-Stripe or Metronome account, billing credentials, or webhook tunnel.
+identity, and contributor text development use this local setup. They require
+no Stripe or Metronome account, billing credentials, or webhook tunnel.
 
 For AI-SDK text/chat, set one contributor key in the ignored `editor/.env.local`:
 
@@ -52,21 +52,15 @@ not select the retired Grida writer or stop unrelated routes from loading.
 - Paid product calls obtain a fresh Platform admission, then persist their
   source claim, dispatch transition, exact completion receipt, and usage outbox.
   Unknown provider outcomes require reconciliation before another dispatch.
-- Existing `/webhooks/stripe` and `/webhooks/metronome` URLs verify and archive
-  the exact signed delivery, forward durable capture to Platform, and acknowledge
-  only after target custody. They do not apply source financial projectors.
+- Existing `/webhooks/stripe` and `/webhooks/metronome` URLs remain
+  signature-verified delivery endpoints. They preserve event custody before
+  acknowledging delivery; they do not apply source financial projectors.
 
-The [source integration README](https://github.com/gridaco/grida/blob/main/editor/lib/platform/README.md)
-describes the workload audiences and focused no-env checks. The
+The [integration README](https://github.com/gridaco/grida/blob/main/editor/lib/platform/README.md)
+describes Grida's adapters and focused checks. The
 [environment example](https://github.com/gridaco/grida/blob/main/editor/.env.example)
-lists optional integration configuration. Source endpoint signing secrets are
-separate from target endpoint signing secrets and from sending workload tokens.
-
-Platform maintainers use the paired private infra repository's local billing
-fixture and its separately scoped vendor Sandbox qualification. Those workflows
-own setup, selected test groups, provider operations, and recovery evidence.
-Retired `editor/scripts/billing` commands and the old Grida billing E2E suite are
-not current setup or proof. A simulator pass does not qualify real payments.
+lists optional integration configuration. Retired `editor/scripts/billing`
+commands and the old billing E2E suite are not current Grida setup or proof.
 
 ## Server provider credentials
 

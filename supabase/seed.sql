@@ -121,6 +121,6 @@ ON CONFLICT (id) DO NOTHING;
 
 -- A fresh migration replay retains the historical pre-transfer billing rows
 -- created by tg_billing_provision_on_org_insert. They do not configure Platform
--- or provide a current billing writer. Paired infra fixtures explicitly
+-- or provide a current billing writer. Isolated service fixtures explicitly
 -- initialize local ownership; public Supabase/insiders/BYOK development does
 -- not require billing vendors or a financial ownership transfer.

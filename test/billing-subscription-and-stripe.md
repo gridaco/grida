@@ -15,11 +15,11 @@ covered_by: []
 > Platform billing owns shared financial acceptance. This record retains its
 > original case IDs, Behavior, status, and history; ownership cleanup is not
 > verification. Current billing runs in the shared console/Platform service.
-> Use the paired infra local billing fixture for simulated proof or its separately
-> authorized vendor Sandbox qualification. Former Grida harness actions, direct
-> source financial edits, and retired billing commands below are historical
-> procedure context, not current setup. Grida-specific product display, BYOK,
-> and receipt assertions remain Grida consumer obligations.
+> Verify current billing through the Console with a test-only setup. Former
+> Grida harness actions, direct source financial edits, and retired billing
+> commands below are historical procedure context, not current setup.
+> Grida-specific product display, BYOK, and receipt assertions remain Grida
+> consumer obligations.
 
 > Deprecated on 2026-07-31. This composite suite assumes saleable Team and
 > annual offers plus seat-scaled plan allowances. Use the approved contract in

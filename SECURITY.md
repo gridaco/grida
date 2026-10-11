@@ -97,9 +97,8 @@ as public.
 4. **Replay protection** — receivers dedup on event id and reject
    events older than 5 minutes (where applicable).
 5. **Tunnel path filter at the edge** — a provider-validation tunnel exposes
-   only the selected webhook callback paths, with a deny-all fallback. Current
-   Platform setup and vendor qualification are maintained with the service;
-   ordinary Grida insiders/BYOK development needs no billing tunnel. Treat
+   only the selected webhook callback paths, with a deny-all fallback.
+   Ordinary Grida insiders/BYOK development needs no billing tunnel. Treat
    callback URLs as public and keep unrelated `/insiders/*` routes unreachable.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-001 .` to enumerate.
@@ -137,9 +136,8 @@ routes, which would publish them under a different URL and bypass this gate.
 **Retained history.** The former `/insiders/billing` harness exercised privileged
 Stripe/Metronome lifecycle actions without org-membership checks. It was retired
 with Grida's duplicate financial engine; Platform owns current financial QA.
-The original [boundary record](https://github.com/gridaco/grida/blob/c39e8d79d845cf60dbad7cbc2ae6fddcb9706bf5/SECURITY.md#grida-sec-002--insiders-dev-harness-is-local-only)
-retains that threat model. Its deleted billing actions are not current proof or
-instructions. This ID still governs every remaining insiders surface.
+Its deleted billing actions are not current proof or instructions. This ID
+retains the threat model and governs every remaining insiders surface.
 
 **What does NOT belong under `(insiders)/`.** Anything that needs to ship to
 production. Move a graduating feature to its authenticated product/API surface;

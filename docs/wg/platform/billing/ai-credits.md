@@ -48,6 +48,5 @@ customer billing while retaining authentication and organization resolution.
 Funded media still needs admission. See [local contributor integration](../../../contributing/billing.md)
 and the [known issue register](./known-issues.md).
 
-The former master plan remains available in
-[its original source revision](https://github.com/gridaco/grida/blob/c39e8d79d845cf60dbad7cbc2ae6fddcb9706bf5/docs/wg/platform/billing/ai-credits.md)
-as historical design and research. Its source-writer/CLI recipes are retired.
+Earlier designs remain in this page's revision history. Their retired
+source-writer and CLI recipes do not define current Grida setup.

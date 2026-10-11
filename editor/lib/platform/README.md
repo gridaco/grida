@@ -1,14 +1,14 @@
 # Grida source bridge and Platform consumers
 
-Platform in the paired `infra` repository is the sole financial owner. Grida
+Platform is the billing service and sole financial owner. Grida
 retains Supabase identity, canonical organizations/memberships, product execution
 custody, native API DTOs, and display/console handoff consumers. Product/project
 identity remains product-local. No `GRIDA_BILLING_OWNER` selector or retired source
 financial writer is available as a fallback.
 
 Configuration is lazy. Ordinary Grida-only local development uses local Supabase,
-insiders auth, and optional contributor text BYOK; it needs no private infra
-checkout or vendor billing setup. Identity/listing, Forms, and unbilled paths load
+insiders auth, and optional contributor text BYOK; it needs no payment-vendor
+setup. Identity/listing, Forms, and unbilled paths load
 without billing configuration. Missing Platform configuration leaves credit
 display unavailable and denies the affected billing/paid operation.
 
@@ -84,7 +84,7 @@ privileged fallback. A cached display/gate projection never admits paid work.
 existing `org_id`. Current membership is required, and settings requires owner.
 Continuation submissions revalidate same-origin and current authority. Creation
 returns the retained destination, never a guessed newest organization. The typed
-fixture mirrors infra's `contracts/platform/destinations.json`.
+fixture is [`__fixtures__/console-destinations.json`](./__fixtures__/console-destinations.json).
 
 `/gateway/account` resolves one opaque 43-character continuation through the
 fixed Platform `POST /platform/v1/continuations/resolve` with the SSR workload.
@@ -155,9 +155,6 @@ node node_modules/vitest/vitest.mjs run --config editor/vitest.platform-consumer
 ```
 
 SQL proof uses the complete migration history and seed in a dedicated local
-fixture. The real paired HTTP/browser billing workflow is maintained in
-[infra's local billing fixture](../../../../infra/integration/local/billing/README.md);
-the [private billing index](../../../../infra/docs/platform/billing/index.md) owns
-operations and recovery. Source unit success alone proves no SQL locking,
-vendor delivery, production cutover, or public publication. Public contributors
-can use [the self-contained Grida guide](../../../docs/contributing/billing.md).
+fixture. Source unit success alone does not prove SQL locking, signed vendor
+delivery or a deployed integration. For supported local consumer development,
+use [the Grida contributor guide](../../../docs/contributing/billing.md).

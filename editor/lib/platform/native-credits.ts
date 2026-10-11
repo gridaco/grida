@@ -1,4 +1,4 @@
-// GRIDA-EE: billing — published native projection over infra-owned cached credit.
+// GRIDA-EE: billing — published native projection over Platform cached credit.
 // GRIDA-SEC-010 / GRIDA-SEC-012 — retain the verified caller's membership authority.
 import "server-only";
 import { oauthServer } from "../auth/oauth-server";

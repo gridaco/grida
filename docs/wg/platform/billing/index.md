@@ -12,9 +12,7 @@ Platform owns Grida's subscriptions, payments, native AI credit, financial
 operations, and recovery. Grida retains identity, canonical organizations,
 product execution receipts, and billing display/console handoff consumers.
 
-These public pages preserve their existing URLs and explain the commercial and
-integration boundary. Private provider runbooks and financial evidence are
-maintained with the Platform service.
+These pages explain the commercial offer and the Grida integration boundary.
 
 - [Billing plans](./plans.md) — current offers and retained historical obligations.
 - [AI credit](./ai-credits.md) — native credit and durable producer custody.

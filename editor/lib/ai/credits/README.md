@@ -4,8 +4,8 @@ The editor consumer for AI credit balance UX. Platform owns the financial
 account, entitlement policy, and cached projection; this module owns display
 state and interaction. Its cached `allowed` observation cannot admit paid work.
 Missing Platform configuration leaves display unavailable without blocking
-unrelated Grida pages. Ordinary insiders/contributor text BYOK needs no private
-billing service setup. See the [source bridge](../../platform/README.md). Every AI call
+unrelated Grida pages. Ordinary insiders/contributor text BYOK needs no
+payment-vendor setup. See the [source bridge](../../platform/README.md). Every AI call
 site that displays balance or routes the GRIDA-SEC-003 gate flow
 consumes from this module.
 
