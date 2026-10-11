@@ -10,7 +10,8 @@ This directory is the **source of truth** for documentation content.
 - **Site build copy**: `/apps/docs/docs/**` (generated/synced during docs site build)
 - **Published at**: `https://grida.co/docs`
 - **Docs from other repos**: some published pages (e.g. `/docs/fx`) are authored in their product's
-  repo and fetched at build ([docs sources](./wg/platform/docs-sources.md)). Edit them there; never
+  repo and fetched at build ([docs sources](./wg/platform/docs-sources.md); which repo publishes
+  where: [gridaco/docs](https://github.com/gridaco/docs)). Edit them there; never
   copy them into `/docs`.
 
 ## Actively maintained
