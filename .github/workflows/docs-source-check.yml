@@ -1,0 +1,42 @@
+name: Docs source check
+
+# Reusable: a repo whose docs are published on grida.co/docs (a docs source,
+# apps/docs/sources.json) runs the site's source rules on its own changes —
+# links that resolve, assets in the published directory and within the size
+# limit, no video, plain markdown (docs/wg/platform/docs-sources.md).
+#
+#   jobs:
+#     docs:
+#       uses: gridaco/grida/.github/workflows/docs-source-check.yml@main
+#
+# The rules and the source's declaration are read from gridaco/grida main;
+# the checked tree is the caller's.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: gridaco/grida
+          ref: main
+          path: grida
+          sparse-checkout: |
+            apps/docs/sources.json
+            apps/docs/scripts/sources
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: node grida/apps/docs/scripts/sources/cli.js check --repo "$GITHUB_REPOSITORY" --dir source

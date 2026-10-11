@@ -71,6 +71,13 @@ The boundaries are real, not bureaucratic:
   to what it binds, so `docs/wg` can stay code-agnostic. It is neither a WG
   doc (too code-specific) nor an SDK doc (not for external consumers) — its
   home is the code.
+- **A product that lives in another Grida repo authors its docs there.**
+  FX's guide is written in `gridaco/fx` and published at `grida.co/docs/fx`
+  as a [docs source](../../../docs/wg/platform/docs-sources.md): its pages
+  and assets never enter this repo, only a pinned commit
+  (`apps/docs/sources.json`). Edit such docs in their repo, follow its asset
+  rules there, and never copy them into `/docs`. Private products are the
+  exception: their public docs are written here.
 - **Plans, TODO lists, and conversational logs are not docs of any
   family.** Plans live in untracked `*.plan.md` files (gitignored); they
   do not belong under `docs/`.
