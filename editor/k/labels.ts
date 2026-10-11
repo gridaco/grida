@@ -20,8 +20,11 @@ export namespace Labels {
     return doctype_labels[dt];
   }
 
-  export function planTier(plan: PlanTier, is_enterprise = false): string {
-    if (is_enterprise) return "Custom";
+  export function planTier(
+    plan: PlanTier | "custom",
+    is_enterprise = false
+  ): string {
+    if (is_enterprise || plan === "custom") return "Custom";
     return plan_labels[plan];
   }
 

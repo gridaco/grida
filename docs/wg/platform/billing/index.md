@@ -1,31 +1,24 @@
 ---
 title: Billing (WG)
-tags:
-  - internal
-  - wg
-  - platform
-  - billing
+description: Platform billing ownership and the retained Grida integration and commercial contracts.
+keywords: [billing, platform, subscriptions, AI credit]
+tags: [wg, platform, billing]
+format: md
 ---
 
 # Billing (WG)
 
-Working group documents for the Grida billing surface (subscriptions,
-AI credit, Stripe ↔ Metronome sync).
+Platform owns Grida's subscriptions, payments, native AI credit, financial
+operations, and recovery. Grida retains identity, canonical organizations,
+product execution receipts, and billing display/console handoff consumers.
 
-## Documents
+These pages explain the commercial offer and the Grida integration boundary.
 
-- [Billing plans](./plans) — the current commercial offer, Custom
-  fulfillment, and legacy-compatibility contract.
-- [AI Credits — Master Plan](./ai-credits) — design notes for the
-  Metronome-backed prepaid credit system, top-up + auto-reload flows,
-  drain order, refund pattern, gate primitive.
-- [Metronome integration](./metronome) — the integration playbook:
-  substrate setup, payment-gate config, webhook event taxonomy.
-- [Known issues](./known-issues) — living register of mitigated /
-  accepted issues across the billing surface (`KI-BILL-NNN`).
-
-## See also
-
-- [Contributor setup](../../../contributing/billing) — local dev with
-  Stripe + Metronome sandbox accounts and a cloudflared tunnel.
-- [User-facing plans and billing guide](../../../platform/billing.mdx).
+- [Billing plans](./plans.md) — current offers and retained historical obligations.
+- [AI credit](./ai-credits.md) — native credit and durable producer custody.
+- [Metronome integration](./metronome.md) — financial-owner and ingress boundaries.
+- [Known issues](./known-issues.md) — retained `KI-BILL-*` history and current scope.
+- [Contributor integration](../../../contributing/billing.md) — local insiders/BYOK
+  development without vendor billing setup.
+- [Plans and billing](../../../platform/billing.mdx) and
+  [refund policy](../../../platform/refund-policy.md) — customer guidance and terms.

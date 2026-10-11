@@ -10,17 +10,14 @@
  * TYPES from this module; the `server-only` guard breaks the build if a
  * value import ever reaches client code.
  *
- * Deliberate divergences from the web billing page's summary action
- * (`getAiCreditsSummary`): this display read never lazily
- * provisions a Metronome account, and it exposes no drift/auto-reload/
- * Stripe fields. The desktop card is thin by design; every control
+ * This display read never provisions a credit account, and it exposes no
+ * drift/auto-reload/Stripe fields. The desktop card is thin by design; every control
  * delegates to the web billing page (`manage_path`).
  */
 import "server-only";
 
 import { resolveSessionOrganization } from "@/lib/auth/organization";
 import {
-  billingOwner,
   platformBilling,
   BillingConsumerError,
 } from "@/lib/platform/billing-consumer";
@@ -31,7 +28,7 @@ export type { PlanId } from "@/lib/billing/plans";
 
 /**
  * Plan identifier presented by Desktop. Custom agreements overlay the
- * Stripe-backed plan; Team remains readable only for historical subscriptions.
+ * commercial plan; Team remains readable only for historical subscriptions.
  */
 export type DesktopPlanId = PlanId | "custom";
 
@@ -66,9 +63,8 @@ export type DesktopBillingSummaryResponse =
 
 /**
  * Ceiling on the best-effort live balance sync. Keeps the settings page
- * open latency bounded when Metronome is slow or unreachable — the cached
- * balance (webhooks + hourly reconcile cron keep it honest) is the
- * fallback. A cached display is never paid execution authority.
+ * open latency bounded when Platform is slow or unreachable — the cached
+ * balance is retained when the owner refresh is unavailable. A cached display is never paid execution authority.
  */
 export const LIVE_REFRESH_TIMEOUT_MS = 2_000;
 
@@ -86,127 +82,48 @@ export async function getDesktopBillingSummary(
   if (!org) return { state: "no_organization" };
 
   const client = await createClient();
-  if (billingOwner() === "infra") {
-    const { data: session } = await client.auth.getSession();
-    if (!session.session?.access_token)
-      throw new BillingConsumerError("unauthorized");
-    const bearer = session.session.access_token;
-    const platform = platformBilling();
-    const [summary, cached, identity] = await Promise.all([
-      platform.summary(org.id, bearer),
-      platform.credits(org.id, bearer),
-      client
-        .from("organization")
-        .select("display_name")
-        .eq("id", org.id)
-        .maybeSingle(),
-    ]);
-    if (identity.error || !identity.data) throw new BillingConsumerError();
-    let projection = cached;
-    if (cached.state !== "not_provisioned") {
-      try {
-        await platform.refresh(
-          org.id,
-          bearer,
-          opts.liveRefreshTimeoutMs ?? LIVE_REFRESH_TIMEOUT_MS
-        );
-        projection = await platform.credits(org.id, bearer);
-      } catch {
-        /* A denied/unavailable refresh preserves the observed cache. */
-      }
-    }
-    return {
-      state: "ready",
-      organization: {
-        id: org.id,
-        name: org.name,
-        display_name: identity.data.display_name || org.name,
-      },
-      plan: summary.plan,
-      credits: {
-        balance_cents: projection.balance_cents,
-        entitled: projection.billing_gate.allowed,
-        blocked_reason: projection.billing_gate.reason,
-        as_of: projection.cache_updated_at,
-      },
-      manage_path: `/organizations/${org.name}/settings/billing`,
-    };
-  }
-  const { getEntitlement } = await import("@/lib/billing/metronome");
-  const [cached, orgRow, subRow] = await Promise.all([
-    getEntitlement(org.id),
-    // RLS member-read; display-only fields. Deliberately not widening the
-    // GRIDA-SEC-003-tagged resolver's select.
+  const { data: session } = await client.auth.getSession();
+  if (!session.session?.access_token)
+    throw new BillingConsumerError("unauthorized");
+  const bearer = session.session.access_token;
+  const platform = platformBilling();
+  const [summary, cached, identity] = await Promise.all([
+    platform.summary(org.id, bearer),
+    platform.credits(org.id, bearer),
     client
       .from("organization")
-      .select("display_name, is_enterprise")
+      .select("display_name")
       .eq("id", org.id)
       .maybeSingle(),
-    client
-      .from("v_billing_subscription")
-      .select("plan")
-      .eq("organization_id", org.id)
-      .maybeSingle(),
   ]);
-
-  // Best-effort live sync, bounded. Skipped for unprovisioned orgs (there
-  // is nothing to sync). On success, re-read the entitlement so the card
-  // shows the canonical post-refresh gate decision; on timeout or failure
-  // (e.g. no METRONOME_API_TOKEN on contributor machines) the cached
-  // values stand. Never provisions — a passive read must not mutate.
-  let ent = cached;
-  if (cached.reason !== "not_provisioned") {
-    const refreshed = await tryLiveRefresh(
-      org.id,
-      opts.liveRefreshTimeoutMs ?? LIVE_REFRESH_TIMEOUT_MS
-    );
-    if (refreshed) ent = await getEntitlement(org.id);
+  if (identity.error || !identity.data) throw new BillingConsumerError();
+  let projection = cached;
+  if (cached.state !== "not_provisioned") {
+    try {
+      await platform.refresh(
+        org.id,
+        bearer,
+        opts.liveRefreshTimeoutMs ?? LIVE_REFRESH_TIMEOUT_MS
+      );
+      projection = await platform.credits(org.id, bearer);
+    } catch {
+      /* A denied/unavailable refresh preserves the observed cache. */
+    }
   }
-
-  const rawPlan = subRow.data?.plan;
-  const stripePlan: PlanId =
-    rawPlan === "pro" || rawPlan === "team" ? rawPlan : "free";
-  const plan: DesktopPlanId = orgRow.data?.is_enterprise
-    ? "custom"
-    : stripePlan;
-
   return {
     state: "ready",
     organization: {
       id: org.id,
       name: org.name,
-      display_name: orgRow.data?.display_name || org.name,
+      display_name: identity.data.display_name || org.name,
     },
-    plan,
+    plan: summary.plan,
     credits: {
-      balance_cents:
-        ent.reason === "not_provisioned" ? null : ent.cachedBalanceCents,
-      entitled: ent.allowed,
-      blocked_reason: ent.allowed ? null : (ent.reason ?? null),
-      as_of: ent.cachedAt,
+      balance_cents: projection.balance_cents,
+      entitled: projection.billing_gate.allowed,
+      blocked_reason: projection.billing_gate.reason,
+      as_of: projection.cache_updated_at,
     },
     manage_path: `/organizations/${org.name}/settings/billing`,
   };
-}
-
-async function tryLiveRefresh(
-  organizationId: number,
-  timeoutMs: number
-): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const { refreshBalance } = await import("@/lib/billing/metronome");
-    return await Promise.race([
-      refreshBalance(organizationId).then(() => true as const),
-      new Promise<false>((resolve) => {
-        timer = setTimeout(() => resolve(false), timeoutMs);
-      }),
-    ]);
-  } catch {
-    return false;
-  } finally {
-    // A timed-out refresh may still complete later; that's a harmless
-    // idempotent cache write. The timer must not outlive the call.
-    if (timer !== undefined) clearTimeout(timer);
-  }
 }

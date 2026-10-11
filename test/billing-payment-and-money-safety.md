@@ -12,6 +12,15 @@ automatable: partial
 covered_by: []
 ---
 
+> Platform billing owns shared financial acceptance. This record retains its
+> original case IDs, Behavior, status, and history; ownership cleanup is not
+> verification. Current billing runs in the shared console/Platform service.
+> Verify current billing through the Console with a test-only setup. Former
+> Grida harness actions, direct source financial edits, and retired billing
+> commands below are historical procedure context, not current setup.
+> Grida-specific product display, BYOK, and receipt assertions remain Grida
+> consumer obligations.
+
 > Deprecated on 2026-07-31. This composite suite assumes the retired plan and
 > recurring-credit model and is not current acceptance criteria. Use the
 > approved billing contract in `docs/wg/platform/billing/plans.md` and add new

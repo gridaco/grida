@@ -12,6 +12,15 @@ automatable: partial
 covered_by: []
 ---
 
+> Platform billing owns shared financial acceptance. This record retains its
+> original case IDs, Behavior, status, and history; ownership cleanup is not
+> verification. Current billing runs in the shared console/Platform service.
+> Verify current billing through the Console with a test-only setup. Former
+> Grida harness actions, direct source financial edits, and retired billing
+> commands below are historical procedure context, not current setup.
+> Grida-specific product display, BYOK, and receipt assertions remain Grida
+> consumer obligations.
+
 ## Behavior
 
 An organization classified as Custom can purchase AI credit manually, but its
@@ -41,3 +50,7 @@ before Stripe or Metronome is mutated.
 
 Manual top-up is intentionally outside this guard because it creates a fresh,
 explicit purchase rather than changing an agreement-managed recurring rule.
+
+The former `offers.test.ts` coverage, where listed, was retired with the source
+financial engine. No replacement full-case coverage or hosted verification is
+claimed by this ownership update. Keep the untested status until actual proof.

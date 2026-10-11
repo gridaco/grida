@@ -185,9 +185,9 @@ function PricingTierCard({
   organization: OrganizationWithAvatar;
 }) {
   const { plan, is_enterprise } = organization;
-  const label = Labels.planTier(plan, is_enterprise);
-  const isCustom = is_enterprise;
-  const highlight = isCustom || plan !== "free";
+  const isCustom = is_enterprise || plan === "custom";
+  const label = plan === null ? null : Labels.planTier(plan, is_enterprise);
+  const highlight = plan !== null && (isCustom || plan !== "free");
   const planActionLabel = isCustom
     ? null
     : plan === "free"
@@ -202,9 +202,12 @@ function PricingTierCard({
     team: "You're on a legacy Team plan. Move to the current Pro monthly subscription when you're ready.",
   };
 
-  const message = isCustom
-    ? "Your Custom plan follows the terms arranged for your organization."
-    : (tierMessages[plan] ?? `Thanks for subscribing to ${label}!`);
+  const message =
+    plan === null
+      ? "Plan information is unavailable."
+      : isCustom
+        ? "Your Custom plan follows the terms arranged for your organization."
+        : tierMessages[plan as PlanTier];
 
   return (
     <div className="relative rounded-lg border p-3">
@@ -213,7 +216,7 @@ function PricingTierCard({
       )}
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold">Current Plan</h3>
-        <Badge variant="outline">{label}</Badge>
+        {label && <Badge variant="outline">{label}</Badge>}
       </div>
       <p className="mb-3 text-xs text-muted-foreground">{message}</p>
       {planActionLabel && (
@@ -492,12 +495,14 @@ function OrganizationSwitcher({
                     alt={org.display_name}
                   />
                   {org.display_name}
-                  <Badge
-                    variant="outline"
-                    className="ms-auto text-xs px-1.5 py-0.5 font-normal text-muted-foreground"
-                  >
-                    {Labels.planTier(org.plan, org.is_enterprise)}
-                  </Badge>
+                  {org.plan !== null && (
+                    <Badge
+                      variant="outline"
+                      className="ms-auto text-xs px-1.5 py-0.5 font-normal text-muted-foreground"
+                    >
+                      {Labels.planTier(org.plan, org.is_enterprise)}
+                    </Badge>
+                  )}
                 </DropdownMenuItem>
               </Link>
             ))}

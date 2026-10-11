@@ -2,11 +2,12 @@
 // GRIDA-GG: gateway — provider selection through the real billing seam.
 // GRIDA-EE: billing — entitlement and usage calls stay in the shared seam.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SourceWorkRPC } from "@/lib/platform/source-work";
+import { ProductBillingError } from "@/lib/platform/product-billing";
 
 const h = vi.hoisted(() => ({
   events: [] as string[],
-  sourceRpc: vi.fn<SourceWorkRPC>(),
+  begin: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  complete: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   replicateOptions: vi.fn<(options: unknown) => void>(),
   run: vi.fn<
     (
@@ -21,14 +22,6 @@ const h = vi.hoisted(() => ({
       reason?: string;
     }>
   >(),
-  ingestUsageEvent:
-    vi.fn<
-      (
-        organizationId: number,
-        costMills: number,
-        options: { transactionId: string }
-      ) => Promise<void>
-    >(),
   openAiOptions: vi.fn<(options: unknown) => void>(),
   listOpenAiModels: vi.fn<() => Promise<{ data: { id: string }[] }>>(),
 }));
@@ -51,24 +44,15 @@ vi.mock("openai", () => ({
   },
 }));
 
-vi.mock("@/lib/billing/metronome", () => ({
-  getEntitlement: h.getEntitlement,
-  ingestUsageEvent: h.ingestUsageEvent,
-  refreshBalance:
-    vi.fn<typeof import("@/lib/billing/metronome").refreshBalance>(),
-  BillingMetronomeError: class BillingMetronomeError extends Error {
-    constructor(
-      message: string,
-      readonly code: string,
-      readonly status = 500
-    ) {
-      super(message);
-    }
-  },
+vi.mock("@/lib/platform/product-consumer", () => ({
+  platformProductBilling: () => ({
+    entitlement: h.getEntitlement,
+    begin: h.begin,
+    complete: h.complete,
+  }),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
-  service_role: { workspace: { rpc: h.sourceRpc } },
   createLibraryClient:
     vi.fn<typeof import("@/lib/supabase/server").createLibraryClient>(),
 }));
@@ -83,20 +67,19 @@ beforeEach(() => {
   vi.resetModules();
   vi.resetAllMocks();
   h.events.length = 0;
-  h.sourceRpc.mockImplementation(async (name, args) => {
-    if (name === "platform_source_work_begin") {
-      h.events.push("begin");
-      return { data: { created: true, id: args.work_id }, error: null };
-    }
-    if (name === "platform_source_work_capture") {
-      h.events.push("capture");
-      return { data: { accepted: true }, error: null };
-    }
-    if (name === "platform_source_work_finish") {
-      h.events.push("finish");
-      return { data: { accepted: true }, error: null };
-    }
-    throw new Error("Unexpected source RPC: " + name);
+  h.begin.mockImplementation(async (context) => {
+    const organizationId = (context as { organizationId: number })
+      .organizationId;
+    const decision = await h.getEntitlement(organizationId);
+    if (!decision.allowed) throw new ProductBillingError("blocked");
+    h.events.push("begin");
+    return {
+      id: "execution-synthetic",
+      claim: { organization_id: String(organizationId) },
+    };
+  });
+  h.complete.mockImplementation(async () => {
+    h.events.push("complete");
   });
   for (const key of [
     "GG_REPLICATE_API_TOKEN",
@@ -123,9 +106,6 @@ beforeEach(() => {
   h.run.mockImplementation(async () => {
     h.events.push("provider");
     return "https://example.test/music.mp3";
-  });
-  h.ingestUsageEvent.mockImplementation(async () => {
-    h.events.push("ingest");
   });
 });
 
@@ -156,27 +136,19 @@ describe("funded Replicate credential admission", () => {
     });
     expect(h.getEntitlement).toHaveBeenCalledExactlyOnceWith(7);
     // Lyria 3 is sold at the catalog's $0.04 per generation: 40 mills.
-    expect(h.ingestUsageEvent).toHaveBeenCalledExactlyOnceWith(7, 40, {
-      transactionId: expect.any(String),
-    });
-    expect(h.events).toEqual([
-      "gate",
-      "begin",
-      "provider",
-      "capture",
-      "ingest",
-      "finish",
-    ]);
-    const [begin, capture, finish] = h.sourceRpc.mock.calls;
-    expect(begin![1]).toMatchObject({
-      work_kind: "legacy_ai",
-      request: { organization_id: "7", product: "grida-ai" },
-    });
-    expect(capture![1]).toMatchObject({
-      work_id: begin![1].work_id,
-      evidence: { quantity: "40", outcome: "succeeded" },
-    });
-    expect(finish![1]).toEqual({ work_id: begin![1].work_id });
+    expect(h.complete).toHaveBeenCalledExactlyOnceWith(
+      { id: "execution-synthetic", claim: { organization_id: "7" } },
+      40,
+      expect.objectContaining({ costMills: 40 })
+    );
+    expect(h.events).toEqual(["gate", "begin", "provider", "complete"]);
+    expect(h.begin).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        organizationId: 7,
+        model_id: "google/lyria-3",
+        requestDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      })
+    );
   });
 
   it.each([
@@ -205,7 +177,7 @@ describe("funded Replicate credential admission", () => {
       byok: "synthetic-byok",
     },
   ])(
-    "refuses $name before provider dispatch or ingestion",
+    "refuses $name before provider dispatch or completion",
     async ({ gg, legacy, byok }) => {
       vi.stubEnv("GG_REPLICATE_API_TOKEN", gg);
       vi.stubEnv("REPLICATE_API_TOKEN", legacy);
@@ -218,10 +190,10 @@ describe("funded Replicate credential admission", () => {
 
       expect(h.replicateOptions).not.toHaveBeenCalled();
       expect(h.run).not.toHaveBeenCalled();
-      expect(h.ingestUsageEvent).not.toHaveBeenCalled();
+      expect(h.complete).not.toHaveBeenCalled();
       // Admission remains unresolved; a failed dispatch must not invent usage.
       expect(h.events).toEqual(["gate", "begin"]);
-      expect(h.sourceRpc).toHaveBeenCalledTimes(1);
+      expect(h.begin).toHaveBeenCalledTimes(1);
     }
   );
 
@@ -239,10 +211,11 @@ describe("funded Replicate credential admission", () => {
     ).rejects.toMatchObject({ code: "blocked", status: 402 });
 
     expect(h.getEntitlement).toHaveBeenCalledExactlyOnceWith(7);
-    expect(h.sourceRpc).not.toHaveBeenCalled();
+    expect(h.begin).toHaveBeenCalledOnce();
+    expect(h.events).toEqual([]);
     expect(h.replicateOptions).not.toHaveBeenCalled();
     expect(h.run).not.toHaveBeenCalled();
-    expect(h.ingestUsageEvent).not.toHaveBeenCalled();
+    expect(h.complete).not.toHaveBeenCalled();
   });
 
   it("does not require Replicate configuration to list unbilled OpenAI models", async () => {
@@ -262,7 +235,7 @@ describe("funded Replicate credential admission", () => {
     expect(h.replicateOptions).not.toHaveBeenCalled();
     expect(h.run).not.toHaveBeenCalled();
     expect(h.getEntitlement).not.toHaveBeenCalled();
-    expect(h.sourceRpc).not.toHaveBeenCalled();
-    expect(h.ingestUsageEvent).not.toHaveBeenCalled();
+    expect(h.begin).not.toHaveBeenCalled();
+    expect(h.complete).not.toHaveBeenCalled();
   });
 });

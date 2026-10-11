@@ -5,6 +5,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createServer, request as httpRequest } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import {
   copyFile,
   lstat,
@@ -40,10 +41,8 @@ const copiedFiles = [
   "lib/account/account.ts",
   "lib/supabase/native-data.ts",
   "lib/supabase/account-data.ts",
-  "lib/supabase/credits-data.ts",
   "lib/supabase/gg-data.ts",
   "lib/billing/credits.ts",
-  "lib/billing/fees.ts",
   "lib/auth/bearer.ts",
   "lib/auth/gg-token.ts",
   "lib/auth/oauth-server.ts",
@@ -167,30 +166,38 @@ function issuerFixture() {
     databaseMode: "ok",
     databaseLimit: 100,
     creditsMode: "ok",
+    creditsMembershipMode: "ok",
+    creditsMembershipCalls: 0,
+    platformAuthorityErrors: 0,
+    workload: {
+      id: "api-proof-ssr",
+      token: randomBytes(32).toString("base64url"),
+      audience: "platform.grida-ssr",
+    },
     ggMode: "ok",
     credits: [
       [
         {
-          organization_id: 1,
-          organization_name: "alpha-1",
-          organization_display_name: "Alpha 1",
+          organization_id: "1",
           account_present: true,
-          credits_provisioned: true,
-          cached_balance_cents: 25,
-          cached_balance_at: "2026-01-02T03:04:05.000Z",
-          customer_entitled: true,
+          state: "cached",
+          source: "cache",
+          currency: "USD",
+          balance_cents: 25,
+          cache_updated_at: "2026-01-02T03:04:05.000Z",
+          billing_gate: { allowed: true, reason: null },
         },
       ],
       [
         {
-          organization_id: 1001,
-          organization_name: "beta",
-          organization_display_name: "Beta organization",
+          organization_id: "1001",
           account_present: true,
-          credits_provisioned: true,
-          cached_balance_cents: 500,
-          cached_balance_at: "2026-01-02T03:04:05.000Z",
-          customer_entitled: true,
+          state: "cached",
+          source: "cache",
+          currency: "USD",
+          balance_cents: 500,
+          cache_updated_at: "2026-01-02T03:04:05.000Z",
+          billing_gate: { allowed: true, reason: null },
         },
       ],
     ],
@@ -204,6 +211,7 @@ function issuerFixture() {
     ],
     authOrigin: "",
     dataOrigin: "",
+    platformOrigin: "",
     wrongServiceCalls: 0,
   };
   fixture.token = (index, claims = {}) => {
@@ -230,7 +238,8 @@ function issuerFixture() {
       service === "auth" ? fixture.authOrigin : fixture.dataOrigin
     );
     const database = url.pathname === "/rest/v1/organization";
-    const credits = url.pathname === "/rest/v1/v_billing_credits";
+    const creditMembership =
+      database && url.searchParams.get("id")?.startsWith("eq.");
     const membership = url.pathname === "/rest/v1/organization_member";
     const userinfo = req.url === "/auth/v1/oauth/userinfo";
     response.setHeader("cache-control", "no-store");
@@ -238,14 +247,14 @@ function issuerFixture() {
     // answer the other service's paths, so incorrect production wiring fails.
     if (
       (service === "auth" && !userinfo) ||
-      (service === "data" && !database && !credits && !membership)
+      (service === "data" && !database && !membership)
     ) {
       fixture.wrongServiceCalls++;
       response.writeHead(500).end();
       return;
     }
-    if (credits) {
-      fixture.creditsCalls++;
+    if (creditMembership) {
+      fixture.creditsMembershipCalls++;
       fixture.databaseCalls++;
     } else if (membership) {
       fixture.ggCalls++;
@@ -338,24 +347,13 @@ function issuerFixture() {
       );
       return;
     }
-    if (credits) {
-      const selector = url.searchParams.get("organization_id");
-      const projection = [
-        "organization_id",
-        "organization_name",
-        "organization_display_name",
-        "account_present",
-        "credits_provisioned",
-        "cached_balance_cents",
-        "cached_balance_at",
-        "customer_entitled",
-      ].join(",");
+    if (creditMembership) {
+      const selector = url.searchParams.get("id");
       if (
-        url.searchParams.get("select") !== projection ||
+        url.searchParams.get("select") !== "id,name,display_name" ||
         url.searchParams.get("limit") !== "2" ||
         !/^eq\.[1-9]\d*$/.test(selector ?? "") ||
-        [...url.searchParams.keys()].sort().join(",") !==
-          "limit,organization_id,select" ||
+        [...url.searchParams.keys()].sort().join(",") !== "id,limit,select" ||
         req.headers["accept-profile"] !== "public" ||
         req.headers.prefer !== "count=exact" ||
         req.headers.cookie !== undefined
@@ -363,7 +361,7 @@ function issuerFixture() {
         response.writeHead(500).end();
         return;
       }
-      const mode = fixture.creditsMode;
+      const mode = fixture.creditsMembershipMode;
       const failure = { unauthorized: 401, forbidden: 403, unavailable: 503 }[
         mode
       ];
@@ -374,27 +372,28 @@ function issuerFixture() {
       if (mode === "redirect") {
         response
           .writeHead(302, {
-            location: `${fixture.dataOrigin}/unexpected-credits`,
+            location: `${fixture.dataOrigin}/unexpected-membership`,
           })
           .end();
         return;
       }
       const id = Number(selector.slice(3));
-      // This is a visibility fixture, not an implementation of Postgres RLS.
-      // The exact bearer determines which organization rows can be returned.
-      let rows = fixture.credits[index].filter(
-        (row) => row.organization_id === id
-      );
+      // Canonical visibility is selected only by the exact native caller.
+      // This request fixture does not implement PostgreSQL RLS.
+      let rows = fixture.organizations[index].filter((row) => row.id === id);
       if (mode === "duplicate" && rows.length) rows = [rows[0], rows[0]];
       if (mode === "wrong-org" && rows.length)
-        rows = [{ ...rows[0], organization_id: id + 1 }];
+        rows = [{ ...rows[0], id: id + 1 }];
+      if (mode === "invalid-slug" && rows.length)
+        rows = [{ ...rows[0], name: "Invalid Slug" }];
+      if (mode === "invalid-display-name" && rows.length)
+        rows = [{ ...rows[0], display_name: null }];
       if (mode === "empty-nonzero-count") rows = [];
       response.statusCode = mode === "partial" ? 206 : 200;
       response.setHeader(
         "content-type",
         mode === "content-type" ? "text/plain" : "application/json"
       );
-      const range = rows.length ? `0-${rows.length - 1}/${rows.length}` : "*/0";
       if (mode !== "missing-count")
         response.setHeader(
           "content-range",
@@ -403,13 +402,14 @@ function issuerFixture() {
             "truncated-count": "0-0/2",
             "bad-range": "1-1/1",
             "empty-nonzero-count": "*/1",
-          }[mode] ?? range
+          }[mode] ??
+            (rows.length ? `0-${rows.length - 1}/${rows.length}` : "*/0")
         );
       response.end(
         mode === "malformed"
           ? "invalid JSON"
           : JSON.stringify(
-              rows.map((row) => ({ ...row, ignored: "upstream-only-field" }))
+              rows.map((row) => ({ ...row, ignored: "canonical-only-field" }))
             )
       );
       return;
@@ -489,6 +489,101 @@ function issuerFixture() {
             name: user.display_name,
             ignored: "upstream-only field",
           })
+    );
+  };
+  fixture.platformHandler = (req, response) => {
+    response.setHeader("cache-control", "no-store");
+    const url = new URL(req.url, fixture.platformOrigin);
+    const route =
+      /^\/platform\/v1\/billing\/organizations\/([1-9]\d*)\/credits$/.exec(
+        url.pathname
+      );
+    if (!route || url.search || req.method !== "GET") {
+      fixture.wrongServiceCalls++;
+      response.writeHead(500).end();
+      return;
+    }
+    fixture.creditsCalls++;
+    const id = Number(route[1]);
+    // This synthetic workload manifest binds one opaque credential to the
+    // passive Grida SSR audience. No workload JWT or user selector is accepted.
+    if (
+      !Number.isSafeInteger(id) ||
+      req.headers.authorization !== `Bearer ${fixture.workload.token}` ||
+      req.headers["x-grida-workload-key-id"] !== fixture.workload.id ||
+      fixture.workload.audience !== "platform.grida-ssr" ||
+      req.headers.accept !== "application/json" ||
+      [
+        "x-grida-account-token",
+        "apikey",
+        "cookie",
+        "origin",
+        "content-type",
+        "content-length",
+        "transfer-encoding",
+      ].some((header) => req.headers[header] !== undefined)
+    ) {
+      fixture.platformAuthorityErrors++;
+      response.writeHead(401).end();
+      return;
+    }
+    const index = tokens.get(req.headers["x-grida-native-token"]);
+    if (index === undefined || fixture.mode === "revoked") {
+      fixture.platformAuthorityErrors++;
+      response.writeHead(401).end();
+      return;
+    }
+    // Platform independently requires the caller's current membership too.
+    if (
+      !fixture.organizations[index].some((row) => row.id === id) ||
+      fixture.creditsMode === "membership-revoked"
+    ) {
+      response.writeHead(403).end();
+      return;
+    }
+    const mode = fixture.creditsMode;
+    const failure = {
+      unauthorized: 401,
+      forbidden: 403,
+      "not-found": 404,
+      unavailable: 503,
+    }[mode];
+    if (failure) {
+      response.writeHead(failure).end("private fixture diagnostics");
+      return;
+    }
+    if (mode === "redirect") {
+      response
+        .writeHead(302, { location: `${fixture.platformOrigin}/unexpected` })
+        .end();
+      return;
+    }
+    const rows = fixture.credits[index].filter(
+      (row) => row.organization_id === String(id)
+    );
+    if (rows.length !== 1) {
+      response.writeHead(404).end();
+      return;
+    }
+    const projection = {
+      ...rows[0],
+      ignored: "platform-only-field",
+      organization: { id: 9999, name: "ignored", display_name: "Ignored" },
+    };
+    if (mode === "wrong-org") projection.organization_id = String(id + 1);
+    response.statusCode = mode === "partial" ? 206 : 200;
+    response.setHeader(
+      "content-type",
+      mode === "content-type" ? "text/plain" : "application/json"
+    );
+    response.end(
+      mode === "malformed"
+        ? "invalid JSON"
+        : mode === "oversized"
+          ? JSON.stringify({ ...projection, ignored: "x".repeat(64 * 1024) })
+          : JSON.stringify(
+              mode === "array" ? [projection, projection] : projection
+            )
     );
   };
   fixture.authServer = createServer(handler("auth"));
@@ -866,66 +961,62 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
   const betaRows = issuer.credits[1];
   const alphaRow = alphaRows[0];
   const betaRow = betaRows[0];
+  const alphaOrganizations = issuer.organizations[0];
   const url = (id) => `${endpoint}?organization_id=${id}`;
-  const expected = (row, state, balance, at, allowed, reason) => ({
-    organization: {
-      id: row.organization_id,
-      name: row.organization_name,
-      display_name: row.organization_display_name,
-    },
+  const expected = (row) => ({
+    organization: issuer.organizations
+      .flat()
+      .find((org) => String(org.id) === row.organization_id),
     account_present: row.account_present,
-    state,
+    state: row.state,
     source: "cache",
     currency: "USD",
-    balance_cents: balance,
-    cache_updated_at: at,
-    billing_gate: { allowed, reason },
+    balance_cents: row.balance_cents,
+    cache_updated_at: row.cache_updated_at,
+    billing_gate: row.billing_gate,
   });
-  const read = async (token, row, reply, label) => {
+  const read = async (token, row, label) => {
     const body = safe(
       await request(port, url(row.organization_id), {
         headers: {
           ...auth(token),
           cookie: "sb-session=conflicting-browser-organization",
           "x-grida-organization-id": "9999",
+          "x-grida-native-token": beta,
+          "x-grida-account-token": beta,
+          "x-grida-workload-key-id": "caller-chosen",
         },
       }),
       200,
       label
     );
     check(
-      isDeepStrictEqual(body, reply),
-      `${label}: cached credits projection or gate mismatch`
+      isDeepStrictEqual(body, expected(row)),
+      `${label}: native credit DTO or Platform projection mismatch`
     );
   };
 
+  await read(alpha, alphaRow, "own credits at the existing gate floor");
+  await read(beta, betaRow, "second user's independent credits");
   await read(
     alpha,
     alphaRow,
-    expected(alphaRow, "cached", 25, alphaRow.cached_balance_at, true, null),
-    "own credits at the existing gate floor"
-  );
-  await read(
-    beta,
-    betaRow,
-    expected(betaRow, "cached", 500, betaRow.cached_balance_at, true, null),
-    "second user's independent credits"
-  );
-  await read(
-    alpha,
-    alphaRow,
-    expected(alphaRow, "cached", 25, alphaRow.cached_balance_at, true, null),
     "credits do not leak through another user's cache"
   );
-  issuer.creditsMode = "partial";
+  issuer.creditsMembershipMode = "partial";
+  await read(alpha, alphaRow, "complete canonical membership with HTTP206");
+  issuer.creditsMembershipMode = "ok";
+  issuer.organizations[0] = alphaOrganizations.map((org) =>
+    org.id === 1 ? { ...org, display_name: "Renamed Alpha" } : org
+  );
   await read(
     alpha,
     alphaRow,
-    expected(alphaRow, "cached", 25, alphaRow.cached_balance_at, true, null),
-    "complete credits row with HTTP206"
+    "credit identity follows current canonical organization"
   );
-  issuer.creditsMode = "ok";
+  issuer.organizations[0] = alphaOrganizations;
 
+  const deniedBefore = issuer.creditsCalls;
   for (const [token, id] of [
     [alpha, betaRow.organization_id],
     [beta, alphaRow.organization_id],
@@ -941,7 +1032,7 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
       "Unknown and invisible organizations must share the forbidden result"
     );
   }
-  issuer.credits[0] = [];
+  issuer.organizations[0] = [];
   safe(
     await request(port, url(alphaRow.organization_id), {
       headers: auth(alpha),
@@ -949,121 +1040,87 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
     403,
     "removed membership is not recovered from cookies or a cached organization"
   );
-  issuer.credits[0] = alphaRows;
+  issuer.organizations[0] = alphaOrganizations;
+  check(
+    issuer.creditsCalls === deniedBefore,
+    "Denied canonical membership reached Platform billing"
+  );
 
-  // Expected gate decisions are explicit fixtures, independent of the server's
-  // gate implementation. No provider, clock freshness rule, or billing write
-  // supplies these results; the intentionally old timestamp remains valid.
+  // Platform owns gate policy. These explicit projections prove native parity,
+  // including unknown balances, without reimplementing policy in the fixture.
   const cases = [
     {
       label: "missing account",
-      raw: {
+      projection: {
         account_present: false,
-        credits_provisioned: false,
-        cached_balance_cents: null,
-        cached_balance_at: null,
-        customer_entitled: null,
+        state: "not_provisioned",
+        balance_cents: null,
+        cache_updated_at: null,
+        billing_gate: { allowed: false, reason: "not_provisioned" },
       },
-      state: "not_provisioned",
-      balance: null,
-      at: null,
-      allowed: false,
-      reason: "not_provisioned",
     },
     {
       label: "account without linked credits customer",
-      raw: {
-        credits_provisioned: false,
-        cached_balance_cents: 0,
-        cached_balance_at: null,
-        customer_entitled: false,
+      projection: {
+        state: "not_provisioned",
+        balance_cents: null,
+        cache_updated_at: null,
+        billing_gate: { allowed: false, reason: "not_provisioned" },
       },
-      state: "not_provisioned",
-      balance: null,
-      at: null,
-      allowed: false,
-      reason: "not_provisioned",
     },
     {
       label: "unobserved cache is not a displayed zero",
-      raw: {
-        cached_balance_cents: 0,
-        cached_balance_at: null,
-        customer_entitled: false,
+      projection: {
+        state: "uncached",
+        balance_cents: null,
+        cache_updated_at: null,
+        billing_gate: { allowed: false, reason: "below_floor" },
       },
-      state: "uncached",
-      balance: null,
-      at: null,
-      allowed: false,
-      reason: "below_floor",
     },
     {
-      label: "unobserved cache does not introduce a new freshness gate",
-      raw: { cached_balance_cents: 25, cached_balance_at: null },
-      state: "uncached",
-      balance: null,
-      at: null,
-      allowed: true,
-      reason: null,
+      label: "unobserved balance preserves Platform's allowed gate",
+      projection: {
+        state: "uncached",
+        balance_cents: null,
+        cache_updated_at: null,
+      },
     },
     {
       label: "observed zero balance",
-      raw: { cached_balance_cents: 0 },
-      state: "cached",
-      balance: 0,
-      at: alphaRow.cached_balance_at,
-      allowed: false,
-      reason: "below_floor",
+      projection: {
+        balance_cents: 0,
+        billing_gate: { allowed: false, reason: "below_floor" },
+      },
     },
     {
       label: "negative cached balance remains a valid estimate",
-      raw: { cached_balance_cents: -25 },
-      state: "cached",
-      balance: -25,
-      at: alphaRow.cached_balance_at,
-      allowed: false,
-      reason: "below_floor",
+      projection: {
+        balance_cents: -25,
+        billing_gate: { allowed: false, reason: "below_floor" },
+      },
     },
     {
       label: "positive balance below the existing floor",
-      raw: { cached_balance_cents: 24 },
-      state: "cached",
-      balance: 24,
-      at: alphaRow.cached_balance_at,
-      allowed: false,
-      reason: "below_floor",
+      projection: {
+        balance_cents: 24,
+        billing_gate: { allowed: false, reason: "below_floor" },
+      },
     },
     {
       label: "eligible balance with a denied customer gate",
-      raw: { cached_balance_cents: 25, customer_entitled: false },
-      state: "cached",
-      balance: 25,
-      at: alphaRow.cached_balance_at,
-      allowed: false,
-      reason: "no_balance",
+      projection: { billing_gate: { allowed: false, reason: "no_balance" } },
     },
   ];
   for (const fixture of cases) {
-    const row = { ...alphaRow, ...fixture.raw };
+    const row = { ...alphaRow, ...fixture.projection };
     issuer.credits[0] = [row];
-    await read(
-      alpha,
-      row,
-      expected(
-        row,
-        fixture.state,
-        fixture.balance,
-        fixture.at,
-        fixture.allowed,
-        fixture.reason
-      ),
-      fixture.label
-    );
+    await read(alpha, row, fixture.label);
   }
   issuer.credits[0] = alphaRows;
 
   let beforeAuth = issuer.calls;
   let beforeData = issuer.databaseCalls;
+  let beforeCredits = issuer.creditsCalls;
   for (const headers of [
     {},
     { cookie: "sb-session=synthetic-web-cookie" },
@@ -1077,7 +1134,9 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
     );
   }
   check(
-    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    issuer.calls === beforeAuth &&
+      issuer.databaseCalls === beforeData &&
+      issuer.creditsCalls === beforeCredits,
     "Invalid credits credential reached issuer/database"
   );
   issuer.mode = "revoked";
@@ -1087,7 +1146,8 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
     "credits require a live account session"
   );
   check(
-    issuer.databaseCalls === beforeData,
+    issuer.databaseCalls === beforeData &&
+      issuer.creditsCalls === beforeCredits,
     "Revoked account reached cached credit data"
   );
   issuer.mode = "ok";
@@ -1136,7 +1196,9 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
     false
   );
   check(
-    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    issuer.calls === beforeAuth &&
+      issuer.databaseCalls === beforeData &&
+      issuer.creditsCalls === beforeCredits,
     "Rejected credits input reached issuer/database"
   );
   safe(
@@ -1154,6 +1216,7 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
 
   beforeAuth = issuer.calls;
   beforeData = issuer.databaseCalls;
+  beforeCredits = issuer.creditsCalls;
   for (const target of [endpoint, url(1)]) {
     const response = await request(port, target, { method: "OPTIONS" });
     safe(response, 204, "credits OPTIONS", false);
@@ -1175,7 +1238,9 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
     );
   }
   check(
-    issuer.calls === beforeAuth && issuer.databaseCalls === beforeData,
+    issuer.calls === beforeAuth &&
+      issuer.databaseCalls === beforeData &&
+      issuer.creditsCalls === beforeCredits,
     "Credits method policy reached issuer/database"
   );
 
@@ -1193,48 +1258,86 @@ async function creditsAssertions(port, issuer, safe, alpha, beta) {
     ["empty-nonzero-count", 503],
     ["duplicate", 503],
     ["wrong-org", 503],
+    ["invalid-slug", 503],
+    ["invalid-display-name", 503],
+  ]) {
+    issuer.creditsMembershipMode = mode;
+    beforeCredits = issuer.creditsCalls;
+    const body = safe(
+      await request(port, url(1), { headers: auth(alpha) }),
+      status,
+      `credits canonical membership ${mode}`
+    );
+    check(
+      body.error &&
+        !Object.hasOwn(body, "balance_cents") &&
+        !Object.hasOwn(body, "account_present") &&
+        issuer.creditsCalls === beforeCredits,
+      "Invalid canonical membership reached billing or became a balance snapshot"
+    );
+  }
+  issuer.creditsMembershipMode = "ok";
+  for (const [mode, status] of [
+    ["unauthorized", 401],
+    ["forbidden", 403],
+    ["not-found", 403],
+    ["membership-revoked", 403],
+    ["unavailable", 503],
+    ["redirect", 503],
+    ["partial", 503],
+    ["malformed", 503],
+    ["content-type", 503],
+    ["oversized", 503],
+    ["array", 503],
+    ["wrong-org", 503],
   ]) {
     issuer.creditsMode = mode;
     const body = safe(
       await request(port, url(1), { headers: auth(alpha) }),
       status,
-      `credits database ${mode}`
+      `credits Platform ${mode}`
     );
     check(
       body.error &&
         !Object.hasOwn(body, "balance_cents") &&
         !Object.hasOwn(body, "account_present"),
-      "Credits failure became an empty or zero balance snapshot"
+      "Platform failure became an empty or zero balance snapshot"
     );
   }
   issuer.creditsMode = "ok";
-  for (const raw of [
-    { cached_balance_cents: 1.5 },
-    { cached_balance_cents: Number.MAX_SAFE_INTEGER + 1 },
-    { cached_balance_cents: null },
-    { cached_balance_at: "not-a-time" },
-    { organization_display_name: null },
-    { organization_name: "Invalid Slug" },
+  for (const projection of [
+    { balance_cents: 1.5 },
+    { balance_cents: Number.MAX_SAFE_INTEGER + 1 },
+    { balance_cents: null },
+    { cache_updated_at: "not-a-time" },
     { account_present: false },
-    { credits_provisioned: "true" },
-    { customer_entitled: null },
+    { account_present: "true" },
+    { state: "unknown" },
+    { state: "uncached" },
+    { state: "not_provisioned" },
+    { source: "provider" },
+    { currency: "EUR" },
+    { billing_gate: { allowed: "true", reason: null } },
+    { billing_gate: { allowed: true, reason: "below_floor" } },
+    { billing_gate: { allowed: false, reason: null } },
+    { billing_gate: { allowed: false, reason: "unknown" } },
   ]) {
-    issuer.credits[0] = [{ ...alphaRow, ...raw }];
+    issuer.credits[0] = [{ ...alphaRow, ...projection }];
     const body = safe(
       await request(port, url(1), { headers: auth(alpha) }),
       503,
-      "malformed credit row rejected"
+      "malformed Platform credit projection rejected"
     );
     check(
-      body.error?.code === "auth_unavailable",
-      "Malformed credits row leaked an unexpected error contract"
+      body.error?.code === "auth_unavailable" &&
+        !Object.hasOwn(body, "balance_cents"),
+      "Malformed projection leaked diagnostics or a fallback balance"
     );
   }
   issuer.credits[0] = alphaRows;
   await read(
     alpha,
     alphaRow,
-    expected(alphaRow, "cached", 25, alphaRow.cached_balance_at, true, null),
     "credits recover after upstream errors without a fallback snapshot"
   );
 }
@@ -2279,6 +2382,70 @@ async function assertions(
   return count;
 }
 
+/** Fresh loopback TLS authority, scoped to the proof children and removed on cleanup. */
+async function platformTLS(workspace, home) {
+  const key = path.join(workspace, "platform-key.pem");
+  const cert = path.join(workspace, "platform-cert.pem");
+  const config = path.join(workspace, "platform-tls.conf");
+  await put(
+    config,
+    `[req]
+distinguished_name = subject
+prompt = no
+x509_extensions = extensions
+[subject]
+CN = 127.0.0.1
+[extensions]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,digitalSignature,keyEncipherment,keyCertSign
+extendedKeyUsage = serverAuth
+subjectAltName = IP:127.0.0.1
+`
+  );
+  const child = spawn(
+    "openssl",
+    [
+      "req",
+      "-x509",
+      "-newkey",
+      "rsa:2048",
+      "-sha256",
+      "-nodes",
+      "-days",
+      "1",
+      "-config",
+      config,
+      "-keyout",
+      key,
+      "-out",
+      cert,
+    ],
+    {
+      env: { PATH: "/usr/bin:/bin", HOME: home, LANG: "C" },
+      stdio: "ignore",
+    }
+  );
+  const code = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("Loopback TLS generation deadline exceeded"));
+    }, 15_000);
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+  check(
+    code === 0,
+    "OpenSSL failed to generate the synthetic loopback TLS authority"
+  );
+  return { key: await readFile(key), cert: await readFile(cert), caFile: cert };
+}
+
 async function main() {
   check(process.argv.length === 2, "Usage: node scripts/api-local/proof.mjs");
   check(
@@ -2296,6 +2463,7 @@ async function main() {
   const issuer = issuerFixture();
   const reservation = createServer();
   let active;
+  let platformServer;
   let interrupted = false;
   const interrupt = () => {
     if (interrupted) return;
@@ -2337,6 +2505,14 @@ async function main() {
       issuerPort !== dataPort,
       "Auth and Data fixtures must be independent"
     );
+    const tls = await platformTLS(workspace, home);
+    platformServer = createHttpsServer(tls, issuer.platformHandler);
+    const platformPort = await listen(platformServer);
+    issuer.platformOrigin = `https://127.0.0.1:${platformPort}`;
+    check(
+      platformPort !== issuerPort && platformPort !== dataPort,
+      "Platform, Auth and Data fixtures must have separate listeners"
+    );
     const port = await listen(reservation);
     await close(reservation);
     const apiOrigin = `http://127.0.0.1:${port}`;
@@ -2361,7 +2537,11 @@ async function main() {
       GRIDA_API_ORIGIN: apiOrigin,
       GRIDA_API_MAINTENANCE: "0",
       GG_TOKEN_SECRET: signingSecret,
-      GRIDA_API_TEST_PORTS: `${port},${issuerPort},${dataPort}`,
+      GRIDA_PLATFORM_BILLING_ORIGIN: issuer.platformOrigin,
+      GRIDA_PLATFORM_SSR_KEY_ID: issuer.workload.id,
+      GRIDA_PLATFORM_SSR_TOKEN: issuer.workload.token,
+      NODE_EXTRA_CA_CERTS: tls.caFile,
+      GRIDA_API_TEST_PORTS: `${port},${issuerPort},${dataPort},${platformPort}`,
       GRIDA_API_TEST_TRIPWIRE: tripwire,
       GRIDA_API_TEST_MEDIA: mediaTripwire,
       NODE_OPTIONS: `--require=${JSON.stringify(path.join(scripts, "network.cjs"))}`,
@@ -2390,6 +2570,9 @@ async function main() {
       "invalid-config",
       "gg-unconfigured",
       "gg-short-secret",
+      "platform-unconfigured",
+      "platform-short-token",
+      "platform-http-origin",
     ]) {
       check(!interrupted, "API proof interrupted");
       phase = `production HTTP ${mode}`;
@@ -2405,6 +2588,22 @@ async function main() {
             : {}),
           ...(mode === "gg-unconfigured" ? { GG_TOKEN_SECRET: "" } : {}),
           ...(mode === "gg-short-secret" ? { GG_TOKEN_SECRET: "short" } : {}),
+          ...(mode === "platform-unconfigured"
+            ? {
+                GRIDA_PLATFORM_BILLING_ORIGIN: "",
+                GRIDA_PLATFORM_SSR_KEY_ID: "",
+                GRIDA_PLATFORM_SSR_TOKEN: "",
+              }
+            : {}),
+          ...(mode === "platform-short-token"
+            ? { GRIDA_PLATFORM_SSR_TOKEN: "short" }
+            : {}),
+          ...(mode === "platform-http-origin"
+            ? {
+                GRIDA_PLATFORM_BILLING_ORIGIN: `http://127.0.0.1:${platformPort}`,
+                GRIDA_PLATFORM_ALLOW_LOCAL: "1",
+              }
+            : {}),
         }
       );
       await ready(active, port);
@@ -2416,7 +2615,37 @@ async function main() {
           signingSecret,
           mediaTripwire
         );
-      else if (mode.startsWith("gg-")) {
+      else if (mode.startsWith("platform-")) {
+        const token = issuer.token(0);
+        const beforeCredits = issuer.creditsCalls;
+        for (const [endpoint, status] of [
+          ["/api/v1/auth/me", 200],
+          ["/api/v1/account/organizations", 200],
+          ["/api/v1/account/credits?organization_id=1", 503],
+        ]) {
+          const response = await request(port, endpoint, {
+            headers: { authorization: `Bearer ${token}` },
+          });
+          const body = JSON.parse(response.body);
+          check(
+            response.status === status &&
+              response.headers["content-type"]?.includes("application/json") &&
+              response.headers["cache-control"]?.includes("no-store") &&
+              !response.headers["set-cookie"] &&
+              !response.headers.location &&
+              (status !== 503 ||
+                (body.error?.code === "auth_unavailable" &&
+                  !Object.hasOwn(body, "balance_cents"))),
+            `${mode} must preserve identity/listing and fail credit display closed`
+          );
+          report.cases++;
+        }
+        check(
+          issuer.creditsCalls === beforeCredits &&
+            (await readFile(tripwire, "utf8")) === "",
+          `${mode} reached Platform or web side effects`
+        );
+      } else if (mode.startsWith("gg-")) {
         for (const [endpoint, options] of [
           [
             "/api/v1/auth/gg",
@@ -2501,8 +2730,8 @@ async function main() {
       active = undefined;
     }
     check(
-      issuer.wrongServiceCalls === 0,
-      "Auth and Data API destinations crossed"
+      issuer.wrongServiceCalls === 0 && issuer.platformAuthorityErrors === 0,
+      "Auth, Data or Platform destinations or authorities crossed"
     );
     passed = true;
   } finally {
@@ -2513,6 +2742,7 @@ async function main() {
         : Promise.resolve(),
       close(issuer.authServer),
       close(issuer.dataServer),
+      platformServer ? close(platformServer) : Promise.resolve(),
       close(reservation),
     ]);
     try {

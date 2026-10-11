@@ -8,6 +8,7 @@
  * module load of the seam.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ProductBilling } from "@/lib/platform/product-billing";
 
 // Rate limits are pinned by their own module; route tests must NEVER
 // reach the real Upstash instance (vitest loads .env.local).
@@ -18,15 +19,14 @@ vi.mock("@/lib/ai/openai-compat/limits", () => ({
 import type { LanguageModelV3, LanguageModelV3Usage } from "@ai-sdk/provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
-const h = vi.hoisted(() => ({ calls: 0 }));
+const h = vi.hoisted(() => ({
+  calls: 0,
+  begin: vi.fn<ProductBilling["begin"]>(),
+  complete: vi.fn<ProductBilling["complete"]>(),
+}));
 
-vi.mock("@/lib/billing/metronome", () => ({
-  getEntitlement: vi.fn<(...args: never[]) => unknown>(),
-  ingestUsageEvent: vi.fn<(...args: never[]) => unknown>(),
-  refreshBalance: vi.fn<(...args: never[]) => unknown>(),
-  BillingMetronomeError: class BillingMetronomeError extends Error {
-    code = "internal";
-  },
+vi.mock("@/lib/platform/product-consumer", () => ({
+  platformProductBilling: () => h,
 }));
 vi.mock("@/lib/supabase/server", () => ({
   createLibraryClient: vi.fn<(...args: never[]) => unknown>(),
@@ -82,7 +82,6 @@ vi.mock("@/lib/ai/models", async (orig) => {
 });
 
 import { POST } from "./route";
-import { getEntitlement, ingestUsageEvent } from "@/lib/billing/metronome";
 import { signGgToken } from "@/lib/auth/gg-token";
 
 const SECRET = "byok-secret-0123456789abcdef0123456789abcdef00";
@@ -102,8 +101,8 @@ function clientModel(token: string): LanguageModelV3 {
 beforeEach(() => {
   process.env.GG_TOKEN_SECRET = SECRET;
   h.calls = 0;
-  vi.mocked(getEntitlement).mockReset();
-  vi.mocked(ingestUsageEvent).mockReset();
+  h.begin.mockReset();
+  h.complete.mockReset();
 });
 
 describe("BYOK carve-out on /api/v1/ai/chat/completions", () => {
@@ -116,8 +115,8 @@ describe("BYOK carve-out on /api/v1/ai/chat/completions", () => {
       expect.objectContaining({ type: "text", text: "byok reply" }),
     ]);
     expect(h.calls).toBe(1);
-    expect(getEntitlement).not.toHaveBeenCalled();
-    expect(ingestUsageEvent).not.toHaveBeenCalled();
+    expect(h.begin).not.toHaveBeenCalled();
+    expect(h.complete).not.toHaveBeenCalled();
   });
 
   it("still rejects a missing token with 401", async () => {

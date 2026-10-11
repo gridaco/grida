@@ -63,7 +63,6 @@ const resolved = {
 };
 let transport: ReturnType<typeof vi.fn<typeof fetch>>;
 beforeEach(() => {
-  vi.stubEnv("GRIDA_BILLING_OWNER", "infra");
   vi.stubEnv("GRIDA_PLATFORM_BILLING_ORIGIN", "https://platform.example.test");
   vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", consoleOrigin);
   vi.stubEnv("GRIDA_OAUTH_ORIGIN", source);

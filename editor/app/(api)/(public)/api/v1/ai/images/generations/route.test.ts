@@ -8,6 +8,7 @@
  * protocol shape, and NO library upload (the daemon owns persistence).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ProductBilling } from "@/lib/platform/product-billing";
 
 // Rate limits are pinned by their own module; route tests must NEVER
 // reach the real Upstash instance (vitest loads .env.local).
@@ -16,24 +17,16 @@ vi.mock("@/lib/ai/openai-compat/limits", () => ({
 }));
 
 const h = vi.hoisted(() => ({
+  begin: vi.fn<ProductBilling["begin"]>(),
+  complete: vi.fn<ProductBilling["complete"]>(),
+  entitlement: vi.fn<ProductBilling["entitlement"]>(),
   imageCalls: 0,
   lastOptions: null as unknown,
   reportedCost: undefined as unknown,
 }));
 
-vi.mock("@/lib/billing/metronome", () => ({
-  getEntitlement: vi.fn<(...args: never[]) => unknown>(),
-  ingestUsageEvent: vi.fn<(...args: never[]) => unknown>(),
-  refreshBalance: vi.fn<(...args: never[]) => unknown>(),
-  BillingMetronomeError: class BillingMetronomeError extends Error {
-    code: string;
-    status: number;
-    constructor(message: string, code: string, status = 500) {
-      super(message);
-      this.code = code;
-      this.status = status;
-    }
-  },
+vi.mock("@/lib/platform/product-consumer", () => ({
+  platformProductBilling: () => h,
 }));
 vi.mock("@/lib/supabase/server", () => ({
   service_role: {
@@ -115,13 +108,13 @@ vi.mock("@/lib/ai/models", async (orig) => {
 });
 
 import { POST } from "./route";
-import { getEntitlement, ingestUsageEvent } from "@/lib/billing/metronome";
+import { ProductBillingError } from "@/lib/platform/product-billing";
 import { signGgToken } from "@/lib/auth/gg-token";
 import { computeImageCostMills } from "@/lib/ai/image-cost";
 import ai from "@/lib/ai";
 
-const mockedGetEntitlement = vi.mocked(getEntitlement);
-const mockedIngest = vi.mocked(ingestUsageEvent);
+const mockedAdmission = h.begin;
+const mockedCompletion = h.complete;
 
 const SECRET = "images-secret-0123456789abcdef0123456789abcdef";
 
@@ -148,14 +141,34 @@ beforeEach(() => {
   h.lastOptions = null;
   h.reportedCost = undefined;
   vi.mocked(ai.image.binding).mockReset();
-  mockedGetEntitlement.mockReset();
-  mockedIngest.mockReset();
-  mockedGetEntitlement.mockResolvedValue({
-    allowed: true,
-    cachedBalanceCents: 500,
-    cachedAt: null,
-  } as never);
-  mockedIngest.mockResolvedValue({ transactionId: "tx" } as never);
+  mockedAdmission.mockReset();
+  mockedCompletion.mockReset();
+  mockedAdmission.mockImplementation(async (context) => ({
+    id: "route-execution",
+    claim: {
+      organization_id: String(context.organizationId),
+      product: "grida-ai",
+      operation: context.feature,
+      model: context.model_id,
+      unit: "cost_mills",
+      policy_version: "legacy-ai-v1",
+      request_digest: context.requestDigest,
+      admission_observed_at: "2026-10-06T00:00:00Z",
+      admission_expires_at: "2026-10-06T00:01:00Z",
+    },
+  }));
+  mockedCompletion.mockImplementation(async ({ claim }, quantity) => ({
+    organization_id: claim.organization_id,
+    product: claim.product,
+    operation: claim.operation,
+    model: claim.model,
+    unit: claim.unit,
+    policy_version: claim.policy_version,
+    outcome: "succeeded",
+    quantity: String(quantity),
+    occurred_at: "2026-10-06T00:00:01Z",
+    evidence_digest: "b".repeat(64),
+  }));
 });
 
 describe("POST /api/v1/ai/images/generations", () => {
@@ -178,8 +191,8 @@ describe("POST /api/v1/ai/images/generations", () => {
         )
       );
       expect(res.status).toBe(200);
-      expect(mockedIngest).toHaveBeenCalledTimes(1);
-      expect(mockedIngest.mock.calls[0]![1]).toBe(Number(cost) * 1000);
+      expect(mockedCompletion).toHaveBeenCalledTimes(1);
+      expect(mockedCompletion.mock.calls[0]![1]).toBe(Number(cost) * 1000);
     }
   );
 
@@ -192,7 +205,7 @@ describe("POST /api/v1/ai/images/generations", () => {
         request({ model_id: CARD.id, prompt: "x" }, token)
       );
       expect(res.status).toBe(200);
-      expect(mockedIngest.mock.calls[0]![1]).toBe(
+      expect(mockedCompletion.mock.calls[0]![1]).toBe(
         computeImageCostMills(CARD, {})
       );
     }
@@ -215,12 +228,14 @@ describe("POST /api/v1/ai/images/generations", () => {
     expect(body.images[0]!.base64).toBe(PNG_B64);
     expect(body.images[0]!.media_type).toContain("image/");
 
-    expect(mockedGetEntitlement).toHaveBeenCalledWith(7);
+    expect(mockedAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 7 })
+    );
     const expected = computeImageCostMills(CARD, { n: 2 });
     // n=2 with maxImagesPerCall=4 → one SDK call, one middleware pass.
-    expect(mockedIngest).toHaveBeenCalledTimes(1);
-    expect(mockedIngest.mock.calls[0]![0]).toBe(7);
-    expect(mockedIngest.mock.calls[0]![1]).toBe(expected);
+    expect(mockedCompletion).toHaveBeenCalledTimes(1);
+    expect(mockedCompletion.mock.calls[0]![0].claim.organization_id).toBe("7");
+    expect(mockedCompletion.mock.calls[0]![1]).toBe(expected);
   });
 
   it.each(["high", "auto"])(
@@ -255,8 +270,8 @@ describe("POST /api/v1/ai/images/generations", () => {
       expect(res.status).toBe(400);
       expect((await res.json()).error.code).toBe("invalid_request_error");
       expect(h.imageCalls).toBe(0);
-      expect(mockedGetEntitlement).not.toHaveBeenCalled();
-      expect(mockedIngest).not.toHaveBeenCalled();
+      expect(mockedAdmission).not.toHaveBeenCalled();
+      expect(mockedCompletion).not.toHaveBeenCalled();
     }
   );
 
@@ -269,8 +284,8 @@ describe("POST /api/v1/ai/images/generations", () => {
       );
       expect(res.status).toBe(400);
       expect(h.imageCalls).toBe(0);
-      expect(mockedGetEntitlement).not.toHaveBeenCalled();
-      expect(mockedIngest).not.toHaveBeenCalled();
+      expect(mockedAdmission).not.toHaveBeenCalled();
+      expect(mockedCompletion).not.toHaveBeenCalled();
     }
   );
 
@@ -334,9 +349,11 @@ describe("POST /api/v1/ai/images/generations", () => {
         media_type: "image/png",
       });
       expect(h.imageCalls).toBe(1);
-      expect(mockedGetEntitlement).toHaveBeenCalledWith(7);
+      expect(mockedAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: 7 })
+      );
       const card = ai.image.findImageModelCard(modelId)!;
-      expect(mockedIngest.mock.calls[0]![1]).toBe(
+      expect(mockedCompletion.mock.calls[0]![1]).toBe(
         computeImageCostMills(card, {})
       );
       const opts = h.lastOptions as {
@@ -359,7 +376,7 @@ describe("POST /api/v1/ai/images/generations", () => {
     );
     expect(res.status).toBe(404);
     expect(h.imageCalls).toBe(0);
-    expect(mockedGetEntitlement).not.toHaveBeenCalled();
+    expect(mockedAdmission).not.toHaveBeenCalled();
   });
 
   it.each(["auto", "low", "medium", "high", "xhigh", "max"])(
@@ -393,8 +410,8 @@ describe("POST /api/v1/ai/images/generations", () => {
     );
     expect(res.status).toBe(400);
     expect(h.imageCalls).toBe(0);
-    expect(mockedGetEntitlement).not.toHaveBeenCalled();
-    expect(mockedIngest).not.toHaveBeenCalled();
+    expect(mockedAdmission).not.toHaveBeenCalled();
+    expect(mockedCompletion).not.toHaveBeenCalled();
   });
 
   it("refuses a model without a Vercel AI Gateway binding before billing", async () => {
@@ -403,21 +420,16 @@ describe("POST /api/v1/ai/images/generations", () => {
     const res = await POST(request({ model_id: CARD.id, prompt: "x" }, token));
     expect(res.status).toBe(404);
     expect(h.imageCalls).toBe(0);
-    expect(mockedGetEntitlement).not.toHaveBeenCalled();
-    expect(mockedIngest).not.toHaveBeenCalled();
+    expect(mockedAdmission).not.toHaveBeenCalled();
+    expect(mockedCompletion).not.toHaveBeenCalled();
   });
 
   it("402 for blocked orgs, before the provider call", async () => {
-    mockedGetEntitlement.mockResolvedValue({
-      allowed: false,
-      reason: "no_balance",
-      cachedBalanceCents: 0,
-      cachedAt: null,
-    } as never);
+    mockedAdmission.mockRejectedValue(new ProductBillingError("blocked"));
     const { token } = await signGgToken("user-1", 7);
     const res = await POST(request({ model_id: CARD.id, prompt: "x" }, token));
     expect(res.status).toBe(402);
     expect(h.imageCalls).toBe(0);
-    expect(mockedIngest).not.toHaveBeenCalled();
+    expect(mockedCompletion).not.toHaveBeenCalled();
   });
 });

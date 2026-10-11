@@ -5,9 +5,6 @@ import { nativeApi } from "./native";
 import { account } from "../account/account";
 import { accountData } from "../supabase/account-data";
 // GRIDA-EE: billing — host composition; account/identity owners remain independent.
-import { credits } from "../billing/credits";
-import { creditsData } from "../supabase/credits-data";
-import { billingOwner } from "../platform/billing-consumer";
 import { nativeCredits } from "../platform/native-credits";
 
 export namespace accountApi {
@@ -36,18 +33,7 @@ export namespace accountApi {
             accountData.forBearer(authorization, config, fetcher),
             input
           );
-        try {
-          if (billingOwner() === "infra")
-            return await nativeCredits(authorization, config, input!, fetcher);
-          return await credits.read(
-            creditsData.forBearer(authorization, config, fetcher),
-            input!
-          );
-        } catch (error) {
-          if (error instanceof credits.NotFound)
-            throw new oauthServer.Failure("forbidden");
-          throw error;
-        }
+        return await nativeCredits(authorization, config, input!, fetcher);
       }
     );
   }

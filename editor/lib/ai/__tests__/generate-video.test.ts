@@ -10,27 +10,18 @@
  * card so price updates don't rot the test.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SourceWorkRPC } from "@/lib/platform/source-work";
+import { ProductBillingError } from "@/lib/platform/product-billing";
 import { catalog as ai_models } from "@grida/ai-models/grida";
 
-const sourceRpc = vi.hoisted(() => vi.fn<SourceWorkRPC>());
-
-vi.mock("@/lib/billing/metronome", () => ({
-  getEntitlement: vi.fn<(...args: never[]) => unknown>(),
-  ingestUsageEvent: vi.fn<(...args: never[]) => unknown>(),
-  refreshBalance: vi.fn<(...args: never[]) => unknown>(),
-  BillingMetronomeError: class BillingMetronomeError extends Error {
-    code: string;
-    status: number;
-    constructor(message: string, code: string, status = 500) {
-      super(message);
-      this.code = code;
-      this.status = status;
-    }
-  },
+const billing = vi.hoisted(() => ({
+  entitlement: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  begin: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  complete: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+}));
+vi.mock("@/lib/platform/product-consumer", () => ({
+  platformProductBilling: () => billing,
 }));
 vi.mock("@/lib/supabase/server", () => ({
-  service_role: { workspace: { rpc: sourceRpc } },
   createLibraryClient: vi.fn<(...args: never[]) => unknown>(),
 }));
 vi.mock("@/lib/auth/organization", () => ({
@@ -42,13 +33,12 @@ vi.mock("ai", async (orig) => ({
 }));
 
 import { experimental_generateVideo } from "ai";
-import { getEntitlement, ingestUsageEvent } from "@/lib/billing/metronome";
 import { methods, InvalidAiRequestError } from "../server";
 import ai from "@/lib/ai";
 
 const mockedGenerate = vi.mocked(experimental_generateVideo);
-const mockedGetEntitlement = vi.mocked(getEntitlement);
-const mockedIngest = vi.mocked(ingestUsageEvent);
+const mockedGetEntitlement = billing.entitlement;
+const mockedCompletion = billing.complete;
 
 const MODEL_ID = "google/veo-3.1";
 const CARD = ai_models.video.models[MODEL_ID]!;
@@ -67,31 +57,28 @@ function stubGeneration() {
 }
 
 beforeEach(() => {
-  sourceRpc.mockReset();
-  sourceRpc.mockImplementation(async (name, args) => {
-    if (name === "platform_source_work_begin")
-      return { data: { created: true, id: args.work_id }, error: null };
-    if (
-      name === "platform_source_work_capture" ||
-      name === "platform_source_work_finish"
-    )
-      return { data: { accepted: true }, error: null };
-    throw new Error("Unexpected source RPC: " + name);
+  billing.begin.mockReset();
+  billing.begin.mockImplementation(async (context) => {
+    const decision = (await billing.entitlement(
+      (context as { organizationId: number }).organizationId
+    )) as { allowed: boolean };
+    if (!decision.allowed) throw new ProductBillingError("blocked");
+    return { id: "execution-synthetic", claim: {} };
   });
   mockedGenerate.mockReset();
   mockedGetEntitlement.mockReset();
-  mockedIngest.mockReset();
+  mockedCompletion.mockReset();
   mockedGetEntitlement.mockResolvedValue({
     allowed: true,
     cachedBalanceCents: 500,
     cachedAt: null,
   } as never);
-  mockedIngest.mockResolvedValue({ transactionId: "tx" } as never);
+  mockedCompletion.mockResolvedValue(undefined);
   stubGeneration();
 });
 
 describe("methods.generateVideo", () => {
-  it("happy path: gates, generates via the Vercel AI Gateway binding, ingests rate×duration", async () => {
+  it("happy path: gates, generates via the Vercel AI Gateway binding, records completion for rate×duration", async () => {
     const duration = CARD.default.duration;
     const result = await methods.generateVideo(ORG, {
       model_id: MODEL_ID,
@@ -109,33 +96,27 @@ describe("methods.generateVideo", () => {
     const rate =
       BINDING.pricing.usd_per_second[CARD.default.resolution]![mode]!;
     const expectedMills = ai.toMills(rate * duration);
-    expect(mockedIngest).toHaveBeenCalledTimes(1);
-    expect(mockedIngest.mock.calls[0]![0]).toBe(ORG);
-    expect(mockedIngest.mock.calls[0]![1]).toBe(expectedMills);
-    expect(sourceRpc.mock.calls.map(([name]) => name)).toEqual([
-      "platform_source_work_begin",
-      "platform_source_work_capture",
-      "platform_source_work_finish",
-    ]);
-    const [begin, capture, finish] = sourceRpc.mock.calls;
-    expect(begin![1]).toMatchObject({
-      work_kind: "legacy_ai",
-      request: { organization_id: String(ORG), product: "grida-ai" },
+    expect(mockedCompletion).toHaveBeenCalledTimes(1);
+    expect(mockedCompletion.mock.calls[0]![0]).toEqual({
+      id: "execution-synthetic",
+      claim: {},
     });
-    expect(capture![1]).toMatchObject({
-      work_id: begin![1].work_id,
-      evidence: { quantity: String(expectedMills), outcome: "succeeded" },
-    });
-    expect(finish![1]).toEqual({ work_id: begin![1].work_id });
-    expect(sourceRpc.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mockedCompletion.mock.calls[0]![1]).toBe(expectedMills);
+    expect(billing.begin).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        organizationId: ORG,
+        requestDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      })
+    );
+    expect(billing.begin.mock.invocationCallOrder[0]).toBeLessThan(
       mockedGenerate.mock.invocationCallOrder[0]!
     );
-    expect(sourceRpc.mock.invocationCallOrder[1]).toBeLessThan(
-      mockedIngest.mock.invocationCallOrder[0]!
+    expect(mockedGenerate.mock.invocationCallOrder[0]!).toBeLessThan(
+      mockedCompletion.mock.invocationCallOrder[0]
     );
-    expect(mockedIngest.mock.invocationCallOrder[0]).toBeLessThan(
-      sourceRpc.mock.invocationCallOrder[2]!
-    );
+    expect(mockedCompletion.mock.calls[0]![2]).toMatchObject({
+      costMills: expectedMills,
+    });
 
     const args = mockedGenerate.mock.calls[0]![0] as {
       prompt: unknown;
@@ -153,7 +134,7 @@ describe("methods.generateVideo", () => {
     });
     const mode = CARD.default.audio ? "audio" : "silent";
     const rate = BINDING.pricing.usd_per_second["720p"]![mode]!;
-    expect(mockedIngest.mock.calls[0]![1]).toBe(
+    expect(mockedCompletion.mock.calls[0]![1]).toBe(
       ai.toMills(rate * CARD.default.duration)
     );
   });
@@ -184,7 +165,7 @@ describe("methods.generateVideo", () => {
       })
     ).rejects.toBeInstanceOf(InvalidAiRequestError);
     expect(mockedGenerate).not.toHaveBeenCalled();
-    expect(mockedIngest).not.toHaveBeenCalled();
+    expect(mockedCompletion).not.toHaveBeenCalled();
   });
 
   it("rejects image-to-video (t2v-only v1 — no server-side URL fetch)", async () => {
@@ -198,17 +179,14 @@ describe("methods.generateVideo", () => {
     expect(mockedGenerate).not.toHaveBeenCalled();
   });
 
-  it("does not dispatch or ingest when durable admission fails", async () => {
-    sourceRpc.mockResolvedValueOnce({
-      data: null,
-      error: { code: "unavailable" },
-    });
+  it("does not dispatch or complete when durable admission fails", async () => {
+    billing.begin.mockRejectedValueOnce(new ProductBillingError());
     await expect(
       methods.generateVideo(ORG, { model_id: MODEL_ID, prompt: "x" })
     ).rejects.toMatchObject({ code: "billing_unavailable" });
-    expect(sourceRpc).toHaveBeenCalledTimes(1);
+    expect(billing.begin).toHaveBeenCalledTimes(1);
     expect(mockedGenerate).not.toHaveBeenCalled();
-    expect(mockedIngest).not.toHaveBeenCalled();
+    expect(mockedCompletion).not.toHaveBeenCalled();
   });
 
   it("blocked orgs never reach the provider", async () => {
@@ -221,7 +199,7 @@ describe("methods.generateVideo", () => {
     await expect(
       methods.generateVideo(ORG, { model_id: MODEL_ID, prompt: "x" })
     ).rejects.toMatchObject({ code: "blocked" });
-    expect(sourceRpc).not.toHaveBeenCalled();
+    expect(billing.complete).not.toHaveBeenCalled();
     expect(mockedGenerate).not.toHaveBeenCalled();
   });
 });

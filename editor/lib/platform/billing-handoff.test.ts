@@ -34,7 +34,6 @@ vi.mock("../supabase/server", () => ({
 import { billingHandoff, sourceBillingPath } from "./billing-handoff";
 const purchase = "11111111-1111-4111-8111-111111111111";
 beforeEach(() => {
-  vi.stubEnv("GRIDA_BILLING_OWNER", "infra");
   vi.stubEnv("GRIDA_OAUTH_ORIGIN", "https://grida.example.test");
   vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", "https://console.example.test");
   state.user = { id: "user-a" };

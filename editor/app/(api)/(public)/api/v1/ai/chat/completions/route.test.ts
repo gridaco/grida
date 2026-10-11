@@ -14,6 +14,7 @@
  * call.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ProductBilling } from "@/lib/platform/product-billing";
 
 // Rate limits are pinned by their own module; route tests must NEVER
 // reach the real Upstash instance (vitest loads .env.local).
@@ -31,24 +32,16 @@ import type {
 } from "@ai-sdk/provider";
 
 const h = vi.hoisted(() => ({
+  begin: vi.fn<ProductBilling["begin"]>(),
+  complete: vi.fn<ProductBilling["complete"]>(),
+  entitlement: vi.fn<ProductBilling["entitlement"]>(),
   generate: null as unknown,
   parts: [] as unknown[],
   lastCallOptions: null as unknown,
 }));
 
-vi.mock("@/lib/billing/metronome", () => ({
-  getEntitlement: vi.fn<(...args: never[]) => unknown>(),
-  ingestUsageEvent: vi.fn<(...args: never[]) => unknown>(),
-  refreshBalance: vi.fn<(...args: never[]) => unknown>(),
-  BillingMetronomeError: class BillingMetronomeError extends Error {
-    code: string;
-    status: number;
-    constructor(message: string, code: string, status = 500) {
-      super(message);
-      this.code = code;
-      this.status = status;
-    }
-  },
+vi.mock("@/lib/platform/product-consumer", () => ({
+  platformProductBilling: () => h,
 }));
 vi.mock("@/lib/supabase/server", () => ({
   service_role: {
@@ -114,12 +107,12 @@ vi.mock("@/lib/ai/models", async (orig) => {
 });
 
 import { POST } from "./route";
-import { getEntitlement, ingestUsageEvent } from "@/lib/billing/metronome";
+import { ProductBillingError } from "@/lib/platform/product-billing";
 import { costMillsFromTokenUsage } from "@/lib/ai/server";
 import { signGgToken, GG_TOKEN_AUDIENCE } from "@/lib/auth/gg-token";
 
-const mockedGetEntitlement = vi.mocked(getEntitlement);
-const mockedIngest = vi.mocked(ingestUsageEvent);
+const mockedAdmission = h.begin;
+const mockedCompletion = h.complete;
 
 const SECRET = "contract-secret-0123456789abcdef0123456789abcdef";
 const MODEL = "anthropic/claude-sonnet-5";
@@ -166,14 +159,34 @@ beforeEach(() => {
   h.generate = null;
   h.parts = [];
   h.lastCallOptions = null;
-  mockedGetEntitlement.mockReset();
-  mockedIngest.mockReset();
-  mockedGetEntitlement.mockResolvedValue({
-    allowed: true,
-    cachedBalanceCents: 500,
-    cachedAt: "2026-07-03T00:00:00Z",
-  } as never);
-  mockedIngest.mockResolvedValue({ transactionId: "tx" } as never);
+  mockedAdmission.mockReset();
+  mockedCompletion.mockReset();
+  mockedAdmission.mockImplementation(async (context) => ({
+    id: "route-execution",
+    claim: {
+      organization_id: String(context.organizationId),
+      product: "grida-ai",
+      operation: context.feature,
+      model: context.model_id,
+      unit: "cost_mills",
+      policy_version: "legacy-ai-v1",
+      request_digest: context.requestDigest,
+      admission_observed_at: "2026-10-06T00:00:00Z",
+      admission_expires_at: "2026-10-06T00:01:00Z",
+    },
+  }));
+  mockedCompletion.mockImplementation(async ({ claim }, quantity) => ({
+    organization_id: claim.organization_id,
+    product: claim.product,
+    operation: claim.operation,
+    model: claim.model,
+    unit: claim.unit,
+    policy_version: claim.policy_version,
+    outcome: "succeeded",
+    quantity: String(quantity),
+    occurred_at: "2026-10-06T00:00:01Z",
+    evidence_digest: "b".repeat(64),
+  }));
 });
 
 const PROMPT: LanguageModelV3CallOptions["prompt"] = [
@@ -230,11 +243,13 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
         .grida.organizationId
     ).toBe(ORG);
 
-    // REAL billing middleware ran: gate + catalog-consistent ingest.
-    expect(mockedGetEntitlement).toHaveBeenCalledWith(ORG);
-    expect(mockedIngest).toHaveBeenCalledTimes(1);
-    const [orgArg, millsArg] = mockedIngest.mock.calls[0]!;
-    expect(orgArg).toBe(ORG);
+    // REAL billing middleware ran: Platform admission + catalog-consistent completion.
+    expect(mockedAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORG })
+    );
+    expect(mockedCompletion).toHaveBeenCalledTimes(1);
+    const [execution, millsArg] = mockedCompletion.mock.calls[0]!;
+    expect(execution.claim.organization_id).toBe(String(ORG));
     expect(millsArg).toBeCloseTo(costMillsFromTokenUsage(MODEL, USAGE), 10);
   });
 
@@ -249,8 +264,10 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
 
     await model.doGenerate({ prompt: PROMPT });
 
-    expect(mockedIngest).toHaveBeenCalledTimes(1);
-    expect(mockedIngest.mock.calls[0]![0]).toBe(ORG);
+    expect(mockedCompletion).toHaveBeenCalledTimes(1);
+    expect(mockedCompletion.mock.calls[0]![0].claim.organization_id).toBe(
+      String(ORG)
+    );
     // Terra above 272K: all input buckets ×2, all output ×1.5. Kept as a
     // literal so it fails independently of the catalogue — the arithmetic
     // is spelled out so a rate change is greppable by rate, not just by
@@ -258,7 +275,7 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
     //   input  (200_001×2 + 70_000×0.2 + 2_000×2.5) × 2 = 838_004
     //   output (1_000×12) × 1.5                         =  18_000
     //   856_004 / 1e6 USD → 856.004 mills
-    expect(mockedIngest.mock.calls[0]![1]).toBeCloseTo(856.004, 10);
+    expect(mockedCompletion.mock.calls[0]![1]).toBeCloseTo(856.004, 10);
   });
 
   it("stream: tool-call arguments reassemble byte-for-byte; usage arrives; ingest fires", async () => {
@@ -320,21 +337,16 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
     expect(finish.usage.inputTokens.total).toBe(100);
     expect(finish.usage.outputTokens.total).toBe(20);
 
-    // Streaming ingest fires on flush (fire-and-forget) — allow a tick.
-    await vi.waitFor(() => expect(mockedIngest).toHaveBeenCalledTimes(1));
-    expect(mockedIngest.mock.calls[0]![1]).toBeCloseTo(
+    // Streaming completion commits usage custody on flush.
+    await vi.waitFor(() => expect(mockedCompletion).toHaveBeenCalledTimes(1));
+    expect(mockedCompletion.mock.calls[0]![1]).toBeCloseTo(
       costMillsFromTokenUsage(MODEL, USAGE),
       10
     );
   });
 
   it("402: a blocked org fails clean, pre-stream, with insufficient_credits", async () => {
-    mockedGetEntitlement.mockResolvedValue({
-      allowed: false,
-      reason: "below_floor",
-      cachedBalanceCents: 10,
-      cachedAt: null,
-    } as never);
+    mockedAdmission.mockRejectedValue(new ProductBillingError("blocked"));
     const model = clientModel(await mintedToken());
     await expect(model.doStream({ prompt: PROMPT })).rejects.toSatisfy(
       (err: unknown) => {
@@ -346,7 +358,7 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
       }
     );
     expect(h.lastCallOptions).toBeNull(); // upstream never opened
-    expect(mockedIngest).not.toHaveBeenCalled();
+    expect(mockedCompletion).not.toHaveBeenCalled();
   });
 
   it("401: garbage, expired, and Supabase-style tokens all fail", async () => {
@@ -382,7 +394,7 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
       .setExpirationTime("1h")
       .sign(key);
     await expectStatus(supabaseLike, "invalid_token");
-    expect(mockedGetEntitlement).not.toHaveBeenCalled();
+    expect(mockedAdmission).not.toHaveBeenCalled();
   });
 
   it("404: unlisted model fails before any provider or billing call", async () => {
@@ -397,7 +409,7 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
       }
     );
     expect(h.lastCallOptions).toBeNull();
-    expect(mockedGetEntitlement).not.toHaveBeenCalled();
+    expect(mockedAdmission).not.toHaveBeenCalled();
   });
 
   it("400: malformed body (raw request, empty messages)", async () => {

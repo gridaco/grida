@@ -37,7 +37,7 @@ const originalFetch = globalThis.fetch;
 globalThis.fetch = function (input, options) {
   const url = new URL(input instanceof Request ? input.url : input);
   if (
-    url.protocol !== "http:" ||
+    !["http:", "https:"].includes(url.protocol) ||
     url.username ||
     url.password ||
     !allowed(url.hostname, url.port)

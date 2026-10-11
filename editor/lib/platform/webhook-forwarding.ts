@@ -1,14 +1,11 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { verifyStripeWebhook } from "../billing";
+import { verifyStripeWebhook } from "../billing/stripe-webhook-signature";
 import { service_role } from "../supabase/server";
 import { configuredOrigin } from "./billing-consumer";
 
 type Provider = "stripe" | "metronome";
 export type WebhookRPC = (
-  name:
-    | "platform_billing_owner"
-    | "platform_source_webhook_capture"
-    | "platform_source_webhook_ack",
+  name: "platform_source_webhook_capture" | "platform_source_webhook_ack",
   args: Record<string, unknown>
 ) => Promise<{ data: unknown; error: unknown }>;
 const object = (v: unknown): v is Record<string, unknown> =>
@@ -19,7 +16,7 @@ const reply = (status: number, error: string) =>
     { status, headers: { "Cache-Control": "no-store" } }
   );
 
-/** null retains the released source processor; a response terminates the route. */
+/** Verify, durably capture, forward and ACK each retained source endpoint event. */
 export async function sourceWebhook(
   request: Request,
   provider: Provider,
@@ -29,7 +26,7 @@ export async function sourceWebhook(
     transport?: typeof fetch;
     now?: number;
   } = {}
-): Promise<Response | null> {
+): Promise<Response> {
   const env = options.env ?? process.env;
   const rpc: WebhookRPC =
     options.rpc ??
@@ -121,27 +118,6 @@ export async function sourceWebhook(
       !object(captured.data) ||
       captured.data.accepted !== true ||
       captured.data.body_hash !== hash
-    )
-      throw new Error();
-    const owner = await rpc("platform_billing_owner", {});
-    if (
-      owner.error ||
-      !object(owner.data) ||
-      typeof owner.data.quarantined !== "boolean"
-    )
-      throw new Error();
-    if (
-      owner.data.owner === "grida" &&
-      owner.data.phase === "active" &&
-      !owner.data.quarantined
-    )
-      return null;
-    if (
-      !(
-        owner.data.quarantined ||
-        (owner.data.owner === "grida" && owner.data.phase === "draining") ||
-        (owner.data.owner === "infra" && owner.data.phase === "transferred")
-      )
     )
       throw new Error();
     const origin = configuredOrigin(env.GRIDA_PLATFORM_BILLING_ORIGIN, env),

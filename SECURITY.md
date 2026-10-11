@@ -89,18 +89,17 @@ as public.
    refresh runs. This makes the receivers reachable on arbitrary hosts
    (dev tunnels, future direct routes); it also makes the trust
    boundary path-aligned with the file system.
-3. **HMAC verification at the receiver** — every receiver verifies a
-   provider signature before any business logic. Fails closed (5xx)
-   when the signing secret is missing in production.
+3. **Signature verification and custody** — every receiver verifies the
+   provider signature against the exact raw body before capture. The retained
+   Grida billing endpoints durably archive that delivery, forward to the fixed
+   Platform capture endpoint, and ACK only after durable target custody. Missing
+   configuration fails closed; no retired source financial projector runs.
 4. **Replay protection** — receivers dedup on event id and reject
    events older than 5 minutes (where applicable).
-5. **Tunnel path filter at the edge** — cloudflared is configured to
-   forward only `/webhooks/*` and reject everything else with 404.
-   Defense-in-depth at the network layer: even if app code drifts, the
-   tunnel cannot expose non-webhook paths. The tunnel config is
-   **deliberately not git-tracked** (it lives in the operator's
-   `~/.cloudflared/`); setup is documented in
-   [docs/contributing/billing.md](docs/contributing/billing.md) §7.
+5. **Tunnel path filter at the edge** — a provider-validation tunnel exposes
+   only the selected webhook callback paths, with a deny-all fallback.
+   Ordinary Grida insiders/BYOK development needs no billing tunnel. Treat
+   callback URLs as public and keep unrelated `/insiders/*` routes unreachable.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-001 .` to enumerate.
 Today:
@@ -109,8 +108,10 @@ Today:
 - [editor/app/(ingest)/webhooks/stripe/route.ts](<editor/app/(ingest)/webhooks/stripe/route.ts>) — Stripe receiver.
 - [editor/app/(ingest)/webhooks/metronome/route.ts](<editor/app/(ingest)/webhooks/metronome/route.ts>) — Metronome receiver.
 - [editor/proxy.ts](editor/proxy.ts) — path bypass.
-- [docs/contributing/billing.md](docs/contributing/billing.md) — tunnel ingress filter setup (the config itself is untracked by design).
-- [editor/scripts/billing/README.md](editor/scripts/billing/README.md) — dev docs.
+- [editor/lib/platform/webhook-forwarding.ts](editor/lib/platform/webhook-forwarding.ts) — signature/capture/forward/ACK custody.
+- [editor/lib/billing/stripe-webhook-signature.ts](editor/lib/billing/stripe-webhook-signature.ts) — standalone Stripe verifier without outbound API authority.
+- [editor/lib/platform/README.md](editor/lib/platform/README.md) — current source integration.
+- [docs/contributing/billing.md](docs/contributing/billing.md) — public local development and financial-owner boundary.
 
 **What does NOT belong under `(ingest)/`.** Admin tools, internal RPC,
 anything that authenticates via cookie/session/bearer-token — those use their
@@ -121,66 +122,26 @@ live under `(api)/(public)/v1/**`. Mixing categories breaks the trust contract.
 
 ### `GRIDA-SEC-002` — Insiders dev harness is local-only
 
-**What it protects.** The `(insiders)` route group hosts a developer
-harness — pages and server actions used to drive Metronome/Stripe
-lifecycle steps manually during development and QA. The actions there
-intentionally **omit org-membership / ownership checks** and accept an
-attacker-supplied `organizationId` as the first argument. That shape is
-fine for a local-only debug surface; it would be a cross-org
-compromise vector in any non-local environment. The boundary is the
-rule that **`/insiders/*` is reachable if and only if
-`NODE_ENV === "development"`.**
+**What it protects.** The `(insiders)` route group remains a local developer
+surface. `/insiders/*` is reachable only when `NODE_ENV === "development"`.
+Next server actions are HTTP RPC endpoints; hiding a harness link does not
+prevent access to its actions. Never import insiders actions from production
+routes, which would publish them under a different URL and bypass this gate.
 
-**Vulnerable scenario (prevented).** A developer ships the
-`(insiders)` route group as part of the production bundle without
-gating it. Server actions like `actionAddStripeChargedCommit(orgId,
-amountCents)`, `actionIngest(orgId, costMills)`, and
-`actionGetInvoicePdf(orgId, invoiceId)` become reachable on the public
-internet. An attacker enumerates `organization_id` (sequential bigint),
-then calls these actions to charge any org's saved Stripe card, zero
-out any org's AI-credit balance via the optimistic-debit RPC (which
-also flips `customer_entitled = false`), or read any org's billing
-state and invoice PDFs.
+**How the code prevents it.** [editor/proxy.ts](editor/proxy.ts) returns 404 for
+`/insiders` and `/insiders/*` outside development, including action POSTs.
+[The insiders layout](<editor/app/(insiders)/layout.tsx>) independently calls
+`notFound()` outside development. Provider tunnels must not expose this group.
 
-**Why it's specifically risky here.** Next.js server actions are
-**HTTP RPC endpoints addressable from any browser** via the
-`Next-Action` header — the action hash is shipped in the client
-bundle of any page that imports it. They are _not_ protected by
-"the page UI isn't linked anywhere"; whatever URL group the action
-lives under is the only structural gate. An open-source repo means
-the action source is public, so the hashes are too. Without a
-proxy-level gate, a single accidentally-deployed harness action is a
-production cross-org vulnerability.
+**Retained history.** The former `/insiders/billing` harness exercised privileged
+Stripe/Metronome lifecycle actions without org-membership checks. It was retired
+with Grida's duplicate financial engine; Platform owns current financial QA.
+Its deleted billing actions are not current proof or instructions. This ID
+retains the threat model and governs every remaining insiders surface.
 
-**How the code prevents it.**
-
-1. **Proxy-level gate** — [editor/proxy.ts](editor/proxy.ts) returns
-   404 for `/insiders` and `/insiders/*` whenever `NODE_ENV !==
-"development"`. The proxy runs _before_ any handler, so this also
-   stops `Next-Action` POSTs to `/insiders/*` URLs.
-2. **Layout-level `notFound()`** —
-   [editor/app/(insiders)/layout.tsx](<editor/app/(insiders)/layout.tsx>)
-   throws `notFound()` when not in dev. Defense-in-depth: even if a
-   future change accidentally weakens the proxy gate, the layout still
-   renders 404 for every page in the group.
-3. **No imports across the boundary** —
-   [editor/app/(insiders)/insiders/billing/actions.ts](<editor/app/(insiders)/insiders/billing/actions.ts>)
-   carries a `GRIDA-SEC-002` header documenting that these actions
-   must NOT be imported from production code paths. Importing them
-   from a `(site)` page would re-emit the action hashes against that
-   page's URL and bypass the proxy gate.
-
-**Files bound by this id.** Run `grep -rn GRIDA-SEC-002 .` to enumerate.
-Today:
-
-- [editor/proxy.ts](editor/proxy.ts) — proxy gate.
-- [editor/app/(insiders)/layout.tsx](<editor/app/(insiders)/layout.tsx>) — layout `notFound()` fallback.
-- [editor/app/(insiders)/insiders/billing/actions.ts](<editor/app/(insiders)/insiders/billing/actions.ts>) — header callout, "no import from prod code".
-
-**What does NOT belong under `(insiders)/`.** Anything that needs to
-ship to production. If a feature in development outgrows the dev
-harness, move it to `(site)/...` (with proper auth) or `(api)/...`
-(with proper auth) — never relax the `(insiders)/` gate to host it.
+**What does NOT belong under `(insiders)/`.** Anything that needs to ship to
+production. Move a graduating feature to its authenticated product/API surface;
+never relax the insiders gate.
 
 ---
 
@@ -198,19 +159,18 @@ calling user.**
 handler that reads `organizationId` from the request body and forwards
 it straight into the seam. An attacker enumerates `organization_id`
 (sequential bigint) and submits requests with `organizationId =
-<victim>`. Each request bills the victim's balance, eventually flips
-their `customer_entitled = false`, and locks them out of AI until
-they top up. Worse, the attacker's free-tier user enjoys the victim's
-credit for as long as it lasts. Mass automation makes this an
+<victim>`. Each request spends the victim's credit and can deny their subsequent
+AI work until the account is funded again. Worse, the attacker's free-tier user
+enjoys the victim's credit for as long as it lasts. Mass automation makes this an
 asymmetric DoS-by-billing attack.
 
 **Why it's specifically risky here.** AI route handlers and server
 actions sit on internal/private surfaces, but they are still HTTP
-endpoints reachable by any authenticated user. Org membership is
-checked by RLS on data reads, **not** on AI-seam writes — the seam
-calls Metronome (an external service), not our own DB, so no RLS
-gate fires. Without a structural producer-side rule, every new AI
-endpoint is a fresh chance to forget the membership check.
+endpoints reachable by any authenticated user. Org membership on product data
+reads does not by itself authorize AI spending. The seam obtains fresh Platform
+admission and retains a source execution receipt; explicit producer membership
+verification is still required. Without a structural producer-side rule, every
+new AI endpoint is a fresh chance to forget the membership check.
 
 **How the code prevents it.**
 
@@ -236,7 +196,8 @@ inputOrgId })`. It resolves from: route param slug → request
    no code path skips this check while billing. The only intentional
    bypass is the BYOK carve-out below, and it does not bill.
 3. **One billing seam, explicit provider-import owners** —
-   [editor/lib/ai/server.ts](editor/lib/ai/server.ts) owns shared billing;
+   [editor/lib/ai/server.ts](editor/lib/ai/server.ts) owns the Grida paid-product
+   admission/receipt integration; Platform owns shared financial billing;
    value imports of `replicate`, `openai`, `@ai-sdk/*`, `@anthropic-ai/sdk`
    and the portable `@grida/ai` SDK are restricted to the reviewed seam allowlist.
    Enforced by oxlint
@@ -270,7 +231,7 @@ inputOrgId })`. It resolves from: route param slug → request
 key ([editor/lib/ai/models.ts](editor/lib/ai/models.ts) —
 `BYOK_OPENROUTER_API_KEY`, `BYOK_VERCEL_AI_GATEWAY_API_KEY`), `grida`/`model`
 return a **bare** provider so the **AI-SDK text/chat path** bypasses
-the billing seam: no gate, no Metronome ingest, **and** the
+the billing seam: no Platform admission or charged usage delivery, **and** the
 `MissingOrgIdError` runtime contract above does not fire (a bare
 provider has no middleware). The contributor's own provider key is
 charged directly — there is no Grida balance, hence no victim to
@@ -2016,17 +1977,17 @@ credential through reuse of an existing browser or daemon bridge.
    Exact RLS-visible counts and validated ascending IDs preserve page continuation
    despite a lower database row cap. Zero visible rows succeed explicitly;
    database failures and malformed/incomplete results never become empty accounts.
-9. **Passive credits retain membership authority.** The fixed credits GET uses
-   the same live-verified bearer for `public.v_billing_credits`. The view runs as
-   the caller and combines existing RLS with an explicit current-user membership
-   predicate in the read statement. Its organization anchor distinguishes denied
-   access from missing billing data. SELECT-only grants and a safe column list
-   expose no provider identifiers or new billing write operation. The query
-   requires an explicit org ID and exact zero/one-row count; a truncated or
-   malformed result never becomes a balance. The billing owner shares the existing
-   pure cached gate and performs no provider call, provisioning or refresh. An
-   already-authorized read may finish after removal; client selection is not
-   authority or an instantaneous revocation mechanism.
+9. **Passive credits retain membership authority.** The issuer live-verifies
+   the native bearer before the fixed Platform credit transport. It forwards
+   original native authority only as `X-Grida-Native-Token` with the separate
+   `platform.grida-ssr` workload credential. Platform checks current canonical
+   membership and permits native authority only on the passive credits route.
+   The adapter validates matching org, unknown-versus-zero state, original cache
+   time, exact safe integers, and gate fields before returning the published DTO.
+   Missing configuration, denied membership, or malformed/incomplete results
+   never become a balance. No source financial-view fallback, provisioning,
+   refresh, or provider call occurs. A display projection cannot authorize paid
+   execution; an already-authorized read is not instantaneous revocation.
 10. **Fixed scoped-GG exchange.** `requestGgAccess` accepts only an explicit
     positive safe-integer organization ID and posts to the configured API origin's
     `/api/v1/auth/gg`. A missing construction-time memory sink fails before custody
@@ -2223,15 +2184,15 @@ the independently provisioned OAuth service. Neither certifies hosted deployment
   reaches fixed user-scoped reads without cookie or privileged-client dependencies.
 - [Credits route](<editor/app/(api)/(public)/api/v1/account/credits/route.ts>) and
   [route tests](editor/lib/api/credits.test.ts),
-  [passive credit owner](editor/lib/billing/credits.ts) and
-  [tests](editor/lib/billing/credits.test.ts),
-  [credit query](editor/lib/supabase/credits-data.ts) and
-  [tests](editor/lib/supabase/credits-data.test.ts) — fixed read-only credit access
-  with explicit unknown data and no provider or privileged dependency.
-- [Credits view migration](supabase/migrations/20260909103531_grida_billing_credits.sql),
-  [schema reference](supabase/schemas/grida_billing.sql), and
-  [pgTAP contract](supabase/tests/test_grida_billing_credits_test.sql) — narrow
-  columns, member RLS and SELECT-only grants; also GRIDA-SEC-012.
+  [native Platform adapter](editor/lib/platform/native-credits.ts) and
+  [tests](editor/lib/platform/native-credits.test.ts),
+  [fixed billing transport](editor/lib/platform/billing-consumer.ts) and
+  [tests](editor/lib/platform/billing-consumer.test.ts) — passive Platform
+  projection with original native authority, exact DTO validation, and no source
+  financial fallback; also GRIDA-SEC-012.
+- [Historical credits-view migration](supabase/migrations/20260909103531_grida_billing_credits.sql)
+  and [schema record](supabase/schemas/grida_billing.sql) retain source history.
+  They do not define current runtime credit authority.
 - [Analytics-free layout](<editor/app/(untracked)/layout.tsx>) and
   [response headers](editor/next.config.ts) — retain GRIDA-SEC-005 while also
   protecting this consent ceremony.
@@ -2555,11 +2516,10 @@ release requirement.
   [tests](editor/lib/supabase/account-data.test.ts) — also GRIDA-SEC-010.
 - [Credits binding](<editor/app/(api)/(public)/api/v1/account/credits/route.ts>) and
   [operation tests](editor/lib/api/credits.test.ts),
-  [credit owner](editor/lib/billing/credits.ts) and [tests](editor/lib/billing/credits.test.ts),
-  [credit query](editor/lib/supabase/credits-data.ts) and [tests](editor/lib/supabase/credits-data.test.ts),
-  [view migration](supabase/migrations/20260909103531_grida_billing_credits.sql),
-  [schema reference](supabase/schemas/grida_billing.sql), and
-  [pgTAP tests](supabase/tests/test_grida_billing_credits_test.sql) — also GRIDA-SEC-010.
+  [native Platform adapter](editor/lib/platform/native-credits.ts) and
+  [tests](editor/lib/platform/native-credits.test.ts),
+  [fixed transport](editor/lib/platform/billing-consumer.ts) and
+  [tests](editor/lib/platform/billing-consumer.test.ts) — also GRIDA-SEC-010.
 - [Proxy](editor/proxy.ts), [dispatch tests](editor/lib/api/proxy.test.ts),
   [Next config](editor/next.config.ts), and [routing tests](editor/lib/api/routing.test.ts).
 - [Source audit](editor/scripts/audit-api.ts), [audit tests](editor/scripts/audit-api.test.ts),

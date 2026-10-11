@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { PublicUrls } from "@/services/public-urls";
+import {
+  platformBilling,
+  type BillingSummary,
+} from "@/lib/platform/billing-consumer";
 import { notFound } from "next/navigation";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -26,23 +30,6 @@ export async function GET(
 
   if (!organizations) {
     return notFound();
-  }
-
-  // Resolve plan per org from the Stripe-backed billing source. Orgs without
-  // an active subscription fall back to "free".
-  const orgIds = organizations.map((o) => o.id);
-  const { data: billingRows } = await client
-    .from("v_billing_subscription")
-    .select("organization_id, plan")
-    .in("organization_id", orgIds);
-  const planByOrg = new Map<number, "free" | "pro" | "team">();
-  for (const r of billingRows ?? []) {
-    if (r.organization_id != null && r.plan) {
-      const p = r.plan;
-      if (p === "free" || p === "pro" || p === "team") {
-        planByOrg.set(r.organization_id, p);
-      }
-    }
   }
 
   const { data: projects, error: __projects_err } = await client
@@ -72,12 +59,35 @@ export async function GET(
     return notFound();
   }
 
+  // A passive Platform projection never invents a Free plan when billing is
+  // unavailable. Keep source RLS reads and workspace availability independent.
+  const planByOrg = new Map<number, BillingSummary["plan"]>();
+  try {
+    const { data, error } = await client.auth.getSession();
+    const bearer = data.session?.access_token;
+    if (!error && bearer) {
+      const platform = platformBilling();
+      await Promise.all(
+        organizations.map(async (org) => {
+          try {
+            const summary = await platform.summary(org.id, bearer);
+            planByOrg.set(org.id, summary.plan);
+          } catch {
+            // A denied or unavailable projection is unknown for this org only.
+          }
+        })
+      );
+    }
+  } catch {
+    // Contributors can use their workspace without a configured billing integration.
+  }
+
   return NextResponse.json({
     data: {
       organizations: organizations.map((org) => ({
         ...org,
         avatar_url: org.avatar_path ? avatar_url(org.avatar_path) : null,
-        plan: planByOrg.get(org.id) ?? "free",
+        plan: planByOrg.get(org.id) ?? null,
       })),
       projects,
       documents,

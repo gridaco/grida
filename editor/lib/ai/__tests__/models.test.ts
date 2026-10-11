@@ -3,17 +3,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const billing = vi.hoisted(() => ({
-  getEntitlement:
-    vi.fn<typeof import("@/lib/billing/metronome").getEntitlement>(),
-  ingestUsageEvent:
-    vi.fn<typeof import("@/lib/billing/metronome").ingestUsageEvent>(),
+  entitlement: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  begin: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  complete: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
-
-vi.mock("@/lib/billing/metronome", () => ({
-  ...billing,
-  refreshBalance:
-    vi.fn<typeof import("@/lib/billing/metronome").refreshBalance>(),
-  BillingMetronomeError: class extends Error {},
+vi.mock("@/lib/platform/product-consumer", () => ({
+  platformProductBilling: () => billing,
 }));
 vi.mock("@/lib/supabase/server", () => ({
   createLibraryClient:
@@ -157,8 +152,8 @@ describe("funded Vercel AI Gateway authority", () => {
     ).resolves.toEqual([0.25, 0.5]);
 
     expect(requests[0].headers.get("authorization")).toBe(`Bearer ${token}`);
-    expect(billing.getEntitlement).not.toHaveBeenCalled();
-    expect(billing.ingestUsageEvent).not.toHaveBeenCalled();
+    expect(billing.entitlement).not.toHaveBeenCalled();
+    expect(billing.complete).not.toHaveBeenCalled();
   });
 });
 

@@ -11,9 +11,6 @@
  * Client-side: `resolveAiError`, `handleAiFetchErrorResponse`, `isAiErrorResponse`.
  */
 
-import type { BillingError } from "@/lib/billing";
-import type { BillingMetronomeError } from "@/lib/billing/metronome";
-
 // ---------------------------------------------------------------------------
 // AiErrorCode — single source of truth
 // ---------------------------------------------------------------------------
@@ -108,7 +105,7 @@ export function orgErrorToAiError(err: unknown): AiErrorResponse {
     success: false,
     code,
     status: extractStatus(err, 403),
-    // Org-resolver `BillingError` messages are constructed by us with no
+    // Org-resolver `OrganizationError` messages are constructed by us with no
     // user input, so they're safe to forward (e.g. `organization "foo"
     // not found or not a member`). For non-Error inputs, fall back.
     message: err instanceof Error ? err.message : "forbidden",
@@ -139,7 +136,7 @@ function orgErrorCode(err: unknown): AiErrorCode {
 }
 
 /**
- * Classify a {@link BillingMetronomeError} (or any code-bearing error)
+ * Classify a code-bearing billing error (or any code-bearing error)
  * from the billing seam.
  *
  * `"blocked"` is the only billing failure the user should see verbatim —
@@ -151,7 +148,7 @@ function orgErrorCode(err: unknown): AiErrorCode {
  * provider-internal detail).
  */
 export function billingErrorToAiError(
-  err: BillingError | BillingMetronomeError | unknown,
+  err: unknown,
   scope: string
 ): AiErrorResponse {
   if (errorCode(err) === "blocked") {

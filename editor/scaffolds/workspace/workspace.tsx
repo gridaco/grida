@@ -149,10 +149,8 @@ export function Workspace({
       avatar_url: organization.avatar_path
         ? PublicUrls.organization_avatar_url(supabase)(organization.avatar_path)
         : null,
-      // `plan` is server-resolved by the workspace API (from
-      // `v_billing_subscription`). Default to "free" until the SWR fetch lands
-      // and the reducer refreshes `state.organization` with the real value.
-      plan: "free" as const,
+      // The Platform plan remains unknown until the workspace projection arrives.
+      plan: null,
     },
     organizations: [],
     projects: [],

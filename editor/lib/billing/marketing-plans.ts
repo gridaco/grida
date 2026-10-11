@@ -1,13 +1,8 @@
 // GRIDA-EE: billing — public presentation of the current commercial offer.
 
-// Public presentation data for `/pricing`.
-//
-// This is deliberately separate from `plans.ts`: the billing catalogue must
-// continue to understand historical subscriptions, while this file describes
-// only the plans a visitor can choose today. Pro's displayed price still comes
-// from the billing catalogue so the public and checkout amounts cannot drift.
+// Public presentation data for `/pricing`. Commercial policy lives in Platform.
 
-import { PAID_PLANS, price_dollars } from "./plans";
+import { PRO_MONTHLY_CENTS } from "./plans";
 
 export interface PricingInformation {
   id: string;
@@ -25,7 +20,7 @@ export interface PricingInformation {
   cta: string;
 }
 
-const proMonthlyDollars = price_dollars(PAID_PLANS.pro.id, "month");
+const proMonthlyDollars = PRO_MONTHLY_CENTS / 100;
 
 const freePlan: PricingInformation = {
   id: "tier_free",

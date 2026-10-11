@@ -61,8 +61,8 @@ The route group makes the contract physically visible:
    docblock.
 4. Add the env var (`<PROVIDER>_WEBHOOK_SECRET`) to
    [editor/.env.example](../../.env.example).
-5. Document the URL + signing secret setup in
-   [editor/scripts/billing/README.md](../../scripts/billing/README.md) (or
+5. Document the retained source bridge and signing secret setup in
+   [editor/lib/platform/README.md](../../lib/platform/README.md) (or
    wherever the provider's setup lives).
 6. Reference the new file in [/SECURITY.md](../../../SECURITY.md) under
    the inventory.

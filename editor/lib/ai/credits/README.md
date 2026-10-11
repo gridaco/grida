@@ -1,6 +1,11 @@
 # `lib/ai/credits` — AI Credits Module
 
-The single source of truth for the AI credit balance UX. Every AI call
+The editor consumer for AI credit balance UX. Platform owns the financial
+account, entitlement policy, and cached projection; this module owns display
+state and interaction. Its cached `allowed` observation cannot admit paid work.
+Missing Platform configuration leaves display unavailable without blocking
+unrelated Grida pages. Ordinary insiders/contributor text BYOK needs no
+payment-vendor setup. See the [source bridge](../../platform/README.md). Every AI call
 site that displays balance or routes the GRIDA-SEC-003 gate flow
 consumes from this module.
 
@@ -83,7 +88,8 @@ const env = await refreshAiCredits();
      including bespoke styling like the "Top up" CTA on `blocked`.
      Re-resolve via `resolveAiError(env, opts)` from `@/lib/ai/error`.
 
-3. **Null balance.** `cents === null` means "unauth or no org". UI
+3. **Null balance.** `cents === null` means unavailable/unknown, including unauthenticated,
+   no-organization, unprovisioned, uncached, or unavailable Platform states. UI
    renders `"—"`, never `"$0.00"`. The deprecated `$0.00` stub at
    `hooks/use-credits.ts` was deleted as part of this refactor.
 
@@ -179,8 +185,8 @@ Everything else is path-stable.
   `/private/ai/chat/route.ts`). Folding `balanceCents` into a trailing
   SSE event is a separate task.
 - **Subscription / auto-reload UI** (the billing settings page). That
-  surface has its own concern (Stripe subscription state) and uses
-  `getAiCreditsSummary`.
+  surface is owned by the shared Platform billing console. The editor keeps
+  its balance indicator and exact organization billing handoff.
 - **Per-feature cost previews**. Callers compute via the cost cards in
   `lib/ai/models.ts`; this module formats the _result_, not the
   estimate.

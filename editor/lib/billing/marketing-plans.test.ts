@@ -19,7 +19,7 @@ describe("public pricing plans", () => {
     ]);
   });
 
-  it("shows the catalogue-backed monthly Pro price without retired offers", () => {
+  it("preserves the public monthly Pro price and current offers", () => {
     expect(plans.find((plan) => plan.name === "Pro")?.priceMonthly).toBe("$20");
     expect(plans.map((plan) => plan.id)).not.toContain("tier_team");
     expect(plans.map((plan) => plan.href).join(" ")).not.toMatch(
