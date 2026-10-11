@@ -81,7 +81,7 @@ vi.mock("@/app/(site)/organizations/[organization_name]/people/page", () => ({
 import ManagePage from "@/app/(site)/gateway/manage/page";
 const source = "https://grida.example.test",
   consoleOrigin = "https://console.example.test";
-const target = "/organizations/42/gateway/requests/req_test1234";
+const target = "/organizations/42/ai-gateway/requests/req_test1234";
 beforeEach(() => {
   vi.stubEnv("GRIDA_OAUTH_ORIGIN", source);
   vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", consoleOrigin);
@@ -204,8 +204,8 @@ it("anonymous creation preserves the exact management continuation and performs 
 });
 it.each([
   "https://evil.test/",
-  "/organizations/42/gateway/keys?token=secret",
-  "/organizations/42/gateway/keys/byok_test1234",
+  "/organizations/42/ai-gateway/keys?token=secret",
+  "/organizations/42/ai-gateway/keys/byok_test1234",
 ])("rejects malformed creation return %s before writing", async (returnTo) => {
   const response = await create(
     request("new", {
