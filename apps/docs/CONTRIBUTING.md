@@ -55,6 +55,7 @@ site publishes them — e.g. FX's guide at `grida.co/docs/fx`, authored in
 [gridaco/fx](https://github.com/gridaco/fx). The model is
 [docs sources](../../docs/wg/platform/docs-sources.md): the source repo owns
 the pages and their assets; this repo owns only **which commit** is published.
+The map of which repo publishes where is [gridaco/docs](https://github.com/gridaco/docs).
 
 - [`sources.json`](./sources.json) declares each source: repo, ref policy,
   published directories, and the asset rules.
@@ -65,13 +66,13 @@ the pages and their assets; this repo owns only **which commit** is published.
 ### Writing docs in a source repo
 
 Your published directory (e.g. `docs/guide/`) must pass the source rules.
-Your CI runs them through the reusable workflow
-[`docs-source-check.yml`](../../.github/workflows/docs-source-check.yml):
+Your CI runs them through the reusable workflow in
+[gridaco/docs](https://github.com/gridaco/docs/blob/main/.github/workflows/source-check.yml):
 
 ```yaml
 jobs:
   docs:
-    uses: gridaco/grida/.github/workflows/docs-source-check.yml@main
+    uses: gridaco/docs/.github/workflows/source-check.yml@main
 ```
 
 | Rule       |                                                                                                                                                                       |
@@ -108,8 +109,9 @@ pnpm sources:verify          # what CI runs on PRs here
   `pnpm sources:sync <id>`, add it to [`sidebars.js`](./sidebars.js) if it
   needs a sidebar entry (guarded with `from_source`), add its repo to the App
   token's `repositories` in
-  [`docs-sources.yml`](../../.github/workflows/docs-sources.yml), and add the
-  reusable check to the source repo's CI.
+  [`docs-sources.yml`](../../.github/workflows/docs-sources.yml), add the
+  reusable check to the source repo's CI, and add the source to the table in
+  [gridaco/docs](https://github.com/gridaco/docs#topology).
   Its pages may not take a path a page in `/docs` already has.
 - **Local clones.** `DOCS_SOURCES_LOCAL="gridaco/fx=../fx" pnpm content:setup`
   (paths from the repo root) previews a source from a local clone instead of
