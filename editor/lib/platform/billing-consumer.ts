@@ -1,4 +1,4 @@
-// GRIDA-EE: billing — lazy, fixed consumer boundary to the infra billing owner.
+// GRIDA-EE: billing — lazy, fixed consumer boundary to Platform billing.
 // GRIDA-SEC-010 / GRIDA-SEC-012 — user authority and workload credentials stay distinct.
 import "server-only";
 import type { credits } from "../billing/credits";

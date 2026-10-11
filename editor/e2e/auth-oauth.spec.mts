@@ -705,13 +705,13 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         // This auth-only fixture has no Platform billing service or credentials.
         // Visible membership must fail closed for billing while identity remains usable.
         await expect(account.credits({ id: local.id })).rejects.toMatchObject({
-          code: "auth_unavailable",
+          code: "unavailable",
         });
         await expect(
           first.auth.requestAccount("credits.read", {
             organization_id: local.id,
           })
-        ).rejects.toMatchObject({ code: "auth_unavailable" });
+        ).rejects.toMatchObject({ code: "unavailable" });
         await expect(
           aliceClient.auth.requestAccount("credits.read", {
             organization_id: local.id,
@@ -721,7 +721,7 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           aliceClient.auth.requestAccount("credits.read", {
             organization_id: acme.id,
           })
-        ).rejects.toMatchObject({ code: "auth_unavailable" });
+        ).rejects.toMatchObject({ code: "unavailable" });
         expect(
           await first.auth.requestAccount("organizations.list", {
             after: local.id,
@@ -767,7 +767,7 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           aliceClient.auth.requestAccount("credits.read", {
             organization_id: local.id,
           })
-        ).rejects.toMatchObject({ code: "auth_unavailable" });
+        ).rejects.toMatchObject({ code: "unavailable" });
         await expect(
           new AccountClient(aliceClient.auth).credits()
         ).rejects.toMatchObject({
@@ -778,7 +778,7 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           new AccountClient(aliceClient.auth).credits({
             name: local.name,
           })
-        ).rejects.toMatchObject({ code: "auth_unavailable" });
+        ).rejects.toMatchObject({ code: "unavailable" });
         const ggAccess = await aliceClient.auth.requestGgAccess({
           organization_id: local.id,
         });
@@ -825,7 +825,7 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           first.auth.requestAccount("credits.read", {
             organization_id: organization.id,
           })
-        ).rejects.toMatchObject({ code: "auth_unavailable" });
+        ).rejects.toMatchObject({ code: "unavailable" });
         expect(await first.auth.requestAccount("organizations.list")).toEqual(
           organizations
         );
@@ -1038,7 +1038,7 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         expect(await probe("organizations")).toEqual(organizations);
         await expect(
           new AccountClient(second.auth).credits({ id: organization.id })
-        ).rejects.toMatchObject({ code: "auth_unavailable" });
+        ).rejects.toMatchObject({ code: "unavailable" });
         expect(
           await probe("organizations", organizations.organizations[0]!.id)
         ).toEqual({ organizations: [], next_cursor: null });

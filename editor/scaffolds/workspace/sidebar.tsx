@@ -190,7 +190,7 @@ function PricingTierCard({
   const highlight = plan !== null && (isCustom || plan !== "free");
   const planActionLabel = isCustom
     ? null
-    : plan === null || plan === "free"
+    : plan === "free"
       ? "Upgrade to Pro"
       : plan === "team"
         ? "Move to Pro monthly"

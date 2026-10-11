@@ -481,25 +481,26 @@ export async function proveNativeLocal({ statePath, candidate }) {
       }
     );
     await phase(
-      "restarted concurrent account reads and cached credits",
+      "restarted concurrent account reads and unavailable billing",
       async () => {
         const reads = await Promise.all(
           Array.from({ length: 3 }, () => json(["account", "view"]))
         );
         for (const read of reads) assert.deepEqual(read, firstAccount);
         const org = firstAccount.organizations[0];
-        const credits = await json(["account", "credits"]);
-        assert.deepEqual(credits.organization, org);
-        assert.equal(credits.source, "cache");
-        assert.equal(credits.currency, "USD");
-        assert.deepEqual(
-          await json(["account", "credits", "--org", org.name]),
-          credits
-        );
-        assert.deepEqual(
-          await json(["account", "credits", "--org-id", String(org.id)]),
-          credits
-        );
+        // This auth-only fixture has no Platform billing service or credentials.
+        for (const selector of [
+          [],
+          ["--org", org.name],
+          ["--org-id", String(org.id)],
+        ]) {
+          assert.equal(
+            (await json(["account", "credits", ...selector], { code: 1 })).error
+              .code,
+            "unavailable"
+          );
+        }
+        assert.deepEqual(await json(["account", "view"]), firstAccount);
         assert.equal(
           (
             await json(["account", "credits", "--org-id", String(org.id)], {

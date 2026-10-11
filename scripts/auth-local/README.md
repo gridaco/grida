@@ -192,8 +192,9 @@ PostgreSQL RLS, unlike the separate synthetic production request-pipeline proof.
 
 The auth-only fixture deliberately has no Platform billing service or billing
 credentials. Credit reads through the auth package and independent
-`@grida/account` client fail safely with `auth_unavailable` for a current member;
-an invisible or removed member still receives `forbidden`. Sole/name/ID
+`@grida/account` client fail safely with the public SDK error `unavailable` for
+a current member; the HTTP service retains `503` with `auth_unavailable`. An
+invisible or removed member still receives `forbidden`. Sole/name/ID
 organization selection and multiple-membership errors remain covered before the
 server rechecks membership. Identity and organization listing remain usable
 through the same credential after the billing failure. The fixture performs no

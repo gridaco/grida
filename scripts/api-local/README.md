@@ -7,8 +7,8 @@ This proof builds and starts Next.js in **production mode**, then sends real
 HTTP requests to the current `/api/v1/auth/me`, `/api/v1/account/organizations`,
 `/api/v1/account/credits`, `/api/v1/auth/gg`, `/api/v1/ai/models`, and the four
 `/api/v1/ai/3d/*` implementations. It needs Node.js
-24+ and the repository's installed dependencies. The command builds the model
-catalogue before starting the proof. It does not install packages, start Docker,
+24+, OpenSSL on the standard system path, and the repository's installed
+dependencies. The command builds the model catalogue before starting the proof. It does not install packages, start Docker,
 use Supabase services, or read account credentials.
 
 ```sh
@@ -17,8 +17,8 @@ pnpm --filter editor test:api:http
 ```
 
 The proof copies the current API operation inventory, request policy, account
-adapters, account and cached-credit projections, RLS data adapters, shared credit
-gate, GG mint/signer/verifier, upload-ticket signer/verifier, fixed GG media
+adapters, account projection, canonical RLS data adapters, the native credit DTO
+and real Platform billing consumer, GG mint/signer/verifier, upload-ticket signer/verifier, fixed GG media
 binding, static model list, bearer verifier, OAuth HTTP client,
 routes, proxy, and Next configuration
 into a fresh private `.cache/api-local` directory. It records their source
@@ -46,8 +46,7 @@ Two independently owned loopback HTTP servers represent canonical Auth and a
 separate Data API origin, such as a read-replica alias. `GRIDA_OAUTH_ISSUER` selects
 the Auth server's `/auth/v1`; only that server supplies `/auth/v1/oauth/userinfo`.
 `NEXT_PUBLIC_SUPABASE_URL` selects the Data server, which supplies synthetic
-`/rest/v1/organization`, `/rest/v1/organization_member`, and
-`/rest/v1/v_billing_credits` responses. Each server rejects the other service's
+`/rest/v1/organization` and `/rest/v1/organization_member` responses. Each server rejects the other service's
 paths. Both accept only exact synthetic tokens issued in memory for two
 synthetic users. A token claiming the reachable Data API alias as its issuer is
 rejected before issuer I/O; shared configuration does not make that alias an
@@ -69,16 +68,39 @@ proxy; those raw syntax cases intentionally prove the framework's `308` response
 without invoking account or web middleware. Other HTTP-parser failures can also
 precede application JSON policy.
 
+The native credit operation first performs the real fixed canonical organization
+read with the caller's bearer. Only a currently visible organization reaches a
+third, independently owned loopback HTTPS Platform fixture at
+`GET /platform/v1/billing/organizations/{id}/credits`. The real billing consumer
+sends a fresh opaque workload credential and exact key ID bound by the synthetic
+fixture to `platform.grida-ssr`, plus the exact caller bearer in
+`X-Grida-Native-Token`. Browser tokens, cookies, publishable keys, caller-selected
+headers and extra paths are refused. This proves consumer request wiring; the
+fixture does not implement Platform's real workload verification, canonical
+membership service or financial policy.
+
+OpenSSL creates a fresh one-day certificate with a `127.0.0.1` subject alternative
+name. Only the proof children receive it through `NODE_EXTRA_CA_CERTS`; ordinary
+TLS verification remains enabled. The production consumer's HTTPS requirement
+is unchanged. Separate server runs prove missing Platform configuration, a short
+workload token, and HTTP configuration fail credit display closed while account
+identity and organization listing continue to work.
+
 Cached-credit cases distinguish an absent account, an unprovisioned account,
-an unobserved cache, and observed zero or negative balances. Explicit fixtures
-exercise the existing credit floor and customer gate without deriving expected
-results from the server implementation. An old cache timestamp does not add a
-new freshness gate. Cases also cover exact organization selection, two-user
-isolation, removed visibility, unknown organizations, body/query/method policy,
-malformed rows, duplicate rows and inconsistent counts. Errors must never become
-successful empty or zero-balance snapshots. The credits projection cannot expose
-extra upstream fields. The fixture admits only the fixed read request; it does
-not implement provider refresh, provisioning, subscription reads or mutations.
+an unobserved cache, and observed zero or negative balances. Explicit Platform
+projections retain the existing credit floor and customer-gate results without
+reimplementing their policy in Grida. An old cache timestamp does not add a
+new freshness gate. Cases also cover exact organization selection, current
+canonical display names, two-user isolation, removed visibility, unknown
+organizations, body/query/method policy, malformed canonical rows, duplicate rows
+and inconsistent counts. Denied or malformed canonical membership never contacts
+Platform. Platform revocation after the source read, opaque upstream failures,
+redirects, unexpected status/content type, oversized or malformed projections,
+wrong organizations and invalid gate/state/balance fields remain errors; they
+never become successful empty or zero-balance snapshots. Native DTO comparison
+also proves extra Platform fields cannot replace canonical organization identity
+or escape the projection. The fixture admits only the passive credit read; it
+does not implement provider refresh, provisioning, subscription reads or mutations.
 
 GG access uses a fresh signing key generated in memory. The real native mint
 requires the exact same-user membership query and explicit organization before
@@ -139,15 +161,16 @@ exercised here; their registered paths remain part of the copied inventory.
 ## Isolation and cleanup
 
 The proof binds only fresh `127.0.0.1` listeners. Child fetch/TCP guards allow
-only the explicitly owned ports, reject Unix socket access and other targets,
+only HTTP/HTTPS on the explicitly owned ports, reject Unix socket access and other targets,
 and refuse redirect following. They are application guards, **not an OS network
 sandbox**: installed dependencies, native build tools, the repository, and the
 same-user host are trusted. The harness never inherits proxy, Node preload,
 Docker, hosted API, or telemetry credentials.
 
-Tokens remain in memory and Authorization headers. Diagnostics redact bearer
-values and JWTs; no browser state, request dumps, or credential artifacts are
-written. Build and request waits are bounded. Cleanup targets only the child
+Tokens remain in memory and their fixed authority headers. The temporary TLS
+key and certificate stay in the private workspace and are removed with it. Diagnostics redact bearer
+values and JWTs; no browser state, request dumps, or account/workload credential
+files are written. Build and request waits are bounded. Cleanup targets only the child
 process groups and listeners started by this run and removes its source, HOME,
 and build directory. Private JSON reports and redacted build/server logs remain
 under `.cache/api-local`; no artifact is uploaded.

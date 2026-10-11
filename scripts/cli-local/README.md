@@ -27,8 +27,11 @@ installed executable hash.
 The native proof covers manual browser consent with fresh PKCE/state, real code
 exchange and identity, explicit file storage, process restart, independent native
 profiles, occupied callback ports, cancellation cleanup, concurrent account reads,
-cached credits and membership denial, local-session logout, and durable revision
-advancement after empty logout. It does not open the OS keyring: default storage
+organization selection and membership denial, local-session logout, and durable
+revision advancement after empty logout. Current-member credit reads with sole,
+name and ID selection safely return `unavailable` because the auth-only fixture
+has no Platform billing service or credentials; account reads remain usable after
+the billing failure. It does not open the OS keyring: default storage
 metadata is inspected, then file custody is selected explicitly before session
 access.
 

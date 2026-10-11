@@ -31,7 +31,10 @@ for (const endpoint of [
 }
 
 for (const url of [
-  "https://127.0.0.1:55481/",
+  "https://127.0.0.1:55431/",
+  "https://example.invalid:55481/",
+  "https://user:password@127.0.0.1:55481/",
+  "ftp://127.0.0.1:55481/",
   "http://127.0.0.1:55431/",
   "http://example.invalid:55481/",
   "http://user:password@127.0.0.1:55481/",
@@ -87,6 +90,53 @@ test("permits only the explicitly owned listener and refuses redirects", async (
     });
     assert.equal(exit, 0);
     assert.equal(requests, 1);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("permits HTTPS to an explicitly owned loopback listener", async () => {
+  const { createServer } = await import("node:net");
+  let connections = 0;
+  // The real production HTTP proof supplies TLS and validates its scoped CA.
+  // This tripwire proves HTTPS passes both fetch and TCP destination guards.
+  const server = createServer((socket) => {
+    connections++;
+    socket.destroy();
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  try {
+    const { spawn } = await import("node:child_process");
+    const child = spawn(
+      process.execPath,
+      [
+        "--require",
+        guard,
+        "-e",
+        `
+        const assert = require('node:assert/strict');
+        assert.rejects(fetch('https://127.0.0.1:${port}/'), (error) => {
+          assert.doesNotMatch(String(error.cause), /unowned network/);
+          return true;
+        });
+      `,
+      ],
+      { env: { GRIDA_API_TEST_PORTS: String(port) }, stdio: "ignore" }
+    );
+    const exit = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        reject(new Error("HTTPS guard proof deadline exceeded"));
+      }, 5_000);
+      child.once("exit", (code) => {
+        clearTimeout(timer);
+        resolve(code);
+      });
+      child.once("error", reject);
+    });
+    assert.equal(exit, 0);
+    assert.equal(connections, 1);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
