@@ -211,6 +211,16 @@ const nextConfig: NextConfig = {
         source: "/bundle/:path*",
         destination: `https://the-bundle-web.vercel.app/bundle/:path*`,
       },
+      // Grida FX — source: https://github.com/gridaco/fx (www/), a static
+      // export built with basePath "/fx" and no trailing slashes.
+      {
+        source: "/fx",
+        destination: `https://grida-fx.vercel.app/fx`,
+      },
+      {
+        source: "/fx/:path*",
+        destination: `https://grida-fx.vercel.app/fx/:path*`,
+      },
     ];
   },
   headers: async () => {
