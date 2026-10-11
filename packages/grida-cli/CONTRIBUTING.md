@@ -26,7 +26,10 @@ continuing TypeScript/web packages consume the same neutral
 [catalogue data](https://github.com/gridaco/grida/tree/main/data/ai)
 and [input schemas](https://github.com/gridaco/grida/blob/main/data/ai/inputs.json).
 The CLI does not refresh this catalogue or choose a model/provider implicitly.
-The npm launcher only selects the matching binary and forwards the invocation.
+The npm launcher selects the matching binary and forwards the invocation. It
+also hands `grida fx …` to the pinned `@grida/fx` (FX owns that command line)
+and prints the daily update notice; see the
+[release guide](https://github.com/gridaco/grida/blob/main/scripts/cli-release/README.md).
 
 Do not import agent, daemon, Electron, Next.js or browser application state.
 Do not add generic authenticated fetch, token getters, duplicated domain policy,
@@ -68,8 +71,9 @@ Rust builds do not need Node or compiled TypeScript packages. Native OS keyring
 adapters are linked into the binary; there is no optional keytar addon. npm
 candidates are staged by the release scripts, not by packing this source
 directory. One published `grida` package contains the launcher and all eight
-native executables. The staged manifest has no dependencies or lifecycle
-scripts; installation does not download or resolve separate platform packages.
+native executables. The staged manifest has no lifecycle scripts and one
+dependency, `@grida/fx` at an exact version, which brings FX's engine package
+for the machine; `grida`'s own executables are never resolved separately.
 
 After `pnpm install --frozen-lockfile`, run `just cli-contracts` for the reviewed
 CLI/provider fixtures, current TS/Rust shared custody, installed package and

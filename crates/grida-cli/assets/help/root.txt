@@ -6,6 +6,7 @@ Commands:
   auth       Sign in and manage this CLI's session
   account    Read your identity, organizations and credits
   ai         Manage provider keys, discover models and generate media
+  fx         Plan and run Grida FX workflows
   docs       Print canonical documentation URLs
 
 Options: --help, --version

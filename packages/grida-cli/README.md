@@ -16,6 +16,9 @@ npm install -g grida
 grida --help
 ```
 
+`grida fx` runs [Grida FX](https://grida.co/fx) workflows: generative asset
+pipelines that are priced before anything is spent, cached and recorded.
+
 [Read the docs](https://grida.co/docs/cli) for setup, supported platforms,
 provider configuration and examples.
 

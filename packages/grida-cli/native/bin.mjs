@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { constants } from "node:os";
 import { fileURLToPath } from "node:url";
+import { checkForUpdate } from "./update.mjs";
 
 const platforms = JSON.parse(
   readFileSync(new URL("./platforms.json", import.meta.url), "utf8")
@@ -93,8 +94,44 @@ export function launch(args = process.argv.slice(2)) {
   });
 }
 
+/**
+ * `grida fx …`: Grida FX, from the `@grida/fx` version this package pins. FX owns the launch
+ * (process group, signals, exit status) and its command line; see the host contract in
+ * https://github.com/gridaco/fx/blob/main/spec/distribution.md. Loaded only for `fx`.
+ */
+export async function launchFx(args) {
+  let fx;
+  try {
+    fx = await import("@grida/fx/cli");
+  } catch {
+    process.stderr.write(
+      "grida fx: Grida FX is not installed with this grida. Reinstall grida.\n"
+    );
+    process.exitCode = 1;
+    return;
+  }
+  if (fx.HOST_CONTRACT !== 1) {
+    process.stderr.write(
+      `grida fx: the installed Grida FX speaks host contract ${fx.HOST_CONTRACT}, not 1. Reinstall grida.\n`
+    );
+    process.exitCode = 1;
+    return;
+  }
+  fx.launch(args, { invoker: "grida" });
+}
+
 if (
   process.argv[1] &&
   realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
-)
-  launch();
+) {
+  const args = process.argv.slice(2);
+  let version;
+  try {
+    version = JSON.parse(
+      readFileSync(new URL("../package.json", import.meta.url), "utf8")
+    ).version;
+  } catch {}
+  if (version) checkForUpdate(args, { version });
+  if (args[0] === "fx") await launchFx(args.slice(1));
+  else launch(args);
+}

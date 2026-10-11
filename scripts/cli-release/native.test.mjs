@@ -9,6 +9,7 @@ import {
   readFile,
   readdir,
   rm,
+  stat,
   symlink,
   writeFile,
 } from "node:fs/promises";
@@ -33,6 +34,14 @@ import {
   verifyInstalledMatrix,
 } from "./native-publish.mjs";
 import { selectPlatform } from "../../packages/grida-cli/native/bin.mjs";
+import {
+  checkForUpdate,
+  enabled,
+  newer,
+  notice,
+  refresh,
+  stateFile,
+} from "../../packages/grida-cli/native/update.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const exec = promisify(execFile);
@@ -102,6 +111,7 @@ test("Windows checkout filters preserve byte-verified native release sources", a
     "packages/grida-cli/README.md",
     "packages/grida-cli/THIRD-PARTY-NOTICES.txt",
     "packages/grida-cli/native/bin.mjs",
+    "packages/grida-cli/native/update.mjs",
     "packages/grida-cli/native/platforms.json",
     "packages/grida-cli/native/licenses.json",
   ]) {
@@ -131,8 +141,12 @@ test("Windows checkout filters preserve byte-verified native release sources", a
 async function rootOnlyInstall(out, report, runtime) {
   const metadata = new Map();
   const archives = new Map();
-  for (const record of [report.package]) {
-    const filename = path.join(out, "archives", record.archive);
+  const records = [
+    ["archives", report.package],
+    ...report.dependencies.map((record) => ["dependencies", record]),
+  ];
+  for (const [folder, record] of records) {
+    const filename = path.join(out, folder, record.archive);
     const bytes = await readFile(filename);
     const manifest = JSON.parse(
       (
@@ -192,7 +206,8 @@ async function rootOnlyInstall(out, report, runtime) {
   origin = `http://127.0.0.1:${registry.address().port}`;
   try {
     await mkdir(runtime);
-    // The public registry contract is one package and one archive request.
+    // The public registry contract is grida and the @grida/fx it pins: one archive each, and
+    // an engine archive only where Grida FX has one for this host.
     // npmRun supplies an empty per-test cache/configuration, with audit off.
     await npmRun(
       [
@@ -216,9 +231,12 @@ async function rootOnlyInstall(out, report, runtime) {
       (await readdir(path.join(runtime, "node_modules")))
         .filter((name) => name !== ".package-lock.json")
         .sort(),
-      [".bin", "grida"]
+      [".bin", "@grida", "grida"]
     );
-    assert.deepEqual(requestedArchives, [report.package.archive]);
+    assert.deepEqual(
+      requestedArchives.sort(),
+      [report.package.archive, report.dependencies[0].archive].sort()
+    );
     assert.deepEqual(
       (await readdir(path.join(runtime, "node_modules/grida/binaries"))).sort(),
       platforms.map((p) => p.id).sort()
@@ -237,6 +255,16 @@ async function rootOnlyInstall(out, report, runtime) {
     );
     assert.equal(version.stdout, `grida ${report.version}\n`);
     assert.equal(version.stderr, "");
+    const fx = await exec(
+      process.execPath,
+      [
+        path.join(runtime, "node_modules/grida/native/bin.mjs"),
+        "fx",
+        "--version",
+      ],
+      { cwd: runtime, timeout: 10_000, maxBuffer: 1024 * 1024 }
+    );
+    assert.equal(fx.stdout, `grida-fx ${report.dependencies[0].version}\n`);
   } finally {
     registry.closeAllConnections();
     await new Promise((resolve) => registry.close(resolve));
@@ -456,6 +484,7 @@ test("release requires the native manifest, stable tag policy and real installed
     name: "grida",
     version: "0.2.0",
     private: false,
+    dependencies: { "@grida/fx": "0.2.0" },
   });
   releaseGuard(manifest, "0.2.0", "latest");
   releaseGuard({ ...manifest, version: "0.3.0-rc.2" }, "0.3.0-rc.2", "next");
@@ -479,9 +508,12 @@ test("release requires the native manifest, stable tag policy and real installed
       platform: p.id,
       binary_sha256: `${p.id}-binary`,
     })),
+    dependencies: [{ name: "@grida/fx", version: "0.2.0", sha256: "fx" }],
   };
   const checks = [
     "offline_npm_install",
+    "exact_fx_dependency",
+    "fx_dispatch",
     "exact_package_version",
     "bundled_platform_matrix",
     "installed_binary_hash",
@@ -500,6 +532,7 @@ test("release requires the native manifest, stable tag policy and real installed
         platform: p.platform,
         archive_sha256: "package",
         binary_sha256: p.binary_sha256,
+        fx: { version: "0.2.0", sha256: "fx", engine: null },
         checks,
       })
     );
@@ -507,6 +540,16 @@ test("release requires the native manifest, stable tag policy and real installed
   await assert.rejects(
     verifyInstalledMatrix(out, { ...report, fixture_targets: ["win32-arm64"] }),
     /cannot be released/
+  );
+  await assert.rejects(
+    verifyInstalledMatrix(out, { ...report, fixture_dependencies: true }),
+    /fixture Grida FX cannot be released/
+  );
+  await assert.rejects(
+    verifyInstalledMatrix(out, {
+      ...report,
+      dependencies: [{ name: "@grida/fx", version: "0.2.0", sha256: "other" }],
+    })
   );
   await writeFile(
     path.join(out, `installed-${report.binaries[0].platform}.json`),
@@ -518,10 +561,23 @@ test("release requires the native manifest, stable tag policy and real installed
 test("platform metadata is exact, libc-specific and never guesses another architecture", () => {
   assert.equal(platforms.length, 8);
   assert.equal(new Set(platforms.map((p) => p.target)).size, 8);
-  const manifest = packageManifest({ name: "grida", version: "0.2.0" });
+  const source = {
+    name: "grida",
+    version: "0.2.0",
+    dependencies: { "@grida/fx": "0.2.0" },
+  };
+  const manifest = packageManifest(source);
   assert.equal(manifest.optionalDependencies, undefined);
-  assert.equal(manifest.dependencies, undefined);
+  assert.deepEqual(manifest.dependencies, { "@grida/fx": "0.2.0" });
   assert.equal(manifest.scripts, undefined);
+  // Grida FX is the one dependency, pinned to one exact version.
+  for (const changed of [
+    { dependencies: undefined },
+    { dependencies: { "@grida/fx": "^0.2.0" } },
+    { dependencies: { "@grida/fx": "0.2.0", other: "1.0.0" } },
+    { optionalDependencies: { "@grida/fx-darwin-arm64": "0.2.0" } },
+  ])
+    assert.throws(() => packageManifest({ ...source, ...changed }));
   assert(manifest.files.includes("binaries"));
   assert.equal(
     selectPlatform("linux", "x64", { header: { glibcVersionRuntime: "2.35" } })
@@ -576,6 +632,12 @@ test(
     assert.equal(report.format, 2);
     assert.equal(report.binaries.length, 8);
     assert.equal((await readdir(path.join(out, "archives"))).length, 1);
+    assert.equal(report.fixture_dependencies, true);
+    assert.deepEqual(
+      (await readdir(path.join(out, "dependencies"))).sort(),
+      report.dependencies.map((record) => record.archive).sort()
+    );
+    assert(proof.checks.includes("fx_dispatch"));
     const reportFile = path.join(out, "native-candidate.json");
     for (const changed of [
       { ...report, binaries: report.binaries.slice(1) },
@@ -596,6 +658,15 @@ test(
       await assert.rejects(verifyNative(out));
     }
     await writeFile(reportFile, JSON.stringify(report));
+    const fxArchive = path.join(
+      out,
+      "dependencies",
+      report.dependencies[0].archive
+    );
+    const fxBytes = await readFile(fxArchive);
+    await writeFile(fxArchive, Buffer.concat([fxBytes, Buffer.from("tamper")]));
+    await assert.rejects(verifyNative(out));
+    await writeFile(fxArchive, fxBytes);
     const archive = path.join(out, "archives", report.package.archive);
     await writeFile(
       archive,
@@ -614,7 +685,7 @@ async function launcherFixture(scratch) {
     path.join(directory, "package.json"),
     JSON.stringify({ name: "grida", version, type: "module" })
   );
-  for (const file of ["bin.mjs", "platforms.json"])
+  for (const file of ["bin.mjs", "update.mjs", "platforms.json"])
     await copyFile(
       path.join(root, "packages/grida-cli/native", file),
       path.join(directory, "native", file)
@@ -712,3 +783,162 @@ test(
     assert.equal((await result).code, 19);
   }
 );
+
+async function fxFixture(directory, contract = 1) {
+  const fx = path.join(directory, "node_modules/@grida/fx");
+  await mkdir(fx, { recursive: true });
+  await writeFile(
+    path.join(fx, "package.json"),
+    JSON.stringify({
+      name: "@grida/fx",
+      version: "0.2.0",
+      type: "module",
+      exports: { "./cli": "./cli.js" },
+    })
+  );
+  await writeFile(
+    path.join(fx, "cli.js"),
+    `export const HOST_CONTRACT = ${contract};\n` +
+      "export function launch(argv, options) { process.stdout.write(JSON.stringify({ argv, options })); process.exitCode = 5; }\n"
+  );
+}
+
+test("grida fx hands its arguments to the pinned Grida FX as the grida invoker", async (t) => {
+  const scratch = await mkdtemp(path.join(tmpdir(), "grida-launcher-fx-"));
+  t.after(() => rm(scratch, { recursive: true, force: true }));
+  const { launcher } = await launcherFixture(scratch);
+  const run = (args) => {
+    const child = spawn(process.execPath, [launcher, ...args], {
+      stdio: "pipe",
+    });
+    child.stdin.end();
+    return childResult(child);
+  };
+  const missing = await run(["fx", "--version"]);
+  assert.equal(missing.code, 1);
+  assert.equal(missing.stdout, "");
+  assert.equal(
+    missing.stderr,
+    "grida fx: Grida FX is not installed with this grida. Reinstall grida.\n"
+  );
+  await fxFixture(path.join(scratch, "grida"), 2);
+  const foreign = await run(["fx", "--version"]);
+  assert.equal(foreign.code, 1);
+  assert.match(foreign.stderr, /host contract 2, not 1/);
+  await fxFixture(path.join(scratch, "grida"));
+  const args = ["run", "a b", "--live", "--json", "雪"];
+  const handed = await run(["fx", ...args]);
+  assert.equal(handed.code, 5, JSON.stringify(handed));
+  assert.deepEqual(JSON.parse(handed.stdout), {
+    argv: args,
+    options: { invoker: "grida" },
+  });
+  // Only the first word selects FX.
+  const other = await run(["-e", "process.stdout.write('native')", "--", "fx"]);
+  assert.equal(other.stdout, "native");
+});
+
+test("the update notice compares SemVer and stays out of scripts, CI and --json", () => {
+  for (const [a, b] of [
+    ["0.6.0", "0.5.0"],
+    ["1.0.0", "0.9.9"],
+    ["0.5.1", "0.5.0"],
+    ["0.5.0", "0.5.0-rc.1"],
+    ["0.5.0-rc.2", "0.5.0-rc.1"],
+    ["0.5.0-rc.10", "0.5.0-rc.9"],
+    ["0.5.0-rc", "0.5.0-1"],
+  ]) {
+    assert(newer(a, b), `${a} > ${b}`);
+    assert(!newer(b, a), `${b} < ${a}`);
+  }
+  assert(!newer("0.5.0", "0.5.0"));
+  assert(!newer("garbage", "0.5.0"));
+  assert.equal(stateFile({ GRIDA_HOME: "relative" }), null);
+  assert.equal(stateFile({ GRIDA_HOME: "" }), null);
+  assert.equal(
+    stateFile({ GRIDA_HOME: "/home/a/.grida" }),
+    path.join("/home/a/.grida", "cli", "update.json")
+  );
+  const tty = { isTTY: true };
+  assert(enabled([], {}, tty));
+  assert(!enabled([], {}, {}));
+  assert(!enabled([], { CI: "true" }, tty));
+  assert(!enabled([], { GRIDA_NO_UPDATE_CHECK: "1" }, tty));
+  assert(!enabled(["ai", "models", "list", "--json"], {}, tty));
+  assert.equal(
+    notice("0.5.0", { latest: "0.6.0" }),
+    "grida 0.6.0 is available (this is 0.5.0). Update: npm install -g grida@latest\n"
+  );
+  assert.equal(notice("0.5.0", { latest: "0.5.0" }), null);
+  assert.equal(notice("0.6.0", { latest: "0.5.0" }), null);
+  assert.equal(notice("0.5.0", {}), null);
+});
+
+test("the update notice reads a local record and refreshes it at most daily", async (t) => {
+  const home = await mkdtemp(path.join(tmpdir(), "grida-update-"));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const env = { GRIDA_HOME: home };
+  const file = stateFile(env);
+  const written = [];
+  const refreshed = [];
+  const stderr = { isTTY: true, write: (text) => written.push(text) };
+  const options = (now) => ({
+    version: "0.5.0",
+    env,
+    stderr,
+    now,
+    refresh: (target) => refreshed.push(target),
+  });
+  // No record: no notice, and a check starts.
+  checkForUpdate([], options(1_000));
+  assert.deepEqual([written, refreshed], [[], [file]]);
+  // A failed check records the attempt and keeps no version.
+  await refresh(file, {
+    fetch: async () => {
+      throw new Error("offline");
+    },
+    now: () => 1_000,
+  });
+  assert.deepEqual(JSON.parse(await readFile(file, "utf8")), {
+    checked_at: 1_000,
+    latest: null,
+  });
+  if (process.platform !== "win32")
+    assert.equal((await stat(file)).mode & 0o777, 0o600);
+  refreshed.length = 0;
+  checkForUpdate([], options(2_000));
+  assert.deepEqual([written, refreshed], [[], []]);
+  // A day later the next check runs; it finds a newer grida.
+  checkForUpdate([], options(1_000 + 24 * 60 * 60 * 1000));
+  assert.deepEqual(refreshed, [file]);
+  await refresh(file, {
+    fetch: async (url) => {
+      assert.equal(url, "https://registry.npmjs.org/-/package/grida/dist-tags");
+      return {
+        ok: true,
+        json: async () => ({ latest: "0.6.0", next: "0.7.0-rc.1" }),
+      };
+    },
+    now: () => 5_000,
+  });
+  refreshed.length = 0;
+  checkForUpdate(["fx", "run", "case"], options(6_000));
+  assert.deepEqual(written, [
+    "grida 0.6.0 is available (this is 0.5.0). Update: npm install -g grida@latest\n",
+  ]);
+  assert.deepEqual(refreshed, []);
+  // A failed later check keeps the version it knew.
+  await refresh(file, { fetch: async () => ({ ok: false }), now: () => 7_000 });
+  assert.deepEqual(JSON.parse(await readFile(file, "utf8")), {
+    checked_at: 7_000,
+    latest: "0.6.0",
+  });
+  // Disabled: neither notice nor check.
+  written.length = 0;
+  checkForUpdate(["--json"], options(99 * 24 * 60 * 60 * 1000));
+  checkForUpdate([], {
+    ...options(99 * 24 * 60 * 60 * 1000),
+    stderr: { write: stderr.write },
+  });
+  assert.deepEqual([written, refreshed], [[], []]);
+});

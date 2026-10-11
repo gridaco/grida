@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
-import { npmProgram, platforms, verifyNative } from "./native.mjs";
+import { fxVersion, npmProgram, platforms, verifyNative } from "./native.mjs";
 
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -19,8 +19,8 @@ export function releaseGuard(manifest, version, tag) {
     "Source package is not configured for the native CLI"
   );
   assert.deepEqual(manifest.bin, { grida: "./native/bin.mjs" });
-  assert.equal(manifest.optionalDependencies, undefined);
-  assert.equal(manifest.dependencies, undefined);
+  // Grida FX is the one dependency, at one exact version (fxVersion).
+  fxVersion(manifest);
   assert(manifest.files.includes("binaries"));
   assert.equal(
     version,
@@ -122,6 +122,7 @@ export async function verifyInstalledMatrix(out, report) {
     !report.fixture_targets?.length,
     "Foreign fixture images cannot be released"
   );
+  assert(!report.fixture_dependencies, "A fixture Grida FX cannot be released");
   assert.equal(report.format, 2);
   assert.deepEqual(
     report.binaries.map((p) => p.platform),
@@ -139,8 +140,12 @@ export async function verifyInstalledMatrix(out, report) {
     assert.equal(proof.platform, record.platform);
     assert.equal(proof.archive_sha256, report.package.sha256);
     assert.equal(proof.binary_sha256, record.binary_sha256);
+    assert.equal(proof.fx?.version, report.dependencies[0].version);
+    assert.equal(proof.fx?.sha256, report.dependencies[0].sha256);
     for (const check of [
       "offline_npm_install",
+      "exact_fx_dependency",
+      "fx_dispatch",
       "exact_package_version",
       "bundled_platform_matrix",
       "installed_binary_hash",

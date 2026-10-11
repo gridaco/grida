@@ -22,6 +22,7 @@ pub use help::Topic;
 pub enum FailureCode {
     InvalidUsage,
     InteractionRequired,
+    LauncherRequired,
 }
 
 impl FailureCode {
@@ -29,12 +30,14 @@ impl FailureCode {
         match self {
             Self::InvalidUsage => "invalid_usage",
             Self::InteractionRequired => "interaction_required",
+            Self::LauncherRequired => "launcher_required",
         }
     }
     pub fn exit_code(self) -> u8 {
         match self {
             Self::InvalidUsage => 2,
             Self::InteractionRequired => 1,
+            Self::LauncherRequired => 1,
         }
     }
 }
@@ -50,6 +53,13 @@ impl Failure {
         Self {
             code: FailureCode::InvalidUsage,
             message: "Invalid command or options. Run grida --help or grida <command> --help.",
+        }
+    }
+    /// `grida fx` reached this executable instead of the npm launcher, which hands it to Grida FX.
+    pub fn launcher_required() -> Self {
+        Self {
+            code: FailureCode::LauncherRequired,
+            message: "grida fx runs Grida FX through the npm grida command. Run it as grida fx, from a grida installed with npm.",
         }
     }
 }

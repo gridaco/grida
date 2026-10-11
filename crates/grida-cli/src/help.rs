@@ -71,4 +71,5 @@ topics! {
     RiggingCheck => ("ai rigging check", "rigging-check", "/generate"),
     RiggingRun => ("ai rigging run", "rigging-run", "/generate"),
     Docs => ("docs", "docs", ""),
+    Fx => ("fx", "fx", "/fx"),
 }

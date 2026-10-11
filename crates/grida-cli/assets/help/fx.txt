@@ -1,0 +1,13 @@
+Usage: grida fx <command> [options]
+
+Plan and run Grida FX workflows: generative asset pipelines that are priced
+before anything is spent, cached by request and recorded.
+
+Grida FX owns these commands, their options and their help:
+  grida fx --help
+  grida fx <command> --help
+
+This grida carries the Grida FX version it pins; updating grida updates it.
+
+--no-input suppresses terminal interaction; the OS keyring may still request access.
+Documentation: https://grida.co/docs/cli/fx

@@ -27,14 +27,41 @@ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const json = (value) => JSON.stringify(value, null, 2) + "\n";
 const binaryName = (platform) =>
   platform.os === "win32" ? "grida.exe" : "grida";
+const EXACT_VERSION =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/;
+const integrityOf = (bytes) =>
+  "sha512-" + createHash("sha512").update(bytes).digest("base64");
+
+/** Grida FX, the one dependency: `grida fx` runs the version grida pins. */
+export const FX = "@grida/fx";
+const LIFECYCLE = ["preinstall", "install", "postinstall", "prepare"];
+
+/** The exact @grida/fx version a source manifest pins; nothing else may be a dependency. */
+export function fxVersion(sourceManifest) {
+  for (const field of [
+    "optionalDependencies",
+    "peerDependencies",
+    "bundleDependencies",
+    "bundledDependencies",
+  ])
+    assert.equal(sourceManifest[field], undefined, `grida has no ${field}`);
+  const dependencies = sourceManifest.dependencies ?? {};
+  assert.deepEqual(
+    Object.keys(dependencies),
+    [FX],
+    "grida depends on exactly @grida/fx"
+  );
+  assert(
+    EXACT_VERSION.test(dependencies[FX]),
+    "grida pins @grida/fx to one exact version"
+  );
+  return dependencies[FX];
+}
 
 export function packageManifest(sourceManifest) {
   assert.equal(sourceManifest.name, "grida");
-  assert(
-    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/.test(
-      sourceManifest.version
-    )
-  );
+  assert(EXACT_VERSION.test(sourceManifest.version));
+  const fx = fxVersion(sourceManifest);
   const {
     name,
     version,
@@ -54,8 +81,10 @@ export function packageManifest(sourceManifest) {
     repository,
     type: "module",
     bin: { grida: "./native/bin.mjs" },
+    dependencies: { [FX]: fx },
     files: [
       "native/bin.mjs",
+      "native/update.mjs",
       "native/platforms.json",
       "native/licenses.json",
       "THIRD-PARTY-NOTICES.txt",
@@ -183,6 +212,7 @@ function allowedFiles(record, manifest) {
     "LICENSE",
     "README.md",
     "native/bin.mjs",
+    "native/update.mjs",
     "native/platforms.json",
     "native/licenses.json",
     "THIRD-PARTY-NOTICES.txt",
@@ -235,7 +265,123 @@ async function pack(directory, archives, scratch, manifest) {
   };
 }
 
-export async function prepareNative({ artifacts, out }) {
+async function archiveManifest(archive) {
+  return JSON.parse(
+    (
+      await exec(
+        "tar",
+        ["-xOzf", path.basename(archive), "package/package.json"],
+        {
+          cwd: path.dirname(archive),
+          timeout: 20_000,
+          maxBuffer: 1024 * 1024,
+        }
+      )
+    ).stdout
+  );
+}
+
+/** One dependency archive as the candidate records it, from its own bytes and manifest. */
+async function dependencyRecord(archive) {
+  const bytes = await readFile(archive);
+  const manifest = await archiveManifest(archive);
+  return {
+    name: manifest.name,
+    version: manifest.version,
+    archive: path.basename(archive),
+    sha256: sha256(bytes),
+    integrity: integrityOf(bytes),
+    bytes: bytes.length,
+    os: manifest.os ?? null,
+    cpu: manifest.cpu ?? null,
+    libc: manifest.libc ?? null,
+  };
+}
+
+/**
+ * Hold the dependency archives to the pin: @grida/fx at exactly `version` first, then exactly
+ * the engine packages it pins as optional dependencies. None runs an install script or brings
+ * another dependency.
+ */
+async function checkDependencies(records, directory, version) {
+  assert(records.length >= 1, "The candidate carries @grida/fx");
+  const [fx, ...engines] = records;
+  assert.equal(fx.name, FX);
+  assert.equal(fx.version, version);
+  const manifests = [];
+  for (const record of records) {
+    assert(/^[A-Za-z0-9._-]+\.tgz$/.test(record.archive));
+    const archive = path.join(directory, record.archive);
+    const stat = await lstat(archive);
+    assert(stat.isFile() && stat.size > 0 && stat.size <= 256 * 1024 * 1024);
+    const bytes = await readFile(archive);
+    assert.equal(bytes.length, record.bytes);
+    assert.equal(sha256(bytes), record.sha256);
+    assert.equal(integrityOf(bytes), record.integrity);
+    const manifest = await archiveManifest(archive);
+    assert.equal(manifest.name, record.name);
+    assert.equal(manifest.version, record.version);
+    assert.equal(
+      manifest.dependencies,
+      undefined,
+      `${record.name} has dependencies`
+    );
+    for (const script of LIFECYCLE)
+      assert.equal(
+        manifest.scripts?.[script],
+        undefined,
+        `${record.name} has an install script`
+      );
+    manifests.push(manifest);
+  }
+  const pinned = manifests[0].optionalDependencies ?? {};
+  assert.deepEqual(
+    engines.map((record) => [record.name, record.version]),
+    Object.entries(pinned).sort(([a], [b]) => a.localeCompare(b)),
+    "The candidate carries exactly the engine packages @grida/fx pins"
+  );
+  for (const record of engines) {
+    assert(Array.isArray(record.os) && Array.isArray(record.cpu));
+  }
+}
+
+/** Pack @grida/fx and the engine packages it pins from the public registry; npm checks each
+ * archive against the registry's integrity. */
+async function fetchDependencies(version, directory, scratch) {
+  const packed = async (spec) => {
+    const { stdout } = await npmRun(
+      [
+        "pack",
+        spec,
+        "--pack-destination",
+        directory,
+        "--json",
+        "--ignore-scripts",
+        "--registry",
+        "https://registry.npmjs.org",
+      ],
+      scratch,
+      { timeout: 300_000 }
+    );
+    const [record] = JSON.parse(stdout);
+    return path.join(directory, record.filename);
+  };
+  const fx = await packed(`${FX}@${version}`);
+  const engines = Object.entries(
+    (await archiveManifest(fx)).optionalDependencies ?? {}
+  ).sort(([a], [b]) => a.localeCompare(b));
+  const archives = [fx];
+  for (const [name, pinned] of engines)
+    archives.push(await packed(`${name}@${pinned}`));
+  return archives;
+}
+
+/**
+ * Prepare the candidate: the package with all eight executables, and the exact @grida/fx
+ * archives it pins (`dependencies/`), so installed proofs stay offline. `fxArchives` supplies
+ * them instead of the registry (test fixtures only: publication refuses them).
+ */
+export async function prepareNative({ artifacts, out, fxArchives }) {
   assert(
     path.isAbsolute(artifacts) && path.isAbsolute(out),
     "Use absolute artifact/output directories"
@@ -258,10 +404,28 @@ export async function prepareNative({ artifacts, out }) {
     created = true;
     const main = path.join(out, "package");
     const archives = path.join(out, "archives");
+    const dependencyArchives = path.join(out, "dependencies");
     await mkdir(path.join(main, "native"), { recursive: true });
     await mkdir(archives);
+    await mkdir(dependencyArchives);
+    const fx = manifest.dependencies[FX];
+    const fetched = fxArchives
+      ? fxArchives
+      : await fetchDependencies(fx, dependencyArchives, scratch);
+    const dependencies = [];
+    for (const archive of fetched) {
+      const target = path.join(dependencyArchives, path.basename(archive));
+      if (archive !== target) await copyFile(archive, target);
+      dependencies.push(await dependencyRecord(target));
+    }
+    await checkDependencies(dependencies, dependencyArchives, fx);
     await writeFile(path.join(main, "package.json"), json(manifest));
-    for (const file of ["bin.mjs", "platforms.json", "licenses.json"])
+    for (const file of [
+      "bin.mjs",
+      "update.mjs",
+      "platforms.json",
+      "licenses.json",
+    ])
       await copyFile(
         path.join(source, "native", file),
         path.join(main, "native", file)
@@ -303,6 +467,8 @@ export async function prepareNative({ artifacts, out }) {
       version: manifest.version,
       package: record,
       binaries,
+      dependencies,
+      ...(fxArchives ? { fixture_dependencies: true } : {}),
     };
     await writeFile(path.join(out, "native-candidate.json"), json(report), {
       mode: 0o600,
@@ -379,6 +545,7 @@ export async function verifyNative(out) {
     "README.md",
     "THIRD-PARTY-NOTICES.txt",
     "native/bin.mjs",
+    "native/update.mjs",
     "native/platforms.json",
     "native/licenses.json",
   ]) {
@@ -407,6 +574,11 @@ export async function verifyNative(out) {
     assert.equal(packed.length, binary.binary_bytes);
     assert.equal(sha256(packed), binary.binary_sha256);
   }
+  await checkDependencies(
+    report.dependencies ?? [],
+    path.join(out, "dependencies"),
+    manifest.dependencies[FX]
+  );
   return report;
 }
 
