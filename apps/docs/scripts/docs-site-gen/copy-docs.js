@@ -1,5 +1,6 @@
 const fse = require("fs-extra");
 const path = require("path");
+const sources = require("../sources");
 
 const origin = path.join(__dirname, "../../../../docs");
 const dest = path.join(__dirname, "../../../docs/docs");
@@ -10,7 +11,7 @@ const dest = path.join(__dirname, "../../../docs/docs");
  *
  * use fse.copySync() to copy files.
  */
-function copyAll() {
+function copyAll({ sources_optional = false } = {}) {
   // Mirror `/docs` into the Docusaurus content dir: remove stale files so
   // deletions in the source tree do not leave duplicate routes (e.g. README
   // vs index) in the build output.
@@ -22,6 +23,9 @@ function copyAll() {
       return base !== ".DS_Store";
     },
   });
+  // Then the docs authored in other repos, fetched at their pinned commits
+  // (apps/docs/sources.json, docs/wg/platform/docs-sources.md).
+  sources.materialize(origin, dest, { optional: sources_optional });
 }
 
 module.exports = copyAll;

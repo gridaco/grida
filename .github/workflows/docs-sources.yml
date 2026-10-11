@@ -1,0 +1,109 @@
+name: Docs sources
+
+# Docs authored in other repos and published on grida.co/docs
+# (apps/docs/sources.json, docs/wg/platform/docs-sources.md). This repo
+# stores only their pins (apps/docs/sources.lock.json); the docs build fetches
+# each source at its pin.
+#
+# - verify (PRs): every source is pinned, a version-of pin agrees with its
+#   package (e.g. @grida/fx in packages/grida-cli), every pinned revision
+#   passes the source rules, and no source claims a path docs/ already has.
+# - sync (weekly, or on demand): moves branch-tracked pins and opens one PR.
+#
+# Sources hold no credential for this repo. A private source needs a GitHub
+# App with contents:read on it: DOCS_SOURCES_APP_ID (variable) and
+# DOCS_SOURCES_APP_PRIVATE_KEY (secret), also given to the docs build as
+# DOCS_SOURCES_TOKEN. Without the App, sync PRs are opened with GITHUB_TOKEN
+# and do not trigger other workflows.
+
+on:
+  pull_request:
+    paths:
+      - apps/docs/sources.json
+      - apps/docs/sources.lock.json
+      - apps/docs/scripts/sources/**
+      - packages/grida-cli/package.json
+      - docs/**
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Source id from apps/docs/sources.json (empty = all)
+        required: false
+      ref:
+        description: Pin one source at this ref instead of its policy
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-sources-${{ github.event_name == 'pull_request' && github.ref || 'sync' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: node --test 'apps/docs/scripts/sources/*.test.js'
+      - run: node apps/docs/scripts/sources/cli.js verify
+
+  sync:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: app
+        if: vars.DOCS_SOURCES_APP_ID != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.DOCS_SOURCES_APP_ID }}
+          private-key: ${{ secrets.DOCS_SOURCES_APP_PRIVATE_KEY }}
+          owner: gridaco
+          # this repo, plus every source repo in apps/docs/sources.json
+          repositories: |
+            grida
+            fx
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Move pins
+        env:
+          DOCS_SOURCES_TOKEN: ${{ steps.app.outputs.token }}
+          SOURCE: ${{ inputs.source }}
+          REF: ${{ inputs.ref }}
+        run: |
+          args=(sync)
+          if [ -n "$SOURCE" ]; then args+=("$SOURCE"); fi
+          if [ -n "$REF" ]; then args+=(--ref "$REF"); fi
+          node apps/docs/scripts/sources/cli.js "${args[@]}" | tee sync.log
+          {
+            echo "Moves docs source pins in \`apps/docs/sources.lock.json\`."
+            echo "Content changes are each source repo's own diff:"
+            echo
+            grep -o 'https://github.com/[^ ]*/compare/[^ ]*' sync.log | sed 's/^/- /' || echo "- (no pin moved)"
+            echo
+            echo "Fix content in the source repo, not here."
+          } > pr-body.md
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.app.outputs.token || github.token }}
+          branch: docs/sources-sync
+          delete-branch: true
+          add-paths: apps/docs/sources.lock.json
+          commit-message: "docs: move docs source pins"
+          title: "docs: move docs source pins"
+          body-path: pr-body.md

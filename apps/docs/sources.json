@@ -1,0 +1,29 @@
+{
+  "$comment": "Docs authored in other repos and published on this site — docs/wg/platform/docs-sources.md. Pins live in sources.lock.json; move them with `pnpm sources:sync`.",
+  "assets": {
+    "types": ["png", "jpg", "jpeg", "gif", "webp", "svg", "avif"],
+    "max_bytes": 512000
+  },
+  "sources": {
+    "fx-guide": {
+      "repo": "gridaco/fx",
+      "ref": {
+        "tag": "v{version}",
+        "version_of": {
+          "file": "packages/grida-cli/package.json",
+          "dependency": "@grida/fx"
+        }
+      },
+      "paths": {
+        "docs/guide": "fx"
+      }
+    },
+    "fx-wg": {
+      "repo": "gridaco/fx",
+      "ref": "main",
+      "paths": {
+        "docs/wg": { "to": "wg/fx", "label": "FX" }
+      }
+    }
+  }
+}

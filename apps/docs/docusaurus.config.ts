@@ -4,6 +4,8 @@ import type * as Preset from "@docusaurus/preset-classic";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 
+const sources = require("./scripts/sources");
+
 const footer = {
   links: [
     {
@@ -147,7 +149,10 @@ const config: Config = {
           routeBasePath: "/",
           path: "docs",
           sidebarPath: require.resolve("./sidebars.js"),
-          editUrl: "https://github.com/gridaco/grida/tree/main/docs",
+          // a page from a docs source is edited in its own repo (DS-9)
+          editUrl: ({ docPath }) =>
+            sources.edit_url(docPath) ??
+            `https://github.com/gridaco/grida/tree/main/docs/${docPath}`,
           remarkPlugins: [remarkMath],
           rehypePlugins: [[rehypeKatex, { strict: false }]],
         },

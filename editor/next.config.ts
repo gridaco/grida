@@ -94,6 +94,13 @@ const nextConfig: NextConfig = {
         destination: `https://github.com/gridaco/nothing/tree/main/docs/wg/${cluster}`,
         permanent: true,
       })),
+      // FX docs are published at /docs/fx (from gridaco/fx — see
+      // apps/docs/sources.json); /fx is the FX website, rewritten below.
+      {
+        source: "/fx/docs/:path*",
+        destination: "/docs/fx/:path*",
+        permanent: true,
+      },
       // /login => /sign-in
       {
         source: "/login",

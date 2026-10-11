@@ -6,6 +6,9 @@ This website is built using [Docusaurus](https://docusaurus.io/).
 
 - Source docs live in the repository root under `/docs/**`.
 - `/apps/docs/docs/**` is generated during docs setup and build.
+- Some pages are authored in other repos (docs sources, e.g. FX) and fetched at
+  build from the commits pinned in `sources.lock.json` — see
+  [CONTRIBUTING.md](./CONTRIBUTING.md#docs-from-other-repos-docs-sources).
 - Locale files live in `translations/<locale>/` directories next to the source docs and are copied into Docusaurus i18n output.
 - Setup clears generated `i18n/<locale>/docusaurus-plugin-content-docs/current`
   before copying translations, so retired pages cannot survive in a locale.
