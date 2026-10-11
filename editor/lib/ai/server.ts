@@ -4,6 +4,8 @@ import { platformProductBilling } from "@/lib/platform/product-consumer";
 import {
   productDigest,
   ProductBillingError,
+  exactCostMills,
+  type ProductExecution,
 } from "@/lib/platform/product-billing";
 
 /**
@@ -60,6 +62,8 @@ import {
   type ModelTier,
 } from "./models";
 import { ai } from "./ai";
+import { computeImageCostMills } from "./image-cost";
+import { nativeImageReservationPolicy as imageReservation } from "./native-image-reservation.generated";
 import {
   type AiErrorResponse,
   billingErrorToAiError,
@@ -83,6 +87,12 @@ export interface GridaCallContext {
   transactionId?: string;
   /** Digest of the actual provider input, required for durable paid execution. */
   requestDigest?: string;
+  /** Finite hold fixed before admission; expensePolicy identifies accepted estimates. */
+  authorizedMills?: string;
+  expenseBoundMills?: string;
+  /** Explicitly accepted native tool/image estimate policy; never a GG API policy. */
+  expensePolicy?: "native-interactive-estimate-v1" | "native-image-estimate-v1";
+  tariffRevision?: string;
   /**
    * Retained caller option. Paid calls now always commit durable usage custody
    * before returning. A completion failure leaves the execution unresolved
@@ -215,7 +225,10 @@ export async function checkGate(ctx: GridaCallContext): Promise<void> {
  */
 export async function withTransaction<T>(
   ctx: GridaCallContext,
-  op: (transactionId: string) => Promise<{ result: T; costMills: number }>
+  op: (
+    transactionId: string,
+    execution: ProductExecution
+  ) => Promise<{ result: T; costMills: number }>
 ): Promise<T> {
   assertOrgId(ctx.organizationId);
   if (!ctx.requestDigest) throw new ProductBillingError();
@@ -223,12 +236,148 @@ export async function withTransaction<T>(
   const execution = await billing.begin({
     ...ctx,
     requestDigest: ctx.requestDigest,
+    ...executionBounds(ctx),
   });
   // Failure/cancellation after dispatch remains durable unknown; it never
   // receives a second dispatch grant or a fabricated zero-cost receipt.
-  const { result, costMills } = await op(execution.id);
+  const { result, costMills } = await op(execution.id, execution);
   await billing.complete(execution, costMills, { result, costMills });
   return result;
+}
+
+/** Holds come from the request policy, never from a stale balance display. */
+function executionBounds(ctx: GridaCallContext & { costMills?: number }) {
+  if (ctx.authorizedMills && ctx.expenseBoundMills && ctx.tariffRevision)
+    return {
+      authorizedMills: ctx.authorizedMills,
+      expenseBoundMills: ctx.expenseBoundMills,
+      tariffRevision: ctx.tariffRevision,
+    };
+  // Unqualified bounds request only the deployed native policy. Platform rejects
+  // that policy for every selected shared account; no average becomes a hold.
+  return {};
+}
+
+/** A conservative token ceiling, including cache-write and long-context rates.
+ * Unknown cost cards fail before dispatch. This reserves the full input context;
+ * successful settlement releases the unused maximum. */
+export function textExecutionBounds(modelId: string, maxOutputTokens?: number) {
+  const spec = resolveModelSpec(modelId),
+    rates = spec.cost;
+  const output = maxOutputTokens ?? spec.outputLimit;
+  if (
+    !Number.isSafeInteger(spec.contextWindow) ||
+    spec.contextWindow <= 0 ||
+    !Number.isSafeInteger(spec.outputLimit) ||
+    spec.outputLimit <= 0 ||
+    !Number.isSafeInteger(output) ||
+    output <= 0 ||
+    output > spec.outputLimit
+  )
+    throw new ProductBillingError("invalid_cost");
+  const inputRate =
+    Math.max(
+      rates.input,
+      rates.cacheRead ?? rates.input,
+      rates.cacheWrite ?? rates.input
+    ) * Math.max(1, rates.longContext?.inputMultiplier ?? 1);
+  const outputRate =
+    rates.output * Math.max(1, rates.longContext?.outputMultiplier ?? 1);
+  if (
+    !Number.isFinite(inputRate) ||
+    !Number.isFinite(outputRate) ||
+    inputRate < 0 ||
+    outputRate < 0
+  )
+    throw new ProductBillingError("invalid_cost");
+  // Upward whole-mill authorization is conservative; receipts keep fractional mills.
+  const amount = exactCostMills(
+    Math.ceil((spec.contextWindow * inputRate + output * outputRate) / 1000)
+  );
+  if (Number(amount) <= 0) throw new ProductBillingError("invalid_cost");
+  return {
+    authorizedMills: amount,
+    expenseBoundMills: amount,
+    tariffRevision: productDigest({
+      model: modelId,
+      rates,
+      contextWindow: spec.contextWindow,
+      outputLimit: output,
+    }),
+  };
+}
+
+/** Native-only forecast with headroom, not a provider-enforced expense cap.
+ * Platform permits one unresolved estimated image call per organization. GG
+ * uses its own strict policy. Actual provider receipts determine settlement. */
+export function imageExecutionBounds(
+  modelId: string,
+  n: number,
+  size: string | undefined,
+  options: Record<string, unknown> | undefined,
+  referenceCount = 0
+) {
+  const card =
+    ai.image.findImageModelCard(modelId) ??
+    ai.image
+      .listed_models()
+      .find((v) => ai.image.binding(v, "vercel")?.id === modelId);
+  if (
+    !card ||
+    !Number.isSafeInteger(n) ||
+    n < 1 ||
+    !Number.isSafeInteger(referenceCount) ||
+    referenceCount < 0
+  )
+    throw new ProductBillingError("invalid_cost");
+  const binding = ai.image.binding(card, "vercel");
+  if (
+    !binding ||
+    !(imageReservation.models as readonly string[]).includes(binding.id)
+  )
+    return {};
+  const dimensions = size?.match(/^(\d+)x(\d+)$/);
+  if (size && !dimensions) throw new ProductBillingError("invalid_cost");
+  const width = dimensions ? Number(dimensions[1]) : undefined;
+  const height = dimensions ? Number(dimensions[2]) : undefined;
+  const area =
+    width && height ? Math.max(1, (width * height) / (1024 * 1024)) : 1;
+  if (width === 0 || height === 0 || !Number.isFinite(area))
+    throw new ProductBillingError("invalid_cost");
+  const provider = options?.[binding.id.split("/")[0]!];
+  const quality =
+    provider &&
+    typeof provider === "object" &&
+    "quality" in provider &&
+    typeof provider.quality === "string"
+      ? provider.quality
+      : undefined;
+  const forecast = computeImageCostMills(card, { n, width, height, quality });
+  const held = Math.ceil(
+    Math.max(
+      imageReservation.minimum_mills_per_output * n,
+      forecast * imageReservation.estimate_multiplier * area
+    ) +
+      referenceCount * n * imageReservation.reference_allowance_mills_per_output
+  );
+  if (!Number.isSafeInteger(held) || held <= 0)
+    throw new ProductBillingError("invalid_cost");
+  const amount = exactCostMills(held);
+  return {
+    authorizedMills: amount,
+    expenseBoundMills: amount,
+    expensePolicy: imageReservation.id,
+    tariffRevision: productDigest({
+      model: binding.id,
+      policy: imageReservation.sha256,
+      pricing: card.pricing,
+      forecast,
+      n,
+      size,
+      quality,
+      referenceCount,
+    }),
+  };
 }
 
 // ===========================================================================
@@ -362,6 +511,7 @@ const languageModelMiddleware: LanguageModelMiddleware = {
   wrapGenerate: async ({ doGenerate, params, model }) => {
     const ctx = {
       ...extractContext(model.modelId, params.providerOptions),
+      ...textExecutionBounds(model.modelId, params.maxOutputTokens),
       requestDigest: productDigest(params),
     };
     return withTransaction(ctx, async () => {
@@ -374,13 +524,18 @@ const languageModelMiddleware: LanguageModelMiddleware = {
   wrapStream: async ({ doStream, params, model }) => {
     const ctx = {
       ...extractContext(model.modelId, params.providerOptions),
+      ...textExecutionBounds(model.modelId, params.maxOutputTokens),
       requestDigest: productDigest(params),
     };
     // Admission and dispatch commit before the upstream connection opens.
     // Only reliable final usage completes custody; interrupted streams
     // remain dispatched with an unknown outcome for reconciliation.
     const billing = platformProductBilling();
-    const execution = await billing.begin(ctx);
+    const execution = await billing.begin({
+      ...ctx,
+      ...executionBounds(ctx),
+      requestDigest: ctx.requestDigest,
+    });
     const upstream = await doStream();
     let finalCostMills: number | null = null;
     const tapped = upstream.stream.pipeThrough(
@@ -408,19 +563,29 @@ const imageModelMiddleware: ImageModelMiddleware = {
 
   // Prefer Vercel AI Gateway's response receipt (USD), which accounts for actual quality,
   // dimensions and cache use. Caller pricing remains a fallback for responses
-  // without a receipt; aggregate image token counts cannot price mixed inputs.
+  // without a receipt only on unselected accounts; aggregate image token counts
+  // cannot price mixed inputs. Shared accounts retain their hold when unknown.
   // https://vercel.com/academy/ai-gateway/ai-gateway-pricing
   wrapGenerate: async ({ doGenerate, params, model }) => {
     const ctx = {
       ...extractContext(model.modelId, params.providerOptions),
       requestDigest: productDigest(params),
+      ...imageExecutionBounds(
+        model.modelId,
+        params.n,
+        params.size,
+        params.providerOptions,
+        (params.files?.length ?? 0) + (params.mask ? 1 : 0)
+      ),
     };
-    if (typeof ctx.costMills !== "number") {
-      console.warn(
-        `[ai-seam] image call missing providerOptions.grida.costMills (model=${ctx.model_id}, feature=${ctx.feature}); no fallback estimate`
-      );
-    }
-    return withTransaction(ctx, async () => {
+    if (
+      typeof ctx.costMills !== "number" ||
+      !Number.isFinite(ctx.costMills) ||
+      ctx.costMills <= 0
+    )
+      throw new ProductBillingError("invalid_cost");
+    const fallbackMills = ctx.costMills;
+    return withTransaction(ctx, async (_id, execution) => {
       const result = await doGenerate();
       const vercelAiGatewayMetadata = result.providerMetadata?.gateway;
       const rawCost =
@@ -438,10 +603,13 @@ const imageModelMiddleware: ImageModelMiddleware = {
       const reportedMills = reportedUsd * 1000;
       // A legitimate zero receipt is not missing. Never turn malformed data
       // into free usage, or multiply a per-call receipt by the image count.
-      const costMills =
-        Number.isFinite(reportedMills) && reportedMills >= 0
-          ? reportedMills
-          : (ctx.costMills ?? 0);
+      const validReceipt = Number.isFinite(reportedMills) && reportedMills >= 0;
+      // A shared hold is a reservation, never evidence of the actual charge.
+      // Missing provider evidence keeps dispatched work unresolved and held.
+      // Preserve the deployed estimate fallback only for unselected accounts.
+      if (!validReceipt && execution.claim.policy_version === "shared-ai-v1")
+        throw new ProductBillingError("invalid_cost");
+      const costMills = validReceipt ? reportedMills : fallbackMills;
       return { result, costMills };
     });
   },
@@ -612,6 +780,32 @@ export async function runPredictionRaw<T = unknown>(
 const MODEL_ID_851_LABS_BACKGROUND_REMOVER_IDENTIFIER =
   "851-labs/background-remover:a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc";
 
+/** Existing interactive tools retain their customer tariff and coordinate
+ * that amount with shared credit. Real-ESRGAN, Bria and Recraft are documented
+ * flat prices. 851 is compute-priced: its existing estimate is an explicitly
+ * accepted small operator-cost variance, not an enforceable expense maximum.
+ * This exception does not publish a model or loosen any Gateway API. */
+export function imageToolExecutionBounds(
+  modelId: ai.image_tools.ImageToolModelId
+) {
+  const card = ai.image_tools.models[modelId];
+  const amount = exactCostMills(ai.toMills(card.cost_usd));
+  const expensePolicy =
+    modelId === "851-labs/background-remover"
+      ? ("native-interactive-estimate-v1" as const)
+      : undefined;
+  return {
+    authorizedMills: amount,
+    expenseBoundMills: amount,
+    ...(expensePolicy ? { expensePolicy } : {}),
+    tariffRevision: productDigest({
+      model: modelId,
+      usd: card.cost_usd,
+      expensePolicy: expensePolicy ?? "provider-flat-price",
+    }),
+  };
+}
+
 function normalizeImageUrl(image: ai.server.methods.ImageData): string {
   if (image.kind === "url") return image.url;
   if (image.base64.startsWith("data:")) return image.base64;
@@ -632,6 +826,7 @@ export namespace methods {
         feature: "ai/image/upscale",
         model_id: "nightmareai/real-esrgan",
         costMills: ai.toMills(card.cost_usd),
+        ...imageToolExecutionBounds("nightmareai/real-esrgan"),
       },
       {
         image: imageUrl,
@@ -660,6 +855,12 @@ export namespace methods {
         feature: "ai/music/generate",
         model_id,
         costMills: ai.toMills(card.pricing.usd),
+        authorizedMills: exactCostMills(Math.ceil(card.pricing.usd * 1000)),
+        expenseBoundMills: exactCostMills(Math.ceil(card.pricing.usd * 1000)),
+        tariffRevision: productDigest({
+          model: model_id,
+          pricing: card.pricing,
+        }),
       },
       input
     );
@@ -681,6 +882,7 @@ export namespace methods {
       organizationId,
       feature: "ai/image/remove-background",
       costMills: ai.toMills(card.cost_usd),
+      ...imageToolExecutionBounds(model_id),
     } as const;
 
     switch (model_id) {
@@ -880,6 +1082,15 @@ export namespace methods {
         feature: "v1/ai/video",
         model_id: card.id,
         requestDigest: productDigest(req),
+        authorizedMills: exactCostMills(ai.toMills(rate * card.max_duration)),
+        expenseBoundMills: exactCostMills(ai.toMills(rate * card.max_duration)),
+        tariffRevision: productDigest({
+          model: card.id,
+          resolution: resolutionLabel,
+          audioMode,
+          rate,
+          max_duration: card.max_duration,
+        }),
       },
       async () => {
         const generation = await experimental_generateVideo({

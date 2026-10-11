@@ -147,6 +147,7 @@ export namespace GgThreeD {
       {
         ...context(organizationId, "model-generation", model_id),
         requestDigest: productDigest({ variant, input }),
+        ...generationBounds(model_id, variant),
       },
       catalog.three_d.model_generation.models[model_id].pricing.usd_per_credit,
       async (key) => {
@@ -173,6 +174,10 @@ export namespace GgThreeD {
       {
         ...context(organizationId, "rig-check", "tripo/rig-check"),
         requestDigest: productDigest(input),
+        ...creditBounds(
+          catalog.three_d.rig_check.operation.pricing,
+          "tripo/rig-check"
+        ),
       },
       catalog.three_d.rig_check.operation.pricing.usd_per_credit,
       async (key) => {
@@ -196,6 +201,10 @@ export namespace GgThreeD {
       {
         ...context(organizationId, "rigging", model_id),
         requestDigest: productDigest(input),
+        ...creditBounds(
+          catalog.three_d.rigging.models[model_id].pricing,
+          model_id
+        ),
       },
       catalog.three_d.rigging.models[model_id].pricing.usd_per_credit,
       async (key) => {
@@ -208,6 +217,37 @@ export namespace GgThreeD {
     );
   }
 
+  function creditBounds(
+    pricing: { credits: number; usd_per_credit: number },
+    model: string
+  ) {
+    const amount = String(
+      Math.ceil(pricing.credits * pricing.usd_per_credit * 1000)
+    );
+    return {
+      authorizedMills: amount,
+      expenseBoundMills: amount,
+      tariffRevision: productDigest({ model, pricing }),
+    };
+  }
+  function generationBounds(
+    model: keyof typeof catalog.three_d.model_generation.models,
+    variant: TripoClient.Variant
+  ) {
+    const pricing = catalog.three_d.model_generation.models[model].pricing;
+    // The card bounds every accepted control, including optional detailed geometry.
+    // The SDK continues to reject incompatible controls before submitting a task.
+    const credits =
+      pricing.base_credits[variant] +
+      Math.max(...Object.values(pricing.texture_credits)) +
+      ("detailed_geometry_credits" in pricing
+        ? pricing.detailed_geometry_credits
+        : 0);
+    return creditBounds(
+      { credits, usd_per_credit: pricing.usd_per_credit },
+      model
+    );
+  }
   type Task = { id: string; credits_consumed?: number };
   type Outcome<T> = { ok: true; value: T } | { ok: false; error: Failure };
   function context(

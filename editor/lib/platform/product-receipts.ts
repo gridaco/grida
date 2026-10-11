@@ -4,7 +4,11 @@ import {
   type CanonicalConfig,
 } from "./canonical";
 export type ProductReceiptRPC = (
-  name: "platform_product_usage_page" | "platform_product_usage_ack",
+  name:
+    | "platform_product_usage_page"
+    | "platform_product_usage_ack"
+    | "platform_product_closure_page"
+    | "platform_product_closure_ack",
   args: Record<string, unknown>
 ) => Promise<{ data: unknown; error: unknown }>;
 export async function handleProductReceipts(
@@ -44,7 +48,7 @@ export async function handleProductReceipts(
     if (!body || typeof body !== "object" || Array.isArray(body))
       throw new Error();
     const record = body as Record<string, unknown>;
-    if (operation === "receipts") {
+    if (operation === "receipts" || operation === "closures") {
       if (
         Object.keys(record).length !== 1 ||
         !Number.isInteger(record.limit) ||
@@ -52,9 +56,12 @@ export async function handleProductReceipts(
         (record.limit as number) > 100
       )
         throw new Error();
-      name = "platform_product_usage_page";
+      name =
+        operation === "closures"
+          ? "platform_product_closure_page"
+          : "platform_product_usage_page";
       args = { batch_limit: record.limit };
-    } else if (operation === "receipts/ack") {
+    } else if (operation === "receipts/ack" || operation === "closures/ack") {
       if (
         Object.keys(record).length !== 1 ||
         !Array.isArray(record.event_ids) ||
@@ -70,7 +77,10 @@ export async function handleProductReceipts(
         new Set(record.event_ids).size !== record.event_ids.length
       )
         throw new Error();
-      name = "platform_product_usage_ack";
+      name =
+        operation === "closures/ack"
+          ? "platform_product_closure_ack"
+          : "platform_product_usage_ack";
       args = { event_ids: record.event_ids };
     } else return reply(404, { error: "not_found" });
   } catch {

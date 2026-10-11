@@ -1,10 +1,11 @@
 BEGIN;
-SELECT plan(95);
+SELECT plan(104);
 CREATE TEMP TABLE platform_signatures(signature text PRIMARY KEY, user_callable boolean);
 INSERT INTO platform_signatures VALUES
  ('public.platform_source_work_begin(uuid, text, jsonb, uuid)',false),('public.platform_source_work_capture(uuid, jsonb)',false),('public.platform_source_work_finish(uuid)',false),('public.platform_source_webhook_capture(text, text, bytea, jsonb)',false),('public.platform_source_webhook_ack(text, text, text)',false),
  ('public.platform_billing_owner()',false),('public.platform_account_context(text)',true),('public.platform_organizations_page(text)',true),
  ('public.platform_gg_account_snapshots(jsonb, text)',false),('public.platform_lifecycle_page(integer)',false),('public.platform_lifecycle_ack(uuid[])',false),
+ ('public.platform_product_closure_page(integer)',false),('public.platform_product_closure_ack(uuid[])',false),('public.platform_product_execution_close(text, text, jsonb)',false),
  ('public.platform_product_execution_claim(text, text, jsonb)',false),('public.platform_product_execution_dispatch(text, text)',false),
  ('public.platform_product_execution_receipt(text, text, jsonb)',false),('public.platform_product_usage_page(integer)',false),('public.platform_product_usage_ack(uuid[])',false);
 SELECT is((SELECT array_agg(format('public.%s(%s)',p.proname,oidvectortypes(p.proargtypes)) ORDER BY p.proname) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname LIKE 'platform_%'),(SELECT array_agg(signature ORDER BY signature) FROM platform_signatures),'complete public RPC family and overload inventory');
@@ -12,7 +13,7 @@ SELECT ok(NOT has_function_privilege('anon',to_regprocedure(signature),'EXECUTE'
 SELECT is(has_function_privilege('authenticated',to_regprocedure(signature),'EXECUTE'),user_callable,'authenticated contract '||signature) FROM platform_signatures ORDER BY signature;
 SELECT is(has_function_privilege('service_role',to_regprocedure(signature),'EXECUTE'),NOT user_callable,'service contract '||signature) FROM platform_signatures ORDER BY signature;
 SELECT ok(NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) a WHERE (n.nspname='grida_platform' OR n.nspname='public' AND p.proname LIKE 'platform_%') AND a.grantee=0 AND a.privilege_type='EXECUTE'),'no new function PUBLIC execute');
-SELECT is((SELECT count(*)::integer FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='grida_platform' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity),12,'all private tables force RLS');
+SELECT is((SELECT count(*)::integer FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='grida_platform' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity),13,'all private tables force RLS');
 SELECT ok(NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN (VALUES('anon'),('authenticated'),('service_role')) role(name) WHERE n.nspname='grida_platform' AND c.relkind='r' AND has_table_privilege(role.name,c.oid,'SELECT,INSERT,UPDATE,DELETE')),'no client or service direct read/write on any private table');
 DO $$ BEGIN
   PERFORM set_config('test.owner',(SELECT id::text FROM auth.users WHERE email='insider@grida.co'),true);
@@ -53,7 +54,7 @@ SELECT is((SELECT version FROM grida_platform.account_states WHERE organization_
 INSERT INTO public.organization_member(organization_id,user_id) VALUES(current_setting('test.created_org')::bigint,current_setting('test.random')::uuid);
 SELECT is((SELECT version FROM grida_platform.account_states WHERE organization_id=current_setting('test.created_org')::bigint),current_setting('test.version')::bigint+2,'direct SQL membership advances org version');
 INSERT INTO grida_platform.product_producers(producer,product) VALUES('local.grida.test','grida.text');
-SELECT set_config('test.claim',jsonb_build_object('organization_id',current_setting('test.created_org'),'product','grida.text','operation','text','model','fixture','unit','cost_mills','policy_version','fixture-1','request_digest',repeat('a',64),'admission_observed_at',clock_timestamp()::text,'admission_expires_at',(clock_timestamp()+interval '50 seconds')::text)::text,true);
+SELECT set_config('test.claim',jsonb_build_object('organization_id',current_setting('test.created_org'),'product','grida.text','operation','text','model','fixture','unit','cost_mills','policy_version','legacy-ai-v1','request_digest',repeat('a',64),'admission_observed_at',clock_timestamp()::text,'admission_expires_at',(clock_timestamp()+interval '50 seconds')::text)::text,true);
 SELECT set_config('test.receipt',((current_setting('test.claim')::jsonb-ARRAY['request_digest','admission_observed_at','admission_expires_at'])||jsonb_build_object('outcome','succeeded','quantity','0.000000000000000001','occurred_at',clock_timestamp()::text,'evidence_digest',repeat('b',64)))::text,true);
 SET LOCAL ROLE service_role;
 SELECT is(public.platform_gg_account_snapshots(jsonb_build_array(jsonb_build_object('id',current_setting('test.created_org'))),'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')->'organizations'->0->>'name','platform-custody-test','service snapshot returns current source');

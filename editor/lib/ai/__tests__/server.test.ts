@@ -55,6 +55,8 @@ import {
   MissingOrgIdError,
   checkGate,
   methods,
+  imageExecutionBounds,
+  imageToolExecutionBounds,
 } from "../server";
 
 const mockedEntitlement = billing.entitlement;
@@ -273,6 +275,9 @@ describe("withTransaction", () => {
     model_id: "openai/gpt-5.6-luna",
     requestDigest: "a".repeat(64),
     transactionId: "execution-synthetic",
+    authorizedMills: "10",
+    expenseBoundMills: "10",
+    tariffRevision: "b".repeat(64),
   };
   it("commits fresh admission before provider work and exact completion before returning", async () => {
     const op = vi.fn<TransactionOperation<{ id: string; value: number }>>(
@@ -286,7 +291,10 @@ describe("withTransaction", () => {
       value: 42,
     });
     expect(mockedBegin).toHaveBeenCalledExactlyOnceWith(context);
-    expect(op).toHaveBeenCalledExactlyOnceWith(context.transactionId);
+    expect(op).toHaveBeenCalledExactlyOnceWith(context.transactionId, {
+      id: context.transactionId,
+      claim: {},
+    });
     expect(mockedComplete).toHaveBeenCalledExactlyOnceWith(
       { id: context.transactionId, claim: {} },
       5,
@@ -468,5 +476,111 @@ describe("checkGate", () => {
         model_id: "openai/gpt-5.6-luna",
       })
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("finite spending authorization", () => {
+  it.each([
+    "openai/gpt-image-2",
+    "openai/gpt-image-2.5-flare",
+    "openai/gpt-image-2.5-sunburst",
+    "google/gemini-3.1-flash-image",
+    "bfl/flux-2-pro",
+    "bfl/flux-2-max",
+  ])(
+    "reserves an explicit native forecast for %s, not a guaranteed cap",
+    (model) => {
+      const hold = imageExecutionBounds(model, 1, "1024x1024", undefined);
+      expect(hold).toMatchObject({ expensePolicy: "native-image-estimate-v1" });
+      expect(Number(hold.authorizedMills)).toBeGreaterThanOrEqual(1000);
+      expect(hold.expenseBoundMills).toBe(hold.authorizedMills);
+    }
+  );
+  it("covers output count and repeats input allowance per output", () => {
+    expect(
+      imageExecutionBounds("bfl/flux-kontext-max", 2, "1024x1024", undefined, 3)
+    ).toMatchObject({ authorizedMills: "3500", expenseBoundMills: "3500" });
+    const small = imageExecutionBounds(
+      "bfl/flux-2-pro",
+      1,
+      "1024x1024",
+      undefined
+    );
+    const large = imageExecutionBounds(
+      "bfl/flux-2-pro",
+      1,
+      "8192x8192",
+      undefined
+    );
+    expect(Number(large.authorizedMills)).toBeGreaterThan(
+      Number(small.authorizedMills)
+    );
+    expect(large.tariffRevision).not.toBe(small.tariffRevision);
+  });
+  it("keeps interactive tools available with their precise accepted policy", async () => {
+    process.env.GG_REPLICATE_API_TOKEN = "test-replicate-token";
+    for (const [model, mills] of [
+      ["nightmareai/real-esrgan", "2"],
+      ["bria/remove-background", "18"],
+      ["recraft-ai/recraft-remove-background", "10"],
+    ] as const) {
+      expect(imageToolExecutionBounds(model)).toEqual(
+        expect.objectContaining({
+          authorizedMills: mills,
+          expenseBoundMills: mills,
+        })
+      );
+      expect(imageToolExecutionBounds(model)).not.toHaveProperty(
+        "expensePolicy"
+      );
+    }
+    replicateMock.run.mockResolvedValueOnce("https://example.test/result.png");
+    await methods.removeBackground(
+      7,
+      "https://example.test/input.png",
+      "851-labs/background-remover"
+    );
+    expect(mockedBegin).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feature: "ai/image/remove-background",
+        model_id:
+          "851-labs/background-remover:a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc",
+        authorizedMills: "1",
+        expenseBoundMills: "1",
+        expensePolicy: "native-interactive-estimate-v1",
+      })
+    );
+    expect(mockedComplete).toHaveBeenCalledWith(
+      expect.anything(),
+      1,
+      expect.anything()
+    );
+  });
+  it("never authorizes dispatch from a settlement average", async () => {
+    const provider = vi.fn<Parameters<typeof withTransaction>[1]>();
+    mockedBegin.mockRejectedValue(new ProductBillingError("blocked"));
+    await expect(
+      withTransaction(
+        {
+          organizationId: 7,
+          feature: "unqualified",
+          model_id: "fixture/average",
+          requestDigest: "a".repeat(64),
+        } as Parameters<typeof withTransaction>[0],
+        provider
+      )
+    ).rejects.toMatchObject({ code: "blocked" });
+    expect(provider).not.toHaveBeenCalled();
+    expect(mockedBegin).toHaveBeenCalledWith(
+      expect.not.objectContaining({ authorizedMills: expect.anything() })
+    );
+  });
+  it("rejects unqualified image pricing and invalid output multiplicity", () => {
+    expect(() =>
+      imageExecutionBounds("fixture/unknown", 1, "1024x1024", undefined)
+    ).toThrow(ProductBillingError);
+    expect(() =>
+      imageExecutionBounds("bfl/flux-2-pro", 0, undefined, undefined)
+    ).toThrow(ProductBillingError);
   });
 });
