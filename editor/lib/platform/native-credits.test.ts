@@ -28,7 +28,6 @@ const rows = (values: unknown[]) =>
     },
   });
 beforeEach(() => {
-  vi.stubEnv("GRIDA_BILLING_OWNER", "infra");
   vi.stubEnv("GRIDA_PLATFORM_BILLING_ORIGIN", "https://platform.example.test");
   vi.stubEnv("GRIDA_PLATFORM_SSR_KEY_ID", "source-ssr");
   vi.stubEnv("GRIDA_PLATFORM_SSR_TOKEN", "w".repeat(43));

@@ -141,7 +141,7 @@ export function fromUnknownError(err: unknown, scope: string): Response {
   ) {
     return invalidRequest(err.message);
   }
-  // Billing gate — `BillingMetronomeError` code "blocked" (duck-typed to
+  // Billing gate — `ProductBillingError` code "blocked" (duck-typed to
   // keep this module's import surface minimal). The message is curated
   // for end-user display; pass it through.
   if (err instanceof Error && (err as { code?: unknown }).code === "blocked") {

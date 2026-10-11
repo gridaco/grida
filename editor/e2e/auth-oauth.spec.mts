@@ -702,29 +702,26 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         expect(await account.selectOrganization({ name: local.name })).toEqual(
           local
         );
-        expect((await account.credits({ id: local.id })).organization).toEqual(
-          local
-        );
-        const localCredits = await first.auth.requestAccount("credits.read", {
-          organization_id: local.id,
+        // This auth-only fixture has no Platform billing service or credentials.
+        // Visible membership must fail closed for billing while identity remains usable.
+        await expect(account.credits({ id: local.id })).rejects.toMatchObject({
+          code: "auth_unavailable",
         });
-        expect(localCredits).toMatchObject({
-          organization: local,
-          state: "not_provisioned",
-          balance_cents: null,
-        });
+        await expect(
+          first.auth.requestAccount("credits.read", {
+            organization_id: local.id,
+          })
+        ).rejects.toMatchObject({ code: "auth_unavailable" });
         await expect(
           aliceClient.auth.requestAccount("credits.read", {
             organization_id: local.id,
           })
         ).rejects.toMatchObject({ code: "forbidden" });
-        expect(
-          (
-            await aliceClient.auth.requestAccount("credits.read", {
-              organization_id: acme.id,
-            })
-          ).organization
-        ).toEqual(acme);
+        await expect(
+          aliceClient.auth.requestAccount("credits.read", {
+            organization_id: acme.id,
+          })
+        ).rejects.toMatchObject({ code: "auth_unavailable" });
         expect(
           await first.auth.requestAccount("organizations.list", {
             after: local.id,
@@ -766,24 +763,22 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           ),
           next_cursor: null,
         });
-        expect(
-          await aliceClient.auth.requestAccount("credits.read", {
+        await expect(
+          aliceClient.auth.requestAccount("credits.read", {
             organization_id: local.id,
           })
-        ).toEqual(localCredits);
+        ).rejects.toMatchObject({ code: "auth_unavailable" });
         await expect(
           new AccountClient(aliceClient.auth).credits()
         ).rejects.toMatchObject({
           code: "organization_required",
           choices_truncated: false,
         });
-        expect(
-          (
-            await new AccountClient(aliceClient.auth).credits({
-              name: local.name,
-            })
-          ).organization
-        ).toEqual(local);
+        await expect(
+          new AccountClient(aliceClient.auth).credits({
+            name: local.name,
+          })
+        ).rejects.toMatchObject({ code: "auth_unavailable" });
         const ggAccess = await aliceClient.auth.requestGgAccess({
           organization_id: local.id,
         });
@@ -820,127 +815,32 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
     );
 
     await phase(
-      "native cached credits distinguish unobserved cache and zero without writes",
+      "native billing fails closed without Platform while identity and organization listing remain usable",
       async () => {
-        const organization = (
-          await first.auth.requestAccount("organizations.list")
-        ).organizations[0]!;
-        const id = organization.id;
-        const accountSnapshot = async () => {
-          const response = await request(
-            "/rest/v1/rpc/fn_billing_get_metronome_account",
-            { admin: true, method: "POST", body: { p_org: id } }
-          );
-          expect(response.status).toBe(200);
-          return createHash("sha256")
-            .update(JSON.stringify(await json(response)))
-            .digest("hex");
-        };
-        const read = async () => {
-          const before = await accountSnapshot();
-          const result = await first.auth.requestAccount("credits.read", {
-            organization_id: id,
-          });
-          expect(result.organization).toEqual(organization);
-          expect(result.currency).toBe("USD");
-          expect(result.source).toBe("cache");
-          expect(await accountSnapshot()).toBe(before);
-          return result;
-        };
-        expect(await read()).toMatchObject({
-          account_present: true,
-          state: "not_provisioned",
-          balance_cents: null,
-          cache_updated_at: null,
-          billing_gate: { allowed: false, reason: "not_provisioned" },
-        });
-        // Existing fixture-only setup RPCs; no provider account or payment is created.
-        const linked = await request(
-          "/rest/v1/rpc/fn_billing_set_metronome_ids",
-          {
-            admin: true,
-            method: "POST",
-            body: {
-              p_org: id,
-              p_customer_id: "credits_local_customer",
-              p_contract_id: "credits_local_contract",
-            },
-          }
+        const organizations =
+          await first.auth.requestAccount("organizations.list");
+        const organization = organizations.organizations[0]!;
+        const before = await first.auth.verify();
+        await expect(
+          first.auth.requestAccount("credits.read", {
+            organization_id: organization.id,
+          })
+        ).rejects.toMatchObject({ code: "auth_unavailable" });
+        expect(await first.auth.requestAccount("organizations.list")).toEqual(
+          organizations
         );
-        expect(linked.status).toBe(204);
-        expect(await read()).toMatchObject({
-          state: "uncached",
-          balance_cents: null,
-          cache_updated_at: null,
-          billing_gate: { allowed: false, reason: "below_floor" },
-        });
-        for (const [balance, entitled, reason] of [
-          [0, false, "below_floor"],
-          [24, true, "below_floor"],
-          [25, false, "no_balance"],
-          [25, true, null],
-        ] as const) {
-          const updated = await request(
-            "/rest/v1/rpc/fn_billing_set_balance_cache",
-            {
-              admin: true,
-              method: "POST",
-              body: {
-                p_org: id,
-                p_balance_cents: balance,
-                p_entitled: entitled,
-              },
-            }
-          );
-          expect(updated.status).toBe(204);
-          const result = await read();
-          expect(result).toMatchObject({
-            state: "cached",
-            balance_cents: balance,
-            billing_gate: { allowed: reason === null, reason },
-          });
-          expect(typeof result.cache_updated_at).toBe("string");
-        }
-        const columns =
-          "organization_id,organization_name,organization_display_name,account_present,credits_provisioned,cached_balance_cents,cached_balance_at,customer_entitled";
-        const route = `/rest/v1/v_billing_credits?select=${columns}&organization_id=eq.${id}`;
-        const own = await request(route, {
-          token: first.session()!.accessToken,
-        });
-        expect(own.status).toBe(200);
-        const rows = await json(own);
-        expect(Array.isArray(rows) && rows.length === 1).toBe(true);
-        expect(Object.keys(rows[0]).sort()).toEqual(columns.split(",").sort());
-        const other = await request(route, {
-          token: aliceClient.session()!.accessToken,
-        });
-        expect(other.status).toBe(200);
-        expect(await json(other)).toEqual([]);
+        expect(await first.auth.verify()).toEqual(before);
       }
     );
 
     await phase(
-      "native GG handoff discovers models without changing credit records",
+      "native GG handoff discovers models without billing setup or changing account custody",
       async () => {
-        const snapshot = async (id: number) => {
-          const response = await request(
-            "/rest/v1/rpc/fn_billing_get_metronome_account",
-            {
-              admin: true,
-              method: "POST",
-              body: { p_org: id },
-            }
-          );
-          expect(response.status).toBe(200);
-          return createHash("sha256")
-            .update(JSON.stringify(await json(response)))
-            .digest("hex");
-        };
         for (const host of [first, aliceClient]) {
           const organization = await new AccountClient(
             host.auth
           ).selectOrganization();
-          const before = await snapshot(organization.id);
+          const before = await host.auth.requestAccount("organizations.list");
           const sessionBefore = JSON.stringify(host.session());
           const access = await host.auth.requestGgAccess({
             organization_id: organization.id,
@@ -961,7 +861,9 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
               Object.isFrozen(grant.organization)
           ).toBe(true);
           expect(await modelCount(grant!.token)).toBeGreaterThan(0);
-          expect(await snapshot(organization.id)).toBe(before);
+          expect(await host.auth.requestAccount("organizations.list")).toEqual(
+            before
+          );
           expect(JSON.stringify(host.session()) === sessionBefore).toBe(true);
           expect(sessionBefore.includes(grant!.token)).toBe(false);
           expect(await accountStatus(grant!.token)).toBe(401);
@@ -1113,12 +1015,13 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
         const organizations =
           await second.auth.requestAccount("organizations.list");
         expect(await probe("organizations")).toEqual(organizations);
-        const credits = await new AccountClient(second.auth).credits();
-        expect(await probe("credits")).toEqual(credits);
+        const organization = await new AccountClient(
+          second.auth
+        ).selectOrganization();
         const ggBeforeRestart = await probe("gg");
         expect(ggBeforeRestart.organization).toEqual({
-          id: credits.organization.id,
-          name: credits.organization.name,
+          id: organization.id,
+          name: organization.name,
         });
         expect(ggBeforeRestart.model_count).toBeGreaterThan(0);
         expect(Object.keys(ggBeforeRestart).sort()).toEqual([
@@ -1127,15 +1030,15 @@ test("isolated OAuth: browser consent, native sessions, restart, permissions and
           "organization",
         ]);
         expect((await probe("restart")).state).toBe("signed-in");
-        const ggAfterRestart = await probe("gg", credits.organization.id);
+        const ggAfterRestart = await probe("gg", organization.id);
         expect(ggAfterRestart.organization).toEqual(
           ggBeforeRestart.organization
         );
         expect(ggAfterRestart.model_count).toBe(ggBeforeRestart.model_count);
         expect(await probe("organizations")).toEqual(organizations);
-        expect(await probe("credits", credits.organization.id)).toEqual(
-          credits
-        );
+        await expect(
+          new AccountClient(second.auth).credits({ id: organization.id })
+        ).rejects.toMatchObject({ code: "auth_unavailable" });
         expect(
           await probe("organizations", organizations.organizations[0]!.id)
         ).toEqual({ organizations: [], next_cursor: null });

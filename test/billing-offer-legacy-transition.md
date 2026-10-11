@@ -9,9 +9,19 @@ severity: high
 date: 2026-07-31
 updated: 2026-07-31
 automatable: false
-covered_by:
+covered_by: []
+former_covered_by:
   - editor/lib/billing/offers.test.ts
 ---
+
+> Platform billing owns shared financial acceptance. This record retains its
+> original case IDs, Behavior, status, and history; ownership cleanup is not
+> verification. Current billing runs in the shared console/Platform service.
+> Use the paired infra local billing fixture for simulated proof or its separately
+> authorized vendor Sandbox qualification. Former Grida harness actions, direct
+> source financial edits, and retired billing commands below are historical
+> procedure context, not current setup. Grida-specific product display, BYOK,
+> and receipt assertions remain Grida consumer obligations.
 
 ## Behavior
 
@@ -40,3 +50,7 @@ creating a second subscription.
 
 Run only with Stripe test-mode credentials. Cancellation and invoice history
 must continue to work for a legacy subscription even before it is moved.
+
+The former `offers.test.ts` coverage, where listed, was retired with the source
+financial engine. No replacement full-case coverage or hosted verification is
+claimed by this ownership update. Keep the untested status until actual proof.

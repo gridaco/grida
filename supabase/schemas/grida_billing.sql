@@ -1,3 +1,10 @@
+-- HISTORICAL REFERENCE: retained source billing archive after Platform transfer.
+-- This file describes the original schema, not an active financial writer.
+-- Current authority, write fences and product/webhook custody are defined by
+-- migrations/20261006041252_platform_billing_handoff_custody.sql and its
+-- preceding Platform boundary migrations. Applied migrations are unchanged.
+-- See ../../docs/contributing/billing.md for the current consumer setup.
+--
 -- GRIDA-EE: billing
 -- grida_billing schema
 --

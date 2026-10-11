@@ -1,11 +1,6 @@
 import grida from "@grida/schema";
 
-/**
- * Plan tier as it appears in the Grida UI. Sourced from
- * `grida_billing.subscription.plan` (Stripe-backed) — `'free' | 'pro' | 'team'`.
- * Custom is a separate ops flag (`organization.is_enterprise`); when true,
- * the UI presents Custom regardless of the underlying Stripe plan.
- */
+/** Self-service plan tiers displayed from the Platform summary. */
 export type PlanTier = "free" | "pro" | "team";
 
 export type JSONValue =
@@ -100,7 +95,7 @@ export interface Organization {
   blog: string | null;
   description: string | null;
   display_name: string;
-  /** Manual ops flag — overrides `plan` for UI rendering when true. */
+  /** Canonical organization flag retained for Custom display and contact access. */
   is_enterprise: boolean;
   id: number;
   name: string;
@@ -114,11 +109,10 @@ export type OrganizationWithMembers = Organization & {
 export type OrganizationWithAvatar = Organization & {
   avatar_url: string | null;
   /**
-   * Stripe-driven plan from `v_billing_subscription`, resolved server-side
-   * by the workspace API. Not a DB column — only present on responses that
-   * went through that API path.
+   * Passive Platform summary resolved by the private workspace API.
+   * Null means unobserved or unavailable; it never implies the Free plan.
    */
-  plan: PlanTier;
+  plan: PlanTier | "custom" | null;
 };
 
 export interface OrganizationMember {

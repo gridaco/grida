@@ -13,13 +13,6 @@ export class BillingConsumerError extends Error {
 }
 
 type Environment = Readonly<Record<string, string | undefined>>;
-export function billingOwner(
-  env: Environment = process.env
-): "grida" | "infra" {
-  const owner = env.GRIDA_BILLING_OWNER ?? "grida";
-  if (owner !== "grida" && owner !== "infra") throw new BillingConsumerError();
-  return owner;
-}
 export function configuredOrigin(
   value: string | undefined,
   env: Environment
@@ -66,7 +59,6 @@ export function consoleBillingUrl(
   destination: BillingDestination,
   env: Environment = process.env
 ): string {
-  if (billingOwner(env) !== "infra") throw new BillingConsumerError();
   return (
     configuredOrigin(env.GRIDA_PLATFORM_CONSOLE_ORIGIN, env) +
     billingDestination(organizationId, destination)
@@ -90,7 +82,6 @@ export function platformBilling(
   env: Environment = process.env,
   fetcher: typeof fetch = globalThis.fetch
 ): BillingConsumer {
-  if (billingOwner(env) !== "infra") throw new BillingConsumerError();
   const origin = configuredOrigin(env.GRIDA_PLATFORM_BILLING_ORIGIN, env);
   const keyId = env.GRIDA_PLATFORM_SSR_KEY_ID ?? "",
     token = env.GRIDA_PLATFORM_SSR_TOKEN ?? "";

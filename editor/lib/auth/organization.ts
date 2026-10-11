@@ -20,7 +20,60 @@
 
 import type { NextRequest } from "next/server";
 import { service_role } from "@/lib/supabase/server";
-import { assertOrgMember, BillingError } from "@/lib/billing";
+export class OrganizationError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly status: number = 400,
+    readonly redirect?: string
+  ) {
+    super(message);
+    this.name = "OrganizationError";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+async function assertOrgMember(
+  user_id: string,
+  org_id: string | number
+): Promise<void> {
+  if (!user_id)
+    throw new OrganizationError("unauthorized", "unauthorized", 401);
+  const orgId = typeof org_id === "string" ? Number(org_id) : org_id;
+  if (!Number.isFinite(orgId)) {
+    throw new OrganizationError(
+      `invalid org_id: ${org_id}`,
+      "invalid_org",
+      403
+    );
+  }
+
+  const { data, error } = await service_role.workspace
+    .from("organization_member")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("user_id", user_id)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new OrganizationError(
+      `membership check failed: ${error.message}`,
+      "membership_check_failed",
+      403
+    );
+  }
+  if (!data) {
+    throw new OrganizationError(
+      "not a member of this organization",
+      "not_member",
+      403
+    );
+  }
+}
 
 const ORG_ID_HEADER = "x-grida-organization-id";
 
@@ -37,7 +90,7 @@ export type RequireOrganizationIdOptions = {
 
 /**
  * Resolve an organization id with verified membership. Throws
- * {@link BillingError} on any failure — codes:
+ * {@link OrganizationError} on any failure — codes:
  *   - `unauthorized` (401) — empty `user_id`
  *   - `missing_organization_id` (400) — no source supplied an id
  *   - `org_not_found` (404) — slug doesn't resolve to a member-org
@@ -48,7 +101,7 @@ export async function requireOrganizationId(
   opts: RequireOrganizationIdOptions
 ): Promise<number> {
   if (!opts.user_id) {
-    throw new BillingError(
+    throw new OrganizationError(
       "requireOrganizationId: missing user_id",
       "unauthorized",
       401
@@ -62,7 +115,7 @@ export async function requireOrganizationId(
     // slug then checking membership.
     const id = await resolveMemberOrgIdBySlug(opts.user_id, slug);
     if (id !== null) return id;
-    throw new BillingError(
+    throw new OrganizationError(
       `organization "${slug}" not found or not a member`,
       "org_not_found",
       404
@@ -73,7 +126,7 @@ export async function requireOrganizationId(
   if (header) {
     const id = parsePositiveInt(header);
     if (id === null) {
-      throw new BillingError(
+      throw new OrganizationError(
         `invalid ${ORG_ID_HEADER} header: "${header}"`,
         "invalid_header",
         400
@@ -89,7 +142,7 @@ export async function requireOrganizationId(
         ? opts.inputOrgId
         : parsePositiveInt(String(opts.inputOrgId));
     if (id === null) {
-      throw new BillingError(
+      throw new OrganizationError(
         `invalid organizationId input: "${String(opts.inputOrgId)}"`,
         "invalid_input",
         400
@@ -106,7 +159,7 @@ export async function requireOrganizationId(
   const sessionOrgId = await resolveSessionOrganizationId(opts.user_id);
   if (sessionOrgId !== null) return sessionOrgId;
 
-  throw new BillingError(
+  throw new OrganizationError(
     "no organizationId resolved (route param / header / input / session all missing)",
     "missing_organization_id",
     400
@@ -198,7 +251,7 @@ async function resolveMemberOrgIdBySlug(
     .maybeSingle();
 
   if (error) {
-    throw new BillingError(
+    throw new OrganizationError(
       `org slug lookup failed: ${error.message}`,
       "org_lookup_failed",
       500

@@ -12,41 +12,23 @@ vi.mock("../gg-three-d-http", () => ({
   GgThreeDHttp: { create: transport.create },
 }));
 vi.mock("replicate", () => ({ default: class {} }));
-vi.mock("@/lib/billing/metronome", () => ({
-  getEntitlement: vi.fn<(...args: never[]) => unknown>(),
-  ingestUsageEvent: vi.fn<(...args: never[]) => unknown>(),
-  refreshBalance: vi.fn<(...args: never[]) => unknown>(),
-  BillingMetronomeError: class extends Error {
-    constructor(
-      message: string,
-      readonly code: string,
-      readonly status = 500
-    ) {
-      super(message);
-    }
-  },
+const billing = vi.hoisted(() => ({
+  entitlement: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  begin: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  complete: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+}));
+vi.mock("@/lib/platform/product-consumer", () => ({
+  platformProductBilling: () => billing,
 }));
 vi.mock("@/lib/supabase/server", () => ({
-  service_role: {
-    workspace: {
-      rpc: async (name: string, args: Record<string, unknown>) => {
-        if (name === "platform_source_work_begin")
-          return { data: { created: true, id: args.work_id }, error: null };
-        if (
-          name === "platform_source_work_capture" ||
-          name === "platform_source_work_finish"
-        )
-          return { data: { accepted: true }, error: null };
-        throw new Error("unexpected source RPC: " + name);
-      },
-    },
-  },
   createLibraryClient: vi.fn<(...args: never[]) => unknown>(),
 }));
 vi.mock("@/lib/auth/organization", () => ({
   requireOrganizationId: vi.fn<(...args: never[]) => unknown>(),
 }));
-import { getEntitlement, ingestUsageEvent } from "@/lib/billing/metronome";
+import { ProductBillingError } from "@/lib/platform/product-billing";
+const getEntitlement = billing.entitlement;
+const completion = billing.complete;
 import { requireOrganizationId } from "@/lib/auth/organization";
 import { GgThreeD } from "../gg-three-d";
 
@@ -93,9 +75,11 @@ function task(
   );
 }
 function charged(mills: number) {
-  expect(ingestUsageEvent).toHaveBeenCalledExactlyOnceWith(7, mills, {
-    transactionId: expect.any(String),
-  });
+  expect(completion).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ id: expect.any(String) }),
+    mills,
+    expect.objectContaining({ costMills: mills })
+  );
   expect(requireOrganizationId).not.toHaveBeenCalled();
 }
 beforeEach(() => {
@@ -108,9 +92,14 @@ beforeEach(() => {
     cachedBalanceCents: 10000,
     cachedAt: null,
   });
-  vi.mocked(ingestUsageEvent).mockResolvedValue({
-    transactionId: "synthetic-ingest",
+  billing.begin.mockImplementation(async (context) => {
+    const decision = (await billing.entitlement(
+      (context as { organizationId: number }).organizationId
+    )) as { allowed: boolean };
+    if (!decision.allowed) throw new ProductBillingError("blocked");
+    return { id: "execution-synthetic", claim: {} };
   });
+  billing.complete.mockResolvedValue(undefined);
   transport.create.mockImplementation(
     () =>
       new ProviderHttp({
@@ -137,7 +126,7 @@ describe("GgThreeD metered execution", () => {
       GgThreeD.modelGenerate(7, "tripo/h3.1", "text", { prompt: "chair" })
     ).rejects.toMatchObject({ status: 402 });
     expect(transport.create).not.toHaveBeenCalled();
-    expect(ingestUsageEvent).not.toHaveBeenCalled();
+    expect(completion).not.toHaveBeenCalled();
     await expect(GgThreeD.check(0, { mesh })).rejects.toMatchObject({
       code: "missing_organization_id",
     });
@@ -153,7 +142,7 @@ describe("GgThreeD metered execution", () => {
       });
       expect(getEntitlement).toHaveBeenCalledWith(7);
       expect(transport.create).not.toHaveBeenCalled();
-      expect(ingestUsageEvent).not.toHaveBeenCalled();
+      expect(completion).not.toHaveBeenCalled();
     }
   );
   it.each(["text", "image", "multiview"] as const)(
@@ -278,7 +267,7 @@ describe("GgThreeD metered execution", () => {
         prompt: "sensitive prompt",
       })
     ).rejects.toMatchObject({ code: "usage_unavailable", task_id });
-    expect(ingestUsageEvent).not.toHaveBeenCalled();
+    expect(completion).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledExactlyOnceWith(
       "[gg-three-d] usage_reconciliation_required",
       {
@@ -322,7 +311,7 @@ describe("GgThreeD metered execution", () => {
     await expect(
       GgThreeD.modelGenerate(7, "tripo/h3.1", "text", { prompt: "chair" })
     ).rejects.toMatchObject({ code: "generation_failed", task_id });
-    expect(ingestUsageEvent).not.toHaveBeenCalled();
+    expect(completion).not.toHaveBeenCalled();
     expect(
       transport.request.mock.calls.filter(([, init]) => init?.method === "POST")
     ).toHaveLength(1);
@@ -335,7 +324,7 @@ describe("GgThreeD metered execution", () => {
     await expect(GgThreeD.check(7, { mesh })).rejects.toMatchObject({
       code: "provider_unavailable",
     });
-    expect(ingestUsageEvent).not.toHaveBeenCalled();
+    expect(completion).not.toHaveBeenCalled();
   });
   it("rejects unknown models, incompatible controls and unsigned URL inputs without submission", async () => {
     await expect(
@@ -354,7 +343,7 @@ describe("GgThreeD metered execution", () => {
       })
     ).rejects.toMatchObject({ code: "invalid_request" });
     expect(transport.request).not.toHaveBeenCalled();
-    expect(ingestUsageEvent).not.toHaveBeenCalled();
+    expect(completion).not.toHaveBeenCalled();
   });
 });
 
@@ -388,7 +377,7 @@ describe("GgThreeD.preparePresign", () => {
       })
     );
     expect(getEntitlement).toHaveBeenCalledWith(7);
-    expect(ingestUsageEvent).not.toHaveBeenCalled();
+    expect(completion).not.toHaveBeenCalled();
   });
   it.each([
     "https://private.example/file",

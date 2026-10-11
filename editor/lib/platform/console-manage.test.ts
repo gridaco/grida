@@ -83,7 +83,6 @@ const source = "https://grida.example.test",
   consoleOrigin = "https://console.example.test";
 const target = "/organizations/42/gateway/requests/req_test1234";
 beforeEach(() => {
-  vi.stubEnv("GRIDA_BILLING_OWNER", "infra");
   vi.stubEnv("GRIDA_OAUTH_ORIGIN", source);
   vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", consoleOrigin);
   state.user = { id: "user-a" };
@@ -263,7 +262,6 @@ it("creation failure retains the original resource without claiming creation suc
   expect(retry.searchParams.get("error")).toBe("create_failed");
 });
 it("ordinary released creation retains its original source destination", async () => {
-  vi.stubEnv("GRIDA_BILLING_OWNER", "grida");
   const response = await create(
     request("new", { name: "new-org", email: "owner@example.test" })
   );

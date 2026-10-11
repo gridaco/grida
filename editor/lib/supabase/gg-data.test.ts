@@ -99,16 +99,18 @@ describe("ggData.forBearer", () => {
 });
 
 describe("nativeData fixed destinations", () => {
-  it.each(["../rpc/private", "https://example.com", "organization?select=*"])(
-    "refuses arbitrary table %s before I/O",
-    async (table) => {
-      const fetcher = vi.fn<typeof fetch>();
-      await expect(
-        nativeData
-          .forBearer(authorization, config, fetcher)
-          .page(table as "organization", {})
-      ).rejects.toMatchObject({ code: "invalid_request" });
-      expect(fetcher).not.toHaveBeenCalled();
-    }
-  );
+  it.each([
+    "../rpc/private",
+    "https://example.com",
+    "organization?select=*",
+    "v_billing_credits",
+  ])("refuses arbitrary table %s before I/O", async (table) => {
+    const fetcher = vi.fn<typeof fetch>();
+    await expect(
+      nativeData
+        .forBearer(authorization, config, fetcher)
+        .page(table as "organization", {})
+    ).rejects.toMatchObject({ code: "invalid_request" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });

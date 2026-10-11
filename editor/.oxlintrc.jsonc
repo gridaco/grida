@@ -6,9 +6,9 @@
     "react/exhaustive-deps": "off",
 
     // --- billing single-seam enforcement -------------------------------
-    // The Stripe SDK may only be imported by `editor/lib/billing/index.ts`.
-    // Other call sites must go through that seam so billing-side concerns
-    // (test-mode guard, money-safety, audit) are on by default.
+    // The Stripe SDK may only be imported by `editor/lib/billing/stripe-webhook-signature.ts`.
+    // This is local signature verification only. Financial provider operations
+    // belong to Platform; Grida never constructs a financial Stripe client.
     //
     // Type-only imports are allowed everywhere; only value imports are
     // restricted.
@@ -18,7 +18,7 @@
         "paths": [
           {
             "name": "stripe",
-            "message": "Use editor/lib/billing instead.",
+            "message": "Stripe is only used by the standalone webhook signature verifier; financial operations belong to Platform.",
             "allowTypeImports": true,
           },
           {
@@ -92,7 +92,7 @@
             // Block subpath imports of the Stripe SDK (e.g. `stripe/lib/...`).
             // The bare-name import is already blocked above via `paths`.
             "group": ["stripe/**"],
-            "message": "Use editor/lib/billing instead.",
+            "message": "Stripe is only used by the standalone webhook signature verifier; financial operations belong to Platform.",
             "allowTypeImports": true,
           },
         ],
@@ -107,8 +107,8 @@
   ],
   "overrides": [
     {
-      // The single Stripe seam.
-      "files": ["lib/billing/index.ts"],
+      // Retained original webhook signature verification only.
+      "files": ["lib/billing/stripe-webhook-signature.ts"],
       "rules": {
         "no-restricted-imports": "off",
       },

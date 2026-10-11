@@ -15,8 +15,7 @@
  */
 
 import { withAiAuth, isByokActive, type AiActionResult } from "@/lib/ai/server";
-import { billingOwner, platformBilling } from "@/lib/platform/billing-consumer";
-import { getEntitlement } from "@/lib/billing/metronome";
+import { platformBilling } from "@/lib/platform/billing-consumer";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSessionOrganizationId } from "@/lib/auth/organization";
 
@@ -43,9 +42,8 @@ const EMPTY: AiCreditsPreload = {
  * server `page.tsx` or route-group `layout.tsx` that has already resolved
  * an `orgId`.
  *
- * Reads only the selected owner's cached projection. With infra ownership,
- * failures leave the display unavailable and never consult source financial
- * tables. Each paid execution obtains a separate fresh admission; this chip
+ * Reads Platform's cached projection. Failures leave the display unavailable.
+ * Each paid execution obtains a separate fresh admission; this chip
  * cannot authorize work. The post-action envelope updates it after a request.
  *
  * Returns `{cents: null, allowed: false}` for unauth visitors; the caller
@@ -54,32 +52,24 @@ const EMPTY: AiCreditsPreload = {
 export async function preloadAiCredits(
   orgId: number
 ): Promise<AiCreditsPreload> {
-  if (billingOwner() === "infra") {
-    // Display only: paid execution separately acquires fresh admission. An
-    // unavailable balance must not prevent unrelated product pages rendering.
-    try {
-      const client = await createClient();
-      const { data } = await client.auth.getSession();
-      if (!data.session?.access_token) return EMPTY;
-      const observed = await platformBilling().credits(
-        orgId,
-        data.session.access_token
-      );
-      return {
-        cents: observed.balance_cents,
-        allowed: observed.billing_gate.allowed,
-        byok: isByokActive(),
-      };
-    } catch {
-      return EMPTY;
-    }
+  // Display only: paid execution separately acquires fresh admission. An
+  // unavailable balance must not prevent unrelated product pages rendering.
+  try {
+    const client = await createClient();
+    const { data } = await client.auth.getSession();
+    if (!data.session?.access_token) return EMPTY;
+    const observed = await platformBilling().credits(
+      orgId,
+      data.session.access_token
+    );
+    return {
+      cents: observed.balance_cents,
+      allowed: observed.billing_gate.allowed,
+      byok: isByokActive(),
+    };
+  } catch {
+    return EMPTY;
   }
-  const ent = await getEntitlement(orgId);
-  // Unprovisioned orgs return `cachedBalanceCents: 0` from getEntitlement;
-  // surface as `null` so the chip renders "—" instead of "$0.00".
-  const cents =
-    ent.reason === "not_provisioned" ? null : ent.cachedBalanceCents;
-  return { cents, allowed: ent.allowed, byok: isByokActive() };
 }
 
 /**
@@ -98,7 +88,7 @@ export async function resolveInitialAiCredits(): Promise<AiCreditsPreload> {
 }
 
 /**
- * Force-sync the org's balance from Metronome via the AI seam. Returns
+ * Refresh the org's observed balance through Platform via the AI seam. Returns
  * the standard `AiActionResult` envelope — `balanceCents` is appended
  * by `withAiAuth`. Used by `useAiCredits().refresh()`.
  */

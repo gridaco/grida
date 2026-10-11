@@ -2,14 +2,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   billingDestination,
-  billingOwner,
   BillingConsumerError,
   cachedCredits,
   consoleBillingUrl,
   platformBilling,
 } from "./billing-consumer";
 const env = {
-  GRIDA_BILLING_OWNER: "infra",
   GRIDA_PLATFORM_BILLING_ORIGIN: "https://platform.example.test",
   GRIDA_PLATFORM_CONSOLE_ORIGIN: "https://console.example.test",
   GRIDA_PLATFORM_SSR_KEY_ID: "grida-ssr-local",
@@ -28,13 +26,6 @@ const projection = {
 };
 afterEach(() => vi.unstubAllEnvs());
 describe("lazy consumer configuration and typed destinations", () => {
-  it("needs no billing configuration for default product startup", () => {
-    expect(billingOwner({})).toBe("grida");
-    expect(billingOwner({ GRIDA_BILLING_OWNER: "infra" })).toBe("infra");
-    expect(() => billingOwner({ GRIDA_BILLING_OWNER: "other" })).toThrow(
-      BillingConsumerError
-    );
-  });
   it("requires explicit origins and scoped workload credentials on use", () => {
     expect(() => platformBilling({})).toThrow(BillingConsumerError);
     for (const key of [

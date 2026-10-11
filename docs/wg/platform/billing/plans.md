@@ -12,6 +12,9 @@ format: md
 
 # Billing plans
 
+Platform owns this commercial policy and its financial lifecycle. This public
+document retains its existing URL and terms.
+
 This document defines Grida's commercial plan model. It separates what a new
 customer can buy from historical billing states that the service must continue
 to understand.

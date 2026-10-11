@@ -1,7 +1,7 @@
 // GRIDA-SEC-010 — typed console return paths never grant organization authority.
 import "server-only";
 import { destination, organizationRoute } from "./console-destination";
-import { billingOwner, configuredOrigin } from "./billing-consumer";
+import { configuredOrigin } from "./billing-consumer";
 export type ManageSearch = Record<string, string | string[] | undefined>;
 export type ManageIntent = "organization" | "settings" | "create-organization";
 export class ConsoleManageError extends Error {
@@ -75,7 +75,6 @@ export function managePath(
   return `/gateway/manage?${params}`;
 }
 export function consoleReturnURL(value: unknown): string {
-  if (billingOwner() !== "infra") throw new ConsoleManageError("forbidden");
   return (
     configuredOrigin(process.env.GRIDA_PLATFORM_CONSOLE_ORIGIN, process.env) +
     returnDestination(value)

@@ -37,7 +37,9 @@ Three surfaces today:
 - **Custom domains (BYOD)** — user-owned apex + subdomain mapping on
   Vercel. See [multi-tenant-custom-domain-vercel](https://grida.co/docs/wg/platform/multi-tenant-custom-domain-vercel).
 - **Billing** — subscriptions, AI credit, the entitlement gate
-  primitive. See the `ee-billing` skill (planned) for the workflow.
+  primitive. Platform in the paired infra repository owns the financial
+  engine and policy. Grida retains its integration consumers; see
+  [`ee-billing`](../ee-billing/SKILL.md) for that workflow.
 
 ## The `GRIDA-EE` marker
 
@@ -85,7 +87,8 @@ Co-locate by surface so the grep doesn't have to do all the work.
   suffix. Mixed packages stay unsuffixed and tag the EE branches
   inside.
 - **Database** — namespaced schema. Existing examples:
-  `grida_billing`, `grida_hosted`. Don't bleed EE columns into
+  `grida_hosted`. Historical `grida_billing` tables are retained financial
+  archives; new Platform financial DDL belongs in infra. Don't bleed EE columns into
   OSS-relevant tables. Schema-design rules live in the
   [`database`](../database/SKILL.md) skill / `supabase/AGENTS.md`;
   consult those.
@@ -120,7 +123,7 @@ this pattern is the second pass. Tag the file with both markers.
 > mirror it into `security/SKILL.md` so a reader entering from that
 > side doesn't miss it.
 
-See also: `ee-billing` (billing workflow — planned),
+See also: [`ee-billing`](../ee-billing/SKILL.md) (Grida billing consumers),
 [`security`](../security/SKILL.md) (boundary contracts, fail-closed
 discipline), [`naming`](../naming/SKILL.md) (the suffix list this
 inherits), [`oss-standards`](../oss-standards/SKILL.md)

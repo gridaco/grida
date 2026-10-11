@@ -19,37 +19,15 @@ vi.mock("replicate", () => ({
   },
 }));
 
-vi.mock("@/lib/billing/metronome", () => ({
-  getEntitlement: vi.fn<(...args: never[]) => unknown>(),
-  ingestUsageEvent: vi.fn<(...args: never[]) => unknown>(),
-  refreshBalance: vi.fn<(...args: never[]) => unknown>(),
-  BillingMetronomeError: class BillingMetronomeError extends Error {
-    code: string;
-    status: number;
-    constructor(message: string, code: string, status = 500) {
-      super(message);
-      this.name = "BillingMetronomeError";
-      this.code = code;
-      this.status = status;
-    }
-  },
+const billing = vi.hoisted(() => ({
+  entitlement: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  begin: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  complete: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
-
+vi.mock("@/lib/platform/product-consumer", () => ({
+  platformProductBilling: () => billing,
+}));
 vi.mock("@/lib/supabase/server", () => ({
-  service_role: {
-    workspace: {
-      rpc: async (name: string, args: Record<string, unknown>) => {
-        if (name === "platform_source_work_begin")
-          return { data: { created: true, id: args.work_id }, error: null };
-        if (
-          name === "platform_source_work_capture" ||
-          name === "platform_source_work_finish"
-        )
-          return { data: { accepted: true }, error: null };
-        throw new Error("unexpected source RPC: " + name);
-      },
-    },
-  },
   createLibraryClient: vi.fn<(...args: never[]) => unknown>(),
 }));
 
@@ -66,12 +44,7 @@ vi.mock("../models", async (orig) => ({
   isByokActive: vi.fn<() => boolean>(),
 }));
 
-import {
-  getEntitlement,
-  ingestUsageEvent,
-  refreshBalance,
-  BillingMetronomeError,
-} from "@/lib/billing/metronome";
+import { ProductBillingError } from "@/lib/platform/product-billing";
 import { createLibraryClient } from "@/lib/supabase/server";
 import { requireOrganizationId } from "@/lib/auth/organization";
 import { isByokActive } from "../models";
@@ -84,9 +57,9 @@ import {
   methods,
 } from "../server";
 
-const mockedGetEntitlement = vi.mocked(getEntitlement);
-const mockedIngestUsageEvent = vi.mocked(ingestUsageEvent);
-const mockedRefreshBalance = vi.mocked(refreshBalance);
+const mockedEntitlement = billing.entitlement;
+const mockedBegin = billing.begin;
+const mockedComplete = billing.complete;
 const mockedCreateLibraryClient = vi.mocked(createLibraryClient);
 const mockedRequireOrganizationId = vi.mocked(requireOrganizationId);
 const mockedIsByokActive = vi.mocked(isByokActive);
@@ -94,9 +67,17 @@ const mockedIsByokActive = vi.mocked(isByokActive);
 beforeEach(() => {
   delete process.env.BYOK_OPENROUTER_API_KEY;
   delete process.env.BYOK_VERCEL_AI_GATEWAY_API_KEY;
-  mockedGetEntitlement.mockReset();
-  mockedIngestUsageEvent.mockReset();
-  mockedRefreshBalance.mockReset();
+  mockedEntitlement.mockReset();
+  mockedBegin.mockReset();
+  mockedComplete.mockReset();
+  mockedEntitlement.mockResolvedValue({ allowed: true, balance_cents: 1000 });
+  mockedBegin.mockImplementation(async (context) => ({
+    id:
+      (context as { transactionId?: string }).transactionId ??
+      "execution-synthetic",
+    claim: {},
+  }));
+  mockedComplete.mockResolvedValue(undefined);
   mockedCreateLibraryClient.mockReset();
   mockedRequireOrganizationId.mockReset();
   mockedIsByokActive.mockReset();
@@ -122,14 +103,6 @@ afterEach(() => {
 describe("methods.generateMusic", () => {
   it("sends only fields accepted by the current Replicate Lyria schema", async () => {
     process.env.GG_REPLICATE_API_TOKEN = "test-replicate-token";
-    mockedGetEntitlement.mockResolvedValueOnce({
-      allowed: true,
-      cachedBalanceCents: 1000,
-      cachedAt: null,
-    });
-    mockedIngestUsageEvent.mockResolvedValueOnce({
-      transactionId: "tx-audio",
-    });
     replicateMock.run.mockResolvedValueOnce("https://example.test/audio.mp3");
 
     await expect(
@@ -165,7 +138,7 @@ describe("costMillsFromTokenUsage", () => {
       outputTokens: { total: 1000 },
     });
     // 0.2e-3 + 1.2e-3 = 1.4e-3 USD = 1.4 mills (fractional —
-    // Metronome aggregates exactly, Stripe rounds once at invoice).
+    // Platform retains the producer's exact native quantity).
     expect(mills).toBeCloseTo(1.4);
   });
 
@@ -291,148 +264,111 @@ describe("costMillsFromTokenUsage", () => {
   });
 });
 
-describe("withTransaction", () => {
-  it("runs op, ingests on success", async () => {
-    mockedGetEntitlement.mockResolvedValueOnce({
-      allowed: true,
-      cachedBalanceCents: 1000,
-      cachedAt: null,
-    });
-    mockedIngestUsageEvent.mockResolvedValueOnce({ transactionId: "tx-1" });
+type TransactionOperation<T> = Parameters<typeof withTransaction<T>>[1];
 
-    const op = vi.fn<
-      (
-        tx: string
-      ) => Promise<{ result: { tx: string; value: number }; costMills: number }>
-    >(async (tx: string) => ({
-      result: { tx, value: 42 },
+describe("withTransaction", () => {
+  const context = {
+    organizationId: 7,
+    feature: "test/feature",
+    model_id: "openai/gpt-5.6-luna",
+    requestDigest: "a".repeat(64),
+    transactionId: "execution-synthetic",
+  };
+  it("commits fresh admission before provider work and exact completion before returning", async () => {
+    const op = vi.fn<TransactionOperation<{ id: string; value: number }>>(
+      async (id) => ({
+        result: { id, value: 42 },
+        costMills: 5,
+      })
+    );
+    expect(await withTransaction(context, op)).toEqual({
+      id: context.transactionId,
+      value: 42,
+    });
+    expect(mockedBegin).toHaveBeenCalledExactlyOnceWith(context);
+    expect(op).toHaveBeenCalledExactlyOnceWith(context.transactionId);
+    expect(mockedComplete).toHaveBeenCalledExactlyOnceWith(
+      { id: context.transactionId, claim: {} },
+      5,
+      { result: { id: context.transactionId, value: 42 }, costMills: 5 }
+    );
+    expect(mockedBegin.mock.invocationCallOrder[0]).toBeLessThan(
+      op.mock.invocationCallOrder[0]
+    );
+    expect(op.mock.invocationCallOrder[0]).toBeLessThan(
+      mockedComplete.mock.invocationCallOrder[0]
+    );
+  });
+  it("does not invoke the provider or complete a refused admission", async () => {
+    mockedBegin.mockRejectedValueOnce(new ProductBillingError("blocked"));
+    const op = vi.fn<TransactionOperation<Record<string, never>>>(async () => ({
+      result: {},
       costMills: 5,
     }));
-
-    const out = await withTransaction(
-      {
-        organizationId: 7,
-        feature: "test/feature",
-        model_id: "openai/gpt-5.6-luna",
-        transactionId: "tx-1",
-      },
-      op
-    );
-
-    expect(out).toEqual({ tx: "tx-1", value: 42 });
-    expect(op).toHaveBeenCalledExactlyOnceWith("tx-1");
-    expect(mockedIngestUsageEvent).toHaveBeenCalledWith(7, 5, {
-      transactionId: "tx-1",
+    await expect(withTransaction(context, op)).rejects.toMatchObject({
+      code: "blocked",
+      status: 402,
     });
-  });
-
-  it("throws BillingMetronomeError on gate refusal; does not invoke op or ingest", async () => {
-    mockedGetEntitlement.mockResolvedValueOnce({
-      allowed: false,
-      reason: "below_floor",
-      cachedBalanceCents: 10,
-      cachedAt: null,
-    });
-    const op =
-      vi.fn<(tx: string) => Promise<{ result: unknown; costMills: number }>>();
-
-    await expect(
-      withTransaction(
-        {
-          organizationId: 7,
-          feature: "test/feature",
-          model_id: "openai/gpt-5.6-luna",
-        },
-        op
-      )
-    ).rejects.toBeInstanceOf(BillingMetronomeError);
-
     expect(op).not.toHaveBeenCalled();
-    expect(mockedIngestUsageEvent).not.toHaveBeenCalled();
+    expect(mockedComplete).not.toHaveBeenCalled();
   });
-
-  it("does NOT ingest when op throws", async () => {
-    mockedGetEntitlement.mockResolvedValueOnce({
-      allowed: true,
-      cachedBalanceCents: 1000,
-      cachedAt: null,
-    });
-    const op = vi.fn<(tx: string) => Promise<never>>(async () => {
+  it("retains an unknown outcome when the provider throws without inventing a completion", async () => {
+    const op = vi.fn<TransactionOperation<never>>(async () => {
       throw new Error("provider blew up");
     });
-
-    await expect(
-      withTransaction(
-        {
-          organizationId: 7,
-          feature: "test/feature",
-          model_id: "openai/gpt-5.6-luna",
-        },
-        op
-      )
-    ).rejects.toThrow("provider blew up");
-
-    expect(mockedIngestUsageEvent).not.toHaveBeenCalled();
+    await expect(withTransaction(context, op)).rejects.toThrow(
+      "provider blew up"
+    );
+    expect(mockedBegin).toHaveBeenCalledOnce();
+    expect(mockedComplete).not.toHaveBeenCalled();
   });
-
-  it("throws MissingOrgIdError for invalid organizationId", async () => {
-    const op =
-      vi.fn<(tx: string) => Promise<{ result: unknown; costMills: number }>>();
+  it("requires the verified organization and request digest before admission", async () => {
+    const op = vi.fn<TransactionOperation<Record<string, never>>>(async () => ({
+      result: {},
+      costMills: 5,
+    }));
     await expect(
-      withTransaction(
-        {
-          organizationId: 0 as number,
-          feature: "test/feature",
-          model_id: "openai/gpt-5.6-luna",
-        },
-        op
-      )
+      withTransaction({ ...context, organizationId: 0 }, op)
     ).rejects.toBeInstanceOf(MissingOrgIdError);
+    await expect(
+      withTransaction({ ...context, requestDigest: undefined }, op)
+    ).rejects.toMatchObject({ code: "billing_unavailable" });
+    expect(mockedBegin).not.toHaveBeenCalled();
     expect(op).not.toHaveBeenCalled();
   });
-
-  it("awaits ingest when ctx.awaitIngest is true (read-after-write semantics)", async () => {
-    mockedGetEntitlement.mockResolvedValueOnce({
-      allowed: true,
-      cachedBalanceCents: 1000,
-      cachedAt: null,
+  it.each([true, false, undefined])(
+    "awaits durable completion for awaitIngest=%s",
+    async (awaitIngest) => {
+      let completed = false;
+      mockedComplete.mockImplementationOnce(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        completed = true;
+      });
+      await withTransaction({ ...context, awaitIngest }, async () => ({
+        result: { ok: true },
+        costMills: 3,
+      }));
+      expect(completed).toBe(true);
+    }
+  );
+  it("propagates a completion-custody failure without dispatching again", async () => {
+    mockedComplete.mockRejectedValueOnce(new ProductBillingError());
+    const op = vi.fn<TransactionOperation<Record<string, never>>>(async () => ({
+      result: {},
+      costMills: 5,
+    }));
+    await expect(withTransaction(context, op)).rejects.toMatchObject({
+      code: "billing_unavailable",
     });
-    // Resolve ingest on next tick so we can prove withTransaction actually
-    // waited on it.
-    let ingestResolved = false;
-    mockedIngestUsageEvent.mockImplementationOnce(async () => {
-      await new Promise((r) => setTimeout(r, 5));
-      ingestResolved = true;
-      return { transactionId: "tx-await" };
-    });
-
-    const op = vi.fn<
-      (tx: string) => Promise<{ result: { ok: true }; costMills: number }>
-    >(async () => ({ result: { ok: true }, costMills: 3 }));
-
-    await withTransaction(
-      {
-        organizationId: 7,
-        feature: "ai/chat",
-        model_id: "openai/gpt-5.6-luna",
-        awaitIngest: true,
-      },
-      op
-    );
-
-    expect(ingestResolved).toBe(true);
-    expect(mockedIngestUsageEvent).toHaveBeenCalledWith(
-      7,
-      3,
-      expect.anything()
-    );
+    expect(op).toHaveBeenCalledOnce();
+    expect(mockedBegin).toHaveBeenCalledOnce();
   });
 });
 
 describe("withAiAuth envelope", () => {
   it("appends balanceCents to the success envelope by default", async () => {
     stubAuthed(7);
-    mockedRefreshBalance.mockResolvedValueOnce({ cents: 2599, live: null });
+    mockedEntitlement.mockResolvedValueOnce({ balance_cents: 2599 });
 
     const result = await withAiAuth("test/scope", undefined, async (orgId) => ({
       reply: "hi",
@@ -443,7 +379,7 @@ describe("withAiAuth envelope", () => {
       success: true,
       data: { reply: "hi", org: 7, balanceCents: 2599 },
     });
-    expect(mockedRefreshBalance).toHaveBeenCalledWith(7);
+    expect(mockedEntitlement).toHaveBeenCalledWith(7);
   });
 
   it("does NOT append balanceCents when opts.balance === false", async () => {
@@ -457,7 +393,7 @@ describe("withAiAuth envelope", () => {
     );
 
     expect(result).toEqual({ success: true, data: { reply: "silent" } });
-    expect(mockedRefreshBalance).not.toHaveBeenCalled();
+    expect(mockedEntitlement).not.toHaveBeenCalled();
   });
 
   it("under BYOK + byokBypass (AI-SDK path): skips refreshBalance, balanceCents:0, auth still enforced", async () => {
@@ -478,7 +414,7 @@ describe("withAiAuth envelope", () => {
     // BYOK bypasses billing only — auth + org resolution still ran.
     expect(mockedCreateLibraryClient).toHaveBeenCalled();
     expect(mockedRequireOrganizationId).toHaveBeenCalled();
-    expect(mockedRefreshBalance).not.toHaveBeenCalled();
+    expect(mockedEntitlement).not.toHaveBeenCalled();
   });
 
   it("under BYOK without byokBypass (Replicate-billed path): still reads the real balance", async () => {
@@ -487,7 +423,7 @@ describe("withAiAuth envelope", () => {
     // or it silently drains credit and surprises with a 402.
     mockedIsByokActive.mockReturnValue(true);
     stubAuthed(7);
-    mockedRefreshBalance.mockResolvedValueOnce({ cents: 2599, live: null });
+    mockedEntitlement.mockResolvedValueOnce({ balance_cents: 2599 });
 
     const result = await withAiAuth("test/scope", undefined, async (orgId) => ({
       reply: "billed",
@@ -498,13 +434,13 @@ describe("withAiAuth envelope", () => {
       success: true,
       data: { reply: "billed", org: 7, balanceCents: 2599 },
     });
-    expect(mockedRefreshBalance).toHaveBeenCalledWith(7);
+    expect(mockedEntitlement).toHaveBeenCalledWith(7);
   });
 });
 
 describe("checkGate", () => {
   it("throws on refusal", async () => {
-    mockedGetEntitlement.mockResolvedValueOnce({
+    mockedEntitlement.mockResolvedValueOnce({
       allowed: false,
       reason: "no_balance",
       cachedBalanceCents: 0,
@@ -516,11 +452,11 @@ describe("checkGate", () => {
         feature: "test",
         model_id: "openai/gpt-5.6-luna",
       })
-    ).rejects.toBeInstanceOf(BillingMetronomeError);
+    ).rejects.toBeInstanceOf(ProductBillingError);
   });
 
   it("returns silently on allow", async () => {
-    mockedGetEntitlement.mockResolvedValueOnce({
+    mockedEntitlement.mockResolvedValueOnce({
       allowed: true,
       cachedBalanceCents: 1000,
       cachedAt: null,

@@ -115,7 +115,7 @@ function errorResponse(err: unknown): NextResponse {
       { status: 400, headers: NO_STORE }
     );
   }
-  // `requireOrganizationId` throws BillingError (duck-typed here — the
+  // `requireOrganizationId` throws OrganizationError (duck-typed here — the
   // class itself is lint-barred under app/desktop/**). Membership /
   // resolution failures collapse into the no-usable-org state; malformed
   // input is a 400; everything else stays opaque.

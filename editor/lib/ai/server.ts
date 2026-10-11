@@ -1,10 +1,6 @@
 // GRIDA-GG: gateway — generation seam methods used by metered GG routes (docs/wg/platform/hosted-ai.md)
 import "server-only";
-import {
-  billingOwner,
-  sourceWork,
-  platformProductBilling,
-} from "@/lib/platform/billing-owner";
+import { platformProductBilling } from "@/lib/platform/product-consumer";
 import {
   productDigest,
   ProductBillingError,
@@ -35,7 +31,7 @@ import {
  * **BYOK carve-out (contributor-only).** When a `BYOK_*` key is set
  * (see `editor/lib/ai/models.ts`), `grida`/`model` return a BARE
  * provider and the billing seam is bypassed entirely — no gate, no
- * Metronome ingest, no balance. BYOK bypasses billing ONLY: auth and
+ * Platform usage receipt, no balance. BYOK bypasses billing ONLY: auth and
  * `requireOrganizationId` always run. GRIDA-SEC-003 — see SECURITY.md.
  */
 
@@ -53,12 +49,6 @@ import Replicate from "replicate";
 import OpenAI from "openai";
 import { createLibraryClient } from "@/lib/supabase/server";
 import { requireOrganizationId } from "@/lib/auth/organization";
-import {
-  getEntitlement,
-  ingestUsageEvent,
-  refreshBalance,
-  BillingMetronomeError,
-} from "@/lib/billing/metronome";
 import {
   byok,
   catalog,
@@ -95,8 +85,8 @@ export interface GridaCallContext {
   requestDigest?: string;
   /**
    * Retained caller option. Paid calls now always commit durable usage custody
-   * and await the original ingest attempt before returning. An ingest failure
-   * leaves the exact receipt for reconciliation instead of retrying dispatch.
+   * before returning. A completion failure leaves the execution unresolved
+   * for reconciliation instead of retrying dispatch.
    */
   awaitIngest?: boolean;
 }
@@ -163,7 +153,17 @@ export class InvalidAiRequestError extends Error {
   }
 }
 
-export { BillingMetronomeError };
+/** Cost-card failures belong to the AI seam; they never select another writer. */
+export class AiBillingError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly status = 500
+  ) {
+    super(message);
+    this.name = "AiBillingError";
+  }
+}
 // GRIDA-SEC-003: re-exported through the seam so the credits module can
 // read BYOK state via `@/lib/ai/server` without reaching past the seam
 // into `./models`. Only the boolean crosses out — never the key.
@@ -179,7 +179,7 @@ export { gridaProviderOptions } from "@grida/ai-models";
 export type { GridaCallProviderOptions };
 
 // ===========================================================================
-// Core seam — gate → run → ingest
+// Core seam — admission → run → completion
 // ===========================================================================
 
 function assertOrgId(orgId: unknown): asserts orgId is number {
@@ -196,63 +196,38 @@ function assertOrgId(orgId: unknown): asserts orgId is number {
 }
 
 /**
- * Gate-check only. Used by the streaming path where ingest is deferred
- * to the `finish` part — denial must fire up front. Unconditional on
- * the billed path; BYOK callers never reach here (bare provider, no
+ * Gate-check only, for operations that do not create a paid execution.
+ * Unconditional on the billed path; BYOK callers never reach here (bare provider, no
  * middleware). GRIDA-SEC-003.
  */
 export async function checkGate(ctx: GridaCallContext): Promise<void> {
   assertOrgId(ctx.organizationId);
-  if (billingOwner() === "infra") {
-    const decision = await platformProductBilling().entitlement(
-      ctx.organizationId
-    );
-    if (!decision.allowed) throw new ProductBillingError("blocked");
-    return;
-  }
-  const e = await getEntitlement(ctx.organizationId);
-  if (!e.allowed) {
-    throw new BillingMetronomeError(
-      `gate: ${e.reason ?? "blocked"} (cache=${e.cachedBalanceCents}¢)`,
-      "blocked",
-      402
-    );
-  }
+  const decision = await platformProductBilling().entitlement(
+    ctx.organizationId
+  );
+  if (!decision.allowed) throw new ProductBillingError("blocked");
 }
 
 /**
  * The shared billing seam. Wraps any provider call in the
- * admission → run → durable receipt envelope. Legacy ingest failures retain
- * exact original custody for reconciliation; provider dispatch is never retried.
+ * admission → run → durable receipt envelope. Completion failures remain
+ * unresolved for reconciliation; provider dispatch is never retried.
  */
 export async function withTransaction<T>(
   ctx: GridaCallContext,
   op: (transactionId: string) => Promise<{ result: T; costMills: number }>
 ): Promise<T> {
-  if (billingOwner() === "infra") {
-    if (!ctx.requestDigest) throw new ProductBillingError();
-    const billing = platformProductBilling();
-    const execution = await billing.begin({
-      ...ctx,
-      requestDigest: ctx.requestDigest,
-    });
-    // Failure/cancellation after dispatch remains durable unknown; it never
-    // receives a second dispatch grant or a fabricated zero-cost receipt.
-    const { result, costMills } = await op(execution.id);
-    await billing.complete(execution, costMills, { result, costMills });
-    return result;
-  }
-  await checkGate(ctx);
-
-  const custody = sourceWork();
-  const work = await custody.beginAI(ctx);
-  const transactionId = work.transactionID;
-  const { result, costMills } = await op(transactionId);
-
-  await custody.completeAI(work, costMills, { result, costMills }, () =>
-    ingestUsageEvent(ctx.organizationId, costMills, { transactionId })
-  );
-
+  assertOrgId(ctx.organizationId);
+  if (!ctx.requestDigest) throw new ProductBillingError();
+  const billing = platformProductBilling();
+  const execution = await billing.begin({
+    ...ctx,
+    requestDigest: ctx.requestDigest,
+  });
+  // Failure/cancellation after dispatch remains durable unknown; it never
+  // receives a second dispatch grant or a fabricated zero-cost receipt.
+  const { result, costMills } = await op(execution.id);
+  await billing.complete(execution, costMills, { result, costMills });
   return result;
 }
 
@@ -265,7 +240,7 @@ function resolveModelSpec(modelId: string): ModelSpec {
   if (direct) return direct;
   const fallback = modelSpecById(modelId);
   if (fallback) return fallback;
-  throw new BillingMetronomeError(
+  throw new AiBillingError(
     `No cost card for model id "${modelId}". Add it to editor/lib/ai/models.ts.`,
     "model_unknown",
     500
@@ -315,12 +290,10 @@ export function costUsdFromTokenUsage(
 }
 
 /**
- * Compute the **metered** cost (mills) we send to Metronome.
+ * Compute the **metered** native cost (mills) retained by Platform.
  *
- * Returns the *real* fractional mill value — Metronome aggregates these
- * across the billing period and invoices the exact sum, so the customer
- * pays at-cost (per the AI-credits design). Rounding happens once, at
- * Stripe invoice time, in cents — not per call.
+ * Returns the *real* fractional mill value. Source custody and Platform usage
+ * retain this exact native quantity; this seam does not round per-call money.
  *
  * 1 mill = $0.001.
  */
@@ -403,16 +376,11 @@ const languageModelMiddleware: LanguageModelMiddleware = {
       ...extractContext(model.modelId, params.providerOptions),
       requestDigest: productDigest(params),
     };
-    // Gate fires synchronously before the upstream connection opens.
-    // Ingest is deferred to the `finish` part — partial-stream
-    // abandonment still ingests observed usage (input tokens are
-    // burned regardless).
-    const billing =
-      billingOwner() === "infra" ? platformProductBilling() : null;
-    const execution = billing ? await billing.begin(ctx) : null;
-    if (!billing) await checkGate(ctx);
-    const custody = billing ? null : sourceWork();
-    const legacyWork = custody ? await custody.beginAI(ctx) : null;
+    // Admission and dispatch commit before the upstream connection opens.
+    // Only reliable final usage completes custody; interrupted streams
+    // remain dispatched with an unknown outcome for reconciliation.
+    const billing = platformProductBilling();
+    const execution = await billing.begin(ctx);
     const upstream = await doStream();
     let finalCostMills: number | null = null;
     const tapped = upstream.stream.pipeThrough(
@@ -423,20 +391,9 @@ const languageModelMiddleware: LanguageModelMiddleware = {
               ctx.model_id,
               part.usage as Parameters<typeof costMillsFromTokenUsage>[1]
             );
-            if (billing && execution)
-              await billing.complete(execution, finalCostMills, {
-                usage: part.usage,
-              });
-            else if (custody && legacyWork)
-              await custody.completeAI(
-                legacyWork,
-                finalCostMills,
-                { usage: part.usage },
-                () =>
-                  ingestUsageEvent(ctx.organizationId, finalCostMills!, {
-                    transactionId: legacyWork.transactionID,
-                  })
-              );
+            await billing.complete(execution, finalCostMills, {
+              usage: part.usage,
+            });
           }
           controller.enqueue(part);
         },
@@ -503,7 +460,7 @@ export type GridaProvider = ((modelId: string) => LanguageModel) & {
 
 /**
  * The seam's public model provider. Default: the billing-wrapped Vercel
- * AI Gateway (gate + ingest middleware). When a `BYOK_*` key is set this
+ * AI Gateway (admission + completion middleware). When a `BYOK_*` key is set this
  * is a bare provider that bypasses billing — see the BYOK carve-out in
  * this file's header / `models.ts` / SECURITY.md GRIDA-SEC-003.
  *
@@ -554,7 +511,7 @@ const embeddingProvider = byok ?? vercelAiGateway;
  *
  * GRIDA-SEC-003: a system/internal, non-billable passthrough kept in this
  * file so the provider import stays contained (mirrors
- * {@link methods.listOpenAiModels}). It does NOT pass through gate→ingest —
+ * {@link methods.listOpenAiModels}). It does NOT pass through admission→completion —
  * there is no org context. A caller reaching this from a PUBLIC surface MUST
  * add its own abuse controls (rate limit + cache).
  */
@@ -627,7 +584,7 @@ export async function runPrediction(
 }
 
 /**
- * Raw variant — returns whatever Replicate emits. Still gated + ingested.
+ * Raw variant — returns whatever Replicate emits. Still admitted + completed.
  */
 export async function runPredictionRaw<T = unknown>(
   ctx: ReplicateCallContext,
@@ -829,7 +786,7 @@ export namespace methods {
 
   /**
    * Hosted video generation — gate → `experimental_generateVideo` via
-   * the raw Vercel AI Gateway provider → ingest. Explicit `withTransaction` because
+   * the raw Vercel AI Gateway provider → completion. Explicit `withTransaction` because
    * `wrapProvider` has no video middleware (unlike text/image).
    *
    * Billing is **pre-priced by requested duration** against the Vercel AI Gateway
@@ -964,7 +921,7 @@ export type WithAiAuthOptions = {
    * When `true` (default), append the live post-call `balanceCents` to
    * the success envelope so client consumers can fold it via
    * `useAiCredits().consume(env)` without an extra round-trip. Adds a
-   * ~100-300ms Metronome read per call.
+   * fresh Platform balance observation per call.
    *
    * Set to `false` for silent endpoints that never surface a balance
    * (e.g. backfill jobs, internal-only routes).
@@ -991,12 +948,12 @@ export type WithAiAuthOptions = {
  * so call sites don't repeat the try-catch.
  *
  * By default, appends `balanceCents` to the success envelope (live
- * Metronome read post-fn). The `withTransaction` middleware defaults to
- * `awaitIngest:true` so the post-fn read sees the reconciled value.
+ * Platform balance observation post-fn). Each paid call commits its source receipt
+ * and usage outbox before returning; destination application can complete later.
  *
  * BYOK (contributor-only): auth + org lookup always run — BYOK never
  * bypasses auth. The balance short-circuit (`balanceCents:0`, no
- * Metronome read) fires only when the caller passes `byokBypass:true`,
+ * Platform balance observation) fires only when the caller passes `byokBypass:true`,
  * i.e. the action runs on the AI-SDK bare provider with no billing
  * middleware. Replicate-billed actions omit it and still read the real
  * balance under BYOK (they genuinely spend). GRIDA-SEC-003.
@@ -1056,22 +1013,17 @@ export async function withAiAuth<T extends Record<string, unknown>>(
       data: { ...data, balanceCents: 0 } as AiActionData<T>,
     };
   }
-  // The action already succeeded — a Metronome read failure must not
+  // The action already succeeded — a Platform read failure must not
   // demote the envelope to `success: false`. Surface the data and a
   // sentinel balance (-1); clients can `useAiCredits().refresh()` to
   // recover. We log loudly so the failure is visible.
   let balanceCents = -1;
   try {
-    if (billingOwner() === "infra") {
-      const observed = await platformProductBilling().entitlement(orgId);
-      balanceCents = observed.balance_cents;
-    } else {
-      const { cents } = await refreshBalance(orgId);
-      balanceCents = cents;
-    }
+    const observed = await platformProductBilling().entitlement(orgId);
+    balanceCents = observed.balance_cents;
   } catch (err) {
     console.error(
-      `[ai-seam] post-fn refreshBalance failed for org=${orgId} scope=${scope}:`,
+      `[ai-seam] post-fn balance observation failed for org=${orgId} scope=${scope}:`,
       err
     );
   }

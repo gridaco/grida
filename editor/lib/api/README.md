@@ -55,11 +55,8 @@ pagination is not a transaction snapshot across requests. A cursor grants no acc
 
 `GET /api/v1/account/credits?organization_id=1` reads the selected organization's
 cached AI credits. The ID is required and must be a canonical positive safe
-integer. Under the default Grida owner, the same verified bearer queries
-`public.v_billing_credits`, a `security_invoker` view anchored on current
-membership. With explicit infra ownership, the fixed
-[consumer adapter](../platform/native-credits.ts) reads only canonical source
-organization identity and the platform's passive cached credit projection with
+integer. The fixed [consumer adapter](../platform/native-credits.ts) reads only
+canonical source organization identity and Platform's passive cached credit projection with
 the original native bearer plus a separate workload credential. It never falls
 back to the source financial view. Unknown and invisible organizations both
 return 403. An earlier organization selection grants no access.
@@ -72,12 +69,12 @@ an unknown balance; recorded zero and negative estimates are preserved. Cache
 timestamps include optimistic usage deductions. Gate eligibility follows the
 existing billing policy and does not promise GG/provider readiness.
 
-[The passive credits owner](../billing/credits.ts) contains the shared pure gate
-and projection; [its query adapter](../supabase/credits-data.ts) imports no
-cookie client, privileged client or provider SDK. The read performs no provider
-refresh, provisioning or writes. Missing schema, invalid rows and DB failures
-remain errors; they never become zero credits. Subscription billing is outside
-this operation. Account identity and organization listing need no billing setup.
+The shared [credit DTO](../billing/credits.ts) contains no financial policy or
+provider operations. The consumer imports no cookie client, privileged client or
+provider SDK. The read performs no provider refresh, provisioning or writes.
+Missing Platform configuration, invalid projections and upstream failures remain
+errors; they never become zero credits. Subscription billing is outside this
+operation. Account identity and organization listing need no billing setup.
 
 All account reads support authenticated HEAD and bodyless OPTIONS;
 other methods return 405. Input and output share the existing no-store policy.

@@ -190,15 +190,15 @@ removes only that new membership; the same native credential immediately sees
 both changes. Seeded owner memberships remain intact. This exercises current
 PostgreSQL RLS, unlike the separate synthetic production request-pipeline proof.
 
-The same proof reads cached credits through the auth package and the independent
-`@grida/account` client. Sole/name/ID selection and multiple-membership errors are
-exercised before the server rechecks membership. A removed member receives no
-credits with the same credential. Existing fixture setup RPCs link synthetic
-billing identifiers and seed cache values; no billing provider is contacted.
-Unprovisioned/unobserved credit data remains distinct from observed zero, and the
-existing gate floor and entitlement flag are preserved. Cache snapshots before
-and after each read prove the read leaves billing state unchanged. Direct REST
-checks verify the safe view columns and other-user denial under real RLS.
+The auth-only fixture deliberately has no Platform billing service or billing
+credentials. Credit reads through the auth package and independent
+`@grida/account` client fail safely with `auth_unavailable` for a current member;
+an invisible or removed member still receives `forbidden`. Sole/name/ID
+organization selection and multiple-membership errors remain covered before the
+server rechecks membership. Identity and organization listing remain usable
+through the same credential after the billing failure. The fixture performs no
+financial setup, credit mutations, or source financial-view reads. Cached-credit
+DTO and projection behavior belong to the separate Platform consumer proof.
 
 The GG extension has passed against local Auth 2.196.0 and PostgreSQL
 15.8.1.085. A native client opts into
@@ -216,15 +216,17 @@ credential families and conflicting cookies, revoked-account remint refusal,
 and restart/remint through copied public package exports. Existing scoped tokens
 retain their 900-second window plus server clock tolerance after membership or
 account revocation; this does not establish immediate GG revocation. Fixture
-billing/cache snapshots remain unchanged around access, and restart/remint
-retains no GG grant in the copied package's custody. No generation endpoint, billing
+organization listing and account custody remain unchanged around access, and
+restart/remint retains no GG grant in the copied package's custody. No generation endpoint, billing
 mutation or provider request belongs in this check. Offline tests cover quota,
 clock/key rotation, malformed responses and handoff races; those tests do not
 substitute for the real local acceptance run or prove provider readiness.
 
 Its restart check copies both built packages and manifests outside the repository
 and runs separate Node processes with disposable `0700`/`0600` test custody.
-It lists organizations and reads credits before and after restart, and checks a terminal cursor.
+It lists organizations and remints GG access before and after restart, and checks
+a terminal cursor. The ordinary account client still fails closed for credits
+without Platform configuration.
 That proves independent package use and this test adapter's restart behavior;
 it does not establish product credential storage or cross-process coordination.
 No hosted service or deployment is covered by the local result. Normal output

@@ -7,13 +7,12 @@ export default defineConfig({
     ...api.test,
     include: [
       "lib/platform/**/*.test.ts",
+      "lib/billing/marketing-plans.test.ts",
       "lib/ai/fixture-gateway.test.ts",
-      "lib/ai/__tests__/server.test.ts",
-      "lib/ai/__tests__/gg-three-d.test.ts",
+      "lib/ai/__tests__/*.test.ts",
       "app/(api)/(public)/api/v1/ai/chat/completions/route.test.ts",
       "app/(api)/(public)/api/v1/ai/chat/completions/route.byok.test.ts",
       "app/(api)/(public)/api/v1/ai/images/generations/route.test.ts",
-      "lib/billing/metronome-entitlement.test.ts",
     ],
   },
 });

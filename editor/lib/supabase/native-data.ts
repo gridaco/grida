@@ -19,16 +19,10 @@ export namespace nativeData {
     }
     return Object.freeze({
       async page(
-        table: "organization" | "organization_member" | "v_billing_credits",
+        table: "organization" | "organization_member",
         query: Readonly<Record<string, string>>
       ): Promise<{ rows: unknown[]; total: number }> {
-        if (
-          ![
-            "organization",
-            "organization_member",
-            "v_billing_credits",
-          ].includes(table)
-        )
+        if (!["organization", "organization_member"].includes(table))
           throw new oauthServer.Failure("invalid_request");
         const url = new URL(`/rest/v1/${table}`, config.dataOrigin);
         for (const [key, value] of Object.entries(query))

@@ -50,14 +50,12 @@ function request(provider: "stripe" | "metronome", body = raw) {
     body,
   });
 }
-function fixture(phase = "draining", owner = "grida") {
+function fixture() {
   const rpc = vi.fn<WebhookRPC>(async (name) => ({
     data:
-      name === "platform_billing_owner"
-        ? { owner, phase, quarantined: false }
-        : name === "platform_source_webhook_capture"
-          ? { accepted: true, body_hash: hash }
-          : { acknowledged: true },
+      name === "platform_source_webhook_capture"
+        ? { accepted: true, body_hash: hash }
+        : { acknowledged: true },
     error: null,
   }));
   const transport = vi.fn<typeof fetch>(async () =>
@@ -75,7 +73,6 @@ describe("signed source capture and forwarding", () => {
       expect(result?.status).toBe(200);
       expect(f.rpc.mock.calls.map((c) => c[0])).toEqual([
         "platform_source_webhook_capture",
-        "platform_billing_owner",
         "platform_source_webhook_ack",
       ]);
       expect(f.rpc.mock.calls[0][1].raw_body).toBe(
@@ -106,11 +103,16 @@ describe("signed source capture and forwarding", () => {
       expect(init?.redirect).toBe("error");
     }
   );
-  it("keeps source-owned processing only while active, after durable signed archive", async () => {
-    const f = fixture("active");
-    expect(await sourceWebhook(request("stripe"), "stripe", f)).toBeNull();
-    expect(f.transport).not.toHaveBeenCalled();
-    expect(f.rpc).toHaveBeenCalledTimes(2);
+  it("always forwards retained source events without consulting retired financial authority", async () => {
+    const f = fixture();
+    expect((await sourceWebhook(request("stripe"), "stripe", f)).status).toBe(
+      200
+    );
+    expect(f.transport).toHaveBeenCalledOnce();
+    expect(f.rpc.mock.calls.map(([name]) => name)).toEqual([
+      "platform_source_webhook_capture",
+      "platform_source_webhook_ack",
+    ]);
   });
   it.each(["stripe", "metronome"] as const)(
     "rejects tampered %s before any SQL or HTTP",
@@ -132,25 +134,23 @@ describe("signed source capture and forwarding", () => {
     expect(f.transport).not.toHaveBeenCalled();
   });
   it("does not ACK a target timeout or non-success, and never resumes the source writer", async () => {
-    const f = fixture("transferred", "infra");
+    const f = fixture();
     f.transport.mockResolvedValue(new Response(null, { status: 503 }));
     expect((await sourceWebhook(request("stripe"), "stripe", f))?.status).toBe(
       503
     );
     expect(f.rpc.mock.calls.map((c) => c[0])).toEqual([
       "platform_source_webhook_capture",
-      "platform_billing_owner",
     ]);
   });
   it("does not ACK a successful HTTP status without the durable target receipt", async () => {
-    const f = fixture("transferred", "infra");
+    const f = fixture();
     f.transport.mockResolvedValue(Response.json({ received: true }));
     expect((await sourceWebhook(request("stripe"), "stripe", f))?.status).toBe(
       503
     );
     expect(f.rpc.mock.calls.map((c) => c[0])).toEqual([
       "platform_source_webhook_capture",
-      "platform_billing_owner",
     ]);
   });
   it("retains a retryable result when local ACK is lost after target acceptance", async () => {
@@ -159,10 +159,7 @@ describe("signed source capture and forwarding", () => {
       name === "platform_source_webhook_ack"
         ? { data: null, error: { code: "lost" } }
         : {
-            data:
-              name === "platform_billing_owner"
-                ? { owner: "infra", phase: "transferred", quarantined: false }
-                : { accepted: true, body_hash: hash },
+            data: { accepted: true, body_hash: hash },
             error: null,
           }
     );
@@ -171,7 +168,7 @@ describe("signed source capture and forwarding", () => {
     );
     expect(f.transport).toHaveBeenCalledTimes(1);
   });
-  it("fails closed on missing forwarding configuration during maintenance", async () => {
+  it("fails closed on missing forwarding configuration", async () => {
     const f = fixture();
     expect(
       (

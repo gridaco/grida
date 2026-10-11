@@ -50,7 +50,11 @@ const fetcher = vi.fn<typeof fetch>(async (target, init) => {
   const headers = new Headers(init?.headers);
   const url = new URL(String(target));
   if (url.origin === "https://platform.example.test") {
-    assert.equal(url.pathname, "/platform/v1/billing/organizations/1/credits");
+    const id = Number(url.pathname.split("/")[5]);
+    assert.equal(
+      url.pathname,
+      `/platform/v1/billing/organizations/${id}/credits`
+    );
     assert.equal(headers.get("authorization"), `Bearer ${"p".repeat(43)}`);
     assert.equal(headers.get("x-grida-workload-key-id"), "m4-ssr");
     assert.equal(headers.has("x-grida-account-token"), false);
@@ -61,21 +65,12 @@ const fetcher = vi.fn<typeof fetch>(async (target, init) => {
       key,
       { issuer, audience: "authenticated" }
     );
-    assert.equal(payload.sub, users[0]);
+    assert.ok(visible[payload.sub!].some((org) => org.id === id));
     if (platformStatus !== 200)
       return new Response("private billing diagnostics", {
         status: platformStatus,
       });
-    return Response.json({
-      organization_id: "1",
-      account_present: true,
-      state: "uncached",
-      source: "cache",
-      currency: "USD",
-      balance_cents: null,
-      cache_updated_at: null,
-      billing_gate: { allowed: false, reason: "no_balance" },
-    });
+    return Response.json({ organization_id: String(id), ...creditRow });
   }
   const { payload } = await jwtVerify(
     headers.get("authorization")!.slice(7),
@@ -93,51 +88,33 @@ const fetcher = vi.fn<typeof fetch>(async (target, init) => {
     assert.equal(headers.get("apikey"), "synthetic-public-key");
     assert.equal(headers.has("cookie"), false);
     assert.equal(url.searchParams.get("select"), "id,name,display_name");
+    if (databaseStatus !== 200)
+      return new Response("private database diagnostics", {
+        status: databaseStatus,
+      });
     const id = Number(url.searchParams.get("id")?.slice(3));
     const rows = visible[payload.sub!].filter((row) => row.id === id);
     return Response.json(rows, {
       headers: { "content-range": rows.length ? "0-0/1" : "*/0" },
     });
   }
-  if (
-    url.origin !== dataOrigin ||
-    url.pathname !== "/rest/v1/v_billing_credits" ||
-    headers.get("apikey") !== "synthetic-public-key" ||
-    headers.has("cookie")
-  ) {
-    throw new Error("Unexpected fixture request.");
-  }
-  if (databaseStatus !== 200)
-    return new Response("private database diagnostics", {
-      status: databaseStatus,
-    });
-  const id = Number(url.searchParams.get("organization_id")?.slice(3));
-  const org = visible[payload.sub!].find((row) => row.id === id);
-  const rows = org
-    ? [
-        {
-          ...creditRow,
-          organization_id: org.id,
-          organization_name: org.name,
-          organization_display_name: org.display_name,
-        },
-      ]
-    : [];
-  return Response.json(rows, {
-    headers: { "content-range": rows.length ? "0-0/1" : "*/0" },
-  });
+  throw new Error("Unexpected fixture request.");
 });
 
 beforeEach(() => {
   databaseStatus = 200;
   platformStatus = 200;
-  vi.stubEnv("GRIDA_BILLING_OWNER", "grida");
+  vi.stubEnv("GRIDA_PLATFORM_BILLING_ORIGIN", "https://platform.example.test");
+  vi.stubEnv("GRIDA_PLATFORM_SSR_KEY_ID", "m4-ssr");
+  vi.stubEnv("GRIDA_PLATFORM_SSR_TOKEN", "p".repeat(43));
   creditRow = {
     account_present: true,
-    credits_provisioned: true,
-    cached_balance_cents: 25,
-    cached_balance_at: "2026-09-07T00:00:00Z",
-    customer_entitled: true,
+    state: "cached",
+    source: "cache",
+    currency: "USD",
+    balance_cents: 25,
+    cache_updated_at: "2026-09-07T00:00:00Z",
+    billing_gate: { allowed: true, reason: null },
   };
   visible = { [users[0]]: [orgs[0]], [users[1]]: [orgs[1]] };
   fetcher.mockClear();
@@ -176,13 +153,13 @@ describe("native credits operation", () => {
         source: "cache",
         currency: "USD",
         balance_cents: 25,
-        cache_updated_at: creditRow.cached_balance_at,
+        cache_updated_at: creditRow.cache_updated_at,
         billing_gate: { allowed: true, reason: null },
       });
       expect(response.headers.get("cache-control")).toBe("no-store");
       expect(response.headers.has("set-cookie")).toBe(false);
       expect(response.headers.has("location")).toBe(false);
-      const recent = fetcher.mock.calls.slice(-2);
+      const recent = fetcher.mock.calls.slice(-3, -1);
       expect(recent.map(([target]) => new URL(String(target)).origin)).toEqual([
         new URL(issuer).origin,
         dataOrigin,
@@ -214,10 +191,12 @@ describe("native credits operation", () => {
   it("distinguishes missing billing account from denied membership and zero", async () => {
     creditRow = {
       account_present: false,
-      credits_provisioned: false,
-      cached_balance_cents: null,
-      cached_balance_at: null,
-      customer_entitled: null,
+      state: "not_provisioned",
+      source: "cache",
+      currency: "USD",
+      balance_cents: null,
+      cache_updated_at: null,
+      billing_gate: { allowed: false, reason: "not_provisioned" },
     };
     const response = await handlers.GET(request(await token()));
     expect(response.status).toBe(200);
@@ -230,7 +209,9 @@ describe("native credits operation", () => {
     });
   });
   it("keeps cached billing eligibility separate from an unknown displayed balance", async () => {
-    creditRow.cached_balance_at = null;
+    creditRow.cache_updated_at = null;
+    creditRow.balance_cents = null;
+    creditRow.state = "uncached";
     const response = await handlers.GET(request(await token()));
     expect(await response.json()).toMatchObject({
       state: "uncached",
@@ -292,7 +273,7 @@ describe("native credits operation", () => {
     }
   );
   it("rejects malformed credit data without an invented balance", async () => {
-    creditRow.cached_balance_cents = "25";
+    creditRow.balance_cents = "25";
     const response = await handlers.GET(request(await token()));
     expect(response.status).toBe(503);
     expect((await response.json()).balance_cents).toBeUndefined();
@@ -301,7 +282,7 @@ describe("native credits operation", () => {
     const response = await handlers.HEAD(request(await token(), "HEAD"));
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("");
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(3);
   });
   it.each(["OPTIONS", "POST", "PUT", "PATCH", "DELETE"] as const)(
     "%s needs no organization and reads nothing",
@@ -314,15 +295,17 @@ describe("native credits operation", () => {
   );
 });
 
-describe("infra-owned published native credits operation", () => {
+describe("published native Platform credit projection", () => {
   beforeEach(() => {
-    vi.stubEnv("GRIDA_BILLING_OWNER", "infra");
-    vi.stubEnv(
-      "GRIDA_PLATFORM_BILLING_ORIGIN",
-      "https://platform.example.test"
-    );
-    vi.stubEnv("GRIDA_PLATFORM_SSR_KEY_ID", "m4-ssr");
-    vi.stubEnv("GRIDA_PLATFORM_SSR_TOKEN", "p".repeat(43));
+    creditRow = {
+      account_present: true,
+      state: "uncached",
+      source: "cache",
+      currency: "USD",
+      balance_cents: null,
+      cache_updated_at: null,
+      billing_gate: { allowed: false, reason: "no_balance" },
+    };
   });
   it("retains the published DTO and original native authority without reading source finance", async () => {
     const credential = await token();
