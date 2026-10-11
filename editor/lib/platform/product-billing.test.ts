@@ -24,6 +24,19 @@ function setup(change: (d: Record<string, unknown>) => void = () => {}) {
   };
   const transport = vi.fn<typeof fetch>(
     async (_url: RequestInfo | URL, init?: RequestInit) => {
+      if (
+        String(_url).endsWith("/dispatch") ||
+        String(_url).endsWith("/close")
+      ) {
+        const body = JSON.parse(init!.body as string);
+        return Response.json({
+          id: "execution-1",
+          organization_id: body.organization_id,
+          request_digest: body.request_digest,
+          dispatch: true,
+          closed: true,
+        });
+      }
       const body = JSON.parse(init!.body as string),
         now = body.requested_at,
         expiry = new Date(Date.parse(now) + 50000).toISOString();
@@ -37,6 +50,9 @@ function setup(change: (d: Record<string, unknown>) => void = () => {}) {
         request_digest: body.request_digest,
         admission_observed_at: now,
         admission_expires_at: expiry,
+        authorized_mills: body.authorized_mills,
+        expense_bound_mills: body.expense_bound_mills,
+        tariff_revision: body.tariff_revision,
       };
       const data = {
         id: body.id,
@@ -84,6 +100,9 @@ const input = {
   model_id: "fixture/model",
   transactionId: "execution-1",
   requestDigest: productDigest({ prompt: "private" }),
+  authorizedMills: "10",
+  expenseBoundMills: "10",
+  tariffRevision: productDigest({ rate: "test" }),
 };
 describe("product admission boundary", () => {
   it("retains claim before dispatch and commits exact completion locally", async () => {
@@ -101,7 +120,25 @@ describe("product admission boundary", () => {
     expect(receipt.quantity).toBe("0.000000000000000001");
     expect(receipt.unit).toBe("cost_mills");
     expect(receipt).not.toHaveProperty("request_digest");
+    expect(f.transport).toHaveBeenCalledTimes(2);
+  });
+  it("retains the deployed source policy before owner-selected shared transition", async () => {
+    const f = setup((d) => {
+      const claim = d.claim as Record<string, unknown>;
+      claim.policy_version = "legacy-ai-v1";
+      delete claim.authorized_mills;
+      delete claim.expense_bound_mills;
+      delete claim.tariff_revision;
+    });
+    const execution = await f.client.begin(input);
+    expect(execution.claim.policy_version).toBe("legacy-ai-v1");
     expect(f.transport).toHaveBeenCalledTimes(1);
+    expect(f.calls.map((c) => c.name)).toEqual([
+      "platform_billing_owner",
+      "platform_product_execution_claim",
+      "platform_product_execution_dispatch",
+    ]);
+    expect(execution.claim).not.toHaveProperty("authorized_mills");
   });
   it.each([
     [
@@ -195,7 +232,7 @@ describe("product admission boundary", () => {
     await expect(client.complete(execution, "1", {})).rejects.toBeInstanceOf(
       ProductBillingError
     );
-    expect(f.transport).toHaveBeenCalledTimes(1);
+    expect(f.transport).toHaveBeenCalledTimes(2);
   });
   it("denies retired source owner before HTTP", async () => {
     const f = setup();

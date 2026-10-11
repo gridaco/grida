@@ -1,9 +1,8 @@
-// GRIDA-SEC-010 — source mirror of infra contracts/platform/destinations.json.
+// GRIDA-SEC-010 — exact organization-scoped Console destination contract.
 const objectIDs = {
   keys: /^key_[A-Za-z0-9_-]{8,128}$/,
-  byok: /^byok_[A-Za-z0-9_-]{8,128}$/,
   requests: /^req_[A-Za-z0-9_-]{8,128}$/,
-  media: /^job_[A-Za-z0-9_-]{8,128}$/,
+  media: /^req_[A-Za-z0-9_-]{8,128}$/,
 };
 const typedObject = (kind: string, value: string) =>
   Object.hasOwn(objectIDs, kind) &&
@@ -29,8 +28,8 @@ const enums: Record<string, readonly string[]> = {
   bucket: ["minute", "hour", "day"],
   group_by: ["model", "provider", "key", "operation", "funding"],
   compare: ["true", "false"],
-  funding_mode: ["grida", "byok"],
-  status: ["pending", "running", "unknown", "succeeded", "failed", "canceled"],
+  funding_mode: ["grida"],
+  status: ["pending", "running", "unknown", "succeeded", "failed"],
 };
 
 /** Strict calendar validation and UTC normalization preserve fractional seconds. */
@@ -112,24 +111,18 @@ export function organizationRoute(
       return { organization: parts[1], section: "/billing" };
     return null;
   }
-  if (parts[2] !== "gateway") return null;
+  if (parts[2] !== "ai-gateway") return null;
   if (parts.length === 3) return { organization: parts[1], section: "/" };
   if (
-    ![
-      "usage",
-      "requests",
-      "keys",
-      "byok",
-      "media",
-      "models",
-      "operations",
-    ].includes(parts[3])
+    !["usage", "requests", "keys", "media", "models", "operations"].includes(
+      parts[3]
+    )
   )
     return null;
   if (
     parts.length === 4 ||
     (parts.length === 5 &&
-      ["requests", "keys", "byok", "media"].includes(parts[3]) &&
+      ["requests", "keys", "media"].includes(parts[3]) &&
       typedObject(parts[3], parts[4]))
   )
     return { organization: parts[1], section: `/${parts[3]}` };

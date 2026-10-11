@@ -7,7 +7,7 @@
  * provider, unknown/unbound models 404, base64 results in the shared
  * protocol shape, and NO library upload (the daemon owns persistence).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ProductBilling } from "@/lib/platform/product-billing";
 
 // Rate limits are pinned by their own module; route tests must NEVER
@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   imageCalls: 0,
   lastOptions: null as unknown,
   reportedCost: undefined as unknown,
+  shared: false,
 }));
 
 vi.mock("@/lib/platform/product-consumer", () => ({
@@ -140,6 +141,7 @@ beforeEach(() => {
   h.imageCalls = 0;
   h.lastOptions = null;
   h.reportedCost = undefined;
+  h.shared = false;
   vi.mocked(ai.image.binding).mockReset();
   mockedAdmission.mockReset();
   mockedCompletion.mockReset();
@@ -151,7 +153,14 @@ beforeEach(() => {
       operation: context.feature,
       model: context.model_id,
       unit: "cost_mills",
-      policy_version: "legacy-ai-v1",
+      policy_version: h.shared ? "shared-ai-v1" : "legacy-ai-v1",
+      ...(h.shared
+        ? {
+            authorized_mills: context.authorizedMills,
+            expense_bound_mills: context.expenseBoundMills,
+            tariff_revision: context.tariffRevision,
+          }
+        : {}),
       request_digest: context.requestDigest,
       admission_observed_at: "2026-10-06T00:00:00Z",
       admission_expires_at: "2026-10-06T00:01:00Z",
@@ -171,7 +180,62 @@ beforeEach(() => {
   }));
 });
 
+afterEach(() => vi.restoreAllMocks());
+
 describe("POST /api/v1/ai/images/generations", () => {
+  it.each([undefined, null, "", "invalid", -1, Infinity])(
+    "keeps shared execution unresolved without a valid provider receipt: %j",
+    async (cost) => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      h.shared = true;
+      h.reportedCost = cost;
+      const { token } = await signGgToken("user-1", 7);
+      const res = await POST(
+        request(
+          {
+            model_id: "bfl/flux-kontext-max",
+            prompt: "x",
+          },
+          token
+        )
+      );
+      expect(res.status).toBe(500); // Public envelope hides internal billing details.
+      expect(logged).toHaveBeenCalledWith(
+        "[v1/ai/images]",
+        expect.objectContaining({
+          name: "ProductBillingError",
+          code: "invalid_cost",
+        })
+      );
+      expect(h.imageCalls).toBe(1);
+      expect(mockedAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          authorizedMills: "1000",
+          expenseBoundMills: "1000",
+        })
+      );
+      expect(mockedCompletion).not.toHaveBeenCalled();
+    }
+  );
+  it.each([0, "0.08"])("settles a valid shared receipt %j", async (cost) => {
+    h.shared = true;
+    h.reportedCost = cost;
+    const { token } = await signGgToken("user-1", 7);
+    const res = await POST(
+      request(
+        {
+          model_id: "bfl/flux-kontext-max",
+          prompt: "x",
+        },
+        token
+      )
+    );
+    expect(res.status).toBe(200);
+    expect(h.imageCalls).toBe(1);
+    expect(mockedCompletion).toHaveBeenCalledTimes(1);
+    expect(mockedCompletion.mock.calls[0]![1]).toBe(Number(cost) * 1000);
+  });
+
   it.each([0, "0", 0.21072, "0.01317"])(
     "bills the upstream receipt %j once instead of the image-count estimate",
     async (cost) => {

@@ -5,6 +5,7 @@ export type ProductRPC = (
     | "platform_billing_owner"
     | "platform_product_execution_claim"
     | "platform_product_execution_dispatch"
+    | "platform_product_execution_close"
     | "platform_product_execution_receipt",
   args: Record<string, unknown>
 ) => Promise<{ data: unknown; error: unknown }>;
@@ -14,6 +15,11 @@ export type ProductContext = {
   model_id: string;
   transactionId?: string;
   requestDigest: string;
+  authorizedMills?: string;
+  expenseBoundMills?: string;
+  /** Explicitly accepted native expense estimate; never a GG API policy. */
+  expensePolicy?: "native-interactive-estimate-v1" | "native-image-estimate-v1";
+  tariffRevision?: string;
 };
 export type Claim = {
   organization_id: string;
@@ -25,6 +31,9 @@ export type Claim = {
   request_digest: string;
   admission_observed_at: string;
   admission_expires_at: string;
+  authorized_mills?: string;
+  expense_bound_mills?: string;
+  tariff_revision?: string;
 };
 export type ProductExecution = { id: string; claim: Claim };
 export type Admission = {
@@ -283,27 +292,72 @@ export class ProductBilling {
       context.model_id.length > 256
     )
       throw new ProductBillingError();
+    const bounded =
+      context.authorizedMills != null &&
+      context.expenseBoundMills != null &&
+      context.tariffRevision != null;
+    if (
+      !bounded &&
+      [
+        context.authorizedMills,
+        context.expenseBoundMills,
+        context.tariffRevision,
+      ].some((v) => v != null)
+    )
+      throw new ProductBillingError("invalid_cost");
     const identity = {
       organization_id: String(context.organizationId),
       product: "grida-ai",
       operation: context.feature,
       model: context.model_id,
       unit: "cost_mills",
-      policy_version: "legacy-ai-v1",
+      policy_version: bounded ? "shared-ai-v1" : "legacy-ai-v1",
+      ...(bounded
+        ? {
+            authorized_mills: exactCostMills(context.authorizedMills!),
+            expense_bound_mills: exactCostMills(context.expenseBoundMills!),
+            tariff_revision: context.tariffRevision!,
+          }
+        : {}),
       request_digest: context.requestDigest,
     };
+    if (
+      bounded &&
+      (!/^[0-9a-f]{64}$/.test(context.tariffRevision!) ||
+        Number(context.authorizedMills) < 0 ||
+        Number(context.expenseBoundMills) < 0)
+    )
+      throw new ProductBillingError("invalid_cost");
     const decision = await this.observe("executions", context.organizationId, {
       ...identity,
+      ...(context.expensePolicy
+        ? { expense_policy: context.expensePolicy }
+        : {}),
       id,
       producer: "grida-ai",
     });
     if (!decision.allowed) throw new ProductBillingError("blocked");
     const claim = decision.claim;
+    const shared = claim?.policy_version === "shared-ai-v1";
+    const expectedIdentity = shared
+      ? identity
+      : {
+          organization_id: identity.organization_id,
+          product: identity.product,
+          operation: identity.operation,
+          model: identity.model,
+          unit: identity.unit,
+          policy_version: "legacy-ai-v1",
+          request_digest: identity.request_digest,
+        };
     if (
       decision.id !== id ||
       !object(claim) ||
-      Object.keys(claim).length !== 9 ||
-      Object.entries(identity).some(
+      (shared
+        ? !bounded || Object.keys(claim).length !== 12
+        : claim.policy_version !== "legacy-ai-v1" ||
+          Object.keys(claim).length !== 9) ||
+      Object.entries(expectedIdentity).some(
         ([key, value]) =>
           (claim as unknown as Record<string, unknown>)[key] !== value
       ) ||
@@ -311,20 +365,105 @@ export class ProductBilling {
       claim.admission_expires_at !== decision.expires_at
     )
       throw new ProductBillingError();
-    const custody = await this.source("platform_product_execution_claim", {
-      producer_id: "grida-ai",
-      execution_id: id,
-      claim,
-    });
-    if (custody.created !== true || custody.state !== "claimed")
-      throw new ProductBillingError("execution_already_dispatched");
-    const dispatch = await this.source("platform_product_execution_dispatch", {
-      producer_id: "grida-ai",
-      execution_id: id,
-    });
-    if (dispatch.dispatch !== true || dispatch.state !== "dispatched")
-      throw new ProductBillingError("execution_already_dispatched");
+    try {
+      const custody = await this.source("platform_product_execution_claim", {
+        producer_id: "grida-ai",
+        execution_id: id,
+        claim,
+      });
+      if (custody.created !== true || custody.state !== "claimed")
+        throw new ProductBillingError("execution_already_dispatched");
+      // Only the target CAS winner may proceed. An ambiguous response never
+      // becomes a second provider dispatch or a new execution identity.
+      if (shared) {
+        const permission = await this.executionCommand(id, claim, "dispatch");
+        if (permission.dispatch !== true)
+          throw new ProductBillingError("execution_already_dispatched");
+      }
+      const dispatch = await this.source(
+        "platform_product_execution_dispatch",
+        {
+          producer_id: "grida-ai",
+          execution_id: id,
+        }
+      );
+      if (dispatch.dispatch !== true || dispatch.state !== "dispatched")
+        throw new ProductBillingError("execution_already_dispatched");
+    } catch (error) {
+      // Close source custody first. A committed tombstone fences a delayed
+      // claim/dispatch; without its proof the financial hold remains intact.
+      try {
+        const closure = await this.source("platform_product_execution_close", {
+          producer_id: "grida-ai",
+          execution_id: id,
+          claim,
+        });
+        if (shared && closure.state === "closed")
+          await this.executionCommand(id, claim, "close", closure);
+      } catch {
+        /* Destination outage retains the original hold for recovery. */
+      }
+      throw error;
+    }
     return { id, claim };
+  }
+  private async executionCommand(
+    id: string,
+    claim: Claim,
+    command: "dispatch" | "close",
+    closure?: Record<string, unknown>
+  ) {
+    const response = await this.transport(
+      `${this.config.origin}/platform/v1/billing/usage/executions/${encodeURIComponent(id)}/${command}`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.config.token}`,
+          "X-Grida-Workload-Key-ID": this.config.keyId,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          organization_id: claim.organization_id,
+          request_digest: claim.request_digest,
+          ...(closure ? { closure } : {}),
+        }),
+        redirect: "error",
+        credentials: "omit",
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new ProductBillingError();
+    }
+    const reader = response.body?.getReader();
+    if (!reader) throw new ProductBillingError();
+    let size = 0;
+    const chunks: Uint8Array[] = [];
+    try {
+      for (;;) {
+        const part = await reader.read();
+        if (part.done) break;
+        size += part.value.length;
+        if (size > 32768) throw new ProductBillingError();
+        chunks.push(part.value);
+      }
+    } finally {
+      await reader.cancel();
+      reader.releaseLock();
+    }
+    const out: unknown = JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks))
+    );
+    if (
+      !object(out) ||
+      out.id !== id ||
+      out.organization_id !== claim.organization_id ||
+      out.request_digest !== claim.request_digest
+    )
+      throw new ProductBillingError();
+    return out;
   }
   async complete(
     execution: ProductExecution,
@@ -336,6 +475,9 @@ export class ProductBilling {
       admission_expires_at: _expires,
       admission_observed_at: _observed,
       request_digest: _digest,
+      authorized_mills: _maximum,
+      expense_bound_mills: _expense,
+      tariff_revision: _tariff,
       ...identity
     } = execution.claim;
     const receipt = {
