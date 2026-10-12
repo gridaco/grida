@@ -7,6 +7,10 @@
       "canonical": "/"
     },
     {
+      "input": "/_/ai-gateway",
+      "canonical": "/_/ai-gateway"
+    },
+    {
       "input": "/organizations/42/billing",
       "canonical": "/organizations/42/billing"
     },
@@ -129,6 +133,11 @@
     "/organizations/42/ai-gateway/byok",
     "/organizations/42/ai-gateway/media/job_test1234",
     "/organizations/42/ai-gateway/usage?funding_mode=byok",
-    "/organizations/42/ai-gateway/usage?status=canceled"
+    "/organizations/42/ai-gateway/usage?status=canceled",
+    "/_/ai-gateway/keys",
+    "/_/ai-gateway/",
+    "/_/ai-gateway?next=/",
+    "/_/unknown",
+    "/_/ai-gateway#keys"
   ]
 }

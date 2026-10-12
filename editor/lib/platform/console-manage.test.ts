@@ -334,3 +334,35 @@ it("management entry denies inaccessible organizations and member settings befor
     })
   ).rejects.toThrow("not_found");
 });
+
+it("universal Gateway link survives organization creation and anonymous sign-in", async () => {
+  const alias = "/_/ai-gateway";
+  expect(
+    manageInput({ intent: "create-organization", return_to: alias }).returnTo
+  ).toBe(alias);
+  const response = await create(
+    request("new", {
+      name: "new-org",
+      email: "owner@example.test",
+      console_return_to: alias,
+    })
+  );
+  expect(response.status).toBe(303);
+  expect(response.headers.get("location")).toBe(consoleOrigin + alias);
+  expect(state.writes).toHaveLength(1);
+  state.writes = [];
+  state.user = null;
+  const anonymous = await create(
+    request("new", {
+      name: "new-org",
+      email: "owner@example.test",
+      console_return_to: alias,
+    })
+  );
+  expect(anonymous.status).toBe(303);
+  const login = new URL(anonymous.headers.get("location")!);
+  expect(login.searchParams.get("next")).toBe(
+    managePath("create-organization", alias)
+  );
+  expect(state.writes).toEqual([]);
+});

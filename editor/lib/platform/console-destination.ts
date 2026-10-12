@@ -148,7 +148,7 @@ export function destination(raw: string): string | null {
   const [pathname, query = "", extra] = raw.split("?");
   if (extra !== undefined || pathname.includes("%")) return null;
   const route = organizationRoute(pathname);
-  if (pathname !== "/" && !route) return null;
+  if (pathname !== "/" && pathname !== "/_/ai-gateway" && !route) return null;
   const parts = pathname.split("/");
   const list = parts.length === 5;
   const allowed =
