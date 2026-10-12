@@ -8,6 +8,10 @@
   width: min(1200px, calc(100% - 80px));
   margin-inline: auto;
   padding-block: 180px 100px;
+  /* the hero owns the first screen; the footer starts below the fold */
+  min-height: 100svh;
+  display: grid;
+  align-content: center;
 }
 
 .hero {
@@ -18,15 +22,20 @@
   min-height: 520px;
 }
 
+/* part of the h1 (keyword), styled as a small label above the headline */
 .eyebrow {
+  display: block;
   margin-bottom: 24px;
   color: var(--muted-foreground);
   font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: normal;
 }
 
 .intro h1 {
   font-size: clamp(48px, 4.8vw, 68px);
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1.04;
   letter-spacing: -0.065em;
 }
@@ -84,6 +93,31 @@
   color: var(--foreground);
 }
 
+.reference {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  transition: color 180ms ease;
+}
+.reference:hover {
+  color: var(--foreground);
+}
+.reference:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+.reference code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.reference svg {
+  width: 13px;
+  height: 13px;
+}
+
 .diagram {
   overflow: hidden;
   border: 1px solid var(--border);
@@ -93,18 +127,39 @@
   -webkit-user-select: none;
 }
 
-.diagramHeader {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 22px 24px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  color: var(--muted-foreground);
+.showcase {
+  gap: 0;
 }
-.diagramHeader svg {
-  width: 14px;
-  height: 14px;
+.tabs {
+  margin: 16px 16px 8px;
+}
+.tabs button {
+  padding-inline: 12px;
+  font-size: 12px;
+}
+
+.code {
+  height: 280px;
+  overflow: auto;
+  padding: 12px 24px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.code :global(.shiki) {
+  margin: 0;
+  background-color: transparent !important;
+  white-space: pre;
+  font-family: var(
+    --font-geist-mono,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace
+  );
+}
+:global(.dark) .code :global(.shiki),
+:global(.dark) .code :global(.shiki span) {
+  color: var(--shiki-dark) !important;
 }
 
 .routing {
@@ -130,17 +185,21 @@
   animation: request 7s linear infinite;
 }
 
+/* only the icon box is centered on the connection line; the label hangs below */
 .application,
 .gateway {
   position: absolute;
   top: 50%;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 14px;
   transform: translate(-50%, -50%);
   font-size: 10px;
   color: var(--muted-foreground);
+}
+.nodeLabel {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 .application {
   left: 12.5%;
@@ -169,10 +228,11 @@
 .gatewaySymbol {
   width: 80px;
   height: 80px;
-  font-size: 26px;
-  font-weight: 500;
-  letter-spacing: -0.07em;
   box-shadow: 0 8px 24px color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+.gatewaySymbol svg {
+  width: 32px;
+  height: 32px;
 }
 
 .providers {
@@ -207,24 +267,6 @@
   color: var(--muted-foreground);
 }
 
-.capabilities {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 40px;
-  margin-top: 100px;
-}
-.capabilities h2 {
-  font-size: 16px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-}
-.capabilities p {
-  margin-top: 16px;
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--muted-foreground);
-}
-
 @keyframes request {
   from {
     stroke-dashoffset: 504;
@@ -245,9 +287,6 @@
   .provider span {
     font-size: 10px;
   }
-  .capabilities {
-    gap: 24px;
-  }
 }
 
 @media (max-width: 800px) {
@@ -263,25 +302,24 @@
     max-width: 440px;
     font-size: 17px;
   }
-  .capabilities {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 64px;
-    gap: 36px;
-  }
 }
 
 @media (max-width: 420px) {
-  .diagramHeader {
-    padding-inline: 18px;
-  }
-  .routing {
+  .routing,
+  .code {
     height: 240px;
+  }
+  .code {
+    padding-inline: 16px;
   }
   .gatewaySymbol {
     width: 58px;
     height: 58px;
     border-radius: 14px;
-    font-size: 22px;
+  }
+  .gatewaySymbol svg {
+    width: 24px;
+    height: 24px;
   }
   .appIcon {
     width: 38px;
@@ -302,17 +340,14 @@
     padding-inline: 16px;
     font-size: 10px;
   }
-  .capabilities {
-    grid-template-columns: 1fr;
-    gap: 32px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .connections .flow {
     animation: none;
   }
-  .actions a {
+  .actions a,
+  .reference {
     transition: none;
   }
 }
