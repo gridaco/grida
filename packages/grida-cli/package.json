@@ -1,6 +1,6 @@
 {
   "name": "grida",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": false,
   "description": "The Grida command line: account access and tools, independent of Desktop.",
   "homepage": "https://grida.co/docs/cli",
@@ -24,7 +24,7 @@
     "typecheck": "cargo check --manifest-path ../../Cargo.toml --locked -p grida-cli"
   },
   "dependencies": {
-    "@grida/fx": "0.2.0"
+    "@grida/fx": "0.3.0"
   },
   "engines": {
     "node": ">=24.0.0"
