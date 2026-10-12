@@ -1,11 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Workspace } from "@/scaffolds/workspace";
 import { notFound, redirect } from "next/navigation";
-import { EditorHelpFab } from "@/scaffolds/globals/editor-help-fab";
-import { EditorCommandK } from "@/scaffolds/globals/editor-cmdk";
-import WorkspaceSidebar from "@/scaffolds/workspace/sidebar";
-import { SidebarProvider } from "@app/ui/components/sidebar";
-import Header from "./header";
 
 type Params = { org: string };
 
@@ -41,19 +36,7 @@ export default async function Layout({
     return notFound();
   }
 
-  return (
-    <SidebarProvider>
-      <Workspace organization={organization}>
-        <EditorHelpFab />
-        <EditorCommandK />
-        <WorkspaceSidebar />
-        <div className="h-full flex flex-1 w-full">
-          <div className="flex flex-col overflow-hidden w-full h-full">
-            <Header />
-            {children}
-          </div>
-        </div>
-      </Workspace>
-    </SidebarProvider>
-  );
+  // The workspace chrome (sidebar, header) is applied per page by
+  // `WorkspaceShell`, so the home gate at `/<org>` can render without it.
+  return <Workspace organization={organization}>{children}</Workspace>;
 }

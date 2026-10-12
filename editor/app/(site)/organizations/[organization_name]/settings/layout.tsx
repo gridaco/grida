@@ -1,4 +1,5 @@
 import SettingsShell from "./_shell";
+import { ConsoleLinks } from "@/lib/platform/console-links";
 
 type Params = { organization_name: string };
 
@@ -12,5 +13,12 @@ export default async function SettingsLayout({
   const { organization_name } = await params;
   // Billing handoffs and the profile view enforce auth and the caller's RLS
   // organization lookup. Keep their resource-specific sign-in continuation.
-  return <SettingsShell orgName={organization_name}>{children}</SettingsShell>;
+  return (
+    <SettingsShell
+      orgName={organization_name}
+      consoleHref={ConsoleLinks.aiGateway(organization_name)}
+    >
+      {children}
+    </SettingsShell>
+  );
 }

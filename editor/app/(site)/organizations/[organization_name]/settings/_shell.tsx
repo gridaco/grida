@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, ArrowUpRightIcon, SquareTerminal } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,9 +23,12 @@ type SettingsCategory = { href: string; label: string };
 
 export default function SettingsShell({
   orgName,
+  consoleHref,
   children,
 }: {
   orgName: string;
+  /** The organization's Console (AI Gateway) page. */
+  consoleHref: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -81,6 +84,22 @@ export default function SettingsShell({
                     </SidebarMenuItem>
                   );
                 })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          {/* TODO(org-home-gate): Console entry added with the `/<org>` gate; revisit with the product catalogue / links cleanup. */}
+          <SidebarGroup className="mt-auto">
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Console">
+                    <a href={consoleHref}>
+                      <SquareTerminal />
+                      <span>Console</span>
+                      <ArrowUpRightIcon className="ms-auto opacity-50" />
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
