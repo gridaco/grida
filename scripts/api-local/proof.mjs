@@ -57,6 +57,7 @@ const copiedFiles = [
   "lib/domains/index.ts",
   "lib/platform/index.ts",
   "lib/platform/billing-consumer.ts",
+  "lib/platform/console-destination.ts",
   "lib/platform/native-credits.ts",
   "app/(api)/(public)/api/v1/auth/me/route.ts",
   "app/(api)/(public)/api/v1/auth/gg/route.ts",
