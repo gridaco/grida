@@ -15,6 +15,7 @@ import {
   type AiActionResult,
   type ProviderUsage,
 } from "@/lib/ai/server";
+import { gatewayCostMills } from "@/lib/ai/gateway-product";
 import { catalog, tiers } from "@/lib/ai/models";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
@@ -37,12 +38,12 @@ export type RunChatData = {
   reply: string;
   /** Catalog id that was actually used. */
   model_id: string;
-  /** Mills billed for this call (metered — matches what we sent to Metronome). */
+  /** Settled GG mills, or a catalogue estimate when costIsEstimate is true. */
   costMills: number;
+  costIsEstimate: boolean;
   /**
-   * Real per-token USD cost from the provider's rate card — un-rounded.
-   * For cheap calls the delta against `costMills/1000` is the rounding
-   * margin we keep.
+   * Catalogue USD estimate. Financial settlement is owned by GG.
+   * It is not a provider expense receipt or a margin measurement.
    */
   realCostUsd: number;
   /** Token usage as reported by the provider. */
@@ -124,7 +125,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResponse> {
         { role: "user", content: input.message },
       ];
 
-      const { text, usage } = await generateText({
+      const { text, usage, providerMetadata } = await generateText({
         model: languageModel,
         messages,
         providerOptions: gridaProviderOptions({
@@ -135,12 +136,15 @@ export async function runChat(input: RunChatInput): Promise<RunChatResponse> {
 
       const providerUsage = toProviderUsage(usage);
       const realCostUsd = costUsdFromTokenUsage(resolvedId, providerUsage);
-      const costMills = costMillsFromTokenUsage(resolvedId, providerUsage);
+      const settledCost = gatewayCostMills(providerMetadata);
+      const costMills =
+        settledCost ?? costMillsFromTokenUsage(resolvedId, providerUsage);
 
       return {
         reply: text,
         model_id: resolvedId,
         costMills,
+        costIsEstimate: settledCost === undefined,
         realCostUsd,
         usage: {
           inputTokens: providerUsage.inputTokens.total ?? 0,

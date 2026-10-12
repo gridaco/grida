@@ -245,6 +245,18 @@ describe("billingErrorToAiError", () => {
     });
   });
 
+  it("does not encourage regenerating accepted GG work", () => {
+    const err = Object.assign(
+      new Error(
+        "AI execution may still be running or charged. Do not repeat accepted work."
+      ),
+      { name: "GatewayProductError", isRetryable: false, status: 502 }
+    );
+    const result = billingErrorToAiError(err, "test");
+    expect(result.message).toContain("Do not repeat");
+    expect(result.message).not.toContain("try again");
+    expect(result.status).toBe(502);
+  });
   it("internal failures sanitize the message (raw exception is logged, not echoed)", () => {
     const e = billingErrorToAiError(
       new Error("Internal: connection refused on db-prod-04:5432"),

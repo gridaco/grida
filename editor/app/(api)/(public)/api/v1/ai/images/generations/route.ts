@@ -1,6 +1,6 @@
 // GRIDA-SEC-006 — see /SECURITY.md
 // GRIDA-GG: gateway — see docs/wg/platform/hosted-ai.md
-// GRIDA-EE: billing — see ee-billing
+// GRIDA-EE: billing — see platform-consumers
 /**
  * `POST /api/v1/ai/images/generations` — hosted image generation for
  * the desktop sidecar. Grida-native wire (the agent package's
@@ -12,7 +12,7 @@
  *
  * Auth: scoped AI token only (GRIDA-SEC-006). Billing: Vercel AI Gateway
  * response receipt when available, otherwise the shared `computeImageCostMills`
- * fallback (`providerOptions.grida.costMills`). NO library
+ * catalogue estimates (`providerOptions.grida.costMills`) are display only. NO library
  * upload — the daemon owns persistence.
  */
 import { generateImage } from "ai";
@@ -66,11 +66,6 @@ export async function POST(request: Request) {
 
     const card = ai.image.findImageModelCard(req.model_id);
     if (!card) return modelNotFound(req.model_id);
-    // Hosted serving goes through Vercel AI Gateway — a card without a
-    // matching binding is not servable here (the sidecar's BYOK
-    // adapters cover the rest).
-    const binding = ai.image.binding(card, "vercel");
-    if (!binding) return modelNotFound(req.model_id);
     if (
       req.quality &&
       card.quality &&
@@ -79,8 +74,8 @@ export async function POST(request: Request) {
       return invalidRequest("Unsupported quality for this model.");
     }
 
-    // An explicit mode must never become an opaque, billed success when the
-    // Vercel AI Gateway binding has not exposed the native control.
+    // Preserve the product card's verified background-control capability.
+    // GG independently validates the selected operation before paid dispatch.
     // Auto is the legacy default.
     const background = req.background === "auto" ? undefined : req.background;
     if (background && !ai.image.supportsTransparentBackground(card, "vercel")) {
@@ -105,14 +100,10 @@ export async function POST(request: Request) {
         ? (`${req.width}x${req.height}` as `${number}x${number}`)
         : undefined;
 
-    // Forward the requested quality tier to the ORIGIN provider so the
-    // tier we just billed (`computeImageCostMills`) is the tier actually
-    // delivered — otherwise a `per_image_tiered` card (e.g. gpt-image-*)
-    // charges "high" while the provider renders its default. The Vercel
-    // AI Gateway keys providerOptions by origin provider (`openai` for
-    // `openai/gpt-image-2`).
-    const slash = binding.id.indexOf("/");
-    const originProvider = slash > 0 ? binding.id.slice(0, slash) : undefined;
+    // Keep the native quality/background input shape. The GG adapter maps
+    // these options to the selected operation; GG owns rating and settlement.
+    const slash = card.id.indexOf("/");
+    const originProvider = slash > 0 ? card.id.slice(0, slash) : undefined;
     const quality = req.quality || undefined;
     const imageOptions = {
       ...(quality ? { quality } : {}),
@@ -141,7 +132,7 @@ export async function POST(request: Request) {
 
     const result: ImageGenerateResult = {
       model_id: card.id,
-      provider_id: "vercel",
+      provider_id: "gg",
       images: generation.images.map((file) => ({
         base64: file.base64,
         media_type: file.mediaType,

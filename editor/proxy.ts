@@ -102,26 +102,12 @@ export async function proxy(req: NextRequest) {
     return new NextResponse("Not Found", { status: 404 });
   }
 
-  // GRIDA-SEC-001 —
-  // see editor/app/(ingest)/README.md and /SECURITY.md.
-  //
-  // Webhook receivers under `/webhooks/*` are signed, machine-callable
-  // endpoints invoked by external services on whatever URL was registered
-  // (e.g. a cloudflared dev tunnel). Skip every host-based pipeline
-  // downstream — tenant routing, Supabase session refresh, maintenance
-  // redirects — and let the receiver respond on the canonical path
-  // regardless of host. Authenticity is enforced by the receiver itself
-  // via the provider's HMAC signature header (see (ingest)/webhooks/*/route.ts).
-  //
-  // The route group `(ingest)` (file-system) and the URL prefix `/webhooks/`
-  // (this bypass + the cloudflared ingress filter) are intentionally
-  // matched: anything under `(ingest)/webhooks/<provider>/route.ts` is
-  // exposed; nothing else is.
-  {
-    const p = req.nextUrl.pathname;
-    if (p === "/webhooks" || p.startsWith("/webhooks/")) {
-      return NextResponse.next({ request: req });
-    }
+  // GRIDA-SEC-001 — retired machine ingress must never reach a handler.
+  if (
+    req.nextUrl.pathname === "/webhooks" ||
+    req.nextUrl.pathname.startsWith("/webhooks/")
+  ) {
+    return new NextResponse("Not Found", { status: 404 });
   }
 
   // #region maintenance mode

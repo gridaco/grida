@@ -7,8 +7,8 @@
  *
  * Pins: the V3 prompt survives the wire roundtrip verbatim; streamed
  * tool-call argument text reassembles byte-for-byte; usage numbers
- * arrive intact (streamed + non-streamed); the REAL billing middleware
- * runs (gate before upstream, ingest with catalog-consistent mills);
+ * arrive intact (streamed + non-streamed); the trusted GG adapter
+ * owns the charge, so no native receipt is admitted or completed;
  * 401 for invalid/expired/foreign tokens (a Supabase-style token MUST
  * fail); 402 is a clean pre-stream response; 404 before any provider
  * call.
@@ -38,6 +38,7 @@ const h = vi.hoisted(() => ({
   generate: null as unknown,
   parts: [] as unknown[],
   lastCallOptions: null as unknown,
+  denied: false,
 }));
 
 vi.mock("@/lib/platform/product-consumer", () => ({
@@ -64,20 +65,22 @@ vi.mock("@/lib/auth/organization", () => ({
   requireOrganizationId: vi.fn<(...args: never[]) => unknown>(),
 }));
 
-// Fake Vercel AI Gateway: scripted V3 model behind the REAL billing middleware
-// (server.ts wraps whatever `vercelAiGateway` this module exports).
-vi.mock("@/lib/ai/models", async (orig) => {
-  const real = await orig<typeof import("@/lib/ai/models")>();
+// Scripted GG model: test the unchanged native codec and authentication.
+// The real SDK/HTTP/financial boundary is covered separately.
+vi.mock("@/lib/ai/gateway-product", async (orig) => {
+  const real = await orig<typeof import("@/lib/ai/gateway-product")>();
   const fakeLanguageModel = (modelId: string) => ({
     specificationVersion: "v3" as const,
-    provider: "fake-vercel-ai-gateway",
+    provider: "fake-gg",
     modelId,
     supportedUrls: {},
     doGenerate: async (options: unknown) => {
+      if (h.denied) throw new ProductBillingError("blocked");
       h.lastCallOptions = options;
       return h.generate;
     },
     doStream: async (options: unknown) => {
+      if (h.denied) throw new ProductBillingError("blocked");
       h.lastCallOptions = options;
       const parts = h.parts as never[];
       return {
@@ -92,8 +95,7 @@ vi.mock("@/lib/ai/models", async (orig) => {
   });
   return {
     ...real,
-    byok: null,
-    isByokActive: () => false,
+    gatewayLanguageModel: fakeLanguageModel,
     vercelAiGateway: {
       languageModel: fakeLanguageModel,
       imageModel: () => {
@@ -106,9 +108,14 @@ vi.mock("@/lib/ai/models", async (orig) => {
   };
 });
 
+vi.mock("@/lib/ai/models", async (original) => ({
+  ...(await original<typeof import("@/lib/ai/models")>()),
+  byok: null,
+  isByokActive: () => false,
+}));
+
 import { POST } from "./route";
 import { ProductBillingError } from "@/lib/platform/product-billing";
-import { costMillsFromTokenUsage } from "@/lib/ai/server";
 import { signGgToken, GG_TOKEN_AUDIENCE } from "@/lib/auth/gg-token";
 
 const mockedAdmission = h.begin;
@@ -126,16 +133,6 @@ const USAGE: LanguageModelV3Usage = {
     cacheWrite: undefined,
   },
   outputTokens: { total: 20, text: 15, reasoning: 5 },
-};
-
-const LONG_CONTEXT_USAGE: LanguageModelV3Usage = {
-  inputTokens: {
-    total: 272_001,
-    noCache: 200_001,
-    cacheRead: 70_000,
-    cacheWrite: 2_000,
-  },
-  outputTokens: { total: 1_000, text: 800, reasoning: 200 },
 };
 
 function clientModel(token: string, modelId = MODEL): LanguageModelV3 {
@@ -159,6 +156,7 @@ beforeEach(() => {
   h.generate = null;
   h.parts = [];
   h.lastCallOptions = null;
+  h.denied = false;
   mockedAdmission.mockReset();
   mockedCompletion.mockReset();
   mockedAdmission.mockImplementation(async (context) => ({
@@ -211,7 +209,7 @@ const TOOLS: LanguageModelV3CallOptions["tools"] = [
 ];
 
 describe("POST /api/v1/ai/chat/completions (contract)", () => {
-  it("non-stream: roundtrips the prompt, returns content + usage, bills real mills", async () => {
+  it("non-stream: roundtrips the prompt, returns content + usage, does not issue a native receipt", async () => {
     h.generate = {
       content: [{ type: "text", text: "It is sunny." }],
       finishReason: { unified: "stop", raw: "stop" },
@@ -246,42 +244,11 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
         .grida.organizationId
     ).toBe(ORG);
 
-    // REAL billing middleware ran: Platform admission + catalog-consistent completion.
-    expect(mockedAdmission).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationId: ORG })
-    );
-    expect(mockedCompletion).toHaveBeenCalledTimes(1);
-    const [execution, millsArg] = mockedCompletion.mock.calls[0]!;
-    expect(execution.claim.organization_id).toBe(String(ORG));
-    expect(millsArg).toBeCloseTo(costMillsFromTokenUsage(MODEL, USAGE), 10);
+    expect(mockedAdmission).not.toHaveBeenCalled();
+    expect(mockedCompletion).not.toHaveBeenCalled();
   });
 
-  it("bills GPT-5.6 long-context usage at the literal request-wide rate", async () => {
-    h.generate = {
-      content: [{ type: "text", text: "Done." }],
-      finishReason: { unified: "stop", raw: "stop" },
-      usage: LONG_CONTEXT_USAGE,
-      warnings: [],
-    };
-    const model = clientModel(await mintedToken(), "openai/gpt-5.6-terra");
-
-    await model.doGenerate({ prompt: PROMPT });
-
-    expect(mockedCompletion).toHaveBeenCalledTimes(1);
-    expect(mockedCompletion.mock.calls[0]![0].claim.organization_id).toBe(
-      String(ORG)
-    );
-    // Terra above 272K: all input buckets ×2, all output ×1.5. Kept as a
-    // literal so it fails independently of the catalogue — the arithmetic
-    // is spelled out so a rate change is greppable by rate, not just by
-    // this total (Terra: $2 in / $0.20 cacheRead / $2.50 cacheWrite / $12 out):
-    //   input  (200_001×2 + 70_000×0.2 + 2_000×2.5) × 2 = 838_004
-    //   output (1_000×12) × 1.5                         =  18_000
-    //   856_004 / 1e6 USD → 856.004 mills
-    expect(mockedCompletion.mock.calls[0]![1]).toBeCloseTo(856.004, 10);
-  });
-
-  it("stream: tool-call arguments reassemble byte-for-byte; usage arrives; ingest fires", async () => {
+  it("stream: tool-call arguments reassemble byte-for-byte; usage arrives; native billing stays idle", async () => {
     const args = '{"city":"Seoul","units":"metric"}';
     h.parts = [
       { type: "stream-start", warnings: [] },
@@ -340,16 +307,12 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
     expect(finish.usage.inputTokens.total).toBe(100);
     expect(finish.usage.outputTokens.total).toBe(20);
 
-    // Streaming completion commits usage custody on flush.
-    await vi.waitFor(() => expect(mockedCompletion).toHaveBeenCalledTimes(1));
-    expect(mockedCompletion.mock.calls[0]![1]).toBeCloseTo(
-      costMillsFromTokenUsage(MODEL, USAGE),
-      10
-    );
+    expect(mockedAdmission).not.toHaveBeenCalled();
+    expect(mockedCompletion).not.toHaveBeenCalled();
   });
 
   it("402: a blocked org fails clean, pre-stream, with insufficient_credits", async () => {
-    mockedAdmission.mockRejectedValue(new ProductBillingError("blocked"));
+    h.denied = true;
     const model = clientModel(await mintedToken());
     await expect(model.doStream({ prompt: PROMPT })).rejects.toSatisfy(
       (err: unknown) => {

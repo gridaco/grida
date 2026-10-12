@@ -7,7 +7,7 @@ description: >
   `(ee)` route group, `*-hosted` package suffix, and namespaced
   `grida_*` schema. Use when adding or touching an EE-only feature,
   or deciding whether a feature is EE territory. Surface skills
-  (`ee-billing`) are siblings.
+  (`platform-consumers`) are siblings.
 ---
 
 # ee
@@ -39,7 +39,7 @@ Three surfaces today:
 - **Billing** — subscriptions, AI credit, the entitlement gate
   primitive. Platform billing handles the financial engine and policy.
   Grida retains its integration consumers; see
-  [`ee-billing`](../ee-billing/SKILL.md) for that workflow.
+  [`platform-consumers`](../platform-consumers/SKILL.md) for that workflow.
 
 ## The `GRIDA-EE` marker
 
@@ -49,7 +49,7 @@ exists _only_ for EE, with the surface as the sub-label:
 ```ts
 // GRIDA-EE: entitlement — paid-plan gate
 // GRIDA-EE: byod — apex domain verification
-// GRIDA-EE: billing — see ee-billing
+// GRIDA-EE: billing — see platform-consumers
 ```
 
 Sub-labels are surface names (`entitlement` / `byod` / `billing`),
@@ -113,8 +113,7 @@ later is the cost of every import.
 
 ## When EE crosses security
 
-EE surfaces that also carry a `GRIDA-SEC-<id>` tag — the Stripe and
-Metronome webhook receivers (`GRIDA-SEC-001`), the BYOK carve-out
+EE surfaces that also carry a `GRIDA-SEC-<id>` tag — the BYOK carve-out
 (`GRIDA-SEC-003`), any path that gates entitlement on a signed
 payload — run the [`security`](../security/SKILL.md) review first;
 this pattern is the second pass. Tag the file with both markers.
@@ -123,7 +122,7 @@ this pattern is the second pass. Tag the file with both markers.
 > mirror it into `security/SKILL.md` so a reader entering from that
 > side doesn't miss it.
 
-See also: [`ee-billing`](../ee-billing/SKILL.md) (Grida billing consumers),
+See also: [`platform-consumers`](../platform-consumers/SKILL.md) (Grida billing consumers),
 [`security`](../security/SKILL.md) (boundary contracts, fail-closed
 discipline), [`naming`](../naming/SKILL.md) (the suffix list this
 inherits), [`oss-standards`](../oss-standards/SKILL.md)

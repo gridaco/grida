@@ -10,6 +10,7 @@ export default defineConfig({
       "lib/billing/marketing-plans.test.ts",
       "lib/ai/fixture-gateway.test.ts",
       "lib/ai/__tests__/*.test.ts",
+      "lib/ai/actions/*.test.ts",
       "app/(api)/(public)/api/v1/ai/chat/completions/route.test.ts",
       "app/(api)/(public)/api/v1/ai/chat/completions/route.byok.test.ts",
       "app/(api)/(public)/api/v1/ai/images/generations/route.test.ts",

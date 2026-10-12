@@ -182,20 +182,18 @@ ingress limitation described below still applies.
 The fixed adapter authenticates and passes only its verified org and resolved
 inputs to `GgThreeD`. The source audit recognizes that exact execution-seam
 import from `gg-media.ts`; it does not grant account adapters or other API files
-access to privileged billing/provider dependencies. The execution seam uses the
-existing entitlement and usage transaction owner. It bills actual provider
-credits at the catalog USD rate, including completed jobs whose later asset
-download fails. Missing usage is an error with reconciliation identifiers, not
-a free result or an invented estimate. See
-[the billing limitation](../../../docs/wg/platform/billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation).
+access to privileged billing/provider dependencies. Migrated execution uses the organization-scoped GG server adapter. GG owns paid
+provider dispatch, observation, reservation and settlement; Grida does not also
+admit/complete a native receipt. The unchanged native response adapts the original
+GG identity and bounded result bytes; an output download failure never submits
+another job. Pre-transition source receipts retain their existing recovery.
 
-Configure server-only `GG_TRIPO_API_KEY`, GG signing, ordinary billing and request
-rate limiting before deploying. There is no fallback to a development BYOK key.
-The `GG_` prefix identifies Grida-funded infrastructure credentials. Tripo uses
-only `GG_TRIPO_API_KEY`, with no unprefixed or BYOK alias. Native CLI
-`TRIPO_API_KEY` remains the user's direct-provider credential. See the
-[funded credential mapping and deployment migration](https://grida.co/docs/contributing/billing#server-provider-credentials)
-for other providers and the Vercel platform OIDC exception.
+Configure `GRIDA_AI_GATEWAY_ORIGIN`, `GRIDA_AI_GATEWAY_KEY_ID` and
+`GRIDA_AI_GATEWAY_TOKEN` for generation, plus server-only `GG_TRIPO_API_KEY` for
+free upload preparation in the same Tripo account, GG signing and request rate
+limiting. There is no fallback to a customer GG key or contributor BYOK. Native
+CLI `TRIPO_API_KEY` remains a direct-provider contributor credential. See the
+[server credential guide](https://grida.co/docs/contributing/billing#server-provider-credentials).
 ElevenLabs is unchanged. Desktop advertises the funded paths separately through
 `tripo_gg` and `rigging_gg`, so older hosts continue to offer only their supported
 BYOK paths.

@@ -7,9 +7,20 @@ const transport = vi.hoisted(() => ({
   create: vi.fn<(key: string) => ProviderHttp>(),
   request: vi.fn<typeof fetch>(),
   download: vi.fn<typeof fetch>(),
+  asset: vi.fn<(...args: unknown[]) => Promise<{ data: Uint8Array }>>(),
+  submit: vi.fn<typeof import("../gateway-product").gatewayFetch>(),
+  wait: vi.fn<(...args: unknown[]) => Promise<Record<string, unknown>>>(),
 }));
 vi.mock("../gg-three-d-http", () => ({
-  GgThreeDHttp: { create: transport.create },
+  GgThreeDHttp: {
+    create: transport.create,
+    productAssets: () => ({ downloadProviderAsset: transport.asset }),
+  },
+}));
+vi.mock("../gateway-product", async (original) => ({
+  ...(await original<typeof import("../gateway-product")>()),
+  gatewayFetch: transport.submit,
+  gatewayWait: transport.wait,
 }));
 vi.mock("replicate", () => ({ default: class {} }));
 const billing = vi.hoisted(() => ({
@@ -29,10 +40,8 @@ vi.mock("@/lib/auth/organization", () => ({
 import { ProductBillingError } from "@/lib/platform/product-billing";
 const getEntitlement = billing.entitlement;
 const completion = billing.complete;
-import { requireOrganizationId } from "@/lib/auth/organization";
 import { GgThreeD } from "../gg-three-d";
 
-const task_id = "task_synthetic";
 const image = { file_token: "file_synthetic_image", media_type: "image/png" };
 const mesh = {
   file_token: "file_synthetic_mesh",
@@ -51,36 +60,6 @@ function glb() {
   );
   buffer.set(document, 20);
   return buffer;
-}
-function task(
-  type: string,
-  credits: number | undefined = 25,
-  output: unknown = {
-    model_url: "https://cdn.tripo3d.ai/model.glb?signature=synthetic",
-  }
-) {
-  transport.request.mockImplementation(async (url) =>
-    Response.json({
-      code: 0,
-      data: String(url).includes("/tasks/")
-        ? {
-            task_id,
-            type,
-            status: "success",
-            ...(credits === undefined ? {} : { credits_consumed: credits }),
-            output,
-          }
-        : { task_id },
-    })
-  );
-}
-function charged(mills: number) {
-  expect(completion).toHaveBeenCalledExactlyOnceWith(
-    expect.objectContaining({ id: expect.any(String) }),
-    mills,
-    expect.objectContaining({ costMills: mills })
-  );
-  expect(requireOrganizationId).not.toHaveBeenCalled();
 }
 beforeEach(() => {
   vi.resetAllMocks();
@@ -107,6 +86,12 @@ beforeEach(() => {
         download: transport.download,
       })
   );
+  transport.submit.mockResolvedValue(Response.json({ id: "req_synthetic" }));
+  transport.wait.mockResolvedValue({
+    id: "req_synthetic",
+    result: { glb: { url: "https://cdn.tripo3d.ai/result.glb" } },
+  });
+  transport.asset.mockResolvedValue({ data: glb() });
   transport.download.mockImplementation(async () => new Response(glb()));
 });
 afterEach(() => {
@@ -114,235 +99,90 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("GgThreeD metered execution", () => {
-  it("requires the verified organization gate before provider work, regardless of BYOK", async () => {
-    vi.mocked(getEntitlement).mockResolvedValue({
-      allowed: false,
-      reason: "no_balance",
-      cachedBalanceCents: 0,
-      cachedAt: null,
-    });
-    await expect(
-      GgThreeD.modelGenerate(7, "tripo/h3.1", "text", { prompt: "chair" })
-    ).rejects.toMatchObject({ status: 402 });
-    expect(transport.create).not.toHaveBeenCalled();
-    expect(completion).not.toHaveBeenCalled();
-    await expect(GgThreeD.check(0, { mesh })).rejects.toMatchObject({
-      code: "missing_organization_id",
-    });
-    expect(transport.request).not.toHaveBeenCalled();
-  });
-  it.each([undefined, "", "   "])(
-    "fails closed when the GG key is %s despite unprefixed and BYOK keys",
-    async (key) => {
-      vi.stubEnv("GG_TRIPO_API_KEY", key);
-      await expect(GgThreeD.check(7, { mesh })).rejects.toMatchObject({
-        code: "provider_unavailable",
-        status: 503,
-      });
-      expect(getEntitlement).toHaveBeenCalledWith(7);
-      expect(transport.create).not.toHaveBeenCalled();
-      expect(completion).not.toHaveBeenCalled();
-    }
-  );
+describe("GgThreeD GG execution", () => {
   it.each(["text", "image", "multiview"] as const)(
-    "bills actual %s generation usage and submits exactly once with the GG key",
+    "routes %s to GG with product-owned upload references",
     async (variant) => {
-      task(`${variant}_to_model`, 20.5);
       const input =
         variant === "text"
           ? { prompt: "chair" }
           : variant === "image"
             ? { image }
-            : { images: { front: image, back: image } };
-      const result = await GgThreeD.modelGenerate(
+            : { images: { front: image, left: image } };
+      const value = await GgThreeD.modelGenerate(
         7,
         "tripo/h3.1",
         variant,
         input
       );
-      expect(result.glb.data).toEqual(glb());
-      charged(205);
-      expect(transport.create).toHaveBeenCalledExactlyOnceWith(
-        "synthetic-gg-key"
-      );
-      expect(
-        transport.request.mock.calls.filter(
-          ([, init]) => init?.method === "POST"
-        )
-      ).toHaveLength(1);
-      expect(
-        transport.request.mock.calls.every(
-          ([url]) => !String(url).endsWith("/files")
-        )
-      ).toBe(true);
-      expect(
-        transport.request.mock.calls.every(
-          ([, init]) =>
-            new Headers(init?.headers).get("authorization") ===
-            "Bearer synthetic-gg-key"
-        )
-      ).toBe(true);
+      expect(value.glb.data).toEqual(glb());
+      expect(value.task.id).toBe("task_synthetic");
+      const [ctx, path, init] = transport.submit.mock.calls[0];
+      expect(ctx.organizationId).toBe(7);
+      expect(path).toBe(`/v1/endpoints/three-d.tripo.h3.1.${variant}`);
+      const body = JSON.parse(String(init?.body));
+      if (variant === "image")
+        expect(body.image).toEqual({
+          url: "https://grida-upload.invalid/file_synthetic_image",
+          media_type: "image/png",
+        });
+      expect(billing.begin).not.toHaveBeenCalled();
+      expect(completion).not.toHaveBeenCalled();
+      expect(transport.request).not.toHaveBeenCalled();
     }
   );
-  it("meters an actual zero-credit eligibility receipt without starting rigging", async () => {
-    task("animate_prerigcheck", 0, { riggable: true, rig_type: "biped" });
-    await expect(GgThreeD.check(7, { mesh })).resolves.toMatchObject({
+  it("returns structured rig-check without an asset download", async () => {
+    transport.wait.mockResolvedValue({
+      id: "req_check",
+      result: { riggable: true, rig_type: "biped" },
+    });
+    expect(await GgThreeD.check(7, { mesh })).toEqual({
       riggable: true,
       rig_type: "biped",
+      task: { id: "task_check" },
     });
-    charged(0);
-    expect(transport.download).not.toHaveBeenCalled();
-    expect(String(transport.request.mock.calls[0]![0])).toMatch(
-      /\/animations\/rig-check$/
-    );
+    expect(transport.asset).not.toHaveBeenCalled();
+    expect(completion).not.toHaveBeenCalled();
   });
-  it("bills rigging from the actual receipt instead of the estimate", async () => {
-    task("animate_rig", 30);
-    await GgThreeD.rig(7, "tripo/rig-v1.0", {
-      mesh,
-      rig_type: "biped",
-      spec: "tripo",
-    });
-    charged(300);
-    expect(
-      JSON.parse(transport.request.mock.calls[0]![1]!.body as string)
-    ).toEqual({
-      input: mesh.file_token,
-      model: "v1.0-20240301",
-      rig_type: "biped",
-      spec: "tripo",
-      out_format: "glb",
-    });
-  });
-  it.each(["download", "invalid_glb", "untrusted_url"] as const)(
-    "bills completed usage before surfacing %s failure; never resubmits",
-    async (failure) => {
-      task("animate_rig", 25, {
-        model_url:
-          failure === "untrusted_url"
-            ? "https://localhost/private"
-            : "https://cdn.tripo3d.ai/model.glb",
-      });
-      if (failure === "download")
-        transport.download.mockRejectedValue(
-          new Error("secret signed URL and provider error")
-        );
-      if (failure === "invalid_glb")
-        transport.download.mockResolvedValue(new Response("not a glb"));
-      const caught = await GgThreeD.rig(7, "tripo/rig-v1.0", {
+  it.each(["tripo/rig-v1.0", "tripo/rig-v2.5"])(
+    "routes %s rigging through GG",
+    async (model) => {
+      await GgThreeD.rig(7, model, {
         mesh,
-        rig_type: "biped",
-        spec: "mixamo",
-      }).catch((error: GgThreeD.Failure) => error);
-      expect(caught).toBeInstanceOf(GgThreeD.Failure);
-      expect(JSON.stringify(caught)).not.toContain("secret");
-      expect(caught).toMatchObject({ task_id });
-      charged(250);
-      expect(
-        transport.request.mock.calls.filter(
-          ([, init]) => init?.method === "POST"
-        )
-      ).toHaveLength(1);
+        rig_type: model.endsWith("1.0") ? "biped" : "quadruped",
+        spec: "tripo",
+      });
+      expect(transport.submit.mock.calls[0][1]).toBe(
+        `/v1/endpoints/three-d.${model.replace("/", ".")}.mesh`
+      );
+      expect(completion).not.toHaveBeenCalled();
     }
   );
-  it("rejects missing completion usage and logs only reconciliation identifiers", async () => {
-    const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    task("text_to_model");
-    transport.request.mockImplementation(async (url) =>
-      Response.json({
-        code: 0,
-        data: String(url).includes("/tasks/")
-          ? {
-              task_id,
-              type: "text_to_model",
-              status: "success",
-              output: { model_url: "https://cdn.tripo3d.ai/model.glb" },
-            }
-          : { task_id },
-      })
-    );
+  it("rejects malformed upload tokens before any execution", async () => {
     await expect(
-      GgThreeD.modelGenerate(7, "tripo/h3.1", "text", {
-        prompt: "sensitive prompt",
+      GgThreeD.modelGenerate(7, "tripo/h3.1", "image", {
+        image: { file_token: "file_bad?query=1", media_type: "image/png" },
       })
-    ).rejects.toMatchObject({ code: "usage_unavailable", task_id });
-    expect(completion).not.toHaveBeenCalled();
-    expect(log).toHaveBeenCalledExactlyOnceWith(
-      "[gg-three-d] usage_reconciliation_required",
-      {
-        organizationId: 7,
-        model_id: "tripo/h3.1",
-        feature: "v1/ai/3d/model-generation",
-        transactionId: expect.any(String),
-        task_id,
-      }
-    );
-    expect(JSON.stringify(log.mock.calls)).not.toContain("sensitive");
+    ).rejects.toMatchObject({ code: "invalid_request" });
+    expect(transport.submit).not.toHaveBeenCalled();
   });
-  it("bills an observed paid completion even when cancellation interrupts its download", async () => {
-    task("text_to_model", 20);
-    const controller = new AbortController();
-    transport.download.mockImplementation(async () => {
-      controller.abort();
-      return new Response(glb());
-    });
-    await expect(
-      GgThreeD.modelGenerate(7, "tripo/h3.1", "text", {
-        prompt: "chair",
-        signal: controller.signal,
-      })
-    ).rejects.toMatchObject({ code: "aborted", task_id });
-    charged(200);
-    expect(
-      transport.request.mock.calls.filter(([, init]) => init?.method === "POST")
-    ).toHaveLength(1);
-  });
-  it("does not invent a charge or resubmit an accepted task without observed success", async () => {
-    const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    transport.request.mockImplementation(async (url) =>
-      Response.json({
-        code: 0,
-        data: String(url).includes("/tasks/")
-          ? { task_id, type: "text_to_model", status: "failed" }
-          : { task_id },
-      })
-    );
+  it("preserves shared-credit denial, without native admission or redispatch", async () => {
+    transport.submit.mockRejectedValue(new ProductBillingError("blocked"));
     await expect(
       GgThreeD.modelGenerate(7, "tripo/h3.1", "text", { prompt: "chair" })
-    ).rejects.toMatchObject({ code: "generation_failed", task_id });
+    ).rejects.toMatchObject({ status: 402 });
+    expect(transport.wait).not.toHaveBeenCalled();
     expect(completion).not.toHaveBeenCalled();
-    expect(
-      transport.request.mock.calls.filter(([, init]) => init?.method === "POST")
-    ).toHaveLength(1);
-    expect(log).toHaveBeenCalledOnce();
   });
-  it("maps production credential rejection without charging or leaking a BYOK instruction", async () => {
-    transport.request.mockResolvedValue(
-      new Response("private upstream response", { status: 401 })
-    );
-    await expect(GgThreeD.check(7, { mesh })).rejects.toMatchObject({
-      code: "provider_unavailable",
+  it("download failure retains the original GG identity without redispatch", async () => {
+    transport.asset.mockRejectedValue(new Error("download failed"));
+    await expect(
+      GgThreeD.modelGenerate(7, "tripo/h3.1", "text", { prompt: "chair" })
+    ).rejects.toMatchObject({
+      code: "invalid_response",
+      task_id: "req_synthetic",
     });
-    expect(completion).not.toHaveBeenCalled();
-  });
-  it("rejects unknown models, incompatible controls and unsigned URL inputs without submission", async () => {
-    await expect(
-      GgThreeD.rig(7, "tripo/unknown", { mesh })
-    ).rejects.toMatchObject({ code: "model_unavailable" });
-    await expect(
-      GgThreeD.rig(7, "tripo/rig-v2.5", {
-        mesh,
-        rig_type: "biped",
-        spec: "tripo",
-      })
-    ).rejects.toMatchObject({ code: "invalid_request" });
-    await expect(
-      GgThreeD.modelGenerate(7, "tripo/p1", "image", {
-        image: { url: "https://private.example/asset" },
-      })
-    ).rejects.toMatchObject({ code: "invalid_request" });
-    expect(transport.request).not.toHaveBeenCalled();
+    expect(transport.submit).toHaveBeenCalledTimes(1);
     expect(completion).not.toHaveBeenCalled();
   });
 });

@@ -6,47 +6,37 @@ tags: [wg, platform, billing]
 format: md
 ---
 
-# AI Credits — Master Plan
+# AI credits and execution ownership
 
-Platform owns the native AI-credit account, payments, Metronome funding/rating,
-subscription eligibility, reload policy, and reconciliation. Grida owns verified
-product execution and permanent claim/dispatch/completion receipt custody.
+Platform owns the organization AI-credit balance, payments, subscriptions,
+automatic top-ups, financial reservations and reconciliation. Grida owns identity,
+organization membership, product entry points and product assets.
 
-The [commercial plan contract](./plans.md) includes no recurring plan-credit grant.
-AI credit is separately purchased. Native AI credit and the standalone Gateway
-wallet are separate economic pools; a Gateway charge cannot also debit native credit.
+Text, image, video and selected Tripo generation/rigging execute through Grida
+Gateway using server-only organization-scoped authority. A user does not need a
+personal Gateway key. GG owns provider dispatch, original job identity, observed
+usage and shared-credit settlement; Grida must not also create a native usage
+receipt for those calls. Public/native Grida DTOs and authorization remain Grida's
+responsibility. Grida downloads/persists product results; failed asset delivery
+never triggers a second paid generation or undoes known usage.
 
-## Product execution boundary
+Replicate-backed interactive tools/music retain the native Platform admission
+and source claim/dispatch/completion receipt seam. Accepted pre-transition native
+work also retains that custody and outbox until reconciled. Its existing SQL
+receipts remain permanent. Repeating an equal receipt is safe; conflicting
+terminal evidence is not another charge. Removing a provider call does not erase
+its accepted obligations or permit redispatch through GG.
 
-The [Grida AI seam](https://github.com/gridaco/grida/blob/main/editor/lib/ai/server.ts)
-requires verified organization authority and fresh Platform admission for billed
-work. A source execution claim commits before dispatch; dispatch grants one
-provider attempt. Exact completion and the usage outbox commit before successful
-return or stream finish. Identical receipts replay safely; conflicting evidence
-is rejected. A dispatched outcome without trustworthy terminal evidence remains
-unknown and requires reconciliation before another execution attempt.
+GG and retained native admission share one reservation authority. Current balance
+is a display observation, not permission to dispatch. Unknown usage remains
+unknown and held for reconciliation. Grida displays settled GG charge metadata
+when available and labels a fallback catalogue estimate; it never represents a
+pending charge as free. Subscription, payment, funding settlement and browser
+return are independent facts.
 
-Native `cost_mills` remains an exact decimal string rather than a floating-point
-estimate or Gateway money. Receipts retain original execution/pricing identity
-through retries, deletion, and restoration. Prompts and result bodies are not
-financial receipt data. Removing the former financial writer does not remove
-producer custody or unknown-outcome obligations.
-
-## Display and funding
-
-Credit indicators read Platform's cached projection and retain unknown versus
-zero balance. Display observations do not authorize paid work. Native credit's
-existing floor is not an atomic prepaid reserve and cannot promise strict
-concurrency enforcement.
-
-Payment, funding settlement, current credit display, and a browser return are
-separate facts. Subscription/reload/purchase operations are handled by Platform;
-Grida no longer runs the original billing SDKs or Supabase projectors.
-
-Contributor text BYOK spends directly with the contributor provider and bypasses
+Contributor text BYOK charges the contributor's own provider and bypasses
 customer billing while retaining authentication and organization resolution.
-Funded media still needs admission. See [local contributor integration](../../../contributing/billing.md)
-and the [known issue register](./known-issues.md).
-
-Earlier designs remain in this page's revision history. Their retired
-source-writer and CLI recipes do not define current Grida setup.
+Library embeddings remain unbilled. Tripo upload preparation remains in Grida;
+its server key must belong to GG's Tripo account, and signed input ownership is
+verified independently of credit admission. See [contributor setup](../../../contributing/billing.md)
+and the [known issues](./known-issues.md).

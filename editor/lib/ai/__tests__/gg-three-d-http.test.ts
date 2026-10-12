@@ -72,6 +72,26 @@ afterEach(() => {
 });
 
 describe("GgThreeDHttp", () => {
+  it("downloads GG provider links without any server credential", async () => {
+    const asset = await GgThreeDHttp.productAssets().downloadProviderAsset(
+      new URL("https://fal.media/output.mp4"),
+      { max_bytes: 100 }
+    );
+    expect(asset.data.length).toBeGreaterThan(0);
+    expect(captured.hostname).toBe("fal.media");
+    expect(captured.headers).not.toHaveProperty("authorization");
+    expect(captured.headers).not.toHaveProperty("cookie");
+  });
+  it("rejects private GG output DNS before opening a socket", async () => {
+    network.lookup.mockResolvedValue([{ address: "127.0.0.1", family: 4 }]);
+    await expect(
+      GgThreeDHttp.productAssets().downloadProviderAsset(
+        new URL("https://fal.media/output.mp4"),
+        { max_bytes: 100 }
+      )
+    ).rejects.toThrow("provider asset download failed");
+    expect(network.request).not.toHaveBeenCalled();
+  });
   it("pins a public DNS result to the fixed HTTPS host while retaining TLS verification", async () => {
     const response = await GgThreeDHttp.create(key).request(
       "https://openapi.tripo3d.ai/v3/generation/text-to-model",

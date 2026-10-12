@@ -1,11 +1,16 @@
-import { productDigest } from "@/lib/platform/product-billing";
 // GRIDA-GG: gateway — organization-funded Tripo features through the AI billing seam.
 // GRIDA-SEC-003 / GRIDA-SEC-006 — the API supplies verified org and authenticated upload refs.
 import "server-only";
-import { RiggingClient, TripoClient } from "@grida/ai";
+import type { RiggingClient, TripoClient } from "@grida/ai";
 import { ProviderCredentials } from "@grida/ai/providers";
 import { catalog } from "@grida/ai-models/grida";
-import { checkGate, withTransaction, type GridaCallContext } from "./server";
+import { checkGate } from "./server";
+import { randomUUID } from "node:crypto";
+import {
+  gatewayFetch,
+  gatewayWait,
+  GatewayProductError,
+} from "./gateway-product";
 import { GgThreeDHttp } from "./gg-three-d-http";
 
 /** Server execution only. It never resolves an organization or accepts request URLs/keys. */
@@ -60,7 +65,11 @@ export namespace GgThreeD {
             ? "jpeg"
             : null;
     if (!format) throw new Failure("invalid_request");
-    await checkGate(context(organizationId, "uploads", "tripo/upload"));
+    await checkGate({
+      organizationId,
+      feature: "v1/ai/3d/uploads",
+      model_id: "tripo/upload",
+    });
     const key = gatewayKey();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30_000);
@@ -141,55 +150,33 @@ export namespace GgThreeD {
     variant: TripoClient.Variant,
     input: unknown
   ): Promise<TripoClient.Result> {
-    if (!catalog.three_d.model_generation.is_model_id(model_id))
+    if (
+      !catalog.three_d.model_generation.is_model_id(model_id) ||
+      !["text", "image", "multiview"].includes(variant)
+    )
       throw new Failure("model_unavailable");
-    return meter(
-      {
-        ...context(organizationId, "model-generation", model_id),
-        requestDigest: productDigest({ variant, input }),
-        ...generationBounds(model_id, variant),
-      },
-      catalog.three_d.model_generation.models[model_id].pricing.usd_per_credit,
-      async (key) => {
-        const operation = await new TripoClient({
-          keys: { get: () => key },
-          http: GgThreeDHttp.create(key),
-        }).resolve({
-          feature: "model-generation",
-          provider: "tripo",
-          model_id,
-          variant,
-        });
-        // The SDK owns runtime validation of every uploaded input and model-specific control.
-        return operation.generateUploaded(input as never);
-      }
+    return resultMesh(
+      organizationId,
+      `three-d.${model_id.replace("/", ".")}.${variant}`,
+      input
     );
   }
-
   export async function check(
     organizationId: number,
     input: unknown
   ): Promise<RiggingClient.CheckResult> {
-    return meter(
-      {
-        ...context(organizationId, "rig-check", "tripo/rig-check"),
-        requestDigest: productDigest(input),
-        ...creditBounds(
-          catalog.three_d.rig_check.operation.pricing,
-          "tripo/rig-check"
-        ),
-      },
-      catalog.three_d.rig_check.operation.pricing.usd_per_credit,
-      async (key) => {
-        const operation = await new RiggingClient({
-          keys: { get: () => key },
-          http: GgThreeDHttp.create(key),
-        }).resolve({ feature: "rig-check", provider: "tripo" });
-        return operation.checkUploaded(input as never);
-      }
-    );
+    const job = await execute(organizationId, "three-d.tripo.rig-check", input);
+    if (
+      typeof job.result?.riggable !== "boolean" ||
+      typeof job.result?.rig_type !== "string"
+    )
+      throw new Failure("invalid_response", job.id);
+    return {
+      riggable: job.result.riggable,
+      rig_type: job.result.rig_type as RiggingClient.RigType,
+      task: { id: taskIdentity(job.id) },
+    };
   }
-
   export async function rig(
     organizationId: number,
     model_id: string,
@@ -197,70 +184,123 @@ export namespace GgThreeD {
   ): Promise<RiggingClient.Result> {
     if (!catalog.three_d.rigging.is_model_id(model_id))
       throw new Failure("model_unavailable");
-    return meter(
-      {
-        ...context(organizationId, "rigging", model_id),
-        requestDigest: productDigest(input),
-        ...creditBounds(
-          catalog.three_d.rigging.models[model_id].pricing,
-          model_id
-        ),
-      },
-      catalog.three_d.rigging.models[model_id].pricing.usd_per_credit,
-      async (key) => {
-        const operation = await new RiggingClient({
-          keys: { get: () => key },
-          http: GgThreeDHttp.create(key),
-        }).resolve({ feature: "rigging", provider: "tripo", model_id });
-        return operation.generateUploaded(input as never);
-      }
-    );
-  }
-
-  function creditBounds(
-    pricing: { credits: number; usd_per_credit: number },
-    model: string
-  ) {
-    const amount = String(
-      Math.ceil(pricing.credits * pricing.usd_per_credit * 1000)
-    );
-    return {
-      authorizedMills: amount,
-      expenseBoundMills: amount,
-      tariffRevision: productDigest({ model, pricing }),
-    };
-  }
-  function generationBounds(
-    model: keyof typeof catalog.three_d.model_generation.models,
-    variant: TripoClient.Variant
-  ) {
-    const pricing = catalog.three_d.model_generation.models[model].pricing;
-    // The card bounds every accepted control, including optional detailed geometry.
-    // The SDK continues to reject incompatible controls before submitting a task.
-    const credits =
-      pricing.base_credits[variant] +
-      Math.max(...Object.values(pricing.texture_credits)) +
-      ("detailed_geometry_credits" in pricing
-        ? pricing.detailed_geometry_credits
-        : 0);
-    return creditBounds(
-      { credits, usd_per_credit: pricing.usd_per_credit },
-      model
-    );
-  }
-  type Task = { id: string; credits_consumed?: number };
-  type Outcome<T> = { ok: true; value: T } | { ok: false; error: Failure };
-  function context(
-    organizationId: number,
-    feature: string,
-    model_id: string
-  ): GridaCallContext {
-    return {
+    return resultMesh(
       organizationId,
-      feature: `v1/ai/3d/${feature}`,
-      model_id,
-      awaitIngest: true,
+      `three-d.${model_id.replace("/", ".")}.mesh`,
+      input
+    );
+  }
+  // Upload tickets are already verified by the HTTP boundary. Convert only
+  // those provider references; GG's public API still requires HTTPS assets.
+  function references(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(references);
+    if (record(value)) {
+      if ("file_token" in value) {
+        if (
+          typeof value.file_token !== "string" ||
+          !validId(value.file_token, "file") ||
+          !["image/png", "image/jpeg", "model/gltf-binary"].includes(
+            String(value.media_type)
+          ) ||
+          Object.keys(value).some(
+            (k) => !["file_token", "media_type"].includes(k)
+          )
+        )
+          throw new Failure("invalid_request");
+        return {
+          url: `https://grida-upload.invalid/${value.file_token}`,
+          media_type: value.media_type,
+        };
+      }
+      return Object.fromEntries(
+        Object.entries(value)
+          .filter(([key]) => key !== "signal")
+          .map(([key, v]) => [key, references(v)])
+      );
+    }
+    return value;
+  }
+  function taskIdentity(id: string) {
+    return `task_${id.replace(/^req_/, "")}`;
+  }
+  async function execute(
+    organizationId: number,
+    endpoint: string,
+    input: unknown
+  ) {
+    const ctx = {
+      organizationId,
+      feature: `v1/ai/3d/${endpoint.includes("rig") ? "rigging" : "model-generation"}`,
     };
+    try {
+      const response = await gatewayFetch(
+        ctx,
+        `/v1/endpoints/${endpoint}`,
+        { method: "POST", body: JSON.stringify(references(input)) },
+        randomUUID()
+      );
+      const submitted = await response.json();
+      if (
+        typeof submitted.id !== "string" ||
+        !/^req_[A-Za-z0-9_-]+$/.test(submitted.id)
+      )
+        throw new Failure("invalid_response");
+      return await gatewayWait(
+        ctx,
+        submitted.id,
+        record(input) && input.signal instanceof AbortSignal
+          ? input.signal
+          : undefined
+      );
+    } catch (error) {
+      if (error instanceof Failure) throw error;
+      if (error instanceof GatewayProductError)
+        throw new Failure(
+          error.status === 400
+            ? "invalid_request"
+            : error.status === 504
+              ? "timeout"
+              : error.status === 499
+                ? "aborted"
+                : "generation_failed",
+          error.requestId
+        );
+      throw error;
+    }
+  }
+  async function resultMesh(
+    organizationId: number,
+    endpoint: string,
+    input: unknown
+  ): Promise<TripoClient.Result> {
+    const job = await execute(organizationId, endpoint, input);
+    const reference = job.result?.glb;
+    if (!record(reference) || typeof reference.url !== "string")
+      throw new Failure("invalid_response", job.id);
+    try {
+      const mesh = await GgThreeDHttp.productAssets().downloadProviderAsset(
+        new URL(reference.url),
+        { max_bytes: 60_000_000 }
+      );
+      const view = new DataView(
+        mesh.data.buffer,
+        mesh.data.byteOffset,
+        mesh.data.byteLength
+      );
+      if (
+        mesh.data.length < 20 ||
+        view.getUint32(0, true) !== 0x46546c67 ||
+        view.getUint32(4, true) !== 2 ||
+        view.getUint32(8, true) !== mesh.data.length
+      )
+        throw new Error("invalid_mesh");
+      return {
+        glb: { data: mesh.data, media_type: "model/gltf-binary" },
+        task: { id: taskIdentity(job.id) },
+      };
+    } catch {
+      throw new Failure("invalid_response", job.id);
+    }
   }
   function gatewayKey() {
     try {
@@ -272,109 +312,6 @@ export namespace GgThreeD {
     } catch {
       throw new Failure("provider_unavailable");
     }
-  }
-  async function meter<T extends { task: Task }>(
-    ctx: GridaCallContext,
-    usdPerCredit: number,
-    operation: (key: string) => Promise<T>
-  ): Promise<T> {
-    const outcome = await withTransaction<Outcome<T>>(
-      ctx,
-      async (transactionId) => {
-        const key = gatewayKey();
-        try {
-          const result = await operation(key);
-          return {
-            result: { ok: true, value: result },
-            costMills: cost(ctx, transactionId, result.task, usdPerCredit),
-          };
-        } catch (error) {
-          if (error instanceof Failure) throw error;
-          if (
-            error instanceof TripoClient.Failure ||
-            error instanceof RiggingClient.Failure
-          ) {
-            const failure = mapFailure(error);
-            if (error.completed_task) {
-              // A paid success remains billable if its later download, validation, or cancellation fails.
-              // Return an outcome so the canonical seam ingests before we surface the safe failure.
-              return {
-                result: { ok: false, error: failure },
-                costMills: cost(
-                  ctx,
-                  transactionId,
-                  error.completed_task,
-                  usdPerCredit
-                ),
-              };
-            }
-            if (error.task_id) reconcile(ctx, transactionId, error.task_id);
-            throw failure;
-          }
-          throw new Failure("generation_failed");
-        }
-      }
-    );
-    if (!outcome.ok) throw outcome.error;
-    return outcome.value;
-  }
-  function cost(
-    ctx: GridaCallContext,
-    transactionId: string,
-    task: Task,
-    usdPerCredit: number
-  ) {
-    const consumed = task.credits_consumed;
-    // Convert the catalog's integral per-credit rate first, avoiding a spurious
-    // extra mill from e.g. 20.5 * $0.01 * 1000 = 205.00000000000003.
-    const unitMills = usdPerCredit * 1000;
-    const mills =
-      typeof consumed === "number" ? Math.ceil(consumed * unitMills) : NaN;
-    if (
-      typeof consumed !== "number" ||
-      !Number.isFinite(consumed) ||
-      consumed < 0 ||
-      !Number.isSafeInteger(unitMills) ||
-      unitMills <= 0 ||
-      !Number.isSafeInteger(mills) ||
-      mills < 0
-    ) {
-      reconcile(ctx, transactionId, task.id);
-      throw new Failure(
-        "usage_unavailable",
-        validId(task.id) ? task.id : undefined
-      );
-    }
-    return mills;
-  }
-  function reconcile(
-    ctx: GridaCallContext,
-    transactionId: string,
-    taskId: string
-  ) {
-    // Identifiers only: no prompts, upload refs, signed URLs, keys, provider payloads, or raw errors.
-    console.error("[gg-three-d] usage_reconciliation_required", {
-      organizationId: ctx.organizationId,
-      model_id: ctx.model_id,
-      feature: ctx.feature,
-      transactionId,
-      ...(validId(taskId) ? { task_id: taskId } : {}),
-    });
-  }
-  function mapFailure(error: TripoClient.Failure | RiggingClient.Failure) {
-    const code = error.code;
-    const mapped =
-      code === "invalid_input"
-        ? "invalid_request"
-        : [
-              "provider_key_required",
-              "credential_rejected",
-              "access_denied",
-              "insufficient_credits",
-            ].includes(code)
-          ? "provider_unavailable"
-          : code;
-    return new Failure(mapped as FailureCode, error.task_id);
   }
   function validId(value: string, prefix = "task") {
     return (

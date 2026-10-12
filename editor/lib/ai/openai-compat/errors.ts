@@ -99,7 +99,7 @@ export function rateLimited(retryAfterSeconds?: number): Response {
 
 /**
  * Terminal catch for the hosted chat/models routes. Never leaks
- * Metronome/Postgres/provider internals.
+ * internal service details.
  */
 export function fromUnknownError(err: unknown, scope: string): Response {
   if (err instanceof GgTokenError) {
@@ -148,6 +148,23 @@ export function fromUnknownError(err: unknown, scope: string): Response {
     return openaiError(402, {
       code: "insufficient_credits",
       type: "insufficient_quota",
+      message: err.message,
+    });
+  }
+  if (
+    err instanceof Error &&
+    err.name === "GatewayProductError" &&
+    (err as { isRetryable?: boolean }).isRetryable === false
+  ) {
+    const status = (err as { status?: number }).status;
+    return openaiError(status === 400 ? 400 : status === 429 ? 429 : 502, {
+      code:
+        status === 400
+          ? "invalid_request_error"
+          : status === 429
+            ? "rate_limit_exceeded"
+            : "internal",
+      type: status === 400 ? "invalid_request_error" : "server_error",
       message: err.message,
     });
   }

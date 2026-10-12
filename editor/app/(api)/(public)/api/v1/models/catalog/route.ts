@@ -24,7 +24,7 @@
  *
  * PRICING IS PRESENT, on purpose. The "no pricing" rule on
  * `/api/v1/ai/models` guards against client-side cost math drifting from
- * Metronome on the OpenAI-compatible surface. This payload is the source
+ * product accounting on the OpenAI-compatible surface. This payload is the source
  * that FEEDS the desktop's local estimate and its compaction limits;
  * withholding rates is what would make it drift. The same numbers are
  * already public on `/ai/models` and in `docs/models`.

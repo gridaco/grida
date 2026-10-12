@@ -2,7 +2,7 @@ import { fixtureGateway } from "./fixture-gateway";
 /**
  * Editor-side AI provider seam — `GRIDA-SEC-003` carve-out.
  *
- * Owns the attributed Vercel AI Gateway provider ({@link vercelAiGateway}) and the
+ * Owns the unbilled Library embedding provider ({@link vercelAiGateway}) and the
  * BYOK branch ({@link byok}). All catalogue data (text-model specs,
  * tier→spec map, lookup helpers) lives in `@grida/ai-models/grida` under
  * its `catalog.text.*` namespace and is re-exported here under its
@@ -59,7 +59,7 @@ export const tiers = TIER_MODEL_IDS;
 
 /**
  * Vercel AI Gateway app-attribution headers — lowercase per the `ai`
- * SDK convention. Shared by the billed `vercelAiGateway` and the BYOK
+ * SDK convention. Shared by the Library embedding `vercelAiGateway` and the BYOK
  * Vercel AI Gateway branch. (OpenRouter uses its own `HTTP-Referer`/`X-Title`
  * casing — see `resolveByokProvider`.)
  */
@@ -74,8 +74,8 @@ const VERCEL_AI_GATEWAY_ATTRIBUTION_HEADERS = {
  * **Internal — seam consumers only.** This is the raw Vercel AI Gateway
  * provider; it does NOT go through the billing seam. Any code outside
  * `editor/lib/ai/_seam/**` should import `grida` from
- * [editor/lib/ai/server.ts](./server.ts) instead, which wraps every model
- * with gate + ingest middleware.
+ * [editor/lib/ai/server.ts](./server.ts) instead, which exposes generation through GG
+ * with organization-scoped GG execution. Raw Vercel remains only for Library embeddings.
  *
  * Keep raw-provider imports inside the seam. The SDK package restrictions in
  * [editor/.oxlintrc.jsonc](../../.oxlintrc.jsonc) do not enforce named exports.
@@ -101,7 +101,7 @@ export const vercelAiGateway = createVercelAiGateway({
 //
 // When a contributor sets a BYOK key, calls route through a BARE
 // provider that bypasses the billing seam entirely (no gate, no
-// Metronome ingest, no balance). The key is charged by the upstream
+// customer usage, no balance). The key is charged by the upstream
 // provider directly — no Grida balance to meter/drain. BYOK bypasses
 // billing ONLY, never auth (requireOrganizationId still runs). Gated
 // solely by server-only env vars NEVER set in the hosted product (same

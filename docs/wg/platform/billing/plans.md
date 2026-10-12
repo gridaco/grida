@@ -71,9 +71,9 @@ Custom agreements may define different AI-credit terms.
 Pro renews monthly until canceled. Cancellation takes effect at the end of the
 current paid period. Custom lifecycle terms come from the applicable agreement.
 
-Standard subscription mutations enter Stripe through owner-authorized,
-intent-scoped Portal sessions created by the app. Stripe's shareable Portal
-login page remains disabled so it cannot bypass the Custom lifecycle guard.
+Subscription changes are managed in Console by an organization owner. Custom
+agreements are handled through sales rather than the self-service subscription
+controls.
 
 ## Legacy compatibility
 

@@ -1,6 +1,6 @@
 "use client";
 
-// GRIDA-EE: billing — see ee-billing
+// GRIDA-EE: billing — see platform-consumers
 /**
  * Thin, read-only AI-credits card for desktop settings.
  *

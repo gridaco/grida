@@ -159,6 +159,18 @@ export function billingErrorToAiError(
       message: err instanceof Error ? err.message : "blocked",
     };
   }
+  if (
+    err instanceof Error &&
+    err.name === "GatewayProductError" &&
+    (err as { isRetryable?: boolean }).isRetryable === false
+  ) {
+    return {
+      success: false,
+      code: "internal",
+      status: extractStatus(err, 502),
+      message: err.message,
+    };
+  }
   console.error(`[${scope}]`, err);
   return {
     success: false,

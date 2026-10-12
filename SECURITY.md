@@ -50,73 +50,24 @@ of any tagged file naturally surfaces the others; an agent picks up the
 
 ## Active boundaries
 
-### `GRIDA-SEC-001` — Ingest trust boundary
+### `GRIDA-SEC-001` — Retired machine ingress
 
-**What it protects.** Webhook receivers are public endpoints invoked by
-external machines. Their authority is established by the provider's signed
-payload, independently of browser cookies or the machine API credential
-families (GRIDA-SEC-012). The boundary is the rule that **everything
-reachable on `/webhooks/*` must verify a provider signature before
-doing anything else.** This applies to every current provider (Stripe,
-Metronome, …) and every future one (Replicate, GitHub, etc.).
+**What it protects.** Grida does not expose financial-provider callback receivers.
+The retired `/webhooks` namespace returns 404 before browser, tenant or handler
+processing. Do not reuse that namespace for an unauthenticated mutation.
 
-**Vulnerable scenario (prevented).** A developer adds an unsigned
-endpoint under the same path prefix — or removes the signature check
-from an existing receiver — and that path becomes reachable from the
-public internet (directly in production, via dev tunnel locally) with
-no authentication. An attacker who finds the URL triggers whatever
-logic lives there. State-changing endpoints (entitlement flips, record
-mutations, tenant-scoped queries) become open APIs.
+**Vulnerable scenario (prevented).** An old callback path accidentally regains a
+handler or an authentication bypass during unrelated routing work.
 
-**Why it's specifically risky here.** Webhook URLs in an open-source
-repo eventually leak — into docs, scripts, screenshots, dashboards
-that get linked, examples in PRs. Local dev typically uses a tunnel
-(cloudflared, ngrok, etc.) to expose the dev server so external
-providers can deliver webhooks; a naïvely-configured tunnel forwards
-every path on the local server. If the tunnel URL becomes public —
-and on an open-source project it does — every route including
-`/insiders/*` becomes reachable on whatever box is currently tunneled.
-The boundary contains the blast radius even when the URL is treated
-as public.
+**How the code prevents it.** The proxy rejects the entire retired namespace.
+Regression checks cover its root and child paths with read, write and preflight
+methods on an arbitrary host. They verify no handler pass-through or browser
+service loading.
 
-**How the code prevents it.**
+**Files bound by this id.**
 
-1. **Dedicated route group** — `editor/app/(ingest)/`. Every webhook
-   receiver lives here. Nothing else does. The route group's
-   [README](<editor/app/(ingest)/README.md>) is the authoritative ruleset.
-2. **Path-based proxy bypass** — [editor/proxy.ts](editor/proxy.ts)
-   short-circuits `/webhooks/*` _before_ tenant routing or session
-   refresh runs. This makes the receivers reachable on arbitrary hosts
-   (dev tunnels, future direct routes); it also makes the trust
-   boundary path-aligned with the file system.
-3. **Signature verification and custody** — every receiver verifies the
-   provider signature against the exact raw body before capture. The retained
-   Grida billing endpoints durably archive that delivery, forward to the fixed
-   Platform capture endpoint, and ACK only after durable target custody. Missing
-   configuration fails closed; no retired source financial projector runs.
-4. **Replay protection** — receivers dedup on event id and reject
-   events older than 5 minutes (where applicable).
-5. **Tunnel path filter at the edge** — a provider-validation tunnel exposes
-   only the selected webhook callback paths, with a deny-all fallback.
-   Ordinary Grida insiders/BYOK development needs no billing tunnel. Treat
-   callback URLs as public and keep unrelated `/insiders/*` routes unreachable.
-
-**Files bound by this id.** Run `grep -rn GRIDA-SEC-001 .` to enumerate.
-Today:
-
-- [editor/app/(ingest)/README.md](<editor/app/(ingest)/README.md>) — rules.
-- [editor/app/(ingest)/webhooks/stripe/route.ts](<editor/app/(ingest)/webhooks/stripe/route.ts>) — Stripe receiver.
-- [editor/app/(ingest)/webhooks/metronome/route.ts](<editor/app/(ingest)/webhooks/metronome/route.ts>) — Metronome receiver.
-- [editor/proxy.ts](editor/proxy.ts) — path bypass.
-- [editor/lib/platform/webhook-forwarding.ts](editor/lib/platform/webhook-forwarding.ts) — signature/capture/forward/ACK custody.
-- [editor/lib/billing/stripe-webhook-signature.ts](editor/lib/billing/stripe-webhook-signature.ts) — standalone Stripe verifier without outbound API authority.
-- [editor/lib/platform/README.md](editor/lib/platform/README.md) — current source integration.
-- [docs/contributing/billing.md](docs/contributing/billing.md) — public local development and financial-owner boundary.
-
-**What does NOT belong under `(ingest)/`.** Admin tools, internal RPC,
-anything that authenticates via cookie/session/bearer-token — those use their
-own browser/private or registered `/api/v1` boundary. Legacy public endpoints
-live under `(api)/(public)/v1/**`. Mixing categories breaks the trust contract.
+- [editor/proxy.ts](editor/proxy.ts) — rejects retired ingress.
+- [editor/lib/api/proxy.test.ts](editor/lib/api/proxy.test.ts) — ingress regression checks.
 
 ---
 
@@ -134,7 +85,7 @@ routes, which would publish them under a different URL and bypass this gate.
 `notFound()` outside development. Provider tunnels must not expose this group.
 
 **Retained history.** The former `/insiders/billing` harness exercised privileged
-Stripe/Metronome lifecycle actions without org-membership checks. It was retired
+financial lifecycle actions without org-membership checks. It was retired
 with Grida's duplicate financial engine; Platform owns current financial QA.
 Its deleted billing actions are not current proof or instructions. This ID
 retains the threat model and governs every remaining insiders surface.
@@ -167,8 +118,8 @@ asymmetric DoS-by-billing attack.
 **Why it's specifically risky here.** AI route handlers and server
 actions sit on internal/private surfaces, but they are still HTTP
 endpoints reachable by any authenticated user. Org membership on product data
-reads does not by itself authorize AI spending. The seam obtains fresh Platform
-admission and retains a source execution receipt; explicit producer membership
+reads does not by itself authorize AI spending. GG obtains fresh shared-credit admission for migrated execution; retained native
+operations preserve source receipts. Explicit producer membership
 verification is still required. Without a structural producer-side rule, every
 new AI endpoint is a fresh chance to forget the membership check.
 
@@ -188,7 +139,7 @@ inputOrgId })`. It resolves from: route param slug → request
    account headers or a provider upload reference.
 2. **Runtime contract in the seam** —
    [editor/lib/ai/server.ts](editor/lib/ai/server.ts)
-   `withTransaction` (and the AI SDK middleware that wraps it) throw
+   `withTransaction` and the trusted GG adapter validate organization identity; native calls throw
    `MissingOrgIdError` if `organizationId` is missing, non-integer,
    or non-positive. This is **unconditional** on the billed path: the
    former `NEXT_PUBLIC_GRIDA_LOCALDEV_SUPERUSER` exception (synthetic
@@ -196,8 +147,9 @@ inputOrgId })`. It resolves from: route param slug → request
    no code path skips this check while billing. The only intentional
    bypass is the BYOK carve-out below, and it does not bill.
 3. **One billing seam, explicit provider-import owners** —
-   [editor/lib/ai/server.ts](editor/lib/ai/server.ts) owns the Grida paid-product
-   admission/receipt integration; Platform owns shared financial billing;
+   [editor/lib/ai/server.ts](editor/lib/ai/server.ts) owns the selected Grida execution entry point; GG owns migrated provider
+   dispatch/metering and Platform owns shared financial billing. Retained native
+   operations use Grida source admission/receipt integration;
    value imports of `replicate`, `openai`, `@ai-sdk/*`, `@anthropic-ai/sdk`
    and the portable `@grida/ai` SDK are restricted to the reviewed seam allowlist.
    Enforced by oxlint
@@ -205,27 +157,26 @@ inputOrgId })`. It resolves from: route param slug → request
    and the CI audit script
    ([editor/scripts/audit-ai-seam.ts](editor/scripts/audit-ai-seam.ts)).
    A new file that bypasses the seam fails at lint or CI.
-   The named [GG Tripo adapter](editor/lib/ai/gg-three-d.ts) consumes the shared
-   `@grida/ai` SDK and calls the same `checkGate`/`withTransaction`; it adds no
-   raw provider factory or independent ledger. Its exact allowlist additions
-   are that adapter, [its fixed egress owner](editor/lib/ai/gg-three-d-http.ts)
-   and the synthetic SDK/billing contract test. The audit covers `@grida/ai`
-   and `@grida/ai/providers`; lint also denies other `@grida/ai/**` value imports
-   outside the allowlist. Type-only imports grant no execution authority.
-4. **Observed Tripo usage, independent of asset delivery** — upload preparation
-   gates before the free provider request; generation, rig-check and rigging gate
-   before execution. Only server-owned `GG_TRIPO_API_KEY` supplies provider authority,
-   with no BYOK or unprefixed-key fallback. Valid terminal `credits_consumed` is converted at the
-   catalog's USD-per-credit rate, including a reported zero for rig-check.
-   The SDK captures a validated successful task receipt before downloading its
-   model. A later download, GLB validation or cancellation failure returns an
-   internal outcome through `withTransaction`, so ingestion precedes the safe
-   error. No error resubmits a paid job. Missing terminal usage produces no
-   fabricated zero-cost success or estimate: available org/model/transaction/task
-   identifiers are logged for reconciliation. Process death and unobserved terminal
-   states remain [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation),
-   not a durable reconciliation guarantee. Existing ingestion-failure semantics
-   remain owned by the shared seam.
+   The [trusted GG adapter](editor/lib/ai/gateway-product.ts) uses a distinct
+   server workload secret, canonical organization and feature. Its receiver checks
+   current credential authority and organization existence; Grida must verify user
+   membership before sending the assertion. Browser cookies and personal API keys
+   cannot substitute for this credential. All generation/metering stays in GG;
+   there is no direct-provider fallback or duplicate native receipt.
+4. **3D upload ownership and result custody** — the named
+   [3D adapter](editor/lib/ai/gg-three-d.ts) retains only free Tripo presign
+   preparation with server-only `GG_TRIPO_API_KEY`. Its key must belong to the
+   same provider account as GG. Authenticated caller/org-bound signed upload
+   tickets are verified before forwarding an internal typed file reference;
+   ordinary users cannot claim a provider file token or arbitrary input URL.
+   GG owns paid model generation, checking, rigging, durable observation and
+   settlement. Grida validates/downloads product output using its
+   [pinned public HTTPS transport](editor/lib/ai/gg-three-d-http.ts), without
+   provider credentials, redirects or private DNS destinations. An asset failure
+   does not regenerate, refund known cost or issue a second native receipt.
+   Already accepted pre-transition work keeps its original source recovery
+   obligation; [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation)
+   preserves that historical distinction.
 
 **BYOK carve-out (intentional).** When a contributor sets a `BYOK_*`
 key ([editor/lib/ai/models.ts](editor/lib/ai/models.ts) —
@@ -254,7 +205,8 @@ on a hosted/preview deploy would make every org bypass billing and the
 org-id sanity gate (auth still holds). Acceptable only because it is a
 contributor/self-host switch under the existing server-env trust model.
 
-**Funded provider authority.** The shared Vercel AI Gateway provider reads only
+**Funded provider authority.** Migrated generation uses the server-only GG product workload configuration.
+The retained Library Vercel embedding provider reads only
 `GG_VERCEL_AI_GATEWAY_API_KEY` for an explicit API key. An absent or blank value
 retains the SDK's per-request platform OIDC resolution; an explicit empty SDK
 setting prevents its ambient `AI_GATEWAY_API_KEY` lookup. Replicate predictions
@@ -3057,6 +3009,4 @@ incident investigations out of the architectural guarantee.
 
 Please email security@grida.co or universe@grida.co. We respond within 48 hours.
 
-If you find a way to reach a non-webhook route via the cloudflared
-tunnel, that is in scope and considered a real bug — the tunnel filter
-is supposed to block it.
+Include the affected route, authentication context and reproduction steps when reporting a routing vulnerability.

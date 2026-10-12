@@ -156,7 +156,7 @@ You have access to the following skills. Load any when relevant.
 - canvas-docs-svg-kit: Author SVG figures for canvas user docs.
 - canvas-user-docs: Write user-facing documentation for the canvas editor.
 - code-react: React-specific code shape.
-- ee-billing: Surface workflow for billing.
+- platform-consumers: Surface workflow for billing.
 - …
 ```
 

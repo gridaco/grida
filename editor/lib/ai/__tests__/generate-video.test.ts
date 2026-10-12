@@ -1,25 +1,34 @@
-// GRIDA-EE: billing — see ee-billing
-/**
- * `methods.generateVideo` — hosted video through the seam.
- *
- * Pins: request validation (unknown/unlisted model, aspect, duration
- * bounds, resolution label mapping, unpriced (label,mode) pairs,
- * image_url shape), pre-priced billing (rate × duration, gate BEFORE
- * the provider call, ingest with the exact mills), and the base64
- * result contract. Expected mills are computed from the REAL catalog
- * card so price updates don't rot the test.
- */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+// GG product video submission; no provider keys or native receipt charging.
+import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { ProductBillingError } from "@/lib/platform/product-billing";
-import { catalog as ai_models } from "@grida/ai-models/grida";
-
-const billing = vi.hoisted(() => ({
-  entitlement: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+const h = vi.hoisted(() => ({
+  fetch:
+    vi.fn<
+      (
+        ctx: unknown,
+        path: string,
+        init: { body: string },
+        identity: string
+      ) => Promise<Response>
+    >(),
+  wait: vi.fn<(...args: unknown[]) => Promise<Record<string, unknown>>>(),
+  download: vi.fn<(...args: unknown[]) => Promise<{ data: Uint8Array }>>(),
   begin: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   complete: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  entitlement: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+}));
+vi.mock("../gateway-product", async (original) => ({
+  ...(await original<typeof import("../gateway-product")>()),
+  gatewayFetch: h.fetch,
+  gatewayWait: h.wait,
+}));
+vi.mock("../gg-three-d-http", () => ({
+  GgThreeDHttp: {
+    productAssets: () => ({ downloadProviderAsset: h.download }),
+  },
 }));
 vi.mock("@/lib/platform/product-consumer", () => ({
-  platformProductBilling: () => billing,
+  platformProductBilling: () => h,
 }));
 vi.mock("@/lib/supabase/server", () => ({
   createLibraryClient: vi.fn<(...args: never[]) => unknown>(),
@@ -27,179 +36,80 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/auth/organization", () => ({
   requireOrganizationId: vi.fn<(...args: never[]) => unknown>(),
 }));
-vi.mock("ai", async (orig) => ({
-  ...(await orig<typeof import("ai")>()),
-  experimental_generateVideo: vi.fn<(...args: never[]) => unknown>(),
-}));
-
-import { experimental_generateVideo } from "ai";
 import { methods, InvalidAiRequestError } from "../server";
-import ai from "@/lib/ai";
-
-const mockedGenerate = vi.mocked(experimental_generateVideo);
-const mockedGetEntitlement = billing.entitlement;
-const mockedCompletion = billing.complete;
-
-const MODEL_ID = "google/veo-3.1";
-const CARD = ai_models.video.models[MODEL_ID]!;
-const BINDING = ai_models.video.binding(CARD, "vercel")!;
-
-const ORG = 7;
-
-function stubGeneration() {
-  mockedGenerate.mockResolvedValue({
-    video: { base64: "AAAA", mediaType: "video/mp4" },
-    videos: [{ base64: "AAAA", mediaType: "video/mp4" }],
-    warnings: [],
-    responses: [],
-    providerMetadata: {},
-  } as never);
-}
-
 beforeEach(() => {
-  billing.begin.mockReset();
-  billing.begin.mockImplementation(async (context) => {
-    const decision = (await billing.entitlement(
-      (context as { organizationId: number }).organizationId
-    )) as { allowed: boolean };
-    if (!decision.allowed) throw new ProductBillingError("blocked");
-    return { id: "execution-synthetic", claim: {} };
+  vi.clearAllMocks();
+  h.fetch.mockResolvedValue(Response.json({ id: "req_video" }));
+  h.wait.mockResolvedValue({
+    id: "req_video",
+    result: {
+      videos: [{ url: "https://fal.media/video.mp4", media_type: "video/mp4" }],
+    },
   });
-  mockedGenerate.mockReset();
-  mockedGetEntitlement.mockReset();
-  mockedCompletion.mockReset();
-  mockedGetEntitlement.mockResolvedValue({
-    allowed: true,
-    cachedBalanceCents: 500,
-    cachedAt: null,
-  } as never);
-  mockedCompletion.mockResolvedValue(undefined);
-  stubGeneration();
+  h.download.mockResolvedValue({ data: Uint8Array.of(1, 2, 3) });
 });
-
-describe("methods.generateVideo", () => {
-  it("happy path: gates, generates via the Vercel AI Gateway binding, records completion for rate×duration", async () => {
-    const duration = CARD.default.duration;
-    const result = await methods.generateVideo(ORG, {
-      model_id: MODEL_ID,
-      prompt: "a calm ocean",
+afterEach(() => vi.restoreAllMocks());
+describe("GG product video", () => {
+  it("submits one original job, retrieves its result and leaves all charging to GG", async () => {
+    const result = await methods.generateVideo(7, {
+      model_id: "google/veo-3.1",
+      prompt: "an ocean",
     });
-
     expect(result).toEqual({
-      model_id: MODEL_ID,
-      provider_id: "vercel",
-      videos: [{ base64: "AAAA", media_type: "video/mp4" }],
+      model_id: "google/veo-3.1",
+      provider_id: "gg",
+      videos: [{ base64: "AQID", media_type: "video/mp4" }],
     });
-    expect(mockedGetEntitlement).toHaveBeenCalledWith(ORG);
-
-    const mode = CARD.default.audio ? "audio" : "silent";
-    const rate =
-      BINDING.pricing.usd_per_second[CARD.default.resolution]![mode]!;
-    const expectedMills = ai.toMills(rate * duration);
-    expect(mockedCompletion).toHaveBeenCalledTimes(1);
-    expect(mockedCompletion.mock.calls[0]![0]).toEqual({
-      id: "execution-synthetic",
-      claim: {},
+    expect(h.fetch).toHaveBeenCalledTimes(1);
+    const [ctx, path, init, identity] = h.fetch.mock.calls[0];
+    expect(ctx).toMatchObject({ organizationId: 7 });
+    expect(path).toBe("/v1/videos");
+    expect(identity).toBeTypeOf("string");
+    expect(JSON.parse(init.body)).toMatchObject({
+      model: "google/veo-3.1",
+      providerOptions: { gg: { resolutionTier: "1080p" } },
     });
-    expect(mockedCompletion.mock.calls[0]![1]).toBe(expectedMills);
-    expect(billing.begin).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({
-        organizationId: ORG,
-        requestDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
-      })
-    );
-    expect(billing.begin.mock.invocationCallOrder[0]).toBeLessThan(
-      mockedGenerate.mock.invocationCallOrder[0]!
-    );
-    expect(mockedGenerate.mock.invocationCallOrder[0]!).toBeLessThan(
-      mockedCompletion.mock.invocationCallOrder[0]
-    );
-    expect(mockedCompletion.mock.calls[0]![2]).toMatchObject({
-      costMills: expectedMills,
+    expect(h.wait).toHaveBeenCalledWith(ctx, "req_video");
+    expect(h.begin).not.toHaveBeenCalled();
+    expect(h.complete).not.toHaveBeenCalled();
+  });
+  it("preserves explicit resolution through the declared GG tier selector", async () => {
+    await methods.generateVideo(7, {
+      model_id: "google/veo-3.1",
+      prompt: "ocean",
+      resolution: "1920x1080",
     });
-
-    const args = mockedGenerate.mock.calls[0]![0] as {
-      prompt: unknown;
-      duration: number;
-    };
-    expect(args.prompt).toBe("a calm ocean");
-    expect(args.duration).toBe(duration);
-  });
-
-  it("maps an explicit {width}x{height} resolution to the pricing label", async () => {
-    await methods.generateVideo(ORG, {
-      model_id: MODEL_ID,
-      prompt: "x",
-      resolution: "1280x720",
+    expect(JSON.parse(h.fetch.mock.calls[0][2].body)).toMatchObject({
+      providerOptions: { gg: { resolutionTier: "1080p" } },
     });
-    const mode = CARD.default.audio ? "audio" : "silent";
-    const rate = BINDING.pricing.usd_per_second["720p"]![mode]!;
-    expect(mockedCompletion.mock.calls[0]![1]).toBe(
-      ai.toMills(rate * CARD.default.duration)
-    );
   });
-
-  it("rejects unknown models, bad aspect ratios, and out-of-bounds durations", async () => {
+  it.each([
+    { model_id: "unknown/model" },
+    { model_id: "google/veo-3.1", aspect_ratio: "1:1" },
+    { model_id: "google/veo-3.1", duration: 1000 },
+    { model_id: "google/veo-3.1", image_url: "https://example.test/a.png" },
+    { model_id: "google/veo-3.1", fps: 30 },
+  ])("rejects unsupported native input before submission %j", async (input) => {
     await expect(
-      methods.generateVideo(ORG, { model_id: "nope/none", prompt: "x" })
+      methods.generateVideo(7, { prompt: "ocean", ...input } as never)
     ).rejects.toBeInstanceOf(InvalidAiRequestError);
-    await expect(
-      methods.generateVideo(ORG, {
-        model_id: MODEL_ID,
-        prompt: "x",
-        aspect_ratio: "7:3",
-      })
-    ).rejects.toBeInstanceOf(InvalidAiRequestError);
-    await expect(
-      methods.generateVideo(ORG, {
-        model_id: MODEL_ID,
-        prompt: "x",
-        duration: CARD.max_duration + 1,
-      })
-    ).rejects.toBeInstanceOf(InvalidAiRequestError);
-    await expect(
-      methods.generateVideo(ORG, {
-        model_id: MODEL_ID,
-        prompt: "x",
-        resolution: "999x111",
-      })
-    ).rejects.toBeInstanceOf(InvalidAiRequestError);
-    expect(mockedGenerate).not.toHaveBeenCalled();
-    expect(mockedCompletion).not.toHaveBeenCalled();
+    expect(h.fetch).not.toHaveBeenCalled();
   });
-
-  it("rejects image-to-video (t2v-only v1 — no server-side URL fetch)", async () => {
+  it("does not retrieve or redispatch when shared-credit admission fails", async () => {
+    h.fetch.mockRejectedValue(new ProductBillingError("blocked"));
     await expect(
-      methods.generateVideo(ORG, {
-        model_id: MODEL_ID,
-        prompt: "x",
-        image_url: "https://example.com/frame.png",
-      })
-    ).rejects.toBeInstanceOf(InvalidAiRequestError);
-    expect(mockedGenerate).not.toHaveBeenCalled();
+      methods.generateVideo(7, { model_id: "google/veo-3.1", prompt: "ocean" })
+    ).rejects.toMatchObject({ status: 402 });
+    expect(h.wait).not.toHaveBeenCalled();
+    expect(h.fetch).toHaveBeenCalledTimes(1);
+    expect(h.complete).not.toHaveBeenCalled();
   });
-
-  it("does not dispatch or complete when durable admission fails", async () => {
-    billing.begin.mockRejectedValueOnce(new ProductBillingError());
+  it("failed product download cannot trigger a new generation or native charge", async () => {
+    h.download.mockRejectedValue(new Error("asset unavailable"));
     await expect(
-      methods.generateVideo(ORG, { model_id: MODEL_ID, prompt: "x" })
-    ).rejects.toMatchObject({ code: "billing_unavailable" });
-    expect(billing.begin).toHaveBeenCalledTimes(1);
-    expect(mockedGenerate).not.toHaveBeenCalled();
-    expect(mockedCompletion).not.toHaveBeenCalled();
-  });
-
-  it("blocked orgs never reach the provider", async () => {
-    mockedGetEntitlement.mockResolvedValue({
-      allowed: false,
-      reason: "below_floor",
-      cachedBalanceCents: 5,
-      cachedAt: null,
-    } as never);
-    await expect(
-      methods.generateVideo(ORG, { model_id: MODEL_ID, prompt: "x" })
-    ).rejects.toMatchObject({ code: "blocked" });
-    expect(billing.complete).not.toHaveBeenCalled();
-    expect(mockedGenerate).not.toHaveBeenCalled();
+      methods.generateVideo(7, { model_id: "google/veo-3.1", prompt: "ocean" })
+    ).rejects.toThrow("Do not repeat accepted work");
+    expect(h.fetch).toHaveBeenCalledTimes(1);
+    expect(h.complete).not.toHaveBeenCalled();
   });
 });
