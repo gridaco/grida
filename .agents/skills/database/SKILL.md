@@ -103,27 +103,10 @@ FUNCTION`, `ADD COLUMN IF NOT EXISTS`) make local re-runs safe.
 
 ### Worked example
 
-Local-only (mergeable):
-
-```
-20260508120000_grida_billing_account_provisioning_uid.sql
-20260508130000_grida_billing_metronome.sql
-20260509120000_grida_billing_debit_cache.sql
-20260509130000_grida_billing_alerts_multi_tier.sql
-```
-
-Applied (untouchable):
-
-```
-20260506132900_grida_billing.sql
-20260507000000_grida_billing_backfill_provision.sql
-20260507223000_grida_billing_security_invoker.sql
-```
-
-Right move: write one consolidated `20260508130000_grida_billing_metronome.sql`
-(latest timestamp; v2 projector from `alerts_multi_tier` replaces v1
-from `metronome.sql`), delete the other three local files, leave the
-applied trio untouched. **Wrong move:** cat all seven into one.
+For a local-only chain that adds a product field, revises its helper and removes
+an intermediate field, consolidate that chain into its final intended state.
+Choose the latest local-only timestamp. Leave every already-applied migration
+unchanged; a future correction to applied SQL requires a forward migration.
 
 ---
 

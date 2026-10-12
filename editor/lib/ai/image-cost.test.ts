@@ -1,4 +1,4 @@
-// GRIDA-EE: billing — see ee-billing
+// GRIDA-EE: billing — see platform-consumers
 /**
  * Shared image cost math. Pins the tier-key shape
  * `${quality}/${width}x${height}` (the quality axis was previously

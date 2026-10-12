@@ -59,7 +59,7 @@ mandatory review before commit. Two extra OSS gates on top, both
 because _push = publish_:
 
 - **Secrets in diffs, fixtures, or tests.** Any credential, signing
-  key, Stripe/Metronome id, webhook signature, or production-shaped
+  key, financial-provider identifier, webhook signature, or production-shaped
   URL committed has been published the moment the branch is pushed.
   Use `.env.local` (gitignored) and fixture placeholders.
 - **Internal URLs and screenshots.** Webhook URLs, dev-tunnel URLs,

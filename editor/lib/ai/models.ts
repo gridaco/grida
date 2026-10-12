@@ -101,7 +101,7 @@ export const vercelAiGateway = createVercelAiGateway({
 //
 // When a contributor sets a BYOK key, calls route through a BARE
 // provider that bypasses the billing seam entirely (no gate, no
-// Metronome ingest, no balance). The key is charged by the upstream
+// customer usage, no balance). The key is charged by the upstream
 // provider directly — no Grida balance to meter/drain. BYOK bypasses
 // billing ONLY, never auth (requireOrganizationId still runs). Gated
 // solely by server-only env vars NEVER set in the hosted product (same

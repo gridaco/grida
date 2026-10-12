@@ -1,4 +1,4 @@
-// GRIDA-EE: billing — see ee-billing
+// GRIDA-EE: billing — see platform-consumers
 /**
  * Desktop AI-credits summary, same-origin.
  *

@@ -16,19 +16,19 @@ references remain in this page's revision history.
 
 ## KI-BILL-001 — Silent auto-recharge runs at-cost (markup gap)
 
-The former Metronome threshold recharge charged at cost while the manual purchase
-path used its fee envelope. The original source implementation treated this as a
-mitigated/accepted gap, with paid-plan eligibility and bounded settings.
+The historical automatic-reload and manual-purchase fee policies differed.
+That economic issue belongs to the billing service; removing application code
+does not by itself establish its resolution.
 
 Platform now owns reload economics and the retained paid obligations. Actual
 current fee handling and provider outcomes must be reconciled before changing
 the issue's disposition. Removing the former editor actions is not closure.
 
-## KI-BILL-002 — Concurrent subscribe Checkouts can produce orphan Stripe sub
+## KI-BILL-002 — Concurrent subscribe Checkouts can produce orphan subscription
 
 The original source risk was two concurrent subscription Checkouts before the
 first subscription projected locally (manual case `TC-BILLING-SUB-059`). A local
-projection rejecting the second subscription did not reverse its Stripe charge.
+projection rejecting the second subscription did not reverse the external charge.
 The original disposition was accepted with manual support/refund responsibility.
 
 Platform has durable purchase and operation custody. Hosted concurrency and

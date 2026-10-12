@@ -50,73 +50,24 @@ of any tagged file naturally surfaces the others; an agent picks up the
 
 ## Active boundaries
 
-### `GRIDA-SEC-001` — Ingest trust boundary
+### `GRIDA-SEC-001` — Retired machine ingress
 
-**What it protects.** Webhook receivers are public endpoints invoked by
-external machines. Their authority is established by the provider's signed
-payload, independently of browser cookies or the machine API credential
-families (GRIDA-SEC-012). The boundary is the rule that **everything
-reachable on `/webhooks/*` must verify a provider signature before
-doing anything else.** This applies to every current provider (Stripe,
-Metronome, …) and every future one (Replicate, GitHub, etc.).
+**What it protects.** Grida does not expose financial-provider callback receivers.
+The retired `/webhooks` namespace returns 404 before browser, tenant or handler
+processing. Do not reuse that namespace for an unauthenticated mutation.
 
-**Vulnerable scenario (prevented).** A developer adds an unsigned
-endpoint under the same path prefix — or removes the signature check
-from an existing receiver — and that path becomes reachable from the
-public internet (directly in production, via dev tunnel locally) with
-no authentication. An attacker who finds the URL triggers whatever
-logic lives there. State-changing endpoints (entitlement flips, record
-mutations, tenant-scoped queries) become open APIs.
+**Vulnerable scenario (prevented).** An old callback path accidentally regains a
+handler or an authentication bypass during unrelated routing work.
 
-**Why it's specifically risky here.** Webhook URLs in an open-source
-repo eventually leak — into docs, scripts, screenshots, dashboards
-that get linked, examples in PRs. Local dev typically uses a tunnel
-(cloudflared, ngrok, etc.) to expose the dev server so external
-providers can deliver webhooks; a naïvely-configured tunnel forwards
-every path on the local server. If the tunnel URL becomes public —
-and on an open-source project it does — every route including
-`/insiders/*` becomes reachable on whatever box is currently tunneled.
-The boundary contains the blast radius even when the URL is treated
-as public.
+**How the code prevents it.** The proxy rejects the entire retired namespace.
+Regression checks cover its root and child paths with read, write and preflight
+methods on an arbitrary host. They verify no handler pass-through or browser
+service loading.
 
-**How the code prevents it.**
+**Files bound by this id.**
 
-1. **Dedicated route group** — `editor/app/(ingest)/`. Every webhook
-   receiver lives here. Nothing else does. The route group's
-   [README](<editor/app/(ingest)/README.md>) is the authoritative ruleset.
-2. **Path-based proxy bypass** — [editor/proxy.ts](editor/proxy.ts)
-   short-circuits `/webhooks/*` _before_ tenant routing or session
-   refresh runs. This makes the receivers reachable on arbitrary hosts
-   (dev tunnels, future direct routes); it also makes the trust
-   boundary path-aligned with the file system.
-3. **Signature verification and custody** — every receiver verifies the
-   provider signature against the exact raw body before capture. The retained
-   Grida billing endpoints durably archive that delivery, forward to the fixed
-   Platform capture endpoint, and ACK only after durable target custody. Missing
-   configuration fails closed; no retired source financial projector runs.
-4. **Replay protection** — receivers dedup on event id and reject
-   events older than 5 minutes (where applicable).
-5. **Tunnel path filter at the edge** — a provider-validation tunnel exposes
-   only the selected webhook callback paths, with a deny-all fallback.
-   Ordinary Grida insiders/BYOK development needs no billing tunnel. Treat
-   callback URLs as public and keep unrelated `/insiders/*` routes unreachable.
-
-**Files bound by this id.** Run `grep -rn GRIDA-SEC-001 .` to enumerate.
-Today:
-
-- [editor/app/(ingest)/README.md](<editor/app/(ingest)/README.md>) — rules.
-- [editor/app/(ingest)/webhooks/stripe/route.ts](<editor/app/(ingest)/webhooks/stripe/route.ts>) — Stripe receiver.
-- [editor/app/(ingest)/webhooks/metronome/route.ts](<editor/app/(ingest)/webhooks/metronome/route.ts>) — Metronome receiver.
-- [editor/proxy.ts](editor/proxy.ts) — path bypass.
-- [editor/lib/platform/webhook-forwarding.ts](editor/lib/platform/webhook-forwarding.ts) — signature/capture/forward/ACK custody.
-- [editor/lib/billing/stripe-webhook-signature.ts](editor/lib/billing/stripe-webhook-signature.ts) — standalone Stripe verifier without outbound API authority.
-- [editor/lib/platform/README.md](editor/lib/platform/README.md) — current source integration.
-- [docs/contributing/billing.md](docs/contributing/billing.md) — public local development and financial-owner boundary.
-
-**What does NOT belong under `(ingest)/`.** Admin tools, internal RPC,
-anything that authenticates via cookie/session/bearer-token — those use their
-own browser/private or registered `/api/v1` boundary. Legacy public endpoints
-live under `(api)/(public)/v1/**`. Mixing categories breaks the trust contract.
+- [editor/proxy.ts](editor/proxy.ts) — rejects retired ingress.
+- [editor/lib/api/proxy.test.ts](editor/lib/api/proxy.test.ts) — ingress regression checks.
 
 ---
 
@@ -134,7 +85,7 @@ routes, which would publish them under a different URL and bypass this gate.
 `notFound()` outside development. Provider tunnels must not expose this group.
 
 **Retained history.** The former `/insiders/billing` harness exercised privileged
-Stripe/Metronome lifecycle actions without org-membership checks. It was retired
+financial lifecycle actions without org-membership checks. It was retired
 with Grida's duplicate financial engine; Platform owns current financial QA.
 Its deleted billing actions are not current proof or instructions. This ID
 retains the threat model and governs every remaining insiders surface.
@@ -3058,6 +3009,4 @@ incident investigations out of the architectural guarantee.
 
 Please email security@grida.co or universe@grida.co. We respond within 48 hours.
 
-If you find a way to reach a non-webhook route via the cloudflared
-tunnel, that is in scope and considered a real bug — the tunnel filter
-is supposed to block it.
+Include the affected route, authentication context and reproduction steps when reporting a routing vulnerability.

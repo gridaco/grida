@@ -93,7 +93,7 @@ export class AiCreditsController {
   /**
    * Force-sync balance from the server. Concurrent calls share the same
    * in-flight fetch — guards against multiple consumers (chip refresh
-   * button, programmatic call) firing duplicate Metronome reads. Ignored
+   * button, programmatic call) firing duplicate credit projection reads. Ignored
    * after `dispose()`.
    */
   refresh = async (): Promise<void> => {

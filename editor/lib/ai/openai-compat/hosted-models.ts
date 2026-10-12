@@ -1,6 +1,6 @@
 // GRIDA-SEC-006 — see /SECURITY.md
 // GRIDA-GG: gateway — see docs/wg/platform/hosted-ai.md
-// GRIDA-EE: billing — see ee-billing
+// GRIDA-EE: billing — see platform-consumers
 /**
  * Hosted-model allowlist — the single availability source for the
  * `/api/v1/ai/*` endpoints, composed from the ONE catalog
@@ -15,7 +15,7 @@
  *
  * Deliberately NO pricing in the payload — pricing is a billing-page
  * concern; exposing per-token USD here invites client-side cost math
- * that drifts from Metronome.
+ * that drifts from the served catalogue.
  */
 import {
   catalog as models,

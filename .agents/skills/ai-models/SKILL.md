@@ -3,7 +3,7 @@ name: ai-models
 description: >
   Research, compare, and update shared AI model JSON for TypeScript, web, and Rust consumers.
   Covers text model tiers, image and video generation models, image tool models,
-  release provenance, pricing data sourcing, and provider-cost metering against prepaid org credit.
+  release provenance, pricing data sourcing, and product-side catalogue cost estimates.
   Use when bumping model versions, adding new models, updating pricing, or
   auditing model specs against provider documentation.
 ---
@@ -37,8 +37,8 @@ description: >
 | `crates/grida-ai/data/`                         | Generated embedded Rust assets; never a separate authoring home                            |
 | `editor/lib/ai/models.ts`                       | AI Gateway + BYOK provider seam (service catalog from `@grida/ai-models/grida`)            |
 | `editor/lib/ai/ai.ts`                           | `toMills()` + Replicate call shapes; re-aggregates the shared catalogue under `ai.*`       |
-| `editor/lib/ai/server.ts`                       | AI seam: prepaid-credit gate, provider call, and post-flight usage ingest                  |
-| `editor/lib/billing/metronome.ts`               | Organization credit entitlement, cached balance gate, and Metronome usage ledger           |
+| `editor/lib/ai/server.ts`                       | Product model selection and delegated execution adapters                                   |
+| `editor/lib/platform/`                          | Account/credit consumers and retained native execution receipts                            |
 | `editor/app/(www)/(ai)/ai/models/page.tsx`      | Public models catalog page                                                                 |
 | `docs/models/index.md`                          | User-facing models & pricing documentation                                                 |
 
@@ -322,22 +322,14 @@ resolution **and** whether audio is generated, so the keys are the exact
 
 Author in `data/ai/facts.json` under `image_tools.models`; the generated TS consumer exposes `models.image_tools.models`. Flat `cost_usd` pricing via Replicate.
 
-## Hosted Usage Metering
+## Hosted execution
 
-Grida Gateway (GG) usage is metered against the organization's prepaid AI
-credit. Unit: **mills** (1 mill = $0.001 USD).
-
-- `ai.toMills(cost_usd)` converts a provider cost to the integer usage unit.
-- The AI seam checks the organization's cached credit entitlement before the
-  provider call and ingests usage into Metronome after the call.
-- Text uses observed token usage. Media routes use verified catalogue pricing
-  for the served request, with `avg_cost_usd` only where the provider does not
-  expose a more exact billable dimension.
-- The current gate is a global balance floor. There is no per-model
-  provider-cost budget; do not invent one when updating a card.
-- BYOK text calls bypass GG metering because the user pays the provider
-  directly. Hosted media remains billable unless its route explicitly uses a
-  supported BYOK provider.
+Product model selection and input validation belong here. Funded generation
+uses the Gateway product adapter; catalogue prices are display estimates, not
+financial authorization. Preserve the server adapter's configuration failure,
+original job identity and native response shapes when updating a model card.
+Retained native tools use the Platform consumer contract. Contributor text BYOK
+retains its separate local-only behavior.
 
 ## After Any Update
 

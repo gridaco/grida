@@ -1,6 +1,6 @@
 // GRIDA-SEC-006 — see /SECURITY.md
 // GRIDA-GG: gateway — see docs/wg/platform/hosted-ai.md
-// GRIDA-EE: billing — see ee-billing
+// GRIDA-EE: billing — see platform-consumers
 /**
  * `POST /api/v1/ai/videos/generations` — hosted video generation for
  * the desktop sidecar. Grida-native wire (`VideoGenerateRequest` /

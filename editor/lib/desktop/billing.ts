@@ -1,4 +1,4 @@
-// GRIDA-EE: billing — see ee-billing
+// GRIDA-EE: billing — see platform-consumers
 /**
  * Desktop AI-credits summary — server-only seam for the same-origin
  * `/desktop/billing/summary` route.
@@ -11,7 +11,7 @@
  * value import ever reaches client code.
  *
  * This display read never provisions a credit account, and it exposes no
- * drift/auto-reload/Stripe fields. The desktop card is thin by design; every control
+ * service implementation fields. The desktop card is thin by design; every control
  * delegates to the web billing page (`manage_path`).
  */
 import "server-only";

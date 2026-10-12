@@ -99,7 +99,7 @@ export function rateLimited(retryAfterSeconds?: number): Response {
 
 /**
  * Terminal catch for the hosted chat/models routes. Never leaks
- * Metronome/Postgres/provider internals.
+ * internal service details.
  */
 export function fromUnknownError(err: unknown, scope: string): Response {
   if (err instanceof GgTokenError) {

@@ -7,7 +7,7 @@
  *
  * `withAiAuth` is invoked with `{ balance: false }` because the forms
  * editor doesn't display the AI credit chip — skipping the post-fn
- * Metronome read avoids both latency and rate-limit pressure.
+ * credit projection read avoids both latency and rate-limit pressure.
  */
 
 import { generateObject } from "ai";

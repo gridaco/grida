@@ -27,21 +27,13 @@ tags:
 
 # Grida Gateway (GG)
 
-**Grida Gateway** — **GG** — is the path by which a signed-in user runs AI
-— chat, image, video, music, and supported 3D features — **without supplying their own model key** (no
-"bring your own key"), billed to their organization's prepaid credit. This
-doc is the canonical spec for _how an untrusted native client is allowed to
-spend credits_ and _why the design is shaped the way it is_. It sits on top
-of, and defers all money mechanics to,
-[Billing / AI Credits](./billing/ai-credits.md).
+Grida's hosted AI is the managed model-capacity option for signed-in product
+users. It uses organization AI credits without requiring a personal model key.
+The installed `gg` provider uses Grida's native authenticated API; it is distinct
+from the standalone customer API at `gateway.grida.ai`.
 
-**Name and lineage.** "Grida Gateway (GG)" is the branded name for this
-one service, chosen so the term carries this exact context. It is designed
-to **spin out** of the editor into a standalone gateway at a future host
-`grida.gg`; that portability is a design constraint, not an aspiration (see
-[Scope boundary](#scope-boundary-capacity-not-remote-execution) and the
-dependency direction below). Throughout: **GG** / **Grida Gateway** names
-the _service_; "hosted AI" is the generic capability it delivers.
+This page describes the native consumer and catalogue contract. Financial policy,
+provider billing and service operations are outside the Grida application.
 
 > **Boundary & surface.** The scoped-token trust boundary is
 > **`GRIDA-SEC-006`** in
@@ -49,87 +41,6 @@ the _service_; "hosted AI" is the generic capability it delivers.
 > the code surface is marked `GRIDA-GG` and governed by the `gg` engineering
 > skill. This doc explains the domain; SECURITY.md is the enforced
 > invariant.
-
-## The problem
-
-Three forces have to be satisfied at once, and they pull against each
-other:
-
-1. **An untrusted client must be able to spend money.** The desktop app is
-   a native process on a machine we don't control. It must be able to
-   invoke paid models, yet it can never hold a credential that is worth
-   more than the narrow thing it is allowed to do.
-2. **Metering must be trustworthy.** Usage billed to a customer has to be
-   counted by a party the customer trusts — us, on the server — not
-   reported after the fact by the client or reconciled from a third party's
-   ledger days later.
-3. **BYOK must keep working, unchanged.** Users who bring their own key
-   must still pay $0 to us and route around all of this. Hosted AI is an
-   _additional_ path, never a replacement.
-
-The durable login (the browser/webview session) is a full first-class
-account credential. Handing _that_ to the native process would collapse
-"can use AI" into "is the whole account." So the durable credential must
-stay where it already lives, and the native process must receive something
-strictly weaker.
-
-## The design space (mental models)
-
-Four industry-named paradigms can deliver no-BYOK AI. Naming them makes the
-choice legible:
-
-| Model | Industry name                                     | Who calls the model provider                                   | Where metering happens                        |
-| ----- | ------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------- |
-| **A** | **Token Vending Machine** (STS-style federation)  | The client, directly, with a minted _upstream_ credential      | After the fact, from provider usage exports   |
-| **B** | **First-party AI Gateway** (LLM proxy / BFF)      | Our server, on the client's behalf                             | Inline, synchronous, server-side              |
-| **C** | **Managed gateway with provisioned virtual keys** | A third-party gateway (per-customer virtual key with a budget) | The vendor's ledger, reconciled into ours     |
-| **D** | **BYOK / client-direct**                          | The client, with the user's own key                            | Not metered by us (the carve-out we preserve) |
-
-**A (Token Vending Machine)** — the pattern AWS STS coined: the server
-mints a temporary _upstream_ credential and the client talks to the model
-provider directly. The server is only in the control plane. Simple and
-cheap, but a leaked minted key is spendable upstream until revoked, and
-metering degrades to asynchronous reconciliation.
-
-**B (First-party AI Gateway)** — every AI call flows through our own
-endpoint; we terminate auth, gate entitlement, stream the response through,
-and meter inline. This is what the shipping peers (Zed, Cursor, Copilot,
-Cody Gateway) converged on. We become a streaming hop and own a wire
-contract forever, but metering and credential blast-radius are both under
-our control.
-
-**C (Managed virtual keys)** — outsource B to a third party
-(provisioning-API sub-keys, per-customer virtual keys with budgets). Least
-infra, but double margin, hard catalog lock-in, and someone else's numbers
-in our ledger.
-
-### What we chose, and why
-
-**B for the data plane, with a thin slice of A for auth only.**
-
-The deciding fact is that the billing rail — entitlement gate and metered
-usage ingest against a prepaid credit ledger — **already lives on the
-server**, inside the AI seam that every first-party AI call passes through.
-Only model B lets that rail run **synchronously and authoritatively**:
-entitlement is checked _before_ the upstream stream opens (a hard,
-pre-flight "insufficient credit," never a surprise post-paid bill), usage
-is ingested from tokens _we_ counted, and the upstream provider key never
-leaves the server. A and C both push metering into asynchronous
-reconciliation and give up the pre-flight gate; C additionally adds margin
-and catalog lock-in.
-
-The "slice of A" is narrow and deliberate: the credential the native
-client holds is **not** an upstream key — it is a purpose-scoped token that
-is only good against _our own gateway_. So it is really the standard
-**OAuth2 resource-server / short-lived access token** pattern, not a true
-Token Vending Machine.
-
-The trade we accepted, stated plainly: we bought the **worst operational
-axis** (we are now in the hot path — if the gateway is down, hosted AI is
-down; we pay streaming egress and live under serverless duration ceilings)
-to buy the **best trust axes** (authoritative metering, minimal credential
-blast radius, upstream keys never exposed). For a product that bills per
-use, that is the correct trade, and it is the one every shipping peer made.
 
 ## Architecture
 
@@ -158,54 +69,6 @@ asset validation/storage and the existing signed direct-upload preparation.
 Accepted pre-transition native obligations remain in the
 [billing register](./billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation).
 
-```mermaid
-sequenceDiagram
-    participant W as Webview session<br/>(durable login)
-    participant M as Mint endpoint<br/>(first-party, same-origin)
-    participant D as Native daemon<br/>(sidecar — memory only)
-    participant H as Native provider transport<br/>(Chromium system route)
-    participant G as Grida Gateway (GG)<br/>(first-party)
-    participant B as Entitlement + ledger<br/>(prepaid credit)
-    participant P as Upstream model provider
-
-    Note over W: signed in — the only durable credential (GRIDA-SEC-005)
-    W->>M: request scoped token (cookie attached same-origin)
-    M->>M: verify session + org membership
-    M-->>W: scoped token — aud "gg:ai", ~15 min, org-bound
-    W->>D: immediately push across authenticated bridge
-    Note over W: transient handoff only<br/>never persisted, logged, or returned
-    Note over D: held in memory only<br/>never on disk, never a refresh token
-    D->>H: AI request + Bearer scoped token
-    Note over H: transient routing only<br/>no persistence, logs, or cookie custody
-    H->>G: request through Chromium's system route
-    G->>G: verify token (audience, signature, expiry)
-    G->>B: entitlement gate (pre-flight)
-    alt insufficient credit
-        B-->>G: blocked
-        G-->>H: 402 insufficient_credits (before any upstream call)
-        H-->>D: bounded response
-    else allowed
-        G->>P: model call (first-party upstream key)
-        P-->>G: streamed tokens / media
-        G-->>H: streamed response
-        H-->>D: credit-bounded stream
-        G->>B: ingest usage (post-flight, at cost)
-    end
-```
-
-The flow reads top to bottom: the webview uses its durable, same-origin
-session to mint a weak token, immediately hands that token to the native
-process across the authenticated bridge, and retains no copy. The native
-process holds it in memory only; every AI call crosses the bounded native
-provider transport and Chromium's effective system route to the first-party
-gateway. Electron main can observe the scoped bearer transiently in that
-request, but does not persist, log, return, or place it in a cookie jar. The
-gateway proves the token, gates the org's credit _before_
-opening upstream, streams the model back, and meters what was actually used.
-The durable session cookie never leaves the webview. **BYOK bypasses this
-entire diagram** — a user-supplied key resolves to a client-direct provider
-that never touches the gateway or the ledger.
-
 ## The contract
 
 ### 1. The scoped token (federation)
@@ -233,9 +96,8 @@ short-lived, organization-bound token**:
   credential; the renderer re-mints and re-pushes proactively before expiry and
   again on an expiry error.
 
-This is the "thin slice of A": a minted credential, but scoped to our own
-resource server, so its blast radius is "≤15 minutes of AI on one org's
-credit" and nothing more.
+This credential authorizes only the native AI resource family; it is not a
+provider credential or a standalone customer API key.
 
 ### 2. The gateway (a first-party metered surface)
 
@@ -252,20 +114,12 @@ API key. It presents two contract styles:
 - **Image and video: Grida-native generation surfaces** — request/response
   shapes owned by our own protocol, returning inline results.
 
-### 3. Metering against prepaid organization credit
+### 3. Credit display and execution
 
-Every GG call is metered against the organization's prepaid AI credit. It runs
-the existing server-side AI seam, so the gateway carries **no billing logic of
-its own**:
-
-- **Pre-flight gate** — the org's entitlement is read before the upstream
-  call opens. No credit ⇒ a hard, pre-stream refusal. There is never a
-  post-paid surprise.
-- **Post-flight ingest** — usage is metered from what the server counted,
-  **sold at cost** (zero markup; see [AI Credits](./billing/ai-credits.md)),
-  and written to the ledger idempotently.
-- **Granularity** — one hosted request per model step, so per-request
-  gating _is_ step-level gating for the agent.
+Grida displays the organization's credit projection. That observation is not
+permission to execute or a settled charge. The execution service owns admission
+and charging; consumers preserve its failures and never resubmit accepted work
+because a result download failed. See [AI credits](./billing/ai-credits.md).
 
 ### 4. Catalogue distribution (credential-free)
 
@@ -460,70 +314,17 @@ agent behind a CLI) is a **separate, still-deferred concern** and must not
 be conflated with hosted model provision. Hosted AI moves the _model call_
 off-device; it does not move the _agent_ off-device.
 
-## Current state (honest)
+## Verification scope
 
-**Implemented (local, end-to-end verified):** text, image, and video all
-run keyless for a signed-in desktop user; the scoped token mints from the
-session, crosses renderer memory only for the transient authenticated-bridge
-handoff, is then retained only in the daemon's memory, and is re-minted on
-expiry; each GG call uses the bounded native provider transport and Chromium
-system route without giving Electron main durable token custody; the gateway
-gates and meters through the live billing rail; BYOK
-continues to bypass everything. The model catalogue is published at
-`/api/v1/models/catalog` and agent hosts resolve through it — seeded from
-their bundled copy, refreshed at boot, on an interval, and once on a run-gate
-miss — so a model added or a tier retargeted on the server reaches an
-already-installed binary without a release. Text, image, and video are all
-published and consumed; `audio`, `image_tools`, and `embedding` deliberately
-are not (no agent-host reader, and the embedding card is a compile-time
-consistency pin against a database column, not distributable data). The experimental ChatGPT subscription
-provider now participates in the native resolver and provider-qualified
-session persistence described above. That local implementation does not make
-it a stable OpenAI-supported integration: its legal/support contract remains
-an external release gate.
-
-**Deferred / accepted limitations** — the parts deliberately left for
-later, and the honest risks:
-
-- **Synchronous video is the weakest long-term contract.** Video
-  generation is served request/response under a serverless duration
-  ceiling. Long-form generation will likely force an asynchronous
-  job-and-poll contract (v2) — and unlike a hosting change, that is a
-  _wire_ change every client must mirror. The v1 model allowlist is scoped
-  accordingly.
-- **Text-to-image and text-to-video only.** Image-to-image / image-to-video
-  need a hosted reference-upload story (blob custody, SSRF-safe intake)
-  that v1 does not provide.
-- **Mid-stream spend is not interrupted.** Gating is per-request; once a
-  stream is open it runs to completion even if the balance crosses zero.
-  Bounded by per-step request granularity; standard industry behavior.
-- **Org-membership revocation lags by up to a token lifetime** (~15 min) —
-  an accepted consequence of stateless, expiry-based revocation.
-- **No recurring plan-credit grant.** Free and Pro include no recurring AI
-  credit; GG spends prepaid organization credit purchased separately. Adding
-  a plan grant would require a new commercial decision before any product or
-  implementation design. The earlier grant concept remains future research in
-  [AI Credits](./billing/ai-credits.md), not a deferred shipping phase.
-- **ChatGPT stable activation** — subscription-first onboarding and sticky
-  provider-qualified sessions are implemented experimentally. A stable
-  legal/support contract with OpenAI, including the native client and
-  subscription-backend posture, remains an external release gate.
-- **Packaged egress smoke** — the native sandbox must be proven to reach
-  the hosted host from a _packaged_ build; the dev loop cannot prove the
-  packaged allowlist. This now also covers the catalogue fetch, which
-  rides the same provider lane.
-- **A published catalogue is not persisted.** A host holds it in memory
-  only, so an offline start falls back to the bundled seed rather than the
-  last catalogue it saw. Accepted: it also means a bad-but-valid snapshot
-  cannot outlive the process that fetched it.
-- **Hosted-deploy prerequisite** — the gateway fails closed without its
-  dedicated signing secret configured in the hosted environment.
+Native client/API contracts, scoped-token custody and consumer behavior have
+focused local tests. A local result does not establish hosted configuration or
+packaged-network qualification. Standalone service releases and their financial
+operations are separate from this consumer contract.
 
 ## Related
 
-- [Billing / AI Credits](./billing/ai-credits.md) — the ledger, gate
-  primitive, at-cost pricing, and top-up flows this spends against.
-- [Metronome integration](./billing/metronome.md) — the metering substrate.
+- [AI credits](./billing/ai-credits.md) — product credit display and execution custody.
+- [Platform integration](../../contributing/billing.md) — local consumer development.
 - [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md) —
   `GRIDA-SEC-003`/`004`/`005`/`006`, the enforced boundaries.
 - [Deferred Grida Cloud Agent Provider](https://github.com/gridaco/grida/blob/main/docs/wg/platform/_history/hosted-ai-deferred-provider-2026-06.md)

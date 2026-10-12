@@ -104,18 +104,40 @@ describe("API dispatch before browser work", () => {
     );
     expect(web.session).not.toHaveBeenCalled();
   });
-  it("retains the production insiders gate and webhook bypass", async () => {
+  it("retains the production insiders gate", async () => {
     const { proxy } = await import("../../proxy");
     expect(
       (await proxy(request("/insiders/billing", undefined, "POST"))).status
     ).toBe(404);
-    expect(
-      (
-        await proxy(request("/webhooks/stripe", "tunnel.example", "POST"))
-      ).headers.get("x-middleware-next")
-    ).toBe("1");
     expect(web.loaded).toEqual([]);
   });
+  // GRIDA-SEC-001 — neither browser routing nor machine dispatch may reopen ingress.
+  it.each([
+    "/webhooks",
+    "/webhooks/",
+    "/webhooks/stripe",
+    "/webhooks/metronome",
+    "/webhooks/other",
+  ])(
+    "rejects retired machine ingress %s for every supported request method",
+    async (path) => {
+      const { proxy } = await import("../../proxy");
+      for (const method of [
+        "GET",
+        "HEAD",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "OPTIONS",
+      ]) {
+        const response = await proxy(request(path, "tunnel.example", method));
+        expect(response.status).toBe(404);
+        expect(response.headers.get("x-middleware-next")).toBeNull();
+      }
+      expect(web.loaded).toEqual([]);
+    }
+  );
   it("retains Desktop cookie refresh and CSP", async () => {
     const { proxy } = await import("../../proxy");
     const response = await proxy(request("/desktop"));

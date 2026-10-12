@@ -8,8 +8,6 @@ import assert from "assert";
  * NOTE: Identifier Duplicates Handling
  *
  * When using identifiers such as email for customer authentication, keep in mind that these values may not be unique.
- * For example, in Stripe’s Customer Portal, if multiple customers share the same email address, Stripe selects the
- * most recently created customer with that email who also has an active subscription.
  *
  * Our Authentication module does not implement duplicate checking by default. It is important that:
  * 1. During customer creation, you enforce unique identifiers, OR
