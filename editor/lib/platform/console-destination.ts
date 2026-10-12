@@ -9,8 +9,9 @@ const typedObject = (kind: string, value: string) =>
   objectIDs[kind as keyof typeof objectIDs].test(value);
 const purchaseID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const canonicalID = (value: string) =>
-  /^[1-9][0-9]*$/.test(value) && BigInt(value) <= BigInt("9223372036854775807");
+export const validOrganizationSlug = (value: unknown): value is string =>
+  typeof value === "string" &&
+  /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/.test(value);
 const enums: Record<string, readonly string[]> = {
   range: [
     "5m",
@@ -99,7 +100,8 @@ export function organizationRoute(
   pathname: string
 ): { organization: string; section: string } | null {
   const parts = pathname.split("/").slice(1);
-  if (parts[0] !== "organizations" || !canonicalID(parts[1] || "")) return null;
+  if (parts[0] !== "organizations" || !validOrganizationSlug(parts[1]))
+    return null;
   if (parts[2] === "billing") {
     if (
       parts.length === 3 ||

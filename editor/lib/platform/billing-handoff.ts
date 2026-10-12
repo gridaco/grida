@@ -80,7 +80,7 @@ export async function billingHandoff(
     section === "return" && typeof search.purchase_id === "string"
       ? { section: "purchase", purchaseId: search.purchase_id }
       : { section: section === "upgrade" ? "upgrade" : "billing" };
-  const url = consoleBillingUrl(org.id, destination);
+  const url = consoleBillingUrl(org.name, destination);
   if (section !== "return" || search.purchase_id) return redirect(url);
   // Released intent-only returns have no durable destination purchase UUID.
   // They must not guess the latest purchase or report a processor success.

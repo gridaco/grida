@@ -7,6 +7,7 @@ import {
   managePath,
   ConsoleManageError,
 } from "@/lib/platform/console-manage";
+import { organizationRoute } from "@/lib/platform/console-destination";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -66,7 +67,8 @@ export async function POST(
           ),
         auth.user.id,
         input.organizationId!,
-        true
+        true,
+        organizationRoute(input.returnTo.split("?")[0])!.organization
       );
       if (organization.name !== org) throw new ConsoleManageError("forbidden");
       continuation = {

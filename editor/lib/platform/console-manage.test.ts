@@ -36,6 +36,14 @@ vi.mock("@/lib/supabase/server", () => ({
       error: state.canonicalError,
     }),
     from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({
+            data: state.canonicalError ? null : { id: 1, name: "acme" },
+            error: null,
+          }),
+        }),
+      }),
       update: (value: Record<string, unknown>) => {
         state.updates.push(value);
         return { eq: async () => ({ error: null }) };
@@ -81,7 +89,7 @@ vi.mock("@/app/(site)/organizations/[organization_name]/people/page", () => ({
 import ManagePage from "@/app/(site)/gateway/manage/page";
 const source = "https://grida.example.test",
   consoleOrigin = "https://console.example.test";
-const target = "/organizations/42/ai-gateway/requests/req_test1234";
+const target = "/organizations/acme/ai-gateway/requests/req_test1234";
 beforeEach(() => {
   vi.stubEnv("GRIDA_OAUTH_ORIGIN", source);
   vi.stubEnv("GRIDA_PLATFORM_CONSOLE_ORIGIN", consoleOrigin);
@@ -118,26 +126,25 @@ describe("reviewed console destination mirror", () => {
 });
 it("retains exact organization/resource through the finite management envelope", () => {
   expect(
-    manageInput({ intent: "settings", org_id: "42", return_to: target })
+    manageInput({ intent: "settings", org_id: "1", return_to: target })
   ).toMatchObject({
     intent: "settings",
-    organizationId: "42",
+    organizationId: "1",
     returnTo: target,
   });
   expect(
-    new URL(managePath("settings", target, "42"), source).searchParams.get(
+    new URL(managePath("settings", target, "1"), source).searchParams.get(
       "return_to"
     )
   ).toBe(target);
   expect(consoleReturnURL(target)).toBe(consoleOrigin + target);
 });
 it.each([
-  { intent: "settings", org_id: "43", return_to: target },
-  { intent: "settings", org_id: "42", return_to: "/" },
+  { intent: "settings", org_id: "1", return_to: "/" },
   { intent: "organization", org_id: "042", return_to: target },
-  { intent: "organization", org_id: "42", return_to: target, project_id: "7" },
+  { intent: "organization", org_id: "1", return_to: target, project_id: "7" },
   { intent: "settings", org_id: ["42", "43"], return_to: target },
-  { intent: "create-organization", org_id: "42", return_to: target },
+  { intent: "create-organization", org_id: "1", return_to: target },
   { intent: "create-organization", return_to: "https://evil.test" },
   {
     intent: "create-organization",
@@ -160,15 +167,15 @@ it("requires a current canonical member and settings owner independently of the 
       error: null,
     })
   );
-  expect(await currentConsoleOrganization(read, "user-a", "42")).toEqual({
-    id: "42",
+  expect(await currentConsoleOrganization(read, "user-a", "1")).toEqual({
+    id: "1",
     name: "acme",
   });
   await expect(
-    currentConsoleOrganization(read, "user-a", "42", true)
+    currentConsoleOrganization(read, "user-a", "1", true)
   ).rejects.toMatchObject({ code: "forbidden" });
   await expect(
-    currentConsoleOrganization(read, "user-b", "42")
+    currentConsoleOrganization(read, "user-b", "1")
   ).rejects.toMatchObject({ code: "forbidden" });
 });
 it("uses the existing real creation writer then returns the exact retained target", async () => {
@@ -204,8 +211,8 @@ it("anonymous creation preserves the exact management continuation and performs 
 });
 it.each([
   "https://evil.test/",
-  "/organizations/42/ai-gateway/keys?token=secret",
-  "/organizations/42/ai-gateway/keys/byok_test1234",
+  "/organizations/acme/ai-gateway/keys?token=secret",
+  "/organizations/acme/ai-gateway/keys/byok_test1234",
 ])("rejects malformed creation return %s before writing", async (returnTo) => {
   const response = await create(
     request("new", {
@@ -275,7 +282,7 @@ it("settings preserves current owner authority and exact continuation after an u
     description: "",
     blog: "",
     console_return_to: target,
-    console_organization_id: "42",
+    console_organization_id: "1",
   };
   state.role = "member";
   expect(
@@ -292,7 +299,7 @@ it("settings preserves current owner authority and exact continuation after an u
   });
   expect(response.status).toBe(303);
   expect(response.headers.get("location")).toBe(
-    source + managePath("settings", target, "42")
+    source + managePath("settings", target, "1")
   );
   expect(state.updates).toHaveLength(1);
 });
@@ -303,12 +310,12 @@ it("signed-out management preserves the exact typed return across source sign-in
     ManagePage({
       searchParams: Promise.resolve({
         intent: "settings",
-        org_id: "42",
+        org_id: "1",
         return_to: target,
       }),
     })
   ).rejects.toThrow(
-    `redirect:/sign-in?next=${encodeURIComponent(managePath("settings", target, "42"))}`
+    `redirect:/sign-in?next=${encodeURIComponent(managePath("settings", target, "1"))}`
   );
   expect(state.writes).toEqual([]);
 });
@@ -318,7 +325,7 @@ it("management entry denies inaccessible organizations and member settings befor
     ManagePage({
       searchParams: Promise.resolve({
         intent: "settings",
-        org_id: "42",
+        org_id: "1",
         return_to: target,
       }),
     })
@@ -328,8 +335,31 @@ it("management entry denies inaccessible organizations and member settings befor
     ManagePage({
       searchParams: Promise.resolve({
         intent: "organization",
-        org_id: "42",
+        org_id: "1",
         return_to: target,
+      }),
+    })
+  ).rejects.toThrow("not_found");
+});
+
+it("settings rejects a foreign or stale slug before a write", async () => {
+  const response = await profile(
+    request("profile", {
+      display_name: "Acme",
+      email: "owner@example.test",
+      console_return_to: "/organizations/foreign/billing",
+      console_organization_id: "1",
+    }),
+    { params: Promise.resolve({ org: "acme" }) }
+  );
+  expect(response.status).toBe(403);
+  expect(state.updates).toEqual([]);
+  await expect(
+    ManagePage({
+      searchParams: Promise.resolve({
+        intent: "settings",
+        org_id: "1",
+        return_to: "/organizations/foreign/billing",
       }),
     })
   ).rejects.toThrow("not_found");

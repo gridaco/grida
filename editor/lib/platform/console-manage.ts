@@ -44,7 +44,7 @@ export function manageInput(search: ManageSearch): {
       : typeof orgId !== "string" ||
         !/^[1-9][0-9]*$/.test(orgId) ||
         BigInt(orgId) > BigInt("9223372036854775807") ||
-        route?.organization !== orgId
+        !route
   )
     throw new ConsoleManageError("invalid");
   const error = search.error;
@@ -57,7 +57,7 @@ export function manageInput(search: ManageSearch): {
   return {
     intent,
     returnTo,
-    organizationId: typeof orgId === "string" ? orgId : route?.organization,
+    organizationId: typeof orgId === "string" ? orgId : undefined,
     error,
   };
 }
@@ -96,7 +96,8 @@ export async function currentConsoleOrganization(
   read: Reader,
   subject: string,
   organizationId: string,
-  ownerOnly = false
+  ownerOnly = false,
+  expectedSlug?: string
 ): Promise<{ id: string; name: string }> {
   const { data, error } = await read(organizationId);
   if (error)
@@ -116,7 +117,8 @@ export async function currentConsoleOrganization(
     typeof result.organization.name !== "string" ||
     !/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/.test(result.organization.name) ||
     !["member", "owner"].includes(String(result.role)) ||
-    (ownerOnly && result.role !== "owner")
+    (ownerOnly && result.role !== "owner") ||
+    (expectedSlug !== undefined && result.organization.name !== expectedSlug)
   )
     throw new ConsoleManageError("forbidden");
   return { id: organizationId, name: result.organization.name };

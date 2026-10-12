@@ -36,19 +36,19 @@ describe("lazy consumer configuration and typed destinations", () => {
       expect(() => platformBilling({ ...env, [key]: "" })).toThrow(
         BillingConsumerError
       );
-    expect(consoleBillingUrl(7, { section: "billing" }, env)).toBe(
-      "https://console.example.test/organizations/7/billing"
+    expect(consoleBillingUrl("acme", { section: "billing" }, env)).toBe(
+      "https://console.example.test/organizations/acme/billing"
     );
-    expect(billingDestination(7, { section: "upgrade" })).toBe(
-      "/organizations/7/billing/upgrade"
+    expect(billingDestination("acme", { section: "upgrade" })).toBe(
+      "/organizations/acme/billing/upgrade"
     );
     expect(
-      billingDestination(7, {
+      billingDestination("acme", {
         section: "purchase",
         purchaseId: "11111111-1111-4111-8111-111111111111",
       })
     ).toBe(
-      "/organizations/7/billing/purchases/11111111-1111-4111-8111-111111111111"
+      "/organizations/acme/billing/purchases/11111111-1111-4111-8111-111111111111"
     );
   });
   it.each([
@@ -62,7 +62,7 @@ describe("lazy consumer configuration and typed destinations", () => {
   ])("rejects non-origin configuration %s", (origin) =>
     expect(() =>
       consoleBillingUrl(
-        7,
+        "acme",
         { section: "billing" },
         { ...env, GRIDA_PLATFORM_CONSOLE_ORIGIN: origin }
       )
@@ -75,18 +75,18 @@ describe("lazy consumer configuration and typed destinations", () => {
       GRIDA_PLATFORM_CONSOLE_ORIGIN: "http://127.0.0.1:56842",
       NODE_ENV: "development",
     };
-    expect(consoleBillingUrl(7, { section: "billing" }, local)).toContain(
-      "127.0.0.1:56842/organizations/7/billing"
+    expect(consoleBillingUrl("acme", { section: "billing" }, local)).toContain(
+      "127.0.0.1:56842/organizations/acme/billing"
     );
     expect(() =>
       consoleBillingUrl(
-        7,
+        "acme",
         { section: "billing" },
         { ...local, NODE_ENV: "production" }
       )
     ).toThrow(BillingConsumerError);
   });
-  it.each([0, -1, 0.5, Number.MAX_SAFE_INTEGER + 1, NaN])(
+  it.each(["", "Acme", "a--b", "a-", "a_b", "a".repeat(40)])(
     "rejects invalid organization %s",
     (org) =>
       expect(() => billingDestination(org, { section: "billing" })).toThrow(
@@ -97,7 +97,7 @@ describe("lazy consumer configuration and typed destinations", () => {
     "rejects invalid resource %s",
     (purchaseId) =>
       expect(() =>
-        billingDestination(7, { section: "purchase", purchaseId })
+        billingDestination("acme", { section: "purchase", purchaseId })
       ).toThrow(BillingConsumerError)
   );
 });

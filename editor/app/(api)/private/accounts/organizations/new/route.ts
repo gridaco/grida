@@ -75,6 +75,13 @@ export async function POST(req: NextRequest) {
     const route = organizationRoute(continuation.target.split("?")[0]);
     if (route) {
       try {
+        const { data: locator, error: locatorError } = await client
+          .from("organization")
+          .select("id,name")
+          .eq("name", route.organization)
+          .maybeSingle();
+        if (locatorError) throw new ConsoleManageError("unavailable");
+        if (!locator) throw new ConsoleManageError("forbidden");
         await currentConsoleOrganization(
           async (id) =>
             await client.rpc(
@@ -82,6 +89,8 @@ export async function POST(req: NextRequest) {
               { organization_id: id } as never
             ),
           userdata.user.id,
+          String(locator.id),
+          false,
           route.organization
         );
       } catch (error) {
