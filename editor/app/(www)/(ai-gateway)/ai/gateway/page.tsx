@@ -13,6 +13,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import { sitemap } from "@/www/data/sitemap";
+import { ConsoleLinks } from "@/lib/platform/console-links";
 import Showcase from "./_sections/showcase";
 import { CREATIVE_CODE, OPENAI_CODE } from "./_sections/content";
 import { highlightCode } from "./_sections/highlight";
@@ -93,10 +94,7 @@ export default async function AIGatewayPage() {
               apps, agents, and workflows.
             </p>
             <div className={styles.actions}>
-              <a
-                href="https://console.grida.co/_/ai-gateway"
-                className={styles.primary}
-              >
+              <a href={ConsoleLinks.aiGateway()} className={styles.primary}>
                 Get API key <ArrowUpRight aria-hidden="true" />
               </a>
               <Link href={sitemap.links.ai_models} className={styles.secondary}>

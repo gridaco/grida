@@ -11,6 +11,8 @@ Grida client adapters; financial policy and provider operations are not owned he
   IDs remain the authorization and service API identity. The management handoff
   rechecks that the requested locator belongs to that same organization.
   Numeric-only names are valid, with no ID fallback or old-name redirect.
+- `console-links.ts` is the single source for outbound Console page URLs
+  (AI Gateway); update its templates when the Console URL spec changes.
 - `native-credits.ts` preserves the installed clients' credit response shape.
 - `product-billing.ts` and `product-consumer.ts` retain admission and completion
   custody for native operations and accepted work.

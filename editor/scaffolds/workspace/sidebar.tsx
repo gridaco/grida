@@ -28,6 +28,7 @@ import {
   ChevronRight,
   ChevronDown,
   Trash2Icon,
+  SquareTerminal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -124,8 +125,12 @@ export function projectstree(
 }
 
 export default function WorkspaceSidebar({
+  consoleHref,
   ...props
-}: React.ComponentProps<typeof Sidebar>) {
+}: React.ComponentProps<typeof Sidebar> & {
+  /** The organization's Console (AI Gateway) page. */
+  consoleHref: string;
+}) {
   const workspace = useWorkspace();
   const { organization, organizations, projects, documents } = workspace;
 
@@ -142,7 +147,16 @@ export default function WorkspaceSidebar({
     target: "_blank",
   };
 
+  // TODO(org-home-gate): Console entry added with the `/<org>` gate; revisit
+  // with the product catalogue / links cleanup.
+  const consoleNav = {
+    title: "Console",
+    icon: SquareTerminal,
+    url: consoleHref,
+  };
+
   const navSecondary = [
+    consoleNav,
     settings,
     // // TODO:
     // {
