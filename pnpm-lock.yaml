@@ -1564,8 +1564,8 @@ importers:
   packages/grida-cli:
     dependencies:
       '@grida/fx':
-        specifier: 0.5.0
-        version: 0.5.0
+        specifier: 0.5.1
+        version: 0.5.1
 
   packages/grida-cmath: {}
 
@@ -4045,30 +4045,30 @@ packages:
   '@grida/fonts@0.0.0':
     resolution: {integrity: sha512-ZuuuO4nfdNC5ImLZuwSyNYGVnFDa9H2fpG1hEY0vgp0rNR16ZkOH+IRARbq7EHOlnHTrMDlwDLpBQEGsLrTStw==}
 
-  '@grida/fx-darwin-arm64@0.5.0':
-    resolution: {integrity: sha512-2jK5ih4qdTg6FtAtE31AA+J9/wpcSv0ZmQJNRUHm+KQ8HlpZ50rfCJlWxMCOF2zAUtHIbulwy8BxPTwklsOzjg==}
+  '@grida/fx-darwin-arm64@0.5.1':
+    resolution: {integrity: sha512-wPiUprYvEL1YTKyJ0FJy8GHO9nIPFVP+YyXOcLscYFO/Vz0UwEc1mx9WwfGKiiJZAeKtJCIbz0DFwIKj8KQtNg==}
     cpu: [arm64]
     os: [darwin]
 
-  '@grida/fx-darwin-x64@0.5.0':
-    resolution: {integrity: sha512-l/TWInK3jUo0Q9ccFhdmTm80w+vM5XrsnYE8UihOUznLePmQwFLMhAyur7bTZnIezw5jPVEhR5ELmiwjScx6SQ==}
+  '@grida/fx-darwin-x64@0.5.1':
+    resolution: {integrity: sha512-AxFTDyEGSDwa/hybI58FrXRPCPnsvk6vQpOsxfzxicrp0lQOWwq37qk4HsZbBk7QXoGq50Bq/Vl01yu+GE+KrQ==}
     cpu: [x64]
     os: [darwin]
 
-  '@grida/fx-linux-arm64-gnu@0.5.0':
-    resolution: {integrity: sha512-cfHiDvTj2/fnjg9TsOkedkVfSe0eTAUlK6gMuTnOYX/1h81l5m4l3bPR3XtHm7rogz9VVJrcNpeItXgIcjQXKQ==}
+  '@grida/fx-linux-arm64-gnu@0.5.1':
+    resolution: {integrity: sha512-HpaU1+jHxi21s++JEWs8nd+tLkOtdJCiKA3O2Dga4f1/Edl6KF7UPhfbZvAGYbAz7IG17ftxXwmnc8Xq+/XUCw==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@grida/fx-linux-x64-gnu@0.5.0':
-    resolution: {integrity: sha512-Mt14aIg/zFQ0FXcxYYkBHIKryqhDRU2JiY8ua8pF+L06yS0fXnQrqguRaYbCq7Nc1oze2CSz8juJdybIz9j/QQ==}
+  '@grida/fx-linux-x64-gnu@0.5.1':
+    resolution: {integrity: sha512-Y4JIsP1MPoPu5z0m4+P3hnaRj6B9t21QLVDFDO5/+vEE94Im3zxJ7Tu+06JWTaIm38zGasfOpQeJvAZIzeDdug==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@grida/fx@0.5.0':
-    resolution: {integrity: sha512-f1Ke+1u8qSLY34VBwYbxReZzeFmCTHiI6jSnUtfIY/fHFItErBiAUSn35a8B4tmf/ZUwp0WaDOMhwAUjS+Fbyw==}
+  '@grida/fx@0.5.1':
+    resolution: {integrity: sha512-BOdU8APEfsMn0CIpX+vZRHdJzh65cb0yImcJ9FFtbR3Cwi4nkfW/ml9Mue/EDR9/qGcfSNkNGBhzeWl5Pdd76g==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -19613,24 +19613,24 @@ snapshots:
 
   '@grida/fonts@0.0.0': {}
 
-  '@grida/fx-darwin-arm64@0.5.0':
+  '@grida/fx-darwin-arm64@0.5.1':
     optional: true
 
-  '@grida/fx-darwin-x64@0.5.0':
+  '@grida/fx-darwin-x64@0.5.1':
     optional: true
 
-  '@grida/fx-linux-arm64-gnu@0.5.0':
+  '@grida/fx-linux-arm64-gnu@0.5.1':
     optional: true
 
-  '@grida/fx-linux-x64-gnu@0.5.0':
+  '@grida/fx-linux-x64-gnu@0.5.1':
     optional: true
 
-  '@grida/fx@0.5.0':
+  '@grida/fx@0.5.1':
     optionalDependencies:
-      '@grida/fx-darwin-arm64': 0.5.0
-      '@grida/fx-darwin-x64': 0.5.0
-      '@grida/fx-linux-arm64-gnu': 0.5.0
-      '@grida/fx-linux-x64-gnu': 0.5.0
+      '@grida/fx-darwin-arm64': 0.5.1
+      '@grida/fx-darwin-x64': 0.5.1
+      '@grida/fx-linux-arm64-gnu': 0.5.1
+      '@grida/fx-linux-x64-gnu': 0.5.1
 
   '@grida/tailwindcss-colors@4.0.1': {}
 
