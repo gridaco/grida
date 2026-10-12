@@ -55,7 +55,7 @@ import { resolve_next } from "@/host/url";
 const continuation = "A".repeat(43),
   source = "https://grida.example.test",
   consoleOrigin = "https://console.example.test";
-const destination = "/organizations/42/ai-gateway/requests/req_test1234";
+const destination = "/organizations/1/ai-gateway/requests/req_test1234";
 const resolved = {
   purpose: "switch",
   return_url: `${consoleOrigin}/auth/continue?continuation=${continuation}`,
@@ -169,12 +169,12 @@ describe("source account continuation", () => {
     },
     {
       ...resolved,
-      cancel_url: "https://foreign.test/organizations/42/billing",
+      cancel_url: "https://foreign.test/organizations/1/billing",
     },
     {
       ...resolved,
       cancel_url:
-        consoleOrigin + "/organizations/42/ai-gateway/keys?project_id=1",
+        consoleOrigin + "/organizations/1/ai-gateway/keys?project_id=1",
     },
     { ...resolved, cancel_url: consoleOrigin + destination + "#fragment" },
     { ...resolved, cancel_url: consoleOrigin + "/auth/logout" },
