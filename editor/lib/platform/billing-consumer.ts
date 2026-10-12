@@ -1,6 +1,7 @@
 // GRIDA-EE: billing — lazy, fixed consumer boundary to Platform billing.
 // GRIDA-SEC-010 / GRIDA-SEC-012 — user authority and workload credentials stay distinct.
 import "server-only";
+import { validOrganizationSlug } from "./console-destination";
 import type { credits } from "../billing/credits";
 
 export class BillingConsumerError extends Error {
@@ -42,12 +43,12 @@ export type BillingDestination =
   | { section: "purchase"; purchaseId: string };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export function billingDestination(
-  organizationId: number,
+  organizationSlug: string,
   destination: BillingDestination
 ): string {
-  if (!Number.isSafeInteger(organizationId) || organizationId <= 0)
+  if (!validOrganizationSlug(organizationSlug))
     throw new BillingConsumerError();
-  const base = `/organizations/${organizationId}/billing`;
+  const base = `/organizations/${organizationSlug}/billing`;
   if (destination.section === "billing") return base;
   if (destination.section === "upgrade") return `${base}/upgrade`;
   if (destination.section === "purchase" && uuid.test(destination.purchaseId))
@@ -55,13 +56,13 @@ export function billingDestination(
   throw new BillingConsumerError();
 }
 export function consoleBillingUrl(
-  organizationId: number,
+  organizationSlug: string,
   destination: BillingDestination,
   env: Environment = process.env
 ): string {
   return (
     configuredOrigin(env.GRIDA_PLATFORM_CONSOLE_ORIGIN, env) +
-    billingDestination(organizationId, destination)
+    billingDestination(organizationSlug, destination)
   );
 }
 export type CachedCredits = Omit<credits.Summary, "organization"> & {

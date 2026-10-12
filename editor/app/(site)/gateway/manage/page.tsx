@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@app/ui/components/alert";
 import OrganizationMembers from "@/app/(site)/organizations/[organization_name]/people/page";
 import OrganizationSettings from "@/app/(site)/organizations/[organization_name]/settings/profile/view";
 import NewOrganization from "@/app/(site)/organizations/new/form";
+import { organizationRoute } from "@/lib/platform/console-destination";
 import {
   consoleReturnURL,
   currentConsoleOrganization,
@@ -47,7 +48,8 @@ export default async function ManagePage({
           ),
         auth.user.id,
         input.organizationId,
-        input.intent === "settings"
+        input.intent === "settings",
+        organizationRoute(input.returnTo.split("?")[0])!.organization
       );
     } catch (error) {
       if (error instanceof ConsoleManageError && error.code === "forbidden")

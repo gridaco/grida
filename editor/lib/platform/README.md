@@ -7,6 +7,10 @@ Grida client adapters; financial policy and provider operations are not owned he
 - `canonical.ts` validates organization observations for server consumers.
 - `billing-consumer.ts` reads credit/plan projections and resolves Console links.
 - `billing-handoff.ts` preserves authenticated organization-specific navigation.
+  Console URLs use current unique `organization.name` slugs; permanent numeric
+  IDs remain the authorization and service API identity. The management handoff
+  rechecks that the requested locator belongs to that same organization.
+  Numeric-only names are valid, with no ID fallback or old-name redirect.
 - `native-credits.ts` preserves the installed clients' credit response shape.
 - `product-billing.ts` and `product-consumer.ts` retain admission and completion
   custody for native operations and accepted work.

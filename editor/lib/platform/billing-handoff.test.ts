@@ -46,7 +46,7 @@ it.each(["billing", "upgrade"] as const)(
   "hands off %s by canonical org, not a project or guessed organization",
   async (section) => {
     await expect(billingHandoff("acme", section)).rejects.toThrow(
-      `redirect:https://console.example.test/organizations/7/billing${section === "upgrade" ? "/upgrade" : ""}`
+      `redirect:https://console.example.test/organizations/acme/billing${section === "upgrade" ? "/upgrade" : ""}`
     );
     expect(state.queries).toEqual(["organization"]);
   }
@@ -66,12 +66,12 @@ it("retains an exact purchase resource across sign-in and console handoff", asyn
   );
   state.user = { id: "user-a" };
   await expect(billingHandoff("acme", "return", search)).rejects.toThrow(
-    `redirect:https://console.example.test/organizations/7/billing/purchases/${purchase}`
+    `redirect:https://console.example.test/organizations/acme/billing/purchases/${purchase}`
   );
 });
 it("released intent-only return preserves uncertainty and does not select a purchase", async () => {
   expect(await billingHandoff("acme", "return", { intent: "topup" })).toEqual({
-    url: "https://console.example.test/organizations/7/billing",
+    url: "https://console.example.test/organizations/acme/billing",
     name: "acme",
   });
   expect(state.queries).toEqual(["organization"]);
