@@ -85,8 +85,7 @@ export async function generateAiImage(
         quality: input.quality,
       });
 
-      const binding = ai.image.binding(model.card, "vercel")!;
-      const originProvider = binding.id.split("/")[0]!;
+      const originProvider = model.card.id.split("/")[0]!;
       const generation = await generateImage({
         prompt: input.prompt,
         size:

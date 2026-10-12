@@ -1,9 +1,9 @@
-// GRIDA-EE: billing — see ee-billing
+// GRIDA-GG: display estimate — GG owns admission and actual charging.
 /**
  * Image-generation cost math — the single mills computation shared by
- * every billed image surface (web server action + hosted
- * `/api/v1/ai/images/generations`). A billing-correctness surface: do
- * not fork per call site.
+ * image surface (web server action + hosted `/api/v1/ai/images/generations`).
+ * This product-card estimate is not a reservation or a settled expense receipt.
+ * GG uses its own admitted tariff and provider evidence for actual charging.
  */
 import "server-only";
 
@@ -22,7 +22,7 @@ const QUALITY_TIERS = new Set(["high", "medium", "low"]);
  *   `avg_cost_usd` — the documented pricing-anchor behavior for
  *   in-envelope but off-preset sizes.
  * - `per_token` — fallback to the card's documented average approximation.
- *   The billing middleware prefers Vercel AI Gateway's actual response cost when present.
+ *   GG's authoritative charge metadata is separate from this display estimate.
  */
 export function computeImageCostMills(
   card: ai.image.ImageModelCard,

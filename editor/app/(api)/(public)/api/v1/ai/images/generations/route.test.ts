@@ -372,12 +372,12 @@ describe("POST /api/v1/ai/images/generations", () => {
     expect(mockedCompletion).not.toHaveBeenCalled();
   });
 
-  it("refuses a model without a Vercel AI Gateway binding before billing", async () => {
+  it("delegates a listed product model to GG without requiring a Vercel binding", async () => {
     vi.mocked(ai.image.binding).mockReturnValueOnce(null);
     const { token } = await signGgToken("user-1", 7);
     const res = await POST(request({ model_id: CARD.id, prompt: "x" }, token));
-    expect(res.status).toBe(404);
-    expect(h.imageCalls).toBe(0);
+    expect(res.status).toBe(200);
+    expect(h.imageCalls).toBe(1);
     expect(mockedAdmission).not.toHaveBeenCalled();
     expect(mockedCompletion).not.toHaveBeenCalled();
   });

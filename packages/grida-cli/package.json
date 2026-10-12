@@ -1,8 +1,21 @@
 {
   "name": "grida",
-  "version": "0.5.0",
+  "version": "0.5.2",
   "private": false,
   "description": "The Grida command line: account access and tools, independent of Desktop.",
+  "keywords": [
+    "3d",
+    "ai",
+    "audio",
+    "cli",
+    "fx",
+    "generative-ai",
+    "grida",
+    "image-generation",
+    "text-to-speech",
+    "video-generation",
+    "workflow"
+  ],
   "homepage": "https://grida.co/docs/cli",
   "license": "Apache-2.0",
   "repository": "https://github.com/gridaco/grida",
@@ -24,7 +37,7 @@
     "typecheck": "cargo check --manifest-path ../../Cargo.toml --locked -p grida-cli"
   },
   "dependencies": {
-    "@grida/fx": "0.2.0"
+    "@grida/fx": "0.5.1"
   },
   "engines": {
     "node": ">=24.0.0"

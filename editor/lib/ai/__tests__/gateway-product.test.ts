@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { generateText, generateImage, Output, jsonSchema } from "ai";
 import {
   gatewayFetch,
+  gatewayWait,
   gatewayLanguageModel,
   gatewayImageModel,
   gatewayCostMills,
@@ -186,6 +187,25 @@ describe("trusted GG product adapter", () => {
       chargedMills: null,
     });
     expect(submitted).toHaveLength(1);
+  });
+  it("cancels an in-flight status read without submitting paid work again", async () => {
+    const controller = new AbortController();
+    vi.mocked(fetch).mockImplementation(async (_url, init) => {
+      const signal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        });
+      });
+    });
+    const waiting = gatewayWait(context, requestId, controller.signal);
+    controller.abort();
+    await expect(waiting).rejects.toBeInstanceOf(GatewayProductError);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain(
+      `/jobs/${requestId}`
+    );
+    expect(submitted).toHaveLength(0);
   });
   it.each([0, -1, NaN, 1.5, Number.MAX_SAFE_INTEGER + 1])(
     "rejects invalid organization %s before network",

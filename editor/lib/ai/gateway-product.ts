@@ -134,9 +134,10 @@ export type GatewayJob = {
 };
 export async function gatewayJob(
   ctx: GatewayContext,
-  id: string
+  id: string,
+  signal?: AbortSignal
 ): Promise<GatewayJob> {
-  const response = await gatewayFetch(ctx, `/v1/jobs/${id}`);
+  const response = await gatewayFetch(ctx, `/v1/jobs/${id}`, { signal });
   const value = await response.json();
   if (
     value.id !== id ||
@@ -155,7 +156,7 @@ export async function gatewayWait(
   const deadline = Date.now() + 600_000;
   while (Date.now() < deadline) {
     signal?.throwIfAborted();
-    const job = await gatewayJob(ctx, id);
+    const job = await gatewayJob(ctx, id, signal);
     if (job.result_status === "available") return job;
     if (
       ["expired", "unavailable"].includes(job.result_status) ||

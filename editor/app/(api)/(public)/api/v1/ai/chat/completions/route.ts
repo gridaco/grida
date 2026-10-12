@@ -56,8 +56,8 @@ export async function POST(request: Request) {
     if (!p.ok) return p.res;
     const req = p.data;
 
-    // Allowlist BEFORE any provider call — Vercel AI Gateway accepts arbitrary
-    // ids; an unlisted one must 404 here, not 500 at cost-card lookup.
+    // Preserve the product model allowlist before GG dispatch. Unlisted IDs
+    // return the native model-not-found response without a paid submission.
     if (!isHostedTextModel(req.model)) return modelNotFound(req.model);
 
     const decoded = decodeRequest(req);
@@ -78,8 +78,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // The gate awaits inside doStream (middleware) — a blocked org
-    // throws here, before any SSE bytes are written.
+    // GG admission completes inside doStream before any SSE bytes are written.
+    // A blocked organization still receives the native error response.
     const { stream } = await model.doStream(callOptions);
     return new Response(
       stream.pipeThrough(

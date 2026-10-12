@@ -687,10 +687,9 @@ export namespace methods {
   }
 
   /**
-   * Resolve a model identifier to a billing-wrapped `ImageModel` plus
-   * its cost card. The returned `model` carries the seam middleware;
-   * callers MUST pass `providerOptions.grida = { organizationId,
-   * feature, costMills }` when invoking `generateImage`.
+   * Resolve a product model identifier to its GG-backed `ImageModel` and
+   * display card. Callers pass `providerOptions.grida = { organizationId,
+   * feature }`; GG owns model validation, reservation and actual charging.
    */
   export function getSDKImageModel(
     model: ai.image.ProviderModel | ai.image.ImageModelId | string
@@ -700,12 +699,6 @@ export namespace methods {
   } | null {
     const card = ai.image.findImageModelCard(model);
     if (!card) return null;
-    // Call Vercel AI Gateway by its binding id, never the canonical card
-    // id. They usually coincide, but not always — the Gemini card's
-    // canonical key is the `-preview` alias while Vercel AI Gateway's current id
-    // is the graduated one. Video already resolves this way.
-    const binding = ai.image.binding(card, "vercel");
-    if (!binding) return null;
     return { model: grida.imageModel(card.id), card };
   }
 

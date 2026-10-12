@@ -66,11 +66,6 @@ export async function POST(request: Request) {
 
     const card = ai.image.findImageModelCard(req.model_id);
     if (!card) return modelNotFound(req.model_id);
-    // Hosted serving goes through Vercel AI Gateway — a card without a
-    // matching binding is not servable here (the sidecar's BYOK
-    // adapters cover the rest).
-    const binding = ai.image.binding(card, "vercel");
-    if (!binding) return modelNotFound(req.model_id);
     if (
       req.quality &&
       card.quality &&
@@ -79,8 +74,8 @@ export async function POST(request: Request) {
       return invalidRequest("Unsupported quality for this model.");
     }
 
-    // An explicit mode must never become an opaque, billed success when the
-    // Vercel AI Gateway binding has not exposed the native control.
+    // Preserve the product card's verified background-control capability.
+    // GG independently validates the selected operation before paid dispatch.
     // Auto is the legacy default.
     const background = req.background === "auto" ? undefined : req.background;
     if (background && !ai.image.supportsTransparentBackground(card, "vercel")) {
@@ -107,8 +102,8 @@ export async function POST(request: Request) {
 
     // Keep the native quality/background input shape. The GG adapter maps
     // these options to the selected operation; GG owns rating and settlement.
-    const slash = binding.id.indexOf("/");
-    const originProvider = slash > 0 ? binding.id.slice(0, slash) : undefined;
+    const slash = card.id.indexOf("/");
+    const originProvider = slash > 0 ? card.id.slice(0, slash) : undefined;
     const quality = req.quality || undefined;
     const imageOptions = {
       ...(quality ? { quality } : {}),
