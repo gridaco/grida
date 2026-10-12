@@ -37,6 +37,10 @@ historical customer/provider identities and obligations remain retained.
 
 ## KI-BILL-004 — Image-cost fallback does not reconcile token usage
 
+**M2 status:** migrated generation is rated and settled by GG; Grida's catalogue
+is a display estimate, not a fallback charge. This issue remains relevant to
+accepted pre-transition receipts and any retained native consumer.
+
 Token-priced images can vary by input, cache, quality, size, and output usage.
 The Grida producer prefers a valid provider response cost; a fixed fallback cannot
 reconstruct missing receipt detail. [PR #1031](https://github.com/gridaco/grida/pull/1031)
@@ -48,6 +52,10 @@ migration does not establish them. Current implementation references are the
 [image pricing](https://github.com/gridaco/grida/blob/main/editor/lib/ai/image-cost.ts).
 
 ## KI-BILL-005 — Tripo jobs without an observed terminal receipt need reconciliation
+
+**M2 status:** new migrated work uses GG's durable original-job observation and
+financial recovery. Accepted native jobs retain their historical obligation;
+the migration does not invent a terminal receipt for them or resubmit them.
 
 Provider execution can outlive a synchronous invocation. An observed terminal
 receipt can be billed independently of later asset delivery, but process death or

@@ -13,7 +13,7 @@ import {
  *
  * `GRIDA-SEC-003` — see [SECURITY.md](../../../SECURITY.md).
  *
- * This file is the only place in the editor allowed to import raw AI
+ * This server seam and its narrow adapters are the only editor modules importing AI
  * provider SDKs (`replicate`, `openai`, `@ai-sdk/*`, `@anthropic-ai/sdk`).
  * Enforced by oxlint `no-restricted-imports` and the CI audit script.
  *
@@ -24,7 +24,8 @@ import {
  *   - `methods.upscale` / `methods.removeBackground` / `methods.generateMusic`
  *     — named business-logic wrappers.
  *
- * Per call: gate-check → durable admission → run → durable usage custody. See
+ * GG owns text/image/video/3D execution and settlement. Retained Replicate calls
+ * use the native receipt seam. See
  * [docs/wg/platform/billing/ai-credits.md](../../../docs/wg/platform/billing/ai-credits.md).
  *
  * `organizationId` MUST come from `requireOrganizationId` —
@@ -37,15 +38,18 @@ import {
  * `requireOrganizationId` always run. GRIDA-SEC-003 — see SECURITY.md.
  */
 
-import type {
-  LanguageModelMiddleware,
-  LanguageModel,
-  ImageModelMiddleware,
-  ImageModel,
-} from "ai";
-import { embed, experimental_generateVideo, wrapProvider } from "ai";
+import type { LanguageModel, ImageModel } from "ai";
+import { embed } from "ai";
+import {
+  gatewayLanguageModel,
+  gatewayImageModel,
+  gatewayFetch,
+  gatewayWait,
+  GatewayProductError,
+} from "./gateway-product";
+import { randomUUID } from "node:crypto";
+import { GgThreeDHttp } from "./gg-three-d-http";
 import { catalog as ai_models } from "@grida/ai-models/grida";
-import type { GridaCallProviderOptions } from "@grida/ai-models";
 import type { VideoGenerateRequest, VideoGenerateResult } from "@grida/agent";
 import Replicate from "replicate";
 import OpenAI from "openai";
@@ -62,8 +66,6 @@ import {
   type ModelTier,
 } from "./models";
 import { ai } from "./ai";
-import { computeImageCostMills } from "./image-cost";
-import { nativeImageReservationPolicy as imageReservation } from "./native-image-reservation.generated";
 import {
   type AiErrorResponse,
   billingErrorToAiError,
@@ -184,9 +186,9 @@ export type { ModelTier };
 // — the one package both this seam and the framework-free `@grida/agent` share
 // — so every billed call site (editor OR package) is compiled against ONE key
 // definition. Re-exported here so editor call sites keep importing it from the
-// seam; `extractContext` (below) reads the same shape via `GridaProviderOptions`.
+// GG adapter validates the same organization and feature fields at runtime.
 export { gridaProviderOptions } from "@grida/ai-models";
-export type { GridaCallProviderOptions };
+export type { GridaCallProviderOptions } from "@grida/ai-models";
 
 // ===========================================================================
 // Core seam — admission → run → completion
@@ -256,128 +258,6 @@ function executionBounds(ctx: GridaCallContext & { costMills?: number }) {
   // Unqualified bounds request only the deployed native policy. Platform rejects
   // that policy for every selected shared account; no average becomes a hold.
   return {};
-}
-
-/** A conservative token ceiling, including cache-write and long-context rates.
- * Unknown cost cards fail before dispatch. This reserves the full input context;
- * successful settlement releases the unused maximum. */
-export function textExecutionBounds(modelId: string, maxOutputTokens?: number) {
-  const spec = resolveModelSpec(modelId),
-    rates = spec.cost;
-  const output = maxOutputTokens ?? spec.outputLimit;
-  if (
-    !Number.isSafeInteger(spec.contextWindow) ||
-    spec.contextWindow <= 0 ||
-    !Number.isSafeInteger(spec.outputLimit) ||
-    spec.outputLimit <= 0 ||
-    !Number.isSafeInteger(output) ||
-    output <= 0 ||
-    output > spec.outputLimit
-  )
-    throw new ProductBillingError("invalid_cost");
-  const inputRate =
-    Math.max(
-      rates.input,
-      rates.cacheRead ?? rates.input,
-      rates.cacheWrite ?? rates.input
-    ) * Math.max(1, rates.longContext?.inputMultiplier ?? 1);
-  const outputRate =
-    rates.output * Math.max(1, rates.longContext?.outputMultiplier ?? 1);
-  if (
-    !Number.isFinite(inputRate) ||
-    !Number.isFinite(outputRate) ||
-    inputRate < 0 ||
-    outputRate < 0
-  )
-    throw new ProductBillingError("invalid_cost");
-  // Upward whole-mill authorization is conservative; receipts keep fractional mills.
-  const amount = exactCostMills(
-    Math.ceil((spec.contextWindow * inputRate + output * outputRate) / 1000)
-  );
-  if (Number(amount) <= 0) throw new ProductBillingError("invalid_cost");
-  return {
-    authorizedMills: amount,
-    expenseBoundMills: amount,
-    tariffRevision: productDigest({
-      model: modelId,
-      rates,
-      contextWindow: spec.contextWindow,
-      outputLimit: output,
-    }),
-  };
-}
-
-/** Native-only forecast with headroom, not a provider-enforced expense cap.
- * Platform permits one unresolved estimated image call per organization. GG
- * uses its own strict policy. Actual provider receipts determine settlement. */
-export function imageExecutionBounds(
-  modelId: string,
-  n: number,
-  size: string | undefined,
-  options: Record<string, unknown> | undefined,
-  referenceCount = 0
-) {
-  const card =
-    ai.image.findImageModelCard(modelId) ??
-    ai.image
-      .listed_models()
-      .find((v) => ai.image.binding(v, "vercel")?.id === modelId);
-  if (
-    !card ||
-    !Number.isSafeInteger(n) ||
-    n < 1 ||
-    !Number.isSafeInteger(referenceCount) ||
-    referenceCount < 0
-  )
-    throw new ProductBillingError("invalid_cost");
-  const binding = ai.image.binding(card, "vercel");
-  if (
-    !binding ||
-    !(imageReservation.models as readonly string[]).includes(binding.id)
-  )
-    return {};
-  const dimensions = size?.match(/^(\d+)x(\d+)$/);
-  if (size && !dimensions) throw new ProductBillingError("invalid_cost");
-  const width = dimensions ? Number(dimensions[1]) : undefined;
-  const height = dimensions ? Number(dimensions[2]) : undefined;
-  const area =
-    width && height ? Math.max(1, (width * height) / (1024 * 1024)) : 1;
-  if (width === 0 || height === 0 || !Number.isFinite(area))
-    throw new ProductBillingError("invalid_cost");
-  const provider = options?.[binding.id.split("/")[0]!];
-  const quality =
-    provider &&
-    typeof provider === "object" &&
-    "quality" in provider &&
-    typeof provider.quality === "string"
-      ? provider.quality
-      : undefined;
-  const forecast = computeImageCostMills(card, { n, width, height, quality });
-  const held = Math.ceil(
-    Math.max(
-      imageReservation.minimum_mills_per_output * n,
-      forecast * imageReservation.estimate_multiplier * area
-    ) +
-      referenceCount * n * imageReservation.reference_allowance_mills_per_output
-  );
-  if (!Number.isSafeInteger(held) || held <= 0)
-    throw new ProductBillingError("invalid_cost");
-  const amount = exactCostMills(held);
-  return {
-    authorizedMills: amount,
-    expenseBoundMills: amount,
-    expensePolicy: imageReservation.id,
-    tariffRevision: productDigest({
-      model: binding.id,
-      policy: imageReservation.sha256,
-      pricing: card.pricing,
-      forecast,
-      n,
-      size,
-      quality,
-      referenceCount,
-    }),
-  };
 }
 
 // ===========================================================================
@@ -457,169 +337,12 @@ export function costMillsFromTokenUsage(
 // Vercel AI SDK adapter — `grida` provider
 // ===========================================================================
 
-// Read-side view: what the billing middleware defensively reads back off
-// `providerOptions.grida`. DERIVED from the producer contract so the field
-// NAMES have a single definition — rename `organizationId` in
-// `GridaCallProviderOptions` and both the builder (produce side) and
-// `extractContext` (read side) stop compiling in lockstep, which is exactly the
-// producer↔consumer link whose absence let a snake_cased key ship. All-optional
-// because the middleware validates presence/shape at runtime (see extractContext).
-type GridaProviderOptions = Partial<GridaCallProviderOptions>;
-
-type ExtractedContext = GridaCallContext & { costMills?: number };
-
-function readGridaOptions(
-  providerOptions: unknown
-): GridaProviderOptions | undefined {
-  if (!providerOptions || typeof providerOptions !== "object") return undefined;
-  const raw = (providerOptions as Record<string, unknown>).grida;
-  if (!raw || typeof raw !== "object") return undefined;
-  return raw as GridaProviderOptions;
-}
-
-function extractContext(
-  modelId: string,
-  providerOptions: unknown
-): ExtractedContext {
-  const g = readGridaOptions(providerOptions);
-  if (g && typeof g.organizationId === "number") {
-    return {
-      organizationId: g.organizationId,
-      feature: g.feature || "ai-sdk",
-      model_id: modelId,
-      transactionId:
-        typeof g.transactionId === "string" ? g.transactionId : undefined,
-      costMills:
-        typeof g.costMills === "number" && g.costMills >= 0
-          ? g.costMills
-          : undefined,
-      // Preserve the published caller option; durable custody is now required
-      // for every paid call regardless of this display-oriented preference.
-      awaitIngest:
-        typeof g.awaitIngest === "boolean" ? g.awaitIngest : undefined,
-    };
-  }
-  throw new MissingOrgIdError(
-    `AI SDK call missing providerOptions.grida.organizationId (model=${modelId}). ` +
-      `Pass { providerOptions: { grida: { organizationId, feature } } } to the SDK call.`
-  );
-}
-
-const languageModelMiddleware: LanguageModelMiddleware = {
-  specificationVersion: "v3",
-
-  wrapGenerate: async ({ doGenerate, params, model }) => {
-    const ctx = {
-      ...extractContext(model.modelId, params.providerOptions),
-      ...textExecutionBounds(model.modelId, params.maxOutputTokens),
-      requestDigest: productDigest(params),
-    };
-    return withTransaction(ctx, async () => {
-      const result = await doGenerate();
-      const costMills = costMillsFromTokenUsage(ctx.model_id, result.usage);
-      return { result, costMills };
-    });
-  },
-
-  wrapStream: async ({ doStream, params, model }) => {
-    const ctx = {
-      ...extractContext(model.modelId, params.providerOptions),
-      ...textExecutionBounds(model.modelId, params.maxOutputTokens),
-      requestDigest: productDigest(params),
-    };
-    // Admission and dispatch commit before the upstream connection opens.
-    // Only reliable final usage completes custody; interrupted streams
-    // remain dispatched with an unknown outcome for reconciliation.
-    const billing = platformProductBilling();
-    const execution = await billing.begin({
-      ...ctx,
-      ...executionBounds(ctx),
-      requestDigest: ctx.requestDigest,
-    });
-    const upstream = await doStream();
-    let finalCostMills: number | null = null;
-    const tapped = upstream.stream.pipeThrough(
-      new TransformStream({
-        async transform(part: { type: string; usage?: unknown }, controller) {
-          if (part.type === "finish" && part.usage) {
-            finalCostMills = costMillsFromTokenUsage(
-              ctx.model_id,
-              part.usage as Parameters<typeof costMillsFromTokenUsage>[1]
-            );
-            await billing.complete(execution, finalCostMills, {
-              usage: part.usage,
-            });
-          }
-          controller.enqueue(part);
-        },
-      })
-    );
-    return { ...upstream, stream: tapped };
-  },
+// GG owns admission, provider dispatch, usage custody and shared-credit settlement.
+// Do not wrap these calls in the retained native receipt seam.
+const wrappedProvider = {
+  languageModel: gatewayLanguageModel,
+  imageModel: gatewayImageModel,
 };
-
-const imageModelMiddleware: ImageModelMiddleware = {
-  specificationVersion: "v3",
-
-  // Prefer Vercel AI Gateway's response receipt (USD), which accounts for actual quality,
-  // dimensions and cache use. Caller pricing remains a fallback for responses
-  // without a receipt only on unselected accounts; aggregate image token counts
-  // cannot price mixed inputs. Shared accounts retain their hold when unknown.
-  // https://vercel.com/academy/ai-gateway/ai-gateway-pricing
-  wrapGenerate: async ({ doGenerate, params, model }) => {
-    const ctx = {
-      ...extractContext(model.modelId, params.providerOptions),
-      requestDigest: productDigest(params),
-      ...imageExecutionBounds(
-        model.modelId,
-        params.n,
-        params.size,
-        params.providerOptions,
-        (params.files?.length ?? 0) + (params.mask ? 1 : 0)
-      ),
-    };
-    if (
-      typeof ctx.costMills !== "number" ||
-      !Number.isFinite(ctx.costMills) ||
-      ctx.costMills <= 0
-    )
-      throw new ProductBillingError("invalid_cost");
-    const fallbackMills = ctx.costMills;
-    return withTransaction(ctx, async (_id, execution) => {
-      const result = await doGenerate();
-      const vercelAiGatewayMetadata = result.providerMetadata?.gateway;
-      const rawCost =
-        vercelAiGatewayMetadata &&
-        typeof vercelAiGatewayMetadata === "object" &&
-        "cost" in vercelAiGatewayMetadata
-          ? vercelAiGatewayMetadata.cost
-          : undefined;
-      const reportedUsd =
-        typeof rawCost === "number"
-          ? rawCost
-          : typeof rawCost === "string" && rawCost.trim() !== ""
-            ? Number(rawCost)
-            : NaN;
-      const reportedMills = reportedUsd * 1000;
-      // A legitimate zero receipt is not missing. Never turn malformed data
-      // into free usage, or multiply a per-call receipt by the image count.
-      const validReceipt = Number.isFinite(reportedMills) && reportedMills >= 0;
-      // A shared hold is a reservation, never evidence of the actual charge.
-      // Missing provider evidence keeps dispatched work unresolved and held.
-      // Preserve the deployed estimate fallback only for unselected accounts.
-      if (!validReceipt && execution.claim.policy_version === "shared-ai-v1")
-        throw new ProductBillingError("invalid_cost");
-      const costMills = validReceipt ? reportedMills : fallbackMills;
-      return { result, costMills };
-    });
-  },
-};
-
-const wrappedProvider = wrapProvider({
-  provider: vercelAiGateway,
-  languageModelMiddleware,
-  imageModelMiddleware,
-});
 
 export type GridaProvider = ((modelId: string) => LanguageModel) & {
   languageModel(modelId: string): LanguageModel;
@@ -627,8 +350,8 @@ export type GridaProvider = ((modelId: string) => LanguageModel) & {
 };
 
 /**
- * The seam's public model provider. Default: the billing-wrapped Vercel
- * AI Gateway (admission + completion middleware). When a `BYOK_*` key is set this
+ * The seam's public model provider. Default: Grida Gateway, which owns
+ * admission, provider execution and settlement. When a `BYOK_*` key is set this
  * is a bare provider that bypasses billing — see the BYOK carve-out in
  * this file's header / `models.ts` / SECURITY.md GRIDA-SEC-003.
  *
@@ -638,7 +361,7 @@ export type GridaProvider = ((modelId: string) => LanguageModel) & {
  */
 // GRIDA-SEC-003: BYOK is text-path-only. Only the LANGUAGE provider
 // swaps to the bare BYOK provider (no billing middleware). Image models
-// stay on the billing-wrapped provider so SDK image generation is still
+// stay on GG so SDK image generation is still
 // gated + metered even under BYOK — matching SECURITY.md / billing.md.
 const activeLanguageProvider = byok ?? wrappedProvider;
 
@@ -654,7 +377,7 @@ export const grida: GridaProvider = gridaFn;
 
 /**
  * Seam-wrapped tier helper. Returns a `LanguageModel` whose calls flow
- * through billing middleware — pass `providerOptions.grida` at the call site.
+ * through GG — pass `providerOptions.grida` at the call site.
  */
 export function model(tier: ModelTier) {
   return grida(catalog[tiers[tier]].id);
@@ -983,21 +706,13 @@ export namespace methods {
     // is the graduated one. Video already resolves this way.
     const binding = ai.image.binding(card, "vercel");
     if (!binding) return null;
-    return { model: grida.imageModel(binding.id), card };
+    return { model: grida.imageModel(card.id), card };
   }
 
   /**
-   * Hosted video generation — gate → `experimental_generateVideo` via
-   * the raw Vercel AI Gateway provider → completion. Explicit `withTransaction` because
-   * `wrapProvider` has no video middleware (unlike text/image).
-   *
-   * Billing is **pre-priced by requested duration** against the Vercel AI Gateway
-   * binding's `(resolution-label, audio-mode)` per-second rate — the
-   * same pre-computed-cost pattern as every Replicate/image call.
-   * Actual output duration may differ slightly (bounded by the card's
-   * max); documented approximation, reconcilable later. The pricing
-   * keys double as the provider's support matrix: an unpriced
-   * `(label, mode)` pair is an invalid request, not a $0 call.
+   * Hosted video generation uses one GG submission and original-job observation.
+   * GG owns reservation, tariff snapshot and settlement. Grida retains the native
+   * DTO and bounded output download; failures cannot authorize regeneration.
    */
   export async function generateVideo(
     organizationId: number,
@@ -1063,7 +778,6 @@ export namespace methods {
         `resolution "${resolutionLabel}" (${audioMode}) is not served for "${card.id}"`
       );
     }
-    const costMills = ai.toMills(rate * duration);
 
     // Text-to-video only in v1 — the SDK's image input takes raw bytes
     // (`DataContent`), and fetching a caller-supplied URL server-side
@@ -1076,43 +790,66 @@ export namespace methods {
       );
     }
 
-    return withTransaction(
+    if (req.fps !== undefined)
+      throw new InvalidAiRequestError(
+        "fps is not supported by the hosted video operation"
+      );
+    const context = { organizationId, feature: "v1/ai/video" };
+    const response = await gatewayFetch(
+      context,
+      "/v1/videos",
       {
-        organizationId,
-        feature: "v1/ai/video",
-        model_id: card.id,
-        requestDigest: productDigest(req),
-        authorizedMills: exactCostMills(ai.toMills(rate * card.max_duration)),
-        expenseBoundMills: exactCostMills(ai.toMills(rate * card.max_duration)),
-        tariffRevision: productDigest({
+        method: "POST",
+        body: JSON.stringify({
           model: card.id,
-          resolution: resolutionLabel,
-          audioMode,
-          rate,
-          max_duration: card.max_duration,
+          prompt: req.prompt,
+          aspectRatio: aspect_ratio,
+          duration,
+          seed: req.seed,
+          generateAudio: card.default.audio,
+          ...(card.id === "google/veo-3.1-lite"
+            ? { resolution: req.resolution }
+            : { providerOptions: { gg: { resolutionTier: resolutionLabel } } }),
         }),
       },
-      async () => {
-        const generation = await experimental_generateVideo({
-          model: vercelAiGateway.videoModel(binding.id),
-          prompt: req.prompt,
-          aspectRatio: aspect_ratio as `${number}:${number}`,
-          resolution: req.resolution as `${number}x${number}` | undefined,
-          duration,
-          fps: req.fps,
-          seed: req.seed,
-        });
-        const result: VideoGenerateResult = {
-          model_id: card.id,
-          provider_id: "vercel",
-          videos: generation.videos.map((file) => ({
-            base64: file.base64,
-            media_type: file.mediaType,
-          })),
-        };
-        return { result, costMills };
-      }
+      randomUUID()
     );
+    const submitted = await response.json();
+    if (
+      typeof submitted.id !== "string" ||
+      !/^req_[A-Za-z0-9_-]+$/.test(submitted.id)
+    )
+      throw new GatewayProductError(502, "invalid_response");
+    const job = await gatewayWait(context, submitted.id);
+    const references = job.result?.videos;
+    if (!Array.isArray(references) || references.length !== 1)
+      throw new GatewayProductError(502, "invalid_response", job.id);
+    const videos = await Promise.all(
+      references.map(
+        async (reference: { url: string; media_type?: string }) => {
+          // Product result delivery remains Grida-owned and credential-free. The
+          // existing transport pins DNS, bounds bytes and rejects private targets.
+          try {
+            const result =
+              await GgThreeDHttp.productAssets().downloadProviderAsset(
+                new URL(reference.url),
+                { max_bytes: 256 * 1024 * 1024 }
+              );
+            return {
+              base64: Buffer.from(result.data).toString("base64"),
+              media_type: reference.media_type ?? "video/mp4",
+            };
+          } catch {
+            throw new GatewayProductError(
+              502,
+              "result_download_failed",
+              job.id
+            );
+          }
+        }
+      )
+    );
+    return { model_id: card.id, provider_id: "gg", videos };
   }
 }
 

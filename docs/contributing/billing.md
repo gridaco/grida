@@ -9,7 +9,7 @@ format: md
 
 Platform owns subscriptions, payments, credit accounts, financial projections,
 and billing operations. Grida owns Supabase identity and organizations, product
-execution receipts, and consumers of Platform billing. The Grida checkout does
+assets, retained native execution receipts, and consumers of Platform billing. The Grida checkout does
 not run a second financial engine.
 
 ## Local Grida development
@@ -33,9 +33,8 @@ the contributor directly; this text path has no Platform credit gate or usage
 charge. Authentication and organization resolution still apply. Catalog model
 IDs are unchanged, so choose IDs accepted by the selected provider.
 
-Contributor BYOK selects only the text/chat provider. Funded image, video,
-audio, and 3D operations need Platform admission and their server provider
-configuration. Never set contributor `BYOK_*` on a hosted or preview deployment:
+Contributor BYOK selects only the text/chat provider. Funded text, image, video and selected 3D operations use GG server authority;
+retained Replicate audio/tools use native Platform admission. Never set contributor `BYOK_*` on a hosted or preview deployment:
 the override is instance-wide. See [the AI trust boundary](https://github.com/gridaco/grida/blob/main/SECURITY.md#grida-sec-003--ai-seam-org-id-trust-boundary).
 
 ## Billing integration
@@ -49,9 +48,10 @@ not select the retired Grida writer or stop unrelated routes from loading.
   after current Grida membership verification.
 - Native credit reads retain the published DTO and unknown-versus-zero balance
   behavior. A display observation never authorizes paid execution.
-- Paid product calls obtain a fresh Platform admission, then persist their
-  source claim, dispatch transition, exact completion receipt, and usage outbox.
-  Unknown provider outcomes require reconciliation before another dispatch.
+- Migrated GG calls obtain financial admission inside GG and never also create
+  a native receipt. Retained Replicate calls and accepted old work preserve their
+  source claim, dispatch transition, completion receipt and usage outbox.
+  Unknown provider outcomes require reconciliation; do not repeat accepted work.
 - Existing `/webhooks/stripe` and `/webhooks/metronome` URLs remain
   signature-verified delivery endpoints. They preserve event custody before
   acknowledging delivery; they do not apply source financial projectors.
@@ -70,12 +70,31 @@ and Development. Neither prefix selects an environment.
 
 | Consumer                 | Configuration                                                    | Selection                                                                                                           |
 | ------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Funded Vercel AI Gateway | `GG_VERCEL_AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN`            | A nonblank GG key selects explicit funded authority; absent/blank preserves platform OIDC. No generic-key fallback. |
+| Library Vercel provider  | `GG_VERCEL_AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN`            | A nonblank GG key selects explicit funded authority; absent/blank preserves platform OIDC. No generic-key fallback. |
 | Funded Replicate         | `GG_REPLICATE_API_TOKEN`                                         | Required for the affected operation; no unprefixed or BYOK fallback.                                                |
-| Funded Tripo             | `GG_TRIPO_API_KEY`                                               | Required for the affected operation; no generic or BYOK fallback.                                                   |
+| Tripo upload preparation | `GG_TRIPO_API_KEY`                                               | Required for free presign preparation in the same Tripo account as GG; no BYOK fallback.                            |
 | Contributor text         | `BYOK_OPENROUTER_API_KEY`, then `BYOK_VERCEL_AI_GATEWAY_API_KEY` | Nonblank contributor keys select direct contributor spending.                                                       |
 | Library embeddings       | Existing shared provider selection                               | Unbilled internal operations; sharing a provider key does not create a customer charge.                             |
 | OpenAI model discovery   | `OPENAI_API_KEY`                                                 | Nonbillable model listing.                                                                                          |
+
+Migrated generation requires server-only `GRIDA_AI_GATEWAY_ORIGIN`,
+`GRIDA_AI_GATEWAY_KEY_ID` and `GRIDA_AI_GATEWAY_TOKEN`. These are a dedicated
+product workload credential, **not** a customer's `sk-gg` API key or provider key.
+Missing configuration fails closed; it does not switch back to direct generation.
+Local HTTP is allowed only for loopback and an explicit
+`GRIDA_AI_GATEWAY_ALLOW_LOCAL=1`; never enable that on a hosted deployment.
+
+The free Grida contract lane is:
+
+```sh
+pnpm --filter editor exec vitest run --config vitest.platform.config.ts
+pnpm --filter editor test:api
+```
+
+It uses synthetic credentials and HTTP fixtures with dotenv loading disabled.
+`vitest.gateway.config.ts` is a paired SDK lane: the caller must supply a running
+local GG fixture, organization and synthetic server credential; it does not
+provision services, load real keys or call paid providers by itself.
 
 Keep Vercel's OIDC lifecycle intact; never turn `VERCEL_OIDC_TOKEN` into a static
 secret. Installed CLI/Desktop credentials are separate: the native provider ID

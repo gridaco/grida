@@ -167,8 +167,8 @@ asymmetric DoS-by-billing attack.
 **Why it's specifically risky here.** AI route handlers and server
 actions sit on internal/private surfaces, but they are still HTTP
 endpoints reachable by any authenticated user. Org membership on product data
-reads does not by itself authorize AI spending. The seam obtains fresh Platform
-admission and retains a source execution receipt; explicit producer membership
+reads does not by itself authorize AI spending. GG obtains fresh shared-credit admission for migrated execution; retained native
+operations preserve source receipts. Explicit producer membership
 verification is still required. Without a structural producer-side rule, every
 new AI endpoint is a fresh chance to forget the membership check.
 
@@ -188,7 +188,7 @@ inputOrgId })`. It resolves from: route param slug → request
    account headers or a provider upload reference.
 2. **Runtime contract in the seam** —
    [editor/lib/ai/server.ts](editor/lib/ai/server.ts)
-   `withTransaction` (and the AI SDK middleware that wraps it) throw
+   `withTransaction` and the trusted GG adapter validate organization identity; native calls throw
    `MissingOrgIdError` if `organizationId` is missing, non-integer,
    or non-positive. This is **unconditional** on the billed path: the
    former `NEXT_PUBLIC_GRIDA_LOCALDEV_SUPERUSER` exception (synthetic
@@ -196,8 +196,9 @@ inputOrgId })`. It resolves from: route param slug → request
    no code path skips this check while billing. The only intentional
    bypass is the BYOK carve-out below, and it does not bill.
 3. **One billing seam, explicit provider-import owners** —
-   [editor/lib/ai/server.ts](editor/lib/ai/server.ts) owns the Grida paid-product
-   admission/receipt integration; Platform owns shared financial billing;
+   [editor/lib/ai/server.ts](editor/lib/ai/server.ts) owns the selected Grida execution entry point; GG owns migrated provider
+   dispatch/metering and Platform owns shared financial billing. Retained native
+   operations use Grida source admission/receipt integration;
    value imports of `replicate`, `openai`, `@ai-sdk/*`, `@anthropic-ai/sdk`
    and the portable `@grida/ai` SDK are restricted to the reviewed seam allowlist.
    Enforced by oxlint
@@ -205,27 +206,26 @@ inputOrgId })`. It resolves from: route param slug → request
    and the CI audit script
    ([editor/scripts/audit-ai-seam.ts](editor/scripts/audit-ai-seam.ts)).
    A new file that bypasses the seam fails at lint or CI.
-   The named [GG Tripo adapter](editor/lib/ai/gg-three-d.ts) consumes the shared
-   `@grida/ai` SDK and calls the same `checkGate`/`withTransaction`; it adds no
-   raw provider factory or independent ledger. Its exact allowlist additions
-   are that adapter, [its fixed egress owner](editor/lib/ai/gg-three-d-http.ts)
-   and the synthetic SDK/billing contract test. The audit covers `@grida/ai`
-   and `@grida/ai/providers`; lint also denies other `@grida/ai/**` value imports
-   outside the allowlist. Type-only imports grant no execution authority.
-4. **Observed Tripo usage, independent of asset delivery** — upload preparation
-   gates before the free provider request; generation, rig-check and rigging gate
-   before execution. Only server-owned `GG_TRIPO_API_KEY` supplies provider authority,
-   with no BYOK or unprefixed-key fallback. Valid terminal `credits_consumed` is converted at the
-   catalog's USD-per-credit rate, including a reported zero for rig-check.
-   The SDK captures a validated successful task receipt before downloading its
-   model. A later download, GLB validation or cancellation failure returns an
-   internal outcome through `withTransaction`, so ingestion precedes the safe
-   error. No error resubmits a paid job. Missing terminal usage produces no
-   fabricated zero-cost success or estimate: available org/model/transaction/task
-   identifiers are logged for reconciliation. Process death and unobserved terminal
-   states remain [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation),
-   not a durable reconciliation guarantee. Existing ingestion-failure semantics
-   remain owned by the shared seam.
+   The [trusted GG adapter](editor/lib/ai/gateway-product.ts) uses a distinct
+   server workload secret, canonical organization and feature. Its receiver checks
+   current credential authority and organization existence; Grida must verify user
+   membership before sending the assertion. Browser cookies and personal API keys
+   cannot substitute for this credential. All generation/metering stays in GG;
+   there is no direct-provider fallback or duplicate native receipt.
+4. **3D upload ownership and result custody** — the named
+   [3D adapter](editor/lib/ai/gg-three-d.ts) retains only free Tripo presign
+   preparation with server-only `GG_TRIPO_API_KEY`. Its key must belong to the
+   same provider account as GG. Authenticated caller/org-bound signed upload
+   tickets are verified before forwarding an internal typed file reference;
+   ordinary users cannot claim a provider file token or arbitrary input URL.
+   GG owns paid model generation, checking, rigging, durable observation and
+   settlement. Grida validates/downloads product output using its
+   [pinned public HTTPS transport](editor/lib/ai/gg-three-d-http.ts), without
+   provider credentials, redirects or private DNS destinations. An asset failure
+   does not regenerate, refund known cost or issue a second native receipt.
+   Already accepted pre-transition work keeps its original source recovery
+   obligation; [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation)
+   preserves that historical distinction.
 
 **BYOK carve-out (intentional).** When a contributor sets a `BYOK_*`
 key ([editor/lib/ai/models.ts](editor/lib/ai/models.ts) —
@@ -254,7 +254,8 @@ on a hosted/preview deploy would make every org bypass billing and the
 org-id sanity gate (auth still holds). Acceptable only because it is a
 contributor/self-host switch under the existing server-env trust model.
 
-**Funded provider authority.** The shared Vercel AI Gateway provider reads only
+**Funded provider authority.** Migrated generation uses the server-only GG product workload configuration.
+The retained Library Vercel embedding provider reads only
 `GG_VERCEL_AI_GATEWAY_API_KEY` for an explicit API key. An absent or blank value
 retains the SDK's per-request platform OIDC resolution; an explicit empty SDK
 setting prevents its ambient `AI_GATEWAY_API_KEY` lookup. Replicate predictions

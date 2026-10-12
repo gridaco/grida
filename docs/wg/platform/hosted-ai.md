@@ -149,11 +149,14 @@ feature invocation must independently authenticate, verify that ownership and
 pass the credit gate. A client cannot transfer another tenant's input reference
 or supply an arbitrary URL for the gateway to fetch.
 
-The gateway meters provider-reported terminal usage, including a completed paid
-job whose model download subsequently fails. It never trusts a client-reported
-cost. An absent usage receipt remains unknown and requires reconciliation; it
-must not be relabeled as zero-cost usage. The outstanding reconciliation
-limitation is recorded in the [billing register](./billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation).
+Grida's authenticated product adapter submits these paid features to GG, which
+meters provider-reported usage and retains original accepted work independently
+of a later model download. It does not trust a client-reported cost or create a
+second native charge. GG observation/settlement continues after the caller leaves;
+missing usage remains unknown and does not authorize regeneration. Grida retains
+asset validation/storage and the existing signed direct-upload preparation.
+Accepted pre-transition native obligations remain in the
+[billing register](./billing/known-issues.md#ki-bill-005--tripo-jobs-without-an-observed-terminal-receipt-need-reconciliation).
 
 ```mermaid
 sequenceDiagram

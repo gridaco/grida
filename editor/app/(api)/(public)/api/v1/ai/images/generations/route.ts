@@ -12,7 +12,7 @@
  *
  * Auth: scoped AI token only (GRIDA-SEC-006). Billing: Vercel AI Gateway
  * response receipt when available, otherwise the shared `computeImageCostMills`
- * fallback (`providerOptions.grida.costMills`). NO library
+ * catalogue estimates (`providerOptions.grida.costMills`) are display only. NO library
  * upload — the daemon owns persistence.
  */
 import { generateImage } from "ai";
@@ -105,12 +105,8 @@ export async function POST(request: Request) {
         ? (`${req.width}x${req.height}` as `${number}x${number}`)
         : undefined;
 
-    // Forward the requested quality tier to the ORIGIN provider so the
-    // tier we just billed (`computeImageCostMills`) is the tier actually
-    // delivered — otherwise a `per_image_tiered` card (e.g. gpt-image-*)
-    // charges "high" while the provider renders its default. The Vercel
-    // AI Gateway keys providerOptions by origin provider (`openai` for
-    // `openai/gpt-image-2`).
+    // Keep the native quality/background input shape. The GG adapter maps
+    // these options to the selected operation; GG owns rating and settlement.
     const slash = binding.id.indexOf("/");
     const originProvider = slash > 0 ? binding.id.slice(0, slash) : undefined;
     const quality = req.quality || undefined;
@@ -141,7 +137,7 @@ export async function POST(request: Request) {
 
     const result: ImageGenerateResult = {
       model_id: card.id,
-      provider_id: "vercel",
+      provider_id: "gg",
       images: generation.images.map((file) => ({
         base64: file.base64,
         media_type: file.mediaType,

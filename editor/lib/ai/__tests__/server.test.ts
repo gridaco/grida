@@ -55,7 +55,6 @@ import {
   MissingOrgIdError,
   checkGate,
   methods,
-  imageExecutionBounds,
   imageToolExecutionBounds,
 } from "../server";
 
@@ -480,43 +479,6 @@ describe("checkGate", () => {
 });
 
 describe("finite spending authorization", () => {
-  it.each([
-    "openai/gpt-image-2",
-    "openai/gpt-image-2.5-flare",
-    "openai/gpt-image-2.5-sunburst",
-    "google/gemini-3.1-flash-image",
-    "bfl/flux-2-pro",
-    "bfl/flux-2-max",
-  ])(
-    "reserves an explicit native forecast for %s, not a guaranteed cap",
-    (model) => {
-      const hold = imageExecutionBounds(model, 1, "1024x1024", undefined);
-      expect(hold).toMatchObject({ expensePolicy: "native-image-estimate-v1" });
-      expect(Number(hold.authorizedMills)).toBeGreaterThanOrEqual(1000);
-      expect(hold.expenseBoundMills).toBe(hold.authorizedMills);
-    }
-  );
-  it("covers output count and repeats input allowance per output", () => {
-    expect(
-      imageExecutionBounds("bfl/flux-kontext-max", 2, "1024x1024", undefined, 3)
-    ).toMatchObject({ authorizedMills: "3500", expenseBoundMills: "3500" });
-    const small = imageExecutionBounds(
-      "bfl/flux-2-pro",
-      1,
-      "1024x1024",
-      undefined
-    );
-    const large = imageExecutionBounds(
-      "bfl/flux-2-pro",
-      1,
-      "8192x8192",
-      undefined
-    );
-    expect(Number(large.authorizedMills)).toBeGreaterThan(
-      Number(small.authorizedMills)
-    );
-    expect(large.tariffRevision).not.toBe(small.tariffRevision);
-  });
   it("keeps interactive tools available with their precise accepted policy", async () => {
     process.env.GG_REPLICATE_API_TOKEN = "test-replicate-token";
     for (const [model, mills] of [
@@ -574,13 +536,5 @@ describe("finite spending authorization", () => {
     expect(mockedBegin).toHaveBeenCalledWith(
       expect.not.objectContaining({ authorizedMills: expect.anything() })
     );
-  });
-  it("rejects unqualified image pricing and invalid output multiplicity", () => {
-    expect(() =>
-      imageExecutionBounds("fixture/unknown", 1, "1024x1024", undefined)
-    ).toThrow(ProductBillingError);
-    expect(() =>
-      imageExecutionBounds("bfl/flux-2-pro", 0, undefined, undefined)
-    ).toThrow(ProductBillingError);
   });
 });

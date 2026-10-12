@@ -37,6 +37,7 @@ const EDITOR_ROOT = path.resolve(__filename, "..", "..");
 const ALLOWLIST = [
   "lib/ai/server.ts",
   "lib/ai/models.ts",
+  "lib/ai/gateway-product.ts",
   "lib/ai/gg-three-d.ts",
   "lib/ai/gg-three-d-http.ts",
   "lib/ai/__tests__/gg-three-d.test.ts",

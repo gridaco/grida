@@ -17,6 +17,15 @@ export namespace GgThreeDHttp {
     });
   }
 
+  /** Only links returned by an authenticated product job; no cookies or credentials. */
+  export function productAssets(): ProviderHttp {
+    return new ProviderHttp({
+      request: () => {
+        throw new Error("asset_only_transport");
+      },
+      download: (input, init) => execute("asset", "", input, init, true),
+    });
+  }
   const blocked = new BlockList();
   for (const [address, prefix] of [
     ["0.0.0.0", 8],
@@ -88,7 +97,8 @@ export namespace GgThreeDHttp {
     lane: "api" | "asset",
     key: string,
     input: Parameters<typeof fetch>[0],
-    init?: RequestInit
+    init?: RequestInit,
+    productAsset = false
   ): Promise<Response> {
     try {
       if (typeof input !== "string" && !(input instanceof URL)) fail();
@@ -150,9 +160,10 @@ export namespace GgThreeDHttp {
           fail();
       } else {
         if (
-          !["cdn.tripo3d.ai", "tripo-data.rg1.data.tripo3d.com"].includes(
-            url.hostname
-          ) ||
+          (!productAsset &&
+            !["cdn.tripo3d.ai", "tripo-data.rg1.data.tripo3d.com"].includes(
+              url.hostname
+            )) ||
           method !== "GET" ||
           [...headers.keys()].length ||
           body != null

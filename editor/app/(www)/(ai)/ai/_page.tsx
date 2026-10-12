@@ -245,6 +245,7 @@ export default function Page({ authed, context }: Props) {
   const [lastCall, setLastCall] = useState<{
     model_id: string;
     costMills: number;
+    costIsEstimate: boolean;
     realCostUsd: number;
     usage: RunChatData["usage"];
   } | null>(null);
@@ -285,6 +286,7 @@ export default function Page({ authed, context }: Props) {
           setLastCall({
             model_id: data.model_id,
             costMills: data.costMills,
+            costIsEstimate: data.costIsEstimate,
             realCostUsd: data.realCostUsd,
             usage: data.usage,
           });
@@ -423,24 +425,23 @@ export default function Page({ authed, context }: Props) {
             <span title="Catalog model id used">
               <span className="opacity-60">model:</span> {lastCall.model_id}
             </span>
-            <span title="What the provider actually charges us, un-rounded.">
-              <span className="opacity-60">real:</span>{" "}
+            <span title="Catalogue estimate; settled charges come from GG.">
+              <span className="opacity-60">catalogue:</span>{" "}
               {AiCredits.format.usd(lastCall.realCostUsd)}
             </span>
-            <span title="Mills sent to Metronome (fractional — Stripe rounds at invoice).">
-              <span className="opacity-60">metered:</span> {lastCall.costMills}m{" "}
-              ({AiCredits.format.usd(lastCall.costMills / 1000)})
+            <span
+              title={
+                lastCall.costIsEstimate
+                  ? "Charge is pending; this is a catalogue estimate."
+                  : "Settled GG charge."
+              }
+            >
+              <span className="opacity-60">
+                {lastCall.costIsEstimate ? "estimate:" : "charged:"}
+              </span>{" "}
+              {lastCall.costMills}m (
+              {AiCredits.format.usd(lastCall.costMills / 1000)})
             </span>
-            {lastCall.realCostUsd > 0 && (
-              <span title="Rounding margin: (metered − real) / real. Should be ~0 once fractional mills are enabled.">
-                <span className="opacity-60">Δ:</span> +
-                {(
-                  (lastCall.costMills / 1000 / lastCall.realCostUsd - 1) *
-                  100
-                ).toFixed(0)}
-                %
-              </span>
-            )}
             <span title="Token usage as reported by the provider.">
               <span className="opacity-60">tokens:</span>{" "}
               {lastCall.usage.inputTokens}in / {lastCall.usage.outputTokens}out
