@@ -47,8 +47,8 @@ overrides:
   react-dom: "19.2.5"
 minimumReleaseAgeExclude:
   - "@grida/canvas-wasm@0.91.0-canary.22"
-  - "@grida/fx-darwin-arm64@0.5.1"
-  - "@grida/fx-darwin-x64@0.5.1"
-  - "@grida/fx-linux-arm64-gnu@0.5.1"
-  - "@grida/fx-linux-x64-gnu@0.5.1"
-  - "@grida/fx@0.5.1"
+  - "@grida/fx-darwin-arm64@0.6.0"
+  - "@grida/fx-darwin-x64@0.6.0"
+  - "@grida/fx-linux-arm64-gnu@0.6.0"
+  - "@grida/fx-linux-x64-gnu@0.6.0"
+  - "@grida/fx@0.6.0"
