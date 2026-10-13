@@ -23,7 +23,7 @@ covered_by: []
 
 > Deprecated on 2026-07-31. This composite suite assumes recurring plan AI
 > allowances, which the current commercial contract does not provide. Use
-> `docs/wg/platform/billing/plans.md` and add new one-behavior-per-file cases
+> `docs/platform/billing.mdx` and add new one-behavior-per-file cases
 > under `test/`.
 
 ## Behavior

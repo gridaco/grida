@@ -22,8 +22,8 @@ covered_by: []
 > consumer obligations.
 
 > Deprecated on 2026-07-31. This composite suite assumes saleable Team and
-> annual offers plus seat-scaled plan allowances. Use the approved contract in
-> `docs/wg/platform/billing/plans.md` and add new one-behavior-per-file cases
+> annual offers plus seat-scaled plan allowances. Use the current billing terms
+> in `docs/platform/billing.mdx` and add new one-behavior-per-file cases
 > under `test/`.
 
 ## Behavior

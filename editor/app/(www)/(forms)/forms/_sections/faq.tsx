@@ -10,7 +10,7 @@ const faqs = [
   {
     question: "How does Grida Forms' pricing compare to other form builders?",
     answer:
-      "Unlike other form builders that charge per submission or limit features based on response count, Grida Forms offers a fair, user-based pricing model. You get unlimited form submissions and all features included in the free tier until you reach 10,000+ Monthly Active Users. This means you can focus on growing your business without worrying about unexpected costs from high form submission volumes.",
+      "Grida Forms is free and open source. Unlike form builders that charge per submission or limit features based on response count, Grida Forms includes unlimited form submissions and every feature at no cost, so you can grow without worrying about submission volume.",
   },
   {
     question:

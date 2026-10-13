@@ -18,8 +18,8 @@ related product features.
 
 ## Sections
 
-- [Plans and billing](billing) — Free, Pro, and Custom plans, AI credit, and
-  subscription management
+- [Plans and billing](billing) — Free and Custom plans, AI credit, and billing
+  management
 - [Refund policy](refund-policy) — Refund, cancellation, and billing-error terms
 - [Customers](customers) — Customer objects, CSV import, and customer management
 - [Tags](tags) — Tag structure and usage for categorization

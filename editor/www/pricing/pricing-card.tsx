@@ -1,113 +1,39 @@
 // GRIDA-EE: billing — plan card presentation for the public pricing page.
 
 import React from "react";
-import { Button } from "@app/ui/components/button";
-import { CheckIcon } from "@radix-ui/react-icons";
+import { CheckIcon } from "lucide-react";
 import { ShineBorder } from "@/www/ui/shine-border";
 
-interface PricingCardFeatureItem {
-  name: string;
-  trail?: string;
-}
-
-export function PricingCard({
+export function PricingWideCard({
   plan,
-  price,
   excerpt,
-  highlight,
   features = [],
-  action,
 }: {
   plan: string;
-  price: {
-    primary: string;
-    secondary?: string;
-    /** Optional small muted note under the primary price. */
-    note?: string;
-  };
-  excerpt: string;
-  highlight?: boolean;
-  features?: PricingCardFeatureItem[];
-  action?: React.ReactNode;
+  excerpt?: string;
+  features?: string[];
 }) {
   return (
-    <div
-      data-highlight={highlight}
-      className="
-        relative
-        bg-background
-        dark:bg-muted/50
-        flex-1 flex flex-col p-6 border gap-4 rounded-lg
-        min-h-[480px] md:min-h-[570px]
-        hover:scale-[1.02]
-        duration-300
-        transition-all
-        shadow
-        justify-between overflow-hidden
-        "
-    >
-      {highlight && (
-        <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
-      )}
-      <div className="flex-[2] flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-semibold">{plan}</h2>
-          <span className="text-sm font-normal text-muted-foreground">
-            {excerpt}
-          </span>
-        </div>
-        <div className="my-2 flex flex-col gap-0.5">
-          <div>
-            <span className="text-4xl font-bold">{price.primary}</span>
-            {price.secondary && (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                {price.secondary}
-              </span>
-            )}
-          </div>
-          {price.note && (
-            <span className="text-xs text-muted-foreground">{price.note}</span>
+    <div className="relative mx-auto grid w-full max-w-5xl overflow-hidden rounded-xl border shadow-xl md:grid-cols-2">
+      <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
+      <div className="flex flex-col justify-center px-10 py-16 md:px-14 md:py-20">
+        <div className="flex flex-col gap-4">
+          <h2 className="text-6xl font-bold leading-none">{plan}</h2>
+          {excerpt && (
+            <p className="max-w-xs text-muted-foreground">{excerpt}</p>
           )}
         </div>
-        <hr />
       </div>
-      <div className="flex-[3] flex flex-col gap-3">
-        {features.map((feature, i) => (
-          <PricingFeatureRow key={i} {...feature} />
+      <ul className="flex flex-col justify-center gap-4 px-10 py-16 md:py-20 md:pl-0 md:pr-14">
+        {features.map((feature) => (
+          <li key={feature} className="flex items-center gap-3">
+            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+              <CheckIcon className="size-3" strokeWidth={3} />
+            </span>
+            <span>{feature}</span>
+          </li>
         ))}
-      </div>
-      {action}
-    </div>
-  );
-}
-
-export function PricingCardButton({
-  children,
-  inverted,
-  asChild,
-}: React.PropsWithChildren<{
-  inverted?: boolean;
-  asChild?: boolean;
-}>) {
-  return (
-    <Button
-      asChild={asChild}
-      variant={inverted ? "default" : "outline"}
-      className="w-full"
-    >
-      {children}
-    </Button>
-  );
-}
-
-export function PricingFeatureRow({ name, trail }: PricingCardFeatureItem) {
-  return (
-    <div className="flex items-center w-full gap-2">
-      <CheckIcon />
-      <span className="flex-1 text-sm">{name}</span>
-      {trail != null && (
-        <span className="opacity-50 text-sm shrink-0">{trail}</span>
-      )}
+      </ul>
     </div>
   );
 }

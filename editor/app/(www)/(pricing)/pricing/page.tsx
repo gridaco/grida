@@ -8,24 +8,24 @@ import PricingFAQ from "./_sections/faq";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pricing — Grida",
+  title: "Pricing — Free and open source | Grida",
   description:
-    "Start free, upgrade to Grida Pro for $20 per organization each month, or contact us for a Custom plan.",
+    "Grida is free and open source, with every product feature included. Pay only for Grida-hosted AI, or bring your own models.",
   alternates: {
     canonical: "https://grida.co/pricing",
   },
   openGraph: {
-    title: "Pricing — Grida",
+    title: "Pricing — Free and open source | Grida",
     description:
-      "Start free, upgrade to Grida Pro for $20 per organization each month, or contact us for a Custom plan.",
+      "Grida is free and open source, with every product feature included. Pay only for Grida-hosted AI, or bring your own models.",
     url: "https://grida.co/pricing",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Pricing — Grida",
+    title: "Pricing — Free and open source | Grida",
     description:
-      "Start free, upgrade to Grida Pro for $20 per organization each month, or contact us for a Custom plan.",
+      "Grida is free and open source, with every product feature included. Pay only for Grida-hosted AI, or bring your own models.",
   },
 };
 
