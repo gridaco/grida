@@ -202,13 +202,8 @@ function PricingTierCard({
   const isCustom = is_enterprise || plan === "custom";
   const label = plan === null ? null : Labels.planTier(plan, is_enterprise);
   const highlight = plan !== null && (isCustom || plan !== "free");
-  const planActionLabel = isCustom
-    ? null
-    : plan === "free"
-      ? "Upgrade to Pro"
-      : plan === "team"
-        ? "Move to Pro monthly"
-        : null;
+  const planActionLabel =
+    !isCustom && plan === "team" ? "Move to Pro monthly" : null;
 
   const tierMessages: Record<PlanTier, string> = {
     free: "You're on the Free plan.",

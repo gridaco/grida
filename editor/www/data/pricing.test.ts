@@ -53,7 +53,10 @@ describe("public pricing comparison", () => {
     }
   });
 
-  it("does not reintroduce retired public offers", () => {
-    expect(JSON.stringify(pricing)).not.toMatch(/team|annual|yearly/i);
+  it("compares only Free and Custom", () => {
+    for (const feature of categories.flatMap((c) => c.features)) {
+      expect(Object.keys(feature.plans)).toEqual(["free", "custom"]);
+    }
+    expect(JSON.stringify(pricing)).not.toMatch(/\bpro\b|team|annual|yearly/i);
   });
 });

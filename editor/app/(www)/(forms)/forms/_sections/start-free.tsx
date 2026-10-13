@@ -14,8 +14,7 @@ export default function StartFree() {
               <div>
                 <h3 className="text-lg font-semibold">Unlimited Responses</h3>
                 <p className="text-muted-foreground mt-1">
-                  Free unlimited responses until you reach 10,000+ Monthly
-                  Active Users
+                  Unlimited form responses, free at any volume
                 </p>
               </div>
             </div>

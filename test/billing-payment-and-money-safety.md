@@ -23,7 +23,7 @@ covered_by: []
 
 > Deprecated on 2026-07-31. This composite suite assumes the retired plan and
 > recurring-credit model and is not current acceptance criteria. Use the
-> approved billing contract in `docs/wg/platform/billing/plans.md` and add new
+> current billing terms in `docs/platform/billing.mdx` and add new
 > one-behavior-per-file cases under `test/`.
 
 ## Behavior

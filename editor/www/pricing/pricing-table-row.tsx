@@ -1,4 +1,4 @@
-// GRIDA-EE: billing — responsive rows for the public plan comparison.
+// GRIDA-EE: billing — responsive rows for the public Free and Custom comparison.
 
 import React, { Fragment, ReactNode } from "react";
 import {
@@ -34,7 +34,6 @@ export const PricingTableRowDesktop = (props: PricingTableRowDesktopProps) => {
           </div>
         </th>
         <td className="bg-background px-6 py-5 free"></td>
-        <td className="bg-background px-6 py-5 pro"></td>
         <td className="bg-background px-6 py-5 custom"></td>
       </tr>
 
@@ -119,7 +118,7 @@ export const PricingTableRowDesktop = (props: PricingTableRowDesktopProps) => {
 
 interface PricingTableRowMobileProps {
   category: PricingCategory;
-  plan: "free" | "pro" | "custom";
+  plan: "free" | "custom";
   sectionId?: string;
   icon: ReactNode;
 }

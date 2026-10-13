@@ -1,4 +1,4 @@
-// GRIDA-EE: billing — responsive public plan comparison.
+// GRIDA-EE: billing — responsive public Free and Custom comparison.
 
 "use client";
 
@@ -65,7 +65,7 @@ function PricingMobileHeader({
 
 const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
   const [activeMobilePlan, setActiveMobilePlan] = useState("Free");
-  const proPlan = plans.find((plan) => plan.name === "Pro")!;
+  const freePlan = plans.find((plan) => plan.name === "Free")!;
   const customPlan = plans.find((plan) => plan.name === "Custom")!;
 
   return (
@@ -88,7 +88,6 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               onChange={(event) => setActiveMobilePlan(event.target.value)}
             >
               <option value="Free">Free</option>
-              <option value="Pro">Pro</option>
               <option value="Custom">Custom</option>
             </select>
           </div>
@@ -99,9 +98,10 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <PricingMobileHeader
               plans={plans}
               plan="Free"
-              price="$0"
-              priceDescription=""
-              description="Create and publish with Grida at no cost."
+              price=""
+              priceDescription={freePlan.priceNote ?? ""}
+              description={freePlan.description}
+              showDollarSign={false}
             />
             <PricingTableRowMobile
               category={pricing.desktop}
@@ -142,60 +142,6 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
             <PricingTableRowMobile
               category={pricing.custom}
               plan="free"
-              icon={<Building2Icon className="size-4" />}
-              sectionId="custom"
-            />
-          </>
-        )}
-
-        {activeMobilePlan === "Pro" && (
-          <>
-            <PricingMobileHeader
-              plans={plans}
-              plan="Pro"
-              price={proPlan.priceMonthly}
-              priceDescription="per organization / month"
-              description={proPlan.description}
-            />
-            <PricingTableRowMobile
-              category={pricing.desktop}
-              plan="pro"
-              icon={<MonitorDownIcon className="size-4" />}
-              sectionId="desktop"
-            />
-            <PricingTableRowMobile
-              category={pricing.design}
-              plan="pro"
-              icon={<PresentationIcon className="size-4" />}
-              sectionId="design"
-            />
-            <PricingTableRowMobile
-              category={pricing.forms}
-              plan="pro"
-              icon={<ListChecksIcon className="size-4" />}
-              sectionId="forms"
-            />
-            <PricingTableRowMobile
-              category={pricing.database}
-              plan="pro"
-              icon={<DatabaseIcon className="size-4" />}
-              sectionId="database"
-            />
-            <PricingTableRowMobile
-              category={pricing.developer}
-              plan="pro"
-              icon={<ArrowLeftRightIcon className="size-4" />}
-              sectionId="developer"
-            />
-            <PricingTableRowMobile
-              category={pricing.ai}
-              plan="pro"
-              icon={<SparklesIcon className="size-4" />}
-              sectionId="ai"
-            />
-            <PricingTableRowMobile
-              category={pricing.custom}
-              plan="pro"
               icon={<Building2Icon className="size-4" />}
               sectionId="custom"
             />
@@ -277,28 +223,16 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
 
               {plans.map((plan) => (
                 <th
-                  className="text-foreground w-1/4 px-0 text-left text-sm font-normal"
+                  className="text-foreground w-1/3 px-0 text-left text-sm font-normal"
                   scope="col"
                   key={plan.name}
                 >
                   <span className="flex flex-col px-6 pr-2 pt-2 gap-1 items-start">
-                    <div className="flex flex-row items-center gap-2">
-                      <h3 className="text-lg xl:text-xl 2xl:text-2xl leading-5 uppercase font-mono font-normal">
-                        {plan.name}
-                      </h3>
-                      {plan.name !== "Custom" && (
-                        <span className="text-foreground-lighter font-mono text-lg tracking-tighter">
-                          {plan.priceMonthly}
-                        </span>
-                      )}
-                    </div>
+                    <h3 className="text-lg xl:text-xl 2xl:text-2xl leading-5 uppercase font-mono font-normal">
+                      {plan.name}
+                    </h3>
                     <div className="h-5">
-                      {plan.name === "Pro" && plan.costUnit && (
-                        <span className="text-[13px] opacity-50 leading-4">
-                          {plan.costUnit}
-                        </span>
-                      )}
-                      {plan.name === "Custom" && plan.priceNote && (
+                      {plan.priceNote && (
                         <span className="text-[13px] opacity-50 leading-4">
                           {plan.priceNote}
                         </span>

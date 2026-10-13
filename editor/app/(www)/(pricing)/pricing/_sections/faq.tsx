@@ -1,4 +1,4 @@
-// GRIDA-EE: billing — customer-facing plan and billing questions.
+// GRIDA-EE: billing — customer-facing pricing and billing questions.
 
 import React from "react";
 import Link from "next/link";
@@ -11,28 +11,40 @@ import {
 
 const faqs: { question: string; answer: React.ReactNode }[] = [
   {
-    question: "Which plans are available?",
+    question: "Is Grida really free?",
     answer:
-      "Grida offers Free, Pro, and Custom plans. Free costs $0, Pro costs $20 per month, and Custom plans use bespoke commercial terms.",
+      "Yes. Grida is free to use, with no subscription and every product feature included. That includes Grida Desktop, the Canvas editor, Forms, Database/CMS, and Figma import.",
   },
   {
-    question: "How is Pro billed?",
-    answer: "Pro is billed monthly at $20 per organization.",
+    question: "Is Grida open source?",
+    answer: (
+      <>
+        Yes. Grida is developed in the open under the Apache 2.0 license. The
+        source code is on{" "}
+        <Link
+          href="https://github.com/gridaco/grida"
+          className="underline underline-offset-4 text-foreground"
+        >
+          GitHub
+        </Link>
+        .
+      </>
+    ),
   },
   {
-    question: "Does a plan include AI credit?",
+    question: "What do I pay for?",
     answer:
-      "Free and Pro do not include recurring AI credit. You can buy prepaid AI credit as needed, and Pro lets an organization enable automatic reload. A Custom agreement may define different AI-credit terms.",
+      "Only Grida-hosted AI. Hosted models use prepaid AI credit, which you can buy as needed in amounts from $10 to $500. Credit is shared across your organization.",
   },
   {
-    question: "How do I upgrade to Pro?",
+    question: "Can I use AI without buying credit?",
     answer:
-      "Choose Upgrade to Pro, select your organization, and complete checkout from its billing settings.",
+      "Yes. Bring your own provider keys or connect local models with Ollama. Those requests do not use Grida AI credit.",
   },
   {
     question: "What is a Custom plan?",
     answer:
-      "Custom plans are arranged directly with Grida for organizations that need tailored commercial terms. Contact us to discuss your requirements.",
+      "Custom plans are arranged directly with Grida for organizations that need tailored terms, deployment, integrations, or support. Contact us to discuss your requirements.",
   },
 ];
 
@@ -53,7 +65,7 @@ export default function PricingFAQ() {
         ))}
       </Accordion>
       <p className="text-center text-sm text-muted-foreground mt-12">
-        For more information about managing your subscription, see the{" "}
+        For more information about AI credit and billing, see the{" "}
         <Link
           href="https://grida.co/docs/platform/billing"
           className="underline underline-offset-4 text-foreground"

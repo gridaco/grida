@@ -73,7 +73,7 @@ and [shared AI seam](https://github.com/gridaco/grida/blob/main/editor/lib/ai/se
 
 Resolved by removing unsupported recurring Free/Pro/Team AI-credit promises in
 [PR #1010](https://github.com/gridaco/grida/pull/1010). The
-[current commercial contract](./plans.md) purchases AI credit separately and
+current commercial contract purchases AI credit separately and
 promises no recurring grant. A future grant requires an approved offer and an
 implemented lifecycle before it is advertised.
 

@@ -14,7 +14,6 @@ product execution receipts, and billing display/console handoff consumers.
 
 These pages explain the commercial offer and the Grida integration boundary.
 
-- [Billing plans](./plans.md) — current offers and retained historical obligations.
 - [AI credit](./ai-credits.md) — native credit and durable producer custody.
 - [Known issues](./known-issues.md) — retained `KI-BILL-*` history and current scope.
 - [Contributor integration](../../../contributing/billing.md) — local insiders/BYOK

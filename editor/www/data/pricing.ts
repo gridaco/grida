@@ -1,4 +1,4 @@
-// GRIDA-EE: billing — feature data for the public plan comparison.
+// GRIDA-EE: billing — feature data for the public Free and Custom comparison.
 
 type Pricing = {
   desktop: PricingCategory;
@@ -20,25 +20,21 @@ type PricingFeature = {
   tooltips?: {
     main?: string;
     free?: string;
-    pro?: string;
     custom?: string;
   };
   plans: {
     free: boolean | string | string[];
-    pro: boolean | string | string[];
     custom: boolean | string | string[];
   };
 };
 
 const availableToAllPlans: PricingFeature["plans"] = {
   free: true,
-  pro: true,
   custom: true,
 };
 
 const customByAgreement: PricingFeature["plans"] = {
   free: false,
-  pro: false,
   custom: "By agreement",
 };
 
@@ -111,7 +107,6 @@ export const pricing: Pricing = {
         title: "Multi-format design export",
         plans: {
           free: "PNG, JPEG, WebP, PDF, SVG",
-          pro: "PNG, JPEG, WebP, PDF, SVG",
           custom: "PNG, JPEG, WebP, PDF, SVG",
         },
       },
@@ -156,7 +151,6 @@ export const pricing: Pricing = {
         title: "Form response simulator",
         plans: {
           free: "Beta",
-          pro: "Beta",
           custom: "Beta",
         },
       },
@@ -168,7 +162,6 @@ export const pricing: Pricing = {
         title: "Customer identity and respondent confirmation emails",
         plans: {
           free: "Verified email required",
-          pro: "Verified email required",
           custom: "Verified email required",
         },
       },
@@ -180,7 +173,6 @@ export const pricing: Pricing = {
         title: "Option inventory tracking",
         plans: {
           free: "Alpha",
-          pro: "Alpha",
           custom: "Alpha",
         },
       },
@@ -201,7 +193,6 @@ export const pricing: Pricing = {
         title: "Supabase Tables, Views, Storage, and Auth",
         plans: {
           free: "Beta",
-          pro: "Beta",
           custom: "Beta",
         },
       },
@@ -213,7 +204,6 @@ export const pricing: Pricing = {
         title: "Gallery, list, and chart views",
         plans: {
           free: "Charts in beta",
-          pro: "Charts in beta",
           custom: "Charts in beta",
         },
       },
@@ -246,7 +236,6 @@ export const pricing: Pricing = {
         title: "Embeddable Canvas viewer and host controls",
         plans: {
           free: "Alpha",
-          pro: "Alpha",
           custom: "Alpha",
         },
       },
@@ -254,7 +243,6 @@ export const pricing: Pricing = {
         title: "SVG SDK and React bindings",
         plans: {
           free: "Alpha",
-          pro: "Alpha",
           custom: "Alpha",
         },
       },
@@ -271,7 +259,6 @@ export const pricing: Pricing = {
         title: "Grida-hosted agent models",
         plans: {
           free: "Prepaid credit",
-          pro: "Prepaid credit",
           custom: "By agreement",
         },
       },
@@ -279,7 +266,6 @@ export const pricing: Pricing = {
         title: "Grida-hosted image-generation models",
         plans: {
           free: "Prepaid credit",
-          pro: "Prepaid credit",
           custom: "By agreement",
         },
       },
@@ -287,7 +273,6 @@ export const pricing: Pricing = {
         title: "Credit shared across the organization",
         plans: {
           free: true,
-          pro: true,
           custom: "By agreement",
         },
       },
@@ -295,7 +280,6 @@ export const pricing: Pricing = {
         title: "Manual AI-credit purchases",
         plans: {
           free: "$10–$500",
-          pro: "$10–$500",
           custom: "By agreement",
         },
       },
@@ -303,7 +287,6 @@ export const pricing: Pricing = {
         title: "Automatic AI-credit reload",
         plans: {
           free: false,
-          pro: true,
           custom: "By agreement",
         },
       },
