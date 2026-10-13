@@ -8,14 +8,14 @@ import PricingFAQ from "./_sections/faq";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pricing — Free and open source | Grida",
+  title: "Pricing — Grida",
   description:
     "Grida is free and open source, with every product feature included. Pay only for Grida-hosted AI, or bring your own models.",
   alternates: {
     canonical: "https://grida.co/pricing",
   },
   openGraph: {
-    title: "Pricing — Free and open source | Grida",
+    title: "Pricing — Grida",
     description:
       "Grida is free and open source, with every product feature included. Pay only for Grida-hosted AI, or bring your own models.",
     url: "https://grida.co/pricing",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "Pricing — Free and open source | Grida",
+    title: "Pricing — Grida",
     description:
       "Grida is free and open source, with every product feature included. Pay only for Grida-hosted AI, or bring your own models.",
   },
