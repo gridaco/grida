@@ -13,6 +13,117 @@ import { iofigma } from "@grida/io-figma";
 import { nanoid } from "nanoid";
 import { datatransfer } from "@/grida-canvas/data-transfer";
 import type { editor } from "@/grida-canvas";
+import type grida from "@grida/schema";
+
+type ClientPosition = {
+  clientX: number;
+  clientY: number;
+};
+
+type CanvasPosition = {
+  canvasX: number;
+  canvasY: number;
+};
+
+type InsertionPosition = ClientPosition | CanvasPosition;
+
+type Vector2 = [number, number];
+
+type Size = {
+  width: number;
+  height: number;
+};
+
+function isCanvasPosition(
+  position: InsertionPosition
+): position is CanvasPosition {
+  return "canvasX" in position && "canvasY" in position;
+}
+
+function getInsertionCanvasPoint(
+  editor: Editor,
+  position?: InsertionPosition
+): Vector2 {
+  if (!position) return [0, 0];
+  if (isCanvasPosition(position)) return [position.canvasX, position.canvasY];
+  return editor.camera.clientPointToCanvasPoint([
+    position.clientX,
+    position.clientY,
+  ]);
+}
+
+function getDropCanvasPoint(
+  editor: Editor,
+  event: React.DragEvent<HTMLElement>
+): Vector2 {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const viewportPoint: Vector2 = [
+    event.clientX - rect.left,
+    event.clientY - rect.top,
+  ];
+  return cmath.vector2.transform(
+    viewportPoint,
+    cmath.transform.invert(editor.state.transform)
+  );
+}
+
+function centerCanvasPoint(canvasPoint: Vector2, size: Size): Vector2 {
+  return [
+    canvasPoint[0] - getPositiveHalf(size.width),
+    canvasPoint[1] - getPositiveHalf(size.height),
+  ];
+}
+
+function getPositiveHalf(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value / 2 : 0;
+}
+
+function createImagePaint(src: string): cg.ImagePaint {
+  return {
+    type: "image",
+    src,
+    fit: "cover",
+    transform: cmath.transform.identity,
+    filters: cg.def.IMAGE_FILTERS,
+    blend_mode: cg.def.BLENDMODE,
+    opacity: 1,
+    active: true,
+  };
+}
+
+function insertImageRectangle(args: {
+  editor: Editor;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  src: string;
+}) {
+  const nodeId = nanoid();
+  const paint = createImagePaint(args.src);
+  const prototype = {
+    type: "rectangle",
+    _$id: nodeId,
+    name: args.name,
+    layout_positioning: "absolute",
+    layout_inset_left: args.x,
+    layout_inset_top: args.y,
+    layout_target_width: args.width,
+    layout_target_height: args.height,
+    fill: paint,
+    fill_paints: [paint],
+  } satisfies grida.program.nodes.NodePrototype;
+
+  args.editor.doc.dispatch({
+    type: "insert",
+    id: nodeId,
+    prototype,
+    target: null,
+    placement: "none",
+  });
+  args.editor.doc.select([nodeId], "reset");
+}
 
 /**
  * Hook that provides file insertion utilities for the Grida canvas editor.
@@ -46,74 +157,40 @@ export function useInsertFile() {
   const instance = useCurrentEditor();
 
   const insertImage = useCallback(
-    async (
-      name: string,
-      file: File,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
-      const [x, y] = instance.camera.clientPointToCanvasPoint(
-        position ? [position.clientX, position.clientY] : [0, 0]
-      );
-
+    async (name: string, file: File, position?: InsertionPosition) => {
+      const canvasPoint = getInsertionCanvasPoint(instance, position);
       const bytes = await file.arrayBuffer();
       const image = await instance.createImage(new Uint8Array(bytes));
+      const [x, y] = centerCanvasPoint(canvasPoint, image);
 
-      // Create rectangle node with image paint instead of image node
-      const node = instance.commands.createRectangleNode();
-      node.$.layout_positioning = "absolute";
-      node.$.name = name;
-      node.$.layout_inset_left = x;
-      node.$.layout_inset_top = y;
-      node.$.layout_target_width = image.width;
-      node.$.layout_target_height = image.height;
-      node.$.fill_paints = [
-        {
-          type: "image",
-          src: image.url,
-          fit: "cover",
-          transform: cmath.transform.identity,
-          filters: cg.def.IMAGE_FILTERS,
-          blend_mode: cg.def.BLENDMODE,
-          opacity: 1,
-          active: true,
-        } satisfies cg.ImagePaint,
-      ];
+      insertImageRectangle({
+        editor: instance,
+        name,
+        x,
+        y,
+        width: image.width,
+        height: image.height,
+        src: image.url,
+      });
     },
     [instance]
   );
 
   const insertSVG = useCallback(
-    async (
-      name: string,
-      svg: string,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
+    async (name: string, svg: string, position?: InsertionPosition) => {
+      const canvasPoint = getInsertionCanvasPoint(instance, position);
       const node = await instance.commands.createNodeFromSvg(svg);
 
-      const center_dx =
-        typeof node.$.layout_target_width === "number" &&
-        node.$.layout_target_width > 0
-          ? node.$.layout_target_width / 2
-          : 0;
-
-      const center_dy =
-        typeof node.$.layout_target_height === "number" &&
-        node.$.layout_target_height > 0
-          ? node.$.layout_target_height / 2
-          : 0;
-
-      const [x, y] = instance.camera.clientPointToCanvasPoint(
-        cmath.vector2.sub(
-          position ? [position.clientX, position.clientY] : [0, 0],
-          [center_dx, center_dy]
-        )
-      );
+      const [x, y] = centerCanvasPoint(canvasPoint, {
+        width:
+          typeof node.$.layout_target_width === "number"
+            ? node.$.layout_target_width
+            : 0,
+        height:
+          typeof node.$.layout_target_height === "number"
+            ? node.$.layout_target_height
+            : 0,
+      });
 
       node.$.name = name;
       node.$.layout_inset_left = x;
@@ -123,17 +200,8 @@ export function useInsertFile() {
   );
 
   const insertMarkdown = useCallback(
-    async (
-      name: string,
-      markdown: string,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
-    ) => {
-      const [x, y] = instance.camera.clientPointToCanvasPoint(
-        position ? [position.clientX, position.clientY] : [0, 0]
-      );
+    async (name: string, markdown: string, position?: InsertionPosition) => {
+      const [x, y] = getInsertionCanvasPoint(instance, position);
 
       const node = instance.commands.createMarkdownNode(markdown);
       node.$.name = name;
@@ -147,10 +215,7 @@ export function useInsertFile() {
     (
       type: io.clipboard.ValidFileType,
       file: File,
-      position?: {
-        clientX: number;
-        clientY: number;
-      }
+      position?: InsertionPosition
     ) => {
       if (type === "image/svg+xml") {
         const reader = new FileReader();
@@ -570,6 +635,11 @@ export function useDataTransferEventTarget() {
   const ondrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+      const dropCanvasPoint = getDropCanvasPoint(instance, event);
+      const dropPosition: CanvasPosition = {
+        canvasX: dropCanvasPoint[0],
+        canvasY: dropCanvasPoint[1],
+      };
 
       const knwondata = event.dataTransfer.getData("x-grida-data-transfer");
       if (knwondata) {
@@ -581,7 +651,7 @@ export function useDataTransferEventTarget() {
               cache: "no-store",
             }).then((res) =>
               res.text().then((text) => {
-                insertSVG(name, text, event);
+                insertSVG(name, text, dropPosition);
               })
             );
 
@@ -595,29 +665,21 @@ export function useDataTransferEventTarget() {
             const { name, src, width, height } = data;
             const task = (async () => {
               const imageRef = await instance.createImageAsync(src);
-              const [x, y] = instance.camera.clientPointToCanvasPoint([
-                event.clientX,
-                event.clientY,
-              ]);
-              const node = instance.commands.createRectangleNode();
-              node.$.layout_positioning = "absolute";
-              node.$.name = name || "Photo";
-              node.$.layout_inset_left = x;
-              node.$.layout_inset_top = y;
-              node.$.layout_target_width = width || imageRef.width;
-              node.$.layout_target_height = height || imageRef.height;
-              node.$.fill_paints = [
-                {
-                  type: "image",
-                  src: imageRef.url,
-                  fit: "cover",
-                  transform: cmath.transform.identity,
-                  filters: cg.def.IMAGE_FILTERS,
-                  blend_mode: cg.def.BLENDMODE,
-                  opacity: 1,
-                  active: true,
-                } satisfies cg.ImagePaint,
-              ];
+              const imageWidth = width ?? imageRef.width;
+              const imageHeight = height ?? imageRef.height;
+              const [x, y] = centerCanvasPoint(dropCanvasPoint, {
+                width: imageWidth,
+                height: imageHeight,
+              });
+              insertImageRectangle({
+                editor: instance,
+                name: name || "Photo",
+                x,
+                y,
+                width: imageWidth,
+                height: imageHeight,
+                src: imageRef.url,
+              });
             })();
 
             toast.promise(task, {
@@ -658,13 +720,13 @@ export function useDataTransferEventTarget() {
 
         const [valid, type] = io.clipboard.filetype(file);
         if (valid) {
-          insertFromFile(type, file, event);
+          insertFromFile(type, file, dropPosition);
         } else {
           toast.error(`file type '${type}' is not supported`);
         }
       }
     },
-    [insertFromFile, insertSVG]
+    [insertFromFile, insertSVG, instance]
   );
   //
 

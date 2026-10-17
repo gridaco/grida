@@ -1001,6 +1001,12 @@ export type DocumentEditorInsertNodeAction = {
    * - `NodeID`: Insert into this parent container
    */
   target: NodeID | null;
+  /**
+   * Controls whether the reducer applies viewport-aware auto placement.
+   * - `"auto"` / undefined: place the inserted subtree in the current viewport
+   * - `"none"`: preserve absolute coordinates from the payload
+   */
+  placement?: "auto" | "none";
 } & (
   | {
       id?: string;
