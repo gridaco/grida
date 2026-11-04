@@ -173,3 +173,33 @@ export function parseStorageUrlOptions(searchParams: URLSearchParams) {
 
   return options;
 }
+
+/**
+ * Whether `path` names a file of `field_id` in the Grida-managed response
+ * bucket. Response files are only ever written as
+ * `response/{response_id}/{field_id}/{name}` (see
+ * {@link FieldStorageService.createSignedUploadUrlFromFile} and the Open API
+ * submission commit), so a field can only ever preview its own files.
+ *
+ * GRIDA-SEC-016 — the bucket is shared by every organization; this confines a
+ * caller who is authorized for one field to that field's objects.
+ */
+export function isResponseFieldStorageObjectPath(
+  path: string,
+  field_id: string
+): boolean {
+  const parts = path.split("/");
+  if (parts.length !== 4) return false;
+
+  const [root, response_id, path_field_id, name] = parts;
+  return (
+    root === "response" &&
+    !!response_id &&
+    response_id !== "." &&
+    response_id !== ".." &&
+    path_field_id === field_id &&
+    !!name &&
+    name !== "." &&
+    name !== ".."
+  );
+}

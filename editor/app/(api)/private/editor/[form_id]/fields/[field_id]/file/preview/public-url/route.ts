@@ -1,5 +1,6 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { service_role } from "@/lib/supabase/server";
+import { createFormsClient, service_role } from "@/lib/supabase/server";
+import { isResponseFieldStorageObjectPath } from "@/services/form/storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import type { FormFieldStorageSchema } from "@/grida-forms-hosted/types";
 import { notFound } from "next/navigation";
@@ -23,8 +24,10 @@ export async function GET(
 
   assert(qpath);
 
-  // TODO: support RLS
-  const { data } = await service_role.forms
+  // GRIDA-SEC-016 — resolve the form as the caller. RLS limits it to members of
+  // the owning project; the storage access below runs with the service role.
+  const formsClient = await createFormsClient();
+  const { data: form, error: formerr } = await formsClient
     .from("form")
     .select(
       `
@@ -35,17 +38,14 @@ export async function GET(
         `
     )
     .eq("id", form_id)
-    .filter("fields.id", "eq", field_id)
-    .single();
+    .maybeSingle();
 
-  if (!data) {
-    return notFound();
-  }
+  if (formerr) console.error(formerr);
+  if (!form) return notFound();
 
-  const { fields, supabase_connection } = data;
-  assert(fields.length === 1);
-  const field = fields[0];
-  assert(field);
+  const { fields, supabase_connection } = form;
+  const field = fields.find((f) => f.id === field_id);
+  if (!field) return notFound();
 
   if (field.storage) {
     const { type, bucket } = field.storage as unknown as FormFieldStorageSchema;
@@ -77,6 +77,11 @@ export async function GET(
       default:
         return NextResponse.error();
     }
+  }
+
+  // GRIDA-SEC-016 — the response bucket is shared by every organization.
+  if (!isResponseFieldStorageObjectPath(qpath, field.id)) {
+    return notFound();
   }
 
   const { data: singed } = await service_role.forms.storage
