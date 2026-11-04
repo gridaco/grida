@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { openSessionsDb, type OpenedSessionsDb } from "./db";
 import { SCHEMA_VERSION } from "./schema";
+import { SessionsStore } from "./store";
 
 /** A pre-`mode` (v1) `chat_sessions` table — the v2 schema MINUS `mode`. */
 const V1_CHAT_SESSIONS_DDL = `
@@ -57,6 +58,152 @@ const V2_CHAT_PARTS_DDL = `
     updated_at INTEGER NOT NULL
   );
 `;
+
+/**
+ * The bootstrap the first session store (a9b78eec7) wrote, unstamped: the
+ * pre-`mode`/pre-continuation tables and a NON-unique
+ * `idx_chat_parts_message_index`. Its parts writer was read-then-insert with
+ * no constraint, so racing writers could leave duplicate (message_id, index)
+ * rows behind.
+ */
+const FIRST_STORE_BOOTSTRAP_SQL = `
+  CREATE TABLE chat_sessions (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT 'New Chat',
+    agent TEXT NOT NULL,
+    workspace_id TEXT,
+    workspace_root TEXT,
+    model_json TEXT,
+    parent_id TEXT,
+    parent_message_id TEXT,
+    permissions_json TEXT NOT NULL DEFAULT '[]',
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_read INTEGER NOT NULL DEFAULT 0,
+    cache_write INTEGER NOT NULL DEFAULT 0,
+    total_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    archived_at INTEGER
+  );
+  CREATE TABLE chat_messages (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    hidden_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE TABLE chat_parts (
+    id TEXT PRIMARY KEY,
+    message_id TEXT NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL,
+    "index" INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    data_json TEXT NOT NULL,
+    tool_call_id TEXT,
+    tool_state TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_chat_sessions_agent_updated
+    ON chat_sessions(agent, updated_at);
+  CREATE INDEX idx_chat_sessions_workspace_updated
+    ON chat_sessions(workspace_id, updated_at);
+  CREATE INDEX idx_chat_sessions_parent ON chat_sessions(parent_id);
+  CREATE INDEX idx_chat_sessions_archived ON chat_sessions(archived_at);
+  CREATE INDEX idx_chat_messages_session_created
+    ON chat_messages(session_id, created_at);
+  CREATE INDEX idx_chat_messages_hidden ON chat_messages(hidden_at);
+  CREATE INDEX idx_chat_parts_message_index
+    ON chat_parts(message_id, "index");
+  CREATE INDEX idx_chat_parts_session ON chat_parts(session_id);
+  CREATE INDEX idx_chat_parts_tool_call ON chat_parts(tool_call_id);
+`;
+
+/**
+ * Write a first-store DB with one message whose index 0 was duplicated by
+ * racing writers (`p_old` then `p_new`) and an unrelated part at index 1.
+ * A `version` of 3 is that DB after a later build ran the v1 → v3 column
+ * steps and stamped it, leaving the non-unique index in place.
+ */
+function writeFirstStoreDb(filePath: string, version: 0 | 3): void {
+  const raw = new DatabaseSync(filePath);
+  raw.exec(FIRST_STORE_BOOTSTRAP_SQL);
+  if (version === 3) {
+    raw.exec(`
+      ALTER TABLE chat_sessions ADD COLUMN mode TEXT;
+      ALTER TABLE chat_parts ADD COLUMN continuation_run_id TEXT;
+    `);
+  }
+  raw.exec(`
+    INSERT INTO chat_sessions (id, agent, created_at, updated_at)
+      VALUES ('s1', 'grida', 0, 0);
+    INSERT INTO chat_messages (id, session_id, role, created_at, updated_at)
+      VALUES ('m1', 's1', 'assistant', 0, 0);
+    INSERT INTO chat_parts
+      (id, message_id, session_id, "index", type, data_json,
+       created_at, updated_at)
+    VALUES
+      ('p_old', 'm1', 's1', 0, 'text', '{"type":"text","text":"h"}', 1, 1),
+      ('p_new', 'm1', 's1', 0, 'text', '{"type":"text","text":"hi"}', 1, 2),
+      ('p_next', 'm1', 's1', 1, 'text', '{"type":"text","text":"!"}', 3, 3);
+  `);
+  raw.exec(`PRAGMA user_version = ${version}`);
+  raw.close();
+}
+
+/** Columns and indexes of every table, normalized for comparison. */
+function schemaShape(sqlite: DatabaseSync) {
+  const tables = (
+    sqlite
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
+      )
+      .all() as Array<{ name: string }>
+  ).map((t) => t.name);
+  return tables.map((table) => ({
+    table,
+    // `ALTER TABLE … ADD COLUMN` appends, so column order is not compared.
+    columns: (
+      sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{
+        name: string;
+        type: string;
+        notnull: number;
+        dflt_value: unknown;
+        pk: number;
+      }>
+    )
+      .map(({ name, type, notnull, dflt_value, pk }) => ({
+        name,
+        type,
+        notnull,
+        dflt_value,
+        pk,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    indexes: (
+      sqlite.prepare(`PRAGMA index_list(${table})`).all() as Array<{
+        name: string;
+        unique: number;
+      }>
+    )
+      .map(({ name, unique }) => ({
+        name,
+        unique,
+        columns: (
+          sqlite.prepare(`PRAGMA index_info(${name})`).all() as Array<{
+            name: string;
+          }>
+        ).map((c) => c.name),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  }));
+}
 
 function userVersion(db: OpenedSessionsDb): number {
   const row = db.sqlite.prepare("PRAGMA user_version").get() as {
@@ -163,6 +310,76 @@ describe("openSessionsDb — user_version gate", () => {
       ).toEqual({ continuation_run_id: "run_1" });
     } finally {
       db.close();
+    }
+  });
+
+  it.each([
+    ["an unstamped", 0],
+    ["an already-stamped v3", 3],
+  ] as const)(
+    "repairs the non-unique chat_parts index on %s first-store DB",
+    async (_, version) => {
+      writeFirstStoreDb(path.join(dir, "sessions.db"), version);
+
+      const db = openSessionsDb({ user_data_path: dir });
+      const store = new SessionsStore(db);
+      try {
+        expect(userVersion(db)).toBe(SCHEMA_VERSION);
+        expect(
+          db.sqlite
+            .prepare(
+              `SELECT "unique" FROM pragma_index_list('chat_parts')
+               WHERE name = 'idx_chat_parts_message_index'`
+            )
+            .get()
+        ).toEqual({ unique: 1 });
+        // The duplicate collapsed to its most recent write; nothing else went.
+        expect(
+          db.sqlite
+            .prepare(`SELECT id FROM chat_parts ORDER BY "index", id`)
+            .all()
+        ).toEqual([{ id: "p_new" }, { id: "p_next" }]);
+
+        // The index-keyed upsert now has its conflict target.
+        const part = await store.upsertPart("m1", {
+          index: 0,
+          type: "text",
+          data: { type: "text", text: "hello" },
+        });
+        expect(part.id).toBe("p_new");
+        const [message] = await store.listMessages("s1");
+        expect(message.parts.map((p) => p.data)).toEqual([
+          { type: "text", text: "hello" },
+          { type: "text", text: "!" },
+        ]);
+      } finally {
+        store.close();
+      }
+
+      // Re-opening the repaired DB is a no-op.
+      const reopened = openSessionsDb({ user_data_path: dir });
+      try {
+        expect(userVersion(reopened)).toBe(SCHEMA_VERSION);
+        expect(
+          reopened.sqlite.prepare(`SELECT count(*) AS n FROM chat_parts`).get()
+        ).toEqual({ n: 2 });
+      } finally {
+        reopened.close();
+      }
+    }
+  );
+
+  it("brings a first-store DB to the same schema as a fresh one", () => {
+    // Drift guard: `CREATE ... IF NOT EXISTS` never changes an existing
+    // definition, so any schema change without a ladder step shows up here.
+    const fresh = openSessionsDb({ db_file: ":memory:", user_data_path: dir });
+    writeFirstStoreDb(path.join(dir, "sessions.db"), 0);
+    const migrated = openSessionsDb({ user_data_path: dir });
+    try {
+      expect(schemaShape(migrated.sqlite)).toEqual(schemaShape(fresh.sqlite));
+    } finally {
+      fresh.close();
+      migrated.close();
     }
   });
 

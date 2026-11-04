@@ -106,19 +106,19 @@ export function openSessionsDb(opts: OpenSessionsDbOptions): OpenedSessionsDb {
   sqlite.exec("PRAGMA busy_timeout = 5000");
   sqlite.exec("PRAGMA foreign_keys = ON");
 
-  // Idempotent schema bootstrap (`CREATE ... IF NOT EXISTS`). Day-1: no
-  // shipped DB to migrate in place — when that changes, switch to
-  // versioned migrations (see schema.ts).
+  // Idempotent schema bootstrap (`CREATE ... IF NOT EXISTS`). It creates
+  // missing objects only: an existing table or index keeps its OLD definition.
+  // Any definition change on an existing DB goes through the versioned
+  // ALTER-ladder below ({@link migrateSchema}), never through this bootstrap.
   sqlite.exec(BOOTSTRAP_SQL);
 
-  // Version gate (`PRAGMA user_version`). A fresh/unstamped DB reads 0 — treat
-  // it as current and stamp to SCHEMA_VERSION. A DB stamped HIGHER than this
-  // binary supports is forward-incompatible: an older binary must not write a
-  // newer DB (it would miss columns and throw `no such column` mid-use), so we
-  // fail loud here. The future in-place ALTER-ladder goes between these two:
-  // when `version` is below SCHEMA_VERSION, step it up one version at a time
-  // (CREATE/ALTER per gap) before stamping. No bodies needed yet — no shipped
-  // DB to migrate from.
+  // Version gate (`PRAGMA user_version`). A DB below SCHEMA_VERSION runs the
+  // ALTER-ladder, then is stamped. A fresh DB and a DB created before version
+  // stamping both read 0, so every ladder step must detect the actual on-disk
+  // state rather than trust the version. A DB stamped HIGHER than this binary
+  // supports is forward-incompatible: an older binary must not write a newer
+  // DB (it would miss columns and throw `no such column` mid-use), so we fail
+  // loud here.
   const version = readUserVersion(sqlite);
   if (version > SCHEMA_VERSION) {
     sqlite.close();
@@ -276,6 +276,59 @@ function migrateSchema(sqlite: DatabaseSync, fromVersion: number): void {
   // no marker and must never be mistaken for interrupted live work.
   if (fromVersion < 3) {
     addColumnIfMissing(sqlite, "chat_parts", "continuation_run_id", "TEXT");
+  }
+  // v3 → v4: `idx_chat_parts_message_index` must be UNIQUE — the index-keyed
+  // part upsert targets `ON CONFLICT(message_id, "index")`. The first session
+  // store created it non-unique, and the bootstrap's `CREATE UNIQUE INDEX IF
+  // NOT EXISTS` is a no-op on a same-named index, so such DBs fail every new
+  // part write.
+  if (fromVersion < 4) {
+    ensureChatPartsMessageIndexUnique(sqlite);
+  }
+}
+
+/**
+ * Promote `idx_chat_parts_message_index` to UNIQUE iff it isn't already. The
+ * non-unique era wrote parts with a read-then-insert that racing writers could
+ * duplicate, so duplicate `(message_id, index)` rows are collapsed first —
+ * keeping the most recently updated one — or the `CREATE UNIQUE INDEX`
+ * throws. Atomic: a failure leaves the DB untouched.
+ */
+function ensureChatPartsMessageIndexUnique(sqlite: DatabaseSync): void {
+  const index = sqlite
+    .prepare(
+      `SELECT "unique" FROM pragma_index_list('chat_parts')
+       WHERE name = 'idx_chat_parts_message_index'`
+    )
+    .get() as { unique?: number } | undefined;
+  if (index?.unique === 1) return;
+
+  sqlite.exec("BEGIN");
+  try {
+    sqlite.exec(`
+      DELETE FROM chat_parts
+      WHERE rowid IN (
+        SELECT rowid FROM (
+          SELECT rowid, ROW_NUMBER() OVER (
+            PARTITION BY message_id, "index"
+            ORDER BY updated_at DESC, rowid DESC
+          ) AS rank
+          FROM chat_parts
+        )
+        WHERE rank > 1
+      );
+      DROP INDEX IF EXISTS idx_chat_parts_message_index;
+      CREATE UNIQUE INDEX idx_chat_parts_message_index
+        ON chat_parts(message_id, "index");
+    `);
+    sqlite.exec("COMMIT");
+  } catch (err) {
+    try {
+      sqlite.exec("ROLLBACK");
+    } catch {
+      // transaction may already be aborted/rolled back
+    }
+    throw err;
   }
 }
 

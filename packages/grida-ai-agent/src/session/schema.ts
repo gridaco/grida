@@ -28,7 +28,7 @@ import {
  * alongside an entry in the ALTER-ladder in `db.ts` whenever the schema
  * changes in a way an in-place migration must handle.
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const chatSessions = sqliteTable(
   "chat_sessions",
@@ -136,9 +136,11 @@ export const chatParts = sqliteTable(
 /**
  * Idempotent schema bootstrap. Applied on `openSessionsDb()` via
  * {@link BOOTSTRAP_SQL}: a single `CREATE ... IF NOT EXISTS` pass, no
- * drizzle-kit migrations. The DB is per-user local with no shipped
- * version to evolve from — when it graduates to real users + breaking
- * changes, replace this with versioned migrations.
+ * drizzle-kit migrations. It only creates what is missing:
+ * `IF NOT EXISTS` matches an existing table or index by NAME and keeps its
+ * old definition (columns, uniqueness, constraints). Changing a definition
+ * here therefore reaches fresh DBs only — every such change also needs a
+ * {@link SCHEMA_VERSION} bump and a step in the ALTER-ladder in `db.ts`.
  *
  * Split into tables-then-indexes purely for readability; both run in one
  * shot (indexes can't reference a not-yet-created table).
