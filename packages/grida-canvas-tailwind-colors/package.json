@@ -17,6 +17,7 @@
   "files": [
     "css",
     "json",
+    "types.d.ts",
     "README.md"
   ],
   "exports": {
@@ -24,17 +25,40 @@
     "./css/rgba.css": "./css/rgba.css",
     "./css/hex.css": "./css/hex.css",
     "./css/oklch.css": "./css/oklch.css",
-    "./json/rgb.json": "./json/rgb.json",
-    "./json/rgbf.json": "./json/rgbf.json",
-    "./json/rgba.json": "./json/rgba.json",
-    "./json/hex.json": "./json/hex.json",
-    "./json/oklch.json": "./json/oklch.json"
+    "./json/rgb.json": {
+      "types": "./json/rgb.d.cts",
+      "default": "./json/rgb.json"
+    },
+    "./json/rgbf.json": {
+      "types": "./json/rgbf.d.cts",
+      "default": "./json/rgbf.json"
+    },
+    "./json/rgba.json": {
+      "types": "./json/rgba.d.cts",
+      "default": "./json/rgba.json"
+    },
+    "./json/hex.json": {
+      "types": "./json/hex.d.cts",
+      "default": "./json/hex.json"
+    },
+    "./json/oklch.json": {
+      "types": "./json/oklch.d.cts",
+      "default": "./json/oklch.json"
+    },
+    "./types": {
+      "types": "./types.d.ts"
+    }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "generate": "deno run --allow-read --allow-write --allow-net --allow-env --no-prompt scripts/generate.ts",
-    "prepublishOnly": "pnpm generate"
+    "prepublishOnly": "pnpm generate",
+    "test": "node --test scripts/package.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^6"
   }
 }

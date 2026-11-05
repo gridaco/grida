@@ -1,15 +1,4 @@
-import type { ColorName, ColorShade } from "./shared";
-
-/**
- * OKLCH color tuple.
- *
- * @unit OKLCH (perceptual color space)
- * @spec Lightness (0.0-1.0), Chroma (0.0+), Hue (0.0-360.0 degrees)
- * @format [l, c, h]
- * @note Hue may be 0 for achromatic colors (grays)
- * @example [0.384, 0.015, 255.59] // slate-500
- */
-type OKLCH = [lightness: number, chroma: number, hue: number];
+import type { ColorName, ColorShade, OKLCH } from "../types.js";
 
 /**
  * Tailwind CSS v4 color palette in OKLCH format.
@@ -23,6 +12,4 @@ type OKLCH = [lightness: number, chroma: number, hue: number];
  */
 declare const colors: Record<ColorName, Record<ColorShade, OKLCH>>;
 
-export type { ColorName, ColorShade, OKLCH };
-
-export default colors;
+export = colors;

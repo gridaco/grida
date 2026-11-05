@@ -1525,7 +1525,11 @@ importers:
 
   packages/grida-canvas-tailwind: {}
 
-  packages/grida-canvas-tailwind-colors: {}
+  packages/grida-canvas-tailwind-colors:
+    devDependencies:
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
 
   packages/grida-canvas-transparency-grid:
     dependencies:
