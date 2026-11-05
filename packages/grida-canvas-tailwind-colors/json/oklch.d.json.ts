@@ -9,7 +9,7 @@ import type { ColorName, ColorShade } from "./shared";
  * @note Hue may be 0 for achromatic colors (grays)
  * @example [0.384, 0.015, 255.59] // slate-500
  */
-type OKLCH = [number, number, number];
+type OKLCH = [lightness: number, chroma: number, hue: number];
 
 /**
  * Tailwind CSS v4 color palette in OKLCH format.

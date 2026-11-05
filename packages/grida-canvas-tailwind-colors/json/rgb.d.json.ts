@@ -8,7 +8,7 @@ import type { ColorName, ColorShade } from "./shared";
  * @format [r, g, b]
  * @example [98, 116, 142] // slate-500
  */
-type RGB = [number, number, number];
+type RGB = [red: number, green: number, blue: number];
 
 /**
  * Tailwind CSS v4 color palette in RGB888 format.

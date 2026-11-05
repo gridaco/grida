@@ -9,7 +9,7 @@ import type { ColorName, ColorShade } from "./shared";
  * @note Alpha is always 1.0 for all Tailwind CSS v4 colors (fully opaque)
  * @example [98, 116, 142, 1] // slate-500
  */
-type RGBA = [number, number, number, number];
+type RGBA = [red: number, green: number, blue: number, alpha: number];
 
 /**
  * Tailwind CSS v4 color palette in RGB888A32F format.
