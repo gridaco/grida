@@ -49,7 +49,7 @@ export function classify(paths) {
     if (packaging.test(file))
       select("conformance", "native", "docs", "tooling");
     if (sdk.test(file) || file.startsWith("data/ai/")) select("conformance");
-    if (documentation.test(file)) select("conformance", "docs");
+    if (documentation.test(file)) select("docs");
     if (file.startsWith("scripts/cli-contracts/")) select("conformance");
     if (jsConfig.test(file)) select("conformance", "docs", "tooling");
     if (file === "turbo.json" || file === ".oxfmtrc.jsonc")

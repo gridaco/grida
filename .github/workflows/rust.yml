@@ -72,13 +72,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build current TypeScript SDK consumers
         run: pnpm exec turbo run build --filter=@grida/ai... --filter=@grida/auth...
-      - name: Build documentation for installed guide checks
-        run: pnpm --filter docs build
       - name: Verify native CLI and shared contracts
         env:
           GRIDA_AUTH_KEYRING_SMOKE: "1"
           GRIDA_AUTH_MACOS_CI: ${{ runner.os == 'macOS' && '1' || '0' }}
-          GRIDA_CLI_DOCS_SUDO_NETWORK: ${{ runner.os == 'Linux' && '1' || '0' }}
         run: |
           node --test scripts/cli-contracts/cli.test.mjs scripts/cli-contracts/catalogue-request.test.mjs
           node scripts/cli-contracts/run.mjs

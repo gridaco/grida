@@ -12,7 +12,7 @@ CI now owns that work.
 | Group         | Work and inputs                                                                                                                                                                                                                                                                                                                    |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `rust`        | Three-platform formatting, Clippy, workspace tests and build. Consumes `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/**`, `crates/**`, shared auth fixtures and the checker PNG used by the conformance executable.                                                                                                   |
-| `conformance` | Linux/macOS Rust and TypeScript contracts, keyring interoperability, generated AI assets, installed npm behavior and guides. Adds the five shared SDK packages (`ai`, `ai-models`, `auth`, `account`, `home`), `data/ai/**`, `.oxfmtrc.jsonc`, root Turbo configuration, CLI contract helpers, documentation and packaging inputs. |
+| `conformance` | Linux/macOS Rust and TypeScript contracts, keyring interoperability, generated AI assets, installed npm behavior. Adds the five shared SDK packages (`ai`, `ai-models`, `auth`, `account`, `home`), `data/ai/**`, `.oxfmtrc.jsonc`, root Turbo configuration, CLI contract helpers and packaging inputs.                           |
 | `native`      | All eight target builds, ABI/license checks, exact bundled candidate and installed platform matrix. Consumes Cargo inputs, `packages/grida-cli/**`, release helpers, `scripts/cli-contracts/installed.mjs`, npm helpers, `LICENSE`, `.gitattributes` and `.nvmrc`. This workflow does not install the pnpm workspace or run Turbo. |
 | `docs`        | Builds Docusaurus, the Rust parser and a host candidate; checks installed help, links and example inputs offline. Consumes Cargo, packaging, `docs/**`, `apps/docs/**`, CLI docs helpers and `fixtures/images/checker.png`. The existing `editor/next.config.ts` routing trigger is retained.                                      |
 | `tooling`     | Tests independent package publication and native release guards. Consumes packaging inputs, npm/publisher helpers, Changesets configuration and JavaScript installation configuration.                                                                                                                                             |
@@ -47,8 +47,12 @@ app-only lockfile update can therefore still compile the host CLI. Native
 delivery has no pnpm dependency graph, so these files alone do not select it.
 
 The complete Cargo tree remains one unit, including crate tests and docs. The
-complete documentation tree remains one unit because Docusaurus builds it and
-CLI guide links can depend on other pages. Any CI workflow or selector change
+complete documentation tree remains one unit within the `docs` group because
+Docusaurus builds it and CLI guide links can depend on other pages. Documentation
+inputs, including external source pins, select only `docs`; runtime conformance
+does not consume the documentation build. The CLI documentation workflow owns
+installed guide proof on PRs, main pushes and releases. `just cli-contracts`
+runs both suites locally. Any CI workflow or selector change
 selects all groups. Unclassified root configuration, fixtures and tooling also
 select all groups; known unrelated product trees do not. When adding a consumed
 input or SDK dependency, update the classifier, this inventory and its tests.
