@@ -6,8 +6,8 @@ const context = {
   repo: { owner: "gridaco", repo: "grida" },
   sha: "a".repeat(40),
 };
-const packageName = "@grida/tailwindcss-colors";
-const version = "4.0.2";
+const packageName = "@fixture/package";
+const version = "1.2.3";
 const tag = `${packageName}@${version}`;
 const ref = `refs/tags/${tag}`;
 const options = { context, packageName, version };
@@ -159,7 +159,7 @@ test("rejects invalid release identities before any API calls", async () => {
   for (const invalid of [
     { packageName: "grida" },
     { packageName: "../other" },
-    { version: "4.0.2/other" },
+    { version: `${version}/other` },
     { context: { ...context, sha: "main" } },
     { create: "true" },
   ]) {

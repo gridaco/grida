@@ -73,29 +73,24 @@ Versioning and publication are separate operations. The publication workflow
 does not run `changeset version`, change manifests, or create version commits.
 The independently published `grida` CLI is rejected by this entrypoint.
 
-For the Tailwind color package, palette generation is a development step. Commit
-and test the generated data before the release PR; publishing does not regenerate
-it from floating upstream dependencies.
-
 ## Running a release
 
 Open [Publish Packages](https://github.com/gridaco/grida/actions/workflows/publish-packages.yml),
 select **Run workflow**, and choose `main`. Enter the exact public workspace
-package name and the stable version already recorded in its manifest. For this
-release, use `@grida/tailwindcss-colors` and `4.0.2`.
+package name and the stable version already recorded in its manifest.
 
 The equivalent CLI command is:
 
 ```sh
 gh workflow run publish-packages.yml --repo gridaco/grida --ref main \
-  -f package=@grida/tailwindcss-colors -f version=4.0.2
+  -f package='<package-name>' -f version='<version>'
 ```
 
 Approve the run's `npm-publish` deployment. The job validates the workspace
-package and exact version, rejects an existing release tag, builds and tests the
-selected package and its dependencies, and publishes only that package to npm's
-`latest` tag through OIDC. An empty selection or version mismatch fails; other
-public packages are not published or changed.
+package and exact version, rejects an existing release tag, runs available build,
+typecheck, and test tasks for the selected package and its dependencies, and
+publishes only that package to npm's `latest` tag through OIDC. An empty selection
+or version mismatch fails; other public packages are not published or changed.
 
 After successful publication, a separate job records a lightweight
 `<package>@<version>` Git tag at the workflow's tested commit. Only that job has
