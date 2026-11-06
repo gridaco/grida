@@ -27,32 +27,32 @@
     "./css/oklch.css": "./css/oklch.css",
     "./json/rgb.json": {
       "import": {
-        "default": "./json/rgb.json",
-        "types": "./json/rgb.json.d.ts"
+        "types": "./json/rgb.json.d.ts",
+        "default": "./json/rgb.json"
       },
       "require": {
-        "default": "./json/rgb.json",
-        "types": "./json/rgb.json.d.cts"
+        "types": "./json/rgb.json.d.cts",
+        "default": "./json/rgb.json"
       }
     },
     "./json/rgbf.json": {
       "import": {
-        "default": "./json/rgbf.json",
-        "types": "./json/rgbf.json.d.ts"
+        "types": "./json/rgbf.json.d.ts",
+        "default": "./json/rgbf.json"
       },
       "require": {
-        "default": "./json/rgbf.json",
-        "types": "./json/rgbf.json.d.cts"
+        "types": "./json/rgbf.json.d.cts",
+        "default": "./json/rgbf.json"
       }
     },
     "./json/rgba.json": {
       "import": {
-        "default": "./json/rgba.json",
-        "types": "./json/rgba.json.d.ts"
+        "types": "./json/rgba.json.d.ts",
+        "default": "./json/rgba.json"
       },
       "require": {
-        "default": "./json/rgba.json",
-        "types": "./json/rgba.json.d.cts"
+        "types": "./json/rgba.json.d.cts",
+        "default": "./json/rgba.json"
       }
     },
     "./json/hex.json": {
@@ -67,12 +67,12 @@
     },
     "./json/oklch.json": {
       "import": {
-        "default": "./json/oklch.json",
-        "types": "./json/oklch.json.d.ts"
+        "types": "./json/oklch.json.d.ts",
+        "default": "./json/oklch.json"
       },
       "require": {
-        "default": "./json/oklch.json",
-        "types": "./json/oklch.json.d.cts"
+        "types": "./json/oklch.json.d.cts",
+        "default": "./json/oklch.json"
       }
     },
     "./types": {
