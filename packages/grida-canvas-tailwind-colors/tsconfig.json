@@ -5,5 +5,5 @@
     "target": "ES2022",
     "types": []
   },
-  "include": ["types.d.ts", "json/**/*.ts", "json/**/*.cts"]
+  "include": ["types.d.ts", "json/*.d.cts"]
 }

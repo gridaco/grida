@@ -57,7 +57,16 @@ after(() => {
   if (directory) rmSync(directory, { recursive: true, force: true });
 });
 
-for (const [name, extension, module, moduleResolution] of [
+test("the packed hex palette uses six lowercase hexadecimal digits", () => {
+  const colors = JSON.parse(
+    readFileSync(path.join(installed, "json/hex.json"), "utf8")
+  );
+  for (const shades of Object.values(colors))
+    for (const value of Object.values(shades))
+      assert.match(value, /^#[0-9a-f]{6}$/);
+});
+
+for (const [name, extension, module, moduleResolution, commonJSRequire] of [
   ["bundler", "ts", ts.ModuleKind.ESNext, ts.ModuleResolutionKind.Bundler],
   [
     "bundler (preserve)",
@@ -73,6 +82,13 @@ for (const [name, extension, module, moduleResolution] of [
     ts.ModuleResolutionKind.NodeNext,
   ],
   [
+    "Node CommonJS (require)",
+    "cts",
+    ts.ModuleKind.NodeNext,
+    ts.ModuleResolutionKind.NodeNext,
+    true,
+  ],
+  [
     "Node16 CommonJS",
     "cts",
     ts.ModuleKind.Node16,
@@ -81,9 +97,10 @@ for (const [name, extension, module, moduleResolution] of [
 ]) {
   test(`the packed JSON palettes and reusable types work with ${name}`, () => {
     const attribute = extension === "mts" ? ' with { type: "json" }' : "";
-    const imports = formats.map(
-      ([format]) =>
-        `import ${format} from "@grida/tailwindcss-colors/json/${format}.json"${attribute};`
+    const imports = formats.map(([format]) =>
+      commonJSRequire
+        ? `import ${format} = require("@grida/tailwindcss-colors/json/${format}.json");`
+        : `import ${format} from "@grida/tailwindcss-colors/json/${format}.json"${attribute};`
     );
     const checks = formats.flatMap(([format, type]) => {
       const data = readFileSync(

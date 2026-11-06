@@ -108,7 +108,8 @@ For a bundler project:
 {
   "compilerOptions": {
     "module": "preserve",
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "target": "ES2022"
   }
 }
 ```
@@ -190,6 +191,13 @@ Object.entries(rgbColors).forEach(([family, shades]) => {
 // Only import what you need - modular exports enable tree-shaking
 const rgbColors = require("@grida/tailwindcss-colors/json/rgb.json");
 const slate500 = rgbColors.slate["500"]; // [98, 116, 142]
+```
+
+For TypeScript that emits CommonJS, use `import = require`:
+
+```typescript
+import rgbColors = require("@grida/tailwindcss-colors/json/rgb.json");
+const slate500 = rgbColors.slate["500"];
 ```
 
 #### Tree-shaking
