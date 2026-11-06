@@ -99,13 +99,13 @@ All types (`AgentFs.Backend`, `AgentFs.LiveBinding`, `AgentFs.ReadResult`, the r
 
 `AgentFs.tools` is the AI-SDK tool table (four zod-schema'd defs plus `grep_files`). Name constants live alongside as `AgentFs.TOOL_NAMES`:
 
-| Tool         | Operation                                                                                                 | Claude Code parallel |
-| ------------ | --------------------------------------------------------------------------------------------------------- | -------------------- |
-| `read_file`  | `{ path }` → `{ content }`                                                                                | `Read`               |
-| `edit_file`  | `{ path, old_string, new_string, replace_all? }` → current-content match-and-replace                      | `Edit`               |
-| `write_file` | `{ path, content }` → full-file upsert                                                                    | `Write`              |
-| `list_files` | `{ path?, offset?, limit? }` → `{ path, folders, files, truncated, next_offset? }` — direct children only | ~`Glob` (scoped)     |
-| `grep_files` | `{ pattern, path_prefix?, case_sensitive? }` → `{ matches, files_scanned }`, mirrors `grep -n -F`         | `Grep`               |
+| Tool         | Operation                                                                                                                                   | Claude Code parallel |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `read_file`  | `{ path }` → `{ content }`                                                                                                                  | `Read`               |
+| `edit_file`  | `{ path, old_string, new_string, replace_all? }` → current-content match-and-replace                                                        | `Edit`               |
+| `write_file` | `{ path, content }` → full-file upsert                                                                                                      | `Write`              |
+| `list_files` | `{ path?, offset?, limit? }` → `{ path, folders, files, truncated, next_offset? }` — direct children only                                   | ~`Glob` (scoped)     |
+| `grep_files` | `{ pattern, path_prefix?, case_sensitive?, offset?, limit? }` → `{ matches, files_scanned, truncated, next_offset? }`, mirrors `grep -n -F` | `Grep`               |
 
 `list_files` is directory discovery, not a repository inventory. It
 defaults to `/`, returns sorted absolute child paths grouped into

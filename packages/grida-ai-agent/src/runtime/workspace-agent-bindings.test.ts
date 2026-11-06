@@ -1063,6 +1063,7 @@ describe("createWorkspaceAgentBindings — read-only directory references", () =
       matches: [
         { path: `${mount}/nested/marker.txt`, line: 1, text: "E2E_MARKER" },
       ],
+      truncated: false,
     });
   });
 
@@ -1228,6 +1229,8 @@ describe("createWorkspaceAgentBindings — read-only directory references", () =
     });
 
     expect(output.matches).toEqual([]);
+    expect(output.truncated).toBe(true);
+    expect(output).not.toHaveProperty("next_offset");
     expect(yielded).toBe(999);
     expect(closed).toBe(true);
     expect(readFile).toHaveBeenCalledTimes(599);

@@ -905,6 +905,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
 
     const matches: AgentFs.GrepMatch[] = [];
     const pathsScanned: string[] = [];
+    let truncated = false;
     // A step is either one directory-open attempt or one entry considered.
     // Text reads are covered by the entry that led to them. Counting the work
     // before filtering/reading is what keeps binary-heavy and unreadable trees
@@ -1009,11 +1010,14 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     };
 
     for (const target of targets) {
-      if (await walk(target.binding, target.rel, 0)) break;
+      if (await walk(target.binding, target.rel, 0)) {
+        truncated = true;
+        break;
+      }
     }
 
     matches.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line);
-    return { matches, paths_scanned: pathsScanned };
+    return { matches, paths_scanned: pathsScanned, truncated };
   }
 
   async read(path: string): Promise<string | null> {
