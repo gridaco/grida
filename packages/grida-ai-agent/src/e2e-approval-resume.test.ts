@@ -51,6 +51,9 @@ let workspace: Workspace;
 let store: SessionsStore;
 let streams: StreamRegistry;
 let app: Hono;
+let runtime: AgentRuntime;
+let userData: string;
+let modelPrompts: unknown[][];
 let srcFile: string;
 let destFile: string;
 
@@ -67,6 +70,7 @@ function makeMockModel(): MockLanguageModelV3 {
     modelId: "openai/gpt-5.6-luna",
     doStream: async (options) => {
       const prompt = options.prompt as unknown[];
+      modelPrompts.push(prompt);
       const wantsCommand =
         lastUserText(prompt).includes(CMD_TRIGGER) &&
         !promptHasToolResult(prompt);
@@ -124,7 +128,8 @@ beforeEach(async () => {
   baseDir = await fs.mkdtemp(
     path.join(os.tmpdir(), "grida-agent-approval-e2e-")
   );
-  const userData = path.join(baseDir, "userdata");
+  userData = path.join(baseDir, "userdata");
+  modelPrompts = [];
   workspaceRoot = await fs.realpath(
     await fs
       .mkdir(path.join(baseDir, "workspace"), { recursive: true })
@@ -137,6 +142,17 @@ beforeEach(async () => {
   await fs.writeFile(srcFile, "png-bytes", "utf8");
   await fs.mkdir(path.join(workspaceRoot, "outputs"), { recursive: true });
 
+  await bootHost();
+});
+
+afterEach(async () => {
+  streams.clear();
+  store.close();
+  await fs.rm(baseDir, { recursive: true, force: true });
+});
+
+/** Build a host from what is on disk, sharing no memory with an earlier one. */
+async function bootHost(): Promise<void> {
   const auth = new AuthStore(userData);
   const secrets = new SecretsStore(auth);
   await secrets.set("openrouter", "sk-test");
@@ -146,7 +162,7 @@ beforeEach(async () => {
   store = new SessionsStore(openSessionsDb({ user_data_path: userData }));
   streams = new StreamRegistry();
   app = new Hono();
-  const runtime = new AgentRuntime({
+  runtime = new AgentRuntime({
     secrets,
     workspace_registry: registry,
     sessions_store: store,
@@ -159,13 +175,76 @@ beforeEach(async () => {
   });
   registerAgentRoutes(app, runtime);
   registerSessionsRoutes(app, { store, runtime });
-});
+}
 
-afterEach(async () => {
+/**
+ * Drop the live host, then start a new one the way the sidecar does: the
+ * trusted startup recovery runs before any client request is served.
+ */
+async function restartHost(): Promise<void> {
   streams.clear();
   store.close();
-  await fs.rm(baseDir, { recursive: true, force: true });
-});
+  await bootHost();
+  await runtime.recoverQueuedSessions();
+}
+
+type ToolPartData = {
+  state?: string;
+  approval?: { id?: string };
+  errorText?: string;
+  output?: { exit_code?: number | null };
+};
+
+async function toolPartData(sessionId: string): Promise<ToolPartData> {
+  const part = await store.findToolPart(sessionId, "tc_cmd");
+  expect(part).toBeTruthy();
+  return part!.data as ToolPartData;
+}
+
+/** Run the first turn until the model's command is paused for approval. */
+async function runUntilApprovalPause(userMsg: {
+  id: string;
+  role: string;
+  parts: Array<{ type: string; text: string }>;
+}): Promise<{ sessionId: string; approvalId: string; turnId: string }> {
+  const res = await app.request("/agent/run", {
+    method: "POST",
+    body: JSON.stringify({
+      messages: [userMsg],
+      workspace_id: workspace.id,
+      mode: "accept-edits",
+    }),
+  });
+  expect(res.status).toBe(200);
+  const sse = await res.text();
+  const sessionId = sessionIdFromSse(sse);
+
+  let approvalId = "";
+  await waitFor(async () => {
+    const data = await toolPartData(sessionId);
+    expect(data.state).toBe("approval-requested");
+    approvalId = data.approval!.id!;
+  });
+  // The first turn must have fully settled before the host goes away.
+  await waitFor(async () => {
+    expect(streams.get(sessionId)?.status).not.toBe("running");
+  });
+  return { sessionId, approvalId, turnId: startIdsOf(sse)[0]! };
+}
+
+function hasContinuationText(
+  messages: Awaited<ReturnType<SessionsStore["listMessages"]>>
+): boolean {
+  return messages.some(
+    (m) =>
+      m.role === "assistant" &&
+      m.parts.some(
+        (p) =>
+          (p.data as { type?: string }).type === "text" &&
+          (p.data as { text?: string }).text === "copied."
+      )
+  );
+}
 
 describe("supervised approval resume (accept-edits) — real SDK stream path", () => {
   it(
@@ -401,6 +480,202 @@ describe("supervised approval resume (accept-edits) — real SDK stream path", (
           "output-available"
         );
       });
+    }
+  );
+});
+
+describe("supervised approval across a host restart — real SDK stream path", () => {
+  const userMessage = (id: string) => ({
+    id,
+    role: "user",
+    parts: [{ type: "text", text: `${CMD_TRIGGER} please` }],
+  });
+
+  it(
+    "a pending approval survives the restart, and Allow executes the paused tool and continues the turn",
+    { timeout: 30_000 },
+    async () => {
+      const userMsg = userMessage("u_restart_allow");
+      const { sessionId, approvalId, turnId } =
+        await runUntilApprovalPause(userMsg);
+
+      await restartHost();
+
+      // Startup repair must treat the pause as a durable wait, not an orphan.
+      expect((await toolPartData(sessionId)).state).toBe("approval-requested");
+      expect(await store.hasPendingApproval(sessionId)).toBe(true);
+      await expect(fs.stat(destFile)).rejects.toThrow(/ENOENT/);
+
+      const res = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: [userMsg],
+          session_id: sessionId,
+          workspace_id: workspace.id,
+          mode: "accept-edits",
+          approval_answer: {
+            tool_call_id: "tc_cmd",
+            approval_id: approvalId,
+            approved: true,
+          },
+        }),
+      });
+      expect(res.status).toBe(200);
+      const sse = await res.text();
+      expect(sse).not.toContain('"type":"error"');
+      // A client that reloaded after the restart still attaches the output to
+      // the message it hydrated, so identity must hold across host generations.
+      expect(startIdsOf(sse)[0]).toBe(turnId);
+
+      await waitFor(async () => {
+        const data = await toolPartData(sessionId);
+        expect(data.state).toBe("output-available");
+        expect(data.output?.exit_code).toBe(0);
+      });
+      expect((await fs.stat(destFile)).isFile()).toBe(true);
+      expect(await store.hasPendingApproval(sessionId)).toBe(false);
+      await waitFor(async () => {
+        expect(hasContinuationText(await store.listMessages(sessionId))).toBe(
+          true
+        );
+      });
+    }
+  );
+
+  it(
+    "a denial answered after the restart never runs the tool, and the turn still continues",
+    { timeout: 30_000 },
+    async () => {
+      const userMsg = userMessage("u_restart_deny");
+      const { sessionId, approvalId } = await runUntilApprovalPause(userMsg);
+
+      await restartHost();
+
+      const res = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: [userMsg],
+          session_id: sessionId,
+          workspace_id: workspace.id,
+          mode: "accept-edits",
+          approval_answer: {
+            tool_call_id: "tc_cmd",
+            approval_id: approvalId,
+            approved: false,
+          },
+        }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.text()).not.toContain('"type":"error"');
+
+      await waitFor(async () => {
+        expect((await toolPartData(sessionId)).state).toBe("output-denied");
+        expect(hasContinuationText(await store.listMessages(sessionId))).toBe(
+          true
+        );
+      });
+      await expect(fs.stat(destFile)).rejects.toThrow(/ENOENT/);
+      expect(await store.hasPendingApproval(sessionId)).toBe(false);
+
+      // The denial is a terminal answer, not an in-flight orphan: another
+      // restart must not rewrite it as an aborted call.
+      await restartHost();
+      expect((await toolPartData(sessionId)).state).toBe("output-denied");
+
+      // The next turn must still resolve the denied call for the model, or a
+      // provider rejects the prompt for its unanswered tool call.
+      modelPrompts = [];
+      const next = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: [
+            {
+              id: "u_after_denial",
+              role: "user",
+              parts: [{ type: "text", text: "try something else" }],
+            },
+          ],
+          session_id: sessionId,
+          workspace_id: workspace.id,
+          mode: "accept-edits",
+        }),
+      });
+      expect(next.status).toBe(200);
+      expect(await next.text()).not.toContain('"type":"error"');
+      await waitFor(async () => {
+        expect(modelPrompts.length).toBeGreaterThan(0);
+      });
+      expect(promptHasToolResult(modelPrompts[0])).toBe(true);
+      expect(JSON.stringify(modelPrompts[0])).toContain(
+        "Tool execution denied."
+      );
+      await expect(fs.stat(destFile)).rejects.toThrow(/ENOENT/);
+    }
+  );
+
+  it.each(["input-available", "approval-responded"] as const)(
+    "a tool orphaned at %s is finalized on restart, not replayed, and the next run proceeds",
+    { timeout: 30_000 },
+    async (orphanState) => {
+      const { sessionId } = await runUntilApprovalPause(
+        userMessage(`u_restart_${orphanState}`)
+      );
+
+      // The prior host died with the call in flight: it may or may not have
+      // already produced its side effect, so it must never run again.
+      const part = await store.findToolPart(sessionId, "tc_cmd");
+      const { approval, ...pausedData } = part!.data as ToolPartData;
+      await store.upsertPart(part!.message_id, {
+        index: part!.index,
+        type: part!.type,
+        data: {
+          ...pausedData,
+          state: orphanState,
+          ...(orphanState === "approval-responded"
+            ? { approval: { id: approval!.id, approved: true } }
+            : {}),
+        },
+        tool_call_id: "tc_cmd",
+        tool_state: orphanState,
+        session_id: sessionId,
+      });
+
+      await restartHost();
+
+      const finalized = await toolPartData(sessionId);
+      expect(finalized.state).toBe("output-error");
+      expect(finalized.errorText).toBe("aborted by host restart");
+      expect(await store.hasPendingApproval(sessionId)).toBe(false);
+
+      modelPrompts = [];
+      const res = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: [
+            {
+              id: `u_after_${orphanState}`,
+              role: "user",
+              parts: [{ type: "text", text: "what happened?" }],
+            },
+          ],
+          session_id: sessionId,
+          workspace_id: workspace.id,
+          mode: "accept-edits",
+        }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.text()).not.toContain('"type":"error"');
+
+      await waitFor(async () => {
+        expect(hasContinuationText(await store.listMessages(sessionId))).toBe(
+          true
+        );
+      });
+      // The next prompt resolves the dangling call for the model...
+      expect(promptHasToolResult(modelPrompts[0])).toBe(true);
+      // ...and neither the restart nor that run re-executed it.
+      await expect(fs.stat(destFile)).rejects.toThrow(/ENOENT/);
+      expect((await toolPartData(sessionId)).state).toBe("output-error");
     }
   );
 });
