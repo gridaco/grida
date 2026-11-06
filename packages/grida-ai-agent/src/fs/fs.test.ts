@@ -1000,6 +1000,166 @@ describe("AgentFs.grep", () => {
       expect(fs2.read("/notes.md")?.content).toBe("hi");
     })();
   });
+
+  describe("output bounds", () => {
+    function seedManyMatches(count: number): AgentFs {
+      const fs = new AgentFs(new AgentFs.MemoryBackend());
+      fs.write("/many.md", {
+        content: Array.from({ length: count }, (_, i) => `hit ${i}`).join("\n"),
+        expected_version: null,
+      });
+      return fs;
+    }
+
+    it("returns a complete result without pagination fields when it fits", () => {
+      const r = seedManyMatches(200).grep({ pattern: "hit" });
+      expect(r.matches).toHaveLength(200);
+      expect(r.truncated).toBe(false);
+      expect(r).not.toHaveProperty("next_offset");
+    });
+
+    it("caps the default page at 200 matches and marks the remainder", () => {
+      const r = seedManyMatches(201).grep({ pattern: "hit" });
+      expect(r.matches).toHaveLength(200);
+      expect(r.truncated).toBe(true);
+      expect(r.next_offset).toBe(200);
+    });
+
+    it("walks every match exactly once through next_offset", () => {
+      const fs = seedManyMatches(5);
+      const lines: number[] = [];
+      let offset: number | undefined = 0;
+      while (offset !== undefined) {
+        const r: AgentFs.GrepResult = fs.grep({
+          pattern: "hit",
+          limit: 2,
+          offset,
+        });
+        lines.push(...r.matches.map((m) => m.line));
+        offset = r.next_offset;
+      }
+      expect(lines).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it("clamps an oversized limit to the maximum page", () => {
+      const r = seedManyMatches(1001).grep({ pattern: "hit", limit: 5000 });
+      expect(r.matches).toHaveLength(1000);
+      expect(r.next_offset).toBe(1000);
+    });
+
+    it("returns an empty final page for an offset past the end", () => {
+      const r = seedManyMatches(3).grep({ pattern: "hit", offset: 10 });
+      expect(r.matches).toEqual([]);
+      expect(r.truncated).toBe(false);
+    });
+
+    it("pages in path order regardless of file discovery order", () => {
+      const fs = new AgentFs(new AgentFs.MemoryBackend());
+      fs.write("/z.md", { content: "hit", expected_version: null });
+      fs.write("/a.md", { content: "hit", expected_version: null });
+      const r = fs.grep({ pattern: "hit", limit: 1 });
+      expect(r.matches.map((m) => m.path)).toEqual(["/a.md"]);
+      expect(r.next_offset).toBe(1);
+    });
+
+    it("clips very long lines and marks only those matches", () => {
+      const fs = new AgentFs(new AgentFs.MemoryBackend());
+      fs.write("/min.js", {
+        content: `hit${"x".repeat(5000)}\nhit short`,
+        expected_version: null,
+      });
+      const [long, short] = fs.grep({ pattern: "hit" }).matches;
+      expect(long.text).toHaveLength(2000);
+      expect(long.text_truncated).toBe(true);
+      expect(short).toEqual({ path: "/min.js", line: 2, text: "hit short" });
+    });
+
+    it("does not split a surrogate pair at the clip boundary", () => {
+      const fs = new AgentFs(new AgentFs.MemoryBackend());
+      fs.write("/emoji.md", {
+        content: `hit${"x".repeat(1996)}\u{1F600}tail`,
+        expected_version: null,
+      });
+      const [match] = fs.grep({ pattern: "hit" }).matches;
+      expect(match.text).toHaveLength(1999);
+      expect(match.text.isWellFormed()).toBe(true);
+      expect(match.text_truncated).toBe(true);
+    });
+
+    it("honors offset and limit through the tool call", async () => {
+      const r = (await AgentFs.resolveToolCallAsync(seedManyMatches(3), {
+        tool_name: AgentFs.TOOL_NAMES.grep_files,
+        input: { pattern: "hit", offset: 1, limit: 1 },
+      })) as AgentFs.GrepResult;
+      expect(r.matches.map((m) => m.line)).toEqual([2]);
+      expect(r.next_offset).toBe(2);
+    });
+
+    it("pages merged backend matches and de-duplicates across the page", async () => {
+      class SearchingBackend extends AgentFs.MemoryBackend {
+        async grep(): Promise<AgentFs.BackendGrepResult> {
+          return {
+            matches: [
+              { path: "/lazy.md", line: 1, text: "hit" },
+              { path: "/a.md", line: 1, text: "hit" },
+            ],
+            paths_scanned: ["/lazy.md"],
+          };
+        }
+      }
+      const fs = new AgentFs(new SearchingBackend());
+      fs.write("/a.md", { content: "hit", expected_version: null });
+
+      const first = await fs.grep_fresh({ pattern: "hit", limit: 1 });
+      expect(first.matches.map((m) => m.path)).toEqual(["/a.md"]);
+      expect(first.truncated).toBe(true);
+      expect(first.next_offset).toBe(1);
+
+      const second = await fs.grep_fresh({
+        pattern: "hit",
+        limit: 1,
+        offset: 1,
+      });
+      expect(second.matches.map((m) => m.path)).toEqual(["/lazy.md"]);
+      expect(second.truncated).toBe(false);
+    });
+
+    it("reports a backend that stopped early without inventing a next page", async () => {
+      class CappedBackend extends AgentFs.MemoryBackend {
+        async grep(): Promise<AgentFs.BackendGrepResult> {
+          return {
+            matches: [{ path: "/lazy.md", line: 1, text: "hit" }],
+            paths_scanned: ["/lazy.md"],
+            truncated: true,
+          };
+        }
+      }
+      const r = await new AgentFs(new CappedBackend()).grep_fresh({
+        pattern: "hit",
+      });
+      expect(r.matches).toHaveLength(1);
+      expect(r.truncated).toBe(true);
+      expect(r).not.toHaveProperty("next_offset");
+    });
+
+    it("marks hydrated matches as partial when the backend search fails", async () => {
+      class FailingBackend extends AgentFs.MemoryBackend {
+        async grep(): Promise<AgentFs.BackendGrepResult> {
+          throw new Error("synthetic grep failure");
+        }
+      }
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const fs = new AgentFs(new FailingBackend());
+      fs.write("/a.md", { content: "hit", expected_version: null });
+
+      const r = await fs.grep_fresh({ pattern: "hit" });
+
+      expect(r.matches.map((m) => m.path)).toEqual(["/a.md"]);
+      expect(r.truncated).toBe(true);
+      expect(r).not.toHaveProperty("next_offset");
+      warn.mockRestore();
+    });
+  });
 });
 
 describe("AgentFs.delete", () => {
