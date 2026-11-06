@@ -404,6 +404,7 @@ export const UploadedFileValue = forwardRef<
           name={name}
           required={required}
           value={value}
+          readOnly
           className={cn("sr-only", className)}
         />
       </>
