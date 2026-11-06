@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "NodeNext",
+    "target": "ES2022",
+    "types": []
+  },
+  "include": ["types.d.ts", "json/*.d.cts"]
+}

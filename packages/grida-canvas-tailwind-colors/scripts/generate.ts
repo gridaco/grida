@@ -174,7 +174,7 @@ function hexToOklchArray(hex: string): [number, number, number] {
 function normalizeHex(hex: string): string {
   try {
     const color = new Color(hex);
-    return color.to("srgb").toString({ format: "hex" });
+    return color.to("srgb").toString({ format: "hex", collapse: false });
   } catch {
     return hex;
   }

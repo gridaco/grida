@@ -98,14 +98,56 @@ The CSS files in this package are only provided for edge cases where you need CS
 
 #### TypeScript Setup
 
-To import JSON files in TypeScript, add `resolveJsonModule` to your `tsconfig.json`:
+Types are resolved through the package's explicit `exports` with
+`moduleResolution: "bundler"`, `"node16"`, or `"nodenext"`. These package imports
+do not require `resolveJsonModule` or `allowArbitraryExtensions`.
+
+For a bundler project:
 
 ```json
 {
   "compilerOptions": {
-    "resolveJsonModule": true
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "target": "ES2022"
   }
 }
+```
+
+For code that runs directly in Node.js, use `module: "nodenext"` and standard
+JSON import attributes in ESM:
+
+```typescript
+import rgbColors from "@grida/tailwindcss-colors/json/rgb.json"
+  with { type: "json" };
+
+const slate500 = rgbColors.slate["500"];
+```
+
+Choose the resolution mode that matches your runtime. See the
+[TypeScript module reference](https://www.typescriptlang.org/docs/handbook/modules/reference.html)
+and [Node.js JSON modules](https://nodejs.org/api/esm.html#json-modules).
+
+#### Reusable Types
+
+Import color keys and tuple types from the type-only `types` entrypoint.
+JSON modules export the palette as their default value; reusable types have
+their own entrypoint for consistent Node.js and bundler resolution.
+
+```typescript
+import type {
+  ColorName,
+  ColorShade,
+  Hex,
+  RGB,
+  RGBF,
+  RGBA,
+  OKLCH,
+} from "@grida/tailwindcss-colors/types";
+
+const family: ColorName = "slate";
+const shade: ColorShade = "500";
+const rgb: RGB = [98, 116, 142];
 ```
 
 #### Importing Colors
@@ -137,9 +179,9 @@ const slate500Oklch = oklchColors.slate["500"]; // [0.384, 0.015, 255.59]
 const allSlateColors = rgbColors.slate; // { "50": [...], "100": [...], ... }
 
 // Iterate over color families
-Object.keys(rgbColors).forEach((family) => {
+Object.entries(rgbColors).forEach(([family, shades]) => {
   console.log(`Color family: ${family}`);
-  console.log(`Available shades:`, Object.keys(rgbColors[family]));
+  console.log(`Available shades:`, Object.keys(shades));
 });
 ```
 
@@ -149,6 +191,13 @@ Object.keys(rgbColors).forEach((family) => {
 // Only import what you need - modular exports enable tree-shaking
 const rgbColors = require("@grida/tailwindcss-colors/json/rgb.json");
 const slate500 = rgbColors.slate["500"]; // [98, 116, 142]
+```
+
+For TypeScript that emits CommonJS, use `import = require`:
+
+```typescript
+import rgbColors = require("@grida/tailwindcss-colors/json/rgb.json");
+const slate500 = rgbColors.slate["500"];
 ```
 
 #### Tree-shaking
@@ -174,8 +223,9 @@ The `exports` field in `package.json` ensures that only explicitly imported file
 
 ```typescript
 import hexColors from "@grida/tailwindcss-colors/json/hex.json";
+import type { ColorName, ColorShade } from "@grida/tailwindcss-colors/types";
 
-function ColorSwatch({ family, shade }: { family: string; shade: string }) {
+function ColorSwatch({ family, shade }: { family: ColorName; shade: ColorShade }) {
   const color = hexColors[family]?.[shade];
   return (
     <div style={{ backgroundColor: color }}>
@@ -200,8 +250,13 @@ ctx.fillRect(0, 0, 100, 100);
 
 ```typescript
 import rgbColors from "@grida/tailwindcss-colors/json/rgb.json";
+import type {
+  ColorName,
+  ColorShade,
+  RGB,
+} from "@grida/tailwindcss-colors/types";
 
-function getColor(family: string, shade: string): [number, number, number] {
+function getColor(family: ColorName, shade: ColorShade): RGB {
   return rgbColors[family]?.[shade] ?? [0, 0, 0];
 }
 
@@ -271,3 +326,20 @@ Choose the format that best fits your use case:
 - Package version matches Tailwind CSS version for consistency
 - Alpha channel (`a`) is always `1` for all colors in Tailwind CSS v4 colors
 - Use the format that best suits your rendering needs (RGBA for canvas, HEX for web, OKLCH for modern color spaces)
+
+## Development
+
+```bash
+pnpm --filter @grida/tailwindcss-colors typecheck
+pnpm --filter @grida/tailwindcss-colors test
+```
+
+The consumer tests pack the package and check every JSON format and reusable
+type under bundler, Node ESM, and CommonJS resolution. They also run the emitted
+Node consumers. Tests use the committed color data without fetching or
+regenerating the palette.
+
+Each JSON subpath explicitly selects a `.d.cts` declaration using `export =`
+to describe the object returned by CommonJS `require`. Node ESM exposes that
+same JSON object as its default export. This models both import styles with
+one declaration per format; reusable types live separately in `types.d.ts`.

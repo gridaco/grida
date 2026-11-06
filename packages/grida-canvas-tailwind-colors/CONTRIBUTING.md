@@ -37,7 +37,8 @@ The script generates:
 
 **TypeScript Declaration Files:**
 
-- `json/*.json.d.ts` - Type definitions for each JSON file
+- `json/*.d.cts` - Palette declarations selected by the package exports
+- `types.d.ts` - Shared color keys and tuple types
 
 ### How It Works
 
