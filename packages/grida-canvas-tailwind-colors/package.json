@@ -54,7 +54,6 @@
   },
   "scripts": {
     "generate": "deno run --allow-read --allow-write --allow-net --allow-env --no-prompt scripts/generate.ts",
-    "prepublishOnly": "pnpm generate",
     "test": "node --test scripts/package.test.mjs",
     "typecheck": "tsc --noEmit"
   },

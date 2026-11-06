@@ -27,8 +27,8 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - name: Test CI change selection
-        run: node --test .github/scripts/ci-changes.test.mjs
+      - name: Test CI change selection and release tagging
+        run: node --test .github/scripts/ci-changes.test.mjs .github/scripts/npm-release-tag.test.cjs
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
       - name: Build Packages

@@ -1,29 +1,45 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import {
-  chmod,
   lstat,
   mkdtemp,
   readFile,
+  realpath,
   rm,
   writeFile,
 } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repository = fileURLToPath(new URL("../", import.meta.url));
-const filename = new URL("../packages/grida-cli/package.json", import.meta.url);
-const changeset = createRequire(import.meta.url).resolve(
-  "@changesets/cli/bin.js"
-);
-
 async function main() {
+  const args = process.argv.slice(2);
+  const check = args[0] === "--check";
+  if (check) args.shift();
   assert.equal(
-    process.argv.length,
+    args.length,
     2,
-    "Workspace publication takes no arguments"
+    "Usage: node scripts/publish-packages.mjs [--check] <package-name> <exact-stable-version>"
+  );
+  const [name, version] = args;
+  assert.match(
+    name,
+    /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/,
+    "Expected an exact npm package name"
+  );
+  assert.notEqual(
+    name,
+    "grida",
+    "The grida CLI has an independent release workflow"
+  );
+  assert.match(
+    version,
+    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/,
+    "Expected an exact stable version"
+  );
+  assert(
+    version.split(".").every((part) => Number.isSafeInteger(Number(part))),
+    "Invalid stable version"
   );
   assert.equal(process.env.GITHUB_REPOSITORY, "gridaco/grida");
   assert.equal(process.env.GITHUB_REF, "refs/heads/main");
@@ -39,17 +55,15 @@ async function main() {
       !process.env.NPM_ID_TOKEN,
     "Workspace publication uses GitHub OIDC without persistent token fallback"
   );
-  const info = await lstat(filename);
-  assert(info.isFile(), "Expected a regular CLI package manifest");
-  const original = await readFile(filename);
-  const manifest = JSON.parse(original.toString("utf8"));
-  assert.equal(manifest.name, "grida", "Unexpected CLI package identity");
-  assert.equal(
-    typeof manifest.private,
-    "boolean",
-    "CLI private flag must be explicit"
+
+  const repository = await realpath(
+    fileURLToPath(new URL("../", import.meta.url))
   );
-  const changed = !manifest.private;
+  const root = JSON.parse(
+    await readFile(path.join(repository, "package.json"), "utf8")
+  );
+  const pinned = /^pnpm@(\d+\.\d+\.\d+)$/.exec(root.packageManager);
+  assert(pinned, "The repository must pin an exact pnpm version");
   const scratch = await mkdtemp(
     path.join(tmpdir(), "grida-workspace-publish-")
   );
@@ -64,53 +78,107 @@ async function main() {
   process.on("SIGINT", interrupt);
   process.on("SIGTERM", terminate);
   try {
-    // Ignore machine-level credentials; pnpm exchanges the job's OIDC identity
-    // for a short-lived, package-scoped npm token during each publication.
+    // pnpm uses the GitHub job identity, never machine-level saved credentials.
     await writeFile(path.join(scratch, "npmrc"), "");
     await writeFile(path.join(scratch, "global-npmrc"), "");
-    // Changesets ignore controls versioning, but publish selects every public
-    // package. Hide only the independently published CLI for this child process.
-    // If forcibly killed before restoration, private:true remains fail-closed.
-    if (changed)
-      await writeFile(
-        filename,
-        JSON.stringify({ ...manifest, private: true }, null, 2) + "\n"
+    const env = {
+      ...process.env,
+      npm_config_userconfig: path.join(scratch, "npmrc"),
+      npm_config_globalconfig: path.join(scratch, "global-npmrc"),
+      npm_config_registry: "https://registry.npmjs.org",
+    };
+    const run = async (args, cwd = repository, capture = false) => {
+      assert(!interrupted, "Publication was cancelled");
+      let stdout = "";
+      child = spawn("pnpm", args, {
+        cwd,
+        env,
+        stdio: ["ignore", capture ? "pipe" : "inherit", "inherit"],
+      });
+      if (capture)
+        child.stdout.on("data", (chunk) => {
+          stdout += chunk;
+        });
+      const code = await new Promise((resolve, reject) => {
+        child.once("error", reject);
+        child.once("close", (status) => resolve(status ?? 1));
+      });
+      child = undefined;
+      assert(!interrupted, "Publication was cancelled");
+      assert.equal(code, 0, "pnpm command failed");
+      return stdout;
+    };
+    assert.equal(
+      (await run(["--version"], repository, true)).trim(),
+      pinned[1],
+      "Use the repository's pinned pnpm version"
+    );
+    const workspaces = JSON.parse(
+      await run(
+        ["list", "--recursive", "--depth", "-1", "--json"],
+        repository,
+        true
+      )
+    );
+    assert(Array.isArray(workspaces), "Expected pnpm's workspace inventory");
+    const matches = workspaces.filter((workspace) => workspace.name === name);
+    assert.equal(matches.length, 1, "Select exactly one workspace package");
+    assert.equal(
+      typeof matches[0].path,
+      "string",
+      "Workspace path is required"
+    );
+    const directory = await realpath(path.resolve(repository, matches[0].path));
+    const relative = path.relative(repository, directory);
+    assert(
+      relative &&
+        relative !== ".." &&
+        !relative.startsWith(`..${path.sep}`) &&
+        !path.isAbsolute(relative),
+      "The package must be inside the repository"
+    );
+    const filename = path.join(directory, "package.json");
+    assert(
+      (await lstat(filename)).isFile(),
+      "Expected a regular package manifest"
+    );
+    const manifest = JSON.parse(await readFile(filename, "utf8"));
+    assert.equal(
+      manifest.name,
+      name,
+      "Workspace name does not match its manifest"
+    );
+    assert.equal(
+      manifest.private,
+      false,
+      "The selected package must be explicitly public"
+    );
+    assert.equal(
+      manifest.version,
+      version,
+      "The requested version must match the committed package version"
+    );
+    if (!check)
+      await run(
+        [
+          "publish",
+          "--access",
+          "public",
+          "--tag",
+          "latest",
+          "--no-git-checks",
+          "--no-recursive",
+        ],
+        directory
       );
-    if (interrupted) {
-      process.exitCode = 1;
-      return;
-    }
-    child = spawn(process.execPath, [changeset, "publish"], {
-      cwd: repository,
-      stdio: "inherit",
-      env: {
-        ...process.env,
-        npm_config_userconfig: path.join(scratch, "npmrc"),
-        npm_config_globalconfig: path.join(scratch, "global-npmrc"),
-        npm_config_registry: "https://registry.npmjs.org",
-      },
-    });
-    process.exitCode = await new Promise((resolve, reject) => {
-      child.once("error", reject);
-      child.once("close", (code) => resolve(code ?? 1));
-    });
   } finally {
-    try {
-      if (changed) {
-        await writeFile(filename, original);
-        await chmod(filename, info.mode & 0o7777);
-      }
-    } finally {
-      process.removeListener("SIGINT", interrupt);
-      process.removeListener("SIGTERM", terminate);
-      await rm(scratch, { recursive: true, force: true });
-    }
+    process.removeListener("SIGINT", interrupt);
+    process.removeListener("SIGTERM", terminate);
+    await rm(scratch, { recursive: true, force: true });
   }
 }
 
-main().catch(() => {
-  console.error(
-    "Workspace publication failed; verify the CLI manifest before retrying."
-  );
+main().catch((error) => {
+  console.error(`Workspace publication failed: ${error.message}`);
   process.exitCode = 1;
 });

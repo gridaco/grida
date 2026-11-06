@@ -73,7 +73,7 @@
     "@grida/sequence": "workspace:*",
     "@grida/svg": "workspace:*",
     "@grida/svg-editor": "workspace:*",
-    "@grida/tailwindcss-colors": "^4.0.2",
+    "@grida/tailwindcss-colors": "^4",
     "@grida/text-editor": "workspace:*",
     "@grida/tokens": "workspace:*",
     "@grida/transparency-grid": "workspace:*",
