@@ -66,6 +66,13 @@ const PATH_DESCRIPTION =
 const HYDRATE_READ_CONCURRENCY = 24;
 const LIST_DIRECTORY_DEFAULT_LIMIT = 200;
 const LIST_DIRECTORY_MAX_LIMIT = 1000;
+const GREP_DEFAULT_LIMIT = 200;
+const GREP_MAX_LIMIT = 1000;
+/**
+ * A single minified line can reach the whole text file limit, so capping the
+ * match count alone does not bound the output.
+ */
+const GREP_MATCH_TEXT_MAX_CHARS = 2000;
 const MODEL_TEXT_FILE_MAX_BYTES = 1_048_576;
 
 function utf8ByteLength(content: string): number {
@@ -122,11 +129,13 @@ function normalizeListOffset(offset: number | undefined): number {
   return Math.max(0, Math.trunc(offset));
 }
 
-function normalizeListLimit(limit: number | undefined): number {
-  if (limit === undefined || !Number.isFinite(limit)) {
-    return LIST_DIRECTORY_DEFAULT_LIMIT;
-  }
-  return Math.max(1, Math.min(Math.trunc(limit), LIST_DIRECTORY_MAX_LIMIT));
+function normalizePageLimit(
+  limit: number | undefined,
+  defaultLimit: number,
+  maxLimit: number
+): number {
+  if (limit === undefined || !Number.isFinite(limit)) return defaultLimit;
+  return Math.max(1, Math.min(Math.trunc(limit), maxLimit));
 }
 
 function collectDirectoryEntries(
@@ -171,7 +180,11 @@ function pageDirectoryEntries(
   args: AgentFs.ListArgs
 ): AgentFs.ListResult {
   const offset = normalizeListOffset(args.offset);
-  const limit = normalizeListLimit(args.limit);
+  const limit = normalizePageLimit(
+    args.limit,
+    LIST_DIRECTORY_DEFAULT_LIMIT,
+    LIST_DIRECTORY_MAX_LIMIT
+  );
   const ordered: Array<{ type: "folder" | "file"; path: string }> = [
     ...entries.folders.map((p) => ({ type: "folder" as const, path: p })),
     ...entries.files.map((p) => ({ type: "file" as const, path: p })),
@@ -185,6 +198,47 @@ function pageDirectoryEntries(
     files: page.filter((e) => e.type === "file").map((e) => e.path),
     truncated,
     ...(truncated ? { next_offset: offset + limit } : {}),
+  };
+}
+
+function clipGrepMatch(match: AgentFs.GrepMatch): AgentFs.GrepMatch {
+  if (match.text.length <= GREP_MATCH_TEXT_MAX_CHARS) return match;
+  return {
+    ...match,
+    text: match.text.slice(0, GREP_MATCH_TEXT_MAX_CHARS),
+    text_truncated: true,
+  };
+}
+
+/**
+ * Order matches, then cut one page. The total order is what keeps `offset`
+ * meaningful across calls, whichever order the files were discovered in.
+ */
+function pageGrepMatches(
+  matches: AgentFs.GrepMatch[],
+  filesScanned: number,
+  args: AgentFs.GrepArgs,
+  scanTruncated = false
+): AgentFs.GrepResult {
+  const offset = normalizeListOffset(args.offset);
+  const limit = normalizePageLimit(
+    args.limit,
+    GREP_DEFAULT_LIMIT,
+    GREP_MAX_LIMIT
+  );
+  const ordered = [...matches].sort(
+    (a, b) =>
+      a.path.localeCompare(b.path) ||
+      a.line - b.line ||
+      a.text.localeCompare(b.text)
+  );
+  const hasNextPage = offset + limit < ordered.length;
+
+  return {
+    matches: ordered.slice(offset, offset + limit).map(clipGrepMatch),
+    files_scanned: filesScanned,
+    truncated: hasNextPage || scanTruncated,
+    ...(hasNextPage ? { next_offset: offset + limit } : {}),
   };
 }
 
@@ -983,7 +1037,11 @@ export class AgentFs {
   /**
    * Literal substring search across every known file. Mirrors `grep -n -F`:
    * line-oriented, fixed-string, returns one entry per matching line with
-   * a 1-indexed line number and the full line text.
+   * a 1-indexed line number and the line text.
+   *
+   * Results are sorted by path and line, then paginated: a broad pattern in a
+   * large workspace must not inflate a transcript that is re-sent every step.
+   * Lines longer than {@link GREP_MATCH_TEXT_MAX_CHARS} are clipped.
    *
    * Bound files are searched via `binding.serialize()` (so the agent sees
    * the same formatted bytes `read()` would return). Empty pattern → empty
@@ -993,6 +1051,14 @@ export class AgentFs {
    * enough context to author a unique match-and-replace edit.
    */
   grep(args: AgentFs.GrepArgs): AgentFs.GrepResult {
+    const { matches, files_scanned } = this.collectGrepMatches(args);
+    return pageGrepMatches(matches, files_scanned, args);
+  }
+
+  private collectGrepMatches(args: AgentFs.GrepArgs): {
+    matches: AgentFs.GrepMatch[];
+    files_scanned: number;
+  } {
     const matches: AgentFs.GrepMatch[] = [];
     let scanned = 0;
     const pattern = args.pattern;
@@ -1027,15 +1093,17 @@ export class AgentFs {
    * in both views.
    */
   async grep_fresh(args: AgentFs.GrepArgs): Promise<AgentFs.GrepResult> {
-    const cached = this.grep(args);
-    if (!this.backend.grep) return cached;
+    const cached = this.collectGrepMatches(args);
+    if (!this.backend.grep) {
+      return pageGrepMatches(cached.matches, cached.files_scanned, args);
+    }
 
     let fresh: AgentFs.BackendGrepResult;
     try {
       fresh = await this.backend.grep(args);
     } catch (err) {
       console.warn("[agent-fs] backend.grep failed:", err);
-      return cached;
+      return pageGrepMatches(cached.matches, cached.files_scanned, args, true);
     }
 
     const scanned = new Set(
@@ -1054,13 +1122,7 @@ export class AgentFs {
       seen.add(key);
       matches.push(match);
     }
-    matches.sort(
-      (a, b) =>
-        a.path.localeCompare(b.path) ||
-        a.line - b.line ||
-        a.text.localeCompare(b.text)
-    );
-    return { matches, files_scanned: scanned.size };
+    return pageGrepMatches(matches, scanned.size, args, fresh.truncated);
   }
 
   /**
@@ -1610,26 +1672,41 @@ export namespace AgentFs {
     path_prefix?: string;
     /** Default true. Set false for case-insensitive match. */
     case_sensitive?: boolean;
+    /** Zero-based offset into the sorted matches. Defaults to 0. */
+    offset?: number;
+    /** Maximum matches in this page. Defaults to 200, capped at 1000. */
+    limit?: number;
   };
 
   export type GrepMatch = {
     path: string;
     /** 1-indexed line number, mirroring `grep -n`. */
     line: number;
-    /** The full line text. */
+    /** The line text, clipped when `text_truncated` is set. */
     text: string;
+    /** True when `text` is only the start of a very long line. */
+    text_truncated?: boolean;
   };
 
   export type GrepResult = {
     matches: ReadonlyArray<GrepMatch>;
     /** Number of files scanned (mounts + pure files matching the prefix). */
     files_scanned: number;
+    /**
+     * True when this page is not the complete answer: more matches remain, or
+     * the backend stopped early or failed (then `next_offset` may be absent).
+     */
+    truncated: boolean;
+    /** Pass as `offset` to fetch the next page. Present only when one exists. */
+    next_offset?: number;
   };
 
   /** Backend search result used to merge lazy and hydrated path spaces. */
   export type BackendGrepResult = {
     matches: ReadonlyArray<GrepMatch>;
     paths_scanned: ReadonlyArray<string>;
+    /** True when the backend hit a search bound before covering its tree. */
+    truncated?: boolean;
   };
 
   // -------------------------------------------------------------------------
@@ -1778,10 +1855,13 @@ export namespace AgentFs {
       description:
         "Literal substring search across every known file. Mirrors `grep -n -F`: " +
         "returns one entry per matching line with a 1-indexed line number and " +
-        "the full line text.\n\n" +
+        "the line text, sorted by path and line.\n\n" +
         "Use this to find references / occurrences before deciding what to " +
         "edit. A matching line may not contain enough surrounding context " +
-        "for a unique edit_file call; read the file when you need more.",
+        "for a unique edit_file call; read the file when you need more.\n\n" +
+        "Results are paginated. When `truncated` is true the matches are " +
+        "partial: narrow `pattern` or `path_prefix`, or pass `next_offset` as " +
+        "`offset` when it is present.",
       inputSchema: z.object({
         pattern: z
           .string()
@@ -1801,16 +1881,49 @@ export namespace AgentFs {
           .describe(
             "Default true. Pass false for case-insensitive match (mirrors `grep -i`)."
           ),
+        offset: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe("Zero-based pagination offset. Omit for the first page."),
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .max(GREP_MAX_LIMIT)
+          .optional()
+          .describe(
+            `Maximum matches to return. Defaults to ${GREP_DEFAULT_LIMIT}.`
+          ),
       }),
       outputSchema: z.object({
         matches: z.array(
           z.object({
             path: z.string(),
             line: z.number().int().describe("1-indexed line number."),
-            text: z.string().describe("Full line text."),
+            text: z
+              .string()
+              .describe(
+                `Line text, limited to ${GREP_MATCH_TEXT_MAX_CHARS} characters.`
+              ),
+            text_truncated: z
+              .boolean()
+              .optional()
+              .describe(
+                "True when text is only the start of a longer line. The match itself may lie beyond it."
+              ),
           })
         ),
         files_scanned: z.number().int(),
+        truncated: z
+          .boolean()
+          .describe("True when these matches are not the complete result."),
+        next_offset: z
+          .number()
+          .int()
+          .optional()
+          .describe("Pass as offset to fetch the next page."),
       }),
     }),
 
@@ -1881,6 +1994,8 @@ export namespace AgentFs {
     pattern: string;
     path_prefix?: string;
     case_sensitive?: boolean;
+    offset?: number;
+    limit?: number;
   };
 
   function modelReadResult(
@@ -1954,9 +2069,9 @@ export namespace AgentFs {
         return fs.list_directory({ path, offset, limit });
       }
       case TOOL_NAMES.grep_files: {
-        const { pattern, path_prefix, case_sensitive } =
+        const { pattern, path_prefix, case_sensitive, offset, limit } =
           toolCall.input as GrepFilesInput;
-        return fs.grep({ pattern, path_prefix, case_sensitive });
+        return fs.grep({ pattern, path_prefix, case_sensitive, offset, limit });
       }
       case TOOL_NAMES.edit_file: {
         const { path, old_string, new_string, replace_all } =
@@ -2026,12 +2141,14 @@ export namespace AgentFs {
         return await fs.list_directory_fresh({ path, offset, limit });
       }
       case TOOL_NAMES.grep_files: {
-        const { pattern, path_prefix, case_sensitive } =
+        const { pattern, path_prefix, case_sensitive, offset, limit } =
           toolCall.input as GrepFilesInput;
         return await fs.grep_fresh({
           pattern,
           path_prefix,
           case_sensitive,
+          offset,
+          limit,
         });
       }
       case TOOL_NAMES.edit_file: {
