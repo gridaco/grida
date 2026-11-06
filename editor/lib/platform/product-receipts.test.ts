@@ -115,3 +115,43 @@ it("ACK failures remain retryable and never fabricate success", async () => {
     body
   );
 });
+
+it("receives durable product custody with an explicit static workload credential", async () => {
+  const { not_after: _expiry, ...withoutExpiry } = key;
+  const rpc = vi.fn<ProductReceiptRPC>(async () => ({
+    data: { events: [] },
+    error: null,
+  }));
+  const staticConfig = {
+    ...config,
+    keys: [{ ...withoutExpiry, lifetime: "static" }],
+  };
+  expect(
+    (
+      await handleProductReceipts(
+        request({ limit: 10 }),
+        "receipts",
+        staticConfig,
+        rpc
+      )
+    ).status
+  ).toBe(200);
+  expect(rpc).toHaveBeenCalledExactlyOnceWith("platform_product_usage_page", {
+    batch_limit: 10,
+  });
+  rpc.mockClear();
+  expect(
+    (
+      await handleProductReceipts(
+        request({ limit: 10 }),
+        "receipts",
+        {
+          ...config,
+          keys: [{ ...withoutExpiry, lifetime: "static", revoked: true }],
+        },
+        rpc
+      )
+    ).status
+  ).toBe(401);
+  expect(rpc).not.toHaveBeenCalled();
+});

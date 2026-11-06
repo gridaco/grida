@@ -6,6 +6,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const nonce = /^[A-Za-z0-9_-]{22,128}$/;
 const maximumLifetime = 90 * 24 * 60 * 60 * 1000;
 const maximumOverlap = 24 * 60 * 60 * 1000;
+const zeroTimestamp = Date.parse("0001-01-01T00:00:00Z");
 const audience = "platform.canonical";
 
 type Key = {
@@ -14,7 +15,8 @@ type Key = {
   environment: string;
   audience: string;
   not_before: string;
-  not_after: string;
+  not_after?: string;
+  lifetime?: "bounded" | "static";
   revoked: boolean;
 };
 export type CanonicalConfig = { environment: string; keys: unknown };
@@ -32,8 +34,8 @@ const exactKeys = (value: Record<string, unknown>, keys: string[]) =>
   Object.keys(value).length === keys.length &&
   keys.every((key) => key in value);
 
-// Same receiving-key contract as infra/packages/go/workloadauth. Configuration
-// contains hashes only; environment and audience never come from the caller.
+// Receiving configuration contains hashes only; environment and audience never
+// come from the caller. Static lifetime is explicit; old manifests stay bounded.
 export function canonicalVerifier(config: CanonicalConfig, now = Date.now()) {
   return workloadVerifier(config, audience, now);
 }
@@ -63,13 +65,16 @@ export function workloadVerifier(
         "environment",
         "audience",
         "not_before",
-        "not_after",
         "revoked",
+        ...("not_after" in raw ? ["not_after"] : []),
+        ...("lifetime" in raw ? ["lifetime"] : []),
       ])
     )
       throw new Error("invalid workload configuration");
     const key = raw as Key;
+    const bounded = !("lifetime" in raw) || key.lifetime === "bounded";
     if (
+      (!bounded && key.lifetime !== "static") ||
       typeof key.id !== "string" ||
       !identity.test(key.id) ||
       key.id.length > 64 ||
@@ -80,19 +85,20 @@ export function workloadVerifier(
       typeof key.verifier_sha256 !== "string" ||
       !/^[0-9a-f]{64}$/.test(key.verifier_sha256) ||
       typeof key.not_before !== "string" ||
-      typeof key.not_after !== "string" ||
+      ((bounded || "not_after" in raw) && typeof key.not_after !== "string") ||
       typeof key.revoked !== "boolean" ||
       ids.has(key.id) ||
       hashes.has(key.verifier_sha256)
     )
       throw new Error("invalid workload configuration");
     const from = Date.parse(key.not_before),
-      to = Date.parse(key.not_after);
+      to = key.not_after === undefined ? Infinity : Date.parse(key.not_after);
     if (
       !Number.isFinite(from) ||
-      !Number.isFinite(to) ||
-      to <= from ||
-      to - from > maximumLifetime
+      from === zeroTimestamp ||
+      to === zeroTimestamp ||
+      !(to > from) ||
+      (bounded && to - from > maximumLifetime)
     )
       throw new Error("invalid workload configuration");
     ids.add(key.id);
@@ -107,7 +113,11 @@ export function workloadVerifier(
     if (group.length > 2) throw new Error("invalid workload configuration");
     if (
       group.length === 2 &&
-      Math.min(...group.map((k) => Date.parse(k.not_after))) -
+      Math.min(
+        ...group.map((k) =>
+          k.not_after === undefined ? Infinity : Date.parse(k.not_after)
+        )
+      ) -
         Math.max(...group.map((k) => Date.parse(k.not_before))) >
         maximumOverlap
     )
@@ -142,7 +152,7 @@ export function workloadVerifier(
       key.environment === config.environment &&
       key.audience === audience &&
       now >= Date.parse(key.not_before) &&
-      now < Date.parse(key.not_after)
+      (key.not_after === undefined || now < Date.parse(key.not_after))
     );
   };
 }

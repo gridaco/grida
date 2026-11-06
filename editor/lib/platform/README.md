@@ -33,6 +33,26 @@ are display estimates; the execution service owns charging.
 The application exposes no financial-provider callback receivers. Applied
 migration history and retained receipts remain unchanged.
 
+## Receiving workload credentials
+
+The canonical and product-receipt handlers accept server-only verifier manifests.
+Each entry binds one key ID and SHA-256 verifier to a fixed environment and
+audience. Caller headers cannot choose either scope; tokens never belong in
+browser configuration.
+
+Omitted `lifetime`, or `"lifetime": "bounded"`, requires both `not_before` and
+`not_after`, with at most 90 days between them. Explicit `"lifetime": "static"`
+requires `not_before` and permits omitting `not_after`. A static credential may
+also set a finite `not_after` when deliberately retiring it; that deadline is
+exclusive. Existing bounded manifests retain their expiry behavior.
+
+Revocation, unique IDs and unique verifiers still apply. Each environment and
+audience permits at most two nonrevoked credentials with at most 24 hours of
+validity overlap. Two static credentials without retirement deadlines cannot
+coexist. For rotation, first give the old credential a short retirement deadline,
+install the replacement verifier, switch the sender, then remove the old verifier.
+Local fixtures and Sandbox deployments continue using bounded credentials.
+
 ## Checks
 
 From the Grida root:
