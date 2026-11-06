@@ -54,6 +54,11 @@ is per package; configuring `grida` or one scoped package does not authorize
 the others. Keep `grida` bound to `cli-release.yml` through its independent
 release setup.
 
+npm initially marks new connections **Pending validation** and displays a
+deadline for the first OIDC publication (48 hours when this setup was checked).
+Registration alone does not validate publication. Coordinate registration with
+the intended release, and check each package's displayed status and deadline.
+
 See [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) and
 [pnpm publication](https://pnpm.io/cli/publish).
 
