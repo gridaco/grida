@@ -1,6 +1,9 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { service_role } from "@/lib/supabase/server";
-import { parseStorageUrlOptions } from "@/services/form/storage";
+import { createFormsClient, service_role } from "@/lib/supabase/server";
+import {
+  isResponseFieldStorageObjectPath,
+  parseStorageUrlOptions,
+} from "@/services/form/storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import type { FormFieldStorageSchema } from "@/grida-forms-hosted/types";
 import assert from "assert";
@@ -8,6 +11,7 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 const expiresIn = 60 * 60;
+const cacheHeaders = { "Cache-Control": `private, max-age=${expiresIn}` };
 
 type Params = { form_id: string; field_id: string };
 
@@ -22,10 +26,11 @@ export async function GET(
   const qpath = req.nextUrl.searchParams.get("path");
   const options = parseStorageUrlOptions(req.nextUrl.searchParams);
 
-  assert(qpath);
+  if (!qpath) return notFound();
 
-  // TODO: support RLS
-  const { data } = await service_role.forms
+  // Authorize the form through RLS before accessing privileged storage.
+  const formsClient = await createFormsClient();
+  const { data: form, error: formerr } = await formsClient
     .from("form")
     .select(
       `
@@ -36,17 +41,14 @@ export async function GET(
         `
     )
     .eq("id", form_id)
-    .filter("fields.id", "eq", field_id)
     .single();
 
-  if (!data) {
-    return notFound();
-  }
+  if (formerr) console.error(formerr);
+  if (!form) return notFound();
 
-  const { fields, supabase_connection } = data;
-  assert(fields.length === 1);
-  const field = fields[0];
-  assert(field);
+  const { fields, supabase_connection } = form;
+  const field = fields.find((f) => f.id === field_id);
+  if (!field) return notFound();
 
   if (field.storage) {
     const { type, bucket } = field.storage as unknown as FormFieldStorageSchema;
@@ -73,21 +75,25 @@ export async function GET(
           const { publicUrl: src } = client.storage
             .from(bucket)
             .getPublicUrl(qpath, options).data;
-          return NextResponse.redirect(src);
+          return NextResponse.redirect(src, {
+            status: 302,
+            headers: cacheHeaders,
+          });
         } else {
-          const { data: singed } = await client.storage
+          const { data: signed } = await client.storage
             .from(bucket)
             .createSignedUrl(qpath, expiresIn, options);
 
-          const src = singed?.signedUrl;
+          const src = signed?.signedUrl;
 
           if (!src) {
             return notFound();
           }
-          return NextResponse.redirect(src);
+          return NextResponse.redirect(src, {
+            status: 302,
+            headers: cacheHeaders,
+          });
         }
-
-        //
       }
       case "grida":
       case "x-s3":
@@ -96,10 +102,15 @@ export async function GET(
     }
   }
 
-  const { data: singed } = await service_role.forms.storage
+  // The managed bucket is shared by every project.
+  if (!isResponseFieldStorageObjectPath(qpath, field.id)) {
+    return notFound();
+  }
+
+  const { data: signed } = await service_role.forms.storage
     .from(GRIDA_FORMS_RESPONSE_BUCKET)
     .createSignedUrl(qpath, expiresIn, options);
-  const src = singed?.signedUrl;
+  const src = signed?.signedUrl;
 
   if (!src) {
     return notFound();
@@ -107,8 +118,6 @@ export async function GET(
 
   return NextResponse.redirect(src, {
     status: 302,
-    headers: {
-      "Cache-Control": `public, max-age=${expiresIn}, s-maxage=${expiresIn}`,
-    },
+    headers: cacheHeaders,
   });
 }

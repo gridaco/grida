@@ -1,5 +1,6 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { service_role } from "@/lib/supabase/server";
+import { createFormsClient, service_role } from "@/lib/supabase/server";
+import { isResponseFieldStorageObjectPath } from "@/services/form/storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import type { FormFieldStorageSchema } from "@/grida-forms-hosted/types";
 import { notFound } from "next/navigation";
@@ -7,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
 
 type Params = { form_id: string; field_id: string };
+const cacheHeaders = { "Cache-Control": "private, no-store" };
 
 export async function GET(
   req: NextRequest,
@@ -17,14 +19,16 @@ export async function GET(
   const { form_id, field_id } = await context.params;
   const qpath = req.nextUrl.searchParams.get("path");
 
-  // passing the options will make image transform (even without empty options) - which will occur 403 on free plan tiers.
-  // @see https://sweetcoding.tistory.com/257
-  // const options = parseStorageUrlOptions(req.nextUrl.searchParams);
+  // Keep original-object URLs here. parseStorageUrlOptions always supplies
+  // `transform`, which selects the image-rendering endpoint even when empty.
+  // Hosted image transformations require Pro or above.
+  // @see https://supabase.com/docs/guides/storage/serving/image-transformations
 
-  assert(qpath);
+  if (!qpath) return notFound();
 
-  // TODO: support RLS
-  const { data } = await service_role.forms
+  // Authorize the form through RLS before accessing privileged storage.
+  const formsClient = await createFormsClient();
+  const { data: form, error: formerr } = await formsClient
     .from("form")
     .select(
       `
@@ -35,17 +39,14 @@ export async function GET(
         `
     )
     .eq("id", form_id)
-    .filter("fields.id", "eq", field_id)
     .single();
 
-  if (!data) {
-    return notFound();
-  }
+  if (formerr) console.error(formerr);
+  if (!form) return notFound();
 
-  const { fields, supabase_connection } = data;
-  assert(fields.length === 1);
-  const field = fields[0];
-  assert(field);
+  const { fields, supabase_connection } = form;
+  const field = fields.find((f) => f.id === field_id);
+  if (!field) return notFound();
 
   if (field.storage) {
     const { type, bucket } = field.storage as unknown as FormFieldStorageSchema;
@@ -59,18 +60,18 @@ export async function GET(
           }
         );
 
-        const { data: singed } = client.storage
-          .from(bucket)
-          .getPublicUrl(qpath);
+        const { data } = client.storage.from(bucket).getPublicUrl(qpath);
 
-        const src = singed?.publicUrl;
+        const src = data?.publicUrl;
 
         if (!src) {
           return notFound();
         }
 
-        return NextResponse.json({ data: singed, error: null });
-        //
+        return NextResponse.json(
+          { data, error: null },
+          { headers: cacheHeaders }
+        );
       }
       case "grida":
       case "x-s3":
@@ -79,15 +80,20 @@ export async function GET(
     }
   }
 
-  const { data: singed } = await service_role.forms.storage
+  // The managed bucket is shared by every project.
+  if (!isResponseFieldStorageObjectPath(qpath, field.id)) {
+    return notFound();
+  }
+
+  const { data } = service_role.forms.storage
     .from(GRIDA_FORMS_RESPONSE_BUCKET)
     .getPublicUrl(qpath);
 
-  const src = singed?.publicUrl;
+  const src = data?.publicUrl;
 
   if (!src) {
     return notFound();
   }
 
-  return NextResponse.json({ data: singed, error: null });
+  return NextResponse.json({ data, error: null }, { headers: cacheHeaders });
 }

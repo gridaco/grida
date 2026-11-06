@@ -1,5 +1,5 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { UniqueFileNameGenerator } from "@/grida-forms/lib/storage";
+import { isValidKey, UniqueFileNameGenerator } from "@/grida-forms/lib/storage";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { service_role } from "@/lib/supabase/server";
 import { TemplateVariables } from "@/lib/templating";
@@ -172,4 +172,23 @@ export function parseStorageUrlOptions(searchParams: URLSearchParams) {
   };
 
   return options;
+}
+
+/** Whether a managed response path belongs to the authorized field. */
+export function isResponseFieldStorageObjectPath(
+  path: string,
+  field_id: string
+): boolean {
+  // Storage signing interpolates the key into a URL. Reject alternate
+  // separators, escapes and URL delimiters before checking the field folder.
+  if (!isValidKey(path) || path.includes("?")) return false;
+
+  // URL parsing strips trailing spaces before resolving dot segments.
+  const parts = path.trimEnd().split("/");
+  return (
+    parts.length === 4 &&
+    parts[0] === "response" &&
+    parts[2] === field_id &&
+    parts.every((part) => part.length > 0 && part !== "." && part !== "..")
+  );
 }
