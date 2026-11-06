@@ -78,6 +78,8 @@ async function fixture(run) {
       JSON.stringify({ name: target[0], version: target[1], private: false })
     );
     await symlink("/usr/bin/tar", path.join(root, "bin/tar"));
+    // GNU tar launches gzip through PATH when reading .tgz fixtures.
+    await symlink("/usr/bin/gzip", path.join(root, "bin/gzip"));
     const list = path.join(root, "inventory.json");
     await writeFile(list, JSON.stringify(inventory));
     const report = path.join(root, "commands.jsonl");
