@@ -87,10 +87,15 @@ async function main() {
       npm_config_globalconfig: path.join(scratch, "global-npmrc"),
       npm_config_registry: "https://registry.npmjs.org",
     };
-    const run = async (args, cwd = repository, capture = false) => {
+    const run = async (
+      args,
+      cwd = repository,
+      capture = false,
+      command = "pnpm"
+    ) => {
       assert(!interrupted, "Publication was cancelled");
       let stdout = "";
-      child = spawn("pnpm", args, {
+      child = spawn(command, args, {
         cwd,
         env,
         stdio: ["ignore", capture ? "pipe" : "inherit", "inherit"],
@@ -105,7 +110,7 @@ async function main() {
       });
       child = undefined;
       assert(!interrupted, "Publication was cancelled");
-      assert.equal(code, 0, "pnpm command failed");
+      assert.equal(code, 0, `${command} command failed`);
       return stdout;
     };
     assert.equal(
@@ -158,19 +163,110 @@ async function main() {
       version,
       "The requested version must match the committed package version"
     );
-    if (!check)
+    if (check) return;
+
+    // Archive publication skips directory hooks. Preserve their usual order;
+    // pnpm pack itself runs prepack, prepare and postpack exactly once.
+    const hook = async (name) => {
+      if (manifest.scripts?.[name])
+        await run(
+          [
+            "run",
+            "--if-present",
+            "--config.enable-pre-post-scripts=false",
+            name,
+          ],
+          directory
+        );
+    };
+    await hook("prepublishOnly");
+    await hook("prepublish");
+    const archive = path.join(scratch, "package.tgz");
+    await run(["pack", "--out", archive, "--no-recursive"], directory);
+    const packed = JSON.parse(
       await run(
-        [
-          "publish",
-          "--access",
-          "public",
-          "--tag",
-          "latest",
-          "--no-git-checks",
-          "--no-recursive",
-        ],
-        directory
+        ["-xOf", archive, "package/package.json"],
+        directory,
+        true,
+        "tar"
+      )
+    );
+    assert.equal(packed.name, name, "The packed package name changed");
+    assert.equal(packed.version, version, "The packed package version changed");
+    assert.equal(
+      packed.private,
+      false,
+      "The packed package must remain public"
+    );
+    const workspaceNames = new Set(
+      workspaces.map((workspace) => workspace.name)
+    );
+    const bundled = packed.bundleDependencies ?? packed.bundledDependencies;
+    for (const [dependency, spec] of Object.entries(
+      packed.dependencies ?? {}
+    )) {
+      if (
+        Object.hasOwn(packed.optionalDependencies ?? {}, dependency) ||
+        bundled === true ||
+        (Array.isArray(bundled) && bundled.includes(dependency))
+      )
+        continue;
+      const original = manifest.dependencies?.[dependency];
+      const alias =
+        typeof spec === "string"
+          ? /^npm:((?:@[^/]+\/)?[^@]+)(?:@|$)/.exec(spec)?.[1]
+          : undefined;
+      if (
+        !workspaceNames.has(dependency) &&
+        !(typeof original === "string" && original.startsWith("workspace:")) &&
+        !workspaceNames.has(alias)
+      )
+        continue;
+      assert.equal(
+        typeof spec,
+        "string",
+        "Expected a packed dependency specifier"
       );
+      // pnpm resolves canonical ranges and npm aliases against the registry.
+      const available = JSON.parse(
+        await run(
+          [
+            "view",
+            `${dependency}@${spec}`,
+            "version",
+            "--json",
+            "--registry",
+            "https://registry.npmjs.org",
+          ],
+          directory,
+          true
+        )
+      );
+      const versions = Array.isArray(available) ? available : [available];
+      assert(
+        versions.length > 0 &&
+          versions.every(
+            (value) => typeof value === "string" && value.length > 0
+          ),
+        `No published version satisfies ${dependency}@${spec}`
+      );
+    }
+    // Upload the exact archive whose runtime requirements were checked.
+    await run(
+      [
+        "publish",
+        archive,
+        "--access",
+        "public",
+        "--tag",
+        "latest",
+        "--no-git-checks",
+        "--no-recursive",
+      ],
+      directory
+    );
+    await hook("publish");
+    await hook("postpublish");
   } finally {
     process.removeListener("SIGINT", interrupt);
     process.removeListener("SIGTERM", terminate);

@@ -92,6 +92,12 @@ typecheck, and test tasks for the selected package and its dependencies, and
 publishes only that package to npm's `latest` tag through OIDC. An empty selection
 or version mismatch fails; other public packages are not published or changed.
 
+Before uploading, the publisher packs the package and checks its required,
+unbundled workspace runtime dependencies against npm using the packed manifest.
+Each dependency must have a published version matching its packed requirement;
+publish dependencies first if needed. The publisher uploads that same archive
+after validation.
+
 After successful publication, a separate job records a lightweight
 `<package>@<version>` Git tag at the workflow's tested commit. Only that job has
 repository write permission; it cannot overwrite an existing tag. Confirm the
@@ -110,5 +116,7 @@ node --test scripts/publish-packages.test.mjs .github/scripts/npm-release-tag.te
 The publisher tests intercept subprocesses in synthetic workspaces. They prove
 exact package/version selection, CLI exclusion, unchanged manifests, OIDC
 propagation, isolated npm configuration, and denial of invalid authority or token
-fallback. Tag tests use a fake GitHub client to check creation and safe retries.
+fallback. They also verify that missing workspace dependencies block publication
+and that the validated archive is the one uploaded. Tag tests use a fake GitHub
+client to check creation and safe retries.
 They do not publish packages or contact npm or GitHub.
