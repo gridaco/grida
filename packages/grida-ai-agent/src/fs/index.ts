@@ -203,9 +203,15 @@ function pageDirectoryEntries(
 
 function clipGrepMatch(match: AgentFs.GrepMatch): AgentFs.GrepMatch {
   if (match.text.length <= GREP_MATCH_TEXT_MAX_CHARS) return match;
+  // Step back one unit rather than end on half of a surrogate pair.
+  const lastUnit = match.text.charCodeAt(GREP_MATCH_TEXT_MAX_CHARS - 1);
+  const end =
+    lastUnit >= 0xd800 && lastUnit <= 0xdbff
+      ? GREP_MATCH_TEXT_MAX_CHARS - 1
+      : GREP_MATCH_TEXT_MAX_CHARS;
   return {
     ...match,
-    text: match.text.slice(0, GREP_MATCH_TEXT_MAX_CHARS),
+    text: match.text.slice(0, end),
     text_truncated: true,
   };
 }

@@ -1130,7 +1130,7 @@ describe("createWorkspaceAgentBindings — read-only directory references", () =
 
     expect(readOutput).toMatchObject({ ok: false, reason: "io_error" });
     expect(listOutput).toMatchObject({ folders: [], files: [] });
-    expect(grepOutput).toMatchObject({ matches: [] });
+    expect(grepOutput).toMatchObject({ matches: [], truncated: true });
     expect(viewError).toMatchObject({
       name: "DirectoryReferencePathError",
       reason: "unreadable",
