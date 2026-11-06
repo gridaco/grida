@@ -160,7 +160,13 @@ import path from 'node:path';
 const tool = path.basename(process.argv[1]);
 const args = process.argv.slice(2);
 const entry = {tool, args};
-if (args[0] === 'publish') entry.name = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')).name;
+if (args[0] === 'publish') {
+  entry.name = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')).name;
+  entry.oidc = !!(process.env.ACTIONS_ID_TOKEN_REQUEST_URL && process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN);
+  entry.isolatedNpmConfig = !!process.env.npm_config_userconfig && !!process.env.npm_config_globalconfig &&
+    fs.readFileSync(process.env.npm_config_userconfig, 'utf8') === '' &&
+    fs.readFileSync(process.env.npm_config_globalconfig, 'utf8') === '';
+}
 fs.appendFileSync(${JSON.stringify(report)}, JSON.stringify(entry) + '\\n');
 if (tool === 'npm' && args[0] === 'info') console.log(JSON.stringify({versions:[]}));
 else if (tool === 'pnpm' && args.join(' ') === '--version') console.log('11.5.2');
@@ -182,6 +188,11 @@ else { console.error('Unexpected synthetic command'); process.exitCode = 99; }
       NODE_OPTIONS: `--require ${JSON.stringify(guard)}`,
       CI: "1",
       NO_COLOR: "1",
+      GITHUB_ACTIONS: "true",
+      GITHUB_REPOSITORY: "gridaco/grida",
+      GITHUB_REF: "refs/heads/main",
+      ACTIONS_ID_TOKEN_REQUEST_URL: "https://oidc.example.invalid/token",
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: "synthetic-job-token",
     };
     const records = async () =>
       (await readFile(report, "utf8"))
@@ -251,6 +262,8 @@ test("real Changesets ignores versioning exclusion when publishing; wrapper excl
     );
     assert.equal(published.length, 1);
     assert.equal(published[0].name, "@fixture/control");
+    assert.equal(published[0].oidc, true);
+    assert.equal(published[0].isolatedNpmConfig, true);
     assert.deepEqual(published[0].args, [
       "publish",
       "--access",
@@ -277,6 +290,26 @@ test("real Changesets ignores versioning exclusion when publishing; wrapper excl
     );
     assert.deepEqual(await readFile(manifest), original);
     assert.equal((await stat(manifest)).mode & 0o777, 0o640);
+  });
+});
+
+test("publication requires main-branch GitHub OIDC and rejects token fallback before registry access", async () => {
+  await fixture(async ({ manifest, original, invoke, records }) => {
+    for (const extraEnv of [
+      { GITHUB_ACTIONS: "false" },
+      { GITHUB_REPOSITORY: "someone/grida" },
+      { GITHUB_REF: "refs/heads/canary" },
+      { GITHUB_REF: "refs/pull/1106/merge" },
+      { ACTIONS_ID_TOKEN_REQUEST_URL: "" },
+      { ACTIONS_ID_TOKEN_REQUEST_TOKEN: "" },
+      { NPM_TOKEN: "synthetic-token" },
+      { NODE_AUTH_TOKEN: "synthetic-token" },
+      { NPM_ID_TOKEN: "synthetic-token" },
+    ]) {
+      assert.equal((await invoke({ extraEnv })).code, 1);
+      assert.deepEqual(await readFile(manifest), original);
+      assert.deepEqual(await records(), []);
+    }
   });
 });
 

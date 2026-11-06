@@ -83,13 +83,28 @@ for (const [name, paths, expected] of [
     ["scripts/cli-contracts/installed.mjs"],
     ["conformance", "native", "docs", "tooling"],
   ],
-  ["CLI documentation", ["docs/cli/auth.md"], ["conformance", "docs"]],
+  ["CLI documentation", ["docs/cli/auth.md"], ["docs"]],
+  ["working-group documentation", ["docs/wg/platform/example.md"], ["docs"]],
   [
-    "docs app dependencies",
-    ["apps/docs/package.json"],
+    "external docs source pins (#1097)",
+    ["apps/docs/sources.lock.json"],
+    ["docs"],
+  ],
+  ["docs source configuration", ["apps/docs/sources.json"], ["docs"]],
+  ["docs build tooling", ["apps/docs/scripts/setup-docs.js"], ["docs"]],
+  ["CLI docs checker", ["scripts/cli-docs/check.mjs"], ["docs"]],
+  ["docs app dependencies", ["apps/docs/package.json"], ["docs"]],
+  ["editor docs routing", ["editor/next.config.ts"], ["docs"]],
+  [
+    "docs pins with runtime changes",
+    ["apps/docs/sources.lock.json", "crates/grida-cli/src/main.rs"],
+    ["rust", "conformance", "native", "docs"],
+  ],
+  [
+    "docs pins with SDK changes",
+    ["apps/docs/sources.lock.json", "packages/grida-auth/src/index.ts"],
     ["conformance", "docs"],
   ],
-  ["editor docs routing", ["editor/next.config.ts"], ["conformance", "docs"]],
   ["contract tooling", ["scripts/cli-contracts/checks.mjs"], ["conformance"]],
   ["Turbo shared config", ["turbo.json"], ["conformance"]],
   ["generated asset formatter", [".oxfmtrc.jsonc"], ["conformance"]],
@@ -472,6 +487,44 @@ test("all general package CI Turbo tasks exclude the Cargo-backed CLI", () => {
     workflow,
     /node --test \.github\/scripts\/ci-changes\.test\.mjs/
   );
+});
+
+test("documentation proof has its own CI gate while local and release verification require both suites", () => {
+  const read = (file) => readFileSync(path.join(root, file), "utf8");
+  // --list exercises the runner's actual check registry without building Rust
+  // or requiring a documentation build or keychain access.
+  const runtimeChecks = execFileSync(
+    process.execPath,
+    ["scripts/cli-contracts/run.mjs", "--list"],
+    { cwd: root, encoding: "utf8" }
+  );
+  assert.match(runtimeChecks, /proof\.installed-native:/);
+  assert.doesNotMatch(runtimeChecks, /proof\.installed-docs:/);
+  assert.doesNotMatch(
+    read(".github/workflows/rust.yml"),
+    /pnpm --filter docs build|scripts\/cli-docs\/|GRIDA_CLI_DOCS_SUDO_NETWORK/
+  );
+
+  const docs = read(".github/workflows/cli-docs.yml");
+  assert.match(docs, /\n  pull_request:\n/);
+  assert.match(docs, /\n  push:\n    branches: \[main\]/);
+  assert.match(docs, /pnpm --filter docs build/);
+  assert.match(docs, /node scripts\/cli-docs\/check\.mjs --native-candidate/);
+
+  const release = read(".github/workflows/cli-release.yml");
+  assert.match(release, /uses: \.\/\.github\/workflows\/cli-docs\.yml/);
+  assert.match(release, /native_candidate_artifact: grida-native-candidate/);
+  const publish = release.slice(release.indexOf("\n  publish:"));
+  const needs = /needs: \[([^\]]+)\]/.exec(publish)?.[1].split(", ");
+  assert(needs?.includes("conformance") && needs.includes("docs"));
+
+  const recipe = /\ncli-contracts:\n((?:    .*\n)+)/.exec(
+    read("justfile")
+  )?.[1];
+  assert(recipe);
+  assert.match(recipe, /pnpm --filter docs build/);
+  assert.match(recipe, /node scripts\/cli-contracts\/run\.mjs/);
+  assert.match(recipe, /node scripts\/cli-docs\/check\.mjs/);
 });
 
 test("workflow gates use selection, run even after failure, and default reusable calls to full verification", () => {

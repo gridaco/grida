@@ -68,13 +68,6 @@ export const checks = [
     commands: [["node", "--test", "scripts/cli-release/native.test.mjs"]],
     assertion: "node_tests",
   },
-  {
-    id: "proof.installed-docs",
-    description:
-      "Installed command/help/docs and guide examples match the built documentation",
-    commands: [["node", "--import", "tsx", "scripts/cli-contracts/docs.mjs"]],
-    assertion: "json_proof",
-  },
 ];
 
 export function assertCheck(check, output) {

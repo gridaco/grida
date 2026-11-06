@@ -3,20 +3,28 @@ name: Publish Packages
 on:
   workflow_dispatch:
 
-  push:
-    branches:
-      # (DISABLED)
-      - __noop__
+permissions:
+  contents: read
+
+concurrency:
+  group: grida-workspace-release
+  cancel-in-progress: false
 
 jobs:
   # The wasm build steps left with the engine repo (it owns @grida/canvas-wasm
   # publishing); this job now only publishes the JS workspace packages.
   publish-packages:
+    if: github.repository == 'gridaco/grida' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -26,6 +34,11 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+
+      - name: Setup Deno for package generation hooks
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -38,7 +51,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Publish Packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish Packages through GitHub OIDC
         run: pnpm publish-packages
+        # Each npm package must trust repository gridaco/grida, workflow
+        # publish-packages.yml, environment npm-publish, with direct publication.
+        # No static npm token or fallback; see scripts/publish-packages.md.
