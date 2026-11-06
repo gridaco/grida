@@ -2993,57 +2993,9 @@ incident investigations out of the architectural guarantee.
 
 ---
 
-### `GRIDA-SEC-016` — Forms response file preview authorization
-
-**What it protects.** Form response attachments (respondent uploads) are
-readable only by members of the project that owns the form. The
-`grida-forms-response` bucket is private and shared by every organization;
-the editor's file preview routes are the access-control layer that turns a
-storage path into a fetchable URL.
-
-**Vulnerable scenario (prevented).** A preview route resolves the
-caller-supplied form id with the service-role client, so any visitor who
-harvests a form and field id from a published form can mint a signed URL for
-another organization's response file. For a field backed by a connected
-Supabase project, the same route would sign any path in the victim's bucket
-under the victim's service role.
-
-**Why it's specifically risky here.** Signing must run with the service role,
-and form/field ids are public by design. Authorization therefore has to happen
-before signing, in the route, and must not trust the requested path.
-
-**How the code prevents it.**
-
-1. **The form is resolved as the caller.** The preview routes look the form
-   up with the session-scoped `createFormsClient()`; RLS limits `form`,
-   `attribute` and `connection_supabase` to project members. Anonymous and
-   non-member callers get 404 before any storage client is created.
-2. **The path is confined to the authorized field.** For Grida-managed storage
-   the requested path must be `response/{response_id}/{field_id}/{name}` for
-   the resolved field, so a member of one project cannot use their own form to
-   sign another organization's objects in the shared bucket.
-3. **Authorized responses stay private.** The signed-URL redirect is marked
-   `Cache-Control: private`, so a shared cache cannot replay a member's signed
-   URL to a caller who was never authorized.
-
-**Limits.** Connected Supabase storage paths are user-configured templates, so
-they are not confined; access is limited to members of the project that owns
-that connection. The bucket's own storage policies are outside this boundary.
-
-**Files bound by this id.**
-
-- [Preview src route](<editor/app/(api)/private/editor/[form_id]/fields/[field_id]/file/preview/src/route.ts>)
-  and [tests](<editor/app/(api)/private/editor/[form_id]/fields/[field_id]/file/preview/src/route.test.ts>).
-- [Preview public-url route](<editor/app/(api)/private/editor/[form_id]/fields/[field_id]/file/preview/public-url/route.ts>)
-  and [tests](<editor/app/(api)/private/editor/[form_id]/fields/[field_id]/file/preview/public-url/route.test.ts>).
-- [Response path confinement](editor/services/form/storage.ts) and
-  [tests](editor/services/form/storage.test.ts).
-
----
-
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-017` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-016` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

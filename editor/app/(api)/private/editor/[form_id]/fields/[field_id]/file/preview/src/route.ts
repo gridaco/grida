@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 const expiresIn = 60 * 60;
+const cacheHeaders = { "Cache-Control": `private, max-age=${expiresIn}` };
 
 type Params = { form_id: string; field_id: string };
 
@@ -25,10 +26,9 @@ export async function GET(
   const qpath = req.nextUrl.searchParams.get("path");
   const options = parseStorageUrlOptions(req.nextUrl.searchParams);
 
-  assert(qpath);
+  if (!qpath) return notFound();
 
-  // GRIDA-SEC-016 — resolve the form as the caller. RLS limits it to members of
-  // the owning project; the storage access below runs with the service role.
+  // Authorize the form through RLS before accessing privileged storage.
   const formsClient = await createFormsClient();
   const { data: form, error: formerr } = await formsClient
     .from("form")
@@ -41,7 +41,7 @@ export async function GET(
         `
     )
     .eq("id", form_id)
-    .maybeSingle();
+    .single();
 
   if (formerr) console.error(formerr);
   if (!form) return notFound();
@@ -75,21 +75,25 @@ export async function GET(
           const { publicUrl: src } = client.storage
             .from(bucket)
             .getPublicUrl(qpath, options).data;
-          return NextResponse.redirect(src);
+          return NextResponse.redirect(src, {
+            status: 302,
+            headers: cacheHeaders,
+          });
         } else {
-          const { data: singed } = await client.storage
+          const { data: signed } = await client.storage
             .from(bucket)
             .createSignedUrl(qpath, expiresIn, options);
 
-          const src = singed?.signedUrl;
+          const src = signed?.signedUrl;
 
           if (!src) {
             return notFound();
           }
-          return NextResponse.redirect(src);
+          return NextResponse.redirect(src, {
+            status: 302,
+            headers: cacheHeaders,
+          });
         }
-
-        //
       }
       case "grida":
       case "x-s3":
@@ -98,15 +102,15 @@ export async function GET(
     }
   }
 
-  // GRIDA-SEC-016 — the response bucket is shared by every organization.
+  // The managed bucket is shared by every project.
   if (!isResponseFieldStorageObjectPath(qpath, field.id)) {
     return notFound();
   }
 
-  const { data: singed } = await service_role.forms.storage
+  const { data: signed } = await service_role.forms.storage
     .from(GRIDA_FORMS_RESPONSE_BUCKET)
     .createSignedUrl(qpath, expiresIn, options);
-  const src = singed?.signedUrl;
+  const src = signed?.signedUrl;
 
   if (!src) {
     return notFound();
@@ -114,9 +118,6 @@ export async function GET(
 
   return NextResponse.redirect(src, {
     status: 302,
-    headers: {
-      // GRIDA-SEC-016 — authorized per caller; shared caches must not reuse it.
-      "Cache-Control": `private, max-age=${expiresIn}`,
-    },
+    headers: cacheHeaders,
   });
 }

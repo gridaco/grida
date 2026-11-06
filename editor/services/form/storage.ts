@@ -1,5 +1,5 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
-import { UniqueFileNameGenerator } from "@/grida-forms/lib/storage";
+import { isValidKey, UniqueFileNameGenerator } from "@/grida-forms/lib/storage";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { service_role } from "@/lib/supabase/server";
 import { TemplateVariables } from "@/lib/templating";
@@ -174,32 +174,21 @@ export function parseStorageUrlOptions(searchParams: URLSearchParams) {
   return options;
 }
 
-/**
- * Whether `path` names a file of `field_id` in the Grida-managed response
- * bucket. Response files are only ever written as
- * `response/{response_id}/{field_id}/{name}` (see
- * {@link FieldStorageService.createSignedUploadUrlFromFile} and the Open API
- * submission commit), so a field can only ever preview its own files.
- *
- * GRIDA-SEC-016 — the bucket is shared by every organization; this confines a
- * caller who is authorized for one field to that field's objects.
- */
+/** Whether a managed response path belongs to the authorized field. */
 export function isResponseFieldStorageObjectPath(
   path: string,
   field_id: string
 ): boolean {
-  const parts = path.split("/");
-  if (parts.length !== 4) return false;
+  // Storage signing interpolates the key into a URL. Reject alternate
+  // separators, escapes and URL delimiters before checking the field folder.
+  if (!isValidKey(path) || path.includes("?")) return false;
 
-  const [root, response_id, path_field_id, name] = parts;
+  // URL parsing strips trailing spaces before resolving dot segments.
+  const parts = path.trimEnd().split("/");
   return (
-    root === "response" &&
-    !!response_id &&
-    response_id !== "." &&
-    response_id !== ".." &&
-    path_field_id === field_id &&
-    !!name &&
-    name !== "." &&
-    name !== ".."
+    parts.length === 4 &&
+    parts[0] === "response" &&
+    parts[2] === field_id &&
+    parts.every((part) => part.length > 0 && part !== "." && part !== "..")
   );
 }

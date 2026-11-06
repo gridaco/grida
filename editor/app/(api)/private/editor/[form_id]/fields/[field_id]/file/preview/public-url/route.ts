@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
 
 type Params = { form_id: string; field_id: string };
+const cacheHeaders = { "Cache-Control": "private, no-store" };
 
 export async function GET(
   req: NextRequest,
@@ -18,14 +19,9 @@ export async function GET(
   const { form_id, field_id } = await context.params;
   const qpath = req.nextUrl.searchParams.get("path");
 
-  // passing the options will make image transform (even without empty options) - which will occur 403 on free plan tiers.
-  // @see https://sweetcoding.tistory.com/257
-  // const options = parseStorageUrlOptions(req.nextUrl.searchParams);
+  if (!qpath) return notFound();
 
-  assert(qpath);
-
-  // GRIDA-SEC-016 — resolve the form as the caller. RLS limits it to members of
-  // the owning project; the storage access below runs with the service role.
+  // Authorize the form through RLS before accessing privileged storage.
   const formsClient = await createFormsClient();
   const { data: form, error: formerr } = await formsClient
     .from("form")
@@ -38,7 +34,7 @@ export async function GET(
         `
     )
     .eq("id", form_id)
-    .maybeSingle();
+    .single();
 
   if (formerr) console.error(formerr);
   if (!form) return notFound();
@@ -59,18 +55,18 @@ export async function GET(
           }
         );
 
-        const { data: singed } = client.storage
-          .from(bucket)
-          .getPublicUrl(qpath);
+        const { data } = client.storage.from(bucket).getPublicUrl(qpath);
 
-        const src = singed?.publicUrl;
+        const src = data?.publicUrl;
 
         if (!src) {
           return notFound();
         }
 
-        return NextResponse.json({ data: singed, error: null });
-        //
+        return NextResponse.json(
+          { data, error: null },
+          { headers: cacheHeaders }
+        );
       }
       case "grida":
       case "x-s3":
@@ -79,20 +75,20 @@ export async function GET(
     }
   }
 
-  // GRIDA-SEC-016 — the response bucket is shared by every organization.
+  // The managed bucket is shared by every project.
   if (!isResponseFieldStorageObjectPath(qpath, field.id)) {
     return notFound();
   }
 
-  const { data: singed } = await service_role.forms.storage
+  const { data } = service_role.forms.storage
     .from(GRIDA_FORMS_RESPONSE_BUCKET)
     .getPublicUrl(qpath);
 
-  const src = singed?.publicUrl;
+  const src = data?.publicUrl;
 
   if (!src) {
     return notFound();
   }
 
-  return NextResponse.json({ data: singed, error: null });
+  return NextResponse.json({ data, error: null }, { headers: cacheHeaders });
 }
