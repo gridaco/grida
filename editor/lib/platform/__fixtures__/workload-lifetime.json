@@ -1,0 +1,611 @@
+{
+  "format": "workload-lifetime-v1",
+  "environment": "production",
+  "audience": "fixture.receiver",
+  "fixture_tokens": {
+    "current": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "next": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "third": "ccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "cases": [
+    {
+      "name": "legacy-bounded",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2026-04-01T00:00:00Z",
+          "revoked": false
+        }
+      ],
+      "valid": true,
+      "checks": [
+        {
+          "at": "2026-01-01T00:00:00Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": true
+        },
+        {
+          "at": "2026-04-01T00:00:00Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "name": "explicit-bounded",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2026-04-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "bounded"
+        }
+      ],
+      "valid": true
+    },
+    {
+      "name": "bounded-missing-expiry",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "bounded-too-long",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2026-04-01T00:00:01Z",
+          "revoked": false
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "static-without-expiry",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": true,
+      "checks": [
+        {
+          "at": "2025-12-31T23:59:59Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": false
+        },
+        {
+          "at": "2026-01-01T00:00:00Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": true
+        },
+        {
+          "at": "2036-01-01T00:00:00Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": true
+        },
+        {
+          "at": "2036-01-01T00:00:00Z",
+          "key_id": "current",
+          "token_id": "next",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "name": "static-long-retirement",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2028-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": true,
+      "checks": [
+        {
+          "at": "2027-12-31T23:59:59Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": true
+        },
+        {
+          "at": "2028-01-01T00:00:00Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "name": "static-retirement-at-start",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "unknown-lifetime",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2026-04-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "forever"
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "null-lifetime",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2026-04-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": null
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "static-null-expiry",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": null,
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "static-zero-expiry",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "0001-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "static-missing-start",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "static-revoked",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": true,
+          "lifetime": "static"
+        }
+      ],
+      "valid": true,
+      "checks": [
+        {
+          "at": "2026-01-02T00:00:00Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": false
+        },
+        {
+          "at": "2036-01-01T00:00:00Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "name": "static-wrong-environment",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "local",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": true,
+      "checks": [
+        {
+          "at": "2026-01-02T00:00:00Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "name": "static-wrong-audience",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.other",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": true,
+      "checks": [
+        {
+          "at": "2026-01-02T00:00:00Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "name": "two-unbounded-static",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        },
+        {
+          "id": "next",
+          "verifier_sha256": "f01b57226261ae3756b93936e1c4e6b849f9a5b0933fa3b91843bf4195b9d964",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "retire-old-static-24h",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2027-01-02T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        },
+        {
+          "id": "next",
+          "verifier_sha256": "f01b57226261ae3756b93936e1c4e6b849f9a5b0933fa3b91843bf4195b9d964",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2027-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": true,
+      "checks": [
+        {
+          "at": "2027-01-01T23:59:59Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": true
+        },
+        {
+          "at": "2027-01-01T23:59:59Z",
+          "key_id": "next",
+          "token_id": "next",
+          "accepted": true
+        },
+        {
+          "at": "2027-01-02T00:00:00Z",
+          "key_id": "current",
+          "token_id": "current",
+          "accepted": false
+        },
+        {
+          "at": "2036-01-01T00:00:00Z",
+          "key_id": "next",
+          "token_id": "next",
+          "accepted": true
+        }
+      ]
+    },
+    {
+      "name": "static-overlap-24h-plus-second",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2027-01-02T00:00:01Z",
+          "revoked": false,
+          "lifetime": "static"
+        },
+        {
+          "id": "next",
+          "verifier_sha256": "f01b57226261ae3756b93936e1c4e6b849f9a5b0933fa3b91843bf4195b9d964",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2027-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "bounded-to-static-rotation",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2026-01-02T00:00:00Z",
+          "revoked": false
+        },
+        {
+          "id": "next",
+          "verifier_sha256": "f01b57226261ae3756b93936e1c4e6b849f9a5b0933fa3b91843bf4195b9d964",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": true
+    },
+    {
+      "name": "static-to-bounded-rotation",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2026-01-02T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        },
+        {
+          "id": "next",
+          "verifier_sha256": "f01b57226261ae3756b93936e1c4e6b849f9a5b0933fa3b91843bf4195b9d964",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2026-04-01T00:00:00Z",
+          "revoked": false
+        }
+      ],
+      "valid": true
+    },
+    {
+      "name": "nonoverlapping-static",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "not_after": "2026-01-02T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        },
+        {
+          "id": "next",
+          "verifier_sha256": "f01b57226261ae3756b93936e1c4e6b849f9a5b0933fa3b91843bf4195b9d964",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-02T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": true
+    },
+    {
+      "name": "three-active-static",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        },
+        {
+          "id": "next",
+          "verifier_sha256": "f01b57226261ae3756b93936e1c4e6b849f9a5b0933fa3b91843bf4195b9d964",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        },
+        {
+          "id": "third",
+          "verifier_sha256": "0c49d89230696ff3c031ca5a128a4e121e3589bf872c17fa04487ed0cc245d21",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "duplicate-id",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        },
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "reused-secret-other-scope",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        },
+        {
+          "id": "next",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.other",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "empty-lifetime",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "2026-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": ""
+        }
+      ],
+      "valid": false
+    },
+    {
+      "name": "static-zero-start",
+      "keys": [
+        {
+          "id": "current",
+          "verifier_sha256": "66d34fba71f8f450f7e45598853e53bfc23bbd129027cbb131a2f4ffd7878cd0",
+          "environment": "production",
+          "audience": "fixture.receiver",
+          "not_before": "0001-01-01T00:00:00Z",
+          "revoked": false,
+          "lifetime": "static"
+        }
+      ],
+      "valid": false
+    }
+  ]
+}
