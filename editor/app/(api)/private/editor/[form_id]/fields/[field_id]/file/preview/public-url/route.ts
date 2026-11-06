@@ -19,6 +19,11 @@ export async function GET(
   const { form_id, field_id } = await context.params;
   const qpath = req.nextUrl.searchParams.get("path");
 
+  // Keep original-object URLs here. parseStorageUrlOptions always supplies
+  // `transform`, which selects the image-rendering endpoint even when empty.
+  // Hosted image transformations require Pro or above.
+  // @see https://supabase.com/docs/guides/storage/serving/image-transformations
+
   if (!qpath) return notFound();
 
   // Authorize the form through RLS before accessing privileged storage.
