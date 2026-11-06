@@ -33,26 +33,18 @@ brew install just
 brew install typos-cli
 ```
 
-Then, install the dependencies and run the development server:
+From the repository root, install dependencies, build the shared packages, and
+start the editor:
 
 ```bash
-# (1) install dependencies
 pnpm install
-
-# run all (not recommended)
-pnpm turbo dev
-
-# run specific app
+pnpm build:packages
 pnpm dev:editor
-
-# or simply..
-cd editor
-pnpm dev # (cwd:/editor)
-
-# -----
-# building
-pnpm turbo build
 ```
+
+The editor uses compiled workspace packages, so build them before starting it.
+When editing shared packages, run `pnpm dev:packages` in a second terminal from
+the repository root to rebuild them as they change.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
