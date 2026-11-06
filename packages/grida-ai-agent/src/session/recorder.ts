@@ -399,6 +399,32 @@ class PartAccumulator {
       return;
     }
 
+    // A denied call ends here: the SDK skips execute and emits no output. Keep
+    // the persisted input and the answered approval, which lowering needs to
+    // give the model the call's denied result on every later turn.
+    if (type === "tool-output-denied") {
+      const c = chunk as { tool_call_id?: string; toolCallId?: string };
+      const toolCallId = c.tool_call_id ?? c.toolCallId;
+      if (typeof toolCallId !== "string") return;
+      const existing = await this.opts.store.findToolPart(
+        this.opts.session_id,
+        toolCallId
+      );
+      if (!existing) return;
+      await this.opts.store.upsertPart(existing.message_id, {
+        index: existing.index,
+        type: existing.type,
+        data: {
+          ...(existing.data as Record<string, unknown>),
+          state: "output-denied",
+        },
+        tool_call_id: toolCallId,
+        tool_state: "output-denied",
+        session_id: this.opts.session_id,
+      });
+      return;
+    }
+
     if (type === "finish-step" || type === "finish") return;
 
     if (
