@@ -107,6 +107,35 @@ describe("Node Properties (headless)", () => {
     expect(node.layout_target_width).toBe(300);
   });
 
+  test("insert can preserve absolute payload placement", () => {
+    ed.doc.dispatch({
+      type: "insert",
+      id: "absolute-insert",
+      target: null,
+      placement: "none",
+      prototype: {
+        type: "rectangle",
+        _$id: "absolute-insert",
+        layout_positioning: "absolute",
+        layout_inset_left: 123,
+        layout_inset_top: 456,
+        layout_target_width: 20,
+        layout_target_height: 30,
+        fill: {
+          type: "solid",
+          color: color.colorformats.RGBA32F.BLACK,
+          active: true,
+        },
+      },
+    });
+
+    const node = ed.state.document.nodes[
+      "absolute-insert"
+    ] as grida.program.nodes.RectangleNode;
+    expect(node.layout_inset_left).toBe(123);
+    expect(node.layout_inset_top).toBe(456);
+  });
+
   test("NodeProxy get/set roundtrip", () => {
     const proxy = ed.doc.getNodeById("rect-0");
     expect(proxy.id).toBe("rect-0");
