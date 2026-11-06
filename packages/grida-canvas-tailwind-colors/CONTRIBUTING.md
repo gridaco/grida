@@ -6,6 +6,10 @@ This document is for contributors and maintainers of this package.
 
 The color data files (CSS and JSON) are generated programmatically from the official Tailwind CSS color data. **Do not edit these files manually** - they will be overwritten when regenerated.
 
+Generation is an explicit development step. Commit and review the generated
+files before preparing a release; publishing uses that committed data and does
+not fetch or regenerate palettes.
+
 ### Running the Generation Script
 
 The generation script uses Deno to fetch colors from `tailwindcss/colors` and generate all format files:

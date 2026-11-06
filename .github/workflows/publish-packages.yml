@@ -2,6 +2,15 @@ name: Publish Packages
 
 on:
   workflow_dispatch:
+    inputs:
+      package:
+        description: Exact public workspace package name
+        required: true
+        type: string
+      version:
+        description: Exact stable version already committed on main
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -11,8 +20,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # The wasm build steps left with the engine repo (it owns @grida/canvas-wasm
-  # publishing); this job now only publishes the JS workspace packages.
   publish-packages:
     if: github.repository == 'gridaco/grida' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -20,6 +27,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      RELEASE_PACKAGE: ${{ inputs.package }}
+      RELEASE_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,24 +45,58 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - name: Setup Deno for package generation hooks
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
-
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify independent CLI publication stays excluded
-        run: node --test scripts/publish-packages.test.mjs
+      - name: Verify scoped publication and release tagging
+        run: node --test scripts/publish-packages.test.mjs .github/scripts/npm-release-tag.test.cjs
 
-      - name: Configure Git for Changesets
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Validate the selected package and committed version
+        run: node scripts/publish-packages.mjs --check "$RELEASE_PACKAGE" "$RELEASE_VERSION"
+
+      - name: Require a new release tag
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const releaseTag = require('./.github/scripts/npm-release-tag.cjs');
+            await releaseTag({
+              github, context,
+              packageName: process.env.RELEASE_PACKAGE,
+              version: process.env.RELEASE_VERSION,
+            });
+
+      - name: Build and test the selected package and its dependencies
+        run: pnpm exec turbo run build typecheck test --filter="$RELEASE_PACKAGE..."
+
+      - name: Lint
+        run: pnpm lint
 
       - name: Publish Packages through GitHub OIDC
-        run: pnpm publish-packages
+        run: pnpm publish-packages "$RELEASE_PACKAGE" "$RELEASE_VERSION"
         # Each npm package must trust repository gridaco/grida, workflow
         # publish-packages.yml, environment npm-publish, with direct publication.
         # No static npm token or fallback; see scripts/publish-packages.md.
+
+  tag:
+    needs: publish-packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_PACKAGE: ${{ inputs.package }}
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Record the published version at the tested commit
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const releaseTag = require('./.github/scripts/npm-release-tag.cjs');
+            await releaseTag({
+              github, context,
+              packageName: process.env.RELEASE_PACKAGE,
+              version: process.env.RELEASE_VERSION,
+              create: true,
+            });

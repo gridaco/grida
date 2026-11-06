@@ -24,7 +24,7 @@ environment's reviewer and deployment-branch protections.
 
 The shared publisher uses the repository's pinned pnpm 11.5.2, which exchanges
 the GitHub Actions OIDC identity for a short-lived token for each package.
-Changesets invokes that pnpm publisher. Do not supply `NPM_TOKEN`,
+The wrapper invokes pnpm directly for one selected workspace package. Do not supply `NPM_TOKEN`,
 `NODE_AUTH_TOKEN`, or `NPM_ID_TOKEN`: the wrapper rejects them and isolates user
 and global npm configuration rather than using saved credentials.
 
@@ -62,31 +62,61 @@ the intended release, and check each package's displayed status and deadline.
 See [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) and
 [pnpm publication](https://pnpm.io/cli/publish).
 
+## Preparing a release
+
+Use Changesets to prepare package versions and changelogs in a release PR.
+Commit the version changes, consumed changesets, and any dependency updates
+before publishing. For a partial release, keep deferred packages' versions and
+changesets unchanged. Review the generated diff, then merge it to `main`.
+
+Versioning and publication are separate operations. The publication workflow
+does not run `changeset version`, change manifests, or create version commits.
+The independently published `grida` CLI is rejected by this entrypoint.
+
 ## Running a release
 
-After the code and changesets are merged, manually dispatch **Publish Packages**
-from `main` in GitHub Actions and approve its `npm-publish` deployment.
-The job installs Node, pnpm, and Deno, runs the existing build/test/lint and
-Changesets versioning steps, then calls `scripts/publish-packages.mjs`.
-Deno is needed by the Tailwind color package's generation hook.
+Open [Publish Packages](https://github.com/gridaco/grida/actions/workflows/publish-packages.yml),
+select **Run workflow**, and choose `main`. Enter the exact public workspace
+package name and the stable version already recorded in its manifest.
 
-The wrapper temporarily excludes only the CLI from Changesets publication and
-restores its manifest when publication finishes or fails. Other public packages
-whose local version is absent from npm are eligible for publication, including
-packages with no new changeset. Confirm the intended release set before dispatch.
+The equivalent CLI command is:
 
-This workflow does not push the versioning commit or generated tags back to
-GitHub. Retain those release changes through the repository's versioning process;
-OIDC registration alone does not add a Changesets release-PR workflow.
+```sh
+gh workflow run publish-packages.yml --repo gridaco/grida --ref main \
+  -f package='<package-name>' -f version='<version>'
+```
+
+Approve the run's `npm-publish` deployment. The job validates the workspace
+package and exact version, rejects an existing release tag, runs available build,
+typecheck, and test tasks for the selected package and its dependencies, and
+publishes only that package to npm's `latest` tag through OIDC. An empty selection
+or version mismatch fails; other public packages are not published or changed.
+
+Before uploading, the publisher packs the package and checks its required,
+unbundled workspace runtime dependencies against npm using the packed manifest.
+Each dependency must have a published version matching its packed requirement;
+publish dependencies first if needed. The publisher uploads that same archive
+after validation.
+
+After successful publication, a separate job records a lightweight
+`<package>@<version>` Git tag at the workflow's tested commit. Only that job has
+repository write permission; it cannot overwrite an existing tag. Confirm the
+npm version, provenance, and Trusted Publisher validation after the run.
+
+If publication succeeds but recording the Git tag fails, rerun the failed tag
+job. It accepts an existing tag at the same commit. Do not rerun successful
+publication or move a release tag to another commit; npm versions are immutable.
 
 ## Local verification
 
 ```sh
-node --test scripts/publish-packages.test.mjs
+node --test scripts/publish-packages.test.mjs .github/scripts/npm-release-tag.test.cjs
 ```
 
-The tests run real Changesets against a synthetic workspace with intercepted
-registry and publication commands. They prove CLI exclusion, exact manifest
-restoration, OIDC propagation, isolated npm configuration, and denial of missing
-OIDC credentials, other repositories or branches, and token fallback. They do
-not publish packages or contact the npm registry.
+The publisher tests intercept subprocesses in synthetic workspaces. They prove
+exact package/version selection, CLI exclusion, unchanged manifests, OIDC
+propagation, isolated npm configuration, and denial of invalid authority or token
+fallback. They also verify that missing workspace dependencies block publication
+and that the validated archive is the one uploaded. Tag tests use a fake GitHub
+client to check creation and safe retries.
+They do not publish packages or contact npm or GitHub.
