@@ -24,6 +24,7 @@ cli-contracts:
     pnpm --filter docs build
     node --test scripts/cli-contracts/cli.test.mjs scripts/cli-contracts/catalogue-request.test.mjs
     node scripts/cli-contracts/run.mjs
+    node scripts/cli-docs/check.mjs
 
 # Provider contracts and native HTTP with synthetic data and local sockets only.
 cli-provider-contracts:

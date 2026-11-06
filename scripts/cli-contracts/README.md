@@ -10,12 +10,17 @@ pnpm install --frozen-lockfile
 just cli-contracts
 ```
 
-The complete gate builds current TS consumers and documentation, checks all 449
+The `just cli-contracts` gate builds current TS consumers and documentation, checks all 449
 CLI/parser vectors, verifies every advertised provider operation and generated
 asset, exercises TS/Rust custody, and installs the native npm package for local
 OAuth/account/provider/GG/artifact/signal and documentation checks. Empty or
 skipped required tests, missing operation vectors and false proof reports fail
 the gate. It does not fetch or build the retired TypeScript CLI.
+
+Runtime conformance (`run.mjs`) and documentation proof
+(`../cli-docs/check.mjs`) have separate entrypoints. The local recipe runs both;
+CI assigns documentation proof to the CLI documentation workflow so docs-only
+changes do not run the runtime and custody suite. Releases require both gates.
 
 macOS and Linux are required for the complete custody gate. Linux needs
 `dbus-run-session`, `gnome-keyring`, `libsecret-1-dev`, and the existing optional
