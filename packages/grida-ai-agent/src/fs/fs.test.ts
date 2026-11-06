@@ -1074,6 +1074,18 @@ describe("AgentFs.grep", () => {
       expect(short).toEqual({ path: "/min.js", line: 2, text: "hit short" });
     });
 
+    it("does not split a surrogate pair at the clip boundary", () => {
+      const fs = new AgentFs(new AgentFs.MemoryBackend());
+      fs.write("/emoji.md", {
+        content: `hit${"x".repeat(1996)}\u{1F600}tail`,
+        expected_version: null,
+      });
+      const [match] = fs.grep({ pattern: "hit" }).matches;
+      expect(match.text).toHaveLength(1999);
+      expect(match.text.isWellFormed()).toBe(true);
+      expect(match.text_truncated).toBe(true);
+    });
+
     it("honors offset and limit through the tool call", async () => {
       const r = (await AgentFs.resolveToolCallAsync(seedManyMatches(3), {
         tool_name: AgentFs.TOOL_NAMES.grep_files,

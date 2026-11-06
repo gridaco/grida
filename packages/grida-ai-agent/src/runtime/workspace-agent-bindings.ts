@@ -1003,6 +1003,8 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
           !isWorkspaceFsCode(err, "path-escapes-workspace")
         ) {
           this.warnReferenceFailure("grep", binding, relPath, err);
+          // The rest of this directory went unsearched.
+          truncated = true;
         }
         return atTraversalLimit();
       }
