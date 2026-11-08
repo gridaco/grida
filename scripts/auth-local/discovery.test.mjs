@@ -26,6 +26,10 @@ test("OAuth fixture serves the real anonymous discovery reader on loopback", asy
     );
     assert.equal((await fetch(fixture.origin + "/v1/paid")).status, 404);
     fixture.assertClean();
+    assert.equal(
+      (await fetch(fixture.origin + "/__fixture/verify")).status,
+      204
+    );
   } finally {
     store.dispose();
     await fixture.close();
@@ -48,6 +52,11 @@ test("fixture rejects and records credential/body/method violations without refl
       ).status,
       400
     );
+    // A later successful anonymous read must not clear the CI verdict.
+    assert.equal((await fetch(fixture.origin + "/v1/models")).status, 200);
+    const verdict = await fetch(fixture.origin + "/__fixture/verify");
+    assert.equal(verdict.status, 500);
+    assert.equal(await verdict.text(), "");
     assert.throws(
       fixture.assertClean,
       /Discovery credential boundary violated/

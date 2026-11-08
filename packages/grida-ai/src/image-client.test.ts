@@ -658,3 +658,44 @@ it("does not reinterpret exact image dimensions as an unrelated output tier", as
   );
   expect(request).not.toHaveBeenCalled();
 });
+
+it("omits implicit image n only for a single-output schema and never drops a requested count", async () => {
+  const catalogue = fixtureGGDiscovery([{ id: card.id, kind: "image" }]);
+  const snapshot = await catalogue.ready();
+  const original = snapshot!.operations[0];
+  const properties = {
+    ...(original.input_schema.properties as Record<string, unknown>),
+  };
+  delete properties.n;
+  const operation = {
+    ...original,
+    input_schema: {
+      ...original.input_schema,
+      properties,
+      additionalProperties: false,
+    },
+  };
+  vi.spyOn(catalogue, "view").mockReturnValue({
+    ...snapshot!,
+    operations: [operation],
+  });
+  vi.spyOn(catalogue, "ready").mockResolvedValue({
+    ...snapshot!,
+    operations: [operation],
+  });
+  const { client, request } = setup({
+    gg: { getAccessToken: () => TOKEN },
+    gg_base_url: "https://grida.example",
+    gg_catalog: catalogue,
+  });
+  const selected = await client.resolve({ model_id: card.id, provider: "gg" });
+  expect(await selected.generate({ prompt: PROMPT })).toEqual({
+    images: [{ data: PNG, media_type: "image/png" }],
+  });
+  expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
+    operation_id: operation.id,
+    input: { prompt: PROMPT },
+  });
+  await failure(selected.generate({ prompt: PROMPT, n: 2 }), "invalid_input");
+  expect(request).toHaveBeenCalledOnce();
+});

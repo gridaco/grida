@@ -121,6 +121,7 @@ describe("GG destination admission", () => {
               ? {
                   id: "req_fixture",
                   request_id: "req_fixture",
+                  model: model_id,
                   status: "succeeded",
                   result_status: "available",
                   result:

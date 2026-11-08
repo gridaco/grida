@@ -35,12 +35,43 @@ export function validateCases(cases) {
     assert.equal(typeof value.expected.stderr, "string");
     // Current GG offerings require injected metadata, never an offline golden
     // snapshot. Grammar is covered here; runtime offerings belong to installed.mjs.
+    // The native grammar permits listing options before, between and after
+    // command words, with string options written as --name value or --name=value.
+    // Normalize only this fixture guard's finite listing vocabulary, not CLI inputs.
+    const words = [];
+    let provider;
+    const flags = new Set([
+      "--json",
+      "--no-input",
+      "--available",
+      "--local-image",
+    ]);
+    const options = new Set([
+      "--provider",
+      "--modality",
+      "--kind",
+      "--org",
+      "--org-id",
+      "--feature",
+    ]);
+    for (let index = 0; index < value.argv.length; index++) {
+      const argument = value.argv[index];
+      if (flags.has(argument)) continue;
+      const separator = argument.indexOf("=");
+      const option = separator === -1 ? argument : argument.slice(0, separator);
+      if (options.has(option)) {
+        const selected =
+          separator === -1
+            ? value.argv[++index]
+            : argument.slice(separator + 1);
+        if (option === "--provider") provider = selected;
+      } else words.push(argument);
+    }
     const listing =
-      value.argv[0] === "ai" &&
-      ["models", "rigging"].includes(value.argv[1]) &&
-      value.argv[2] === "list";
-    const provider = value.argv.indexOf("--provider");
-    const currentGG = provider === -1 || value.argv[provider + 1] === "gg";
+      words[0] === "ai" &&
+      ["models", "rigging"].includes(words[1]) &&
+      words[2] === "list";
+    const currentGG = provider === undefined || provider === "gg";
     const control = value.argv.some((arg) =>
       ["--help", "-h", "--version", "-V"].includes(arg)
     );

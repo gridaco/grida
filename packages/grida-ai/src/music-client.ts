@@ -112,7 +112,12 @@ export class MusicClient {
       )
         throw new MusicClient.Failure("invalid_response");
       requestId = submitted.id;
-      return await this.#result(request, client, requestId);
+      return await this.#result(
+        request,
+        client,
+        requestId,
+        descriptor.model_id
+      );
     } catch (error) {
       try {
         request?.check();

@@ -45,7 +45,9 @@ export class GridaGatewayImageModel implements ImageModelV3 {
       const properties = this.operation.input_schema.properties as
         | Record<string, Record<string, unknown>>
         | undefined;
-      const input: Record<string, unknown> = { prompt, n };
+      const input: Record<string, unknown> = { prompt };
+      if (properties && Object.hasOwn(properties, "n")) input.n = n;
+      else if (n !== 1) throw new GGOperationsClient.Failure("invalid_input");
       const sizes = properties?.size?.enum;
       if (size && Array.isArray(sizes) && !sizes.includes(size))
         throw new GGOperationsClient.Failure("invalid_input");

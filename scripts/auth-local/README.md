@@ -78,6 +78,8 @@ writes fresh editor settings; restart the fixture editor after repeating it.
 
 The editor launcher serves deterministic anonymous GG discovery on reserved loopback port 55438. It configures `GRIDA_AI_GATEWAY_ORIGIN` only for that fixture editor; no provider or execution endpoint is served.
 
+After the browser and native proofs, CI requires the loopback-only `/__fixture/verify` verdict to pass. A rejected credential/body/method attempt permanently fails that verdict for the launcher lifetime, even if later anonymous reads succeed.
+
 The fixture also reserves ports 55430 and 55437–55439. Start fails if any fixture
 port, container, volume, or another fixture's ownership lock is already in use.
 It does not stop or reset an existing stack.

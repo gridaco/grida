@@ -227,6 +227,9 @@ jobs:
           test "$AUTH_EDITOR_READY" = 1
           editor/node_modules/.bin/playwright test --config editor/playwright.auth.config.ts
           node scripts/cli-local/native-proof.mjs --state "$GRIDA_AUTH_TEST_STATE" --candidate "$AUTH_NATIVE_CANDIDATE"
+          # The launcher also checks on exit, but EXIT cleanup ignores wait status.
+          # A prior rejected request must fail this step even after clean reads.
+          curl --disable --noproxy '*' --fail --silent --show-error --output /dev/null --max-time 2 http://127.0.0.1:55438/__fixture/verify
       - name: Stop only the owned local fixture
         if: ${{ always() && steps.fixture.outputs.state != '' }}
         env:

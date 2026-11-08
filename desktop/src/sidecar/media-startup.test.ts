@@ -97,6 +97,7 @@ describe("built Desktop media startup", () => {
           return Response.json({
             id: "req_music",
             request_id: "req_music",
+            model: "google/lyria-3",
             status: "succeeded",
             result_status: "available",
             result: {

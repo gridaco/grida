@@ -156,7 +156,8 @@ export namespace MediaModelAvailability {
         (model) =>
           model.id === modelId &&
           model.kind === "video" &&
-          model.interfaces.includes("videos")
+          model.interfaces.includes("videos") &&
+          model.client_supported_options?.video_text === true
       )
     )
       return { available: true };

@@ -12,6 +12,7 @@ export async function proveMusic({ load, require, check }) {
   const initialToken = "synthetic-music-gg-no-authority";
   const rotatedToken = "synthetic-rotated-music-gg-no-authority";
   let token = initialToken;
+  let submittedModel = model;
   let mode = "success";
   let downloads = 0;
   let cancelledBodies = 0;
@@ -36,6 +37,7 @@ export async function proveMusic({ load, require, check }) {
         return Response.json({
           id: "req_music",
           request_id: "req_music",
+          model: submittedModel,
           status: "succeeded",
           result_status: "available",
           result: {
@@ -51,6 +53,10 @@ export async function proveMusic({ load, require, check }) {
       assert.equal(request.method, "POST");
       const body = await request.json();
       requests.push(body);
+      submittedModel =
+        body.operation_id === "music.google.lyria-3-pro.generate"
+          ? "google/lyria-3-pro"
+          : model;
       assert.deepEqual(Object.keys(body).sort(), ["input", "operation_id"]);
       assert.equal(body.input.prompt, prompt);
       assert.equal(body.input.seed, 0);

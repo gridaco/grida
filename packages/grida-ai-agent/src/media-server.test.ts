@@ -44,6 +44,7 @@ async function start(options: Partial<MediaDaemonOptions> = {}) {
       return Response.json({
         id: "req_music",
         request_id: "req_music",
+        model: "google/lyria-3",
         status: "succeeded",
         result_status: "available",
         result: {
@@ -393,4 +394,57 @@ describe("media-only public composition", () => {
     await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
     expect(await new MediaStore(media_root).list()).toEqual([]);
   });
+});
+
+it("projects native prompt-video eligibility separately from the broad video interface", async () => {
+  const metadata = ggContractFixture([
+    { id: "fixture/text-video", kind: "video", variants: ["text"] },
+    { id: "fixture/image-video", kind: "video", variants: ["image"] },
+  ]);
+  const request = vi.fn<typeof fetch>(async (input) => {
+    const response = metadata.response(input);
+    if (!response) throw new Error("unexpected non-metadata request");
+    return response;
+  });
+  const { daemon } = await start({
+    gg_base_url: GG,
+    provider_http: { request, download: vi.fn<typeof fetch>() },
+  });
+  const response = await call(
+    daemon,
+    "/providers/gg/models",
+    undefined,
+    {},
+    "GET"
+  );
+  expect(response.status).toBe(200);
+  const data = await response.json();
+  expect(data.models).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: "fixture/text-video",
+        interfaces: ["videos"],
+        client_supported_options: { video_text: true },
+      }),
+      expect.objectContaining({
+        id: "fixture/image-video",
+        interfaces: ["videos"],
+        client_supported_options: { video_text: false },
+      }),
+    ])
+  );
+  expect(
+    data.models.every(
+      (model: Record<string, unknown>) =>
+        !Object.hasOwn(model, "request_schemas")
+    )
+  ).toBe(true);
+  expect(JSON.stringify(data)).not.toContain(TOKEN);
+  expect(
+    request.mock.calls.every(
+      ([, init]) =>
+        init?.method === "GET" &&
+        !new Headers(init?.headers).has("authorization")
+    )
+  ).toBe(true);
 });

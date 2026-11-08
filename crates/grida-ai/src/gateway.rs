@@ -116,25 +116,10 @@ impl GatewayCatalogue {
             {
                 continue;
             }
-            // The model is frozen by discovery/selection, not another user input.
-            if let Some(properties) = schema["properties"].as_object_mut() {
-                if properties
-                    .get("model")
-                    .is_some_and(|v| v["const"] != model_id)
-                {
-                    continue;
-                }
-                properties.remove("model");
-            }
-            if let Some(required) = schema["required"].as_array_mut() {
-                required.retain(|v| v != "model");
-            }
-            if let Some(examples) = schema["examples"].as_array_mut() {
-                for example in examples {
-                    if let Some(fields) = example.as_object_mut() {
-                        fields.remove("model");
-                    }
-                }
+            // Selection supplies the fixed model throughout root object constraints,
+            // including intersections introduced while resolving $ref siblings.
+            if !project_selected_model(&mut schema, model_id) {
+                continue;
             }
             let result_schema = resolve(&entry["result_schema"], contracts, 0, &mut schema_budget)?;
             if !known_result(kind, &result_schema) {
@@ -178,6 +163,7 @@ impl GatewayCatalogue {
             .ok_or_else(invalid)?;
         let mut seen = BTreeSet::new();
         let mut schema_budget = 8 * 1024 * 1024;
+        let installed = Catalog::bundled();
         for endpoint in endpoints {
             let id = bounded(&endpoint["id"], 256)?;
             if endpoint["object"] != "endpoint" || !seen.insert(id) {
@@ -209,6 +195,9 @@ impl GatewayCatalogue {
                         && models["data"].as_array().is_some_and(|models| {
                             models.iter().any(|m| {
                                 m["id"] == entry["model_id"]
+                                    && m["gg"]["interfaces"].as_array().is_some_and(|interfaces| {
+                                        interfaces.iter().any(|interface| interface == "endpoints")
+                                    })
                                     && m["gg"]["operation_ids"]
                                         .as_array()
                                         .is_some_and(|ops| ops.iter().any(|op| op == id))
@@ -223,6 +212,10 @@ impl GatewayCatalogue {
                 _ => false,
             };
             if !valid {
+                continue;
+            }
+            let request = resolve(&entry["request_schema"], contracts, 0, &mut schema_budget)?;
+            if !fixed_rigging_request(&request, entry, &installed) {
                 continue;
             }
             let result = resolve(&entry["result_schema"], contracts, 0, &mut schema_budget)?;
@@ -452,7 +445,91 @@ fn known_result(kind: &str, schema: &Value) -> bool {
     let property = if kind == "image" { "b64_json" } else { "url" };
     reference["type"] == "object"
         && reference["properties"][property]["type"] == "string"
-        && (kind != "music" || reference["properties"]["media_type"]["const"] == "audio/mpeg")
+        && (kind != "music"
+            || reference["properties"]["media_type"]["const"] == "audio/mpeg"
+                && reference["required"].as_array().is_some_and(|required| {
+                    required.iter().any(|field| field == "url")
+                        && required.iter().any(|field| field == "media_type")
+                }))
+}
+fn project_selected_model(schema: &mut Value, model: &str) -> bool {
+    let Some(fields) = schema.as_object_mut() else {
+        return schema == true;
+    };
+    if let Some(properties) = fields.get_mut("properties").and_then(Value::as_object_mut) {
+        if properties
+            .get("model")
+            .is_some_and(|constraint| crate::input::normalize(constraint, json!(model)).is_err())
+        {
+            return false;
+        }
+        properties.remove("model");
+    }
+    if let Some(required) = fields.get_mut("required").and_then(Value::as_array_mut) {
+        required.retain(|value| value != "model");
+    }
+    if let Some(examples) = fields.get_mut("examples").and_then(Value::as_array_mut) {
+        for example in examples {
+            if let Some(fields) = example.as_object_mut() {
+                fields.remove("model");
+            }
+        }
+    }
+    if let Some(intersection) = fields.get_mut("allOf").and_then(Value::as_array_mut) {
+        for constraint in intersection {
+            if !project_selected_model(constraint, model) {
+                return false;
+            }
+        }
+    }
+    true
+}
+/// The installed upload adapter owns a closed layout, not an arbitrary input
+/// schema engine. New composed layouts require adapter work before any upload.
+fn fixed_rigging_request(schema: &Value, operation: &Value, installed: &Catalog) -> bool {
+    fn composed(value: &Value) -> bool {
+        match value {
+            Value::Object(fields) => {
+                fields.keys().any(|key| {
+                    ["allOf", "anyOf", "oneOf", "if", "then", "else", "not"].contains(&key.as_str())
+                }) || fields.values().any(composed)
+            }
+            Value::Array(values) => values.iter().any(composed),
+            _ => false,
+        }
+    }
+    if schema["type"] != "object" || composed(schema) {
+        return false;
+    }
+    let Some(adapter) = installed.operations.iter().find(|adapter| {
+        adapter["provider_id"] == "gg"
+            && adapter["feature"] == operation["feature"]
+            && (operation["model_id"].is_null() || adapter["model_id"] == operation["model_id"])
+    }) else {
+        return false;
+    };
+    let mut request =
+        json!({"mesh":{"url":"https://assets.example/mesh.glb","media_type":"model/gltf-binary"}});
+    if operation["feature"] == "rig-check" {
+        return crate::input::normalize(schema, request).is_ok();
+    }
+    let fields = &adapter["input_schema"]["properties"];
+    let (Some(types), Some(specs)) = (
+        fields["rig_type"]["enum"].as_array(),
+        fields["spec"]["enum"].as_array(),
+    ) else {
+        return false;
+    };
+    for rig_type in types {
+        for spec in specs {
+            request["rig_type"] = rig_type.clone();
+            request["spec"] = spec.clone();
+            if crate::input::normalize(schema, request.clone()).is_err() {
+                return false;
+            }
+        }
+    }
+    true
 }
 fn bounded(value: &Value, max: usize) -> Result<&str> {
     value
@@ -580,11 +657,14 @@ mod tests {
     }
     #[test]
     fn music_result_must_match_the_hosted_mp3_contract() {
-        let schema = json!({"type":"object","required":["audio"],"properties":{"audio":{"type":"object","properties":{"url":{"type":"string"},"media_type":{"const":"audio/mpeg"}}}}});
+        let schema = json!({"type":"object","required":["audio"],"properties":{"audio":{"type":"object","required":["url","media_type"],"properties":{"url":{"type":"string"},"media_type":{"const":"audio/mpeg"}}}}});
         assert!(known_result("music", &schema));
         let mut unsupported = schema.clone();
         unsupported["properties"]["audio"]["properties"]["media_type"]["const"] =
             json!("audio/wav");
+        assert!(!known_result("music", &unsupported));
+        unsupported = schema.clone();
+        unsupported["properties"]["audio"]["required"] = json!(["media_type"]);
         assert!(!known_result("music", &unsupported));
     }
     #[test]
@@ -718,6 +798,149 @@ mod tests {
         assert!(resolve(&contracts["$defs"]["Input"], &contracts, 0, &mut 16).is_err());
         contracts["$defs"]["Cycle"] = json!({"$ref":"#/$defs/Cycle"});
         assert!(resolve(&contracts["$defs"]["Cycle"], &contracts, 0, &mut 65536).is_err());
+    }
+    #[test]
+    fn selected_model_is_projected_through_reference_sibling_intersections() {
+        let (models, mut contracts) = fixtures();
+        contracts["x-gg-operations"][0]["request_schema"] = json!({"$ref":"#/$defs/Input","required":["model","prompt"],"properties":{"model":{"const":"lab/new-model"},"prompt":{"type":"string","minLength":2,"maxLength":5}},"additionalProperties":false});
+        let catalogue = GatewayCatalogue::from_public(&models, &contracts)
+            .unwrap()
+            .overlay(Catalog::bundled());
+        let selector = crate::Selector {
+            kind: "image".into(),
+            provider: "gg".into(),
+            model_id: "lab/new-model".into(),
+            variant: Some("text".into()),
+            feature: None,
+        };
+        assert!(
+            catalogue
+                .parse_input(&selector, json!({"prompt":"hello"}))
+                .is_ok()
+        );
+        for prompt in ["", "x", "toolong"] {
+            assert!(
+                catalogue
+                    .parse_input(&selector, json!({"prompt":prompt}))
+                    .is_err()
+            );
+        }
+        contracts["x-gg-operations"][0]["request_schema"]["allOf"] = json!([true]);
+        assert!(
+            !GatewayCatalogue::from_public(&models, &contracts)
+                .unwrap()
+                .operations
+                .is_empty()
+        );
+        contracts["x-gg-operations"][0]["request_schema"]["allOf"] = json!([false]);
+        assert!(
+            GatewayCatalogue::from_public(&models, &contracts)
+                .unwrap()
+                .operations
+                .is_empty()
+        );
+        contracts["x-gg-operations"][0]["request_schema"]["allOf"] = json!([]);
+        contracts["x-gg-operations"][0]["request_schema"]["properties"]["model"]["const"] =
+            json!("lab/other-model");
+        assert!(
+            GatewayCatalogue::from_public(&models, &contracts)
+                .unwrap()
+                .operations
+                .is_empty()
+        );
+    }
+    #[test]
+    fn rigging_requires_current_interface_and_the_installed_request_layout() {
+        let mut fixture = public_fixture();
+        let rig_id = "three-d.tripo.rig-v1.0.mesh";
+        fixture["models"]["data"].as_array_mut().unwrap().push(json!({"object":"model","id":"tripo/rig-v1.0","gg":{"interfaces":["endpoints"],"operation_ids":[rig_id]}}));
+        fixture["endpoints"]["data"].as_array_mut().unwrap().push(json!({"object":"endpoint","id":rig_id,"operation":rig_id,"model":"tripo/rig-v1.0","kind":"three-d"}));
+        fixture["operations"]["$defs"]["RigInput"] = json!({"type":"object","properties":{"mesh":{"$ref":"#/$defs/source_glb"},"rig_type":{"type":"string","enum":["biped"]},"spec":{"type":"string","enum":["tripo","mixamo"]}},"required":["mesh","rig_type","spec"],"additionalProperties":false});
+        fixture["operations"]["x-gg-operations"].as_array_mut().unwrap().push(json!({"operation_id":rig_id,"endpoint_id":rig_id,"model_id":"tripo/rig-v1.0","kind":"three-d","variant":"mesh","feature":"rigging","response_mode":"job","delivery":"provider_reference","content_type":"application/json","request_view":"json","path":format!("/v1/endpoints/{rig_id}"),"request_schema":{"$ref":"#/$defs/RigInput"},"result_schema":{"type":"object","required":["glb"],"properties":{"glb":{"type":"object","properties":{"url":{"type":"string"}}}}}}));
+        let selector = crate::Selector {
+            kind: "three-d".into(),
+            provider: "gg".into(),
+            model_id: "tripo/rig-v1.0".into(),
+            variant: None,
+            feature: Some("rigging".into()),
+        };
+        let project = |fixture: &Value| {
+            GatewayCatalogue::from_discovery(
+                &fixture["models"],
+                &fixture["endpoints"],
+                &fixture["operations"],
+            )
+            .unwrap()
+            .overlay(Catalog::bundled())
+        };
+        assert!(project(&fixture).inspect(&selector).is_ok());
+        let index = fixture["models"]["data"].as_array().unwrap().len() - 1;
+        fixture["models"]["data"][index]["gg"]["interfaces"] = json!([]);
+        assert!(project(&fixture).inspect(&selector).is_err());
+        fixture["models"]["data"][index]["gg"]["interfaces"] = json!(["endpoints"]);
+        fixture["operations"]["$defs"]["RigInput"]["required"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("new_control"));
+        assert!(project(&fixture).inspect(&selector).is_err());
+        let selector = crate::Selector {
+            model_id: String::new(),
+            feature: Some("rig-check".into()),
+            ..selector
+        };
+        assert!(project(&fixture).inspect(&selector).is_ok());
+        fixture["operations"]["$defs"]["three-d.tripo.rig-check.input"]["required"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("new_control"));
+        assert!(project(&fixture).inspect(&selector).is_err());
+    }
+    #[test]
+    fn discovered_numeric_multiples_are_checked_recursively() {
+        let (models, mut contracts) = fixtures();
+        contracts["$defs"]["Input"]["properties"]["duration"] =
+            json!({"type":"number","allOf":[{"multipleOf":2}]});
+        let catalogue = GatewayCatalogue::from_public(&models, &contracts)
+            .unwrap()
+            .overlay(Catalog::bundled());
+        let selector = crate::Selector {
+            kind: "image".into(),
+            provider: "gg".into(),
+            model_id: "lab/new-model".into(),
+            variant: Some("text".into()),
+            feature: None,
+        };
+        assert!(
+            catalogue
+                .parse_input(&selector, json!({"prompt":"hello","duration":4}))
+                .is_ok()
+        );
+        assert!(
+            catalogue
+                .parse_input(&selector, json!({"prompt":"hello","duration":3}))
+                .is_err()
+        );
+        assert!(
+            catalogue
+                .parse_input(
+                    &selector,
+                    json!({"prompt":"hello","duration":9007199254740991u64})
+                )
+                .is_err()
+        );
+        assert!(
+            crate::input::normalize(&json!({"type":"number","multipleOf":0.1}), json!(0.3)).is_ok()
+        );
+        assert!(
+            crate::input::normalize(&json!({"type":"number","multipleOf":0.1}), json!(0.35))
+                .is_err()
+        );
+        for divisor in [json!(0), json!(-2), json!("2")] {
+            assert!(
+                crate::input::normalize(&json!({"type":"number","multipleOf":divisor}), json!(4))
+                    .is_err()
+            );
+        }
     }
     #[test]
     fn unknown_interfaces_untrusted_references_and_inconsistent_model_do_not_execute() {

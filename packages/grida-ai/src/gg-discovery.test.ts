@@ -703,3 +703,50 @@ describe("conservative executable schema admission", () => {
     ).toBe(true);
   });
 });
+
+describe("structurally repeated local reference constraints", () => {
+  it("admits independently parsed equal arrays and nested objects regardless of key order", async () => {
+    const metadata = ggContractFixture([
+      { id: "fixture/music", kind: "music" },
+    ]);
+    const operation = metadata.contracts["x-gg-operations"][0];
+    const input = metadata.contracts.$defs[
+      operation.request_schema.$ref.slice(8)
+    ] as Record<string, unknown>;
+    input.required = ["prompt"];
+    Object.assign(operation.request_schema, {
+      required: ["prompt"],
+      properties: { ...(input.properties as object) },
+    });
+    const result = metadata.contracts.$defs[
+      operation.result_schema.$ref.slice(8)
+    ] as { properties: { audio: Record<string, unknown> } };
+    metadata.contracts.$defs.RepeatedAudio = { ...result.properties.audio };
+    result.properties.audio = {
+      $ref: "#/$defs/RepeatedAudio",
+      required: ["url", "media_type"],
+      properties: {
+        media_type: { const: "audio/mpeg" },
+        url: { type: "string" },
+      },
+    };
+    const store = new GGDiscoveryStore({
+      fetch: async (url) => metadata.response(url)!,
+    });
+    const snapshot = await store.ready();
+    expect(snapshot?.operations).toHaveLength(1);
+    expect(supportsGGPromptOperation(snapshot!.operations[0])).toBe(true);
+  });
+  it("still withholds genuinely conflicting repeated constraints", async () => {
+    const metadata = ggContractFixture([
+      { id: "fixture/music", kind: "music" },
+    ]);
+    Object.assign(metadata.contracts["x-gg-operations"][0].request_schema, {
+      required: ["extra_control"],
+    });
+    const store = new GGDiscoveryStore({
+      fetch: async (url) => metadata.response(url)!,
+    });
+    expect((await store.ready())?.operations).toEqual([]);
+  });
+});

@@ -540,10 +540,38 @@ function localDefinition(
   // reader cannot flatten conflicting keywords without weakening one side.
   // Withhold those shapes; never replace a referenced requirement/type/const.
   for (const [key, constraint] of Object.entries(constraints)) {
-    if (Object.hasOwn(resolved, key) && resolved[key] !== constraint)
+    if (
+      Object.hasOwn(resolved, key) &&
+      !sameConstraint(resolved[key], constraint)
+    )
       return null;
   }
   return { ...resolved, ...constraints };
+}
+
+/** Schema documents are bounded JSON; equality must not depend on object identity or key order. */
+function sameConstraint(left: unknown, right: unknown, depth = 0): boolean {
+  if (left === right) return true;
+  if (depth > 32) return false;
+  if (Array.isArray(left) || Array.isArray(right))
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) =>
+        sameConstraint(value, right[index], depth + 1)
+      )
+    );
+  if (!record(left) || !record(right)) return false;
+  const keys = Object.keys(left);
+  return (
+    keys.length === Object.keys(right).length &&
+    keys.every(
+      (key) =>
+        Object.hasOwn(right, key) &&
+        sameConstraint(left[key], right[key], depth + 1)
+    )
+  );
 }
 
 function supportsResult(

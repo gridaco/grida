@@ -559,12 +559,20 @@ describe("MediaModelAvailability.video", () => {
     ...currentImage("fixture/new-video"),
     kind: "video",
     interfaces: ["videos"],
+    client_supported_options: { video_text: true },
   };
 
   it("uses a current compatible GG offering rather than a native binding", () => {
     expect(MediaModelAvailability.video(live.id, [live], ready).available).toBe(
       true
     );
+    expect(
+      MediaModelAvailability.video(
+        live.id,
+        [{ ...live, client_supported_options: { video_text: false } }],
+        ready
+      ).available
+    ).toBe(false);
     expect(MediaModelAvailability.video(live.id, [], ready).available).toBe(
       false
     );

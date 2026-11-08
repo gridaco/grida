@@ -113,10 +113,24 @@ export class MediaHost {
               const backgrounds = properties?.background?.enum?.filter(
                 (value): value is string => typeof value === "string"
               );
+              const options = {
+                ...(backgrounds?.length ? { background: backgrounds } : {}),
+                ...(model.kind === "video"
+                  ? {
+                      video_text: snapshot.operations.some(
+                        (item) =>
+                          item.model_id === model.id &&
+                          item.path === "/v1/videos" &&
+                          item.variant === "text" &&
+                          supportsGGPromptOperation(item)
+                      ),
+                    }
+                  : {}),
+              };
               return {
                 ...model,
-                ...(backgrounds?.length
-                  ? { client_supported_options: { background: backgrounds } }
+                ...(Object.keys(options).length
+                  ? { client_supported_options: options }
                   : {}),
               };
             }),

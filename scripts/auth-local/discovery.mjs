@@ -51,6 +51,12 @@ export async function startAuthDiscovery({ port = 55438 } = {}) {
       res.writeHead(400).end();
       return;
     }
+    // GRIDA-SEC-011 — CI explicitly reads this latched verdict after both
+    // proofs; shutdown status alone is insufficient when cleanup ignores it.
+    if (req.url === "/__fixture/verify") {
+      res.writeHead(failures.length === 0 ? 204 : 500).end();
+      return;
+    }
     const document = documents.get(req.url);
     if (!document) {
       res.writeHead(404).end();

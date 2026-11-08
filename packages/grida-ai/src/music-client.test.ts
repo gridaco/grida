@@ -10,6 +10,7 @@ function job(audio: unknown = { url: URL, media_type: "audio/mpeg" }) {
   return {
     id: "req_music",
     request_id: "req_music",
+    model: ID,
     status: "succeeded",
     result_status: "available",
     result: { audio },
@@ -394,4 +395,25 @@ describe("MusicClient original-job recovery", () => {
     expect(request).not.toHaveBeenCalled();
     expect(read).not.toHaveBeenCalled();
   });
+});
+
+it("rejects generated audio for a different model while preserving the accepted receipt", async () => {
+  const { client, request, download } = setup();
+  request.mockImplementation(async (url) =>
+    Response.json(
+      String(url).includes("/jobs?")
+        ? { ...job(), model: "fixture/other" }
+        : { id: "req_music" }
+    )
+  );
+  const selected = await client.resolve({ model_id: ID, provider: "gg" });
+  await failure(
+    selected.generate({ prompt: "A piano" }),
+    "invalid_response",
+    "req_music"
+  );
+  expect(download).not.toHaveBeenCalled();
+  expect(
+    request.mock.calls.filter(([, init]) => init?.method === "POST")
+  ).toHaveLength(1);
 });

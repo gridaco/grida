@@ -2326,7 +2326,9 @@ the system browser launcher, or OS keyring availability.
   [native-probe.mjs](scripts/auth-local/native-probe.mjs) — isolated hosts.
   [discovery.mjs](scripts/auth-local/discovery.mjs) supplies anonymous synthetic
   model, endpoint and operation documents on loopback; it rejects execution,
-  credentials and request bodies. No public Gateway request is needed.
+  credentials and request bodies. A latched loopback-only verdict is checked by CI
+  after both proofs; cleanup cannot hide a prior violation. No public Gateway
+  request is needed.
 - [guards.test.mjs](scripts/auth-local/guards.test.mjs),
   [network.test.mjs](scripts/auth-local/network.test.mjs),
   [discovery.test.mjs](scripts/auth-local/discovery.test.mjs), and

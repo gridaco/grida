@@ -1,9 +1,29 @@
+import type { CurrentGGModel } from "@/lib/desktop/gg-models";
+
 type ProviderBoundModel = Readonly<{
   providers?: object;
 }>;
 
 /** Settings readiness for models resolved through BYOK or Grida hosted media. */
 export namespace MediaModelReadiness {
+  /** Only old binaries use the finite legacy hosted contract. */
+  export function hosted(
+    id: string,
+    kind: "image" | "video",
+    current: readonly CurrentGGModel[] | null
+  ): boolean | undefined {
+    if (current === null) return undefined;
+    return current.some(
+      (model) =>
+        model.id === id &&
+        model.kind === kind &&
+        (kind === "image"
+          ? model.interfaces.includes("images.generations")
+          : model.interfaces.includes("videos") &&
+            model.client_supported_options?.video_text === true)
+    );
+  }
+
   // GRIDA-GG: desktop — native feature support alone does not admit org credits.
   export function tripo(
     byok: boolean | null,

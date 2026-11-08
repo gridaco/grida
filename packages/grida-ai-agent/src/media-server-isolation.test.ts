@@ -295,7 +295,7 @@ const options = {
         assert.equal(headers.get("authorization"), "Bearer " + token);
         assert.equal(headers.has("xi-api-key"), false);
         if (init?.method === "POST") gg++;
-        return Response.json({ id: "req_music", request_id: "req_music", status: "succeeded", result_status: "available", result: { audio: { url: "https://assets.example/music.mp3", media_type: "audio/mpeg" } } });
+        return Response.json({ id: "req_music", request_id: "req_music", model: "google/lyria-3", status: "succeeded", result_status: "available", result: { audio: { url: "https://assets.example/music.mp3", media_type: "audio/mpeg" } } });
       }
       assert.equal(url, "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128");
       assert.equal(headers.get("xi-api-key"), key);

@@ -1124,9 +1124,7 @@ function MediaModelsSection({
                 card,
                 connectedVisualProviders,
                 hostedMediaReady,
-                currentGG === null
-                  ? undefined
-                  : currentGG.some((model) => model.id === card.id)
+                MediaModelReadiness.hosted(card.id, "image", currentGG)
               )
             }
             hrefForModel={mediaToolHref}
@@ -1142,9 +1140,7 @@ function MediaModelsSection({
                 card,
                 connectedVisualProviders,
                 hostedMediaReady,
-                currentGG === null
-                  ? undefined
-                  : currentGG.some((model) => model.id === card.id)
+                MediaModelReadiness.hosted(card.id, "video", currentGG)
               )
             }
             hrefForModel={mediaToolHref}

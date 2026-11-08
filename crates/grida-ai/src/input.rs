@@ -222,7 +222,19 @@ fn matches_schema(s: &Value, v: &Value) -> bool {
         && (s["maximum"].as_f64().is_some_and(|max| n > max)
             || s["minimum"].as_f64().is_some_and(|min| n < min)
             || s["exclusiveMaximum"].as_f64().is_some_and(|max| n >= max)
-            || s["exclusiveMinimum"].as_f64().is_some_and(|min| n <= min))
+            || s["exclusiveMinimum"].as_f64().is_some_and(|min| n <= min)
+            || s.get("multipleOf").is_some_and(|divisor| {
+                let Some(divisor) = divisor.as_f64().filter(|d| d.is_finite() && *d > 0.0) else {
+                    return true;
+                };
+                if n.fract() == 0.0 && divisor.fract() == 0.0 {
+                    return n % divisor != 0.0;
+                }
+                let quotient = n / divisor;
+                !quotient.is_finite()
+                    || (quotient - quotient.round()).abs()
+                        > (f64::EPSILON * quotient.abs().max(1.0) * 4.0).min(1e-9)
+            }))
     {
         return false;
     }
