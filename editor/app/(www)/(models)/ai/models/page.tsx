@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Button } from "@app/ui/components/button";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import { ConsoleLinks } from "@/lib/platform/console-links";
@@ -35,28 +36,25 @@ export default async function ModelsPage({
   return (
     <>
       <Header />
-      <main className="container mx-auto min-h-[70vh] px-4 pt-36 pb-24 lg:pt-44">
-        <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
+      <main className="container mx-auto min-h-[70vh] px-4 pt-28 pb-24 lg:pt-32">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-6">
           <div className="max-w-2xl">
             <Link
               href="/ai/gateway"
-              className="mb-4 inline-block text-sm text-muted-foreground hover:text-foreground"
+              className="mb-2 inline-block text-sm text-muted-foreground hover:text-foreground"
             >
               Grida AI Gateway
             </Link>
-            <h1 className="text-4xl font-semibold tracking-tight lg:text-5xl">
+            <h1 className="text-3xl font-semibold tracking-tight lg:text-4xl">
               Models
             </h1>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Creative models. One API. Explore capabilities and usage pricing.
+            <p className="mt-2 text-base text-muted-foreground">
+              Explore models, capabilities, and pricing.
             </p>
           </div>
-          <a
-            href={ConsoleLinks.aiGateway()}
-            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Get API key
-          </a>
+          <Button asChild>
+            <a href={ConsoleLinks.aiGateway()}>Get API key</a>
+          </Button>
         </div>
         <ModelsBrowser initial={view} initialFilters={parseFilters(query)} />
       </main>

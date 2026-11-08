@@ -29,39 +29,79 @@ export type PublicModel = z.infer<typeof modelSchema>;
 export type Catalogue = z.infer<typeof catalogueSchema>;
 export type Filters = {
   q: string;
-  kind: string;
-  lab: string;
+  kinds: string[];
+  labs: string[];
   input: string[];
   output: string[];
 };
 export const emptyFilters: Filters = {
   q: "",
-  kind: "",
-  lab: "",
+  kinds: [],
+  labs: [],
   input: [],
   output: [],
 };
-export function parseFilters(params: URLSearchParams): Filters {
-  const list = (key: string) =>
-    [
-      ...new Set(
-        (params.get(key) ?? "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => (modalities as readonly string[]).includes(s))
-      ),
-    ].sort();
+const maxLabFilters = 64;
+const validLab = (value: string) =>
+  value.length <= 64 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+function normalizeList(
+  values: readonly string[],
+  valid: (value: string) => boolean,
+  limit: number
+): string[] {
+  const selected = new Set<string>();
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (valid(trimmed)) selected.add(trimmed);
+    if (selected.size >= limit) break;
+  }
+  return [...selected].sort();
+}
+function normalizeFilters(filter: Filters): Filters {
+  let q = "";
+  let length = 0;
+  for (const point of filter.q) {
+    if (length++ === 128) break;
+    q += point;
+  }
+  const knownKind = (value: string) =>
+    (kinds as readonly string[]).includes(value);
+  const knownModality = (value: string) =>
+    (modalities as readonly string[]).includes(value);
   return {
-    q: [...(params.get("q") ?? "")].slice(0, 128).join(""),
-    kind: kinds.includes(params.get("kind") as (typeof kinds)[number])
-      ? params.get("kind")!
-      : "",
-    lab: /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(params.get("lab") ?? "")
-      ? params.get("lab")!
-      : "",
+    q,
+    kinds: normalizeList(filter.kinds, knownKind, kinds.length),
+    labs: normalizeList(filter.labs, validLab, maxLabFilters),
+    input: normalizeList(filter.input, knownModality, modalities.length),
+    output: normalizeList(filter.output, knownModality, modalities.length),
+  };
+}
+/** Page-only CSV filters: the public API still accepts a single kind and lab. */
+export function parseFilters(params: URLSearchParams): Filters {
+  const list = (key: string) => (params.get(key) ?? "").split(",");
+  return normalizeFilters({
+    q: params.get("q") ?? "",
+    kinds: list("kind"),
+    labs: list("lab"),
     input: list("input_modalities"),
     output: list("output_modalities"),
-  };
+  });
+}
+/** Canonical shareable page query; empty predicates are omitted. */
+export function serializeFilters(filter: Filters): URLSearchParams {
+  const normalized = normalizeFilters(filter);
+  const params = new URLSearchParams();
+  const entries = [
+    ["q", normalized.q],
+    ["kind", normalized.kinds.join(",")],
+    ["lab", normalized.labs.join(",")],
+    ["input_modalities", normalized.input.join(",")],
+    ["output_modalities", normalized.output.join(",")],
+  ];
+  for (const [key, value] of entries) {
+    if (value) params.set(key, value);
+  }
+  return params;
 }
 export function filterModels(
   models: readonly PublicModel[],
@@ -71,8 +111,8 @@ export function filterModels(
   return models.filter((model) => {
     const { gg } = model;
     if (
-      (filter.kind && gg.kind !== filter.kind) ||
-      (filter.lab && gg.card.lab.id !== filter.lab)
+      (filter.kinds.length > 0 && !filter.kinds.includes(gg.kind)) ||
+      (filter.labs.length > 0 && !filter.labs.includes(gg.card.lab.id))
     )
       return false;
     if (

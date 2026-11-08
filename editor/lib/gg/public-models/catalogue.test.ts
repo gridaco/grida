@@ -6,6 +6,7 @@ import {
   formatRate,
   millsToUSD,
   parseFilters,
+  serializeFilters,
 } from "./catalogue";
 import { catalogueFixture } from "./fixtures";
 import { catalogueSchema } from "./schema";
@@ -53,6 +54,75 @@ describe("public models projection and local query", () => {
     ).toEqual(["beta/music"]);
     expect(filter("kind=three-d&lab=beta")).toEqual(["beta/mesh"]);
     expect(filter("output_modalities=audio&lab=unknown")).toEqual([]);
+  });
+  it("ORs selections within category and lab, then ANDs independent predicates", () => {
+    const models = catalogueFixture().data;
+    const filter = (query: string) =>
+      filterModels(models, parseFilters(new URLSearchParams(query))).map(
+        (model) => model.id
+      );
+    expect(filter("kind=text,music")).toEqual(["alpha/Éclair", "beta/music"]);
+    expect(filter("lab=alpha,beta")).toHaveLength(3);
+    expect(filter("kind=text,music&lab=beta")).toEqual(["beta/music"]);
+    expect(
+      filter(
+        "kind=text,three-d&lab=alpha,beta&input_modalities=image&output_modalities=text,three-d"
+      )
+    ).toEqual(["alpha/Éclair", "beta/mesh"]);
+    expect(
+      filter("kind=text,three-d&lab=alpha,beta&input_modalities=image,text")
+    ).toEqual(["alpha/Éclair"]);
+  });
+  it("normalizes and round-trips shareable page queries without changing API filter semantics", () => {
+    const parsed = parseFilters(
+      new URLSearchParams({
+        q: "Éclair + music",
+        kind: "music, text,music,unknown",
+        lab: "beta,alpha,beta,Invalid,invalid_name,",
+        input_modalities: " text,image,text,unknown",
+        output_modalities: "three-d,audio,audio",
+      })
+    );
+    expect(parsed).toEqual({
+      q: "Éclair + music",
+      kinds: ["music", "text"],
+      labs: ["alpha", "beta"],
+      input: ["image", "text"],
+      output: ["audio", "three-d"],
+    });
+    const serialized = serializeFilters(parsed);
+    expect(serialized.get("kind")).toBe("music,text");
+    expect(serialized.get("lab")).toBe("alpha,beta");
+    expect(parseFilters(serialized)).toEqual(parsed);
+    expect(
+      serializeFilters(parseFilters(new URLSearchParams())).toString()
+    ).toBe("");
+    expect(
+      serializeFilters({
+        ...parsed,
+        kinds: ["text", "music", "text"],
+        labs: ["beta", "alpha"],
+      }).toString()
+    ).toBe(serialized.toString());
+  });
+  it("bounds query length and retained selections, accepting only known values and valid lab IDs", () => {
+    const parsed = parseFilters(
+      new URLSearchParams({
+        q: "😀".repeat(129),
+        kind: [...Array(20).fill("image"), "text", "invalid"].join(","),
+        lab: [
+          "x".repeat(65),
+          ...Array.from({ length: 70 }, (_, i) => `lab-${i}`),
+        ].join(","),
+        input_modalities: "unknown,image,image",
+      })
+    );
+    expect([...parsed.q]).toHaveLength(128);
+    expect(parsed.kinds).toEqual(["image", "text"]);
+    expect(parsed.labs).toHaveLength(64);
+    expect(parsed.labs).not.toContain("x".repeat(65));
+    expect(parsed.input).toEqual(["image"]);
+    expect(parseFilters(serializeFilters(parsed))).toEqual(parsed);
   });
   it("preserves exact USD decimal rates without confusing mills and dollars", () => {
     expect(millsToUSD("0.0125000")).toBe("$0.0000125");

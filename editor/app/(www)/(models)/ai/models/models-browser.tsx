@@ -1,28 +1,52 @@
 "use client";
 
-import Image from "next/image";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Badge } from "@app/ui/components/badge";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@app/ui/components/select";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@app/ui/components/table";
 import { Alert, AlertDescription } from "@app/ui/components/alert";
-import { ArrowUpRight, Search } from "lucide-react";
+import {
+  AudioLines,
+  Box,
+  Braces,
+  ChevronDown,
+  ImageIcon,
+  Search,
+  Type,
+  Video,
+} from "lucide-react";
 import {
   filterModels,
-  formatRate,
   kindLabels,
-  kinds,
+  emptyFilters,
+  serializeFilters,
   parseFilters,
   type Filters,
   type PublicModel,
 } from "@/lib/gg/public-models/catalogue";
+import { ModelFilters, modalityLabels } from "./model-filters";
+import { ModelDetails } from "./model-details";
+import { LabLogo } from "./lab-logo";
+import {
+  modelPricing,
+  type PriceSummaryLine,
+} from "@/lib/gg/public-models/pricing";
 import type { CatalogueView } from "@/lib/gg/public-models/cache";
 
 const releaseFormatter = new Intl.DateTimeFormat("en-US", {
@@ -31,164 +55,201 @@ const releaseFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   timeZone: "UTC",
 });
-const ModelCard = memo(function ModelCard({ model }: { model: PublicModel }) {
-  const { gg } = model;
-  return (
-    <article className="flex min-w-0 flex-col rounded-xl border p-6 [content-visibility:auto] [contain-intrinsic-size:auto_320px]">
-      <div className="mb-5 flex items-center gap-3">
-        {gg.card.lab.logo ? (
-          <Image
-            src={gg.card.lab.logo.url}
-            width={96}
-            height={24}
-            unoptimized
-            alt=""
-            loading="lazy"
-            className="h-6 max-w-24 object-contain dark:invert"
-          />
-        ) : (
-          <span
-            aria-hidden="true"
-            className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium"
-          >
-            {gg.card.lab.name.slice(0, 1)}
-          </span>
-        )}
-        <span className="text-sm text-muted-foreground">
-          {gg.card.lab.name}
-        </span>
-        <Badge variant="secondary" className="ml-auto">
-          {kindLabels[gg.kind]}
-        </Badge>
-      </div>
-      <h2 className="text-lg font-medium tracking-tight">{gg.card.label}</h2>
-      <code className="mt-1 break-all text-xs text-muted-foreground">
-        {model.id}
-      </code>
-      {gg.card.description ? (
-        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-          {gg.card.description}
-        </p>
-      ) : null}
-      <div className="mt-5 flex flex-wrap gap-1.5">
-        {gg.input_modalities.length ? (
-          <span className="text-xs text-muted-foreground">
-            {gg.input_modalities.join(", ")} <span aria-label="to">→</span>{" "}
-            {gg.output_modalities.join(", ")}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            Outputs {gg.output_modalities.join(", ")}
-          </span>
-        )}
-      </div>
-      <details className="mt-5 border-t pt-4 text-sm">
-        <summary className="cursor-pointer font-medium">
-          Usage pricing{" "}
-          <span className="font-normal text-muted-foreground">
-            · {gg.pricing.components.length}{" "}
-            {gg.pricing.components.length === 1 ? "rate" : "rates"}
-          </span>
-        </summary>
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          {gg.pricing.measurement}
-        </p>
-        {gg.pricing_context === "operation_input" ? (
-          <p className="mt-3 text-xs text-muted-foreground">
-            Rates are selected by operation and input. See the operation schema
-            before submitting.
-          </p>
-        ) : null}
-        <div className="mt-3 space-y-3">
-          {gg.pricing.components.map((rate) => (
-            <div key={rate.id} className="rounded-md bg-muted/50 p-3">
-              <div className="flex flex-wrap justify-between gap-2 text-xs">
-                <span className="break-all">
-                  {rate.meter.replaceAll("_", " ")}
-                </span>
-                <strong className="font-mono font-medium">
-                  {formatRate(rate)}
-                </strong>
-              </div>
-              <p className="mt-1 break-all text-[11px] text-muted-foreground">
-                {rate.id}
-              </p>
-              {rate.quantity_range ? (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {rate.quantity_range.meter.replaceAll("_", " ")}: ≥{" "}
-                  {rate.quantity_range.min}
-                  {rate.quantity_range.max
-                    ? ` and < ${rate.quantity_range.max}`
-                    : ""}
-                </p>
-              ) : null}
-              {rate.quantity_rounding.mode === "ceil" ? (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Quantity rounded up in increments of{" "}
-                  {rate.quantity_rounding.increment}.
-                </p>
-              ) : null}
-              {Object.keys(rate.when).length ? (
-                <details className="mt-2 text-xs text-muted-foreground">
-                  <summary className="cursor-pointer">Applies when</summary>
-                  <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all">
-                    {JSON.stringify(rate.when, null, 2)}
-                  </pre>
-                </details>
-              ) : null}
-            </div>
-          ))}
-        </div>
-        {gg.operation_ids.length ? (
-          <details className="mt-3 text-xs">
-            <summary className="cursor-pointer">
-              Operations ({gg.operation_ids.length})
-            </summary>
-            <ul className="mt-2 space-y-2">
-              {gg.operation_ids.map((id) => (
-                <li key={id}>
-                  <a
-                    href={`https://gateway.grida.ai/v1/endpoints/${encodeURIComponent(id)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="break-all underline underline-offset-4"
-                  >
-                    {id}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : null}
-      </details>
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-6 text-xs text-muted-foreground">
-        {gg.card.release.date ? (
-          <a href={gg.card.release.source_url} target="_blank" rel="noreferrer">
-            Released{" "}
-            <time dateTime={gg.card.release.date}>
-              {releaseFormatter.format(
-                new Date(`${gg.card.release.date}T00:00:00Z`)
-              )}
-            </time>
-          </a>
-        ) : (
-          <span>Release date unavailable</span>
-        )}
-        <a
-          href={`https://gateway.grida.ai/v1/models/${model.id.split("/").map(encodeURIComponent).join("/")}`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 hover:text-foreground"
+function PriceCell({
+  lines,
+  additional = [],
+  model,
+  side,
+  expanded,
+  detailsId,
+  onToggle,
+}: {
+  lines: PriceSummaryLine[];
+  additional?: PriceSummaryLine[];
+  model: PublicModel;
+  side: "Input" | "Output";
+  expanded: boolean;
+  detailsId: string;
+  onToggle: () => void;
+}) {
+  const primary = lines[0];
+  const extra =
+    lines.reduce((count, line) => count + line.extraRates, 0) +
+    Math.max(0, lines.length - 1);
+  const cached = additional.find(
+    (line) => line.rates[0].meter === "cached_input_tokens"
+  );
+  if (!primary && !additional.length)
+    return (
+      <TableCell className="text-muted-foreground">
+        <span
+          title={`No separate ${side.toLowerCase()} rate is listed. This does not mean the request is free.`}
         >
-          API details <ArrowUpRight className="size-3" aria-hidden="true" />
-        </a>
-      </div>
-      {gg.availability_ends_on ? (
-        <p className="mt-3 text-xs text-muted-foreground">
-          Available until {gg.availability_ends_on} (UTC).
-        </p>
-      ) : null}
-    </article>
+          —
+        </span>
+      </TableCell>
+    );
+  return (
+    <TableCell className="min-w-36">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={detailsId}
+        onClick={onToggle}
+        className="rounded-sm text-left text-xs underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+      >
+        <span className="sr-only">
+          {side} pricing for {model.gg.card.label}:{" "}
+        </span>
+        {primary ? (
+          <span className="block font-mono tabular-nums">{primary.price}</span>
+        ) : null}
+        {extra ? (
+          <span className="mt-1 block text-muted-foreground">
+            +{extra} more
+          </span>
+        ) : primary?.conditional ? (
+          <span className="mt-1 block text-muted-foreground">
+            Varies by input
+          </span>
+        ) : null}
+        {cached ? (
+          <span className="mt-1 block text-muted-foreground">
+            Cached: {cached.price}
+          </span>
+        ) : null}
+        {additional.length > (cached ? 1 : 0) ? (
+          <span className="mt-1 block text-muted-foreground">
+            +{additional.length - (cached ? 1 : 0)} other{" "}
+            {additional.length - (cached ? 1 : 0) === 1 ? "rate" : "rates"}
+          </span>
+        ) : null}
+      </button>
+    </TableCell>
+  );
+}
+
+const modalityIcons = {
+  text: Type,
+  json: Braces,
+  image: ImageIcon,
+  video: Video,
+  audio: AudioLines,
+  "three-d": Box,
+};
+function ModalityIcons({
+  values,
+}: {
+  values: PublicModel["gg"]["input_modalities"];
+}) {
+  return values.map((value) => {
+    const Icon = modalityIcons[value];
+    return (
+      <span key={value} title={modalityLabels[value]}>
+        <Icon className="size-3.5" aria-hidden="true" />
+        <span className="sr-only">{modalityLabels[value]}</span>
+      </span>
+    );
+  });
+}
+
+const ModelRow = memo(function ModelRow({ model }: { model: PublicModel }) {
+  const { gg } = model;
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
+  const pricing = modelPricing(model);
+  const toggle = () => setExpanded(!expanded);
+  return (
+    <>
+      <TableRow data-state={expanded ? "selected" : undefined}>
+        <TableCell className="min-w-72 py-4 pl-5 whitespace-normal">
+          <div className="flex items-center gap-3">
+            <LabLogo lab={gg.card.lab} />
+            <div className="min-w-0">
+              <h2 className="text-sm font-medium">{gg.card.label}</h2>
+              <code className="mt-0.5 block break-all text-xs text-muted-foreground">
+                {model.id}
+              </code>
+            </div>
+          </div>
+        </TableCell>
+        <PriceCell
+          lines={pricing.input}
+          additional={pricing.additional}
+          model={model}
+          side="Input"
+          expanded={expanded}
+          detailsId={detailsId}
+          onToggle={toggle}
+        />
+        <PriceCell
+          lines={pricing.output}
+          model={model}
+          side="Output"
+          expanded={expanded}
+          detailsId={detailsId}
+          onToggle={toggle}
+        />
+        <TableCell>
+          <Badge variant="secondary" className="font-normal">
+            {kindLabels[gg.kind]}
+          </Badge>
+          <div
+            className="mt-2 flex items-center gap-1.5 text-muted-foreground"
+            aria-label={`Input: ${gg.input_modalities.map((m) => modalityLabels[m]).join(", ") || "none"}. Output: ${gg.output_modalities.map((m) => modalityLabels[m]).join(", ")}`}
+          >
+            <ModalityIcons values={gg.input_modalities} />
+            <span aria-hidden="true" className="mx-0.5 text-xs">
+              →
+            </span>
+            <ModalityIcons values={gg.output_modalities} />
+          </div>
+        </TableCell>
+        <TableCell className="text-xs text-muted-foreground">
+          {gg.card.release.date ? (
+            <a
+              href={gg.card.release.source_url}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-foreground"
+            >
+              <time dateTime={gg.card.release.date}>
+                {releaseFormatter.format(
+                  new Date(`${gg.card.release.date}T00:00:00Z`)
+                )}
+              </time>
+            </a>
+          ) : (
+            <span aria-label="Release date unavailable">—</span>
+          )}
+        </TableCell>
+        <TableCell className="pr-4 text-right">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`${expanded ? "Hide" : "Show"} details for ${gg.card.label}`}
+            aria-expanded={expanded}
+            aria-controls={detailsId}
+            onClick={() => setExpanded(!expanded)}
+          >
+            <ChevronDown
+              aria-hidden="true"
+              className={`size-4 transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
+            />
+          </Button>
+        </TableCell>
+      </TableRow>
+      <TableRow
+        id={detailsId}
+        hidden={!expanded}
+        className="bg-muted/20 hover:bg-muted/20"
+      >
+        <TableCell colSpan={6} className="py-5 pl-16 pr-5 whitespace-normal">
+          <ModelDetails model={model} pricing={pricing} />
+        </TableCell>
+      </TableRow>
+    </>
   );
 });
 
@@ -278,31 +339,27 @@ export function ModelsBrowser({
   const catalogue =
     clock > 0 && clock >= view.expires_at ? null : view.catalogue;
   const visible = useMemo(
-    () => filterModels(catalogue?.data ?? [], filters),
+    () =>
+      filterModels(catalogue?.data ?? [], filters).sort(
+        (a, b) =>
+          (b.gg.card.release.date ?? "").localeCompare(
+            a.gg.card.release.date ?? ""
+          ) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+      ),
     [catalogue, filters]
   );
-  const labs = useMemo(
-    () =>
-      [
-        ...new Map(
-          (catalogue?.data ?? []).map((m) => [
-            m.gg.card.lab.id,
-            m.gg.card.lab.name,
-          ])
-        ).entries(),
-      ].sort((a, b) => a[1].localeCompare(b[1])),
-    [catalogue]
-  );
   function change(next: Filters, typing = false) {
-    setFilters(next);
+    const query = serializeFilters(next);
+    setFilters(parseFilters(query));
     const url = new URL(window.location.href);
-    for (const [key, value] of [
-      ["q", next.q],
-      ["kind", next.kind],
-      ["lab", next.lab],
-      ["input_modalities", next.input.join(",")],
-      ["output_modalities", next.output.join(",")],
+    for (const key of [
+      "q",
+      "kind",
+      "lab",
+      "input_modalities",
+      "output_modalities",
     ]) {
+      const value = query.get(key);
       if (value) url.searchParams.set(key, value);
       else url.searchParams.delete(key);
     }
@@ -345,16 +402,16 @@ export function ModelsBrowser({
           </AlertDescription>
         </Alert>
       ) : null}
-      <div className="mb-8 flex flex-wrap gap-3">
-        <div className="relative min-w-56 flex-1">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:w-80 sm:shrink-0">
           <Search
-            className="absolute left-3 top-3 size-4 text-muted-foreground"
+            className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden="true"
           />
           <Input
             aria-label="Search models"
-            placeholder="Search models"
-            className="pl-9"
+            placeholder="Search models and labs…"
+            className="h-9 pl-9"
             maxLength={128}
             value={filters.q}
             onChange={(event) =>
@@ -362,56 +419,57 @@ export function ModelsBrowser({
             }
           />
         </div>
-        <Select
-          value={filters.kind || "all"}
-          onValueChange={(value) =>
-            change({ ...filters, kind: value === "all" ? "" : value })
-          }
+        <ModelFilters
+          models={catalogue.data}
+          filters={filters}
+          onChange={change}
+        />
+        <p
+          className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums"
+          role="status"
         >
-          <SelectTrigger aria-label="Category" className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            {kinds.map((kind) => (
-              <SelectItem value={kind} key={kind}>
-                {kindLabels[kind]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.lab || "all"}
-          onValueChange={(value) =>
-            change({ ...filters, lab: value === "all" ? "" : value })
-          }
-        >
-          <SelectTrigger aria-label="Model lab" className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All labs</SelectItem>
-            {labs.map(([id, label]) => (
-              <SelectItem value={id} key={id}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground" role="status">
           {visible.length} {visible.length === 1 ? "model" : "models"}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          USD · Usage pricing, before credit-purchase fees
         </p>
       </div>
       {visible.length ? (
-        <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {visible.map((model) => (
-            <ModelCard model={model} key={model.id} />
-          ))}
+        <div className="overflow-hidden rounded-lg border">
+          <Table>
+            <caption className="sr-only">
+              Models available through Grida AI Gateway, with capabilities and
+              usage pricing.
+            </caption>
+            <TableHeader className="bg-muted/30">
+              <TableRow className="hover:bg-transparent">
+                <TableHead scope="col" className="pl-5">
+                  Model
+                </TableHead>
+                <TableHead scope="col">
+                  Input{" "}
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    USD
+                  </span>
+                </TableHead>
+                <TableHead scope="col">
+                  Output{" "}
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    USD
+                  </span>
+                </TableHead>
+                <TableHead scope="col">Capabilities</TableHead>
+                <TableHead scope="col" aria-sort="descending">
+                  Released ↓
+                </TableHead>
+                <TableHead scope="col" className="w-12">
+                  <span className="sr-only">Details</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visible.map((model) => (
+                <ModelRow model={model} key={model.id} />
+              ))}
+            </TableBody>
+          </Table>
         </div>
       ) : (
         <div className="rounded-xl border px-6 py-16 text-center">
@@ -419,9 +477,7 @@ export function ModelsBrowser({
           <Button
             className="mt-3"
             variant="link"
-            onClick={() =>
-              change({ q: "", kind: "", lab: "", input: [], output: [] })
-            }
+            onClick={() => change(emptyFilters)}
           >
             Clear filters
           </Button>

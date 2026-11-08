@@ -84,3 +84,24 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## MiniMax
+
+- Component: `MiniMaxLogo` (`src/logos/minimax.tsx`).
+- Source: [MiniMax's official logo asset archive](https://file.cdn.minimax.io/public/brand-vi/20260914/MiniMax_Logo_Asset.zip),
+  linked from its [official brand book](https://www.minimax.io/brand-vi).
+- Conversion: extracted the two symbol paths from the original monochrome
+  Illustrator/PDF vector artboard 13. Path geometry is unchanged; the viewBox
+  frames the symbol with balanced padding. Wordmark and presentation backdrop
+  are omitted, and monochrome artwork uses `currentColor`. No tracing.
+- The MiniMax name and mark belong to MiniMax. Retrieved November 8, 2026.
+
+## Ideogram
+
+- Component: `IdeogramLogo` (`src/logos/ideogram.tsx`).
+- Source: [Ideogram's official SVG favicon](https://ideogram.ai/favicon.svg?v=new-brand-20261020),
+  linked from its [official homepage](https://ideogram.ai/).
+- Conversion: retained both symbol paths and the native 48 × 48 viewBox;
+  omitted the rectangular backing tile and used `currentColor` for the
+  monochrome artwork.
+- The Ideogram name and mark belong to Ideogram, Inc. Retrieved November 8, 2026.

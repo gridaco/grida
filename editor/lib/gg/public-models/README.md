@@ -9,9 +9,15 @@ Redirects are rejected. `ggConfig.publicModels()` in `../config.ts` is the only
 environment reader; it is separate from signing/workload credential settings.
 
 `schema.ts` validates and projects only the page's supported fields; its Zod
-validator stays out of the browser bundle. `catalogue.ts` owns local query and
-price-formatting helpers. Published USD rates remain exact decimal strings; conditional rates and quantity bands are
-shown without inventing an average or a per-output quote.
+validator stays out of the browser bundle. `catalogue.ts` owns local query
+filter parsing and exact decimal formatting. `pricing.ts` groups the published
+rates into input, output and ancillary schedules for the table. Different meters
+remain separate: cached input is not the ordinary input price, and additive
+components are never summed or silently discarded. A lower conditional unit rate
+is labeled “From”; all conditions, tiers and rounding remain in the expanded row.
+Normalized usage units stay usage units. The current feed does not provide enough
+information to turn them into per-image or per-second quotes; the page must not
+invent that conversion or maintain its own model-specific price list.
 
 `cache.ts` owns one snapshot and one in-flight fetch per server process. Reads
 have a five-second deadline and a 2 MiB decoded limit. Successful validation is
@@ -25,10 +31,20 @@ fallback cannot silently extend those deadlines.
 Exact public page/feed reads bypass session refresh in `proxy.ts`, while retaining
 maintenance and tenant-host routing. Other routes keep their identity behavior.
 
-The browser filters the initial server-rendered data locally. Search replaces
-history; deliberate filters push history. Back/forward, restoration and long-open
+The browser filters the initial server-rendered data locally and orders models by
+release date, newest first. Unknown dates come last; equal dates use model ID as
+a stable tie-breaker. The public API retains its canonical ID ordering. The filter builder
+supports multiple selections for type, lab, input and output. The page uses CSV
+values in `kind` and `lab` for OR within those groups, AND across groups, ALL
+selected inputs and ANY selected outputs. These are page-local queries over the
+complete snapshot; the public API still accepts a single `kind` and `lab`.
+Search replaces history; deliberate filter selections push history. Back/forward, restoration and long-open
 tabs recheck freshness through the no-store `/ai/models/feed` route. That route
 shares the same bounded reader; it does not forward search queries upstream.
+
+Lab logos are rendered from the existing `@grida/react-icons/logos` package by
+canonical lab ID; the page does not fetch the feed’s CDN logo URLs. Labs without
+a bundled mark use a neutral initial.
 
 The installed-client `/api/v1/models/catalog` contract, shared BYOK catalogues and
 special Grida background-removal/upscale tools remain independent and unchanged.
