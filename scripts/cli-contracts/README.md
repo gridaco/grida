@@ -109,6 +109,10 @@ transports stay hidden and discovery credentials never cross lanes.
 CLI vectors launch real executables with disposable homes and working directories,
 bounded output/deadlines and no inherited credentials. Offline cases deliberately
 use an absent host registration and require no home or working-directory writes.
+Current GG model and rigging listings cannot use frozen offline output snapshots:
+those argv variants are parser checks, while injected discovery and installed
+process checks own their runtime availability. Explicit BYOK listings still run
+offline through the real executable. The fixture validator enforces this split.
 
 Parser-only vectors call the production parser through a thin JSON-lines driver.
 The Rust driver is built only with `conformance` and is never distributed.

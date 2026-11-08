@@ -33,6 +33,25 @@ export function validateCases(cases) {
     assert(value.stdin === undefined || typeof value.stdin === "string");
     assert([0, 1, 2].includes(value.expected.exit));
     assert.equal(typeof value.expected.stderr, "string");
+    // Current GG offerings require injected metadata, never an offline golden
+    // snapshot. Grammar is covered here; runtime offerings belong to installed.mjs.
+    const listing =
+      value.argv[0] === "ai" &&
+      ["models", "rigging"].includes(value.argv[1]) &&
+      value.argv[2] === "list";
+    const provider = value.argv.indexOf("--provider");
+    const currentGG = provider === -1 || value.argv[provider + 1] === "gg";
+    const control = value.argv.some((arg) =>
+      ["--help", "-h", "--version", "-V"].includes(arg)
+    );
+    assert(
+      !listing ||
+        !currentGG ||
+        control ||
+        value.mode === "parse" ||
+        value.expected.exit !== 0,
+      `Current GG listings require parser mode or an injected runtime fixture: ${value.id}`
+    );
     const stdout = value.expected.stdout;
     assert.equal(
       Object.keys(stdout).length,

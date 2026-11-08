@@ -107,6 +107,37 @@ test("the runner accepts a matching result and rejects false-green observations"
   );
 });
 
+test("offline vectors cannot freeze current GG model or rigging listings", () => {
+  for (const command of ["models", "rigging"]) {
+    for (const provider of [[], ["--provider", "gg"]]) {
+      const listing = {
+        ...example,
+        id: "selfcheck.current-gg",
+        argv: ["ai", command, "list", ...provider, "--json"],
+        expected: { exit: 0, stderr: "", stdout: { json: [] } },
+      };
+      assert.throws(
+        () => validateCases([listing]),
+        /Current GG listings require/
+      );
+      validateCases([{ ...listing, mode: "parse" }]);
+      validateCases([
+        {
+          ...listing,
+          expected: { ...listing.expected, exit: 1 },
+        },
+      ]);
+      validateCases([{ ...listing, argv: ["ai", command, "list", "--help"] }]);
+      validateCases([
+        {
+          ...listing,
+          argv: ["ai", command, "list", "--provider", "tripo", "--json"],
+        },
+      ]);
+    }
+  }
+});
+
 test("text/help checks reject empty or mismatched output", () => {
   const text = {
     ...example,
