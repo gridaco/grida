@@ -1,6 +1,7 @@
 // Check current TypeScript public operations against reviewed synthetic provider wires.
 // No live provider or account is accessed. Rust replays these exact request/response pairs.
 import fs from "node:fs";
+import assert from "node:assert/strict";
 import { parseArgs } from "node:util";
 const { values } = parseArgs({
   options: { check: { type: "boolean", default: false } },
@@ -95,11 +96,29 @@ for (const descriptor of descriptors) {
   };
   const input = sample(descriptor.input_schema);
   const transcript = [];
+  let discoveryFailure;
   const handler =
     (lane) =>
     async (url, init = {}) => {
       const discovery = metadata.response(url);
-      if (discovery) return discovery;
+      if (discovery) {
+        try {
+          assert.equal(init.method ?? "GET", "GET");
+          assert(init.body == null || init.body === "");
+          const headers = new Headers(init.headers);
+          for (const name of [
+            "authorization",
+            "cookie",
+            "x-api-key",
+            "proxy-authorization",
+          ])
+            assert(!headers.has(name));
+        } catch (error) {
+          discoveryFailure ??= error;
+          throw error;
+        }
+        return discovery;
+      }
       url = String(url);
       const method = init.method ?? "GET";
       const request = projectRequest(lane, url, init);
@@ -293,6 +312,7 @@ for (const descriptor of descriptors) {
           : value
       )
     );
+    if (discoveryFailure) throw discoveryFailure;
     samples.push({
       id: [
         descriptor.kind,

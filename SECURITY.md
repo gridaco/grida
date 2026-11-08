@@ -1416,6 +1416,10 @@ levels into one.
     a result URL. Music/video references are downloaded only through the bounded,
     credential-free asset lane. A failed poll or asset read never authorizes a
     second paid submission, a credential fallback or an organization change.
+    Validated accepted job IDs remain in safe music/video errors. Music session
+    refresh resumes that exact job with GET-only reads, without depending on
+    current catalogue membership. Job retrieval has its own per-user abuse
+    budget; it does not consume discovery or submission allowance.
 
 **Residual risks (accepted, documented).** Org-membership revocation is
 not re-checked within a token's 900-second window plus clock tolerance. The mint rate
@@ -2320,8 +2324,12 @@ the system browser launcher, or OS keyring availability.
 - [editor.mjs](scripts/auth-local/editor.mjs),
   [network.cjs](scripts/auth-local/network.cjs), and
   [native-probe.mjs](scripts/auth-local/native-probe.mjs) — isolated hosts.
+  [discovery.mjs](scripts/auth-local/discovery.mjs) supplies anonymous synthetic
+  model, endpoint and operation documents on loopback; it rejects execution,
+  credentials and request bodies. No public Gateway request is needed.
 - [guards.test.mjs](scripts/auth-local/guards.test.mjs),
-  [network.test.mjs](scripts/auth-local/network.test.mjs), and
+  [network.test.mjs](scripts/auth-local/network.test.mjs),
+  [discovery.test.mjs](scripts/auth-local/discovery.test.mjs), and
   [consumer proof](editor/e2e/auth-oauth.spec.mts) — adjacent verification.
 - [Dedicated Playwright config](editor/playwright.auth.config.ts),
   [ordinary Playwright config](editor/playwright.config.ts),
@@ -2560,7 +2568,12 @@ generation receipts without a fixed projection.
    public registration's HTTPS API origin or the fixed local fixture, with only
    image/video/music generation POST paths and the four exact
    `/api/v1/ai/3d/{uploads,model-generation,rig-check,rigging}` POST paths, with no
-   query parameters. Provider redirects are rejected without
+   query parameters. Current GG discovery additionally admits anonymous GETs to
+   exactly `https://gateway.grida.ai/v1/models`, `/v1/endpoints` and
+   `/schemas/operations.json`, with no authority, query or body. The current
+   operation bridge accepts POST `/api/v1/ai/operations`; original jobs use
+   GET `/api/v1/ai/jobs` with only a validated `request_id` query.
+   Provider redirects are rejected without
    replay. The download lane is HTTPS GET/HEAD with no credential, cookie, body or
    caller-selected Host header. Each connection and download redirect resolves
    fresh DNS, rejects the entire answer if any address is non-public, and pins one

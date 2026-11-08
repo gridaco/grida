@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import { readState } from "./stack.mjs";
 import { guards } from "./guards.mjs";
+import { startAuthDiscovery } from "./discovery.mjs";
 
 const scripts = path.dirname(fileURLToPath(import.meta.url));
 
@@ -107,6 +108,7 @@ export default { ...original, turbopack: { ...original.turbopack, root: ${JSON.s
         "@font-face { font-family: 'Inter'; src: local('Arial'); font-weight: 100 900; }",
     })};\n`
   );
+  const discovery = await startAuthDiscovery();
   const env = {
     PATH: [
       path.dirname(process.execPath),
@@ -118,6 +120,7 @@ export default { ...original, turbopack: { ...original.turbopack, root: ${JSON.s
     TMPDIR: state.root,
     LANG: "en_US.UTF-8",
     ...fixtureEnv,
+    GRIDA_AI_GATEWAY_ORIGIN: discovery.origin,
     NODE_ENV: "development",
     NEXT_TELEMETRY_DISABLED: "1",
     NEXT_PUBLIC_GRIDA_USE_TELEMETRY: "0",
@@ -140,11 +143,19 @@ export default { ...original, turbopack: { ...original.turbopack, root: ${JSON.s
   for (const signal of ["SIGINT", "SIGTERM"])
     process.once(signal, () => child.kill(signal));
   child.on("error", () => {
+    void discovery.close();
     console.error("Unable to start local auth editor");
     process.exitCode = 1;
   });
-  child.on("exit", (code) => {
+  child.on("exit", async (code) => {
     process.exitCode = code ?? 1;
+    try {
+      discovery.assertClean();
+    } catch {
+      console.error("Local auth discovery boundary failed");
+      process.exitCode = 1;
+    }
+    await discovery.close();
   });
 }
 

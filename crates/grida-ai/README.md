@@ -20,7 +20,9 @@ the public descriptor cannot change its selected operation or validation schema.
 `verify`, `voices` and `gateway_catalogue` are explicitly networked operations.
 
 `gateway_catalogue` reads only `https://gateway.grida.ai/v1/models` and
-`/schemas/operations.json`, without credentials. Reads have a shared 15-second
+`/v1/endpoints` and `/schemas/operations.json`, without credentials.
+Expired HTTP metadata or a passed scheduled catalogue change is rejected;
+dedicated GG rigging/check commands require their current endpoint before file upload. Reads have a shared 15-second
 deadline, 2 MiB per document and bounded local-reference expansion. It never
 follows arbitrary schema URLs or falls back to bundled GG availability. BYOK
 selection remains offline. The CLI uses the current intersection for GG list,

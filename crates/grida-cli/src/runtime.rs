@@ -146,6 +146,10 @@ async fn execute(
             model.provider == Provider::Gg
         }
         Command::ModelsList { provider, .. } => provider.is_none_or(|p| p == Provider::Gg),
+        Command::RiggingList { provider, .. } => provider.is_none_or(|p| p == MeshProvider::Gg),
+        Command::RiggingInspect { provider, .. }
+        | Command::RiggingCheck { provider, .. }
+        | Command::RiggingRun { provider, .. } => *provider == MeshProvider::Gg,
         _ => false,
     };
     let catalog = if live_gateway {
@@ -426,6 +430,7 @@ async fn execute(
             selector,
         } => {
             let selection = rig_selector(provider, &MeshOperation::Check);
+            catalog.inspect(&selection)?;
             let value = match source {
                 MeshSource::Json(s) => files::read_input(&s, &token).await?,
                 MeshSource::Mesh(path) => json!({"mesh":encoded_mesh(&path,&token).await?}),
@@ -442,6 +447,7 @@ async fn execute(
             selector,
         } => {
             let selection = rig_selector(provider, &MeshOperation::Rig { model });
+            catalog.inspect(&selection)?;
             let value = match source {
                 RiggingSource::Json(s) => files::read_input(&s, &token).await?,
                 RiggingSource::Mesh {

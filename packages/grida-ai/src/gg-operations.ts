@@ -34,7 +34,7 @@ export class GGOperationsClient {
     const operation = snapshot?.operations.find(
       (item) => item.id === operationId
     );
-    if (!operation) throw new Error("model_unavailable");
+    if (!operation) throw new GGOperationsClient.Failure("model_unavailable");
     return operation;
   }
   /** One submission. A transport failure never triggers a fresh generation. */
@@ -45,12 +45,12 @@ export class GGOperationsClient {
   ): Promise<Record<string, unknown>> {
     const operation = await this.resolve(operationId);
     if (!input || typeof input !== "object" || Array.isArray(input))
-      throw new Error("invalid_input");
+      throw new GGOperationsClient.Failure("invalid_input");
     if (input.model !== undefined && input.model !== operation.model_id)
-      throw new Error("invalid_input");
+      throw new GGOperationsClient.Failure("invalid_input");
     const body = JSON.stringify({ operation_id: operation.id, input });
     if (new TextEncoder().encode(body).byteLength > 3 * 1024 * 1024)
-      throw new Error("invalid_input");
+      throw new GGOperationsClient.Failure("invalid_input");
     const request = new MediaRequest(this.#http, signal, 600_000);
     try {
       const result = await request.wait(
@@ -74,7 +74,7 @@ export class GGOperationsClient {
   /** Lookup deliberately does not depend on today's model catalogue. */
   async job(id: string, signal?: AbortSignal): Promise<GGJob> {
     if (!/^req_[A-Za-z0-9_-]{1,160}$/.test(id))
-      throw new Error("invalid_input");
+      throw new GGOperationsClient.Failure("invalid_input");
     const request = new MediaRequest(this.#http, signal);
     try {
       const response = await request.request(
@@ -154,5 +154,15 @@ function record(value: unknown): value is Record<string, unknown> {
 class JobThrottled extends Error {
   constructor(readonly delay: number) {
     super("job_throttled");
+  }
+}
+
+export namespace GGOperationsClient {
+  /** Local pre-dispatch failures; never interpret arbitrary host error messages as these codes. */
+  export class Failure extends Error {
+    constructor(readonly code: "invalid_input" | "model_unavailable") {
+      super(code);
+      this.name = "GGOperationFailure";
+    }
   }
 }

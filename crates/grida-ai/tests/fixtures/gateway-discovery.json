@@ -2,6 +2,7 @@
   "models": {
     "object": "list",
     "revision": "synthetic-native-discovery",
+    "next_change_at": null,
     "data": [
       {
         "id": "bfl/flux-2-pro",

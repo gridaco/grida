@@ -53,3 +53,29 @@ describe("MediaModelReadiness.visual", () => {
     expect(MediaModelReadiness.visual({ providers }, null, true)).toBe(true);
   });
 });
+
+describe("current hosted media readiness", () => {
+  it("withdraws a native row when current GG no longer serves it", () => {
+    expect(
+      MediaModelReadiness.visual({ providers }, new Set(), true, false)
+    ).toBe(false);
+    expect(
+      MediaModelReadiness.visual(
+        { providers },
+        new Set(["openrouter"]),
+        true,
+        false
+      )
+    ).toBe(true);
+  });
+  it("accepts current GG independently from a Vercel BYOK binding", () => {
+    expect(
+      MediaModelReadiness.visual(
+        { providers: { fal: {} } },
+        new Set(),
+        true,
+        true
+      )
+    ).toBe(true);
+  });
+});

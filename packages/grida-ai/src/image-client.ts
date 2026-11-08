@@ -9,6 +9,7 @@ import type { ImageModelV3 } from "@ai-sdk/provider";
 import { generateImage } from "ai";
 import { makeImageModelFor } from "./image-byok";
 import { GridaGatewayImageModel } from "./image-gg";
+import { GGOperationsClient } from "./gg-operations";
 import {
   GridaGatewayAuthError,
   GridaGatewayCreditsError,
@@ -418,7 +419,10 @@ function exactKeys(value: unknown, allowed: readonly string[]): void {
 
 function safeFailure(error: unknown): ImageClient.Failure {
   try {
-    if (error instanceof ImageClient.Failure)
+    if (
+      error instanceof ImageClient.Failure ||
+      error instanceof GGOperationsClient.Failure
+    )
       return new ImageClient.Failure(error.code);
     if (error instanceof GridaGatewayAuthError)
       return new ImageClient.Failure("gg_token_expired");

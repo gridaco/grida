@@ -78,7 +78,12 @@ interface ModelItemProps {
 
 function ModelItem({ model, isSelected, onSelect }: ModelItemProps) {
   return (
-    <CommandItem key={model.id} onSelect={onSelect}>
+    <CommandItem
+      key={model.id}
+      value={model.id}
+      keywords={[model.grida.label]}
+      onSelect={onSelect}
+    >
       {model.grida.label}
       <Check
         className={cn(

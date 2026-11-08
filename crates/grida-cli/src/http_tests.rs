@@ -823,7 +823,7 @@ async fn first_sse_event_requires_data_and_exact_video_route() {
 #[test]
 fn public_discovery_has_no_credential_or_account_authority() {
     let transport = Transport::new(Some(API)).unwrap();
-    for path in ["/v1/models", "/schemas/operations.json"] {
+    for path in ["/v1/models", "/v1/endpoints", "/schemas/operations.json"] {
         let url = format!("https://gateway.grida.ai{path}");
         let target = admitted_url(&url).unwrap();
         assert!(

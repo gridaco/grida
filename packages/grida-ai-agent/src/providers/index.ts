@@ -27,6 +27,7 @@
  */
 
 import type { GGDiscoveryStore } from "@grida/ai";
+import { AGENT_DEFAULT_TIER, type ModelTier } from "../tiers";
 import { catalog as models } from "@grida/ai/catalogue";
 import { catalogView, type ModelCatalogStore } from "./model-catalog";
 import type { TierModelIds } from "./byok";
@@ -154,6 +155,7 @@ export type ResolveOptions = {
   explicit?: string;
   /** Selected model, used to prevent a provider/model mismatch. */
   model_id?: string;
+  tier?: ModelTier;
 };
 
 export async function resolveProvider(
@@ -161,7 +163,12 @@ export async function resolveProvider(
   options: ResolveOptions = {}
 ): Promise<ResolvedProvider> {
   if (options.explicit) {
-    return await resolveExplicit(options.explicit, deps, options.model_id);
+    return await resolveExplicit(
+      options.explicit,
+      deps,
+      options.model_id,
+      options.tier
+    );
   }
   // One read for the whole resolution: a mid-resolution refresh must not
   // let the gate and the provider choice disagree about the catalogue.
@@ -201,7 +208,11 @@ export async function resolveProvider(
     // anything). Resolves only with a LIVE session token.
   }
 
-  const gridaResolved = await maybeResolveGg(deps, options.model_id);
+  const gridaResolved = await maybeResolveGg(
+    deps,
+    options.model_id,
+    options.tier
+  );
   if (gridaResolved) return gridaResolved;
 
   if (deps.endpoints) {
@@ -221,7 +232,8 @@ export async function resolveProvider(
 async function resolveExplicit(
   providerId: string,
   deps: ResolveDeps,
-  modelId?: string
+  modelId?: string,
+  tier?: ModelTier
 ): Promise<ResolvedProvider> {
   const view = catalogView(deps.catalog);
   if (isChatGptProviderId(providerId)) {
@@ -233,7 +245,7 @@ async function resolveExplicit(
     // Without a live token the pick surfaces as the existing 409
     // `provider_down` with `provider_id: "gg"` — the renderer maps
     // that to "Sign in to use included AI".
-    const resolved = await maybeResolveGg(deps, modelId);
+    const resolved = await maybeResolveGg(deps, modelId, tier);
     if (!resolved) throw new ProviderUnavailableError(providerId);
     return resolved;
   }
@@ -284,19 +296,14 @@ async function maybeResolveChatGpt(
  */
 async function maybeResolveGg(
   deps: ResolveDeps,
-  modelId?: string
+  modelId?: string,
+  tier: ModelTier = AGENT_DEFAULT_TIER
 ): Promise<ResolvedProvider | null> {
   const hosted = liveGgMediaDeps(deps);
   if (!hosted || !deps.gg_catalog) return null;
   await deps.gg_catalog.ready();
-  if (
-    modelId
-      ? !deps.gg_catalog.supports(modelId, "chat.completions")
-      : !deps.gg_catalog
-          .list("text")
-          .some((model) => model.interfaces.includes("chat.completions"))
-  )
-    return null;
+  const selected = modelId ?? catalogView(deps.catalog).tier_model_ids[tier];
+  if (!deps.gg_catalog.supports(selected, "chat.completions")) return null;
   return {
     provider_id: GG_PROVIDER_ID,
     kind: "gg",

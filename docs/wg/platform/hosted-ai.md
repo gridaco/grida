@@ -134,7 +134,7 @@ There are three different questions, with different owners:
 `@grida/ai/catalogue` joins a generated compatibility projection of the external
 facts with Grida's product presets. It owns lookup helpers, tier choices and the
 retained schema-1 codec; it does not author independent model facts or declare
-current GG availability. [The data guide](../../../data/ai/README.md) describes
+current GG availability. [The data guide](https://github.com/gridaco/grida/blob/main/data/ai/README.md) describes
 generation and native snapshots. Ordinary GG additions using an implemented
 interface are data updates; new input transports or output representations still
 require client code.

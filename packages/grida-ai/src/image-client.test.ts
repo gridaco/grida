@@ -623,3 +623,38 @@ describe("ImageClient native background admission", () => {
     }
   );
 });
+
+it("does not reinterpret exact image dimensions as an unrelated output tier", async () => {
+  const catalogue = fixtureGGDiscovery([{ id: card.id, kind: "image" }]);
+  const snapshot = await catalogue.ready();
+  const original = snapshot!.operations[0];
+  const operation = {
+    ...original,
+    input_schema: {
+      ...original.input_schema,
+      properties: {
+        ...(original.input_schema.properties as object),
+        size: { type: "string", enum: ["1K", "2K", "4K"] },
+      },
+    },
+  };
+  vi.spyOn(catalogue, "view").mockReturnValue({
+    ...snapshot!,
+    operations: [operation],
+  });
+  vi.spyOn(catalogue, "ready").mockResolvedValue({
+    ...snapshot!,
+    operations: [operation],
+  });
+  const { client, request } = setup({
+    gg: { getAccessToken: () => TOKEN },
+    gg_base_url: "https://grida.example",
+    gg_catalog: catalogue,
+  });
+  const selected = await client.resolve({ model_id: card.id, provider: "gg" });
+  await failure(
+    selected.generate({ prompt: PROMPT, size: "1536x1024" }),
+    "invalid_input"
+  );
+  expect(request).not.toHaveBeenCalled();
+});

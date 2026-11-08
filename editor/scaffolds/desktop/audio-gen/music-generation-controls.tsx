@@ -1,13 +1,14 @@
 "use client";
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useGGModels, type CurrentGGModel } from "@/lib/desktop/gg-models";
 import { catalog as models } from "@grida/ai/catalogue";
 import {
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
+  PromptInputProvider,
   PromptInputSelect,
   PromptInputSelectContent,
   PromptInputSelectItem,
@@ -62,24 +63,15 @@ export function MusicGenerationControls(props: MusicGenerationControlsProps) {
     undefined,
     models.audio.music.default_id
   );
-  if (!fallbackModel) return <MusicGenerationUnavailable />;
-
   return (
-    <AvailableMusicGenerationControls
-      key={props.initialModelId ?? "new"}
-      {...props}
-      initialModelId={
-        current === null
-          ? MediaModelAvailability.select(
-              availableModels,
-              props.initialModelId,
-              fallbackModel.id
-            )?.id
-          : props.initialModelId
-      }
-      availableModels={availableModels}
-      fallbackModelId={fallbackModel.id}
-    />
+    <PromptInputProvider>
+      <AvailableMusicGenerationControls
+        key={props.initialModelId ?? "new"}
+        {...props}
+        availableModels={availableModels}
+        fallbackModelId={fallbackModel?.id}
+      />
+    </PromptInputProvider>
   );
 }
 
@@ -108,15 +100,24 @@ function AvailableMusicGenerationControls({
   fallbackModelId,
 }: MusicGenerationControlsProps & {
   availableModels: readonly MusicChoice[];
-  fallbackModelId: string;
+  fallbackModelId?: string;
 }) {
-  const [modelId, setModelId] = useState(initialModelId ?? fallbackModelId);
+  const [modelId, setModelId] = useState<string | null>(
+    initialModelId ?? fallbackModelId ?? null
+  );
+  // Select the first available default only once; refresh/outage never replaces
+  // an explicit or previously chosen model, or remounts the draft composer.
+  useEffect(() => {
+    if (fallbackModelId) setModelId((selected) => selected ?? fallbackModelId);
+  }, [fallbackModelId]);
   const modelAvailable = availableModels.some((model) => model.id === modelId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (message: PromptInputMessage) => {
-    if (busy || disabled || !modelAvailable) return;
+    if (busy || disabled || !modelAvailable || !modelId) {
+      throw setGenerationError(setError, "Select an available music model.");
+    }
     const prompt = message.text.trim();
     if (!prompt) {
       throw setGenerationError(setError, "Describe the music to generate.");
@@ -177,12 +178,12 @@ function AvailableMusicGenerationControls({
         <PromptInputFooter>
           <PromptInputTools>
             <PromptInputSelect
-              value={modelId}
+              value={modelId ?? ""}
               onValueChange={(value) => {
                 setModelId(value as string);
                 setError(null);
               }}
-              disabled={busy || disabled}
+              disabled={busy || disabled || availableModels.length === 0}
             >
               <MediaModelPickerTrigger className="max-w-48">
                 <PromptInputSelectValue placeholder="Model" />
@@ -198,28 +199,19 @@ function AvailableMusicGenerationControls({
           </PromptInputTools>
           <PromptInputSubmit
             status={busy ? "submitted" : undefined}
-            disabled={busy || disabled}
+            disabled={busy || disabled || !modelAvailable}
             aria-label="Generate music"
           />
         </PromptInputFooter>
       </PromptInput>
+      {!modelAvailable && (
+        <p className="px-3 pt-2 text-xs text-muted-foreground" role="status">
+          {availableModels.length === 0
+            ? "No music generation model is currently available. Your draft is kept."
+            : "This music model is unavailable. Select another model to continue."}
+        </p>
+      )}
       <MusicGenerationMessage error={error} />
-    </div>
-  );
-}
-
-function MusicGenerationUnavailable() {
-  return (
-    <div
-      data-testid="controls-music-generation"
-      className="mx-auto w-full max-w-2xl"
-    >
-      <p
-        className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground shadow-lg"
-        role="status"
-      >
-        No music generation model is available for this tool.
-      </p>
     </div>
   );
 }
@@ -234,17 +226,47 @@ export async function generateMusicWithGgRecovery(
   req: MusicGenerateRequest,
   dependencies: MusicGenerationDependencies = musicGenerationDependencies
 ): Promise<MusicGenerateResult> {
+  let requestId = req.request_id;
   try {
     return await dependencies.generate(req);
   } catch (cause) {
     if (!gridaGateway.isGgTokenExpired(cause)) throw cause;
+    requestId = acceptedMusicRequestId(cause) ?? requestId;
   }
 
-  const session = await dependencies.forceRefresh();
-  if (session.kind !== "active") {
-    throw new Error(musicSessionError(session.kind));
+  try {
+    const session = await dependencies.forceRefresh();
+    if (session.kind !== "active") {
+      throw new Error(musicSessionError(session.kind));
+    }
+    // An accepted job must only resume its existing result retrieval. The host
+    // treats request_id as recovery-only; it never repeats generation.
+    return await dependencies.generate(
+      requestId ? { ...req, request_id: requestId } : req
+    );
+  } catch (cause) {
+    if (!requestId || acceptedMusicRequestId(cause)) throw cause;
+    throw Object.assign(
+      new Error(`${errorMessage(cause)} GG request: ${requestId}.`, { cause }),
+      { request_id: requestId }
+    );
   }
-  return await dependencies.generate(req);
+}
+
+function acceptedMusicRequestId(cause: unknown): string | undefined {
+  try {
+    const id =
+      cause && typeof cause === "object" && "request_id" in cause
+        ? cause.request_id
+        : undefined;
+    if (typeof id === "string" && /^req_[A-Za-z0-9_-]{1,160}$/.test(id))
+      return id;
+    return /(?:^|\s)GG request: (req_[A-Za-z0-9_-]{1,160})(?=[.\s]|$)/.exec(
+      errorMessage(cause)
+    )?.[1];
+  } catch {
+    return undefined;
+  }
 }
 
 function MusicGenerationMessage({ error }: { error: string | null }) {

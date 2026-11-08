@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { GGDiscoveryStore } from "./gg-discovery";
+import { GGDiscoveryStore, supportsGGPromptOperation } from "./gg-discovery";
+import { ggContractFixture } from "./testing/gg-contract";
 import publicWire from "./testing/fixtures/gg-discovery-public.json";
 
 const model = (id = "fixture/new-model") => ({
@@ -335,7 +336,16 @@ describe("current executable operation contracts", () => {
         Result: {
           type: "object",
           required: ["data"],
-          properties: { data: { type: "array" } },
+          properties: {
+            data: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["b64_json"],
+                properties: { b64_json: { type: "string" } },
+              },
+            },
+          },
         },
       },
       "x-gg-operations": [
@@ -457,6 +467,8 @@ it("parses representative released public discovery documents together", async (
   });
   const snapshot = await store.ready();
   expect(snapshot?.models).toHaveLength(publicWire.models.data.length);
+  for (const operation of snapshot!.operations)
+    expect(supportsGGPromptOperation(operation)).toBe(true);
   expect(snapshot?.operations.map((operation) => operation.model_id)).toEqual(
     expect.arrayContaining([
       "google/lyria-3",
@@ -470,4 +482,224 @@ it("parses representative released public discovery documents together", async (
         endpoint.id === "three-d.tripo.rig-check" && endpoint.model === null
     )
   ).toBe(true);
+});
+
+describe("conservative executable schema admission", () => {
+  it("expires an old operations bundle even when model listings are fresh", async () => {
+    const metadata = ggContractFixture([
+      { id: "fixture/image", kind: "image" },
+    ]);
+    let now = 0;
+    const store = new GGDiscoveryStore({
+      now: () => now,
+      fetch: async (url) => {
+        const response = metadata.response(url)!;
+        if (String(url).endsWith("operations.json"))
+          response.headers.set("age", "299");
+        return response;
+      },
+    });
+    expect((await store.ready())?.operations).toHaveLength(1);
+    now = 1000;
+    expect(store.view()).toBeNull();
+  });
+  it.each(["image", "video", "music"] as const)(
+    "withholds changed %s payload representations before execution",
+    async (kind) => {
+      for (const broken of [
+        "missing",
+        "wrong-type",
+        "not-required",
+        "non-array",
+      ]) {
+        const metadata = ggContractFixture([{ id: "fixture/model", kind }]);
+        const result = metadata.contracts.$defs[
+          Object.keys(metadata.contracts.$defs).find((key) =>
+            key.endsWith("_result")
+          )!
+        ] as {
+          properties: Record<
+            string,
+            {
+              type: string;
+              required: string[];
+              properties: Record<string, unknown>;
+              items?: {
+                type: string;
+                required: string[];
+                properties: Record<string, unknown>;
+              };
+            }
+          >;
+        };
+        const field =
+          kind === "image" ? "data" : kind === "video" ? "videos" : "audio";
+        const item =
+          kind === "music"
+            ? result.properties[field]
+            : result.properties[field].items!;
+        const payload = kind === "image" ? "b64_json" : "url";
+        if (broken === "missing") delete item.properties[payload];
+        else if (broken === "wrong-type")
+          item.properties[payload] = { type: "object" };
+        else if (broken === "not-required") item.required = [];
+        else result.properties[field].type = "string";
+        const store = new GGDiscoveryStore({
+          fetch: async (url) => metadata.response(url)!,
+        });
+        expect((await store.ready())?.operations).toEqual([]);
+      }
+    }
+  );
+  it("cannot hide a referenced required control or prompt type with a sibling", async () => {
+    const { fixtureGGDiscovery } = await import("./testing/gg-discovery");
+    const operation = (await fixtureGGDiscovery([
+      { id: "fixture/image", kind: "image" },
+    ]).ready())!.operations[0];
+    const schema = operation.input_schema;
+    expect(
+      supportsGGPromptOperation({
+        ...operation,
+        input_schema: {
+          ...schema,
+          $defs: { RequiredControl: { required: ["extra_control"] } },
+          allOf: [{ $ref: "#/$defs/RequiredControl", required: [] }],
+        },
+      })
+    ).toBe(false);
+    expect(
+      supportsGGPromptOperation({
+        ...operation,
+        input_schema: {
+          ...schema,
+          $defs: { NonString: { type: "object" } },
+          properties: {
+            ...(schema.properties as object),
+            prompt: { $ref: "#/$defs/NonString", type: "string" },
+          },
+        },
+      })
+    ).toBe(false);
+    // Real released prompt shapes add a maximum alongside a nonblank string
+    // reference. Non-conflicting sibling constraints remain usable.
+    expect(
+      supportsGGPromptOperation({
+        ...operation,
+        input_schema: {
+          ...schema,
+          $defs: { Nonblank: { type: "string", pattern: "\\S" } },
+          properties: {
+            ...(schema.properties as object),
+            prompt: { $ref: "#/$defs/Nonblank", maxLength: 32000 },
+          },
+        },
+      })
+    ).toBe(true);
+  });
+  it("keeps root request-reference sibling requirements in native admission", async () => {
+    const metadata = ggContractFixture([
+      { id: "fixture/image", kind: "image" },
+    ]);
+    Object.assign(metadata.contracts["x-gg-operations"][0].request_schema, {
+      allOf: [{ required: ["extra_control"] }],
+    });
+    const store = new GGDiscoveryStore({
+      fetch: async (url) => metadata.response(url)!,
+    });
+    const operation = (await store.ready())!.operations[0];
+    expect(operation).toBeDefined();
+    expect(supportsGGPromptOperation(operation)).toBe(false);
+  });
+  it("withholds conflicting root input requirements and result MIME references", async () => {
+    for (const kind of ["image", "music"] as const) {
+      const metadata = ggContractFixture([{ id: "fixture/model", kind }]);
+      const operation = metadata.contracts["x-gg-operations"][0];
+      if (kind === "image")
+        Object.assign(operation.request_schema, { required: [] });
+      else {
+        metadata.contracts.$defs.UnusableAudioType = { const: "audio/wav" };
+        const result = metadata.contracts.$defs[
+          operation.result_schema.$ref.slice(8)
+        ] as { properties: { audio: { properties: Record<string, unknown> } } };
+        result.properties.audio.properties.media_type = {
+          $ref: "#/$defs/UnusableAudioType",
+          const: "audio/mpeg",
+        };
+      }
+      const store = new GGDiscoveryStore({
+        fetch: async (url) => metadata.response(url)!,
+      });
+      expect((await store.ready())?.operations).toEqual([]);
+    }
+  });
+  it("rejects unrepresentable prompt/start-image fields and composed required controls", async () => {
+    const { fixtureGGDiscovery } = await import("./testing/gg-discovery");
+    const operation = (await fixtureGGDiscovery([
+      { id: "fixture/video", kind: "video", image: true },
+    ]).ready())!.operations[1];
+    expect(supportsGGPromptOperation(operation, true)).toBe(true);
+    for (const override of [
+      {
+        properties: {
+          ...(operation.input_schema.properties as object),
+          prompt: { type: "object" },
+        },
+      },
+      {
+        properties: {
+          ...(operation.input_schema.properties as object),
+          image: { type: "object" },
+        },
+      },
+      { allOf: [{ required: ["extra_required"] }] },
+      {
+        allOf: [
+          {
+            if: { required: ["fps"] },
+            // oxlint-disable-next-line unicorn/no-thenable -- JSON Schema keyword, never a Promise continuation.
+            then: { required: ["extra_required"] },
+          },
+        ],
+      },
+      {
+        allOf: [
+          {
+            if: { required: ["prompt"] },
+            // oxlint-disable-next-line unicorn/no-thenable -- JSON Schema keyword, never a Promise continuation.
+            then: { required: ["extra_required"] },
+          },
+        ],
+      },
+      { oneOf: [{ required: ["prompt"] }, { required: ["extra_required"] }] },
+    ]) {
+      expect(
+        supportsGGPromptOperation(
+          {
+            ...operation,
+            input_schema: { ...operation.input_schema, ...override },
+          },
+          true
+        )
+      ).toBe(false);
+    }
+    // An animation-only conditional cannot apply to native prompt controls.
+    expect(
+      supportsGGPromptOperation(
+        {
+          ...operation,
+          input_schema: {
+            ...operation.input_schema,
+            allOf: [
+              {
+                if: { required: ["frame_count"] },
+                // oxlint-disable-next-line unicorn/no-thenable -- JSON Schema keyword, never a Promise continuation.
+                then: { required: ["output_format"] },
+              },
+            ],
+          },
+        },
+        true
+      )
+    ).toBe(true);
+  });
 });

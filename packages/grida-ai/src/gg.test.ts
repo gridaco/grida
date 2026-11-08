@@ -147,7 +147,11 @@ describe("GG destination admission", () => {
                 }
           );
         });
-        download.mockResolvedValue(new Response(new Uint8Array([1, 2, 3])));
+        download.mockResolvedValue(
+          new Response(
+            new Uint8Array(_name === "music" ? [0x49, 0x44, 0x33] : [1, 2, 3])
+          )
+        );
         const operation = await client.resolve({ model_id, provider: "gg" });
         await operation.generate({ prompt: "Synthetic GG URL test" });
         expect(request).toHaveBeenCalledTimes(_name === "image" ? 1 : 2);

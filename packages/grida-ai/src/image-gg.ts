@@ -36,15 +36,6 @@ export class GridaGatewayImageModel implements ImageModelV3 {
   ): Promise<Awaited<ReturnType<ImageModelV3["doGenerate"]>>> {
     const { prompt, n, size, aspectRatio, seed, abortSignal, providerOptions } =
       options;
-    let width: number | undefined;
-    let height: number | undefined;
-    if (size) {
-      const match = /^(\d+)x(\d+)$/.exec(size);
-      if (match) {
-        width = Number(match[1]);
-        height = Number(match[2]);
-      }
-    }
     // The desktop image route sets the picker's quality tier under
     // `providerOptions.gg` (keyed by provider id); forward it so the hosted
     // endpoint bills AND delivers the requested tier rather than dropping it.
@@ -55,27 +46,11 @@ export class GridaGatewayImageModel implements ImageModelV3 {
         | Record<string, Record<string, unknown>>
         | undefined;
       const input: Record<string, unknown> = { prompt, n };
-      let canonicalSize: string | undefined = size;
       const sizes = properties?.size?.enum;
-      if (
-        size &&
-        Array.isArray(sizes) &&
-        !sizes.includes(size) &&
-        width &&
-        height
-      ) {
-        const tiers = sizes.filter(
-          (item): item is string =>
-            typeof item === "string" && /^\d+K$/.test(item)
-        );
-        canonicalSize =
-          tiers.find(
-            (tier) => Math.max(width!, height!) <= Number.parseInt(tier) * 1024
-          ) ?? tiers.at(-1);
-        if (!canonicalSize) throw new Error("invalid_input");
-      }
+      if (size && Array.isArray(sizes) && !sizes.includes(size))
+        throw new GGOperationsClient.Failure("invalid_input");
       for (const [key, value] of Object.entries({
-        size: canonicalSize,
+        size,
         aspect_ratio: aspectRatio,
         seed,
         quality,
@@ -83,7 +58,7 @@ export class GridaGatewayImageModel implements ImageModelV3 {
       })) {
         if (value !== undefined) {
           if (!properties || !Object.hasOwn(properties, key))
-            throw new Error("invalid_input");
+            throw new GGOperationsClient.Failure("invalid_input");
           input[key] = value;
         }
       }

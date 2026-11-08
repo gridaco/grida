@@ -169,7 +169,10 @@ export async function proveVideo({ load, require, check }) {
         prompt,
         ...(provider !== "gg" ? { image_url: frame } : {}),
       });
-      assert.deepEqual(result, { videos: [{ data, media_type: "video/mp4" }] });
+      assert.deepEqual(result, {
+        ...(provider === "gg" ? { request_id: "req_video" } : {}),
+        videos: [{ data, media_type: "video/mp4" }],
+      });
       assert.equal(result.videos[0].data.constructor, Uint8Array);
       assert.equal(
         requests.slice(before).filter((request) => request.method === "POST")

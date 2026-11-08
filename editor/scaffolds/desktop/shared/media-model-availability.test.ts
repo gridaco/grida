@@ -547,3 +547,56 @@ describe("MediaModelAvailability.requiresImageUpdate", () => {
     );
   });
 });
+
+describe("MediaModelAvailability.video", () => {
+  const id = "google/veo-3.1";
+  const ready: MediaModelAvailability.VideoProviderState = {
+    loaded: true,
+    configured: [],
+    hosted: true,
+  };
+  const live = {
+    ...currentImage("fixture/new-video"),
+    kind: "video",
+    interfaces: ["videos"],
+  };
+
+  it("uses a current compatible GG offering rather than a native binding", () => {
+    expect(MediaModelAvailability.video(live.id, [live], ready).available).toBe(
+      true
+    );
+    expect(MediaModelAvailability.video(live.id, [], ready).available).toBe(
+      false
+    );
+    expect(MediaModelAvailability.video(id, [], ready).available).toBe(false);
+  });
+  it("keeps an exact connected BYOK text route usable during discovery failure", () => {
+    expect(
+      MediaModelAvailability.video(id, [], {
+        ...ready,
+        hosted: false,
+        configured: ["vercel"],
+      }).available
+    ).toBe(true);
+    expect(
+      MediaModelAvailability.video(live.id, [], {
+        ...ready,
+        configured: ["vercel"],
+      }).available
+    ).toBe(false);
+    expect(
+      MediaModelAvailability.video("google/veo-3.1-lite", [], {
+        ...ready,
+        configured: ["fal"],
+      }).available
+    ).toBe(false);
+  });
+  it("retains hosted native compatibility only for older binaries", () => {
+    expect(MediaModelAvailability.video(id, null, ready).available).toBe(true);
+    expect(MediaModelAvailability.video(id, [], ready).available).toBe(false);
+    expect(
+      MediaModelAvailability.video(id, null, { ...ready, loaded: false })
+        .available
+    ).toBe(false);
+  });
+});

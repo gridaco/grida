@@ -46,9 +46,21 @@ export function ggContractFixture(
           properties: {
             [field]:
               entry.kind === "image" || entry.kind === "video"
-                ? { type: "array" }
+                ? {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      required: [entry.kind === "image" ? "b64_json" : "url"],
+                      properties: {
+                        [entry.kind === "image" ? "b64_json" : "url"]: {
+                          type: "string",
+                        },
+                      },
+                    },
+                  }
                 : {
                     type: "object",
+                    required: ["url", "media_type"],
                     properties: {
                       url: { type: "string" },
                       media_type: {

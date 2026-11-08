@@ -157,7 +157,7 @@ jobs:
         run: |
           pnpm --filter @grida/auth typecheck
           pnpm --filter @grida/auth test
-          node --test scripts/auth-local/guards.test.mjs scripts/auth-local/network.test.mjs
+          node --test scripts/auth-local/guards.test.mjs scripts/auth-local/network.test.mjs scripts/auth-local/discovery.test.mjs
           node --test scripts/cli-local/native-proof.test.mjs
           node_modules/.bin/vitest run --config editor/vitest.oauth.config.ts
       - name: Build and pack the actual native host candidate

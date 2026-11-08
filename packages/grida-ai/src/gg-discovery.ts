@@ -148,7 +148,7 @@ export class GGDiscoveryStore {
         nextChange(endpoints.value)
       );
       const expires = Math.min(
-        started + MAX_AGE_MS - Math.max(models.age, endpoints.age),
+        started + MAX_AGE_MS - Math.max(models.age, endpoints.age, bundle.age),
         change
       );
       if (expires <= this.now()) throw 0;
@@ -168,7 +168,7 @@ export class GGDiscoveryStore {
       if (this.disposed) return false;
       this.current = snapshot;
       this.freshUntil = Math.min(
-        started + FRESH_MS - Math.max(models.age, endpoints.age),
+        started + FRESH_MS - Math.max(models.age, endpoints.age, bundle.age),
         expires
       );
       this.retryAt = 0;
@@ -445,8 +445,9 @@ function parseOperations(
       continue;
     const reference = value.request_schema.$ref;
     if (!/^#\/\$defs\/[^/]{1,200}$/.test(reference)) throw 0;
-    const definition = definitions[reference.slice(8)];
-    if (!record(definition)) throw 0;
+    if (!record(definitions[reference.slice(8)])) throw 0;
+    const definition = localDefinition(value.request_schema, definitions);
+    if (!definition) continue;
     const path = value.path;
     const iface =
       path === "/v1/images/generations"
@@ -503,40 +504,8 @@ function parseOperations(
       typeof value.result_schema.$ref !== "string"
     )
       continue;
-    const result = localDefinition(value.result_schema, definitions);
-    const resultProperties =
-      result && record(result.properties) ? result.properties : null;
-    if (!result || !resultProperties) continue;
-    const outputField =
-      iface === "images.generations"
-        ? "data"
-        : iface === "videos"
-          ? "videos"
-          : value.kind === "music"
-            ? "audio"
-            : "glb";
-    if (
-      !record(resultProperties[outputField]) ||
-      !Array.isArray(result.required) ||
-      !result.required.includes(outputField)
-    )
+    if (!supportsResult(value.result_schema, definitions, iface, value.kind))
       continue;
-    if (iface === "endpoints") {
-      const output = localDefinition(
-        resultProperties[outputField] as Record<string, unknown>,
-        definitions
-      );
-      const properties =
-        output && record(output.properties) ? output.properties : null;
-      const mime =
-        properties && record(properties.media_type)
-          ? properties.media_type.const
-          : null;
-      if (
-        mime !== (value.kind === "music" ? "audio/mpeg" : "model/gltf-binary")
-      )
-        continue;
-    }
     selected.push({
       id: value.operation_id,
       model_id: model.id,
@@ -553,31 +522,239 @@ function parseOperations(
   return selected;
 }
 
+/** Resolve only bounded local schema references; no remote schema execution. */
 function localDefinition(
   schema: Record<string, unknown>,
-  definitions: Record<string, unknown>
+  definitions: Record<string, unknown>,
+  depth = 0
 ): Record<string, unknown> | null {
+  if (depth > 16) return null;
   if (typeof schema.$ref !== "string") return schema;
   if (!/^#\/\$defs\/[^/]{1,200}$/.test(schema.$ref)) return null;
   const value = definitions[schema.$ref.slice(8)];
-  return record(value) ? value : null;
+  if (!record(value)) return null;
+  const resolved = localDefinition(value, definitions, depth + 1);
+  if (!resolved) return null;
+  const { $ref: _reference, ...constraints } = schema;
+  // $ref siblings intersect with their target. This small native admission
+  // reader cannot flatten conflicting keywords without weakening one side.
+  // Withhold those shapes; never replace a referenced requirement/type/const.
+  for (const [key, constraint] of Object.entries(constraints)) {
+    if (Object.hasOwn(resolved, key) && resolved[key] !== constraint)
+      return null;
+  }
+  return { ...resolved, ...constraints };
 }
-/** Common native controls can represent these required fields without model-specific code. */
+
+function supportsResult(
+  schema: Record<string, unknown>,
+  definitions: Record<string, unknown>,
+  iface: string,
+  kind: unknown
+): boolean {
+  const result = localDefinition(schema, definitions);
+  const field =
+    iface === "images.generations"
+      ? "data"
+      : iface === "videos"
+        ? "videos"
+        : kind === "music"
+          ? "audio"
+          : "glb";
+  if (
+    !result ||
+    result.type !== "object" ||
+    !record(result.properties) ||
+    !Array.isArray(result.required) ||
+    !result.required.includes(field) ||
+    !record(result.properties[field])
+  )
+    return false;
+  let item = localDefinition(result.properties[field], definitions);
+  if (iface === "images.generations" || iface === "videos") {
+    if (!item || item.type !== "array" || !record(item.items)) return false;
+    item = localDefinition(item.items, definitions);
+  }
+  const payload = iface === "images.generations" ? "b64_json" : "url";
+  if (
+    !item ||
+    item.type !== "object" ||
+    !record(item.properties) ||
+    !Array.isArray(item.required) ||
+    !item.required.includes(payload) ||
+    !record(item.properties[payload])
+  )
+    return false;
+  const representation = localDefinition(item.properties[payload], definitions);
+  if (representation?.type !== "string") return false;
+  if (iface !== "endpoints") return true;
+  if (
+    !item.required.includes("media_type") ||
+    !record(item.properties.media_type)
+  )
+    return false;
+  return (
+    localDefinition(item.properties.media_type, definitions)?.const ===
+    (kind === "music" ? "audio/mpeg" : "model/gltf-binary")
+  );
+}
+
+/** Common native controls can represent these required fields without model-specific code.
+ * This checks the small input representation we implement, not arbitrary JSON Schema validity.
+ * Unsupported required/composed shapes fail closed before a paid submission.
+ */
 export function supportsGGPromptOperation(
   operation: GGOperation,
   image = false
 ): boolean {
-  const required = operation.input_schema.required;
+  const schema = operation.input_schema;
+  const definitions = record(schema.$defs) ? schema.$defs : {};
+  const fields = new Set(
+    image ? ["model", "prompt", "image"] : ["model", "prompt"]
+  );
+  const properties = record(schema.properties) ? schema.properties : null;
   if (
-    !Array.isArray(required) ||
-    !required.every((key) => typeof key === "string")
+    schema.type !== "object" ||
+    !properties ||
+    !record(properties.prompt) ||
+    !stringInput(properties.prompt, definitions)
   )
     return false;
-  const fields = image ? ["model", "prompt", "image"] : ["model", "prompt"];
-  const properties = operation.input_schema.properties;
+  if (
+    image &&
+    (!record(properties.image) || !stringInput(properties.image, definitions))
+  )
+    return false;
+  const possibleFields = new Set([
+    ...fields,
+    ...(operation.kind === "image"
+      ? ["n", "size", "aspect_ratio", "seed", "quality", "background"]
+      : operation.kind === "video"
+        ? [
+            "duration",
+            "seed",
+            "fps",
+            "generateAudio",
+            "image",
+            "aspectRatio",
+            "aspect_ratio",
+            "resolution",
+            "providerOptions",
+          ]
+        : ["seed"]),
+  ]);
+  return nativeRequirements(schema, fields, definitions, 0, possibleFields);
+}
+function stringInput(
+  schema: Record<string, unknown>,
+  definitions: Record<string, unknown>
+): boolean {
+  const value = localDefinition(schema, definitions);
   return (
-    record(properties) &&
-    Object.hasOwn(properties, "prompt") &&
-    required.every((key) => fields.includes(key))
+    !!value &&
+    value.type === "string" &&
+    !["allOf", "anyOf", "oneOf", "if", "then", "else"].some((key) =>
+      Object.hasOwn(value, key)
+    )
   );
+}
+function conditionCanMatch(
+  schema: Record<string, unknown>,
+  fields: ReadonlySet<string>,
+  depth = 0
+): boolean {
+  if (depth > 16) return true;
+  if (
+    Array.isArray(schema.required) &&
+    schema.required.some((key) => typeof key !== "string" || !fields.has(key))
+  )
+    return false;
+  if (
+    Array.isArray(schema.anyOf) &&
+    !schema.anyOf.some(
+      (branch) => record(branch) && conditionCanMatch(branch, fields, depth + 1)
+    )
+  )
+    return false;
+  if (
+    Array.isArray(schema.allOf) &&
+    !schema.allOf.every(
+      (branch) => record(branch) && conditionCanMatch(branch, fields, depth + 1)
+    )
+  )
+    return false;
+  return true;
+}
+function nativeRequirements(
+  schema: Record<string, unknown>,
+  fields: ReadonlySet<string>,
+  definitions: Record<string, unknown>,
+  depth = 0,
+  possibleFields: ReadonlySet<string> = fields
+): boolean {
+  if (depth > 16) return false;
+  const value = localDefinition(schema, definitions);
+  if (!value || (value.type !== undefined && value.type !== "object"))
+    return false;
+  if (
+    value.required !== undefined &&
+    (!Array.isArray(value.required) ||
+      value.required.some((key) => typeof key !== "string" || !fields.has(key)))
+  )
+    return false;
+  if (record(value.properties)) {
+    for (const key of ["prompt", ...(fields.has("image") ? ["image"] : [])]) {
+      if (
+        Object.hasOwn(value.properties, key) &&
+        (!record(value.properties[key]) ||
+          !stringInput(value.properties[key], definitions))
+      )
+        return false;
+    }
+  }
+  for (const key of ["allOf", "anyOf", "oneOf"]) {
+    if (
+      value[key] !== undefined &&
+      (!Array.isArray(value[key]) ||
+        !(value[key] as unknown[]).every(
+          (branch) =>
+            record(branch) &&
+            nativeRequirements(
+              branch,
+              fields,
+              definitions,
+              depth + 1,
+              possibleFields
+            )
+        ))
+    )
+      return false;
+  }
+  if (value.if !== undefined && !record(value.if)) return false;
+  if (
+    value.then !== undefined &&
+    (!record(value.then) ||
+      ((!record(value.if) || conditionCanMatch(value.if, possibleFields)) &&
+        !nativeRequirements(
+          value.then,
+          fields,
+          definitions,
+          depth + 1,
+          possibleFields
+        )))
+  )
+    return false;
+  if (
+    value.else !== undefined &&
+    (!record(value.else) ||
+      !nativeRequirements(
+        value.else,
+        fields,
+        definitions,
+        depth + 1,
+        possibleFields
+      ))
+  )
+    return false;
+  return true;
 }

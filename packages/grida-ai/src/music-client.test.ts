@@ -35,12 +35,17 @@ function setup() {
 }
 async function failure(
   promise: Promise<unknown>,
-  code: MusicClient.FailureCode
+  code: MusicClient.FailureCode,
+  requestId?: string
 ) {
   const error = await promise.catch((value) => value);
   expect(error).toBeInstanceOf(MusicClient.Failure);
   expect(error).toMatchObject({ code, message: code });
-  expect(JSON.parse(JSON.stringify(error))).toEqual({ code, message: code });
+  expect(JSON.parse(JSON.stringify(error))).toEqual({
+    code,
+    message: code,
+    ...(requestId ? { request_id: requestId } : {}),
+  });
   expect(String(error)).not.toMatch(/synthetic-|upstream|secret/);
   expect(error).not.toHaveProperty("cause");
 }
@@ -56,7 +61,10 @@ describe("MusicClient current GG operation", () => {
     expect(Object.keys(client)).toEqual([]);
     expect(
       await selected.generate({ prompt: "  A quiet piano melody  ", seed: 0 })
-    ).toEqual({ audio: { data: DATA, media_type: "audio/mpeg" } });
+    ).toEqual({
+      audio: { data: DATA, media_type: "audio/mpeg" },
+      request_id: "req_music",
+    });
     expect(request.mock.calls.map(([url]) => String(url))).toEqual([
       "https://grida.example/api/v1/ai/operations",
       "https://grida.example/api/v1/ai/jobs?request_id=req_music",
@@ -153,7 +161,8 @@ describe("MusicClient current GG operation", () => {
       );
       await failure(
         selected.generate({ prompt: "A piano" }),
-        "invalid_response"
+        "invalid_response",
+        "req_music"
       );
       expect(download).not.toHaveBeenCalled();
     }
@@ -175,6 +184,7 @@ describe("MusicClient current GG operation", () => {
     );
     expect(await selected.generate({ prompt: "A piano" })).toEqual({
       audio: { data: DATA, media_type: "audio/mpeg" },
+      request_id: "req_music",
     });
   });
   it("refuses private result targets and bounds the downloaded bytes", async () => {
@@ -192,7 +202,8 @@ describe("MusicClient current GG operation", () => {
     );
     await failure(
       selected.generate({ prompt: "A piano" }),
-      "generation_failed"
+      "generation_failed",
+      "req_music"
     );
     expect(download).not.toHaveBeenCalled();
     request.mockImplementation(async (url) =>
@@ -210,7 +221,8 @@ describe("MusicClient current GG operation", () => {
     );
     await failure(
       selected.generate({ prompt: "A piano" }),
-      "generation_failed"
+      "generation_failed",
+      "req_music"
     );
   });
   it("aborts before submission without acquiring another credential", async () => {
@@ -230,8 +242,156 @@ describe("MusicClient current GG operation", () => {
     const selected = await client.resolve({ model_id: ID, provider: "gg" });
     request.mockImplementation(async () => new Promise<Response>(() => {}));
     const check = failure(selected.generate({ prompt: "A piano" }), "timeout");
-    await vi.advanceTimersByTimeAsync(300_001);
+    await vi.advanceTimersByTimeAsync(600_001);
     await check;
     expect(request).toHaveBeenCalledOnce();
+  });
+});
+
+describe("music accepted work and result integrity", () => {
+  it("preserves availability classification when discovery withdraws the operation before dispatch", async () => {
+    const catalogue = fixtureGGDiscovery([{ id: ID, kind: "music" }]);
+    const request = vi.fn<typeof fetch>();
+    const client = new MusicClient({
+      http: new ProviderHttp({ request, download: vi.fn<typeof fetch>() }),
+      gg: { getAccessToken: () => TOKEN },
+      gg_base_url: "https://grida.example",
+      gg_catalog: catalogue,
+    });
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    vi.spyOn(catalogue, "ready").mockResolvedValue({
+      ...catalogue.view()!,
+      operations: [],
+    });
+    await failure(
+      selected.generate({ prompt: "A piano" }),
+      "model_unavailable"
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+  it("accepts an original job completing after five minutes without another submission", async () => {
+    vi.useFakeTimers();
+    const { client, request } = setup();
+    const started = Date.now();
+    request.mockImplementation(async (url) =>
+      Response.json(
+        String(url).includes("/jobs?")
+          ? Date.now() - started > 300_000
+            ? job()
+            : {
+                ...job(),
+                status: "running",
+                result_status: "pending",
+                result: null,
+              }
+          : { id: "req_music" }
+      )
+    );
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    const pending = selected.generate({ prompt: "A piano" });
+    await vi.advanceTimersByTimeAsync(302_000);
+    expect(await pending).toEqual({
+      audio: { data: DATA, media_type: "audio/mpeg" },
+      request_id: "req_music",
+    });
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(1);
+  });
+  it.each(["poll", "download", "timeout", "abort", "malformed-mp3"])(
+    "keeps the accepted receipt after %s failure without generating again",
+    async (stage) => {
+      vi.useFakeTimers();
+      const { client, request, download } = setup();
+      const abort = new AbortController();
+      request.mockImplementation(async (url) => {
+        if (!String(url).includes("/jobs?"))
+          return Response.json({ id: "req_music" });
+        if (stage === "timeout" || stage === "abort")
+          return new Promise<Response>(() => {});
+        if (stage === "poll") throw new Error("upstream-secret");
+        return Response.json(job());
+      });
+      if (stage === "download") download.mockRejectedValue(new Error("secret"));
+      if (stage === "malformed-mp3")
+        download.mockResolvedValue(new Response("<html>failure</html>"));
+      const selected = await client.resolve({ model_id: ID, provider: "gg" });
+      const code =
+        stage === "timeout"
+          ? "timeout"
+          : stage === "abort"
+            ? "aborted"
+            : stage === "malformed-mp3"
+              ? "invalid_response"
+              : "generation_failed";
+      const pending = failure(
+        selected.generate({ prompt: "A piano", signal: abort.signal }),
+        code,
+        "req_music"
+      );
+      await vi.advanceTimersByTimeAsync(1);
+      if (stage === "abort") abort.abort();
+      if (stage === "timeout") await vi.advanceTimersByTimeAsync(600_001);
+      await pending;
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
+    }
+  );
+  it("does not retain unvalidated request identities in safe failures", () => {
+    expect(
+      new MusicClient.Failure("generation_failed", "secret-token").toJSON()
+    ).toEqual({ code: "generation_failed", message: "generation_failed" });
+  });
+});
+
+describe("MusicClient original-job recovery", () => {
+  it("recovers paid music after authentication refresh without a catalogue or POST", async () => {
+    const catalogue = fixtureGGDiscovery([]);
+    const request = vi.fn<typeof fetch>(async () =>
+      Response.json({ ...job(), model: ID })
+    );
+    const download = vi.fn<typeof fetch>(async () => new Response(DATA));
+    const ready = vi.spyOn(catalogue, "ready");
+    const client = new MusicClient({
+      http: new ProviderHttp({ request, download }),
+      gg: { getAccessToken: () => "replacement-token" },
+      gg_base_url: "https://grida.example",
+      gg_catalog: catalogue,
+    });
+    expect(
+      await client.recover({ request_id: "req_music", model_id: ID })
+    ).toEqual({
+      audio: { data: DATA, media_type: "audio/mpeg" },
+      request_id: "req_music",
+    });
+    expect(ready).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0][1]?.method).toBe("GET");
+    expect(String(request.mock.calls[0][0])).toMatch(
+      /jobs\?request_id=req_music$/
+    );
+  });
+  it("rejects recovery of another model before downloading, retaining the receipt", async () => {
+    const { client, request, download } = setup();
+    request.mockResolvedValue(
+      Response.json({ ...job(), model: "fixture/other" })
+    );
+    await failure(
+      client.recover({ request_id: "req_music", model_id: ID }),
+      "invalid_response",
+      "req_music"
+    );
+    expect(download).not.toHaveBeenCalled();
+    expect(request.mock.calls[0][1]?.method).toBe("GET");
+  });
+  it("rejects malformed recovery identities without network or authority reads", async () => {
+    const { client, request, read } = setup();
+    await failure(
+      client.recover({ request_id: "https://secret.example", model_id: ID }),
+      "invalid_input"
+    );
+    expect(request).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
   });
 });

@@ -23,6 +23,15 @@ export function mediaGenerationError(
   }
 ): Response {
   const code = (args.error as { code?: unknown })?.code;
+  const candidate = (args.error as { request_id?: unknown })?.request_id;
+  const requestId =
+    typeof candidate === "string" &&
+    /^req_[A-Za-z0-9_-]{1,160}$/.test(candidate)
+      ? candidate
+      : undefined;
+  const receipt = requestId ? { request_id: requestId } : {};
+  // Electron preserves Error.message but may remove custom fields.
+  const marker = requestId ? ` GG request: ${requestId}.` : "";
 
   // GRIDA-GG: provider — actionable hosted-session failures.
   // GRIDA-SEC-006 — preserve literal codes across contextBridge while never
@@ -30,7 +39,8 @@ export function mediaGenerationError(
   if (code === "gg_token_expired") {
     return c.json(
       {
-        error: "gg_token_expired: Grida session expired",
+        error: `gg_token_expired: Grida session expired${marker}`,
+        ...receipt,
         code,
         provider_id: "gg",
       },
@@ -40,7 +50,8 @@ export function mediaGenerationError(
   if (code === "insufficient_credits") {
     return c.json(
       {
-        error: "insufficient_credits: insufficient AI credits",
+        error: `insufficient_credits: insufficient AI credits${marker}`,
+        ...receipt,
         code,
         provider_id: "gg",
       },
@@ -50,7 +61,8 @@ export function mediaGenerationError(
   if (code === "provider_access_denied") {
     return c.json(
       {
-        error: "provider_access_denied: provider access denied",
+        error: `provider_access_denied: provider access denied${marker}`,
+        ...receipt,
         code,
         provider_id: args.provider_id,
       },
@@ -66,7 +78,8 @@ export function mediaGenerationError(
   );
   return c.json(
     {
-      error: args.label,
+      error: args.label + marker,
+      ...receipt,
       model_id: args.model_id,
       provider_id: args.provider_id,
     },

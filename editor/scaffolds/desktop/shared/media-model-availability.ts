@@ -136,6 +136,48 @@ export namespace MediaModelAvailability {
     };
   }
 
+  export type VideoProviderState = Readonly<{
+    loaded: boolean;
+    configured: readonly models.video.VideoProvider[];
+    hosted: boolean;
+  }>;
+
+  /** Current GG text operations or exact connected native text routes. */
+  export function video(
+    modelId: string,
+    current: readonly CurrentGGModel[] | null,
+    state: VideoProviderState
+  ): ImageAccess {
+    if (!state.loaded)
+      return { available: false, reason: "Checking connected providers…" };
+    if (
+      state.hosted &&
+      current?.some(
+        (model) =>
+          model.id === modelId &&
+          model.kind === "video" &&
+          model.interfaces.includes("videos")
+      )
+    )
+      return { available: true };
+    const card = models.video.models[modelId];
+    const textRoute = (provider: models.video.VideoProvider) => {
+      if (!card?.listed || !models.video.binding(card, provider)) return false;
+      const input = models.video.input(card, provider);
+      return input === "text" || input === "text-or-image";
+    };
+    if (
+      state.configured.some(textRoute) ||
+      (current === null && state.hosted && textRoute("vercel"))
+    )
+      return { available: true };
+    return {
+      available: false,
+      reason:
+        "This model is unavailable. Choose another model or connect a supported provider key.",
+    };
+  }
+
   /** Refreshable, secret-free key presence and hosted-session readiness. */
   export class ImageProviders {
     private current: ImageProviderState;

@@ -183,40 +183,170 @@ pub(crate) fn normalize(schema: &Value, value: Value) -> Result<Value> {
     Ok(value)
 }
 fn matches_schema(s: &Value, v: &Value) -> bool {
-    if let Some(n) = v.as_f64()
-        && (s["maximum"].as_f64().is_some_and(|max| n > max)
-            || s["minimum"].as_f64().is_some_and(|min| n < min))
-    {
-        return false;
+    if let Some(valid) = s.as_bool() {
+        return valid;
     }
     if s.get("const").is_some_and(|c| c != v)
         || s["enum"].as_array().is_some_and(|a| !a.contains(v))
         || s.get("not").is_some_and(|n| matches_schema(n, v))
+        || s["anyOf"]
+            .as_array()
+            .is_some_and(|a| !a.iter().any(|s| matches_schema(s, v)))
+        || s["oneOf"]
+            .as_array()
+            .is_some_and(|a| a.iter().filter(|s| matches_schema(s, v)).count() != 1)
+        || s["allOf"]
+            .as_array()
+            .is_some_and(|a| !a.iter().all(|s| matches_schema(s, v)))
     {
         return false;
     }
-    if s["required"]
-        .as_array()
-        .is_some_and(|a| a.iter().any(|k| v.get(k.as_str().unwrap_or("")).is_none()))
+    if let Some(kind) = s["type"].as_str() {
+        let valid = match kind {
+            "object" => v.is_object(),
+            "array" => v.is_array(),
+            "string" => v.is_string(),
+            "boolean" => v.is_boolean(),
+            "null" => v.is_null(),
+            "number" => v.is_number(),
+            "integer" => v
+                .as_f64()
+                .is_some_and(|n| n.fract() == 0.0 && n.abs() <= 9007199254740991.0),
+            _ => false,
+        };
+        if !valid {
+            return false;
+        }
+    }
+    if let Some(n) = v.as_f64()
+        && (s["maximum"].as_f64().is_some_and(|max| n > max)
+            || s["minimum"].as_f64().is_some_and(|min| n < min)
+            || s["exclusiveMaximum"].as_f64().is_some_and(|max| n >= max)
+            || s["exclusiveMinimum"].as_f64().is_some_and(|min| n <= min))
     {
         return false;
     }
-    if let Some(fields) = s["properties"].as_object() {
-        for (key, schema) in fields {
-            if let Some(value) = v.get(key)
-                && !matches_schema(schema, value)
+    if let Some(text) = v.as_str() {
+        let count = if s["x-grida-length-unit"] == "utf16" {
+            text.encode_utf16().count()
+        } else {
+            text.chars().count()
+        };
+        if s["minLength"]
+            .as_u64()
+            .is_some_and(|min| count < min as usize)
+            || s["maxLength"]
+                .as_u64()
+                .is_some_and(|max| count > max as usize)
+            || s["pattern"]
+                .as_str()
+                .is_some_and(|p| regex::Regex::new(p).map_or(true, |p| !p.is_match(text)))
+        {
+            return false;
+        }
+        if let Some(limits) = s.get("x-gg-pixel-limits") {
+            let Some((w, h)) = dimensions(text) else {
+                return false;
+            };
+            let pixels = w * h;
+            if limits["width_maximum"].as_u64().is_some_and(|max| w > max)
+                || limits["height_maximum"].as_u64().is_some_and(|max| h > max)
+                || limits["multiple_of"]
+                    .as_u64()
+                    .is_some_and(|m| m == 0 || !w.is_multiple_of(m) || !h.is_multiple_of(m))
+                || limits["pixels_minimum"]
+                    .as_u64()
+                    .is_some_and(|min| pixels < min)
+                || limits["pixels_maximum"]
+                    .as_u64()
+                    .is_some_and(|max| pixels > max)
+                || limits["aspect_ratio_maximum"]
+                    .as_f64()
+                    .is_some_and(|max| w.max(h) as f64 / w.min(h) as f64 > max)
             {
                 return false;
             }
         }
     }
-    if let Some(condition) = s.get("if")
-        && matches_schema(condition, v)
-        && let Some(then) = s.get("then")
+    if let Some(values) = v.as_array()
+        && (s["minItems"]
+            .as_u64()
+            .is_some_and(|min| values.len() < min as usize)
+            || s["maxItems"]
+                .as_u64()
+                .is_some_and(|max| values.len() > max as usize)
+            || s.get("items")
+                .is_some_and(|item| values.iter().any(|v| !matches_schema(item, v))))
     {
-        return matches_schema(then, v);
+        return false;
+    }
+    if let Some(object) = v.as_object() {
+        if s["required"].as_array().is_some_and(|a| {
+            a.iter()
+                .any(|k| !object.contains_key(k.as_str().unwrap_or("")))
+        }) || s["additionalProperties"] == false
+            && object.keys().any(|key| s["properties"].get(key).is_none())
+        {
+            return false;
+        }
+        if let Some(fields) = s["properties"].as_object() {
+            for (key, schema) in fields {
+                if let Some(value) = object.get(key)
+                    && !matches_schema(schema, value)
+                {
+                    return false;
+                }
+            }
+        }
+        if let Some(limits) = s.get("x-gg-animation-limits")
+            && v["output_format"] == limits["output_format"]
+        {
+            let frames = v["frame_count"]
+                .as_u64()
+                .or_else(|| limits["default_frames"].as_u64())
+                .unwrap_or(0);
+            let outputs = v["n"].as_u64().unwrap_or(1);
+            let pixels = v["size"]
+                .as_str()
+                .and_then(dimensions)
+                .map(|(w, h)| w * h)
+                .or_else(|| limits["minimum_frame_pixels"].as_u64())
+                .unwrap_or(u64::MAX);
+            if frames == 0
+                || frames > limits["maximum_frames"].as_u64().unwrap_or(0)
+                || pixels
+                    .checked_mul(frames)
+                    .and_then(|n| n.checked_mul(outputs))
+                    .is_none_or(|n| n > limits["maximum_request_pixels"].as_u64().unwrap_or(0))
+            {
+                return false;
+            }
+        }
+    }
+    if let Some(condition) = s.get("if") {
+        let branch = if matches_schema(condition, v) {
+            s.get("then")
+        } else {
+            s.get("else")
+        };
+        if branch.is_some_and(|branch| !matches_schema(branch, v)) {
+            return false;
+        }
     }
     true
+}
+fn dimensions(text: &str) -> Option<(u64, u64)> {
+    let (width, height) = text.split_once('x')?;
+    if !width.bytes().all(|b| b.is_ascii_digit()) || !height.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let (width, height) = (width.parse::<u64>().ok()?, height.parse::<u64>().ok()?);
+    (width > 0
+        && height > 0
+        && width <= 9007199254740991
+        && height <= 9007199254740991
+        && width.checked_mul(height).is_some())
+    .then_some((width, height))
 }
 pub(crate) fn validate_glb(data: &[u8]) -> Result<()> {
     let word = |at: usize| -> Result<u32> {

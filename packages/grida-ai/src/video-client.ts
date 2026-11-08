@@ -15,6 +15,7 @@ import { ProviderHttp } from "./http";
 import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
 import { byokProvidersFor } from "./provider-ids";
 import { videoModels } from "./video-models";
+import { GGOperationsClient } from "./gg-operations";
 import { MediaRequest } from "./media-request";
 import {
   GGDiscoveryStore,
@@ -162,6 +163,7 @@ export class VideoClient {
     operation?: GGOperation
   ): Promise<VideoClient.Result> {
     let request: MediaRequest | undefined;
+    let requestId: string | undefined;
     try {
       const args = generationInput(input, image, descriptor);
       request = new MediaRequest(this.#http, args.signal);
@@ -178,7 +180,10 @@ export class VideoClient {
             args,
             request,
             operation,
-            this.#ggCatalog
+            this.#ggCatalog,
+            (id) => {
+              requestId = id;
+            }
           )
         );
       } else {
@@ -233,14 +238,14 @@ export class VideoClient {
         });
       }
       request.check();
-      return { videos };
+      return { videos, ...(requestId ? { request_id: requestId } : {}) };
     } catch (error) {
       try {
         request?.check();
       } catch (abort) {
-        throw safeFailure(abort);
+        throw safeFailure(abort, requestId);
       }
-      throw safeFailure(error);
+      throw safeFailure(error, requestId);
     } finally {
       request?.dispose();
     }
@@ -295,7 +300,10 @@ export namespace VideoClient {
     data: Uint8Array;
     media_type: "image/png" | "image/jpeg" | "image/webp";
   };
-  export type Result = { videos: { data: Uint8Array; media_type: string }[] };
+  export type Result = {
+    videos: { data: Uint8Array; media_type: string }[];
+    request_id?: string;
+  };
   export type FailureCode =
     | "invalid_input"
     | "model_unavailable"
@@ -310,13 +318,23 @@ export namespace VideoClient {
     | "unsupported_untrusted_result_origin";
   export class Failure extends Error {
     readonly code: FailureCode;
-    constructor(code: FailureCode) {
+    readonly request_id?: string;
+    constructor(code: FailureCode, requestId?: string) {
       super(failureCode(code));
       this.name = "VideoFailure";
       this.code = failureCode(code);
+      if (
+        typeof requestId === "string" &&
+        /^req_[A-Za-z0-9_-]{1,160}$/.test(requestId)
+      )
+        this.request_id = requestId;
     }
-    toJSON(): { code: FailureCode; message: string } {
-      return { code: this.code, message: this.code };
+    toJSON(): { code: FailureCode; message: string; request_id?: string } {
+      return {
+        code: this.code,
+        message: this.code,
+        ...(this.request_id ? { request_id: this.request_id } : {}),
+      };
     }
   }
 }
@@ -406,21 +424,26 @@ function exactKeys(value: unknown, allowed: readonly string[]): void {
 function isProvider(value: string): value is VideoClient.ByokProvider {
   return (models.video.providers as readonly string[]).includes(value);
 }
-function safeFailure(error: unknown): VideoClient.Failure {
+function safeFailure(error: unknown, requestId?: string): VideoClient.Failure {
   try {
     if (
       error instanceof VideoClient.Failure ||
+      error instanceof GGOperationsClient.Failure ||
       error instanceof MediaRequest.Failure
     )
-      return new VideoClient.Failure(error.code);
+      return new VideoClient.Failure(
+        error.code,
+        requestId ??
+          (error instanceof VideoClient.Failure ? error.request_id : undefined)
+      );
     if (error instanceof GridaGatewayAuthError)
-      return new VideoClient.Failure("gg_token_expired");
+      return new VideoClient.Failure("gg_token_expired", requestId);
     if (error instanceof GridaGatewayCreditsError)
-      return new VideoClient.Failure("insufficient_credits");
+      return new VideoClient.Failure("insufficient_credits", requestId);
   } catch {
     /* Unknown host errors can have throwing accessors. */
   }
-  return new VideoClient.Failure("generation_failed");
+  return new VideoClient.Failure("generation_failed", requestId);
 }
 function failureCode(value: unknown): VideoClient.FailureCode {
   return typeof value === "string" &&

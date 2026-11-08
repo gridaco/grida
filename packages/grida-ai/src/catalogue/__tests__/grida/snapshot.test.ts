@@ -970,6 +970,9 @@ describe("native facts versus legacy schema-1 publication", () => {
         .providers.openrouter
     ).toEqual(current);
     const legacy = snapshot.legacy();
+    expect(Object.keys(legacy.image!.models)).toHaveLength(20);
+    expect(Object.keys(legacy.video!.models)).toHaveLength(7);
+    expect(snapshot.parse(wire(legacy))?.image).toEqual(legacy.image);
     expect(
       legacy.video!.models["bytedance/seedance-2.0"].providers.openrouter
     ).toBeUndefined();
@@ -986,5 +989,61 @@ describe("native facts versus legacy schema-1 publication", () => {
       snapshot.seed().video!.models["bytedance/seedance-2.0"].providers
         .openrouter
     ).toEqual(current);
+  });
+});
+
+describe("legacy publication preserves usable sections after filtering", () => {
+  it("omits an unsupported primary without substituting its provider or losing unrelated image cards", () => {
+    const source = snapshot.seed();
+    const id = "openai/gpt-image-2.5-flare";
+    const card = source.image!.models[id];
+    expect(card).toBeDefined();
+    card.provider = "openrouter";
+    const binding =
+      card.providers.openrouter ?? card.providers.fal ?? card.providers.vercel!;
+    card.providers.openrouter = {
+      ...binding,
+      provider: "openrouter",
+      id: "openai/gpt-image-2.5-flare",
+    };
+    delete card.providers.openrouter.avg_cost_usd;
+    source.preferences!.image = {
+      default_id: id,
+      order: [id, "bfl/flux-2-pro"],
+    };
+    const before = wire(source);
+    const legacy = snapshot.legacy({ source });
+    expect(legacy.image!.models[id]).toBeUndefined();
+    expect(legacy.image!.models["bfl/flux-2-pro"]).toEqual(
+      source.image!.models["bfl/flux-2-pro"]
+    );
+    expect(legacy.preferences!.image).toEqual({ order: ["bfl/flux-2-pro"] });
+    const parsed = snapshot.parse(wire(legacy));
+    expect(parsed?.image).toEqual(legacy.image);
+    expect(parsed?.preferences).toEqual(legacy.preferences);
+    expect(wire(source)).toEqual(before);
+  });
+  it("omits a video with no readable meter and prunes its recommendations", () => {
+    const source = snapshot.seed();
+    const id = "bytedance/seedance-2.0";
+    const original = source.video!.models[id].providers.openrouter!;
+    source.video!.models[id].providers = { openrouter: original };
+    source.preferences!.video = { default_id: id, order: [id] };
+    const legacy = snapshot.legacy({ source });
+    expect(legacy.video!.models[id]).toBeUndefined();
+    expect(legacy.preferences!.video).toEqual({ order: [] });
+    expect(snapshot.parse(wire(legacy))?.video).toEqual(legacy.video);
+  });
+  it("omits a wholly unreadable optional section instead of publishing a rejected empty section", () => {
+    const source = snapshot.seed();
+    const id = "bytedance/seedance-2.0";
+    const card = source.video!.models[id];
+    card.providers = { openrouter: card.providers.openrouter! };
+    source.video!.models = { [id]: card };
+    source.preferences!.video = { default_id: id };
+    const legacy = snapshot.legacy({ source });
+    expect(legacy.video).toBeUndefined();
+    expect(legacy.preferences!.video).toBeUndefined();
+    expect(snapshot.parse(wire(legacy))?.text).toEqual(legacy.text);
   });
 });

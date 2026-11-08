@@ -66,10 +66,10 @@ scratch.
 
 Product presets and native compatibility data come from `@grida/ai/catalogue`, which joins Grida membership,
 legacy status, tiers, request presets and optional recommendations to the neutral
-`@grida/ai-models` facts. The shared SDK retains its Grida defaults and owns the
-refresh store, using the service entry's seed and schema-1 parser. The image and
-video routes and chat runtime share that store; audio and 3D retain their bundled
-catalogs. The optional image default
+`@grida/ai-models` facts. Native/BYOK metadata stays pinned to that installed
+seed. Image/video routes and the chat runtime share the host's separate bounded
+GG discovery store; hosted music also uses current GG operation contracts.
+Sound effects, speech and typed native 3D adapters retain their bundled inputs. The optional image default
 is used only when the caller has not chosen a model. Explicit legacy selections
 remain valid while the service still admits them.
 
@@ -88,10 +88,13 @@ GG custody blocks subsequent invocations but cannot recall an accepted request.
 The route retains its wire protocol, GG status mapping and media receipts.
 
 The music HTTP route uses `MusicClient` with GG authority and provider transport;
-it does not receive BYOK keys. The SDK validates the two bundled Lyria models,
-text/seed input and a bounded MP3 response. The route converts bytes to its
+it does not receive BYOK keys. The SDK validates current GG music operation
+contracts, supported text/seed input and a bounded MP3 response. The route converts bytes to its
 existing wire shape, derives the canonical model filename, and adds an optional
-root-level storage receipt. GG refresh remains with the host. Music, sound
+root-level storage receipt. The ten-minute music deadline covers submission,
+polling and download. Accepted failures retain a safe request ID; session refresh
+resumes that job with GET-only reads, including after catalogue retirement. GG
+refresh remains with the host. Music, sound
 effects and speech have separate contracts under the audio modality.
 
 The sound-effects HTTP route uses `SoundEffectClient` with only an ElevenLabs

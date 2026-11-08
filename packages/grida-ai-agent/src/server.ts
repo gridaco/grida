@@ -394,7 +394,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         gg_base_url: gridaGatewayBaseUrl,
         chatgpt,
         catalog: modelCatalog,
-        gg_catalog: ggCatalog,
+        gg_catalog: gridaGatewayBaseUrl ? ggCatalog : undefined,
         provider_http: providerHttp,
         workspace_registry: services.workspaces,
         sessions_store: sessionsStore,

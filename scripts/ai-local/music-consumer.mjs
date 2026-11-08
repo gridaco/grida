@@ -103,7 +103,10 @@ export async function proveMusic({ load, require, check }) {
     return true;
   };
   const generated = (result) => {
-    assert.deepEqual(result, { audio: { data, media_type: "audio/mpeg" } });
+    assert.deepEqual(result, {
+      request_id: "req_music",
+      audio: { data, media_type: "audio/mpeg" },
+    });
     assert.equal(result.audio.data.constructor, Uint8Array);
   };
   await check(

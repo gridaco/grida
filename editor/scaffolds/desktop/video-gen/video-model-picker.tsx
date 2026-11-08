@@ -1,6 +1,10 @@
 "use client";
 
-import { mediaModelChoices, useGGModels } from "@/lib/desktop/gg-models";
+import {
+  mediaModelChoices,
+  type CurrentGGModel,
+} from "@/lib/desktop/gg-models";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 import { catalog as models } from "@grida/ai/catalogue";
 import {
   Select,
@@ -19,12 +23,15 @@ export function VideoModelPicker({
   value,
   onValueChange,
   disabled,
+  current,
+  providers,
 }: {
   value: string;
   onValueChange: (id: string) => void;
   disabled?: boolean;
+  current: readonly CurrentGGModel[] | null;
+  providers: MediaModelAvailability.VideoProviderState;
 }) {
-  const current = useGGModels();
   const listed = mediaModelChoices(
     models.video.listed_models(),
     current,
@@ -36,8 +43,20 @@ export function VideoModelPicker({
         <SelectValue placeholder="Choose a model" />
       </MediaModelPickerTrigger>
       <SelectContent>
+        {value && !listed.some((card) => card.id === value) && (
+          <SelectItem value={value} disabled>
+            {value} · Unavailable
+          </SelectItem>
+        )}
         {listed.map((card) => (
-          <SelectItem key={card.id} value={card.id}>
+          <SelectItem
+            key={card.id}
+            value={card.id}
+            disabled={
+              !MediaModelAvailability.video(card.id, current, providers)
+                .available
+            }
+          >
             {card.label}
             {card.deprecated && (
               <span className="text-muted-foreground"> · Legacy</span>

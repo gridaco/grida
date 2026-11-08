@@ -93,6 +93,8 @@ export type ModelFactory = (
 
 export type CreateAgentOptions = {
   model_factory: ModelFactory;
+  /** Initial constructor fallback; per-call options remain authoritative. */
+  initial_model?: Pick<AgentCallOptions, "tier" | "model_id">;
   /** Raw eager skill blocks for a host with NO discovery (the web SVG editor).
    *  Everywhere a bundled dir / workspace exists, skills advertise-then-load
    *  via `skill_index` + the `skill` tool instead. */
@@ -208,7 +210,12 @@ function buildAgent(opts: CreateAgentOptions, download?: DownloadFunction) {
   return new ToolLoopAgent<AgentCallOptions, typeof tools>({
     // Constructor-level model is a fallback; `prepareCall` overrides
     // it per turn from the user-selected tier.
-    model: opts.model_factory(AGENT_DEFAULT_TIER),
+    model: opts.initial_model
+      ? opts.model_factory(
+          opts.initial_model.tier ?? AGENT_DEFAULT_TIER,
+          opts.initial_model.model_id
+        )
+      : opts.model_factory(AGENT_DEFAULT_TIER),
     instructions,
     tools,
     experimental_download: download,

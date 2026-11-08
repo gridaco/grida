@@ -2,6 +2,7 @@
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
 
 import * as gridaGateway from "@/lib/desktop/gg-session";
+import { useVideoProviders } from "@/lib/desktop/video-providers";
 import { useGGModels } from "@/lib/desktop/gg-models";
 import { MediaModelAvailability } from "../shared/media-model-availability";
 
@@ -136,17 +137,22 @@ export function DesktopVideoPlayground({
   onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
   const current = useGGModels();
+  const { state: providerState, refresh: refreshProviders } =
+    useVideoProviders();
   const [selectedModelId, setModelId] = useState(initialModelId ?? "");
   // Released binaries without discovery retain their former native default.
   // An empty current snapshot on newer binaries never enables a hosted model.
   const modelId =
     current === null
-      ? (MediaModelAvailability.select(
+      ? selectedModelId ||
+        (MediaModelAvailability.select(
           models.video.listed_models(),
-          selectedModelId,
+          undefined,
           models.video.default_id
-        )?.id ?? "")
+        )?.id ??
+          "")
       : selectedModelId;
+  const access = MediaModelAvailability.video(modelId, current, providerState);
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [aspect, setAspect] = useState<string>(AUTO);
@@ -160,13 +166,15 @@ export function DesktopVideoPlayground({
   const remove = (id: string) =>
     setTiles((prev) => prev.filter((t) => t.id !== id));
 
-  const onSubmit = (message: PromptInputMessage) => {
-    void runGenerate(message.text);
-  };
+  const onSubmit = (message: PromptInputMessage) => runGenerate(message.text);
 
   const runGenerate = async (rawPrompt: string) => {
     const prompt = rawPrompt.trim();
-    if (!prompt || !modelId) return;
+    if (!prompt || !modelId || !access.available)
+      throw new Error("Select an available video model.");
+    const refreshed = await refreshProviders(modelId);
+    if (!MediaModelAvailability.video(modelId, current, refreshed).available)
+      throw new Error("This video model is unavailable.");
     // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh so a
     // signed-in keyless user generates through the included provider.
     // Never throws; BYOK runs are unaffected when it degrades.
@@ -219,6 +227,11 @@ export function DesktopVideoPlayground({
     <div className="relative flex min-h-0 flex-1 flex-col">
       <header className="flex shrink-0 items-center justify-between px-6 py-4">
         <h1 className="text-2xl font-bold tracking-tight">Video</h1>
+        {modelId && !access.available && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {access.reason}
+          </p>
+        )}
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-40">
@@ -268,6 +281,8 @@ export function DesktopVideoPlayground({
                 />
                 <VideoModelPicker
                   value={modelId}
+                  current={current}
+                  providers={providerState}
                   onValueChange={(next) => {
                     // Model-scoped options don't carry over — a stale aspect
                     // ratio / duration the new model doesn't offer would fail.
@@ -277,7 +292,7 @@ export function DesktopVideoPlayground({
                   }}
                 />
               </PromptInputTools>
-              <PromptInputSubmit disabled={!modelId} />
+              <PromptInputSubmit disabled={!modelId || !access.available} />
             </PromptInputFooter>
           </PromptInput>
         </PromptInputProvider>

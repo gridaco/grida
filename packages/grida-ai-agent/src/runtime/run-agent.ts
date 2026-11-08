@@ -211,6 +211,7 @@ export async function runAgent(
   const agent = createAgentWithUrlPartDownload(
     {
       model_factory: provider.model_factory,
+      initial_model: { tier: req.tier, model_id: req.model_id },
       // No eager skill blocks on the workspace path — built-ins advertise-then-load
       // from the bundled discovery layer via `skill_index` + the `skill` tool.
       fs: bindings?.fs,

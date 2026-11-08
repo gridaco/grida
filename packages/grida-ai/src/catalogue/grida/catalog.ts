@@ -2072,8 +2072,15 @@ export namespace catalog {
     }
 
     /** Publish only schema-1 binding arms readable by older installed clients. */
-    export function legacy(opts?: { version?: string }): Snapshot {
-      const snapshot = seed(opts);
+    export function legacy(opts?: {
+      version?: string;
+      source?: Snapshot;
+    }): Snapshot {
+      // The publisher owns the returned wire object; filtering never mutates a native view.
+      const snapshot: Snapshot = JSON.parse(
+        JSON.stringify(opts?.source ?? seed(opts))
+      );
+      if (opts?.version !== undefined) snapshot.version = opts.version;
       for (const card of Object.values(snapshot.video?.models ?? {})) {
         for (const provider of video.providers) {
           const binding = card.providers[provider];
@@ -2089,6 +2096,41 @@ export namespace catalog {
         for (const provider of image.providers) {
           if (card.providers[provider]?.avg_cost_usd === undefined)
             delete card.providers[provider];
+        }
+      }
+      // A removed primary is not replaced with a different provider or model.
+      // Omit only that unusable card so it cannot invalidate unrelated legacy choices.
+      for (const family of ["image", "video"] as const) {
+        const section = snapshot[family];
+        if (!section) continue;
+        for (const [id, card] of Object.entries(section.models)) {
+          const valid =
+            family === "image"
+              ? parseImageCard(id, card)
+              : parseVideoCard(id, card);
+          if (!valid) delete section.models[id];
+        }
+        if (Object.keys(section.models).length === 0) {
+          delete snapshot[family];
+          if (snapshot.preferences) delete snapshot.preferences[family];
+          continue;
+        }
+        const preference = snapshot.preferences?.[family];
+        if (preference) {
+          const { default_id, order } = preference;
+          snapshot.preferences![family] = {
+            ...(default_id !== undefined &&
+            Object.hasOwn(section.models, default_id)
+              ? { default_id }
+              : {}),
+            ...(order === undefined
+              ? {}
+              : {
+                  order: order.filter((id) =>
+                    Object.hasOwn(section.models, id)
+                  ),
+                }),
+          };
         }
       }
       return snapshot;

@@ -2583,6 +2583,10 @@ async function main() {
           req.method === "POST" &&
           url.pathname === "/internal/grida/v1/images/generations"
         ) {
+          check(
+            req.headers["x-grida-organization-id"] === "1",
+            "GG image organization does not match grant"
+          );
           let raw = "";
           for await (const chunk of req) {
             raw += chunk;

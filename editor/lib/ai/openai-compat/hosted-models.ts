@@ -59,6 +59,7 @@ export async function hostedModelList(): Promise<readonly HostedModelEntry[]> {
               catalog.audio.music.is_model_id(model.id)
             ? "music"
             : model.kind === "three-d" &&
+                model.interfaces.includes("endpoints") &&
                 (catalog.three_d.model_generation.is_model_id(model.id) ||
                   catalog.three_d.rigging.is_model_id(model.id))
               ? "three-d"
@@ -74,7 +75,10 @@ export async function hostedModelList(): Promise<readonly HostedModelEntry[]> {
           modality,
           tier: TIERS.find((tier) => TIER_MODEL_IDS[tier] === model.id) ?? null,
           label: model.label,
-          deprecated: false,
+          deprecated:
+            catalog.text.modelSpecById(model.id)?.deprecated === true ||
+            catalog.image.models[model.id]?.deprecated === true ||
+            catalog.video.models[model.id]?.deprecated === true,
           ...(modality === "three-d"
             ? {
                 feature: catalog.three_d.rigging.is_model_id(model.id)

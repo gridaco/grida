@@ -58,7 +58,9 @@ export class MediaHost {
     this.ggCatalog = new GGDiscoveryStore({
       fetch: this.providerHttp.request,
       on_change: agent.on_provider_ready,
-      disabled: process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1",
+      disabled:
+        !this.gridaGatewayBaseUrl ||
+        process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1",
     });
     this.modelCatalog = new ModelCatalogStore({
       // Native BYOK facts are the reviewed installed release. The schema-1

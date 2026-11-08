@@ -7,6 +7,8 @@ export type MusicGenerateRequest = {
   model_id: string;
   prompt: string;
   seed?: number;
+  /** Resume an already accepted GG job; never submits another generation. */
+  request_id?: string;
 };
 
 export type MusicGenerateResult = {

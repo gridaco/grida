@@ -670,6 +670,7 @@ describe("VideoClient public operation", () => {
     const operation = await client.resolve({ model_id: ID, provider: "gg" });
     expect(await operation.generate({ prompt: PROMPT, seed: 0 })).toEqual({
       videos: [{ data: DATA, media_type: "video/mp4" }],
+      request_id: "req_fixture",
     });
     expect(request.mock.calls[0][0]).toBe(`${GG}/api/v1/ai/operations`);
     expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
@@ -1234,4 +1235,92 @@ describe("video execution and result bounds", () => {
     await failure(operation.generate({ prompt: PROMPT }), "invalid_response");
     expect(cancel).toHaveBeenCalledOnce();
   });
+});
+
+describe("GG native request admission and paid-job receipts", () => {
+  it("rejects an unsupported optional control as input before submission", async () => {
+    const catalogue = fixtureGGDiscovery([{ id: ID, kind: "video" }]);
+    const snapshot = await catalogue.ready();
+    const operation = snapshot!.operations[0];
+    const properties = {
+      ...(operation.input_schema.properties as Record<string, unknown>),
+    };
+    delete properties.fps;
+    vi.spyOn(catalogue, "view").mockReturnValue({
+      ...snapshot!,
+      operations: [
+        {
+          ...operation,
+          input_schema: { ...operation.input_schema, properties },
+        },
+      ],
+    });
+    const { client, request } = setup({
+      gg: { getAccessToken: () => "scoped-token" },
+      gg_base_url: GG,
+      gg_catalog: catalogue,
+    });
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    await failure(
+      selected.generate({ prompt: PROMPT, fps: 24 }),
+      "invalid_input"
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+  it.each(["poll", "download", "abort", "timeout"])(
+    "preserves the original video ID after %s fails",
+    async (stage) => {
+      vi.useFakeTimers();
+      const { client, request, download } = setup({
+        gg: { getAccessToken: () => "scoped-token" },
+        gg_base_url: GG,
+      });
+      const abort = new AbortController();
+      request.mockImplementation(async (url) => {
+        if (!String(url).includes("/jobs?"))
+          return Response.json({ id: "req_video" });
+        if (stage === "poll") throw new Error("upstream-secret");
+        if (stage === "abort" || stage === "timeout")
+          return new Promise<Response>(() => {});
+        return Response.json({
+          id: "req_video",
+          request_id: "req_video",
+          status: "succeeded",
+          result_status: "available",
+          result: {
+            videos: [
+              {
+                url: "https://assets.example/video.mp4",
+                media_type: "video/mp4",
+              },
+            ],
+          },
+        });
+      });
+      if (stage === "download") download.mockRejectedValue(new Error("secret"));
+      const selected = await client.resolve({ model_id: ID, provider: "gg" });
+      const pending = selected
+        .generate({ prompt: PROMPT, signal: abort.signal })
+        .catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(1);
+      if (stage === "abort") abort.abort();
+      if (stage === "timeout") await vi.advanceTimersByTimeAsync(300_001);
+      const code =
+        stage === "abort"
+          ? "aborted"
+          : stage === "timeout"
+            ? "timeout"
+            : "generation_failed";
+      const error = await pending;
+      expect(error).toBeInstanceOf(VideoClient.Failure);
+      expect(JSON.parse(JSON.stringify(error))).toEqual({
+        code,
+        message: code,
+        request_id: "req_video",
+      });
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
+    }
+  );
 });

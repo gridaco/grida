@@ -113,7 +113,24 @@ for (const wire of wires) {
       (lane) =>
       async (url, init = {}) => {
         const discovery = metadata.response(url);
-        if (discovery) return discovery;
+        if (discovery) {
+          try {
+            assert.equal(init.method ?? "GET", "GET");
+            assert(init.body == null || init.body === "");
+            const headers = new Headers(init.headers);
+            for (const name of [
+              "authorization",
+              "cookie",
+              "x-api-key",
+              "proxy-authorization",
+            ])
+              assert(!headers.has(name));
+          } catch (error) {
+            wireFailure ??= error;
+            throw error;
+          }
+          return discovery;
+        }
         const current = calls++;
         const step = wire.transcript[current];
         try {

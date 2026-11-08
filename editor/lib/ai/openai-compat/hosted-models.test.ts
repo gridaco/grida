@@ -66,6 +66,16 @@ describe("current hosted catalogue", () => {
       ["tripo/rig-v2.5", "rigging"],
     ]);
   });
+  it("preserves known legacy status and requires the 3D interface", async () => {
+    fixture.models = [
+      model("openai/gpt-5.5", "text", ["chat.completions"]),
+      model("tripo/rig-v2.5", "three-d", []),
+    ];
+    expect(await hostedModelList()).toMatchObject([
+      { id: "openai/gpt-5.5", grida: { deprecated: true } },
+    ]);
+    expect(await hostedModelList()).toHaveLength(1);
+  });
   it("withdraws removed IDs rather than silently falling back to compiled facts", async () => {
     fixture.models = [];
     expect(await isHostedTextModel("fixture/fresh-text")).toBe(false);

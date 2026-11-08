@@ -222,7 +222,11 @@ export async function proveInstalled({ binary, launcher, workdir }) {
           releaseRoute = resolve;
         });
       }
-      if (req.url === "/v1/models" || req.url === "/schemas/operations.json") {
+      if (
+        ["/v1/models", "/v1/endpoints", "/schemas/operations.json"].includes(
+          req.url
+        )
+      ) {
         assert.equal(req.method, "GET");
         assert.equal(req.headers.authorization, undefined);
         assert.equal(bytes.length, 0);
@@ -230,7 +234,18 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         if (schemas) {
           res.writeHead(200, { "content-type": "application/schema+json" });
           res.end(JSON.stringify(discovery.contracts));
-        } else respond(res, discovery.models);
+        } else
+          respond(
+            res,
+            req.url === "/v1/endpoints"
+              ? {
+                  object: "list",
+                  revision: discovery.models.revision,
+                  data: [],
+                  next_change_at: null,
+                }
+              : discovery.models
+          );
         return;
       }
       if (req.url === "/auth/v1/oauth/token") {
@@ -455,6 +470,37 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(inspected.input_schema.properties.n.maximum, 4);
     assert.equal(inspected.gateway_operation.id, "image.bfl.flux-2-pro.text");
     assert.equal(inspected.pricing.revision, "synthetic");
+    assert.deepEqual(
+      await run(["ai", "rigging", "list", "--provider", "gg", "--json"]),
+      []
+    );
+    const missingRig = await run(
+      [
+        "ai",
+        "rigging",
+        "check",
+        "--provider",
+        "gg",
+        "--mesh",
+        path.join(owned, "must-not-exist-for-discovery-proof.glb"),
+        "--json",
+      ],
+      { exit: 1 }
+    );
+    assert.equal(missingRig.error.code, "operation_unavailable");
+    const beforeByok = new Map(counts);
+    const byokRig = await run([
+      "ai",
+      "rigging",
+      "inspect",
+      "--provider",
+      "tripo",
+      "--feature",
+      "rig-check",
+      "--json",
+    ]);
+    assert.equal(byokRig.feature, "rig-check");
+    assert.deepEqual(counts, beforeByok);
     checks.push("installed_anonymous_current_gg_discovery");
     const initial = await run(["auth", "storage", "show", "--json"]);
     assert.equal(initial.backend, "keyring");

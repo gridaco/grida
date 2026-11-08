@@ -4,8 +4,7 @@ const h = vi.hoisted(() => ({
   execute: vi.fn<typeof import("../ai/gateway-product").gatewayFetch>(),
   ready:
     vi.fn<() => Promise<{ operations: Record<string, unknown>[] } | null>>(),
-  limit:
-    vi.fn<() => Promise<{ success: boolean; retryAfterSeconds?: number }>>(),
+  limit: vi.fn<typeof import("../ai/openai-compat/limits").allowAiRequest>(),
 }));
 vi.mock("../ai/gateway-product", () => ({ gatewayFetch: h.execute }));
 vi.mock("../ai/openai-compat/hosted-models", () => ({
@@ -61,6 +60,23 @@ beforeEach(async () => {
   );
 });
 describe("generic scoped operation bridge", () => {
+  it("retrieves accepted jobs without consuming the model-listing budget", async () => {
+    h.limit.mockImplementation(async (name) => ({
+      success: name !== "models",
+    }));
+    h.execute.mockResolvedValue(
+      Response.json({ id: "req_existing", status: "queued" })
+    );
+    const response = await jobs.GET(
+      new Request("https://grida.co/api/v1/ai/jobs?request_id=req_existing", {
+        headers: { authorization: `Bearer ${token}` },
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(h.limit).toHaveBeenCalledExactlyOnceWith("jobs", "fixture-user");
+    expect((await post.POST(submit())).status).toBe(429);
+    expect(h.execute).toHaveBeenCalledTimes(1);
+  });
   it("uses the verified organization and discovery-selected path, never caller headers", async () => {
     const response = await post.POST(submit());
     expect(response.status).toBe(200);

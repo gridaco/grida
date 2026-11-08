@@ -75,7 +75,8 @@ export namespace videoModels {
     input: Input,
     request: MediaRequest,
     operation: GGOperation,
-    discovery: GGDiscoveryStore
+    discovery: GGDiscoveryStore,
+    onAccepted?: (id: string) => void
   ): Promise<Video[]> {
     request.check();
     {
@@ -92,18 +93,19 @@ export namespace videoModels {
         image: input.image_url,
       })) {
         if (value !== undefined) {
-          if (!Object.hasOwn(properties, key)) invalid();
+          if (!Object.hasOwn(properties, key))
+            throw new GGOperationsClient.Failure("invalid_input");
           body[key] = value;
         }
       }
-      if (input.image) invalid();
+      if (input.image) throw new GGOperationsClient.Failure("invalid_input");
       if (input.aspect_ratio) {
         const key = Object.hasOwn(properties, "aspectRatio")
           ? "aspectRatio"
           : Object.hasOwn(properties, "aspect_ratio")
             ? "aspect_ratio"
             : null;
-        if (!key) invalid();
+        if (!key) throw new GGOperationsClient.Failure("invalid_input");
         body[key] = input.aspect_ratio;
       }
       if (input.resolution) {
@@ -111,12 +113,12 @@ export namespace videoModels {
           body.resolution = input.resolution;
         else if (Object.hasOwn(properties, "providerOptions")) {
           const pair = /^(\d+)x(\d+)$/.exec(input.resolution);
-          if (!pair) invalid();
+          if (!pair) throw new GGOperationsClient.Failure("invalid_input");
           const edge = Math.min(Number(pair[1]), Number(pair[2]));
           body.providerOptions = {
             gg: { resolutionTier: edge === 2160 ? "4k" : `${edge}p` },
           };
-        } else invalid();
+        } else throw new GGOperationsClient.Failure("invalid_input");
       }
       const client = new GGOperationsClient({
         http: request.transport(maxEnvelopeBytes),
@@ -132,6 +134,7 @@ export namespace videoModels {
         !/^req_[A-Za-z0-9_-]{1,160}$/.test(submitted.id)
       )
         invalid();
+      onAccepted?.(submitted.id);
       const job = await request.wait(client.wait(submitted.id, request.signal));
       const videos = job.result?.videos;
       if (!Array.isArray(videos) || !videos.length || videos.length > 16)

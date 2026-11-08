@@ -34,9 +34,12 @@ export function registerMusicRoutes(app: Hono, deps: MusicRoutesDeps) {
       model_id: v.string,
       prompt: v.string,
       seed: v.optional(v.number),
+      request_id: v.optional(
+        v.matching(/^req_[A-Za-z0-9_-]{1,160}$/, "must be a GG request ID")
+      ),
     });
     if (!r.ok) return r.res;
-    const { model_id, prompt, seed } = r.data;
+    const { model_id, prompt, seed, request_id } = r.data;
     if (!deps.gg || !deps.gg_base_url) {
       return c.json(
         { error: "hosted music generation is unavailable", provider_id: "gg" },
@@ -44,32 +47,43 @@ export function registerMusicRoutes(app: Hono, deps: MusicRoutesDeps) {
       );
     }
 
+    let acceptedRequestId = request_id;
     try {
-      const operation = await new MusicClient({
+      const client = new MusicClient({
         http: providerHttp,
         gg: deps.gg,
         gg_base_url: deps.gg_base_url,
         gg_catalog: deps.gg_catalog,
-      }).resolve({ model_id, provider: "gg" });
-      const result = await operation.generate({
-        prompt,
-        seed,
-        signal: c.req.raw.signal,
       });
+      const result =
+        request_id !== undefined
+          ? await client.recover({
+              model_id,
+              request_id,
+              signal: c.req.raw.signal,
+            })
+          : await (
+              await client.resolve({ model_id, provider: "gg" })
+            ).generate({
+              prompt,
+              seed,
+              signal: c.req.raw.signal,
+            });
+      acceptedRequestId = result.request_id ?? acceptedRequestId;
       // The host owns wire encoding and filenames. Provider metadata never
       // enters a receipt; preserve the hosted route's canonical model basename.
       const audio = {
         base64: Buffer.from(result.audio.data).toString("base64"),
         media_type: result.audio.media_type,
-        file_name: `${operation.model_id.split("/").at(-1) ?? "music"}.mp3`,
+        file_name: `${model_id.split("/").at(-1) ?? "music"}.mp3`,
       };
       const storedMedia = await GeneratedMediaPersistence.save(
         deps.media,
         audio
       );
       return c.json({
-        model_id: operation.model_id,
-        provider_id: operation.provider_id,
+        model_id: model_id,
+        provider_id: "gg",
         audio,
         ...(storedMedia ? { stored_media: storedMedia } : {}),
       });
@@ -88,8 +102,11 @@ export function registerMusicRoutes(app: Hono, deps: MusicRoutesDeps) {
       return mediaGenerationError(c, {
         error:
           error instanceof MusicClient.Failure
-            ? error
-            : new MusicClient.Failure("generation_failed"),
+            ? new MusicClient.Failure(
+                error.code,
+                error.request_id ?? acceptedRequestId
+              )
+            : new MusicClient.Failure("generation_failed", acceptedRequestId),
         scope: "agent-host-music",
         label: "music generation failed",
         model_id,

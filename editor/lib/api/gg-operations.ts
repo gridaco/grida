@@ -58,7 +58,10 @@ export namespace ggOperationsApi {
             }
           );
         const claims = await verifyGgToken(request);
-        const admission = await allowAiRequest("models", claims.sub);
+        const admission = await allowAiRequest(
+          operation === "gg.jobs" ? "jobs" : "models",
+          claims.sub
+        );
         if (!admission.success) return rateLimited(admission.retryAfterSeconds);
         const context = {
           organizationId: claims.org,

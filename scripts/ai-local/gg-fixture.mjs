@@ -4,12 +4,30 @@ export function ggDocuments(entries) {
   const definitions = {
     ImageResult: {
       type: "object",
-      properties: { data: { type: "array" } },
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { b64_json: { type: "string" } },
+            required: ["b64_json"],
+          },
+        },
+      },
       required: ["data"],
     },
     VideoResult: {
       type: "object",
-      properties: { videos: { type: "array" } },
+      properties: {
+        videos: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { url: { type: "string" } },
+            required: ["url"],
+          },
+        },
+      },
       required: ["videos"],
     },
     MusicResult: {

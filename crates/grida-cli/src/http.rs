@@ -231,8 +231,10 @@ impl Transport {
             return if admitted_origin
                 && url.query().is_none()
                 && *method == Method::GET
-                && matches!(url.path(), "/v1/models" | "/schemas/operations.json")
-            {
+                && matches!(
+                    url.path(),
+                    "/v1/models" | "/v1/endpoints" | "/schemas/operations.json"
+                ) {
                 Ok(Route::Discovery)
             } else {
                 Err(Error::Failed)
