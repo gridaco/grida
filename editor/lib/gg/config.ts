@@ -3,6 +3,19 @@
 import "server-only";
 
 export namespace ggConfig {
+  /** Public discovery has no signing/workload credential or account selector. */
+  export function publicModels(): {
+    origin: string;
+    allowInsecureLoopback: boolean;
+  } {
+    return {
+      origin: process.env.GRIDA_AI_GATEWAY_ORIGIN ?? "https://gateway.grida.ai",
+      allowInsecureLoopback:
+        process.env.NODE_ENV !== "production" &&
+        process.env.GRIDA_AI_GATEWAY_ALLOW_LOCAL === "1",
+    };
+  }
+
   /** Read on each operation so signing-key rotation needs no process cache. */
   export function signing(): {
     current: Uint8Array | null;

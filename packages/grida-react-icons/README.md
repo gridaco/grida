@@ -83,8 +83,8 @@ package's reason to exist. They also carry **third-party trademarks**,
 which is the main reason the package stays `private` until publishing gets
 legal review.
 
-Sources and attribution for the Blender, Codex, Godot, Unity, and Unreal Engine
-marks are recorded in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for recorded logo sources
+and attribution.
 
 ## The contract every icon obeys
 

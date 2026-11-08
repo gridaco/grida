@@ -22,6 +22,7 @@ export default defineConfig({
       "lib/supabase/gg-data.test.ts",
       "app/**/private/workspace/**/route.test.ts",
       "lib/gg/**/*.test.ts",
+      "app/(www)/(models)/ai/models/feed/route.test.ts",
       "lib/auth/gg-token.test.ts",
       "app/desktop/auth/token/route.test.ts",
       "app/(api)/(public)/api/v1/ai/models/route.test.ts",

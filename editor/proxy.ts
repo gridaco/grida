@@ -173,7 +173,16 @@ export async function proxy(req: NextRequest) {
     (!process.env.NEXT_PUBLIC_SUPABASE_URL ||
       !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 
-  if (env_not_set_but_can_skip_on_local_dev) {
+  const publicCatalogueRead =
+    (req.method === "GET" || req.method === "HEAD") &&
+    (req.nextUrl.pathname === "/ai/models" ||
+      req.nextUrl.pathname === "/ai/models/feed");
+
+  // Public discovery never depends on identity/session refresh. Maintenance and
+  // tenant-host routing still apply; this grants no execution/account authority.
+  if (publicCatalogueRead) {
+    res = NextResponse.next({ request: req });
+  } else if (env_not_set_but_can_skip_on_local_dev) {
     res = NextResponse.next({
       request: desktopHeaders.requestHeaders
         ? { headers: desktopHeaders.requestHeaders }
