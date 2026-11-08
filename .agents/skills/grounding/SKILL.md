@@ -39,11 +39,12 @@ then trust:
 - **DB schema** → `supabase/migrations/` (applied, immutable);
   `supabase/schemas/*.sql` is a readable projection that can lag — use
   the **database** skill.
-- **Shared AI catalogue and input contracts** → repository-root
-  `data/ai/facts.json`, `data/ai/service.json`, and `data/ai/inputs.json`.
-  Edit these authored sources; marked TypeScript literals and
-  `crates/grida-ai/data/` assets are generated consumers. Follow
-  [`ai-models`](../ai-models/SKILL.md) for authoring and regeneration.
+- **AI model facts** → the pinned public `@grida/ai-models` release;
+  **current hosted offerings and operation schemas** → GG discovery.
+  Grida authors only `data/ai/presets.json` product choices and
+  `data/ai/native-inputs.json` implemented native/BYOK inputs. Marked
+  TypeScript literals and Rust assets are generated consumers. Follow
+  [`ai-models`](../ai-models/SKILL.md) for ownership and regeneration.
 - **Directory contract** → the nearest `AGENTS.md`/`README.md`.
 - **"I remember API X…"** → re-read current code; a memory is a claim
   about a _past_ state, verify before acting.

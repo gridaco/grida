@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     if (!rl.success) return rateLimited(rl.retryAfterSeconds);
 
     return Response.json(
-      { object: "list", data: hostedModelList() },
+      { object: "list", data: await hostedModelList() },
       { headers: NO_STORE }
     );
   } catch (err) {

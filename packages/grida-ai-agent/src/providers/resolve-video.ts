@@ -1,3 +1,4 @@
+import type { GGDiscoveryStore } from "@grida/ai";
 // GRIDA-GG: provider — agent auto selection over the shared video operation.
 // GRIDA-SEC-004 / GRIDA-SEC-006 — host credentials and transport stay inside the operation.
 import { VideoClient, ProviderHttp } from "@grida/ai";
@@ -9,6 +10,7 @@ export type ResolvedVideoModel = VideoClient.Resolved;
 export type ResolveVideoDeps = {
   secrets: SecretsStore;
   catalog?: ModelCatalogStore;
+  gg_catalog?: GGDiscoveryStore;
   provider_http?: ProviderHttp;
   gg?: GridaGatewaySessionStore;
   gg_base_url?: string;
@@ -46,6 +48,7 @@ export async function resolveVideoModel(
     // remote downloads still require a supplied host transport.
     http: deps.provider_http ?? new ProviderHttp(),
     catalog: deps.catalog,
+    gg_catalog: deps.gg_catalog,
     gg: deps.gg,
     gg_base_url: deps.gg_base_url,
   });

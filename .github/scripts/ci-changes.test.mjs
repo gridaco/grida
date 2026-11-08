@@ -37,7 +37,7 @@ for (const [name, paths, expected] of [
   ["AI SDK source", ["packages/grida-ai/src/index.ts"], ["conformance"]],
   ["shared auth source", ["packages/grida-auth/src/index.ts"], ["conformance"]],
   ["SDK dependencies", ["packages/grida-auth/package.json"], ["conformance"]],
-  ["model catalogue", ["data/ai/facts.json"], ["conformance"]],
+  ["model catalogue", ["data/ai/presets.json"], ["conformance"]],
   [
     "Cargo dependencies",
     ["Cargo.lock"],
@@ -403,13 +403,7 @@ test("shared SDK workspace dependency closure is covered; no workspace consumer 
       `${file} requires the CLI: revisit general CI exclusion`
     );
   }
-  const queue = [
-    "@grida/ai",
-    "@grida/ai-models",
-    "@grida/auth",
-    "@grida/account",
-    "@grida/home",
-  ];
+  const queue = ["@grida/ai", "@grida/auth", "@grida/account", "@grida/home"];
   const checked = new Set();
   while (queue.length) {
     const name = queue.pop();

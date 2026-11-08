@@ -5,7 +5,6 @@ import {
   MediaOperations,
   ImageClient,
   VideoClient,
-  MusicClient,
   SoundEffectClient,
   TextToSpeechClient,
   ThreeDClient,
@@ -83,11 +82,6 @@ const cases: {
       { prompt: "x" },
       { prompt: "x", image_url: "https://asset.example/frame#fragment" },
     ],
-  },
-  {
-    selector: { kind: "music", model_id: "google/lyria-3", provider: "gg" },
-    valid: { prompt: ` ${"😀".repeat(2048)} `, seed: 0 },
-    invalid: [{ prompt: "😀".repeat(2048) + "x" }, { prompt: "x", seed: 0.1 }],
   },
   {
     selector: {
@@ -168,6 +162,10 @@ describe("MediaOperations and native operation validation", () => {
       const prepared = operations.parseInput(selector, valid);
       let generate: (input: never) => Promise<unknown>;
       switch (prepared.kind) {
+        case "music":
+          throw new Error(
+            "Current GG music is covered by its discovery-based client tests"
+          );
         case "image":
           generate = (
             await new ImageClient({ keys: { get }, http }).resolve(
@@ -180,15 +178,6 @@ describe("MediaOperations and native operation validation", () => {
             await new VideoClient({ keys: { get }, http }).resolve(
               prepared.selection
             )
-          ).generate;
-          break;
-        case "music":
-          generate = (
-            await new MusicClient({
-              gg: { getAccessToken: () => "synthetic-scoped-token" },
-              gg_base_url: "https://fixture.example",
-              http,
-            }).resolve(prepared.selection)
           ).generate;
           break;
         case "sound-effect":

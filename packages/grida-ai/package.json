@@ -33,18 +33,40 @@
         "types": "./dist/providers.d.cts",
         "default": "./dist/providers.cjs"
       }
+    },
+    "./catalogue": {
+      "import": {
+        "types": "./dist/catalogue/index.d.mts",
+        "default": "./dist/catalogue/index.mjs"
+      },
+      "require": {
+        "types": "./dist/catalogue/index.d.cts",
+        "default": "./dist/catalogue/index.cjs"
+      }
+    },
+    "./discovery": {
+      "import": {
+        "types": "./dist/gg-discovery.d.mts",
+        "default": "./dist/gg-discovery.mjs"
+      },
+      "require": {
+        "types": "./dist/gg-discovery.d.cts",
+        "default": "./dist/gg-discovery.cjs"
+      }
     }
   },
   "scripts": {
-    "build": "node ../grida-ai-models/scripts/generate.mjs --check && tsdown",
-    "test": "vitest run",
+    "build": "node ../../scripts/ai-catalogue/generate.mjs --check && tsdown",
+    "check:generated": "node ../../scripts/ai-catalogue/generate.mjs --bundle --check",
+    "generate": "node ../../scripts/ai-catalogue/generate.mjs",
+    "test": "node --test ../../scripts/ai-catalogue/generation.test.mjs && vitest run",
     "test:package": "node --test ../../scripts/ai-local/proof.test.mjs ../../scripts/npm.test.mjs && node ../../scripts/ai-local/proof.mjs",
-    "typecheck": "node ../grida-ai-models/scripts/generate.mjs --check && tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json"
+    "typecheck": "node ../../scripts/ai-catalogue/generate.mjs --check && tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json"
   },
   "dependencies": {
     "@ai-sdk/gateway": "3.0.125",
     "@ai-sdk/provider": "3.0.10",
-    "@grida/ai-models": "workspace:*",
+    "@grida/ai-models": "1.20261108.1",
     "ai": "6.0.197"
   },
   "devDependencies": {

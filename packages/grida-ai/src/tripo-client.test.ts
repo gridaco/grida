@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { MediaOperations, ProviderHttp, TripoClient } from "./index";
 import { ProviderCredentials } from "./providers";
-import { catalog } from "@grida/ai-models/grida";
+import { catalog } from "./catalogue/grida";
 
 const taskId = "2b6f207d-7cd6-46f1-a110-efc7c27a79df";
 const key = "synthetic-tripo-key";

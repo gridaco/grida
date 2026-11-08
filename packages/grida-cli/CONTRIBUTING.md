@@ -24,7 +24,7 @@ owns account authentication, custody and account reads. The
 owns catalogue queries, input validation and provider operations. Rust and the
 continuing TypeScript/web packages consume the same neutral
 [catalogue data](https://github.com/gridaco/grida/tree/main/data/ai)
-and [input schemas](https://github.com/gridaco/grida/blob/main/data/ai/inputs.json).
+and [input schemas](https://github.com/gridaco/grida/blob/main/data/ai/native-inputs.json).
 The CLI does not refresh this catalogue or choose a model/provider implicitly.
 The npm launcher selects the matching binary and forwards the invocation. It
 also hands `grida fx …` to the pinned `@grida/fx` (FX owns that command line)

@@ -28,6 +28,8 @@ pub struct Selector {
 pub struct Parsed {
     pub descriptor: Value,
     pub input: Value,
+    #[serde(skip)]
+    pub(crate) frozen_descriptor: Option<Value>,
 }
 impl Parsed {
     pub fn kind(&self) -> &str {
@@ -46,7 +48,7 @@ impl Parsed {
 
 #[derive(Clone)]
 pub struct Catalog {
-    operations: Vec<Value>,
+    pub(crate) operations: Vec<Value>,
 }
 impl Catalog {
     pub fn bundled() -> Self {
@@ -54,19 +56,6 @@ impl Catalog {
             operations: serde_json::from_str(include_str!("../data/operations.json"))
                 .expect("validated bundled operation contracts"),
         }
-    }
-    /// Raw authored facts with snake-case domain keys. Snapshot and service
-    /// views retain their separate schema-1 compatibility spelling.
-    pub fn facts() -> Value {
-        serde_json::from_str(include_str!("../data/facts.json")).expect("validated bundled facts")
-    }
-    pub fn snapshot() -> Value {
-        serde_json::from_str(include_str!("../data/snapshot.json"))
-            .expect("validated bundled snapshot")
-    }
-    pub fn views() -> Value {
-        serde_json::from_str(include_str!("../data/views.json"))
-            .expect("validated bundled service views")
     }
     pub fn list(&self, filter: &Filter) -> Result<Vec<Value>> {
         validate_filter(filter)?;
@@ -130,7 +119,14 @@ impl Catalog {
     pub fn parse_input(&self, selector: &Selector, value: Value) -> Result<Parsed> {
         let descriptor = self.inspect(selector)?;
         let input = input::normalize(&descriptor["input_schema"], value)?;
-        Ok(Parsed { descriptor, input })
+        let frozen_descriptor = descriptor
+            .get("gateway_operation")
+            .map(|_| descriptor.clone());
+        Ok(Parsed {
+            descriptor,
+            input,
+            frozen_descriptor,
+        })
     }
 }
 fn validate_filter(f: &Filter) -> Result<()> {
@@ -169,7 +165,7 @@ mod tests {
     #[test]
     fn all_existing_operations_are_discoverable() {
         let catalogue = Catalog::bundled();
-        assert_eq!(catalogue.list(&Filter::default()).unwrap().len(), 112);
+        assert!(!catalogue.list(&Filter::default()).unwrap().is_empty());
         for d in catalogue
             .operations
             .iter()

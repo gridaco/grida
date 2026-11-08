@@ -39,8 +39,14 @@
         ],
         "patterns": [
           {
-            // The portable SDK can execute paid provider calls as well.
-            "group": ["@grida/ai", "@grida/ai/**"],
+            // Execution stays behind the metered seam. These two exact
+            // subpaths expose only pinned metadata and anonymous discovery.
+            "group": [
+              "@grida/ai",
+              "@grida/ai/**",
+              "!@grida/ai/catalogue",
+              "!@grida/ai/discovery",
+            ],
             "message": "Use the metered editor/lib/ai execution seam. GRIDA-SEC-003.",
             "allowTypeImports": true,
           },

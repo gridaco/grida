@@ -228,7 +228,7 @@ export type ContextUsage = {
 /**
  * Compute everything the meter needs: the estimated context ring %, visible
  * role breakdown, and provider-reported last-turn usage. `contextWindow` is
- * the model's limit (from `@grida/ai-models`); pass 0/undefined when unknown
+ * the model's limit (from `@grida/ai/catalogue`); pass 0/undefined when unknown
  * — `percent` is then 0 and the view hides itself.
  */
 export function computeContextUsage(

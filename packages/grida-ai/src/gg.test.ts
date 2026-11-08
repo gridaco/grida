@@ -1,13 +1,8 @@
+import { fixtureGGDiscovery } from "./testing/gg-discovery";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — GG URL admission before scoped credential access.
 // GRIDA-GG: token — synthetic transport only; no live credentials or services.
 import { describe, expect, it, vi } from "vitest";
-import {
-  ImageClient,
-  MediaOperations,
-  MusicClient,
-  ProviderHttp,
-  VideoClient,
-} from "./index";
+import { ImageClient, MusicClient, ProviderHttp, VideoClient } from "./index";
 import { gridaGatewayApiBase, joinApi, postHosted } from "./gg";
 import { liveGgMediaDeps } from "./gg-session";
 
@@ -55,7 +50,7 @@ const clients = [
   [
     "image",
     (options: ImageClient.Options) => new ImageClient(options),
-    new MediaOperations().list({ kind: "image", provider: "gg" })[0].model_id,
+    "fixture/image",
     { images: [{ base64: "iVBORw0KGgo=" }] },
     "images",
   ],
@@ -73,6 +68,7 @@ const clients = [
         http: options.http,
         gg: options.gg!,
         gg_base_url: options.gg_base_url,
+        gg_catalog: options.gg_catalog,
       }),
     "google/lyria-3",
     {
@@ -89,46 +85,81 @@ const clients = [
 ] as const;
 
 describe("GG destination admission", () => {
-  describe.each(clients)(
-    "%s client",
-    (_name, create, model_id, response, route) => {
-      it.each(refused)(
-        "rejects %s before credential access or transport",
-        (gg_base_url) => {
-          const { options, read, get, request, download } = authority();
-          expect(() => create({ ...options, gg_base_url })).toThrow(
-            "invalid_input"
-          );
-          expect(read).not.toHaveBeenCalled();
-          expect(get).not.toHaveBeenCalled();
-          expect(request).not.toHaveBeenCalled();
-          expect(download).not.toHaveBeenCalled();
-        }
-      );
+  describe.each(clients)("%s client", (_name, create, model_id) => {
+    it.each(refused)(
+      "rejects %s before credential access or transport",
+      (gg_base_url) => {
+        const { options, read, get, request, download } = authority();
+        expect(() => create({ ...options, gg_base_url })).toThrow(
+          "invalid_input"
+        );
+        expect(read).not.toHaveBeenCalled();
+        expect(get).not.toHaveBeenCalled();
+        expect(request).not.toHaveBeenCalled();
+        expect(download).not.toHaveBeenCalled();
+      }
+    );
 
-      it.each(admitted)(
-        "generates through admitted origin %s",
-        async (gg_base_url, origin) => {
-          const { options, read, get, request, download } = authority();
-          const client = create({ ...options, gg_base_url });
-          expect(read).not.toHaveBeenCalled();
-          expect(request).not.toHaveBeenCalled();
-          request.mockResolvedValue(Response.json(response));
-          const operation = await client.resolve({ model_id, provider: "gg" });
-          await operation.generate({ prompt: "Synthetic GG URL test" });
-          expect(request).toHaveBeenCalledOnce();
-          expect(request.mock.calls[0][0]).toBe(
-            `${origin}/api/v1/ai/${route}/generations`
+    it.each(admitted)(
+      "generates through admitted origin %s",
+      async (gg_base_url, origin) => {
+        const { options, read, get, request, download } = authority();
+        const client = create({
+          ...options,
+          gg_base_url,
+          gg_catalog: fixtureGGDiscovery([{ id: model_id, kind: _name }]),
+        });
+        expect(read).not.toHaveBeenCalled();
+        expect(request).not.toHaveBeenCalled();
+        request.mockImplementation(async (url) => {
+          if (_name === "image")
+            return Response.json({
+              data: [{ b64_json: "iVBORw0KGgo=", media_type: "image/png" }],
+            });
+          return Response.json(
+            String(url).includes("/jobs?")
+              ? {
+                  id: "req_fixture",
+                  request_id: "req_fixture",
+                  status: "succeeded",
+                  result_status: "available",
+                  result:
+                    _name === "video"
+                      ? {
+                          videos: [
+                            {
+                              url: "https://assets.example/video.mp4",
+                              media_type: "video/mp4",
+                            },
+                          ],
+                        }
+                      : {
+                          audio: {
+                            url: "https://assets.example/music.mp3",
+                            media_type: "audio/mpeg",
+                          },
+                        },
+                }
+              : {
+                  id: "req_fixture",
+                  request_id: "req_fixture",
+                  result_status: "pending",
+                }
           );
-          expect(
-            new Headers(request.mock.calls[0][1]?.headers).get("authorization")
-          ).toBe("Bearer synthetic-scoped-token");
-          expect(get).not.toHaveBeenCalled();
-          expect(download).not.toHaveBeenCalled();
-        }
-      );
-    }
-  );
+        });
+        download.mockResolvedValue(new Response(new Uint8Array([1, 2, 3])));
+        const operation = await client.resolve({ model_id, provider: "gg" });
+        await operation.generate({ prompt: "Synthetic GG URL test" });
+        expect(request).toHaveBeenCalledTimes(_name === "image" ? 1 : 2);
+        expect(request.mock.calls[0][0]).toBe(`${origin}/api/v1/ai/operations`);
+        expect(
+          new Headers(request.mock.calls[0][1]?.headers).get("authorization")
+        ).toBe("Bearer synthetic-scoped-token");
+        expect(get).not.toHaveBeenCalled();
+        expect(download).toHaveBeenCalledTimes(_name === "image" ? 0 : 1);
+      }
+    );
+  });
 
   it.each(refused)(
     "refuses %s through every shared provider helper",

@@ -5,6 +5,7 @@ const { values } = parseArgs({
   options: { check: { type: "boolean", default: false } },
 });
 import assert from "node:assert/strict";
+import { ggTripoContractFixture } from "../../packages/grida-ai/src/testing/gg-contract.ts";
 import { expectedFaultRequest, projectRequest } from "./catalogue-request.mjs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -23,6 +24,7 @@ const wires = JSON.parse(
   )
 );
 const vectors = [];
+const metadata = ggTripoContractFixture();
 for (const wire of wires) {
   const scenarios = [
     ...[401, 403, 429, 500].map((status) => ({ step: 0, status })),
@@ -110,6 +112,8 @@ for (const wire of wires) {
     const send =
       (lane) =>
       async (url, init = {}) => {
+        const discovery = metadata.response(url);
+        if (discovery) return discovery;
         const current = calls++;
         const step = wire.transcript[current];
         try {

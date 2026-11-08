@@ -3,7 +3,7 @@
 import "server-only";
 import type { RiggingClient, TripoClient } from "@grida/ai";
 import { ProviderCredentials } from "@grida/ai/providers";
-import { catalog } from "@grida/ai-models/grida";
+import { catalog } from "@grida/ai/catalogue";
 import { checkGate } from "./server";
 import { randomUUID } from "node:crypto";
 import {

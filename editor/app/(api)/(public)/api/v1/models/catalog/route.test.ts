@@ -4,9 +4,8 @@
  * the model catalogue, parseable by every client that consumes it.
  */
 import { describe, it, expect } from "vitest";
-import { catalog as models, TIER_MODEL_IDS } from "@grida/ai-models/grida";
+import { catalog as models, TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import { GET } from "./route";
-import { isHostedTextModel } from "@/lib/ai/openai-compat/hosted-models";
 
 async function body(): Promise<unknown> {
   const res = await GET();
@@ -55,17 +54,12 @@ describe("GET /api/v1/models/catalog", () => {
     });
   });
 
-  it("publishes the same table the server-side gate enforces", async () => {
-    // `isHostedTextModel` and this payload are the same static import in
-    // the same deploy artifact — a client converging here converges on
-    // the exact allowlist chat/completions will apply.
+  it("publishes the legacy client projection independently of current GG availability", async () => {
     const parsed = models.snapshot.parse(await body())!;
-    for (const id of Object.keys(parsed.text.catalog)) {
-      expect(isHostedTextModel(id)).toBe(true);
-    }
-    for (const id of Object.keys(models.text.catalog)) {
-      expect(parsed.text.catalog[id]).toBeDefined();
-    }
+    expect(parsed.text.catalog).toEqual(models.snapshot.legacy().text.catalog);
+    expect(
+      parsed.video!.models["bytedance/seedance-2.0"].providers.openrouter
+    ).toBeUndefined();
   });
 
   it("publishes tiers that resolve within the published catalogue", async () => {

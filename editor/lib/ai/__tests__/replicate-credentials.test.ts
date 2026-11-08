@@ -22,8 +22,6 @@ const h = vi.hoisted(() => ({
       reason?: string;
     }>
   >(),
-  openAiOptions: vi.fn<(options: unknown) => void>(),
-  listOpenAiModels: vi.fn<() => Promise<{ data: { id: string }[] }>>(),
 }));
 
 vi.mock("replicate", () => ({
@@ -31,15 +29,6 @@ vi.mock("replicate", () => ({
     readonly run = h.run;
     constructor(options: unknown) {
       h.replicateOptions(options);
-    }
-  },
-}));
-
-vi.mock("openai", () => ({
-  default: class OpenAiMock {
-    readonly models = { list: h.listOpenAiModels };
-    constructor(options: unknown) {
-      h.openAiOptions(options);
     }
   },
 }));
@@ -215,27 +204,6 @@ describe("funded Replicate credential admission", () => {
     expect(h.events).toEqual([]);
     expect(h.replicateOptions).not.toHaveBeenCalled();
     expect(h.run).not.toHaveBeenCalled();
-    expect(h.complete).not.toHaveBeenCalled();
-  });
-
-  it("does not require Replicate configuration to list unbilled OpenAI models", async () => {
-    vi.stubEnv("OPENAI_API_KEY", "synthetic-openai-model-list");
-    h.listOpenAiModels.mockResolvedValueOnce({
-      data: [{ id: "synthetic-openai-model" }],
-    });
-    const { methods } = await import("../server");
-
-    await expect(methods.listOpenAiModels()).resolves.toEqual({
-      data: [{ id: "synthetic-openai-model" }],
-    });
-
-    expect(h.openAiOptions).toHaveBeenCalledExactlyOnceWith({
-      apiKey: "synthetic-openai-model-list",
-    });
-    expect(h.replicateOptions).not.toHaveBeenCalled();
-    expect(h.run).not.toHaveBeenCalled();
-    expect(h.getEntitlement).not.toHaveBeenCalled();
-    expect(h.begin).not.toHaveBeenCalled();
     expect(h.complete).not.toHaveBeenCalled();
   });
 });

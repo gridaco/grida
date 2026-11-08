@@ -1,7 +1,8 @@
+import { GGDiscoveryStore } from "./gg-discovery";
 // GRIDA-SEC-004 — exact Tripo operations, private credentials, bounded uploads and GLB result.
 // GRIDA-SEC-006 — scoped GG tokens remain on the fixed gateway request lane.
 // GRIDA-GG: provider — explicit funded operation; never falls back between accounts.
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "./catalogue/grida";
 import { InputSchema } from "./input-schema";
 import { TripoInputs } from "./tripo-inputs";
 import { ProviderCredentials } from "./provider-credentials";
@@ -36,15 +37,25 @@ export class TripoClient {
   readonly #http: ProviderHttp;
   readonly #getKey: TripoClient.Keys["get"];
   readonly #gg?: GgTripo;
+  readonly #ggCatalog: GGDiscoveryStore;
   constructor(options: TripoClient.Options) {
     try {
-      InputSchema.exact(options, ["http", "keys", "gg", "gg_base_url"]);
+      InputSchema.exact(options, [
+        "http",
+        "keys",
+        "gg",
+        "gg_base_url",
+        "gg_catalog",
+      ]);
       if (
         !(options.http instanceof ProviderHttp) ||
         typeof options.keys.get !== "function"
       )
         throw 0;
       this.#http = options.http;
+      this.#ggCatalog =
+        options.gg_catalog ??
+        new GGDiscoveryStore({ fetch: options.http.request });
       this.#getKey = options.keys.get.bind(options.keys);
       if (
         options.gg !== undefined &&
@@ -78,6 +89,7 @@ export class TripoClient {
       if (selected.provider === "gg") {
         if (!this.#gg) throw new LocalFailure("gg_token_expired");
         this.#gg.ready();
+        await this.#available(selected.model_id, selected.variant);
       } else await this.#key(request);
       const descriptor = Object.freeze({
         feature: "model-generation" as const,
@@ -97,6 +109,20 @@ export class TripoClient {
     } finally {
       request?.dispose();
     }
+  }
+
+  async #available(modelId: string, variant: string): Promise<void> {
+    const snapshot = await this.#ggCatalog.ready();
+    const id = `three-d.${modelId.replaceAll("/", ".")}.${variant}`;
+    if (
+      !snapshot?.endpoints.some(
+        (endpoint) =>
+          endpoint.id === id &&
+          endpoint.model === modelId &&
+          endpoint.variant === variant
+      )
+    )
+      throw new LocalFailure("model_unavailable");
   }
 
   async #key(request: MediaRequest): Promise<string> {
@@ -142,6 +168,7 @@ export class TripoClient {
       if (descriptor.provider_id === "gg") {
         if (uploaded) throw new LocalFailure("invalid_input");
         if (!this.#gg) throw new LocalFailure("gg_token_expired");
+        await this.#available(descriptor.model_id, descriptor.variant);
         return await this.#gg.generate(
           request,
           descriptor,
@@ -252,6 +279,7 @@ export namespace TripoClient {
     http: ProviderHttp;
     gg?: GgTokenSource;
     gg_base_url?: string;
+    gg_catalog?: GGDiscoveryStore;
   };
   export type Image = {
     data: Uint8Array;

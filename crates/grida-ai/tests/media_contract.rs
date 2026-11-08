@@ -45,7 +45,30 @@ impl Transport for Replay {
 async fn every_existing_operation_matches_typescript_wire_and_output() {
     let vectors: Vec<Value> =
         serde_json::from_str(include_str!("fixtures/media-wire-vectors.json")).unwrap();
-    assert_eq!(vectors.len(), 112);
+    let selector_key = |selector: &Selector| serde_json::to_string(selector).unwrap();
+    let expected = Catalog::bundled()
+        .list(&grida_ai::Filter::default())
+        .unwrap()
+        .into_iter()
+        .map(|d| {
+            selector_key(&Selector {
+                kind: d["kind"].as_str().unwrap().into(),
+                model_id: d["model_id"].as_str().unwrap_or("").into(),
+                provider: d["provider_id"].as_str().unwrap().into(),
+                variant: d["variant"].as_str().map(String::from),
+                feature: d["feature"].as_str().map(String::from),
+            })
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    let recorded = vectors
+        .iter()
+        .map(|v| selector_key(&serde_json::from_value::<Selector>(v["selector"].clone()).unwrap()))
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        recorded, expected,
+        "Every installed adapter needs a reviewed wire vector"
+    );
+    assert_eq!(recorded.len(), vectors.len(), "Duplicate wire selector");
     for vector in vectors {
         let selector: Selector = serde_json::from_value(vector["selector"].clone()).unwrap();
         let parsed = Catalog::bundled()

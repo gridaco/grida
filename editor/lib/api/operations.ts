@@ -4,7 +4,7 @@ export namespace apiOperations {
     path: string;
     methods: readonly string[];
     authority: "native-account" | "gg" | "public";
-    binding: "account" | "gg" | "gg-media" | "legacy";
+    binding: "account" | "gg" | "gg-media" | "gg-operations" | "legacy";
     cache: "no-store" | "owner" | "public";
   }>;
 
@@ -40,6 +40,20 @@ export namespace apiOperations {
       methods: ["GET", "HEAD", "OPTIONS"],
       authority: "native-account",
       binding: "account",
+      cache: "no-store",
+    },
+    "gg.operations": {
+      path: "/api/v1/ai/operations",
+      methods: ["POST", "OPTIONS"],
+      authority: "gg",
+      binding: "gg-operations",
+      cache: "no-store",
+    },
+    "gg.jobs": {
+      path: "/api/v1/ai/jobs",
+      methods: ["GET", "OPTIONS"],
+      authority: "gg",
+      binding: "gg-operations",
       cache: "no-store",
     },
     "gg.chat": {

@@ -286,8 +286,13 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         endpoints: endpointsStore,
         on_provider_ready: signalProviderReady,
       });
-      const { providerHttp, gridaSession, gridaGatewayBaseUrl, modelCatalog } =
-        media;
+      const {
+        providerHttp,
+        gridaSession,
+        gridaGatewayBaseUrl,
+        modelCatalog,
+        ggCatalog,
+      } = media;
       media.register(app);
       let chatgpt: ChatGptProviderRuntime | undefined;
       if (!caps.providers && opts.chatgpt) {
@@ -389,6 +394,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         gg_base_url: gridaGatewayBaseUrl,
         chatgpt,
         catalog: modelCatalog,
+        gg_catalog: ggCatalog,
         provider_http: providerHttp,
         workspace_registry: services.workspaces,
         sessions_store: sessionsStore,

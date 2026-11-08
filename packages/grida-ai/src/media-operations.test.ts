@@ -1,8 +1,9 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — credential-free executable descriptions and shared input rules.
 // GRIDA-GG: provider — discovery describes routes, never scoped access or credit eligibility.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "./catalogue/grida";
 import { MediaOperations } from "./index";
+import { MediaInputs } from "./media-inputs";
 
 const music = {
   kind: "music",
@@ -81,14 +82,7 @@ describe("MediaOperations discovery", () => {
     const operations = new MediaOperations();
     const descriptors = operations.list();
     expect(new Set(descriptors.map((entry) => entry.kind))).toEqual(
-      new Set([
-        "image",
-        "video",
-        "music",
-        "sound-effect",
-        "text-to-speech",
-        "three-d",
-      ])
+      new Set(["image", "video", "sound-effect", "text-to-speech", "three-d"])
     );
     expect(descriptors.length).toBeGreaterThan(10);
     expect(
@@ -99,12 +93,34 @@ describe("MediaOperations discovery", () => {
         )
       ).size
     ).toBe(descriptors.length);
-    expect(operations.inspect(music)).toMatchObject({
-      kind: "music",
-      model_id: music.model_id,
-      provider_id: "gg",
-    });
+    rejects(() => operations.inspect(music), "operation_unavailable");
+
     expect(network).not.toHaveBeenCalled();
+  });
+
+  it("keeps current image/video/music GG offerings out of the static native catalogue", () => {
+    const operations = new MediaOperations();
+    for (const kind of ["image", "video", "music"] as const) {
+      expect(operations.list({ kind, provider: "gg" })).toEqual([]);
+    }
+    rejects(
+      () => operations.inspect({ ...music, provider: "gg" }),
+      "operation_unavailable"
+    );
+    for (const id of ["bytedance/seedance-2.0", "xai/grok-imagine-video-1.5"]) {
+      const descriptor = operations.inspect({
+        kind: "video",
+        model_id: id,
+        provider: "openrouter",
+        variant: "text",
+      });
+      expect(descriptor.provider_id).toBe("openrouter");
+      expect(descriptor.variant).toBe("text");
+      expect(descriptor.binding_id).toBe(
+        models.video.binding(models.video.models[id]!, "openrouter")!.id
+      );
+      expect(descriptor).not.toHaveProperty("cost_mills");
+    }
   });
 
   it("limits explicit model-generation discovery to Tripo's BYOK and GG descriptors", () => {
@@ -209,15 +225,6 @@ describe("MediaOperations discovery", () => {
       expect(descriptor).not.toHaveProperty("credits");
       expect(descriptor).not.toHaveProperty("endpoint");
     }
-    expect(operations.inspect(music).output).toEqual({
-      representation: "native",
-      field: "audio",
-      cardinality: "one",
-      data: "Uint8Array",
-      media_types: ["audio/mpeg"],
-      max_items: 1,
-      max_total_bytes: 32 * 1024 * 1024,
-    });
     expect(operations.inspect(trellis).output).toMatchObject({
       field: "glb",
       media_types: ["model/gltf-binary"],
@@ -237,12 +244,7 @@ describe("MediaOperations discovery", () => {
     ).toEqual(
       [threeDText.model_id, threeDImage.model_id, trellis.model_id].sort()
     );
-    expect(
-      operations
-        .list({ kind: "music" })
-        .map((entry) => entry.model_id)
-        .sort()
-    ).toEqual(["google/lyria-3", "google/lyria-3-pro"]);
+    expect(operations.list({ kind: "music" })).toEqual([]);
     expect(operations.list({ kind: "music", provider: "fal" })).toEqual([]);
     expect(operations.list({ kind: "sound-effect", provider: "gg" })).toEqual(
       []
@@ -463,20 +465,28 @@ describe("MediaOperations JSON input", () => {
     rejects(() => operations.parseInput(video, { prompt: "x", duration: 0 }));
   });
 
-  it("counts trimmed music prompts as UTF-16 units and preserves seed zero", () => {
-    expect(properties(operations.inspect(music)).prompt).toMatchObject({
+  it("keeps native music input validation separate from current GG discovery", () => {
+    const schema = MediaInputs.music.schema.properties as Record<
+      string,
+      unknown
+    >;
+    expect(schema.prompt).toMatchObject({
       "x-grida-trim": true,
       "x-grida-max-length": 4096,
       "x-grida-length-unit": "utf16",
     });
     expect(
-      operations.parseInput(music, {
-        prompt: ` ${"🎵".repeat(2048)} `,
-        seed: 0,
-      })
-    ).toMatchObject({ input: { prompt: "🎵".repeat(2048), seed: 0 } });
-    rejects(() => operations.parseInput(music, { prompt: "🎵".repeat(2049) }));
-    rejects(() => operations.parseInput(music, { prompt: "x", images: [] }));
+      MediaInputs.music.parse(
+        { prompt: ` ${"🎵".repeat(2048)} `, seed: 0 },
+        true
+      )
+    ).toMatchObject({ prompt: "🎵".repeat(2048), seed: 0 });
+    expect(() =>
+      MediaInputs.music.parse({ prompt: "🎵".repeat(2049) }, true)
+    ).toThrow("0");
+    expect(() =>
+      MediaInputs.music.parse({ prompt: "x", images: [] }, true)
+    ).toThrow("0");
   });
 
   it("counts trimmed sound prompts as code points and preserves omitted, false and zero options", () => {
@@ -650,8 +660,8 @@ describe("MediaOperations JSON input", () => {
     rejects(() =>
       operations.parseInput(sound, { prompt: "x", loop: undefined })
     );
-    rejects(() => operations.parseInput(music, []));
-    rejects(() => operations.parseInput(music, null));
+    rejects(() => operations.parseInput(sound, []));
+    rejects(() => operations.parseInput(sound, null));
   });
 
   it("snapshots scalar getters once and contains arbitrary thrown input details", () => {
@@ -699,7 +709,7 @@ describe("image discovery after catalogue evolution", () => {
         .every((entry) => !entry.deprecated)
     ).toBe(true);
   });
-  it.each(["fal", "vercel", "gg"] as const)(
+  it.each(["fal", "vercel", "openrouter"] as const)(
     "describes and parses supported %s background intent for native resolution",
     (provider) => {
       const selector = { kind: "image", model_id, provider } as const;
@@ -738,7 +748,7 @@ describe("image discovery after catalogue evolution", () => {
     );
     const openrouter = {
       kind: "image",
-      model_id,
+      model_id: "openai/gpt-image-2",
       provider: "openrouter",
     } as const;
     expect(properties(operations.inspect(openrouter)).background.enum).toEqual([

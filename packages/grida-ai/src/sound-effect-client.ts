@@ -1,5 +1,5 @@
 // GRIDA-SEC-004 — fixed ElevenLabs authority, bounded sound-effect execution, safe byte results.
-import { models } from "@grida/ai-models";
+import { models } from "./catalogue";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";

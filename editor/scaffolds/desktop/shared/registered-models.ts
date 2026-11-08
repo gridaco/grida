@@ -3,15 +3,15 @@
  *
  * One fetch surface + pure resolution helpers shared by the model
  * picker, exact model capability gates, and the context
- * meter, so every consumer resolves a model id the same way: static
- * catalog ∪ user-registered endpoint models via
- * `models.text.registry.resolve`.
+ * meter. GG uses current discovery, BYOK uses pinned public facts, and
+ * registered endpoints retain their own metadata and provider identity.
  */
 
 "use client";
 
 import { useEffect, useState } from "react";
-import { catalog as _models } from "@grida/ai-models/grida";
+import type { CurrentGGModel } from "@/lib/desktop/gg-models";
+import { catalog as _models } from "@grida/ai/catalogue";
 import {
   byokProvidersFor,
   resolveEndpointModels,
@@ -37,8 +37,30 @@ export namespace registered_models {
   export function resolve(
     modelId: string,
     endpoints: readonly EndpointProviderConfig[],
-    providerId?: string
+    providerId?: string,
+    ggModels: readonly CurrentGGModel[] | null = []
   ): _models.text.registry.ResolvedModelSpec | undefined {
+    if (providerId === "gg" && ggModels === null)
+      return _models.text.registry.resolve(modelId, []);
+    if (providerId === "gg") {
+      const current = ggModels?.find(
+        (model) =>
+          model.id === modelId && model.interfaces.includes("chat.completions")
+      );
+      if (!current) return undefined;
+      const installed = _models.text.registry.resolve(modelId, []);
+      return _models.text.registry.normalize({
+        id: modelId,
+        label: current.label,
+        contextWindow: current.limits.context_tokens,
+        outputLimit: current.limits.max_output_tokens,
+        tool_call: current.capabilities.tools === true,
+        // Broad image support cannot manufacture exact native MIME declarations.
+        imageInputMimes: current.capabilities.image_input
+          ? (installed?.imageInputMimes ?? [])
+          : [],
+      });
+    }
     // An explicit endpoint provider owns only its own registered metadata.
     // An explicit native/BYOK/Grida provider must never inherit capabilities
     // from an unrelated endpoint whose model id happens to collide.

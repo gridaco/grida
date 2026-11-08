@@ -14,7 +14,7 @@
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { ModelFactory } from "../agent";
-import type { GgTokenSource } from "@grida/ai";
+import type { GGDiscoveryStore, GgTokenSource } from "@grida/ai";
 import { ProviderHttp } from "./http";
 import { BUNDLED_TIER_MODEL_IDS, type TierModelIds } from "./byok";
 
@@ -36,7 +36,8 @@ export function makeGridaGatewayFactory(
   session: GgTokenSource,
   baseUrl: string,
   providerHttp: ProviderHttp = new ProviderHttp(),
-  tierModelIds: TierModelIds = BUNDLED_TIER_MODEL_IDS
+  tierModelIds: TierModelIds = BUNDLED_TIER_MODEL_IDS,
+  discovery?: GGDiscoveryStore
 ): ModelFactory {
   const provider = createOpenAICompatible({
     name: "gg",
@@ -58,5 +59,11 @@ export function makeGridaGatewayFactory(
   // same catalog) — explicit picks hand straight through, tiers resolve
   // via the canonical table. Deliberately NOT the endpoint factory's
   // collapse-to-default: Grida Cloud serves the catalog.
-  return (tier, modelId) => provider(modelId ?? tierModelIds()[tier]);
+  return (tier, modelId) => {
+    const id = modelId ?? tierModelIds()[tier];
+    if (discovery && !discovery.supports(id, "chat.completions")) {
+      throw new Error("gg_model_unavailable");
+    }
+    return provider(id);
+  };
 }

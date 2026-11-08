@@ -1,7 +1,7 @@
 # Provider contract vectors
 
 `media-wire-vectors.json` records synthetic provider request/response exchanges
-and public results for all 112 bundled operations. `input-vectors.jsonl` records
+and public results for all installed adapter operations. `input-vectors.jsonl` records
 valid, missing, malformed and boundary inputs through the TypeScript public
 parser. `error-vectors.jsonl` records status, malformed responses, hostile origins,
 observed receipts and cancellation failures. The Rust tests replay these without contacting providers or accounts.
@@ -38,6 +38,14 @@ the reviewed SDK model protocol. Native video `FirstSseEvent` completion is
 asserted separately from TS request metadata.
 Negative controls deliberately change headers, bodies, completion and multipart
 boundaries to prove that the comparison rejects them.
+
+`gateway-discovery.json` is a small synthetic current GG offering used by the
+installed native process proof. Dynamic GG image/video/music use that public
+metadata protocol instead of frozen model-by-model wire vectors. The Rust GG
+unit tests separately cover changing IDs, supported-interface intersection,
+credential-free discovery, mutation resistance, original-job polling and no paid
+retry. The static matrix retains BYOK and explicit native Tripo upload/rigging
+adapters.
 
 CI verifies the checked-in baseline; it does not accept or re-record new
 expectations automatically. Header/body projections must stay explicit and

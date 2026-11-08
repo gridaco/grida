@@ -86,7 +86,18 @@ impl MediaClient {
             variant: parsed.descriptor["variant"].as_str().map(String::from),
             feature: parsed.descriptor["feature"].as_str().map(String::from),
         };
-        let parsed = Catalog::bundled().parse_input(&selector, parsed.input.clone())?;
+        let parsed = if let Some(frozen) = &parsed.frozen_descriptor {
+            if &parsed.descriptor != frozen {
+                return Err(input::bad());
+            }
+            Parsed {
+                descriptor: frozen.clone(),
+                input: input::normalize(&frozen["input_schema"], parsed.input.clone())?,
+                frozen_descriptor: Some(frozen.clone()),
+            }
+        } else {
+            Catalog::bundled().parse_input(&selector, parsed.input.clone())?
+        };
         let duration = if parsed.kind() == "three-d" {
             if parsed.provider() == "gg" { 780 } else { 600 }
         } else if parsed.provider() == "fal"
@@ -149,11 +160,21 @@ impl MediaClient {
             }
             _ => return Err(Failure::new("provider_unavailable")),
         };
+        if parsed.frozen_descriptor.is_some() {
+            return self
+                .gateway_operation(
+                    &session,
+                    &parsed,
+                    &key,
+                    base.as_deref().ok_or_else(invalid)?,
+                )
+                .await;
+        }
         match parsed.kind() {
-            "image" => self.image(&session, &parsed, &key, base.as_deref()).await,
-            "video" => self.video(&session, &parsed, &key, base.as_deref()).await,
+            "image" => self.image(&session, &parsed, &key).await,
+            "video" => self.video(&session, &parsed, &key).await,
             "music" | "sound-effect" | "text-to-speech" => {
-                self.audio(&session, &parsed, &key, base.as_deref()).await
+                self.audio(&session, &parsed, &key).await
             }
             "three-d" if parsed.provider() == "fal" => {
                 self.fal_three_d(&session, &parsed, &key).await
@@ -162,13 +183,170 @@ impl MediaClient {
             _ => Err(Failure::new("operation_unavailable")),
         }
     }
-    async fn image(
+    async fn gateway_operation(
         &self,
         s: &Session<'_>,
         p: &Parsed,
         key: &str,
-        base: Option<&str>,
+        base: &str,
     ) -> Result<MediaResult> {
+        let operation = p.descriptor["gateway_operation"]["id"]
+            .as_str()
+            .ok_or_else(invalid)?;
+        let interface = p.descriptor["gateway_operation"]["interface"]
+            .as_str()
+            .ok_or_else(invalid)?;
+        let mut input = p.input.clone();
+        if interface != "endpoints" {
+            input["model"] = json!(p.model_id());
+        }
+        let mut value = s
+            .json(
+                "POST",
+                &format!("{base}/api/v1/ai/operations"),
+                headers("gg", key),
+                Some(&json!({"operation_id":operation,"input":input})),
+                if p.kind() == "image" {
+                    ENVELOPE_BYTES
+                } else {
+                    1048576
+                },
+            )
+            .await?;
+        if p.kind() == "image" {
+            let max = p.input["n"].as_u64().unwrap_or(1) as usize;
+            let items = bounded_items(&value["data"], max)?;
+            let mut remaining = MEDIA_BYTES;
+            let mut assets = Vec::new();
+            for item in items {
+                let asset = image_base64(
+                    item["b64_json"].as_str().ok_or_else(invalid)?,
+                    &mut remaining,
+                )?;
+                if image_mime(&asset.data) != Some(item["media_type"].as_str().ok_or_else(invalid)?)
+                {
+                    return Err(invalid());
+                }
+                assets.push(asset);
+            }
+            return Ok(MediaResult::assets("images", assets));
+        }
+        let id = crate::tripo::identifier(&value["id"], "req")?;
+        let outcome = async {
+            loop {
+                if value["object"] != "job"
+                    || value["id"] != id
+                    || value["operation_id"] != operation
+                    || value["model"] != p.model_id()
+                    || value["interface"] != interface
+                {
+                    return Err(invalid());
+                }
+                let status = value["status"].as_str().ok_or_else(invalid)?;
+                if !["accepted", "running", "unknown", "succeeded", "failed"].contains(&status) {
+                    return Err(invalid());
+                }
+                if value["result_status"] == "available" {
+                    let result = &value["result"];
+                    let refs = match p.kind() {
+                        "video" => bounded_items(&result["videos"], 1)?
+                            .iter()
+                            .collect::<Vec<_>>(),
+                        "music" => vec![&result["audio"]],
+                        "three-d" => vec![&result["glb"]],
+                        _ => return Err(invalid()),
+                    };
+                    let mut remaining = MEDIA_BYTES;
+                    let mut assets = Vec::new();
+                    for reference in refs {
+                        let url = reference["url"].as_str().ok_or_else(invalid)?;
+                        let target = url::Url::parse(url).map_err(|_| invalid())?;
+                        if target.scheme() != "https"
+                            || !target.username().is_empty()
+                            || target.password().is_some()
+                            || target.fragment().is_some()
+                        {
+                            return Err(invalid());
+                        }
+                        let mut asset = s.download(url, remaining).await?;
+                        // A null metadata MIME is not a guess: use the actual
+                        // bounded download header, then validate this interface.
+                        if let Some(media) = reference["media_type"].as_str() {
+                            asset.media_type = media.into();
+                        }
+                        match p.kind() {
+                            "video" => validate_video(&asset)?,
+                            "music"
+                                if asset.media_type == "audio/mpeg"
+                                    && (asset.data.starts_with(b"ID3")
+                                        || asset.data.first() == Some(&255)) => {}
+                            "three-d" => {
+                                input::validate_glb(&asset.data).map_err(|_| invalid())?;
+                                asset.media_type = "model/gltf-binary".into();
+                            }
+                            _ => return Err(invalid()),
+                        }
+                        consume_bytes(&mut remaining, asset.data.len())?;
+                        assets.push(asset);
+                    }
+                    return Ok(MediaResult {
+                        field: p.descriptor["output"]["field"]
+                            .as_str()
+                            .ok_or_else(invalid)?
+                            .into(),
+                        assets,
+                        task: Some(TaskReceipt {
+                            id: id.clone(),
+                            credits_consumed: None,
+                        }),
+                        findings: None,
+                    });
+                }
+                match value["result_status"].as_str() {
+                    Some("pending") => {}
+                    Some("expired" | "unavailable") => {
+                        return Err(Failure::new(if status == "failed" {
+                            "generation_failed"
+                        } else {
+                            "result_unavailable"
+                        }));
+                    }
+                    _ => return Err(invalid()),
+                }
+                s.sleep(2000).await?;
+                value = loop {
+                    let response = s
+                        .send(Request {
+                            completion: crate::ResponseCompletion::Body,
+                            lane: Lane::Provider,
+                            method: "GET".into(),
+                            url: format!("{base}/api/v1/ai/jobs?request_id={id}"),
+                            headers: headers("gg", key),
+                            body: vec![],
+                            max_bytes: 1048576,
+                        })
+                        .await?;
+                    if response.status == 429 {
+                        // GET polling is safe to repeat; never turn this into a
+                        // new paid submission. The original deadline remains.
+                        let seconds = response
+                            .headers
+                            .get("retry-after")
+                            .and_then(|v| v.parse::<u64>().ok())
+                            .unwrap_or(5)
+                            .clamp(1, 30);
+                        s.sleep(seconds * 1000).await?;
+                        continue;
+                    }
+                    success(response.status, true)?;
+                    break serde_json::from_slice(&response.body).map_err(|_| invalid())?;
+                };
+            }
+        }
+        .await;
+        outcome.map_err(|e: Failure| e.task(&id))
+    }
+    async fn image(&self, s: &Session<'_>, p: &Parsed, key: &str) -> Result<MediaResult> {
         let count = p.input["n"].as_u64().ok_or_else(input::bad)? as usize;
         let cap = if p.provider() == "vercel" { count } else { 4 };
         let mut assets = Vec::new();
@@ -207,39 +385,6 @@ impl MediaClient {
                     data.iter()
                         .filter_map(|i| i["b64_json"].as_str())
                         .map(|b| image_base64(b, &mut remaining_bytes))
-                        .collect::<Result<Vec<_>>>()?
-                }
-                "gg" => {
-                    body["model_id"] = p.model_id().into();
-                    if let Some(size) = body.as_object_mut().and_then(|b| b.remove("size")) {
-                        let (w, h) = pair(size.as_str().ok_or_else(input::bad)?, 'x')?;
-                        body["width"] = json!(w);
-                        body["height"] = json!(h);
-                    }
-                    if body["background"] == "auto" {
-                        body.as_object_mut()
-                            .ok_or_else(input::bad)?
-                            .remove("background");
-                    }
-                    let v = s
-                        .json(
-                            "POST",
-                            &format!("{}/api/v1/ai/images/generations", base.ok_or_else(invalid)?),
-                            headers("gg", key),
-                            Some(&body),
-                            ENVELOPE_BYTES,
-                        )
-                        .await?;
-                    v["images"]
-                        .as_array()
-                        .ok_or_else(invalid)?
-                        .iter()
-                        .map(|i| {
-                            image_base64(
-                                i["base64"].as_str().ok_or_else(invalid)?,
-                                &mut remaining_bytes,
-                            )
-                        })
                         .collect::<Result<Vec<_>>>()?
                 }
                 "vercel" => {
@@ -346,13 +491,7 @@ impl MediaClient {
         }
         Ok(MediaResult::assets("images", assets))
     }
-    async fn video(
-        &self,
-        s: &Session<'_>,
-        p: &Parsed,
-        key: &str,
-        base: Option<&str>,
-    ) -> Result<MediaResult> {
+    async fn video(&self, s: &Session<'_>, p: &Parsed, key: &str) -> Result<MediaResult> {
         let mut wire = json!({});
         copy(
             &p.input,
@@ -369,27 +508,6 @@ impl MediaClient {
         let mut assets = Vec::new();
         let mut remaining_bytes = MEDIA_BYTES;
         match p.provider() {
-            "gg" => {
-                wire["model_id"] = p.model_id().into();
-                let v = s
-                    .json(
-                        "POST",
-                        &format!("{}/api/v1/ai/videos/generations", base.ok_or_else(invalid)?),
-                        headers("gg", key),
-                        Some(&wire),
-                        ENVELOPE_BYTES,
-                    )
-                    .await?;
-                for i in bounded_items(&v["videos"], 16)? {
-                    let a = video_base64(
-                        i["base64"].as_str().ok_or_else(invalid)?,
-                        i["media_type"].as_str().ok_or_else(invalid)?,
-                        remaining_bytes,
-                    )?;
-                    consume_bytes(&mut remaining_bytes, a.data.len())?;
-                    assets.push(a);
-                }
-            }
             "fal" => {
                 let lite = p.binding_id() == "fal-ai/veo3.1/lite/image-to-video";
                 if lite {
@@ -562,48 +680,7 @@ impl MediaClient {
         }
         Ok(MediaResult::assets("videos", assets))
     }
-    async fn audio(
-        &self,
-        s: &Session<'_>,
-        p: &Parsed,
-        key: &str,
-        base: Option<&str>,
-    ) -> Result<MediaResult> {
-        if p.kind() == "music" {
-            let mut body = p.input.clone();
-            body["model_id"] = p.model_id().into();
-            let v = s
-                .json(
-                    "POST",
-                    &format!("{}/api/v1/ai/music/generations", base.ok_or_else(invalid)?),
-                    headers("gg", key),
-                    Some(&body),
-                    32 * 1024 * 1024 * 4 / 3 + 65536,
-                )
-                .await?;
-            let filename = v["audio"]["file_name"].as_str().ok_or_else(invalid)?;
-            if v["model_id"] != p.model_id()
-                || v["provider_id"] != "gg"
-                || v["audio"]["media_type"] != "audio/mpeg"
-                || filename.len() > 132
-                || filename.contains(['/', '\\'])
-                || !filename.to_lowercase().ends_with(".mp3")
-            {
-                return Err(invalid());
-            }
-            let data = input::decode(
-                v["audio"]["base64"].as_str().ok_or_else(invalid)?,
-                32 * 1024 * 1024,
-            )
-            .map_err(|_| invalid())?;
-            return Ok(MediaResult::assets(
-                "audio",
-                vec![Asset {
-                    data,
-                    media_type: "audio/mpeg".into(),
-                }],
-            ));
-        }
+    async fn audio(&self, s: &Session<'_>, p: &Parsed, key: &str) -> Result<MediaResult> {
         let (mut body, url) = if p.kind() == "sound-effect" {
             let mut b = json!({"text":p.input["prompt"],"model_id":p.binding_id()});
             copy(

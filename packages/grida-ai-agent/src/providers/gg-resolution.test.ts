@@ -7,6 +7,7 @@
  * failure shape (ProviderUnavailableError with provider_id "gg" →
  * the renderer's "Sign in to use included AI").
  */
+import { ggDiscoveryFixture } from "./gg-discovery.fixture";
 import { describe, expect, it } from "vitest";
 import type { SecretsStore } from "@grida/daemon/server";
 import type { EndpointProviderConfig } from "../protocol/endpoints";
@@ -53,6 +54,7 @@ function deps(args: {
         } as EndpointProvidersStore)
       : undefined,
     gg: args.gg,
+    gg_catalog: ggDiscoveryFixture(),
     gg_base_url: args.base === null ? undefined : (args.base ?? BASE),
   };
 }
@@ -109,5 +111,32 @@ describe("grida hosted resolution", () => {
       { explicit: "vercel" }
     );
     expect(resolved.provider_id).toBe("vercel");
+  });
+});
+
+// Current offering is independent from bundled facts and withdrawn routes fail closed.
+describe("current GG text offering", () => {
+  it("admits a new ID without local model membership and rejects stale local IDs", async () => {
+    const gg_catalog = ggDiscoveryFixture(["fixture/new-text"]);
+    const host = { ...deps({ gg: liveSession() }), gg_catalog };
+    const resolved = await resolveProvider(host, {
+      explicit: "gg",
+      model_id: "fixture/new-text",
+    });
+    expect(
+      (resolved.model_factory("pro", "fixture/new-text") as { modelId: string })
+        .modelId
+    ).toBe("fixture/new-text");
+    await expect(
+      resolveProvider(host, { explicit: "gg", model_id: "openai/gpt-5.6-sol" })
+    ).rejects.toMatchObject({ provider_id: "gg" });
+  });
+  it("never treats a scoped token alone as catalogue authority", async () => {
+    await expect(
+      resolveProvider(
+        { ...deps({ gg: liveSession() }), gg_catalog: undefined },
+        { explicit: "gg" }
+      )
+    ).rejects.toMatchObject({ provider_id: "gg" });
   });
 });

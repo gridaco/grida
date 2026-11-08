@@ -38,7 +38,7 @@ import {
   CollapsibleTrigger,
 } from "@app/ui/components/collapsible";
 import { cn } from "@app/ui/lib/utils";
-import type { catalog as models } from "@grida/ai-models/grida";
+import type { catalog as models } from "@grida/ai/catalogue";
 import { mediaLibrary, type MediaItem } from "@/lib/desktop/bridge";
 import { RiggingPlayground } from "../3d-rig/rigging-playground";
 import { ThreeDPlayground } from "../3d-gen/three-d-playground";

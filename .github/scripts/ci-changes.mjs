@@ -11,7 +11,7 @@ const all = () => Object.fromEntries(groups.map((group) => [group, true]));
 // affects JS consumers conservatively; native delivery never installs that graph.
 const cargo =
   /^(Cargo\.(toml|lock)|rust-toolchain\.toml|\.cargo\/.*|crates\/.*)$/;
-const sdk = /^packages\/grida-(ai|ai-models|auth|account|home)\//;
+const sdk = /^packages\/grida-(ai|auth|account|home)\//;
 const rustFixtures =
   /^(packages\/grida-auth\/fixtures\/|fixtures\/images\/checker\.png$)/;
 const packaging =

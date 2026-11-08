@@ -106,7 +106,7 @@ import { buildReplayPrefix } from "./replay-prefix";
 import type { ChatMessageWithParts } from "../session/rows";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
-import type { catalog as models } from "@grida/ai-models/grida";
+import type { catalog as models } from "@grida/ai/catalogue";
 import { catalogView } from "../providers/model-catalog";
 import { isChatGptProviderId } from "../protocol/chatgpt";
 import { tierModelId as chatGptTierModelId } from "../providers/chatgpt";
@@ -818,10 +818,12 @@ export class AgentRuntime {
     // One read for the whole resolution, so every limit in a single
     // compaction decision comes from the same catalogue.
     const view = catalogView(this.deps.catalog);
+    const ggModels = this.deps.gg_catalog?.list("text") ?? [];
     const endpoints = this.deps.endpoints;
     if (!endpoints) {
       return {
-        resolve: (model) => resolveModelLimits(model, undefined, view),
+        resolve: (model) =>
+          resolveModelLimits(model, undefined, view, ggModels),
         configs: [],
         view,
       };
@@ -848,7 +850,7 @@ export class AgentRuntime {
           effective = { ...model, model_id: defaultId };
         }
       }
-      return resolveModelLimits(effective, applicableCustom, view);
+      return resolveModelLimits(effective, applicableCustom, view, ggModels);
     };
     return { resolve, configs, view };
   }
@@ -1740,6 +1742,7 @@ export class AgentRuntime {
       image_gen_enabled: this.deps.image_gen_enabled === true,
       image_model_id: this.deps.image_model_id,
       catalog: this.deps.catalog,
+      gg_catalog: this.deps.gg_catalog,
       // Host-level default for question resolution.
       interactive: this.deps.interactive === true,
       // Host-level default for design_search; per-run `req.library` overrides.

@@ -53,7 +53,7 @@ provider does not silently move auxiliary work; an unavailable stored provider
 defers or fails until the user intentionally changes provider/model.
 
 **Tier.** Cheapest the provider exposes (`nano` tier in
-[`@grida/ai-models`](https://github.com/gridaco/grida/tree/main/packages/grida-ai-models)).
+[`@grida/ai/catalogue`](https://github.com/gridaco/grida/tree/main/packages/grida-ai/src/catalogue)).
 Hard ceiling for any future provider: a tier explicitly marked
 "low-cost / low-latency."
 
@@ -164,5 +164,5 @@ Process:
   — the compaction shape `compactor` will implement.
 - [Fundamental tools (Grida binding)](./tools-fundamentals.md) — how
   the locked-tool RFC lands in Grida.
-- [`@grida/ai-models`](https://github.com/gridaco/grida/tree/main/packages/grida-ai-models)
+- [`@grida/ai/catalogue`](https://github.com/gridaco/grida/tree/main/packages/grida-ai/src/catalogue)
   — the tier / model / pricing catalog these subagents resolve against.

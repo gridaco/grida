@@ -45,6 +45,10 @@ export namespace apiAudit {
     "gg.3d.rig-check": "/api/v1/ai/3d/rig-check",
     "gg.3d.rigging": "/api/v1/ai/3d/rigging",
   } as const;
+  const GG_OPERATIONS = {
+    "gg.operations": ["/api/v1/ai/operations", "POST,OPTIONS"],
+    "gg.jobs": ["/api/v1/ai/jobs", "GET,OPTIONS"],
+  } as const;
   const slash = (value: string) => value.split(path.sep).join("/");
   const inside = (root: string, file: string) => {
     const relative = path.relative(root, file);
@@ -149,19 +153,27 @@ export namespace apiAudit {
     // not. In particular, a matching bind() call somewhere in a file is not
     // sufficient evidence that its exported handlers use that boundary.
     const owner =
-      binding === "gg-media"
-        ? "ggMediaApi"
-        : binding === "gg"
-          ? "ggApi"
-          : "accountApi";
+      binding === "gg-operations"
+        ? "ggOperationsApi"
+        : binding === "gg-media"
+          ? "ggMediaApi"
+          : binding === "gg"
+            ? "ggApi"
+            : "accountApi";
     const bindingModule =
-      binding === "gg-media" ? "gg-media" : binding === "gg" ? "gg" : "account";
+      binding === "gg-operations"
+        ? "gg-operations"
+        : binding === "gg-media"
+          ? "gg-media"
+          : binding === "gg"
+            ? "gg"
+            : "account";
     const expected = source(
       "route.ts",
       `import { ${owner} } from "@/lib/api/${bindingModule}";
        export const runtime = "nodejs";
        export const dynamic = "force-dynamic";
-       ${binding === "gg-media" ? "export const maxDuration = 800;" : ""}
+       ${["gg-media", "gg-operations"].includes(binding) ? "export const maxDuration = 800;" : ""}
        const handlers = ${owner}.bind(${JSON.stringify(id)});
        ${METHODS.map((method) => `export const ${method} = handlers.${method};`).join("\n")}`
     );
@@ -384,6 +396,20 @@ export namespace apiAudit {
             `${id}: legacy exceptions are fixed to six existing operations.`
           );
         }
+      } else if (definition.binding === "gg-operations") {
+        const fixed = GG_OPERATIONS[id as keyof typeof GG_OPERATIONS];
+        if (
+          !fixed ||
+          fixed[0] !== definition.path ||
+          fixed[1] !== definition.methods.join(",") ||
+          definition.authority !== "gg" ||
+          definition.cache !== "no-store"
+        )
+          report(
+            "registry",
+            registryFile,
+            `${id}: generic AI requires its fixed GG binding, path, methods and no-store policy.`
+          );
       } else if (definition.binding === "gg-media") {
         if (
           GG_MEDIA[id as keyof typeof GG_MEDIA] !== definition.path ||
@@ -727,8 +753,11 @@ export namespace apiAudit {
           // is reviewed/tested separately under GRIDA-SEC-003/006. No account
           // binding or arbitrary API module acquires this import exception.
           if (
-            relative === "lib/api/gg-media.ts" &&
-            slash(path.relative(root, target)) === "lib/ai/gg-three-d.ts"
+            (relative === "lib/api/gg-media.ts" &&
+              slash(path.relative(root, target)) === "lib/ai/gg-three-d.ts") ||
+            (relative === "lib/api/gg-operations.ts" &&
+              slash(path.relative(root, target)) ===
+                "lib/ai/gateway-product.ts")
           )
             continue;
           if (EXTENSIONS.test(target)) await visit(target);

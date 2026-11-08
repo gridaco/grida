@@ -2,19 +2,32 @@
 // GRIDA-GG: token — token is re-read for every submission.
 import type { ImageModelV3, ImageModelV3CallOptions } from "@ai-sdk/provider";
 import type { GgTokenSource } from "./gg-session";
-import { joinApi, postHosted } from "./gg";
 import { ProviderHttp } from "./http";
-type ImageGenerateResult = { images: { base64: string }[] };
+import { GGOperationsClient } from "./gg-operations";
+import type { GGDiscoveryStore, GGOperation } from "./gg-discovery";
 export class GridaGatewayImageModel implements ImageModelV3 {
   readonly specificationVersion = "v3" as const;
   readonly provider = "gg";
-  readonly maxImagesPerCall = 4;
+  get maxImagesPerCall(): number {
+    const properties = this.operation.input_schema.properties as
+      | Record<string, Record<string, unknown>>
+      | undefined;
+    const maximum = properties?.n?.maximum ?? properties?.n?.const ?? 1;
+    return typeof maximum === "number" &&
+      Number.isSafeInteger(maximum) &&
+      maximum > 0 &&
+      maximum <= 16
+      ? maximum
+      : 1;
+  }
 
   constructor(
     private readonly session: GgTokenSource,
     private readonly baseUrl: string,
     readonly modelId: string,
-    private readonly providerHttp: ProviderHttp = new ProviderHttp(),
+    private readonly providerHttp: ProviderHttp,
+    private readonly operation: GGOperation,
+    private readonly discovery: GGDiscoveryStore,
     private readonly background?: "opaque" | "transparent"
   ) {}
 
@@ -37,33 +50,71 @@ export class GridaGatewayImageModel implements ImageModelV3 {
     // endpoint bills AND delivers the requested tier rather than dropping it.
     const rawQuality = providerOptions?.gg?.quality;
     const quality = typeof rawQuality === "string" ? rawQuality : undefined;
-    const result = await postHosted<ImageGenerateResult>({
-      session: this.session,
-      url: joinApi(this.baseUrl, "/api/v1/ai/images/generations"),
-      scope: "grida-images",
-      abortSignal,
-      provider_http: this.providerHttp,
-      body: {
-        model_id: this.modelId,
-        prompt,
-        n,
-        width,
-        height,
+    {
+      const properties = this.operation.input_schema.properties as
+        | Record<string, Record<string, unknown>>
+        | undefined;
+      const input: Record<string, unknown> = { prompt, n };
+      let canonicalSize: string | undefined = size;
+      const sizes = properties?.size?.enum;
+      if (
+        size &&
+        Array.isArray(sizes) &&
+        !sizes.includes(size) &&
+        width &&
+        height
+      ) {
+        const tiers = sizes.filter(
+          (item): item is string =>
+            typeof item === "string" && /^\d+K$/.test(item)
+        );
+        canonicalSize =
+          tiers.find(
+            (tier) => Math.max(width!, height!) <= Number.parseInt(tier) * 1024
+          ) ?? tiers.at(-1);
+        if (!canonicalSize) throw new Error("invalid_input");
+      }
+      for (const [key, value] of Object.entries({
+        size: canonicalSize,
         aspect_ratio: aspectRatio,
-        quality,
         seed,
-        // Captured, capability-checked intent; provider options cannot override it.
+        quality,
         background: this.background,
-      },
-    });
-    return {
-      images: result.images.map((image) => image.base64),
-      warnings: [],
-      response: {
-        timestamp: new Date(),
-        modelId: this.modelId,
-        headers: undefined,
-      },
-    };
+      })) {
+        if (value !== undefined) {
+          if (!properties || !Object.hasOwn(properties, key))
+            throw new Error("invalid_input");
+          input[key] = value;
+        }
+      }
+      const client = new GGOperationsClient({
+        http: this.providerHttp,
+        gg: this.session,
+        gg_base_url: this.baseUrl,
+        gg_catalog: this.discovery,
+      });
+      const raw = await client.submit(this.operation.id, input, abortSignal);
+      if (
+        !Array.isArray(raw.data) ||
+        !raw.data.length ||
+        raw.data.length > n ||
+        raw.data.some(
+          (image) =>
+            !image ||
+            typeof image !== "object" ||
+            typeof image.b64_json !== "string"
+        )
+      )
+        throw new Error("invalid_response");
+      return {
+        images: raw.data.map((image: { b64_json: string }) => image.b64_json),
+        warnings: [],
+        response: {
+          timestamp: new Date(),
+          modelId: this.modelId,
+          headers: undefined,
+        },
+      };
+    }
   }
 }

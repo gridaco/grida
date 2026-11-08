@@ -39,6 +39,7 @@ import {
   type EndpointModelOverrides,
   type EndpointModelSpec,
   type EndpointProviderConfig,
+  type GGModelsView,
   type ProbedEndpointModel,
   type ImageGenerateRequest,
   type ImageGenerateResult,
@@ -401,6 +402,14 @@ export namespace secrets {
  * on {@link providers.isSupported}.
  */
 export namespace providers {
+  export function supportsGgModels(): boolean {
+    return typeof getDesktopBridge()?.providers?.gg_models === "function";
+  }
+  export async function ggModels(): Promise<GGModelsView | null> {
+    const bridge = getDesktopBridge()?.providers;
+    return bridge?.gg_models ? bridge.gg_models() : null;
+  }
+
   export function isSupported(): boolean {
     return getDesktopBridge()?.providers != null;
   }

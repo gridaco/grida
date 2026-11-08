@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
+import { ggMediaDiscoveryFixture as fixtureGGDiscovery } from "./gg-discovery.fixture";
 import { ModelCatalogStore } from "./model-catalog";
 import { ProviderHttp } from "./http";
 import { TRANSPARENT_PNG_BASE64 } from "../testing/transparent-png";
@@ -89,6 +90,7 @@ describe("resolveImageModel", () => {
               secrets: { _getKey: readKey } as unknown as SecretsStore,
               gg,
               gg_base_url: "https://grida.test",
+              gg_catalog: fixtureGGDiscovery([{ id: LISTED, kind: "image" }]),
             },
             LISTED,
             { explicit, background: "transparent" }
@@ -107,7 +109,12 @@ describe("resolveImageModel", () => {
       gg.set({ access_token: "test-token", expires_at: Date.now() + 900_000 });
       await expect(
         resolveImageModel(
-          { secrets: fakeSecrets({}), gg, gg_base_url: "https://grida.test" },
+          {
+            secrets: fakeSecrets({}),
+            gg,
+            gg_base_url: "https://grida.test",
+            gg_catalog: fixtureGGDiscovery([{ id: LISTED, kind: "image" }]),
+          },
           LISTED,
           { background: "transparent" }
         )
@@ -172,7 +179,7 @@ describe("resolveImageModel", () => {
     );
     expect(r.provider_id).toBe("fal");
     expect(r.model_id).toBe(LISTED);
-    expect(r.binding_id).toBe("fal-ai/gpt-image-2");
+    expect(r.binding_id).toBe("openai/gpt-image-2");
     expect(r.generate).toBeTypeOf("function");
     expect(r).not.toHaveProperty("model");
   });
@@ -239,11 +246,7 @@ describe("resolveImageModel", () => {
             explicit === "vercel"
               ? { images: [TRANSPARENT_PNG_BASE64] }
               : {
-                  model_id: id,
-                  provider_id: "vercel",
-                  images: [
-                    { base64: TRANSPARENT_PNG_BASE64, media_type: "image/png" },
-                  ],
+                  data: [{ b64_json: TRANSPARENT_PNG_BASE64 }],
                 }
           )
         );
@@ -253,6 +256,9 @@ describe("resolveImageModel", () => {
             secrets: fakeSecrets({ vercel: "vercel-key" }),
             gg,
             gg_base_url: "https://grida.test",
+            gg_catalog: fixtureGGDiscovery([
+              { id, kind: "image", background: true },
+            ]),
             provider_http: new ProviderHttp({ request, download }),
           },
           id,
@@ -278,7 +284,7 @@ describe("resolveImageModel", () => {
         expect(String(request.mock.calls[0]?.[0])).toBe(
           explicit === "vercel"
             ? "https://ai-gateway.vercel.sh/v3/ai/image-model"
-            : "https://grida.test/api/v1/ai/images/generations"
+            : "https://grida.test/api/v1/ai/operations"
         );
         expect(
           new Headers(request.mock.calls[0]?.[1]?.headers).get("ai-model-id")
@@ -296,11 +302,12 @@ describe("resolveImageModel", () => {
                 },
               }
             : {
-                model_id: id,
-                width: 1536,
-                height: 1024,
-                quality: "max",
-                background: "transparent",
+                operation_id: `image.${id.replaceAll("/", ".")}.text`,
+                input: {
+                  size: "1536x1024",
+                  quality: "max",
+                  background: "transparent",
+                },
               }
         );
         expect(body).not.toHaveProperty("output_format");
@@ -338,7 +345,7 @@ describe("resolveImageModel", () => {
       }
     );
 
-    it("selects Vercel AI Gateway for transparency before FAL while skipping OpenRouter", async () => {
+    it("uses published OpenRouter background support with ordinary provider precedence", async () => {
       const r = await resolveImageModel(
         {
           secrets: fakeSecrets({
@@ -350,11 +357,11 @@ describe("resolveImageModel", () => {
         id,
         { background: "transparent" }
       );
-      expect(r.provider_id).toBe("vercel");
+      expect(r.provider_id).toBe("openrouter");
       expect(r.binding_id).toBe(id);
     });
 
-    it("preserves transparent edits on FAL when all providers are connected", async () => {
+    it("preserves transparent edits through the first qualified provider", async () => {
       const r = await resolveImageModel(
         {
           secrets: fakeSecrets({
@@ -366,11 +373,11 @@ describe("resolveImageModel", () => {
         id,
         { background: "transparent", references: true }
       );
-      expect(r.provider_id).toBe("fal");
-      expect(r.binding_id).toBe(`${id.replace("2.5-", "2.5/")}/edit`);
+      expect(r.provider_id).toBe("openrouter");
+      expect(r.binding_id).toBe(id);
     });
 
-    it("uses OpenRouter's same-ID reference route without claiming transparency", async () => {
+    it("uses OpenRouter's same-ID reference route with published background support", async () => {
       const r = await resolveImageModel(
         { secrets: fakeSecrets({ openrouter: "or" }) },
         id,
@@ -379,16 +386,14 @@ describe("resolveImageModel", () => {
       expect(r.provider_id).toBe("openrouter");
       expect(r.binding_id).toBe(id);
       expect(r.references_max).toBe(16);
-      await expect(
-        resolveImageModel(
-          { secrets: fakeSecrets({ openrouter: "or", fal: "fal" }) },
-          id,
-          { explicit: "openrouter", background: "transparent" }
-        )
-      ).rejects.toMatchObject({
-        code: "image_model_unavailable",
+      const transparent = await resolveImageModel(
+        { secrets: fakeSecrets({ openrouter: "or", fal: "fal" }) },
+        id,
+        { explicit: "openrouter", background: "transparent" }
+      );
+      expect(transparent).toMatchObject({
         provider_id: "openrouter",
-        background: "transparent",
+        native_background: true,
       });
     });
 
@@ -413,8 +418,11 @@ describe("resolveImageModel", () => {
         });
         const resolved = await resolveImageModel(
           {
-            secrets: fakeSecrets({ openrouter: "sk-or" }),
+            secrets: fakeSecrets({}),
             gg,
+            gg_catalog: fixtureGGDiscovery([
+              { id, kind: "image", background: true },
+            ]),
             gg_base_url: "https://grida.test",
           },
           id,
@@ -439,6 +447,9 @@ describe("resolveImageModel", () => {
             secrets: fakeSecrets({ fal: "fal" }),
             gg,
             gg_base_url: "https://grida.test",
+            gg_catalog: fixtureGGDiscovery([
+              { id, kind: "image", background: true },
+            ]),
           },
           id,
           { explicit: "gg", references: true, background: "transparent" }

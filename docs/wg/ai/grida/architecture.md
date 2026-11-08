@@ -190,11 +190,11 @@ package export.
 
 ## Package Map
 
-| Package            | Path                        | Owns                                                                                                                                 |
-| ------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `@grida/daemon`    | `packages/grida-daemon/`    | `DaemonServer`, the GRIDA-SEC-004 perimeter, daemon discovery, files/recents/workspaces, secrets store, shell runner, sandbox frame. |
-| `@grida/agent`     | `packages/grida-ai-agent/`  | The agent tenant: runtime, sessions, native providers, prompts, tools, the AI route groups, CLI, and the AI upstream sandbox hosts.  |
-| `@grida/ai-models` | `packages/grida-ai-models/` | Model catalog + pricing table. Imported for tier/model metadata.                                                                     |
+| Package               | Path                               | Owns                                                                                                                                 |
+| --------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `@grida/daemon`       | `packages/grida-daemon/`           | `DaemonServer`, the GRIDA-SEC-004 perimeter, daemon discovery, files/recents/workspaces, secrets store, shell runner, sandbox frame. |
+| `@grida/agent`        | `packages/grida-ai-agent/`         | The agent tenant: runtime, sessions, native providers, prompts, tools, the AI route groups, CLI, and the AI upstream sandbox hosts.  |
+| `@grida/ai/catalogue` | `packages/grida-ai/src/catalogue/` | Released model-fact projection and Grida product presets; current hosted offering comes from GG discovery.                           |
 
 Current layer shape:
 

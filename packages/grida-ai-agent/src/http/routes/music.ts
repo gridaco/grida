@@ -1,3 +1,4 @@
+import type { GGDiscoveryStore } from "@grida/ai";
 /**
  * GRIDA-SEC-004 / GRIDA-SEC-006 — hosted music generation.
  *
@@ -20,6 +21,7 @@ export type MusicRoutesDeps = {
   gg?: GridaGatewaySessionStore;
   gg_base_url?: string;
   provider_http?: ProviderHttp;
+  gg_catalog?: GGDiscoveryStore;
 };
 
 export function registerMusicRoutes(app: Hono, deps: MusicRoutesDeps) {
@@ -47,6 +49,7 @@ export function registerMusicRoutes(app: Hono, deps: MusicRoutesDeps) {
         http: providerHttp,
         gg: deps.gg,
         gg_base_url: deps.gg_base_url,
+        gg_catalog: deps.gg_catalog,
       }).resolve({ model_id, provider: "gg" });
       const result = await operation.generate({
         prompt,

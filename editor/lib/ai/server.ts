@@ -49,10 +49,9 @@ import {
 } from "./gateway-product";
 import { randomUUID } from "node:crypto";
 import { GgThreeDHttp } from "./gg-three-d-http";
-import { catalog as ai_models } from "@grida/ai-models/grida";
+import { catalog as ai_models } from "@grida/ai/catalogue";
 import type { VideoGenerateRequest, VideoGenerateResult } from "@grida/agent";
 import Replicate from "replicate";
-import OpenAI from "openai";
 import { createLibraryClient } from "@/lib/supabase/server";
 import { requireOrganizationId } from "@/lib/auth/organization";
 import {
@@ -182,13 +181,13 @@ export class AiBillingError extends Error {
 export { isByokActive };
 export type { ModelTier };
 
-// The producer contract for `providerOptions.grida` lives in `@grida/ai-models`
+// The producer contract for `providerOptions.grida` lives in `@grida/ai`
 // — the one package both this seam and the framework-free `@grida/agent` share
 // — so every billed call site (editor OR package) is compiled against ONE key
 // definition. Re-exported here so editor call sites keep importing it from the
 // GG adapter validates the same organization and feature fields at runtime.
-export { gridaProviderOptions } from "@grida/ai-models";
-export type { GridaCallProviderOptions } from "@grida/ai-models";
+export { gridaProviderOptions } from "@grida/ai";
+export type { GridaCallProviderOptions } from "@grida/ai";
 
 // ===========================================================================
 // Core seam — admission → run → completion
@@ -401,8 +400,7 @@ const embeddingProvider = byok ?? vercelAiGateway;
  * embedding — the caller applies any model-specific post-processing.
  *
  * GRIDA-SEC-003: a system/internal, non-billable passthrough kept in this
- * file so the provider import stays contained (mirrors
- * {@link methods.listOpenAiModels}). It does NOT pass through admission→completion —
+ * file so the provider import stays contained. It does NOT pass through admission→completion —
  * there is no org context. A caller reaching this from a PUBLIC surface MUST
  * add its own abuse controls (rate limit + cache).
  */
@@ -668,25 +666,6 @@ export namespace methods {
   }
 
   /**
-   * List OpenAI provider models (passthrough). Only used by the canvas
-   * model picker UI today; no auth or billing — the OpenAI list endpoint
-   * is non-billable. Lives here (not in a callsite) because GRIDA-SEC-003
-   * requires the `openai` SDK import to live inside this file.
-   */
-  let _openaiClient: OpenAI | null = null;
-  function getOpenAiClient(): OpenAI {
-    if (_openaiClient) return _openaiClient;
-    _openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    return _openaiClient;
-  }
-  export async function listOpenAiModels(): Promise<{
-    data: OpenAI.Models.Model[];
-  }> {
-    const result = await getOpenAiClient().models.list();
-    return { data: result.data };
-  }
-
-  /**
    * Resolve a product model identifier to its GG-backed `ImageModel` and
    * display card. Callers pass `providerOptions.grida = { organizationId,
    * feature }`; GG owns model validation, reservation and actual charging.
@@ -765,6 +744,10 @@ export namespace methods {
     // The wire has no audio-mode field (protocol gap, accepted v1) —
     // bill the card's default mode.
     const audioMode = card.default.audio ? "audio" : "silent";
+    if (binding.pricing.type !== "per_second")
+      throw new InvalidAiRequestError(
+        "This legacy native video route requires a documented per-second price."
+      );
     const rate = binding.pricing.usd_per_second[resolutionLabel]?.[audioMode];
     if (rate === undefined) {
       throw new InvalidAiRequestError(

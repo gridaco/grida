@@ -1,7 +1,8 @@
+import { GGDiscoveryStore } from "./gg-discovery";
 // GRIDA-SEC-004 — separate structured eligibility and bounded rigged-mesh operations.
 // GRIDA-SEC-006 — scoped credentials never accompany provider uploads.
 // GRIDA-GG: provider — explicitly selected funded checks and rigging.
-import { catalog } from "@grida/ai-models/grida";
+import { catalog } from "./catalogue/grida";
 import { InputSchema } from "./input-schema";
 import { RiggingInputs } from "./rigging-inputs";
 import { ProviderCredentials } from "./provider-credentials";
@@ -18,15 +19,25 @@ export class RiggingClient {
   readonly #http: ProviderHttp;
   readonly #getKey: RiggingClient.Keys["get"];
   readonly #gg?: GgTripo;
+  readonly #ggCatalog: GGDiscoveryStore;
   constructor(options: RiggingClient.Options) {
     try {
-      InputSchema.exact(options, ["http", "keys", "gg", "gg_base_url"]);
+      InputSchema.exact(options, [
+        "http",
+        "keys",
+        "gg",
+        "gg_base_url",
+        "gg_catalog",
+      ]);
       if (
         !(options.http instanceof ProviderHttp) ||
         typeof options.keys.get !== "function"
       )
         throw 0;
       this.#http = options.http;
+      this.#ggCatalog =
+        options.gg_catalog ??
+        new GGDiscoveryStore({ fetch: options.http.request });
       this.#getKey = options.keys.get.bind(options.keys);
       if (
         options.gg !== undefined &&
@@ -62,6 +73,7 @@ export class RiggingClient {
       if (selected.provider === "gg") {
         if (!this.#gg) throw new TripoTransport.Failure("gg_token_expired");
         this.#gg.ready();
+        await this.#available(selected);
       } else await this.#key(request);
       if (selected.feature === "rig-check")
         return Object.freeze({
@@ -99,6 +111,23 @@ export class RiggingClient {
     } finally {
       request?.dispose();
     }
+  }
+
+  async #available(selected: RiggingClient.Selection): Promise<void> {
+    const snapshot = await this.#ggCatalog.ready();
+    const id =
+      selected.feature === "rig-check"
+        ? "three-d.tripo.rig-check"
+        : `three-d.${selected.model_id.replaceAll("/", ".")}.mesh`;
+    if (
+      !snapshot?.endpoints.some(
+        (endpoint) =>
+          endpoint.id === id &&
+          endpoint.model ===
+            (selected.feature === "rig-check" ? null : selected.model_id)
+      )
+    )
+      throw new TripoTransport.Failure("model_unavailable");
   }
 
   async #key(request: MediaRequest): Promise<string> {
@@ -158,6 +187,7 @@ export class RiggingClient {
       if (selected.provider === "gg") {
         if (uploaded) throw new TripoTransport.Failure("invalid_input");
         if (!this.#gg) throw new TripoTransport.Failure("gg_token_expired");
+        await this.#available(selected);
         return await this.#gg.rig(
           request,
           selected,
@@ -278,6 +308,7 @@ export namespace RiggingClient {
     http: ProviderHttp;
     gg?: GgTokenSource;
     gg_base_url?: string;
+    gg_catalog?: GGDiscoveryStore;
   };
   export type Mesh = { data: Uint8Array; media_type: "model/gltf-binary" };
   export type UploadedMesh = {

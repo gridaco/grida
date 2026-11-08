@@ -1,7 +1,8 @@
+import type { GGDiscoveryStore } from "@grida/ai";
 // GRIDA-GG: provider — agent defaults and legacy auto selection over the shared image operation.
 // GRIDA-SEC-004 / GRIDA-SEC-006 — host credentials and transport stay inside the operation.
 import { ImageClient, ProviderHttp } from "@grida/ai";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import type { SecretsStore } from "@grida/daemon/server";
 import { byokProvidersFor } from "../protocol/provider-ids";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
@@ -11,6 +12,7 @@ export type ResolvedImageModel = ImageClient.Resolved;
 export type ResolveImageDeps = {
   secrets: SecretsStore;
   catalog?: ModelCatalogStore;
+  gg_catalog?: GGDiscoveryStore;
   provider_http?: ProviderHttp;
   gg?: GridaGatewaySessionStore;
   gg_base_url?: string;
@@ -80,6 +82,7 @@ export async function resolveImageModel(
     // remote downloads still require a supplied host transport.
     http: deps.provider_http ?? new ProviderHttp(),
     catalog: deps.catalog,
+    gg_catalog: deps.gg_catalog,
     gg: deps.gg,
     gg_base_url: deps.gg_base_url,
   });

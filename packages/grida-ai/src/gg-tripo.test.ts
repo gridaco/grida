@@ -1,3 +1,4 @@
+import { fixtureGGTripoDiscovery } from "./testing/gg-discovery";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — scoped GG routing never grants upload credentials or retries.
 // GRIDA-GG: provider — independent funded 3D operation contract.
 import { describe, expect, it, vi } from "vitest";
@@ -71,7 +72,9 @@ function setup() {
   const download = vi.fn<typeof fetch>(async () => {
     throw new Error("No result downloads");
   });
+  const gg_catalog = fixtureGGTripoDiscovery();
   const options = {
+    gg_catalog,
     keys: { get },
     http: new ProviderHttp({ request, download }),
     gg,
@@ -82,6 +85,7 @@ function setup() {
     download,
     get,
     gg,
+    gg_catalog,
     setToken: (value: string | null) => {
       token = value;
     },
@@ -91,6 +95,19 @@ function setup() {
 }
 
 describe("funded Tripo model generation", () => {
+  it("withdraws a known typed GG route before upload or dispatch when the current endpoint is absent", async () => {
+    const state = setup();
+    vi.mocked(state.gg_catalog.ready).mockResolvedValue(null);
+    await expect(state.tripo.resolve(selection)).rejects.toMatchObject({
+      code: "model_unavailable",
+    });
+    await expect(
+      state.rigging.resolve({ feature: "rig-check", provider: "gg" })
+    ).rejects.toMatchObject({ code: "model_unavailable" });
+    expect(state.request).not.toHaveBeenCalled();
+    expect(state.get).not.toHaveBeenCalled();
+  });
+
   for (const model_id of ["tripo/h3.1", "tripo/p1", "tripo/p2"] as const) {
     it.each(["text", "image", "multiview"] as const)(
       `${model_id} supports %s without BYOK authority`,

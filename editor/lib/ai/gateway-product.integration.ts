@@ -1,7 +1,7 @@
 // Free paired contract proof. The caller starts a real local GG server backed
 // by PostgreSQL; only upstream providers and source observations are fixtures.
 import { describe, it, expect } from "vitest";
-import { catalog } from "@grida/ai-models/grida";
+import { catalog } from "@grida/ai/catalogue";
 import { generateText, streamText, generateImage } from "ai";
 import {
   gatewayLanguageModel,

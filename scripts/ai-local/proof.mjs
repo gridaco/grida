@@ -29,7 +29,7 @@ const require = createRequire(path.join(repository, "package.json"));
 const guard = fileURLToPath(new URL("./network.cjs", import.meta.url));
 const forbidden =
   /^(?:@grida\/(?!ai$|ai-models$)|@app\/|@agentclientprotocol\/|grida$|electron$|next$|react(?:-dom)?$|hono$|@hono\/|drizzle-orm$)/;
-const names = ["grida-ai-models", "grida-ai"];
+const names = ["grida-ai"];
 const reportPath = path.join(repository, ".cache/ai-local/result.json");
 
 // Report cleanup separately so it cannot overwrite the operation's original failure.
@@ -365,7 +365,7 @@ async function main() {
         );
       }
     }
-    for (const name of ["@grida/ai", "@grida/ai-models"]) {
+    for (const name of ["@grida/ai"]) {
       report.phase = "materialize declared production dependencies";
       await materialize(
         name,
@@ -425,6 +425,10 @@ async function main() {
     }
     report.audited_source_and_declaration_files = audited;
     await cp(
+      fileURLToPath(new URL("./gg-fixture.mjs", import.meta.url)),
+      path.join(runtime, "gg-fixture.mjs")
+    );
+    await cp(
       fileURLToPath(new URL("./consumer.mjs", import.meta.url)),
       path.join(runtime, "consumer.mjs")
     );
@@ -469,8 +473,8 @@ async function main() {
         `
 import { ImageClient, VideoClient, MusicClient, SoundEffectClient, TextToSpeechClient, ThreeDClient, ProviderHttp, GridaGatewaySessionStore, ModelCatalogStore, MediaOperations } from "@grida/ai";
 import { byokProvidersFor } from "@grida/ai/providers";
-import { models } from "@grida/ai-models";
-import { catalog } from "@grida/ai-models/grida";
+import { models } from "@grida/ai/catalogue";
+import { catalog } from "@grida/ai/catalogue";
 declare const http: ProviderHttp;
 const snapshot: catalog.snapshot.Snapshot = catalog.snapshot.seed();
 const parsed: catalog.snapshot.Snapshot | null = catalog.snapshot.parse(snapshot);
@@ -583,6 +587,11 @@ void [client, image, video, music, soundEffect, speech, threeD, providers, model
     report.phase = "complete";
   } catch (error) {
     error.proofPhase = report.phase;
+    report.failure = {
+      message: String(error.message).slice(-4096),
+      stdout: String(error.stdout ?? "").slice(-16384),
+      stderr: String(error.stderr ?? "").slice(-16384),
+    };
     failure = error;
   } finally {
     await finishReport(owned, reportPath, report, failure);

@@ -1,6 +1,7 @@
 "use client";
 
-import { catalog as models } from "@grida/ai-models/grida";
+import { mediaModelChoices } from "@/lib/desktop/gg-models";
+import { catalog as models } from "@grida/ai/catalogue";
 import {
   Select,
   SelectContent,
@@ -26,7 +27,11 @@ export function ImageModelPicker({
   disabled?: boolean;
   providers: MediaModelAvailability.ImageProviderState;
 }) {
-  const listed = models.image.listed_models();
+  const listed = mediaModelChoices(
+    models.image.listed_models(),
+    providers.gg_models ?? [],
+    "image"
+  );
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <MediaModelPickerTrigger>
@@ -34,7 +39,13 @@ export function ImageModelPicker({
       </MediaModelPickerTrigger>
       <SelectContent>
         {listed.map((card) => {
-          const access = MediaModelAvailability.image(card, providers);
+          const nativeCard = models.image.models[card.id];
+          const access = MediaModelAvailability.image(
+            nativeCard,
+            providers,
+            false,
+            card.id
+          );
           return (
             <SelectItem
               key={card.id}
@@ -46,9 +57,11 @@ export function ImageModelPicker({
                 <span className="text-muted-foreground"> · Legacy</span>
               )}
               {access.available &&
-                models.image.binding(card, "fal") &&
-                !models.image.binding(card, "vercel") &&
-                !models.image.binding(card, "openrouter") && (
+                nativeCard &&
+                providers.configured.includes("fal") &&
+                models.image.binding(nativeCard, "fal") &&
+                !models.image.binding(nativeCard, "vercel") &&
+                !models.image.binding(nativeCard, "openrouter") && (
                   <span className="text-muted-foreground">
                     {" "}
                     · fal key required

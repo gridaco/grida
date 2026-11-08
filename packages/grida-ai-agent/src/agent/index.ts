@@ -52,10 +52,7 @@ import {
 import { renderSkillIndex } from "../skills/skill-tool";
 import { AgentVision } from "../vision";
 import { AgentGen } from "../gen";
-import {
-  gridaProviderOptions,
-  type GridaCallProviderOptions,
-} from "@grida/ai-models";
+import { gridaProviderOptions, type GridaCallProviderOptions } from "@grida/ai";
 import type {
   SkillBodyCache,
   SkillBodyLoader,

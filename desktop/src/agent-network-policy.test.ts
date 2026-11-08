@@ -414,3 +414,46 @@ describe("Tripo hosted upload grant", () => {
     ).toThrow(/not granted|not allowed|forbidden/);
   });
 });
+
+// GRIDA-SEC-004 — discovery grants no account, inference or asset authority.
+describe("anonymous GG discovery", () => {
+  const request = {
+    grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+    method: "GET",
+    url: "https://gateway.grida.ai/v1/models",
+    headers: [["accept", "application/json"]] as [string, string][],
+  };
+  it.each(["/v1/models", "/v1/endpoints", "/schemas/operations.json"])(
+    "permits only a body-free anonymous GET of %s",
+    (path) => {
+      const allowed = AgentNetworkPolicy.authorize(grants, {
+        ...request,
+        url: `https://gateway.grida.ai${path}`,
+      });
+      expect(allowed.url.pathname).toBe(path);
+      expect(AgentNetworkPolicy.maxRequestBodyBytes(allowed)).toBe(0);
+    }
+  );
+  it.each([
+    { method: "POST" },
+    { method: "HEAD" },
+    { url: "https://gateway.grida.ai/v1/chat/completions" },
+    { url: "https://gateway.grida.ai/v1/models?query=secret" },
+    { url: "https://gateway.grida.ai/schemas/operations.json/" },
+    { url: "https://gateway.grida.ai:444/v1/models" },
+    { url: "https://sub.gateway.grida.ai/v1/models" },
+    { url: "https://gateway.grida.ai.attacker.example/v1/models" },
+    { url: "http://gateway.grida.ai/v1/models" },
+    { headers: [["authorization", "Bearer secret"]] },
+    { headers: [["xi-api-key", "secret"]] },
+    { headers: [["content-type", "application/json"]] },
+    { grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID },
+  ])("refuses widening the public metadata boundary", (change) => {
+    expect(() =>
+      AgentNetworkPolicy.authorize(grants, {
+        ...request,
+        ...change,
+      } as AgentNetworkPolicy.RequestMetadata)
+    ).toThrow(/not allowed|not granted/);
+  });
+});

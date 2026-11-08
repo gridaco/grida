@@ -2,7 +2,8 @@
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
 
 import { useState } from "react";
-import { catalog as models } from "@grida/ai-models/grida";
+import { useGGModels, type CurrentGGModel } from "@/lib/desktop/gg-models";
+import { catalog as models } from "@grida/ai/catalogue";
 import {
   PromptInput,
   PromptInputBody,
@@ -27,7 +28,7 @@ import { MediaModelPickerTrigger } from "../shared/media-model-picker-trigger";
 import { MediaModelAvailability } from "../shared/media-model-availability";
 import { generatedMediaFile } from "../shared/generated-media-file";
 
-const MUSIC_MODELS = models.audio.music.listed_models();
+type MusicChoice = Readonly<{ id: string; label: string }>;
 
 type MusicGenerationDependencies = Readonly<{
   generate: (req: MusicGenerateRequest) => Promise<MusicGenerateResult>;
@@ -41,23 +42,21 @@ const musicGenerationDependencies: MusicGenerationDependencies = {
 
 export type MusicGeneratedPreview = Readonly<{
   file: File;
-  modelId: models.audio.music.ModelId;
+  modelId: string;
   storedMedia?: MediaItem;
 }>;
 
 type MusicGenerationControlsProps = Readonly<{
-  initialModelId?: models.audio.music.ModelId;
-  modelIds?: readonly models.audio.music.ModelId[];
+  initialModelId?: string;
+  modelIds?: readonly string[];
   onGenerated: (result: MusicGeneratedPreview) => void;
   onBusyChange?: (busy: boolean) => void;
   disabled?: boolean;
 }>;
 
 export function MusicGenerationControls(props: MusicGenerationControlsProps) {
-  const availableModels = MediaModelAvailability.filter(
-    MUSIC_MODELS,
-    props.modelIds
-  );
+  const current = useGGModels();
+  const availableModels = musicModelChoices(current, props.modelIds);
   const fallbackModel = MediaModelAvailability.select(
     availableModels,
     undefined,
@@ -67,13 +66,36 @@ export function MusicGenerationControls(props: MusicGenerationControlsProps) {
 
   return (
     <AvailableMusicGenerationControls
-      key={`${props.initialModelId ?? ""}|${availableModels
-        .map((model) => model.id)
-        .join("|")}`}
+      key={props.initialModelId ?? "new"}
       {...props}
+      initialModelId={
+        current === null
+          ? MediaModelAvailability.select(
+              availableModels,
+              props.initialModelId,
+              fallbackModel.id
+            )?.id
+          : props.initialModelId
+      }
       availableModels={availableModels}
       fallbackModelId={fallbackModel.id}
     />
+  );
+}
+
+/** Only a released binary without the discovery bridge keeps its installed music UI. */
+export function musicModelChoices(
+  current: readonly CurrentGGModel[] | null,
+  legacyModelIds?: readonly string[]
+): readonly MusicChoice[] {
+  if (current === null) {
+    return MediaModelAvailability.filter(
+      models.audio.music.listed_models(),
+      legacyModelIds
+    );
+  }
+  return current.filter(
+    (model) => model.kind === "music" && model.interfaces.includes("endpoints")
   );
 }
 
@@ -85,20 +107,16 @@ function AvailableMusicGenerationControls({
   availableModels,
   fallbackModelId,
 }: MusicGenerationControlsProps & {
-  availableModels: ReadonlyArray<(typeof MUSIC_MODELS)[number]>;
-  fallbackModelId: models.audio.music.ModelId;
+  availableModels: readonly MusicChoice[];
+  fallbackModelId: string;
 }) {
-  const resolvedInitialModelId =
-    initialModelId &&
-    availableModels.some((model) => model.id === initialModelId)
-      ? initialModelId
-      : fallbackModelId;
-  const [modelId, setModelId] = useState(resolvedInitialModelId);
+  const [modelId, setModelId] = useState(initialModelId ?? fallbackModelId);
+  const modelAvailable = availableModels.some((model) => model.id === modelId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (message: PromptInputMessage) => {
-    if (busy || disabled) return;
+    if (busy || disabled || !modelAvailable) return;
     const prompt = message.text.trim();
     if (!prompt) {
       throw setGenerationError(setError, "Describe the music to generate.");
@@ -161,7 +179,7 @@ function AvailableMusicGenerationControls({
             <PromptInputSelect
               value={modelId}
               onValueChange={(value) => {
-                setModelId(value as models.audio.music.ModelId);
+                setModelId(value as string);
                 setError(null);
               }}
               disabled={busy || disabled}

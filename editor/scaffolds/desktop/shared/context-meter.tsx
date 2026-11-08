@@ -8,6 +8,7 @@
 
 "use client";
 
+import { useGGModels } from "@/lib/desktop/gg-models";
 import { useMemo } from "react";
 import type { UIMessage } from "ai";
 import type { EndpointProviderConfig } from "@/lib/desktop/bridge";
@@ -74,10 +75,12 @@ export function DesktopContextMeter({
 }) {
   // Memoized: chat panels re-render per streamed token, and resolve()
   // rebuilds the flattened spec list each call.
+  const ggModels = useGGModels();
   const contextWindow = useMemo(
     () =>
-      registered_models.resolve(modelId, endpoints, providerId)?.contextWindow,
-    [modelId, providerId, endpoints]
+      registered_models.resolve(modelId, endpoints, providerId, ggModels)
+        ?.contextWindow,
+    [modelId, providerId, endpoints, ggModels]
   );
   const {
     usedTokens,

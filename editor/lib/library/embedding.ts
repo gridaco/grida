@@ -1,5 +1,5 @@
 import "server-only";
-import aimodels from "@grida/ai-models";
+import aimodels from "@grida/ai/catalogue";
 import { embedTextUnbilled } from "@/lib/ai/server";
 
 /**
@@ -11,8 +11,8 @@ import { embedTextUnbilled } from "@/lib/ai/server";
  * ({@link embedTextUnbilled}) with the Library's own model id, dimensionality
  * + normalization, and a query cache. The worker (document side, sibling
  * repo) embeds asset image + text with the SAME model/dim/normalization
- * recorded on the `@grida/ai-models` embedding card — that card is the single
- * source of the consistency invariant both sides read.
+ * recorded in `data/ai/presets.json` under `library_embedding`. These persisted
+ * storage choices stay independent of updates to the public model facts.
  */
 
 const MODEL_ID = aimodels.embedding.LIBRARY_EMBEDDING_MODEL_ID;

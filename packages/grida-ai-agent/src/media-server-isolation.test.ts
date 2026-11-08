@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import ts from "typescript";
+import { ggContractFixture } from "../../grida-ai/src/testing/gg-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const execute = promisify(execFile);
@@ -190,6 +191,9 @@ describe("built media-only entry", () => {
 
 // A real child runs outside Vitest's source aliases. Every provider response is
 // synthetic. Positive controls establish that unavailable authority really fails.
+const musicMetadata = ggContractFixture([
+  { id: "google/lyria-3", kind: "music" },
+]);
 const probe = String.raw`
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -272,6 +276,7 @@ const key = "synthetic-entry-provider-key";
 const token = "synthetic-entry-scoped-token";
 const gateway = "https://grida.invalid";
 let byok = 0, gg = 0;
+const metadata = ${JSON.stringify({ models: musicMetadata.models, endpoints: musicMetadata.endpoints, contracts: musicMetadata.contracts })};
 const options = {
   password, user_data_path: path.join(base, "state"), media_root: path.join(base, "media"),
   http_access: { allowed_origins: [origin], allowed_referer_paths: ["/desktop"] },
@@ -279,12 +284,18 @@ const options = {
   provider_http: {
     request: async (input, init) => {
       const url = String(input), headers = new Headers(init?.headers);
-      if (url === gateway + "/api/v1/models/catalog") return new Response(null, { status: 404 });
-      if (url === gateway + "/api/v1/ai/music/generations") {
+      if (url.startsWith("https://gateway.grida.ai/")) {
+        assert.equal(headers.has("authorization"), false);
+        if (url.endsWith("/v1/models")) return Response.json(metadata.models);
+        if (url.endsWith("/v1/endpoints")) return Response.json(metadata.endpoints);
+        if (url.endsWith("/schemas/operations.json")) return Response.json(metadata.contracts, { headers: { "content-type": "application/schema+json" } });
+        throw new Error("Unexpected discovery URL");
+      }
+      if (url === gateway + "/api/v1/ai/operations" || url === gateway + "/api/v1/ai/jobs?request_id=req_music") {
         assert.equal(headers.get("authorization"), "Bearer " + token);
         assert.equal(headers.has("xi-api-key"), false);
-        gg++;
-        return Response.json({ model_id: "google/lyria-3", provider_id: "gg", audio: { base64: "SUQz", media_type: "audio/mpeg", file_name: "lyria-3.mp3" } });
+        if (init?.method === "POST") gg++;
+        return Response.json({ id: "req_music", request_id: "req_music", status: "succeeded", result_status: "available", result: { audio: { url: "https://assets.example/music.mp3", media_type: "audio/mpeg" } } });
       }
       assert.equal(url, "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128");
       assert.equal(headers.get("xi-api-key"), key);
@@ -292,7 +303,11 @@ const options = {
       byok++;
       return new Response(new Uint8Array([73, 68, 51]), { headers: { "content-type": "audio/mpeg" } });
     },
-    download: async () => deny("network"),
+    download: async (url, init) => {
+      assert.equal(String(url), "https://assets.example/music.mp3");
+      assert.equal(new Headers(init?.headers).has("authorization"), false);
+      return new Response(new Uint8Array([73, 68, 51]), { headers: { "content-type": "audio/mpeg" } });
+    },
   },
 };
 function call(daemon, pathname, value = {}) {

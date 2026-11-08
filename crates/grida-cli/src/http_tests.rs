@@ -32,6 +32,7 @@ async fn fixture() -> (Transport, TcpListener, TlsAcceptor) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let cert = rcgen::generate_simple_self_signed(vec![
         "ai-gateway.vercel.sh".to_owned(),
+        "gateway.grida.ai".to_owned(),
         "cdn.example".to_owned(),
         "mozagqllybnbytfcmvdh.supabase.co".to_owned(),
         "grida.co".to_owned(),
@@ -816,5 +817,107 @@ async fn first_sse_event_requires_data_and_exact_video_route() {
             .await,
         Err(Error::Cancelled)
     ));
+    server.await.unwrap();
+}
+
+#[test]
+fn public_discovery_has_no_credential_or_account_authority() {
+    let transport = Transport::new(Some(API)).unwrap();
+    for path in ["/v1/models", "/schemas/operations.json"] {
+        let url = format!("https://gateway.grida.ai{path}");
+        let target = admitted_url(&url).unwrap();
+        assert!(
+            transport
+                .admit(Lane::Discovery, &target, &Method::GET)
+                .is_ok()
+        );
+        assert!(
+            transport
+                .admit(Lane::Provider, &target, &Method::GET)
+                .is_err()
+        );
+        assert!(
+            transport
+                .admit(Lane::Account, &target, &Method::GET)
+                .is_err()
+        );
+        assert!(
+            transport
+                .admit(Lane::Discovery, &target, &Method::POST)
+                .is_err()
+        );
+        let mut request = Request::new(Method::GET, url, "");
+        assert!(snapshot(Route::Discovery, &target, &mut request).is_ok());
+        request.headers.insert(
+            "authorization",
+            HeaderValue::from_static("Bearer must-not-leave"),
+        );
+        assert!(snapshot(Route::Discovery, &target, &mut request).is_err());
+    }
+    for bad in [
+        "https://gateway.grida.ai/v1/models?key=secret",
+        "https://gateway.grida.ai/v1/jobs/req_x",
+        "https://grida.co/v1/models",
+        "http://gateway.grida.ai/v1/models",
+        "https://gateway.grida.ai.attacker.test/v1/models",
+    ] {
+        assert!(
+            transport
+                .admit(Lane::Discovery, &admitted_url(bad).unwrap(), &Method::GET)
+                .is_err()
+        );
+    }
+    assert!(
+        transport
+            .admit(
+                Lane::Provider,
+                &admitted_url("https://grida.co/api/v1/ai/operations").unwrap(),
+                &Method::POST
+            )
+            .is_ok()
+    );
+    assert!(
+        transport
+            .admit(
+                Lane::Provider,
+                &admitted_url("https://grida.co/api/v1/ai/jobs?request_id=req_original").unwrap(),
+                &Method::GET
+            )
+            .is_ok()
+    );
+    assert!(
+        transport
+            .admit(
+                Lane::Provider,
+                &admitted_url("https://grida.co/api/v1/ai/jobs?request_id=req_original&org=1")
+                    .unwrap(),
+                &Method::GET
+            )
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn discovery_uses_a_real_credential_free_connection_with_an_independent_body_bound() {
+    let (transport, listener, acceptor) = fixture().await;
+    let server = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let mut stream = acceptor.accept(socket).await.unwrap();
+        let request = String::from_utf8(received(&mut stream).await)
+            .unwrap()
+            .to_ascii_lowercase();
+        assert!(request.starts_with("get /v1/models http/1.1\r\n"));
+        assert!(!request.contains("authorization:"));
+        assert!(!request.contains("cookie:"));
+        stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2097153\r\nConnection: close\r\n\r\n").await.unwrap();
+    });
+    // An overly permissive caller limit cannot extend the host's public-read bound.
+    let request = Request::new(Method::GET, "https://gateway.grida.ai/v1/models", "");
+    assert!(
+        transport
+            .send(Lane::Discovery, request, &CancellationToken::new())
+            .await
+            .is_err()
+    );
     server.await.unwrap();
 }

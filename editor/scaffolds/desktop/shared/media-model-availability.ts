@@ -1,5 +1,6 @@
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import { byokProvidersFor } from "@grida/agent";
+import type { CurrentGGModel } from "@/lib/desktop/gg-models";
 import type { DesktopBridge } from "@/lib/desktop/bridge";
 
 type MediaModelCard = Readonly<{ id: string; deprecated?: boolean }>;
@@ -26,6 +27,8 @@ export namespace MediaModelAvailability {
     desktopVersion?: string;
     configured: readonly models.image.ImageProvider[];
     hosted: boolean;
+    /** null only for released binaries without the discovery bridge. */
+    gg_models?: readonly CurrentGGModel[] | null;
   }>;
 
   export type ImageAccess = Readonly<{
@@ -64,8 +67,25 @@ export namespace MediaModelAvailability {
   export function image(
     card: models.image.ImageModelCard | undefined,
     state: ImageProviderState,
-    transparent = false
+    transparent = false,
+    modelId = card?.id
   ): ImageAccess {
+    const hostedModel = state.gg_models?.find(
+      (model) =>
+        model.id === modelId && model.interfaces.includes("images.generations")
+    );
+    if (
+      state.loaded &&
+      state.images &&
+      state.hosted &&
+      hostedModel &&
+      (!transparent ||
+        (supportsImageBackground(state.desktopVersion) &&
+          hostedModel.client_supported_options?.background?.includes(
+            "transparent"
+          ) === true))
+    )
+      return { available: true };
     if (!card?.listed)
       return { available: false, reason: "Choose an image model" };
     if (
@@ -95,15 +115,16 @@ export namespace MediaModelAvailability {
     ) {
       return { available: true };
     }
-    // GRIDA-GG: desktop — hosted readiness follows the served Vercel AI Gateway binding.
+    // Released clients lack discovery but retain this exact native contract.
+    // Empty or failed discovery on a capable host never takes this branch.
     if (
+      state.gg_models === null &&
       state.hosted &&
       models.image.binding(card, "vercel") &&
       (!transparent ||
         models.image.supportsTransparentBackground(card, "vercel"))
-    ) {
+    )
       return { available: true };
-    }
     const purpose = transparent
       ? "for transparent backgrounds"
       : "to use this model";
@@ -131,6 +152,10 @@ export namespace MediaModelAvailability {
         desktopVersion: bridge?.app.version,
         configured: [],
         hosted: false,
+        gg_models:
+          bridge && typeof bridge.providers?.gg_models !== "function"
+            ? null
+            : [],
       };
     }
 
@@ -143,7 +168,9 @@ export namespace MediaModelAvailability {
 
     async refresh(
       card?: models.image.ImageModelCard,
-      transparent = false
+      transparent = false,
+      ggModels?: readonly CurrentGGModel[] | null,
+      modelId = card?.id
     ): Promise<ImageProviderState> {
       const generation = ++this.generation;
       const bridge = this.bridge;
@@ -170,6 +197,7 @@ export namespace MediaModelAvailability {
           .filter((provider) => provider.connected)
           .map((provider) => provider.id),
         hosted: false,
+        gg_models: ggModels !== undefined ? ggModels : this.current.gg_models,
       };
       const publish = (state: ImageProviderState): ImageProviderState => {
         // A newer refresh or unmount invalidates this submit-time result too,
@@ -194,9 +222,9 @@ export namespace MediaModelAvailability {
         publish(available ? { ...next, hosted: true } : next)
       );
       if (
-        card &&
-        (image(card, keyState, transparent).available ||
-          !image(card, { ...keyState, hosted: true }, transparent).available)
+        image(card, keyState, transparent, modelId).available ||
+        !image(card, { ...keyState, hosted: true }, transparent, modelId)
+          .available
       ) {
         return keyState;
       }

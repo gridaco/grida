@@ -1,7 +1,7 @@
 // GRIDA-SEC-006 — offline funded descriptors grant no token or credit authority.
 // GRIDA-SEC-004 — mesh-operation discovery has no credentials or provider authority.
 // GRIDA-GG: provider — fixed funded operation discovery does not imply account access.
-import { catalog } from "@grida/ai-models/grida";
+import { catalog } from "./catalogue/grida";
 import { InputSchema, type InputJsonSchema } from "./input-schema";
 import { RiggingInputs } from "./rigging-inputs";
 import { MediaInputs } from "./media-inputs";

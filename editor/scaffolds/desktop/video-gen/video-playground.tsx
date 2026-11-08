@@ -2,10 +2,12 @@
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
 
 import * as gridaGateway from "@/lib/desktop/gg-session";
+import { useGGModels } from "@/lib/desktop/gg-models";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 
 import { useState } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@app/ui/components/dialog";
@@ -31,7 +33,6 @@ import {
 } from "@app/ui/ai-elements/prompt-input";
 import { video, type MediaItem } from "@/lib/desktop/bridge";
 import { VideoModelPicker } from "./video-model-picker";
-import { MediaModelAvailability } from "../shared/media-model-availability";
 
 /** Named prompt templates — motion-flavored starters, original to Grida. */
 const PROMPT_TEMPLATES: { name: string; prompt: string }[] = [
@@ -134,14 +135,18 @@ export function DesktopVideoPlayground({
   onGenerationBusyChange?: (busy: boolean) => void;
   onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
-  const [modelId, setModelId] = useState(
-    () =>
-      MediaModelAvailability.select(
-        models.video.listed_models(),
-        initialModelId,
-        models.video.default_id
-      )?.id ?? ""
-  );
+  const current = useGGModels();
+  const [selectedModelId, setModelId] = useState(initialModelId ?? "");
+  // Released binaries without discovery retain their former native default.
+  // An empty current snapshot on newer binaries never enables a hosted model.
+  const modelId =
+    current === null
+      ? (MediaModelAvailability.select(
+          models.video.listed_models(),
+          selectedModelId,
+          models.video.default_id
+        )?.id ?? "")
+      : selectedModelId;
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [aspect, setAspect] = useState<string>(AUTO);
@@ -161,7 +166,7 @@ export function DesktopVideoPlayground({
 
   const runGenerate = async (rawPrompt: string) => {
     const prompt = rawPrompt.trim();
-    if (!prompt) return;
+    if (!prompt || !modelId) return;
     // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh so a
     // signed-in keyless user generates through the included provider.
     // Never throws; BYOK runs are unaffected when it degrades.
@@ -272,7 +277,7 @@ export function DesktopVideoPlayground({
                   }}
                 />
               </PromptInputTools>
-              <PromptInputSubmit />
+              <PromptInputSubmit disabled={!modelId} />
             </PromptInputFooter>
           </PromptInput>
         </PromptInputProvider>

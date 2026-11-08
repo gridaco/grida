@@ -100,7 +100,7 @@ pub fn compare(request: &Request, expected: &Value) -> Result<(), String> {
         }
         serde_json::from_slice(&request.body).map_err(|_| "invalid request JSON")?
     };
-    let actual = json!({"lane":match request.lane {Lane::Provider=>"provider",Lane::Download=>"download",Lane::Upload=>"upload"},"method":request.method,"url":request.url,"headers":headers,"body":body});
+    let actual = json!({"lane":match request.lane {Lane::Provider=>"provider",Lane::Download=>"download",Lane::Upload=>"upload",Lane::Discovery=>"discovery"},"method":request.method,"url":request.url,"headers":headers,"body":body});
     if &actual != expected {
         return Err(format!(
             "request differs: actual {actual}, expected {expected}"

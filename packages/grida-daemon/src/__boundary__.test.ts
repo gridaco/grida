@@ -79,7 +79,7 @@ describe("@grida/daemon is AI-free (#927)", () => {
     'const ai = require("@grida/ai");',
     'import ai = require("@grida/ai");',
     'type Image = import("@grida/ai").Image;',
-    'import { models } from "@grida/ai-models";',
+    'import { models } from "@grida/ai/catalogue";',
     'import { createAgent } from "@grida/agent";',
   ])("detects an AI dependency in %s", (source) => {
     expect(imports(source).some((name) => AI_DEP_PATTERN.test(name))).toBe(

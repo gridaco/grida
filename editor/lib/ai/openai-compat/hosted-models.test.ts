@@ -1,7 +1,28 @@
-// GRIDA-SEC-006 — see /SECURITY.md
-// GRIDA-GG: gateway — listed service membership without provider or billing initialization.
-import { describe, expect, it, vi } from "vitest";
-
+// GRIDA-SEC-006 — public GG availability is independent of bundled provider bindings.
+import { beforeEach, describe, expect, it, vi } from "vitest";
+const fixture = vi.hoisted(() => ({
+  models: [] as Record<string, unknown>[],
+  ready: vi.fn<() => Promise<void>>(),
+}));
+vi.mock("@grida/ai/discovery", async (original) => {
+  const actual = await original<typeof import("@grida/ai/discovery")>();
+  return {
+    ...actual,
+    GGDiscoveryStore: class {
+      ready = fixture.ready;
+      model(id: string) {
+        return fixture.models.find((model) => model.id === id);
+      }
+      list() {
+        return fixture.models;
+      }
+      dispose() {}
+    },
+  };
+});
+vi.mock("@/lib/gg/config", () => ({
+  ggConfig: { publicModels: () => ({ origin: "https://gateway.grida.ai" }) },
+}));
 vi.mock("../models", () => {
   throw new Error("provider seam must not initialize");
 });
@@ -11,196 +32,52 @@ vi.mock("ai", () => {
 vi.mock("@ai-sdk/openai-compatible", () => {
   throw new Error("provider SDK must not initialize");
 });
-
-vi.mock("@grida/ai-models/grida", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@grida/ai-models/grida")>();
-  const base = actual.catalog.text.listed_models()[0]!;
-  const active = { ...base, id: "fixture/active" };
-  const legacy = { ...base, id: "fixture/legacy", deprecated: true };
-  const staged = { ...base, id: "fixture/staged" };
-  const members = {
-    ...actual.catalog.text.catalog,
-    [active.id]: active,
-    [legacy.id]: legacy,
-    [staged.id]: staged,
-  };
-  const view = actual.catalog.policy.resolve(members, {
-    members: {
-      ...actual.catalog.definitions.text.members,
-      [active.id]: { status: "listed" },
-      [legacy.id]: { status: "listed", legacy: true },
-      [staged.id]: { status: "staged" },
-    },
-  });
-
-  return {
-    ...actual,
-    catalog: {
-      ...actual.catalog,
-      text: {
-        ...actual.catalog.text,
-        catalog: members,
-        listed_models: () => view.listed(),
-      },
-      three_d: {
-        ...actual.catalog.three_d,
-        model_generation: {
-          ...actual.catalog.three_d.model_generation,
-          listed_models: () =>
-            actual.catalog.three_d.model_generation
-              .listed_models()
-              .map((card) => ({
-                ...card,
-                deprecated: card.id === "tripo/h3.1",
-              })),
-        },
-        rigging: {
-          ...actual.catalog.three_d.rigging,
-          listed_models: () =>
-            actual.catalog.three_d.rigging.listed_models().map((card) => ({
-              ...card,
-              deprecated: card.id === "tripo/rig-v1.0",
-            })),
-        },
-      },
-    },
-  };
-});
-
-import { catalog as models, TIER_MODEL_IDS } from "@grida/ai-models/grida";
 import { hostedModelList, isHostedTextModel } from "./hosted-models";
-
-describe("hosted catalog", () => {
-  it("loads listed text members directly without initializing provider code", () => {
-    const listed = hostedModelList();
-    const text = listed.filter((entry) => entry.grida.modality === "text");
-    expect(text.map((entry) => entry.id)).toEqual(
-      models.text.listed_models().map((spec) => spec.id)
-    );
-    for (const spec of models.text.listed_models()) {
-      expect(isHostedTextModel(spec.id)).toBe(true);
-      expect(text.find((entry) => entry.id === spec.id)).toMatchObject({
-        id: spec.id,
-        grida: { label: spec.label, deprecated: spec.deprecated === true },
-      });
-    }
-    expect(hostedModelList()).toBe(listed);
+function model(id: string, kind: string, interfaces: string[]) {
+  return { id, kind, interfaces, label: id, created: 0, owned_by: "fixture" };
+}
+beforeEach(() => {
+  fixture.models = [
+    model("fixture/fresh-text", "text", ["chat.completions"]),
+    model("fixture/responses-only", "text", ["responses"]),
+    model("fixture/fresh-image", "image", ["images.generations"]),
+    model("fixture/fresh-video", "video", ["videos"]),
+    model("fixture/music", "music", ["endpoints"]),
+  ];
+});
+describe("current hosted catalogue", () => {
+  it("offers new IDs using implemented interfaces without requiring a Vercel binding", async () => {
+    expect(await isHostedTextModel("fixture/fresh-text")).toBe(true);
+    expect(await isHostedTextModel("fixture/responses-only")).toBe(false);
+    const listed = await hostedModelList();
+    expect(listed.map((entry) => entry.id)).toEqual(["fixture/fresh-text"]);
+    expect(listed.map((entry) => entry.grida.modality)).toEqual(["text"]);
+    expect(JSON.stringify(listed)).not.toMatch(/price|mills|provider_key/i);
+  });
+  it("retains the rigging feature for both installed Tripo contracts", async () => {
+    fixture.models = [
+      model("tripo/rig-v1.0", "three-d", ["endpoints"]),
+      model("tripo/rig-v2.5", "three-d", ["endpoints"]),
+    ];
     expect(
-      text.find((entry) => entry.id === TIER_MODEL_IDS.nano)?.grida.tier
-    ).toBe("nano");
+      (await hostedModelList()).map(({ id, grida }) => [id, grida.feature])
+    ).toEqual([
+      ["tripo/rig-v1.0", "rigging"],
+      ["tripo/rig-v2.5", "rigging"],
+    ]);
   });
-
-  it("accepts exact listed active and legacy members", () => {
-    expect(isHostedTextModel("fixture/active")).toBe(true);
-    expect(isHostedTextModel("fixture/legacy")).toBe(true);
-    expect(
-      hostedModelList().find((entry) => entry.id === "fixture/legacy")?.grida
-        .deprecated
-    ).toBe(true);
+  it("withdraws removed IDs rather than silently falling back to compiled facts", async () => {
+    fixture.models = [];
+    expect(await isHostedTextModel("fixture/fresh-text")).toBe(false);
+    expect(await hostedModelList()).toEqual([]);
   });
-
-  it("rejects a staged reference even when its facts remain in the service catalog", () => {
-    expect(Object.hasOwn(models.text.catalog, "fixture/staged")).toBe(true);
-    expect(isHostedTextModel("fixture/staged")).toBe(false);
-  });
-
-  it("rejects bare, date-suffixed, unknown, and prototype-property ids", () => {
+  it("never treats prototype members or bare aliases as model IDs", async () => {
     for (const id of [
-      "active",
-      "fixture/active-2026-09-09",
-      "unknown",
+      "constructor",
       "toString",
-    ]) {
-      expect(isHostedTextModel(id)).toBe(false);
-    }
+      "fresh-text",
+      "fixture/fresh-text-new",
+    ])
+      expect(await isHostedTextModel(id)).toBe(false);
   });
-
-  it("enforces the same membership advertised by the hosted text listing", () => {
-    const text = hostedModelList().filter(
-      (entry) => entry.grida.modality === "text"
-    );
-    for (const id of Object.keys(models.text.catalog)) {
-      expect(isHostedTextModel(id)).toBe(text.some((entry) => entry.id === id));
-    }
-  });
-
-  it("preserves image/video Vercel AI Gateway availability and the pricing-free public shape", () => {
-    const list = hostedModelList();
-    expect(
-      list
-        .filter((entry) => entry.grida.modality === "image")
-        .map((entry) => entry.id)
-    ).toEqual(
-      models.image
-        .listed_models()
-        .filter((card) => models.image.binding(card, "vercel"))
-        .map((card) => card.id)
-    );
-    expect(
-      list
-        .filter((entry) => entry.grida.modality === "video")
-        .map((entry) => entry.id)
-    ).toEqual(
-      models.video
-        .listed_models()
-        .filter((card) => models.video.binding(card, "vercel"))
-        .map((card) => card.id)
-    );
-    for (const entry of list) {
-      expect(Object.keys(entry)).toEqual([
-        "id",
-        "object",
-        "created",
-        "owned_by",
-        "grida",
-      ]);
-      expect(Object.keys(entry.grida)).toEqual([
-        "modality",
-        ...(entry.grida.modality === "three-d" ? ["feature"] : []),
-        "tier",
-        "label",
-        "deprecated",
-      ]);
-    }
-  });
-  it("advertises listed Tripo models by explicit feature without exposing provider credentials or pricing", () => {
-    const threeD = hostedModelList().filter(
-      (entry) => entry.grida.modality === "three-d"
-    );
-    for (const [feature, cards] of [
-      ["model-generation", models.three_d.model_generation.listed_models()],
-      ["rigging", models.three_d.rigging.listed_models()],
-    ] as const) {
-      expect(
-        threeD
-          .filter((entry) => entry.grida.feature === feature)
-          .map((entry) => entry.id)
-      ).toEqual(cards.map((card) => card.id));
-    }
-    expect(threeD).toHaveLength(5);
-    expect(threeD.every((entry) => entry.owned_by === "tripo")).toBe(true);
-    expect(
-      hostedModelList().some((entry) => entry.id === "tripo/rig-check")
-    ).toBe(false);
-  });
-
-  it.each([
-    ["model-generation", "tripo/h3.1", "tripo/p1"],
-    ["rigging", "tripo/rig-v1.0", "tripo/rig-v2.5"],
-  ] as const)(
-    "preserves listed %s deprecation without removing the model",
-    (feature, legacy, active) => {
-      const entries = hostedModelList().filter(
-        (entry) =>
-          entry.grida.modality === "three-d" && entry.grida.feature === feature
-      );
-      expect(
-        entries.find((entry) => entry.id === legacy)?.grida.deprecated
-      ).toBe(true);
-      expect(
-        entries.find((entry) => entry.id === active)?.grida.deprecated
-      ).toBe(false);
-    }
-  );
 });

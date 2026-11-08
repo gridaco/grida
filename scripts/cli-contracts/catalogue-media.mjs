@@ -5,6 +5,7 @@ import { parseArgs } from "node:util";
 const { values } = parseArgs({
   options: { check: { type: "boolean", default: false } },
 });
+import { ggTripoContractFixture } from "../../packages/grida-ai/src/testing/gg-contract.ts";
 import { projectRequest } from "./catalogue-request.mjs";
 import { assertOperationVectors } from "./catalogue-vectors.mjs";
 import path from "node:path";
@@ -35,6 +36,7 @@ const key = "synthetic-key";
 const gg = { getAccessToken: () => "synthetic-token" };
 const base = "https://gg.example";
 const samples = [];
+const metadata = ggTripoContractFixture();
 function sample(schema, name = "") {
   if (schema.default !== undefined) return schema.default;
   if (schema.enum)
@@ -96,6 +98,8 @@ for (const descriptor of descriptors) {
   const handler =
     (lane) =>
     async (url, init = {}) => {
+      const discovery = metadata.response(url);
+      if (discovery) return discovery;
       url = String(url);
       const method = init.method ?? "GET";
       const request = projectRequest(lane, url, init);

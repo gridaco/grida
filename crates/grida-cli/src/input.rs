@@ -237,10 +237,15 @@ async fn read_flags(d: &Value, r: &Request, token: &CancellationToken) -> Result
             )));
         }
     }
-    let image_field = r
-        .image
-        .as_ref()
-        .map(|s| if https(s) { "image_url" } else { "image" });
+    let canonical_image_url =
+        d.get("gateway_operation").is_some() && p["image"]["type"] == "string";
+    let image_field = r.image.as_ref().map(|s| {
+        if https(s) && !canonical_image_url {
+            "image_url"
+        } else {
+            "image"
+        }
+    });
     if let Some(field) = image_field {
         claim(p, &mut claimed, field, "--image in this file or URL form")?;
     }
@@ -309,8 +314,8 @@ async fn read_flags(d: &Value, r: &Request, token: &CancellationToken) -> Result
         }
     }
     if let Some(source) = &r.image {
-        if image_field == Some("image_url") {
-            value.insert("image_url".into(), json!(source));
+        if image_field == Some("image_url") || canonical_image_url && https(source) {
+            value.insert(image_field.unwrap().into(), json!(source));
         } else {
             let asset = image(
                 source,
@@ -362,6 +367,7 @@ async fn read_flags(d: &Value, r: &Request, token: &CancellationToken) -> Result
 }
 
 pub fn describe(d: &Value) -> Vec<String> {
+    let canonical = d.get("gateway_operation").is_some();
     let p = &d["input_schema"]["properties"];
     let local = local_flags(d);
     let required = d["input_schema"]["required"].as_array();
@@ -416,7 +422,16 @@ pub fn describe(d: &Value) -> Vec<String> {
                 ),
                 "image_url" => details.push("--image HTTPS-URL".into()),
                 "image" => {
-                    details.push("--image FILE".into());
+                    details.push(
+                        if s["type"] == "string" {
+                            "--image HTTPS-URL"
+                        } else if canonical {
+                            "use --input JSON"
+                        } else {
+                            "--image FILE"
+                        }
+                        .into(),
+                    );
                     let nested = &s["properties"];
                     let maximum = &nested["data"]["x-grida-decoded-max-bytes"];
                     if maximum.is_number() {
@@ -451,7 +466,7 @@ pub fn describe(d: &Value) -> Vec<String> {
     if d["variant"] != "text" {
         example.extend(["--variant".into(), quote(text(d, "variant"))]);
     }
-    if d["variant"] == "multiview" {
+    if canonical || d["variant"] == "multiview" {
         example.extend(["--input".into(), "@input.json".into()]);
     } else if p.get("prompt").is_some() {
         example.extend(["--prompt".into(), quote("Describe what to generate")]);
@@ -460,11 +475,11 @@ pub fn describe(d: &Value) -> Vec<String> {
         ("text", "--text", "Hello from Grida"),
         ("voice_id", "--voice", "YOUR_VOICE_ID"),
     ] {
-        if p.get(field).is_some() {
+        if !canonical && p.get(field).is_some() {
             example.extend([flag.into(), quote(value)]);
         }
     }
-    if p.get("references").is_some() {
+    if !canonical && p.get("references").is_some() {
         example.extend([
             "--reference".into(),
             if local.contains(&"--reference") {
@@ -474,9 +489,9 @@ pub fn describe(d: &Value) -> Vec<String> {
             },
         ]);
     }
-    if p.get("image").is_some() {
+    if !canonical && p.get("image").is_some() {
         example.extend(["--image".into(), "./input.png".into()]);
-    } else if p.get("image_url").is_some() {
+    } else if !canonical && p.get("image_url").is_some() {
         example.extend(["--image".into(), quote("https://example.com/input.png")]);
     }
     example.extend(["--out".into(), "./result".into()]);

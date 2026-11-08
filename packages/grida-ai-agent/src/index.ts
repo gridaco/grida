@@ -181,3 +181,5 @@ export {
   type ToolsetCapabilities,
 } from "./tools";
 export { AGENT_DEFAULT_TIER, AGENT_TIERS, type ModelTier } from "./tiers";
+
+export type { GGModelsView } from "./protocol/gg-models";

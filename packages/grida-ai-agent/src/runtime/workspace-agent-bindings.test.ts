@@ -804,6 +804,7 @@ describe("createWorkspaceAgentBindings — image_gen gating", () => {
         workspace_registry: registry,
         secrets: fakeSecrets({ openrouter: "private-key" }),
         image_gen_enabled: true,
+        image_model_id: "openai/gpt-image-2",
         scratch_dir: scratchRoot,
         provider_http: new ProviderHttp({ request, download }),
       }

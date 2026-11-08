@@ -20,6 +20,15 @@ import { AgentDaemonSocketHost } from "../main/agent-daemon-socket-host";
 const desktop = fileURLToPath(new URL("../..", import.meta.url));
 const fixture = fileURLToPath(new URL("./testing/", import.meta.url));
 const requireDesktop = createRequire(path.join(desktop, "package.json"));
+// Runtime-load the shared test-only builder: Desktop has its own TypeScript
+// root, and the helper is deliberately not a shipped SDK export.
+const { ggContractFixture } = requireDesktop(
+  "../packages/grida-ai/src/testing/gg-contract.ts"
+) as {
+  ggContractFixture(entries: { id: string; kind: "music" }[]): {
+    response(url: string): Response | undefined;
+  };
+};
 const origin = "https://example.invalid";
 const password = "synthetic-desktop-media-password-123456789";
 const key = "synthetic-elevenlabs-key";
@@ -58,8 +67,46 @@ describe("built Desktop media startup", () => {
       );
       const runtime = await sidecarRuntime();
       const verified: string[] = [];
+      const network: {
+        url: string;
+        method: string | undefined;
+        authorization: string | null;
+        cookie: string | null;
+        apiKey: string | null;
+      }[] = [];
+      const metadata = ggContractFixture([
+        { id: "google/lyria-3", kind: "music" },
+      ]);
       const fetchProvider = async (url: string, init: RequestInit) => {
         const headers = new Headers(init.headers);
+        network.push({
+          url,
+          method: init.method,
+          authorization: headers.get("authorization"),
+          cookie: headers.get("cookie"),
+          apiKey: headers.get("xi-api-key"),
+        });
+        const discovery = metadata.response(url);
+        if (discovery) return discovery;
+        if (url === "https://fal.media/music.mp3") {
+          return new Response(audio, {
+            headers: { "content-type": "audio/mpeg" },
+          });
+        }
+        if (url === `${origin}/api/v1/ai/jobs?request_id=req_music`) {
+          return Response.json({
+            id: "req_music",
+            request_id: "req_music",
+            status: "succeeded",
+            result_status: "available",
+            result: {
+              audio: {
+                url: "https://fal.media/music.mp3",
+                media_type: "audio/mpeg",
+              },
+            },
+          });
+        }
         expect(init.method).toBe("POST");
         expect(headers.has("cookie")).toBe(false);
         const body = JSON.parse(await new Response(init.body).text());
@@ -78,23 +125,24 @@ describe("built Desktop media startup", () => {
             headers: { "content-type": "audio/mpeg" },
           });
         }
-        expect(url).toBe(`${origin}/api/v1/ai/music/generations`);
+        expect(url).toBe(`${origin}/api/v1/ai/operations`);
         expect(headers.get("authorization")).toBe(`Bearer ${ggToken}`);
         expect(headers.has("xi-api-key")).toBe(false);
         expect(body).toEqual({
-          model_id: "google/lyria-3",
-          prompt: "A piano phrase",
+          operation_id: "music.google.lyria-3.generate",
+          input: { prompt: "A piano phrase" },
         });
         verified.push("music");
-        return Response.json({
-          model_id: "google/lyria-3",
-          provider_id: "gg",
-          audio: {
-            base64: audio.toString("base64"),
-            media_type: "audio/mpeg",
-            file_name: "lyria-3.mp3",
+        return Response.json(
+          {
+            id: "req_music",
+            request_id: "req_music",
+            status: "pending",
+            result_status: "pending",
+            result: null,
           },
-        });
+          { status: 202 }
+        );
       };
 
       active = await Sidecar.start({
@@ -193,6 +241,41 @@ describe("built Desktop media startup", () => {
       expect(music.status).toBe(200);
       await expectReceipt(mediaRoot, (await music.json()).stored_media);
       expect(verified).toEqual(["sfx", "music"]);
+      // Assert the complete observed flow, so no conditional branch can silently
+      // skip its authority proof. Discovery and downloads have no credentials.
+      const anonymous = {
+        method: "GET",
+        authorization: null,
+        cookie: null,
+        apiKey: null,
+      };
+      const scoped = {
+        authorization: `Bearer ${ggToken}`,
+        cookie: null,
+        apiKey: null,
+      };
+      expect(network.toSorted((a, b) => a.url.localeCompare(b.url))).toEqual(
+        [
+          ...["/v1/models", "/v1/endpoints", "/schemas/operations.json"].map(
+            (path) => ({ url: `https://gateway.grida.ai${path}`, ...anonymous })
+          ),
+          { url: "https://fal.media/music.mp3", ...anonymous },
+          {
+            url: `${origin}/api/v1/ai/jobs?request_id=req_music`,
+            method: "GET",
+            ...scoped,
+          },
+          { url: `${origin}/api/v1/ai/operations`, method: "POST", ...scoped },
+          {
+            url: "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128",
+            method: "POST",
+            authorization: null,
+            cookie: null,
+            apiKey: key,
+          },
+        ].toSorted((a, b) => a.url.localeCompare(b.url))
+      );
+
       expect((await active.post("/auth/gg/clear")).status).toBe(200);
       expect(
         (
@@ -341,7 +424,6 @@ class Sidecar {
         env: {
           ...options.env,
           ELECTRON_RUN_AS_NODE: "1",
-          GRIDA_AGENT_DISABLE_MODELS_FETCH: "1",
           GRIDA_MEDIA_STARTUP_ROOT: options.root,
           GRIDA_MEDIA_STARTUP_STATE: options.userData,
           GRIDA_MEDIA_STARTUP_REPORT: path.join(

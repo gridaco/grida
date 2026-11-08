@@ -1,7 +1,7 @@
 // GRIDA-SEC-006 / GRIDA-SEC-012 — fixed GG bearer binding; no account or cookie fallback.
 // GRIDA-GG: gateway — bounded 3D feature requests and streamed model results.
 import "server-only";
-import { catalog } from "@grida/ai-models/grida";
+import { catalog } from "@grida/ai/catalogue";
 import { verifyGgToken } from "../auth/gg-token";
 import { ggUploads } from "../gg/uploads";
 import { GgThreeD } from "../ai/gg-three-d";

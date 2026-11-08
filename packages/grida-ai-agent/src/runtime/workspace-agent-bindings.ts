@@ -150,6 +150,7 @@ export async function createWorkspaceAgentBindings(
     gg?: import("../providers/gg-session").GridaGatewaySessionStore;
     /** Image catalogue for `generate_image`; absent ⇒ the bundled one. */
     catalog?: import("../providers/model-catalog").ModelCatalogStore;
+    gg_catalog?: import("@grida/ai/discovery").GGDiscoveryStore;
     gg_base_url?: string;
     /** Provider HTTP used only inside the image-generator closure. */
     provider_http?: ProviderHttp;
@@ -297,6 +298,7 @@ export async function createWorkspaceAgentBindings(
       gg_base_url: deps.gg_base_url,
       provider_http: deps.provider_http,
       catalog: deps.catalog,
+      gg_catalog: deps.gg_catalog,
     };
     if (await hasUsableImageProvider(imageDeps)) {
       image_gen = createImageGenerator(

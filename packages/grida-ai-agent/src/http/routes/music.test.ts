@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
+import { ggContractFixture } from "../../../../grida-ai/src/testing/gg-contract";
 import { GridaGatewaySessionStore, ProviderHttp } from "@grida/ai";
 import type { MediaItem } from "@grida/daemon";
 import type { MediaPersistence } from "@grida/daemon/server";
@@ -14,12 +15,16 @@ const TOKEN = "synthetic-scoped-token";
 
 function hostedResult(model_id: MusicGenerateRequest["model_id"] = LYRIA) {
   return {
-    model_id,
-    provider_id: "gg",
-    audio: {
-      base64: "SUQz",
-      media_type: "audio/mpeg",
-      file_name: "provider-suggested.mp3",
+    id: "req_music",
+    request_id: "req_music",
+    model: model_id,
+    status: "succeeded",
+    result_status: "available",
+    result: {
+      audio: {
+        url: "https://assets.example/music.mp3",
+        media_type: "audio/mpeg",
+      },
     },
     metadata: "private-provider-metadata",
     stored_media: { id: "untrusted-receipt" },
@@ -41,11 +46,23 @@ function appWith(
   const request = vi.fn<typeof globalThis.fetch>(
     options.request ?? (async () => Response.json(hostedResult()))
   );
-  const download = vi.fn<typeof globalThis.fetch>();
+  const metadata = ggContractFixture(
+    [LYRIA, "google/lyria-3-pro"].map((id) => ({ id, kind: "music" as const }))
+  );
+  const download = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+    expect(new Headers(init?.headers).has("authorization")).toBe(false);
+    return new Response(Buffer.from("ID3"), {
+      headers: { "content-type": "audio/mpeg" },
+    });
+  });
   const app = new Hono();
   registerMusicRoutes(app, {
     media: options.media,
-    provider_http: new ProviderHttp({ request, download }),
+    provider_http: new ProviderHttp({
+      request: async (url, init) =>
+        metadata.response(url) ?? request(url, init),
+      download,
+    }),
     ...(options.hosted === false
       ? {}
       : { gg, gg_base_url: "https://grida.test" }),
@@ -72,7 +89,6 @@ describe("music generation route", () => {
       const res = await post(app, {
         model_id,
         prompt: "  clockwork percussion  ",
-        seed: 0,
       });
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({
@@ -84,22 +100,21 @@ describe("music generation route", () => {
           file_name: `${model_id.split("/")[1]}.mp3`,
         },
       });
-      expect(request).toHaveBeenCalledOnce();
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
       const [url, init] = request.mock.calls[0];
-      expect(String(url)).toBe(
-        "https://grida.test/api/v1/ai/music/generations"
-      );
+      expect(String(url)).toBe("https://grida.test/api/v1/ai/operations");
       expect(init?.method).toBe("POST");
       expect(new Headers(init?.headers).get("authorization")).toBe(
         `Bearer ${TOKEN}`
       );
       expect(JSON.parse(String(init?.body))).toEqual({
-        model_id,
-        prompt: "clockwork percussion",
-        seed: 0,
+        operation_id: `music.${model_id.replaceAll("/", ".")}.generate`,
+        input: { prompt: "clockwork percussion" },
       });
       expect(init?.signal).toBeInstanceOf(AbortSignal);
-      expect(download).not.toHaveBeenCalled();
+      expect(download).toHaveBeenCalledOnce();
     }
   );
 
@@ -175,7 +190,9 @@ describe("music generation route", () => {
         error: "invalid music input",
         code: "invalid_input",
       });
-      expect(request).toHaveBeenCalledOnce();
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
     }
   );
 
@@ -188,7 +205,9 @@ describe("music generation route", () => {
   ])("rejects invalid host input before provider I/O: %j", async (payload) => {
     const { app, request, download } = appWith();
     expect((await post(app, payload)).status).toBe(400);
-    expect(request).not.toHaveBeenCalled();
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(0);
     expect(download).not.toHaveBeenCalled();
   });
 
@@ -200,7 +219,9 @@ describe("music generation route", () => {
       error: "hosted music generation is unavailable",
       provider_id: "gg",
     });
-    expect(request).not.toHaveBeenCalled();
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(0);
   });
 
   it("returns an actionable expiry when scoped custody is cleared before submission", async () => {
@@ -213,7 +234,9 @@ describe("music generation route", () => {
       code: "gg_token_expired",
       provider_id: "gg",
     });
-    expect(request).not.toHaveBeenCalled();
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(0);
   });
 
   it.each([
@@ -234,7 +257,9 @@ describe("music generation route", () => {
       const res = await post(app, { model_id: LYRIA, prompt: "x" });
       expect(res.status).toBe(status);
       expect(await res.json()).toEqual({ error, code, provider_id: "gg" });
-      expect(request).toHaveBeenCalledOnce();
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
       expect(save).not.toHaveBeenCalled();
     }
   );
@@ -258,7 +283,9 @@ describe("music generation route", () => {
         provider_id: "gg",
       });
       expect(JSON.stringify(logged.mock.calls)).not.toContain(sentinel);
-      expect(request).toHaveBeenCalledOnce();
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
       expect(save).not.toHaveBeenCalled();
     } finally {
       logged.mockRestore();
@@ -266,11 +293,24 @@ describe("music generation route", () => {
   });
 
   it.each([
-    { ...hostedResult(), model_id: "google/lyria-3-pro" },
-    { ...hostedResult(), audio: { url: "https://private.example/music.mp3" } },
+    { ...hostedResult(), request_id: "req_wrong" },
     {
       ...hostedResult(),
-      audio: { ...hostedResult().audio, file_name: "../../secret.mp3" },
+      result: {
+        audio: {
+          url: "http://private.example/music.mp3",
+          media_type: "audio/mpeg",
+        },
+      },
+    },
+    {
+      ...hostedResult(),
+      result: {
+        audio: {
+          url: "https://assets.example/music.mp3",
+          media_type: "video/mp4",
+        },
+      },
     },
   ])("does not persist or expose a malformed hosted result", async (result) => {
     const save = vi.fn<MediaPersistence["save"]>();
@@ -287,7 +327,9 @@ describe("music generation route", () => {
         model_id: LYRIA,
         provider_id: "gg",
       });
-      expect(request).toHaveBeenCalledOnce();
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
       expect(download).not.toHaveBeenCalled();
       expect(save).not.toHaveBeenCalled();
       expect(JSON.stringify(logged.mock.calls)).not.toMatch(
@@ -336,7 +378,9 @@ describe("music generation route", () => {
       expect(JSON.stringify(logged.mock.calls)).not.toContain(
         "private-abort-reason"
       );
-      expect(request).toHaveBeenCalledOnce();
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
       expect(save).not.toHaveBeenCalled();
     } finally {
       logged.mockRestore();

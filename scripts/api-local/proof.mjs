@@ -1,3 +1,4 @@
+import { ggDocuments } from "../ai-local/gg-fixture.mjs";
 // GRIDA-SEC-012 — production Next pipeline proof with private, synthetic inputs.
 // GRIDA-SEC-006 — see /SECURITY.md
 // GRIDA-GG: token — fresh fixture authority proves mint and credential isolation.
@@ -37,6 +38,7 @@ const copiedFiles = [
   "lib/api/account.ts",
   "lib/api/gg.ts",
   "lib/api/gg-media.ts",
+  "lib/api/gg-operations.ts",
   "lib/gg/uploads.ts",
   "lib/account/account.ts",
   "lib/supabase/native-data.ts",
@@ -52,6 +54,8 @@ const copiedFiles = [
   "lib/ai/openai-compat/codec.ts",
   "lib/ai/openai-compat/errors.ts",
   "lib/ai/openai-compat/hosted-models.ts",
+  "lib/ai/gateway-product.ts",
+  "lib/platform/product-billing.ts",
   "lib/ai/openai-compat/wire.ts",
   "lib/desktop/csp.ts",
   "lib/domains/index.ts",
@@ -62,6 +66,8 @@ const copiedFiles = [
   "app/(api)/(public)/api/v1/auth/me/route.ts",
   "app/(api)/(public)/api/v1/auth/gg/route.ts",
   "app/(api)/(public)/api/v1/ai/models/route.ts",
+  "app/(api)/(public)/api/v1/ai/operations/route.ts",
+  "app/(api)/(public)/api/v1/ai/jobs/route.ts",
   "app/(api)/(public)/api/v1/ai/3d/uploads/route.ts",
   "app/(api)/(public)/api/v1/ai/3d/model-generation/route.ts",
   "app/(api)/(public)/api/v1/ai/3d/rig-check/route.ts",
@@ -1780,6 +1786,35 @@ async function ggAssertions(
       "GG model list has an invalid shape"
     );
   }
+  const generated = safe(
+    await request(port, "/api/v1/ai/operations", {
+      method: "POST",
+      headers: {
+        ...auth(alphaGrant),
+        "content-type": "application/json",
+        cookie: "organization=1001",
+        "x-grida-organization-id": "1001",
+      },
+      body: JSON.stringify({
+        operation_id: "image.openai.gpt-image-2.text",
+        input: { prompt: "A fixture square" },
+      }),
+    }),
+    200,
+    "GG canonical operation through scoped native bridge"
+  );
+  check(
+    generated.data?.[0]?.b64_json === "iVBORw0KGgo=",
+    "GG operation response changed"
+  );
+  const original = safe(
+    await request(port, "/api/v1/ai/jobs?request_id=req_original", {
+      headers: auth(alphaGrant),
+    }),
+    200,
+    "GG original job through scoped native bridge"
+  );
+  check(original.id === "req_original", "GG original job identity changed");
   for (const headers of [
     {},
     { cookie: "sb-session=synthetic-web-cookie" },
@@ -2465,6 +2500,7 @@ async function main() {
   const reservation = createServer();
   let active;
   let platformServer;
+  let ggServer;
   let interrupted = false;
   const interrupt = () => {
     if (interrupted) return;
@@ -2514,6 +2550,79 @@ async function main() {
       platformPort !== issuerPort && platformPort !== dataPort,
       "Platform, Auth and Data fixtures must have separate listeners"
     );
+    const ggDocs = ggDocuments([{ id: "openai/gpt-image-2", kind: "image" }]);
+    const ggWorkloadToken = "g".repeat(43);
+    ggServer = createServer(async (req, response) => {
+      try {
+        const url = new URL(req.url, "http://fixture.invalid");
+        response.setHeader("content-type", "application/json");
+        if (
+          req.method === "GET" &&
+          Object.hasOwn(ggDocs, url.pathname) &&
+          !url.search
+        ) {
+          check(
+            !req.headers.authorization && !req.headers.cookie,
+            "Public discovery must be anonymous"
+          );
+          if (url.pathname.endsWith("operations.json"))
+            response.setHeader("content-type", "application/schema+json");
+          response.end(JSON.stringify(ggDocs[url.pathname]));
+          return;
+        }
+        check(
+          req.headers.authorization === `Bearer ${ggWorkloadToken}` &&
+            req.headers["x-grida-workload-key-id"] === "fixture-gg-workload",
+          "GG workload authority missing"
+        );
+        check(
+          ["1", "1001"].includes(req.headers["x-grida-organization-id"]),
+          "GG verified organization missing"
+        );
+        if (
+          req.method === "POST" &&
+          url.pathname === "/internal/grida/v1/images/generations"
+        ) {
+          let raw = "";
+          for await (const chunk of req) {
+            raw += chunk;
+            check(raw.length < 1024, "GG synthetic input exceeded bound");
+          }
+          const input = JSON.parse(raw);
+          check(input.model === "openai/gpt-image-2", "Wrong synthetic model");
+          response.end(
+            JSON.stringify({
+              created: 0,
+              data: [{ b64_json: "iVBORw0KGgo=", media_type: "image/png" }],
+            })
+          );
+          return;
+        }
+        if (
+          req.method === "GET" &&
+          url.pathname === "/internal/grida/v1/jobs/req_original"
+        ) {
+          response.end(
+            JSON.stringify({
+              id: "req_original",
+              request_id: "req_original",
+              status: "succeeded",
+              result_status: "available",
+              result: {},
+            })
+          );
+          return;
+        }
+        response
+          .writeHead(404)
+          .end(JSON.stringify({ error: { code: "not_found" } }));
+      } catch {
+        response
+          .writeHead(500)
+          .end(JSON.stringify({ error: { code: "fixture_failed" } }));
+      }
+    });
+    const ggPort = await listen(ggServer);
     const port = await listen(reservation);
     await close(reservation);
     const apiOrigin = `http://127.0.0.1:${port}`;
@@ -2538,11 +2647,15 @@ async function main() {
       GRIDA_API_ORIGIN: apiOrigin,
       GRIDA_API_MAINTENANCE: "0",
       GG_TOKEN_SECRET: signingSecret,
+      GRIDA_AI_GATEWAY_ORIGIN: `http://127.0.0.1:${ggPort}`,
+      GRIDA_AI_GATEWAY_ALLOW_LOCAL: "1",
+      GRIDA_AI_GATEWAY_KEY_ID: "fixture-gg-workload",
+      GRIDA_AI_GATEWAY_TOKEN: ggWorkloadToken,
       GRIDA_PLATFORM_BILLING_ORIGIN: issuer.platformOrigin,
       GRIDA_PLATFORM_SSR_KEY_ID: issuer.workload.id,
       GRIDA_PLATFORM_SSR_TOKEN: issuer.workload.token,
       NODE_EXTRA_CA_CERTS: tls.caFile,
-      GRIDA_API_TEST_PORTS: `${port},${issuerPort},${dataPort},${platformPort}`,
+      GRIDA_API_TEST_PORTS: `${port},${issuerPort},${dataPort},${platformPort},${ggPort}`,
       GRIDA_API_TEST_TRIPWIRE: tripwire,
       GRIDA_API_TEST_MEDIA: mediaTripwire,
       NODE_OPTIONS: `--require=${JSON.stringify(path.join(scripts, "network.cjs"))}`,
@@ -2744,6 +2857,7 @@ async function main() {
       close(issuer.authServer),
       close(issuer.dataServer),
       platformServer ? close(platformServer) : Promise.resolve(),
+      ggServer ? close(ggServer) : Promise.resolve(),
       close(reservation),
     ]);
     try {

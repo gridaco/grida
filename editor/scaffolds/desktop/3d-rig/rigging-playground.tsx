@@ -19,7 +19,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { catalog } from "@grida/ai-models/grida";
+import { catalog } from "@grida/ai/catalogue";
 import { TripoLogo } from "@grida/react-icons/logos";
 import { Button } from "@app/ui/components/button";
 import { Label } from "@app/ui/components/label";

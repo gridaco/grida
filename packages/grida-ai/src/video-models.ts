@@ -2,11 +2,12 @@
 // GRIDA-GG: token — hosted video is text-only and uses the shared live-token contract.
 import { createGateway as createVercelAiGateway } from "@ai-sdk/gateway";
 import { assertAllowedUrl, falQueueOutcome, pollQueue } from "./fetch-helpers";
-import { postHosted } from "./gg";
 import type { GgTokenSource } from "./gg-session";
 import { MediaRequest } from "./media-request";
 import { MediaInputs } from "./media-inputs";
 import type { VideoClient } from "./video-client";
+import { GGOperationsClient } from "./gg-operations";
+import type { GGOperation, GGDiscoveryStore } from "./gg-discovery";
 
 /** Internal adapters. No raw model, credentials, provider metadata, or queue handles are public. */
 export namespace videoModels {
@@ -72,31 +73,80 @@ export namespace videoModels {
     base: string,
     id: string,
     input: Input,
-    request: MediaRequest
+    request: MediaRequest,
+    operation: GGOperation,
+    discovery: GGDiscoveryStore
   ): Promise<Video[]> {
     request.check();
-    const result = await request.wait(
-      postHosted<{ videos: { base64: string; media_type: string }[] }>({
-        session,
-        url: new URL("/api/v1/ai/videos/generations", base).toString(),
-        body: { model_id: id, ...wire(input) },
-        scope: "video",
-        abortSignal: request.signal,
-        provider_http: request.transport(videoModels.maxEnvelopeBytes),
-        max_response_bytes: videoModels.maxEnvelopeBytes,
-      })
-    );
-    if (
-      !Array.isArray(result.videos) ||
-      !result.videos.length ||
-      result.videos.length > 16
-    )
-      invalid();
-    return result.videos.map((item) => ({
-      type: "base64",
-      data: item.base64,
-      mediaType: item.media_type,
-    }));
+    {
+      const properties = operation.input_schema.properties as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const body: Record<string, unknown> = { prompt: input.prompt };
+      for (const [key, value] of Object.entries({
+        duration: input.duration,
+        seed: input.seed,
+        fps: input.fps,
+        generateAudio: input.generate_audio,
+        image: input.image_url,
+      })) {
+        if (value !== undefined) {
+          if (!Object.hasOwn(properties, key)) invalid();
+          body[key] = value;
+        }
+      }
+      if (input.image) invalid();
+      if (input.aspect_ratio) {
+        const key = Object.hasOwn(properties, "aspectRatio")
+          ? "aspectRatio"
+          : Object.hasOwn(properties, "aspect_ratio")
+            ? "aspect_ratio"
+            : null;
+        if (!key) invalid();
+        body[key] = input.aspect_ratio;
+      }
+      if (input.resolution) {
+        if (Object.hasOwn(properties, "resolution"))
+          body.resolution = input.resolution;
+        else if (Object.hasOwn(properties, "providerOptions")) {
+          const pair = /^(\d+)x(\d+)$/.exec(input.resolution);
+          if (!pair) invalid();
+          const edge = Math.min(Number(pair[1]), Number(pair[2]));
+          body.providerOptions = {
+            gg: { resolutionTier: edge === 2160 ? "4k" : `${edge}p` },
+          };
+        } else invalid();
+      }
+      const client = new GGOperationsClient({
+        http: request.transport(maxEnvelopeBytes),
+        gg: session,
+        gg_base_url: base,
+        gg_catalog: discovery,
+      });
+      const submitted = await request.wait(
+        client.submit(operation.id, body, request.signal)
+      );
+      if (
+        typeof submitted.id !== "string" ||
+        !/^req_[A-Za-z0-9_-]{1,160}$/.test(submitted.id)
+      )
+        invalid();
+      const job = await request.wait(client.wait(submitted.id, request.signal));
+      const videos = job.result?.videos;
+      if (!Array.isArray(videos) || !videos.length || videos.length > 16)
+        invalid();
+      return videos.map((item) => {
+        if (!item || typeof item !== "object" || typeof item.url !== "string")
+          invalid();
+        return {
+          type: "url" as const,
+          url: item.url,
+          mediaType:
+            typeof item.media_type === "string" ? item.media_type : "video/mp4",
+        };
+      });
+    }
   }
 
   async function fal(

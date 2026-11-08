@@ -1,3 +1,4 @@
+import type { GGDiscoveryStore } from "@grida/ai";
 /**
  * GRIDA-SEC-004 — direct Tripo BYOK model generation behind the daemon perimeter.
  * The SDK owns the exact feature/model/input contract, uploads and job lifecycle.
@@ -17,6 +18,7 @@ export type ModelGenerationRoutesDeps = {
   provider_http?: ProviderHttp;
   gg?: GridaGatewaySessionStore;
   gg_base_url?: string;
+  gg_catalog?: GGDiscoveryStore;
 };
 
 type Parsed = Extract<MediaOperations.Parsed, { feature: "model-generation" }>;
@@ -84,6 +86,7 @@ export function registerModelGenerationRoutes(
           http,
           gg: deps.gg,
           gg_base_url: deps.gg_base_url,
+          gg_catalog: deps.gg_catalog,
         });
         const result = await generate(client, parsed, c.req.raw.signal);
         completedTaskId = result.task.id;

@@ -30,6 +30,7 @@
 
 "use client";
 
+import { useGGModels } from "@/lib/desktop/gg-models";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Chat, useChat } from "@ai-sdk/react";
@@ -509,11 +510,12 @@ function AgentPaneContent({
 
   // Exact native image formats come from the catalogue or an explicit custom
   // endpoint declaration. The broad `multimodal` flag never widens this set.
+  const ggModels = useGGModels();
   const providerFileMimes = useMemo(
     () =>
-      registered_models.resolve(modelId, endpoints, modelProviderId)
+      registered_models.resolve(modelId, endpoints, modelProviderId, ggModels)
         ?.imageInputMimes ?? [],
-    [modelId, modelProviderId, endpoints]
+    [modelId, modelProviderId, endpoints, ggModels]
   );
 
   // Permission/supervision posture (RFC `permission modes`). Seeds from the

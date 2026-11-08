@@ -10,9 +10,15 @@ format: md
 
 # Grida CLI models and voices
 
-Find an executable operation before preparing its input. Listing and inspection
-use the bundled catalogue and work offline without credentials, except for
-explicit availability checks described below.
+Find a supported operation before preparing its input. GG listing and inspection
+read the current public Gateway catalogue and operation schemas without
+credentials. Explicit BYOK listing and inspection use the installed adapter
+inventory and work offline. An unfiltered list combines both, so it needs a
+connection; select a BYOK provider to browse offline.
+
+A model is shown only when this CLI supports its interface and transport.
+New GG models using an existing supported interface do not need a CLI update.
+A new protocol or result format can require one.
 
 ## Find models
 
@@ -50,9 +56,18 @@ grida ai models inspect --provider fal --model google/veo-3.1-lite --variant ima
 ```
 
 Human output shows types, required fields, limits, and an example. `--json`
-returns the full schema. Inspect the intended variant: image/video inspection
+returns the full schema. GG JSON operations also include the current published
+usage tariff and its units, rather than an installed provider-cost estimate.
+The selected `--model` supplies the canonical request's model field; do not repeat
+it in the input JSON. Inspect the intended variant: image/video inspection
 defaults to text input where that variant exists. Generation's `--reference`
 and `--image` flags select compatible variants automatically.
+
+GG's generic adapter supports JSON image generation, video, music and 3D
+operations. Multipart-only image editing is not advertised by that adapter;
+existing native Tripo file and rigging operations retain their separate contracts.
+GG discovery does not require a separate Gateway API key. Generation uses your
+Grida session and selected organization.
 
 The selected operation's schema is authoritative. A provider's model page may
 advertise options Grida does not expose. There is no raw provider passthrough

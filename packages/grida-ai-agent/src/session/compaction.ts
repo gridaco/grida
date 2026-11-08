@@ -16,7 +16,7 @@
  *   recovery   → transient retry → tool-output prune → chunk → drop-middle
  */
 
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import type { ModelFactory } from "../agent";
 import type { ChatModel, ChatMessageWithParts } from "./rows";
 import type { SessionsStore } from "./store";
@@ -87,8 +87,22 @@ export function resolveModelLimits(
   // that refreshes passes its live view, so a model published after this
   // binary shipped is sized by its REAL window rather than falling
   // through to the frontier-sized default below.
-  view: models.snapshot.View = models.snapshot.view()
+  view: models.snapshot.View = models.snapshot.view(),
+  ggModels: readonly {
+    id: string;
+    limits: Readonly<Record<string, number>>;
+  }[] = []
 ): ModelLimits {
+  if (model?.provider_id === "gg") {
+    const id = model.model_id ?? view.tier_model_ids[model.tier ?? "pro"];
+    const limits = ggModels.find((candidate) => candidate.id === id)?.limits;
+    if (limits && limits.context_tokens > 0 && limits.max_output_tokens > 0) {
+      return {
+        context_window: limits.context_tokens,
+        output_limit: limits.max_output_tokens,
+      };
+    }
+  }
   let spec: { contextWindow: number; outputLimit: number } | undefined =
     model?.model_id ? view.resolve(model.model_id, custom) : undefined;
   if (!spec && model?.tier) spec = view.by_tier[model.tier];

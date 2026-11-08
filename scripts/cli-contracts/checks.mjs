@@ -46,12 +46,7 @@ export const checks = [
         `scripts/cli-contracts/catalogue-${name}.mjs`,
         "--check",
       ]),
-      [
-        "node",
-        "packages/grida-ai-models/scripts/generate.mjs",
-        "--bundle",
-        "--check",
-      ],
+      ["node", "scripts/ai-catalogue/generate.mjs", "--bundle", "--check"],
     ],
   },
   {

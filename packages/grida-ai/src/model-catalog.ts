@@ -1,29 +1,15 @@
 // GRIDA-GG: gateway — catalogue distribution, see docs/wg/platform/hosted-ai.md
 /**
- * The catalogue this host resolves against.
+ * Installed-adapter catalogue compatibility (schema 1).
  *
- * `@grida/ai-models/grida` is compiled into the binary, so a shipped host can
- * only see the catalogue it was built with: a model added on the server
- * is rejected by this host's own run gate until someone ships a release.
- * This store removes that coupling — the bundled catalogue becomes a
- * SEED, and the published one (`GET /api/v1/models/catalog` on the
- * configured Grida base URL) becomes the authority.
- *
- * Remote wins over the seed, and that is the right way round even when
- * the binary is newer: the published snapshot and the server's own model
- * gate are the same static import in the same deploy, so converging on
- * the published table is converging on the table that will actually be
- * enforced.
- *
- * IN MEMORY ONLY, deliberately. The seed is the offline story and a
- * restart is the reset — which also means a bad-but-valid snapshot can
- * never outlive the process that fetched it. Nothing here touches disk.
- *
- * Fail-safe throughout: a fetch that errors, 404s, or fails validation
- * leaves the last good view in place. `start()` never throws and never
- * blocks a caller; `view()` is synchronous and always answers.
+ * The seed is generated from released public Models facts plus Grida's product
+ * presets and implemented native input contracts. Older installed clients use
+ * GET /api/v1/models/catalog for compatible updates; failures retain their seed.
+ * This snapshot is not GG's current availability, price or financial authority.
+ * GGDiscoveryStore separately reads current anonymous GG offerings and contracts.
+ * This store is memory-only and never touches credentials or persisted state.
  */
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "./catalogue/grida";
 
 /** Published catalogue path on the Grida base URL. */
 export const CATALOG_PATH = "/api/v1/models/catalog";

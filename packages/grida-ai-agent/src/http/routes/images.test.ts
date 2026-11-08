@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
+import { ggContractFixture } from "../../../../grida-ai/src/testing/gg-contract";
 import { GridaGatewaySessionStore, ProviderHttp } from "@grida/ai";
 import type { MediaItem } from "@grida/daemon";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
@@ -26,6 +27,11 @@ function appWith(
     options.request ??
       (async () => Response.json({ data: [{ b64_json: PNG }] }))
   );
+  const metadata = ggContractFixture(
+    [LISTED, "openai/gpt-image-2.5-flare", "openai/gpt-image-2.5-sunburst"].map(
+      (id) => ({ id, kind: "image" as const })
+    )
+  );
   const download = vi.fn<typeof globalThis.fetch>();
   const app = new Hono();
   registerImagesRoutes(app, {
@@ -36,7 +42,11 @@ function appWith(
     media: options.media,
     gg: options.gg,
     gg_base_url: options.gg ? "https://grida.test" : undefined,
-    provider_http: new ProviderHttp({ request, download }),
+    provider_http: new ProviderHttp({
+      request: async (url, init) =>
+        metadata.response(url) ?? request(url, init),
+      download,
+    }),
   });
   return { app, request, download };
 }
@@ -131,7 +141,7 @@ describe("POST /images/generate", () => {
       keys: { openrouter: "key" },
       gg,
       request: async () =>
-        Response.json({ images: [{ base64: PNG, media_type: "image/png" }] }),
+        Response.json({ data: [{ b64_json: PNG, media_type: "image/png" }] }),
     });
     const res = await post(app, {
       model_id: LISTED,
@@ -142,11 +152,11 @@ describe("POST /images/generate", () => {
     expect(res.status).toBe(200);
     expect((await res.json()).provider_id).toBe("gg");
     expect(String(request.mock.calls[0][0])).toBe(
-      "https://grida.test/api/v1/ai/images/generations"
+      "https://grida.test/api/v1/ai/operations"
     );
-    expect(JSON.parse(String(request.mock.calls[0][1]?.body)).quality).toBe(
-      "medium"
-    );
+    expect(
+      JSON.parse(String(request.mock.calls[0][1]?.body)).input.quality
+    ).toBe("medium");
   });
 
   it("offers each output to host persistence and attaches only accepted receipts", async () => {
@@ -282,9 +292,9 @@ describe.each(["openai/gpt-image-2.5-flare", "openai/gpt-image-2.5-sunburst"])(
               provider === "vercel"
                 ? { images: [TRANSPARENT_PNG_BASE64] }
                 : {
-                    images: [
+                    data: [
                       {
-                        base64: TRANSPARENT_PNG_BASE64,
+                        b64_json: TRANSPARENT_PNG_BASE64,
                         media_type: "image/png",
                       },
                     ],
@@ -322,15 +332,15 @@ describe.each(["openai/gpt-image-2.5-flare", "openai/gpt-image-2.5-sunburst"])(
                   },
                 },
               }
-            : { quality: "max", background: "transparent" }
+            : { input: { quality: "max", background: "transparent" } }
         );
         expect(request).toHaveBeenCalledOnce();
         expect(download).not.toHaveBeenCalled();
       }
     );
 
-    it.each(["checkerboard", "transparent"])(
-      "rejects invalid or unsupported OpenRouter background %s before provider I/O",
+    it.each(["checkerboard", ""])(
+      "rejects invalid OpenRouter background %s before provider I/O",
       async (background) => {
         const { app, request } = appWith({
           keys: { openrouter: "key", fal: "key" },

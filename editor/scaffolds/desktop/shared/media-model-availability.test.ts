@@ -1,7 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
 import { MediaModelAvailability } from "./media-model-availability";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
+import type { CurrentGGModel } from "@/lib/desktop/gg-models";
 import type { DesktopBridge } from "@/lib/desktop/bridge";
+
+function currentImage(id: string, transparent = false): CurrentGGModel {
+  return {
+    id,
+    label: id,
+    kind: "image",
+    created: 0,
+    owned_by: "test",
+    interfaces: ["images.generations"],
+    input_modalities: ["text"],
+    output_modalities: ["image"],
+    operation_ids: [],
+    capabilities: {},
+    client_supported_options: {
+      background: transparent ? ["auto", "opaque", "transparent"] : ["auto"],
+    },
+    limits: {},
+  };
+}
 
 const catalogue = Object.freeze([
   { id: "alpha", label: "Alpha" },
@@ -78,6 +98,35 @@ describe("MediaModelAvailability.image", () => {
     hosted: false,
   };
 
+  it("preserves the released image contract only when the host lacks discovery", () => {
+    const native = models.image.models["openai/gpt-image-2.5-flare"]!;
+    const legacy = { ...ready, configured: [], hosted: true, gg_models: null };
+    expect(MediaModelAvailability.image(native, legacy).available).toBe(true);
+    expect(MediaModelAvailability.image(native, legacy, true).available).toBe(
+      true
+    );
+    expect(MediaModelAvailability.image(gpt2, legacy, true).available).toBe(
+      false
+    );
+    expect(
+      MediaModelAvailability.image(native, {
+        ...legacy,
+        desktopVersion: "0.0.21",
+      }).available
+    ).toBe(false);
+    expect(MediaModelAvailability.image(undefined, legacy).available).toBe(
+      false
+    );
+    expect(
+      MediaModelAvailability.image(native, { ...legacy, gg_models: [] })
+        .available
+    ).toBe(false);
+    expect(
+      MediaModelAvailability.image(native, { ...legacy, gg_models: undefined })
+        .available
+    ).toBe(false);
+  });
+
   it("requires an actual connected binding, not just a listed card", () => {
     expect(MediaModelAvailability.image(flare, ready).available).toBe(true);
     for (const configured of [[], ["openrouter"], ["vercel"]] as const) {
@@ -109,23 +158,46 @@ describe("MediaModelAvailability.image", () => {
         { ...ready, configured: ["openrouter"] },
         true
       ).available
-    ).toBe(false);
+    ).toBe(true);
     expect(
       MediaModelAvailability.image(
         card,
-        { ...ready, configured: [], hosted: true },
+        {
+          ...ready,
+          configured: [],
+          hosted: true,
+          gg_models: [currentImage(id, true)],
+        },
         true
       ).available
     ).toBe(true);
   });
 
-  it("only offers hosted readiness on models with a Vercel AI Gateway binding", () => {
-    const hosted = { ...ready, configured: [], hosted: true };
-    expect(MediaModelAvailability.image(gpt2, hosted).available).toBe(true);
-    expect(MediaModelAvailability.image(flare, hosted).available).toBe(false);
-    expect(MediaModelAvailability.image(gpt2, hosted, true).available).toBe(
+  it("uses current GG offerings independently of native Vercel bindings", () => {
+    const hosted = {
+      ...ready,
+      configured: [],
+      hosted: true,
+      gg_models: [currentImage(flare.id)],
+    };
+    expect(MediaModelAvailability.image(gpt2, hosted).available).toBe(false);
+    expect(MediaModelAvailability.image(flare, hosted).available).toBe(true);
+    expect(MediaModelAvailability.image(flare, hosted, true).available).toBe(
       false
     );
+    const newId = "test/new-image-not-in-client-facts";
+    expect(
+      MediaModelAvailability.image(
+        undefined,
+        { ...hosted, gg_models: [currentImage(newId)] },
+        false,
+        newId
+      ).available
+    ).toBe(true);
+    expect(
+      MediaModelAvailability.image(flare, { ...hosted, gg_models: [] })
+        .available
+    ).toBe(false);
   });
 
   it("requires a verified transparent route even when an ordinary route is connected", () => {
@@ -150,28 +222,30 @@ describe("MediaModelAvailability.image", () => {
     ).toBe(true);
   });
 
-  it("permits hosted transparency only when the Vercel AI Gateway binding verifies it", () => {
-    const hosted = { ...ready, configured: [], hosted: true };
-    const verified: models.image.ImageModelCard = {
-      ...gpt2,
-      providers: {
-        ...gpt2.providers,
-        vercel: { ...gpt2.providers.vercel!, transparent_background: true },
-      },
+  it("permits hosted transparency only when GG advertises it and the client implements it", () => {
+    const hosted = {
+      ...ready,
+      configured: [],
+      hosted: true,
+      gg_models: [currentImage(gpt2.id, true)],
     };
-    expect(MediaModelAvailability.image(verified, hosted, true).available).toBe(
+    expect(MediaModelAvailability.image(gpt2, hosted, true).available).toBe(
       true
     );
     expect(
       MediaModelAvailability.image(
-        verified,
+        gpt2,
         { ...hosted, desktopVersion: "0.0.21" },
         true
       ).available
     ).toBe(false);
-    expect(MediaModelAvailability.image(gpt2, hosted, true).available).toBe(
-      false
-    );
+    expect(
+      MediaModelAvailability.image(
+        gpt2,
+        { ...hosted, gg_models: [currentImage(gpt2.id)] },
+        true
+      ).available
+    ).toBe(false);
   });
 
   it("does not downgrade transparent intent when the fal key disappears", () => {
@@ -235,6 +309,41 @@ describe("MediaModelAvailability.ImageProviders", () => {
     unsubscribe();
   });
 
+  it("keeps old-host hosted submits working without treating a new empty bridge as old", async () => {
+    const card = models.image.models["openai/gpt-image-2.5-flare"]!;
+    const oldHost = bridge(async () => false);
+    const oldStore = new MediaModelAvailability.ImageProviders(
+      oldHost,
+      async () => true
+    );
+    const oldState = await oldStore.refresh(card);
+    expect(oldState).toMatchObject({ hosted: true, gg_models: null });
+    expect(MediaModelAvailability.image(card, oldState).available).toBe(true);
+    const newHost = {
+      ...oldHost,
+      providers: {
+        ...oldHost.providers,
+        gg_models: async () => ({
+          revision: "empty",
+          expires_at: Date.now(),
+          models: [],
+          operations: [],
+          endpoint_ids: [],
+        }),
+      },
+    } as DesktopBridge;
+    const newStore = new MediaModelAvailability.ImageProviders(
+      newHost,
+      async () => true
+    );
+    await newStore.refresh(card);
+    await vi.waitFor(() => expect(newStore.getSnapshot().hosted).toBe(true));
+    expect(newStore.getSnapshot().gg_models).toEqual([]);
+    expect(
+      MediaModelAvailability.image(card, newStore.getSnapshot()).available
+    ).toBe(false);
+  });
+
   it("treats failed key and hosted-session checks as unavailable", async () => {
     const store = new MediaModelAvailability.ImageProviders(
       bridge(async () => {
@@ -279,11 +388,47 @@ describe("MediaModelAvailability.ImageProviders", () => {
       async () => true
     );
     const gpt2 = models.image.models["openai/gpt-image-2"]!;
-    expect(await store.refresh(gpt2)).toMatchObject({
+    expect(
+      await store.refresh(gpt2, false, [currentImage(gpt2.id)])
+    ).toMatchObject({
       loaded: true,
       configured: [],
       hosted: true,
     });
+  });
+
+  it("waits for a slow hosted-only mint for a new live model and does not admit retired facts", async () => {
+    let finish: (ready: boolean) => void = () => {};
+    const ready = new Promise<boolean>((resolve) => {
+      finish = resolve;
+    });
+    const store = new MediaModelAvailability.ImageProviders(
+      bridge(async () => false),
+      () => ready
+    );
+    const id = "test/new-image-not-in-client-facts";
+    let completed = false;
+    const pending = store
+      .refresh(undefined, false, [currentImage(id)], id)
+      .then((value) => {
+        completed = true;
+        return value;
+      });
+    await vi.waitFor(() => expect(store.getSnapshot().loaded).toBe(true));
+    expect(completed).toBe(false);
+    finish(true);
+    const state = await pending;
+    expect(
+      MediaModelAvailability.image(undefined, state, false, id).available
+    ).toBe(true);
+    const retired = models.image.models["openai/gpt-image-2"]!;
+    expect(
+      MediaModelAvailability.image(
+        retired,
+        await store.refresh(retired, false, []),
+        false
+      ).available
+    ).toBe(false);
   });
 
   it("awaits hosted transparency when no eligible BYOK route is connected", async () => {
@@ -299,7 +444,9 @@ describe("MediaModelAvailability.ImageProviders", () => {
         vercel: { ...base.providers.vercel!, transparent_background: true },
       },
     };
-    const refreshed = await store.refresh(verified, true);
+    const refreshed = await store.refresh(verified, true, [
+      currentImage(verified.id, true),
+    ]);
     expect(refreshed.hosted).toBe(true);
     expect(
       MediaModelAvailability.image(verified, refreshed, true).available

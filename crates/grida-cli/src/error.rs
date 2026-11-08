@@ -61,6 +61,9 @@ impl Error {
                 "operation_unavailable" => {
                     "This rigging operation is unavailable. Run grida ai rigging list."
                 }
+                "catalogue_unavailable" => {
+                    "Gateway model discovery is unavailable. Retry the read later; no generation was submitted."
+                }
                 "provider_key_required" => {
                     "Configure Tripo with grida ai providers configure tripo, or supply TRIPO_API_KEY or --key-stdin."
                 }
@@ -121,6 +124,9 @@ impl From<grida_ai::Failure> for Error {
             }
             "operation_unavailable" => {
                 "This provider/model/input variant has no supported operation. Run grida ai models list."
+            }
+            "catalogue_unavailable" => {
+                "Gateway model discovery is unavailable. Retry the read later; no generation was submitted."
             }
             "provider_key_required" => {
                 "Configure the selected provider with grida ai providers configure, or supply its environment key or --key-stdin."

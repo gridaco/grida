@@ -3,7 +3,7 @@
 
 import { createGateway as createVercelAiGateway } from "@ai-sdk/gateway";
 import type { ImageModelV3, ImageModelV3CallOptions } from "@ai-sdk/provider";
-import type { models } from "@grida/ai-models";
+import type { models } from "./catalogue";
 import type { ImageClient } from "./image-client";
 import {
   assertAllowedUrl,

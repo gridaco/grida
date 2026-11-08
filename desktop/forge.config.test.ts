@@ -26,7 +26,7 @@ describe("Desktop package file filter", () => {
       ...manifest.devDependencies,
     }).filter(([, specifier]) => specifier.startsWith("link:../packages/"));
 
-    expect(linked.map(([name]) => name)).toContain("@grida/ai-models");
+    expect(linked.map(([name]) => name)).toContain("@grida/ai");
     for (const [name] of linked) {
       expect(ignore(`/node_modules/${name}`)).toBe(true);
       expect(ignore(`/node_modules/${name}/dist/index.js`)).toBe(true);

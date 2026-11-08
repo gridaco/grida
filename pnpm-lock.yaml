@@ -427,9 +427,6 @@ importers:
       '@grida/ai':
         specifier: workspace:*
         version: link:../packages/grida-ai
-      '@grida/ai-models':
-        specifier: workspace:*
-        version: link:../packages/grida-ai-models
       '@grida/bitmap':
         specifier: workspace:*
         version: link:../packages/grida-canvas-bitmap
@@ -1199,8 +1196,8 @@ importers:
         specifier: 3.0.10
         version: 3.0.10
       '@grida/ai-models':
-        specifier: workspace:*
-        version: link:../grida-ai-models
+        specifier: 1.20261108.1
+        version: 1.20261108.1
       ai:
         specifier: 6.0.197
         version: 6.0.197(zod@4.3.6)
@@ -1235,9 +1232,6 @@ importers:
       '@grida/ai':
         specifier: workspace:*
         version: link:../grida-ai
-      '@grida/ai-models':
-        specifier: workspace:*
-        version: link:../grida-ai-models
       '@grida/daemon':
         specifier: workspace:*
         version: link:../grida-daemon
@@ -1262,18 +1256,6 @@ importers:
       zod:
         specifier: ^4
         version: 4.3.6
-    devDependencies:
-      tsdown:
-        specifier: ^0.22.1
-        version: 0.22.1(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.36)
-      typescript:
-        specifier: 6.0.3
-        version: 6.0.3
-      vitest:
-        specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.7.0)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
-
-  packages/grida-ai-models:
     devDependencies:
       tsdown:
         specifier: ^0.22.1
@@ -4039,6 +4021,9 @@ packages:
 
   '@github/keytar@7.10.6':
     resolution: {integrity: sha512-mRW6cUsSG+nj4jp5gp8e91zPySaT73r+2JM6VyMZfrEgksjPmjSMr+tPGNOK3HUHV+GUU9B1LAiiYy/wmAnIxA==}
+
+  '@grida/ai-models@1.20261108.1':
+    resolution: {integrity: sha512-5V1lnEYeGGsZNB/XzClK1uQO5sbDAruQ7KrRlYu+NhRNtQCKayoQnks1R7MrSbIyhu4NT73gAZOSjeaOwRI9xg==}
 
   '@grida/canvas-wasm@0.91.0-canary.22':
     resolution: {integrity: sha512-w+jjgAqWV/zj21RG2BKqMvdddiZLT5ONSFOQSFwMhq++AGcY5glLYTkX4ga8fTqViiufLBZTXE4NNPDWDjA8Hg==}
@@ -19600,6 +19585,8 @@ snapshots:
     dependencies:
       node-addon-api: 8.9.2
     optional: true
+
+  '@grida/ai-models@1.20261108.1': {}
 
   '@grida/canvas-wasm@0.91.0-canary.22': {}
 

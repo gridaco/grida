@@ -1,6 +1,7 @@
 "use client";
 
-import { catalog as models } from "@grida/ai-models/grida";
+import { mediaModelChoices, useGGModels } from "@/lib/desktop/gg-models";
+import { catalog as models } from "@grida/ai/catalogue";
 import {
   Select,
   SelectContent,
@@ -23,7 +24,12 @@ export function VideoModelPicker({
   onValueChange: (id: string) => void;
   disabled?: boolean;
 }) {
-  const listed = models.video.listed_models();
+  const current = useGGModels();
+  const listed = mediaModelChoices(
+    models.video.listed_models(),
+    current,
+    "video"
+  );
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <MediaModelPickerTrigger>

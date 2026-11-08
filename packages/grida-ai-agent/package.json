@@ -165,7 +165,6 @@
     "@ai-sdk/openai-compatible": "2.0.48",
     "@ai-sdk/provider": "3.0.10",
     "@grida/ai": "workspace:*",
-    "@grida/ai-models": "workspace:*",
     "@grida/daemon": "workspace:*",
     "@grida/home": "workspace:*",
     "@hono/node-server": "^1.13.7",

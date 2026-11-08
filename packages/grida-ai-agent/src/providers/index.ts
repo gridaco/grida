@@ -26,7 +26,8 @@
  * precedence.
  */
 
-import { catalog as models } from "@grida/ai-models/grida";
+import type { GGDiscoveryStore } from "@grida/ai";
+import { catalog as models } from "@grida/ai/catalogue";
 import { catalogView, type ModelCatalogStore } from "./model-catalog";
 import type { TierModelIds } from "./byok";
 import type { ModelFactory } from "../agent";
@@ -129,6 +130,8 @@ export type ResolveDeps = {
   /** Origin the grida provider calls (e.g. `https://grida.co`). Host-
    *  injected; absent ⇒ the grida provider is disabled. */
   gg_base_url?: string;
+  /** Current anonymous GG offering; local facts never enable hosted execution. */
+  gg_catalog?: GGDiscoveryStore;
   /**
    * Native ChatGPT subscription provider. Optional construction-time config
    * keeps the provider dormant when a host has no approved OAuth/backend
@@ -196,9 +199,10 @@ export async function resolveProvider(
     // exact behavior; explicit choice always wins), before endpoints
     // (fresh signed-in users get included AI without configuring
     // anything). Resolves only with a LIVE session token.
-    const gridaResolved = maybeResolveGg(deps);
-    if (gridaResolved) return gridaResolved;
   }
+
+  const gridaResolved = await maybeResolveGg(deps, options.model_id);
+  if (gridaResolved) return gridaResolved;
 
   if (deps.endpoints) {
     for (const endpoint of await deps.endpoints.list()) {
@@ -229,9 +233,7 @@ async function resolveExplicit(
     // Without a live token the pick surfaces as the existing 409
     // `provider_down` with `provider_id: "gg"` — the renderer maps
     // that to "Sign in to use included AI".
-    const resolved = isCatalogModel(view, modelId)
-      ? maybeResolveGg(deps)
-      : null;
+    const resolved = await maybeResolveGg(deps, modelId);
     if (!resolved) throw new ProviderUnavailableError(providerId);
     return resolved;
   }
@@ -280,9 +282,21 @@ async function maybeResolveChatGpt(
  * is re-read per request inside the factory's fetch — this check only
  * gates resolution.
  */
-function maybeResolveGg(deps: ResolveDeps): ResolvedProvider | null {
+async function maybeResolveGg(
+  deps: ResolveDeps,
+  modelId?: string
+): Promise<ResolvedProvider | null> {
   const hosted = liveGgMediaDeps(deps);
-  if (!hosted) return null;
+  if (!hosted || !deps.gg_catalog) return null;
+  await deps.gg_catalog.ready();
+  if (
+    modelId
+      ? !deps.gg_catalog.supports(modelId, "chat.completions")
+      : !deps.gg_catalog
+          .list("text")
+          .some((model) => model.interfaces.includes("chat.completions"))
+  )
+    return null;
   return {
     provider_id: GG_PROVIDER_ID,
     kind: "gg",
@@ -293,7 +307,8 @@ function maybeResolveGg(deps: ResolveDeps): ResolvedProvider | null {
       // The STORE, not a snapshot of it: a background subagent asks for
       // its tier long after resolution, and must get the model the
       // catalogue names then.
-      () => catalogView(deps.catalog).tier_model_ids
+      () => catalogView(deps.catalog).tier_model_ids,
+      deps.gg_catalog
     ),
   };
 }

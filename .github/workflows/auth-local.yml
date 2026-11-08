@@ -27,7 +27,6 @@ on:
       - "packages/grida-auth/**"
       - "packages/grida-account/**"
       - "packages/grida-home/**"
-      - "packages/grida-ai-models/**"
       - "data/ai/**"
       - "editor/lib/auth/**"
       - "editor/lib/gg/**"

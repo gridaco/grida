@@ -10,7 +10,7 @@ pnpm install --frozen-lockfile
 just cli-contracts
 ```
 
-The `just cli-contracts` gate builds current TS consumers and documentation, checks all 449
+The `just cli-contracts` gate builds current TS consumers and documentation, checks the reviewed
 CLI/parser vectors, verifies every advertised provider operation and generated
 asset, exercises TS/Rust custody, and installs the native npm package for local
 OAuth/account/provider/GG/artifact/signal and documentation checks. Empty or
@@ -99,6 +99,13 @@ prerequisite; see the [provider testing policy](../../crates/grida-ai/README.md#
 `cases.json` contains stable IDs, argv, optional literal stdin and expected
 exit/stdout/stderr. These are reviewed golden expectations originally established
 during the TS-to-Rust migration and now maintained as CLI regression contracts.
+Static GG model-by-model listing goldens are intentionally absent: public
+availability is not an installed inventory. The installed fixture serves
+anonymous GG discovery and schemas, then exercises the same native reader and
+organization-scoped execution path. Rust protocol tests additionally prove that
+new model IDs use supported interfaces without a client release, unsupported
+transports stay hidden and discovery credentials never cross lanes.
+
 CLI vectors launch real executables with disposable homes and working directories,
 bounded output/deadlines and no inherited credentials. Offline cases deliberately
 use an absent host registration and require no home or working-directory writes.
