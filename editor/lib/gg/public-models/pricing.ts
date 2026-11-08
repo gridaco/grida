@@ -8,7 +8,7 @@ export type PriceSummaryLine = {
   price: string;
   conditional: boolean;
   from: boolean;
-  /** Other distinct unit rates in this same meter/unit schedule. */
+  /** Other distinct unit rates in this mutually exclusive schedule. */
   extraRates: number;
   hint: string | null;
   /** Original public schedules, including conditions, rounding and usage bands. */
@@ -26,7 +26,17 @@ const labels: Record<string, string> = {
   cached_input_tokens: "Cached input",
   cache_write_tokens: "Cache write",
   generations: "Generation",
+  fal_output_units: "Output usage",
+  fal_standard_cost_mills: "Output usage",
+  provider_credits: "Provider credits",
 };
+const outputMeters = new Set([
+  "output_tokens",
+  "generations",
+  "fal_output_units",
+  "fal_standard_cost_mills",
+  "provider_credits",
+]);
 
 /** Exact rational comparisons keep display ordering out of floating-point money math. */
 function decimal(value: string): { numerator: bigint; denominator: bigint } {
@@ -70,20 +80,53 @@ export function displayRate(rate: PublicRate): string {
   return formatted;
 }
 
+/** Half-open bands on the same meter cannot apply to the same request. */
+function alternativeBands(rates: readonly PublicRate[]): boolean {
+  const meter = rates[0].quantity_range?.meter;
+  if (!meter || rates.some((rate) => rate.quantity_range?.meter !== meter))
+    return false;
+  const compareDecimals = (left: string, right: string) => {
+    const l = decimal(left),
+      r = decimal(right);
+    const difference =
+      l.numerator * r.denominator - r.numerator * l.denominator;
+    return difference < BigInt(0) ? -1 : difference > BigInt(0) ? 1 : 0;
+  };
+  const bands = rates
+    .map((rate) => rate.quantity_range!)
+    .sort((a, b) => compareDecimals(a.min, b.min));
+  return bands.every((band, i) => {
+    if (i === 0) return true;
+    const previous = bands[i - 1];
+    return (
+      previous.max !== null && compareDecimals(previous.max, band.min) <= 0
+    );
+  });
+}
+
 /**
- * Friendly discovery summaries, not an estimator or tariff evaluator. Distinct
- * measured components remain separate; applicable charges can be additive.
+ * Friendly discovery summaries, not an estimator or predicate evaluator. Only
+ * proven alternative bands share a "From" line; possibly additive components
+ * keep their own lines even when they measure the same unit at the same rate.
  */
 export function modelPricing(model: PublicModel): ModelPricing {
-  const groups = new Map<string, PublicRate[]>();
+  const buckets = new Map<string, PublicRate[]>();
   for (const rate of model.gg.pricing.components) {
     const key = JSON.stringify([rate.meter, rate.unit]);
-    const group = groups.get(key) ?? [];
-    group.push(rate);
-    groups.set(key, group);
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(rate);
+    buckets.set(key, bucket);
   }
+  const groups = [...buckets].flatMap(([key, rates]) =>
+    rates.length === 1 || alternativeBands(rates)
+      ? [{ key, rates }]
+      : rates.map((rate) => ({
+          key: JSON.stringify([rate.meter, rate.unit, rate.id]),
+          rates: [rate],
+        }))
+  );
   const result: ModelPricing = { input: [], output: [], additional: [] };
-  for (const [key, group] of groups) {
+  for (const { key, rates: group } of groups) {
     const rates = [...group].sort(
       (a, b) =>
         compareRates(a, b) ||
@@ -98,7 +141,9 @@ export function modelPricing(model: PublicModel): ModelPricing {
     const from = distinctRates > 1;
     const line: PriceSummaryLine = {
       key,
-      label: labels[first.meter] ?? "Usage",
+      label: Object.hasOwn(labels, first.meter)
+        ? labels[first.meter]
+        : first.meter.replaceAll("_", " "),
       price: `${from ? "From " : ""}${displayRate(first)}`,
       conditional: hasConditions,
       from,
@@ -107,15 +152,8 @@ export function modelPricing(model: PublicModel): ModelPricing {
       rates,
     };
     if (first.meter === "input_tokens") result.input.push(line);
-    else if (first.meter === "output_tokens") result.output.push(line);
-    else if (
-      first.meter === "cached_input_tokens" ||
-      first.meter === "cache_write_tokens" ||
-      model.gg.kind === "text" ||
-      model.gg.kind === "decision"
-    )
-      result.additional.push(line);
-    else result.output.push(line);
+    else if (outputMeters.has(first.meter)) result.output.push(line);
+    else result.additional.push(line);
   }
   // Cached input always precedes write fees; unknown ancillary meters stay stable.
   result.additional.sort(

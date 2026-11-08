@@ -11,6 +11,7 @@ describe("public models page refresh", () => {
     reader.mockResolvedValue({
       state: "fresh",
       catalogue: catalogueFixture(),
+      served_at: 1,
       validated_at: 1,
       refresh_at: 2,
       expires_at: 3,
@@ -35,6 +36,7 @@ describe("public models page refresh", () => {
     reader.mockResolvedValue({
       state: "unavailable",
       catalogue: null,
+      served_at: 1,
       validated_at: null,
       refresh_at: 2,
       expires_at: 1,

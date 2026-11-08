@@ -93,63 +93,103 @@ describe("friendly public pricing", () => {
       from: false,
     });
   });
-  it("deduplicates equal conditional image/edit rates without fabricating a per-image quote", () => {
+  it("keeps potentially additive same-meter components separate, including equal rates", () => {
     const summary = modelPricing(
       model(
         [
           rate("fal_output_units", "35", {
-            id: "text",
+            id: "base",
             unit: "provider_unit",
             when: { required: ["text"] },
           }),
           rate("fal_output_units", "35.000", {
-            id: "edit",
+            id: "reference",
             unit: "provider_unit",
             when: { required: ["image"] },
           }),
-        ],
-        "image"
-      )
-    );
-    expect(summary.output[0]).toMatchObject({
-      price: "$0.035 / usage unit",
-      extraRates: 0,
-      conditional: true,
-      from: false,
-      hint: "Varies by input",
-    });
-    expect(summary.output[0].rates).toHaveLength(2);
-    expect(summary.output[0].price).not.toContain("image");
-  });
-  it("never sums or takes a minimum across additive meters or different units", () => {
-    const summary = modelPricing(
-      model(
-        [
-          rate("base", "100", { unit: "image" }),
-          rate("duration", "50", { unit: "second" }),
-          rate("duration", "10", { unit: "generation" }),
+          rate("fal_output_units", "10", {
+            id: "surcharge",
+            unit: "provider_unit",
+          }),
         ],
         "image"
       )
     );
     expect(summary.output.map((line) => line.price)).toEqual([
-      "$0.10 / image",
-      "$0.05 / second",
-      "$0.01 / generation",
+      "$0.035 / usage unit",
+      "$0.035 / usage unit",
+      "$0.01 / usage unit",
     ]);
     expect(
       summary.output.every((line) => !line.from && line.extraRates === 0)
     ).toBe(true);
+    expect(summary.output.map((line) => line.rates[0].id)).toEqual([
+      "base",
+      "reference",
+      "surcharge",
+    ]);
+    expect(new Set(summary.output.map((line) => line.key)).size).toBe(3);
   });
-  it("compares decimal ratios exactly, including equivalent denominators and huge or tiny prices", () => {
+  it("does not collapse overlapping bands or bands on different context meters", () => {
+    const summary = modelPricing(
+      model([
+        rate("output_tokens", "0.01", {
+          id: "base",
+          quantity_range: { meter: "input_tokens", min: "0", max: "100" },
+        }),
+        rate("output_tokens", "0.02", {
+          id: "overlap",
+          quantity_range: { meter: "input_tokens", min: "50", max: "200" },
+        }),
+        rate("output_tokens", "0.03", {
+          id: "other-context",
+          quantity_range: { meter: "images", min: "200", max: null },
+        }),
+      ])
+    );
+    expect(summary.output).toHaveLength(3);
+    expect(summary.output.every((line) => !line.from)).toBe(true);
+  });
+  it("keeps unknown meter identities and does not assume that media charges measure output", () => {
+    const summary = modelPricing(
+      model(
+        [
+          rate("input_megapixels", "100", { unit: "megapixel" }),
+          rate("duration", "50", { unit: "second" }),
+          rate("duration", "10", { unit: "generation" }),
+          rate("constructor", "1"),
+        ],
+        "image"
+      )
+    );
+    expect(summary.input).toEqual([]);
+    expect(summary.output).toEqual([]);
+    expect(summary.additional.map((line) => [line.label, line.price])).toEqual([
+      ["constructor", "$1000.00 / 1M tokens"],
+      ["duration", "$0.01 / generation"],
+      ["duration", "$0.05 / second"],
+      ["input megapixels", "$0.10 / megapixel"],
+    ]);
+    expect(
+      summary.additional.every((line) => !line.from && line.extraRates === 0)
+    ).toBe(true);
+  });
+  it("compares decimal ratios exactly, including equivalent denominators and tiny prices", () => {
     const summary = modelPricing(
       model([
         rate("output_tokens", "10000", {
           per_quantity: "1000000",
           id: "per-million",
+          quantity_range: { meter: "total_input_tokens", min: "0", max: "10" },
         }),
-        rate("output_tokens", "0.01", { id: "per-token" }),
-        rate("output_tokens", "0.000000125", { id: "tiny" }),
+        rate("output_tokens", "0.01", {
+          id: "per-token",
+          quantity_range: { meter: "total_input_tokens", min: "10", max: "20" },
+        }),
+        rate("output_tokens", "0.000000125", {
+          id: "tiny",
+          quantity_range: { meter: "total_input_tokens", min: "20", max: null },
+        }),
       ])
     );
     expect(summary.output[0]).toMatchObject({
@@ -167,6 +207,28 @@ describe("friendly public pricing", () => {
     expect(displayRate(rate("amount", "1", { unit: "mill" }))).toBe(
       "$0.001 / usage mill"
     );
+  });
+  it("distinguishes adjacent rates beyond Number precision despite reversed IDs", () => {
+    const summary = modelPricing(
+      model([
+        rate("output_tokens", "9007199254740993", {
+          id: "a-expensive",
+          quantity_range: { meter: "total_input_tokens", min: "1", max: null },
+        }),
+        rate("output_tokens", "9007199254740992", {
+          id: "z-cheaper",
+          quantity_range: { meter: "total_input_tokens", min: "0", max: "1" },
+        }),
+      ])
+    );
+    expect(summary.output[0]).toMatchObject({
+      price: "From $9007199254740992000.00 / 1M tokens",
+      extraRates: 1,
+    });
+    expect(summary.output[0].rates.map((r) => r.id)).toEqual([
+      "z-cheaper",
+      "a-expensive",
+    ]);
   });
   it("keeps the public schedules immutable and formats exact context/rounding conditions", () => {
     const component = rate("input_tokens", "0.002", {

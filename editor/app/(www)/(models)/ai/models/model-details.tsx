@@ -19,9 +19,11 @@ import {
 export function ModelDetails({
   model,
   pricing,
+  gatewayOrigin,
 }: {
   model: PublicModel;
   pricing: ModelPricing;
+  gatewayOrigin: string;
 }) {
   const { gg } = model;
   const groups = [...pricing.input, ...pricing.output, ...pricing.additional];
@@ -46,7 +48,12 @@ export function ModelDetails({
             ) : null}
           </div>
           <a
-            href={`https://gateway.grida.ai/v1/models/${model.id.split("/").map(encodeURIComponent).join("/")}`}
+            href={
+              new URL(
+                `/v1/models/${model.id.split("/").map(encodeURIComponent).join("/")}`,
+                gatewayOrigin
+              ).href
+            }
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
@@ -101,9 +108,7 @@ export function ModelDetails({
                           rowSpan={group.rates.length}
                           className="py-3 pl-0 align-top font-medium"
                         >
-                          {group.label === "Usage"
-                            ? "Output usage"
-                            : group.label}
+                          {group.label}
                         </TableCell>
                       ) : null}
                       <TableCell className="py-3 text-right align-top font-mono tabular-nums">
@@ -114,14 +119,26 @@ export function ModelDetails({
                           {conditions.map((condition) => (
                             <p key={condition}>{condition}</p>
                           ))}
-                          {hasPredicate ? (
+                          {hasPredicate || rate.description ? (
                             <details>
                               <summary className="cursor-pointer hover:text-foreground">
-                                Applies when
+                                {hasPredicate
+                                  ? "Applies when"
+                                  : "Charge details"}
                               </summary>
-                              <pre className="mt-2 max-w-sm overflow-x-auto rounded-md border bg-background p-3 text-[11px] whitespace-pre-wrap break-all">
-                                {JSON.stringify(rate.when, null, 2)}
-                              </pre>
+                              {rate.description ? (
+                                <p className="mt-2 max-w-sm leading-5">
+                                  {rate.description}
+                                </p>
+                              ) : null}
+                              <p className="mt-1 font-mono text-[11px]">
+                                Meter: {rate.meter}
+                              </p>
+                              {hasPredicate ? (
+                                <pre className="mt-2 max-w-sm overflow-x-auto rounded-md border bg-background p-3 text-[11px] whitespace-pre-wrap break-all">
+                                  {JSON.stringify(rate.when, null, 2)}
+                                </pre>
+                              ) : null}
                             </details>
                           ) : !conditions.length ? (
                             <span>All usage</span>
@@ -163,7 +180,12 @@ export function ModelDetails({
                 {gg.operation_ids.map((id) => (
                   <li key={id}>
                     <a
-                      href={`https://gateway.grida.ai/v1/endpoints/${encodeURIComponent(id)}`}
+                      href={
+                        new URL(
+                          `/v1/endpoints/${encodeURIComponent(id)}`,
+                          gatewayOrigin
+                        ).href
+                      }
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex max-w-full items-center gap-1 hover:text-foreground"

@@ -6,10 +6,14 @@ import {
   formatRate,
   millsToUSD,
   parseFilters,
+  parsePageFilters,
   serializeFilters,
 } from "./catalogue";
 import { catalogueFixture } from "./fixtures";
 import { catalogueSchema } from "./schema";
+import { ModelDetails } from "../../../app/(www)/(models)/ai/models/model-details";
+import { LabLogo } from "../../../app/(www)/(models)/ai/models/lab-logo";
+import { modelPricing } from "./pricing";
 import { ModelsBrowser } from "../../../app/(www)/(models)/ai/models/models-browser";
 
 describe("public models projection and local query", () => {
@@ -105,6 +109,48 @@ describe("public models projection and local query", () => {
       }).toString()
     ).toBe(serialized.toString());
   });
+  it("uses the same first repeated parameter in server rendering and browser restoration", () => {
+    const query = "kind=music&kind=text&lab=beta&lab=alpha&q=first&q=second";
+    expect(
+      parsePageFilters({
+        kind: ["music", "text"],
+        lab: ["beta", "alpha"],
+        q: ["first", "second"],
+        missing: undefined,
+      })
+    ).toEqual(parseFilters(new URLSearchParams(query)));
+  });
+  it("uses bundled logos only for own lab IDs, with an unknown-lab fallback", () => {
+    const lab = catalogueFixture().data[0].gg.card.lab;
+    const render = (id: string) =>
+      renderToStaticMarkup(
+        createElement(LabLogo, {
+          lab: { ...lab, id, name: "Test Lab" },
+        })
+      );
+    expect(render("openai")).toContain("<svg");
+    expect(render("constructor")).toContain(">T</span>");
+    expect(render("unknown")).not.toContain("<svg");
+  });
+  it("keeps model and operation references on the configured catalogue origin", () => {
+    const model = catalogueFixture().data[1];
+    const html = renderToStaticMarkup(
+      createElement(ModelDetails, {
+        model,
+        pricing: modelPricing(model),
+        gatewayOrigin: "https://gateway.example",
+      })
+    );
+    expect(html).toContain("https://gateway.example/v1/models/beta/mesh");
+    expect(html).toContain(
+      "https://gateway.example/v1/endpoints/three-d.test.image"
+    );
+    expect(html).not.toContain("gateway.grida.ai");
+    expect(html).toContain("Output usage.");
+    expect(html).toContain("Meter: ");
+    expect(html).toContain("output_tokens");
+    expect(html).toContain("Applies when");
+  });
   it("bounds query length and retained selections, accepting only known values and valid lab IDs", () => {
     const parsed = parseFilters(
       new URLSearchParams({
@@ -151,28 +197,34 @@ describe("public models projection and local query", () => {
           initial: {
             state: "fresh",
             catalogue,
+            served_at: 0,
             validated_at: 0,
             refresh_at: 60000,
             expires_at: 300000,
           },
           initialFilters: parseFilters(new URLSearchParams(query)),
+          gatewayOrigin: "https://gateway.example",
         })
       );
     expect(render("kind=three-d")).toContain("beta/mesh");
     expect(render("kind=three-d")).not.toContain("alpha/Éclair");
-    expect(render("kind=three-d")).toContain("Rates are selected by operation");
-    expect(render("kind=three-d")).toContain("Applies when");
+    expect(render("kind=three-d")).not.toContain(
+      "Rates are selected by operation"
+    );
+    expect(render("kind=three-d")).not.toContain("Applies when");
     expect(render("q=nothing")).toContain("No matching models");
     const unavailable = renderToStaticMarkup(
       createElement(ModelsBrowser, {
         initial: {
           state: "unavailable",
           catalogue: null,
+          served_at: 0,
           validated_at: null,
           refresh_at: 1000,
           expires_at: 0,
         },
         initialFilters: parseFilters(new URLSearchParams()),
+        gatewayOrigin: "https://gateway.example",
       })
     );
     expect(unavailable).toContain("Models are temporarily unavailable");

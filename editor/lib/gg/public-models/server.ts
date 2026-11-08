@@ -27,3 +27,6 @@ if (
   };
 }
 export const readPublicModels = readers.__gridaPublicModelReaderV1.read;
+
+// The reader validates this origin; detail links must describe the same catalogue.
+export const publicModelsOrigin = new URL(origin).origin;

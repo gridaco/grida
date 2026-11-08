@@ -23,6 +23,7 @@ describe("public catalogue server origin binding", () => {
     const first = await import("./server");
     vi.resetModules();
     const second = await import("./server");
+    expect(first.publicModelsOrigin).toBe("http://localhost:8080");
     expect(first.readPublicModels).toBe(second.readPublicModels);
   });
 });

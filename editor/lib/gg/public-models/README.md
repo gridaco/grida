@@ -5,7 +5,8 @@
 key, cookie or account identity. Production requires an HTTPS origin; development
 may explicitly configure an HTTP loopback origin with
 `GRIDA_AI_GATEWAY_ALLOW_LOCAL=1`. That flag never permits HTTP in production.
-Redirects are rejected. `ggConfig.publicModels()` in `../config.ts` is the only
+Redirects are rejected. Model, operation and API-reference links use that same
+validated origin. `ggConfig.publicModels()` in `../config.ts` is the only
 environment reader; it is separate from signing/workload credential settings.
 
 `schema.ts` validates and projects only the page's supported fields; its Zod
@@ -13,8 +14,10 @@ validator stays out of the browser bundle. `catalogue.ts` owns local query
 filter parsing and exact decimal formatting. `pricing.ts` groups the published
 rates into input, output and ancillary schedules for the table. Different meters
 remain separate: cached input is not the ordinary input price, and additive
-components are never summed or silently discarded. A lower conditional unit rate
-is labeled “From”; all conditions, tiers and rounding remain in the expanded row.
+components are never summed or silently discarded. Only provably disjoint quantity
+bands share a “From” summary; overlapping or opaque conditions stay separate.
+Unknown meters retain their identities under additional charges. Descriptions,
+conditions, tiers and rounding remain in the expanded row, mounted only on demand.
 Normalized usage units stay usage units. The current feed does not provide enough
 information to turn them into per-image or per-second quotes; the page must not
 invent that conversion or maintain its own model-specific price list.
@@ -38,9 +41,14 @@ supports multiple selections for type, lab, input and output. The page uses CSV
 values in `kind` and `lab` for OR within those groups, AND across groups, ALL
 selected inputs and ANY selected outputs. These are page-local queries over the
 complete snapshot; the public API still accepts a single `kind` and `lab`.
-Search replaces history; deliberate filter selections push history. Back/forward, restoration and long-open
+Repeated parameters use the first value consistently on the server and browser.
+Search replaces history; deliberate filter selections push history. Client navigation
+synchronizes the visible filters with the new query. Back/forward, restoration and long-open
 tabs recheck freshness through the no-store `/ai/models/feed` route. That route
 shares the same bounded reader; it does not forward search queries upstream.
+The browser anchors server deadlines to elapsed time instead of comparing them
+with the visitor’s wall clock. Expiry still hides stale data during failed refreshes.
+Provider-endpoint release dates are identified separately from model releases.
 
 Lab logos are rendered from the existing `@grida/react-icons/logos` package by
 canonical lab ID; the page does not fetch the feed’s CDN logo URLs. Labs without

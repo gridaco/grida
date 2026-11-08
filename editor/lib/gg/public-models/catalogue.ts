@@ -87,6 +87,17 @@ export function parseFilters(params: URLSearchParams): Filters {
     output: list("output_modalities"),
   });
 }
+/** Next's repeated query arrays follow the browser's first-value policy. */
+export function parsePageFilters(
+  params: Record<string, string | string[] | undefined>
+): Filters {
+  const query = new URLSearchParams();
+  for (const [key, values] of Object.entries(params)) {
+    const value = Array.isArray(values) ? values[0] : values;
+    if (value !== undefined) query.set(key, value);
+  }
+  return parseFilters(query);
+}
 /** Canonical shareable page query; empty predicates are omitted. */
 export function serializeFilters(filter: Filters): URLSearchParams {
   const normalized = normalizeFilters(filter);

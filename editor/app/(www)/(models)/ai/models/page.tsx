@@ -4,8 +4,11 @@ import { Button } from "@app/ui/components/button";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import { ConsoleLinks } from "@/lib/platform/console-links";
-import { readPublicModels } from "@/lib/gg/public-models/server";
-import { parseFilters } from "@/lib/gg/public-models/catalogue";
+import {
+  publicModelsOrigin,
+  readPublicModels,
+} from "@/lib/gg/public-models/server";
+import { parsePageFilters } from "@/lib/gg/public-models/catalogue";
 import { ModelsBrowser } from "./models-browser";
 
 // No ISR fallback: old HTML must not silently outlive a price/retirement boundary.
@@ -30,9 +33,6 @@ export default async function ModelsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [view, params] = await Promise.all([readPublicModels(), searchParams]);
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params))
-    if (typeof value === "string") query.set(key, value);
   return (
     <>
       <Header />
@@ -56,7 +56,11 @@ export default async function ModelsPage({
             <a href={ConsoleLinks.aiGateway()}>Get API key</a>
           </Button>
         </div>
-        <ModelsBrowser initial={view} initialFilters={parseFilters(query)} />
+        <ModelsBrowser
+          initial={view}
+          initialFilters={parsePageFilters(params)}
+          gatewayOrigin={publicModelsOrigin}
+        />
       </main>
       <Footer />
     </>

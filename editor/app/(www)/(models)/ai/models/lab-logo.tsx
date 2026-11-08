@@ -36,7 +36,7 @@ const labLogos: Partial<Record<string, ComponentType<{ className?: string }>>> =
   };
 
 export function LabLogo({ lab }: { lab: PublicModel["gg"]["card"]["lab"] }) {
-  const Logo = labLogos[lab.id];
+  const Logo = Object.hasOwn(labLogos, lab.id) ? labLogos[lab.id] : undefined;
   return (
     <span
       aria-hidden="true"

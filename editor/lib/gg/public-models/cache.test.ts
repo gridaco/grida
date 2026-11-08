@@ -38,6 +38,7 @@ describe("bounded public catalogue cache", () => {
       headers: { Accept: "application/json" },
     });
     expect(results.every((result) => result.state === "fresh")).toBe(true);
+    expect(results.every((result) => result.served_at === base)).toBe(true);
   });
   it("keeps last-good data for at most five minutes with failure backoff, then becomes unavailable", async () => {
     let time = base;
@@ -76,6 +77,7 @@ describe("bounded public catalogue cache", () => {
     });
     expect(await read()).toMatchObject({
       state: "stale",
+      served_at: base,
       validated_at: base - 120000,
       expires_at: base + 120000,
     });

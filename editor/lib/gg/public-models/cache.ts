@@ -8,6 +8,7 @@ const FAILURE_BACKOFF_MS = 5_000;
 export type CatalogueView = {
   state: "fresh" | "stale" | "unavailable";
   catalogue: Catalogue | null;
+  served_at: number;
   validated_at: number | null;
   refresh_at: number;
   expires_at: number;
@@ -136,6 +137,7 @@ export function createCatalogueReader({
     if (!cached || at >= cached.expiresAt)
       return {
         state: "unavailable",
+        served_at: at,
         catalogue: null,
         validated_at: null,
         refresh_at: Math.max(at + FAILURE_BACKOFF_MS, retryAt),
@@ -143,6 +145,7 @@ export function createCatalogueReader({
       };
     return {
       state: at < cached.freshUntil ? "fresh" : "stale",
+      served_at: at,
       catalogue: cached.catalogue,
       validated_at: cached.validatedAt,
       refresh_at: Math.max(at + 1000, cached.freshUntil, retryAt),

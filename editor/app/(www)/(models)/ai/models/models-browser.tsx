@@ -48,6 +48,10 @@ import {
   type PriceSummaryLine,
 } from "@/lib/gg/public-models/pricing";
 import type { CatalogueView } from "@/lib/gg/public-models/cache";
+import {
+  initialTimeAnchor,
+  serverTime,
+} from "@/lib/gg/public-models/browser-clock";
 
 const releaseFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -153,7 +157,13 @@ function ModalityIcons({
   });
 }
 
-const ModelRow = memo(function ModelRow({ model }: { model: PublicModel }) {
+const ModelRow = memo(function ModelRow({
+  model,
+  gatewayOrigin,
+}: {
+  model: PublicModel;
+  gatewayOrigin: string;
+}) {
   const { gg } = model;
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -212,12 +222,20 @@ const ModelRow = memo(function ModelRow({ model }: { model: PublicModel }) {
               target="_blank"
               rel="noreferrer"
               className="hover:text-foreground"
+              title={
+                gg.card.release.basis === "provider_endpoint"
+                  ? "Provider endpoint release; the model may have been released earlier."
+                  : "Model release"
+              }
             >
               <time dateTime={gg.card.release.date}>
                 {releaseFormatter.format(
                   new Date(`${gg.card.release.date}T00:00:00Z`)
                 )}
               </time>
+              {gg.card.release.basis === "provider_endpoint" ? (
+                <span className="mt-1 block text-[10px]">Endpoint release</span>
+              ) : null}
             </a>
           ) : (
             <span aria-label="Release date unavailable">—</span>
@@ -240,15 +258,17 @@ const ModelRow = memo(function ModelRow({ model }: { model: PublicModel }) {
           </Button>
         </TableCell>
       </TableRow>
-      <TableRow
-        id={detailsId}
-        hidden={!expanded}
-        className="bg-muted/20 hover:bg-muted/20"
-      >
-        <TableCell colSpan={6} className="py-5 pl-16 pr-5 whitespace-normal">
-          <ModelDetails model={model} pricing={pricing} />
-        </TableCell>
-      </TableRow>
+      {expanded ? (
+        <TableRow id={detailsId} className="bg-muted/20 hover:bg-muted/20">
+          <TableCell colSpan={6} className="py-5 pl-16 pr-5 whitespace-normal">
+            <ModelDetails
+              model={model}
+              pricing={pricing}
+              gatewayOrigin={gatewayOrigin}
+            />
+          </TableCell>
+        </TableRow>
+      ) : null}
     </>
   );
 });
@@ -256,14 +276,51 @@ const ModelRow = memo(function ModelRow({ model }: { model: PublicModel }) {
 export function ModelsBrowser({
   initial,
   initialFilters,
+  gatewayOrigin,
 }: {
   initial: CatalogueView;
   initialFilters: Filters;
+  gatewayOrigin: string;
 }) {
   const [view, setView] = useState(initial);
   const [filters, setFilters] = useState(initialFilters);
   const [busy, setBusy] = useState(false);
-  const [clock, setClock] = useState(0);
+  const [clock, setClock] = useState(initial.served_at);
+  const timeAnchor = useRef({
+    server: initial.served_at,
+    monotonic: 0,
+    wall: 0,
+  });
+  const serverNow = useCallback(
+    () =>
+      serverTime(timeAnchor.current, {
+        monotonic: performance.now(),
+        wall: Date.now(),
+      }),
+    []
+  );
+  useEffect(() => {
+    const at = performance.now();
+    const navigation = performance.getEntriesByType("navigation")[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    // Counting from request start is conservative: HTML transit and hydration never
+    // restart the server's freshness window. Soft navigation can refresh immediately.
+    const started = navigation?.requestStart ?? at;
+    timeAnchor.current = initialTimeAnchor(
+      initial.served_at,
+      {
+        monotonic: at,
+        wall: Date.now(),
+      },
+      started
+    );
+    setView(initial);
+    setClock(serverNow());
+  }, [initial, serverNow]);
+  useEffect(() => {
+    setFilters(initialFilters);
+  }, [initialFilters]);
   const pending = useRef(false);
   const controller = useRef<AbortController | null>(null);
   const refresh = useCallback(async () => {
@@ -271,6 +328,7 @@ export function ModelsBrowser({
     pending.current = true;
     setBusy(true);
     controller.current = new AbortController();
+    const started = { monotonic: performance.now(), wall: Date.now() };
     try {
       const response = await fetch("/ai/models/feed", {
         cache: "no-store",
@@ -283,28 +341,32 @@ export function ModelsBrowser({
       });
       const next: CatalogueView = await response.json();
       if (
-        next.state === "fresh" ||
-        next.state === "stale" ||
-        next.state === "unavailable"
-      )
+        (next.state === "fresh" ||
+          next.state === "stale" ||
+          next.state === "unavailable") &&
+        Number.isFinite(next.served_at) &&
+        Number.isFinite(next.refresh_at) &&
+        Number.isFinite(next.expires_at)
+      ) {
+        timeAnchor.current = { server: next.served_at, ...started };
         setView(next);
-      else throw new Error("Invalid catalogue view");
+      } else throw new Error("Invalid catalogue view");
     } catch {
       setView((current) => ({
         ...current,
         state: current.catalogue ? "stale" : "unavailable",
-        refresh_at: Date.now() + 10_000,
+        refresh_at: serverNow() + 10_000,
       }));
     } finally {
       pending.current = false;
       setBusy(false);
-      setClock(Date.now());
+      setClock(serverNow());
     }
-  }, []);
+  }, [serverNow]);
   useEffect(() => {
     let timer: number;
     const schedule = () => {
-      const at = Date.now();
+      const at = serverNow();
       const refreshAt = view.refresh_at > at ? view.refresh_at : at + 1_000;
       const expiry = view.expires_at > at ? view.expires_at : Infinity;
       timer = window.setTimeout(
@@ -314,7 +376,7 @@ export function ModelsBrowser({
     };
     const update = () => {
       window.clearTimeout(timer);
-      const at = Date.now();
+      const at = serverNow();
       setClock(at);
       // Expiry hides old prices immediately; it never bypasses retry backoff.
       if (at >= view.refresh_at) void refresh();
@@ -334,10 +396,9 @@ export function ModelsBrowser({
       window.removeEventListener("pageshow", restore);
       document.removeEventListener("visibilitychange", update);
     };
-  }, [view, refresh]);
+  }, [view, refresh, serverNow]);
   useEffect(() => () => controller.current?.abort(), []);
-  const catalogue =
-    clock > 0 && clock >= view.expires_at ? null : view.catalogue;
+  const catalogue = clock >= view.expires_at ? null : view.catalogue;
   const visible = useMemo(
     () =>
       filterModels(catalogue?.data ?? [], filters).sort(
@@ -466,7 +527,11 @@ export function ModelsBrowser({
             </TableHeader>
             <TableBody>
               {visible.map((model) => (
-                <ModelRow model={model} key={model.id} />
+                <ModelRow
+                  model={model}
+                  gatewayOrigin={gatewayOrigin}
+                  key={model.id}
+                />
               ))}
             </TableBody>
           </Table>
@@ -487,7 +552,7 @@ export function ModelsBrowser({
         Models available through Grida AI Gateway. Separate Desktop and CLI
         provider-key features may offer other models.{" "}
         <a
-          href="https://gateway.grida.ai/llms.txt"
+          href={new URL("/llms.txt", gatewayOrigin).href}
           className="underline underline-offset-4"
         >
           API reference
