@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ggContractFixture } from "../../grida-ai/src/testing/gg-contract";
 import { MediaStore } from "@grida/daemon/server";
 import { DaemonTransport } from "@grida/daemon/transport";
 import {
@@ -25,22 +26,32 @@ async function start(options: Partial<MediaDaemonOptions> = {}) {
   cleanups.push(() => fs.rm(base, { recursive: true, force: true }));
   const user_data_path = path.join(base, "state");
   const media_root = path.join(base, "media");
+  const metadata = ggContractFixture([{ id: "google/lyria-3", kind: "music" }]);
   const request = vi.fn<typeof fetch>(async (input, init) => {
+    const discovery = metadata.response(input);
+    if (discovery) return discovery;
     const url = String(input);
     if (url === `${GG}/api/v1/models/catalog`)
       return new Response(null, { status: 404 });
-    if (url === `${GG}/api/v1/ai/music/generations`) {
+    if (
+      url === `${GG}/api/v1/ai/operations` ||
+      url === `${GG}/api/v1/ai/jobs?request_id=req_music`
+    ) {
       assert.equal(
         new Headers(init?.headers).get("authorization"),
         `Bearer ${TOKEN}`
       );
       return Response.json({
-        model_id: "google/lyria-3",
-        provider_id: "gg",
-        audio: {
-          base64: "SUQz",
-          media_type: "audio/mpeg",
-          file_name: "lyria-3.mp3",
+        id: "req_music",
+        request_id: "req_music",
+        model: "google/lyria-3",
+        status: "succeeded",
+        result_status: "available",
+        result: {
+          audio: {
+            url: "https://assets.example/music.mp3",
+            media_type: "audio/mpeg",
+          },
         },
       });
     }
@@ -52,8 +63,12 @@ async function start(options: Partial<MediaDaemonOptions> = {}) {
       headers: { "content-type": "audio/mpeg" },
     });
   });
-  const download = vi.fn<typeof fetch>(async () => {
-    throw new Error("Unexpected asset download");
+  const download = vi.fn<typeof fetch>(async (url, init) => {
+    expect(String(url)).toBe("https://assets.example/music.mp3");
+    expect(new Headers(init?.headers).has("authorization")).toBe(false);
+    return new Response(Buffer.from("ID3"), {
+      headers: { "content-type": "audio/mpeg" },
+    });
   });
   const configuration: MediaDaemonOptions = {
     password: PASSWORD,
@@ -296,10 +311,27 @@ describe("media-only public composition", () => {
     const generated = await call(first.daemon, "/audio/music/generate", {
       model_id: "google/lyria-3",
       prompt: "gentle drums",
-      seed: 0,
     });
     expect(generated.status).toBe(200);
     expect((await generated.json()).audio.file_name).toBe("lyria-3.mp3");
+    const discovery = first.request.mock.calls.filter(([url]) =>
+      String(url).startsWith("https://gateway.grida.ai/")
+    );
+    expect(discovery).toHaveLength(3);
+    expect(
+      discovery.map(([, init]) =>
+        new Headers(init?.headers).has("authorization")
+      )
+    ).toEqual([false, false, false]);
+    const submissions = first.request.mock.calls.filter(
+      ([, init]) => init?.method === "POST"
+    );
+    expect(submissions).toHaveLength(1);
+    expect(JSON.parse(String(submissions[0][1]?.body))).toEqual({
+      operation_id: "music.google.lyria-3.generate",
+      input: { prompt: "gentle drums" },
+    });
+
     const beforeClear = first.request.mock.calls.length;
     expect((await call(first.daemon, "/auth/gg/clear")).status).toBe(200);
     expect(
@@ -362,4 +394,57 @@ describe("media-only public composition", () => {
     await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
     expect(await new MediaStore(media_root).list()).toEqual([]);
   });
+});
+
+it("projects native prompt-video eligibility separately from the broad video interface", async () => {
+  const metadata = ggContractFixture([
+    { id: "fixture/text-video", kind: "video", variants: ["text"] },
+    { id: "fixture/image-video", kind: "video", variants: ["image"] },
+  ]);
+  const request = vi.fn<typeof fetch>(async (input) => {
+    const response = metadata.response(input);
+    if (!response) throw new Error("unexpected non-metadata request");
+    return response;
+  });
+  const { daemon } = await start({
+    gg_base_url: GG,
+    provider_http: { request, download: vi.fn<typeof fetch>() },
+  });
+  const response = await call(
+    daemon,
+    "/providers/gg/models",
+    undefined,
+    {},
+    "GET"
+  );
+  expect(response.status).toBe(200);
+  const data = await response.json();
+  expect(data.models).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: "fixture/text-video",
+        interfaces: ["videos"],
+        client_supported_options: { video_text: true },
+      }),
+      expect.objectContaining({
+        id: "fixture/image-video",
+        interfaces: ["videos"],
+        client_supported_options: { video_text: false },
+      }),
+    ])
+  );
+  expect(
+    data.models.every(
+      (model: Record<string, unknown>) =>
+        !Object.hasOwn(model, "request_schemas")
+    )
+  ).toBe(true);
+  expect(JSON.stringify(data)).not.toContain(TOKEN);
+  expect(
+    request.mock.calls.every(
+      ([, init]) =>
+        init?.method === "GET" &&
+        !new Headers(init?.headers).has("authorization")
+    )
+  ).toBe(true);
 });

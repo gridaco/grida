@@ -1,11 +1,12 @@
 "use client";
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
 
+import { useGGModels } from "@/lib/desktop/gg-models";
 import * as gridaGateway from "@/lib/desktop/gg-session";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
 import {
@@ -168,30 +169,40 @@ export function DesktopImagePlayground({
       ),
     [bridge]
   );
-  const providers = useSyncExternalStore(
+  const providerState = useSyncExternalStore(
     providerStore.subscribe,
     providerStore.getSnapshot,
     providerStore.getSnapshot
   );
+  const ggModels = useGGModels();
+  const providers = { ...providerState, gg_models: ggModels };
   useEffect(() => providerStore.connect(), [providerStore]);
   const [modelId, setModelId] = useState(
     () =>
+      initialModelId ??
       MediaModelAvailability.select(
         models.image.listed_models(),
         initialModelId,
         models.image.default_id
-      )?.id ?? ""
+      )?.id ??
+      ""
   );
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [size, setSize] = useState<SizeOption>(AUTO_SIZE);
   const card = models.image.models[modelId];
   const [transparent, setTransparent] = useState(false);
-  const access = MediaModelAvailability.image(card, providers, transparent);
+  const access = MediaModelAvailability.image(
+    card,
+    providers,
+    transparent,
+    modelId
+  );
   const transparencyAccess = MediaModelAvailability.image(
     card,
     providers,
-    true
+    true,
+    modelId
   );
   const [quality, setQuality] = useState<string>(
     () => card?.quality?.default ?? "auto"
@@ -210,8 +221,20 @@ export function DesktopImagePlayground({
     if (!prompt) return;
     // GRIDA-SEC-006 — refresh hosted-session readiness and key presence before
     // submission. A removed key never silently turns transparent intent opaque.
-    const refreshed = await providerStore.refresh(card, transparent);
-    if (!MediaModelAvailability.image(card, refreshed, transparent).available)
+    const refreshed = await providerStore.refresh(
+      card,
+      transparent,
+      ggModels,
+      modelId
+    );
+    if (
+      !MediaModelAvailability.image(
+        card,
+        { ...refreshed, gg_models: ggModels },
+        transparent,
+        modelId
+      ).available
+    )
       return;
     const id = crypto.randomUUID();
     const model_id = modelId;

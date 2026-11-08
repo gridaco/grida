@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { FileUp, FolderSearch, Music2, X } from "lucide-react";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import { Button } from "@app/ui/components/button";
 import {
   Empty,
@@ -29,8 +29,8 @@ export function MusicPlayground({
   onStoredMediaCreated,
   onRevealStoredMedia,
 }: {
-  initialModelId?: models.audio.music.ModelId;
-  modelIds?: readonly models.audio.music.ModelId[];
+  initialModelId?: string;
+  modelIds?: readonly string[];
   generationDisabled?: boolean;
   onGenerationBusyChange?: (busy: boolean) => void;
   onStoredMediaCreated?: (item: MediaItem) => void;
@@ -38,8 +38,7 @@ export function MusicPlayground({
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [source, setSource] = useState<"local" | "generated" | null>(null);
-  const [generatedModelId, setGeneratedModelId] =
-    useState<models.audio.music.ModelId | null>(null);
+  const [generatedModelId, setGeneratedModelId] = useState<string | null>(null);
   const [storedMedia, setStoredMedia] = useState<MediaItem | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const bridge = useDesktopBridge();
@@ -128,7 +127,9 @@ export function MusicPlayground({
                   }
                   subtitle={
                     generatedModelId
-                      ? models.audio.music.models[generatedModelId].label
+                      ? (models.audio.music.models[
+                          generatedModelId as models.audio.music.ModelId
+                        ]?.label ?? generatedModelId)
                       : "Local audio"
                   }
                   eyebrow={

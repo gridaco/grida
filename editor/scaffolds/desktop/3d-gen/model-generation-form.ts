@@ -1,4 +1,4 @@
-import { models } from "@grida/ai-models";
+import { models } from "@grida/ai/catalogue";
 import type { ModelGenerationGenerateRequest } from "@/lib/desktop/bridge";
 
 /** Converts the model-generation form into the native feature contract. */

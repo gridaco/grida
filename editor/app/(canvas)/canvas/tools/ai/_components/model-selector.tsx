@@ -17,8 +17,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@app/ui/components/popover";
-import type OpenAI from "openai";
-type Model = OpenAI.Models.Model;
+import type { HostedModelEntry } from "@/lib/ai/openai-compat/hosted-models";
+type Model = HostedModelEntry;
 
 import { useModels } from "../_hooks/use-models";
 
@@ -42,7 +42,7 @@ export function ModelSelector({ ...props }: ModelSelectorProps) {
           aria-label="Select a model"
           className="w-auto justify-between"
         >
-          {selectedModel ? selectedModel.id : "Select a model..."}
+          {selectedModel ? selectedModel.grida.label : "Select a model..."}
           <ChevronsUpDown className="opacity-50 size-4" />
         </Button>
       </PopoverTrigger>
@@ -78,8 +78,13 @@ interface ModelItemProps {
 
 function ModelItem({ model, isSelected, onSelect }: ModelItemProps) {
   return (
-    <CommandItem key={model.id} onSelect={onSelect}>
-      {model.id}
+    <CommandItem
+      key={model.id}
+      value={model.id}
+      keywords={[model.grida.label]}
+      onSelect={onSelect}
+    >
+      {model.grida.label}
       <Check
         className={cn(
           "ml-auto size-4",

@@ -1,8 +1,13 @@
+Model facts are consumed from the pinned public `@grida/ai-models` release.
+`@grida/ai/catalogue` owns only the client compatibility projection and Grida
+product presets; it is not the live GG offering list. See
+[`data/ai`](../../data/ai/README.md) for ownership and generation.
+
 # @grida/ai
 
 Private, experimental SDK for shared model-driven operations. Catalogue-backed
 image and video generation use BYOK OpenRouter, Vercel AI Gateway, fal, or scoped Grida
-Gateway credentials. Music generation uses the existing GG-only Lyria route;
+Gateway credentials. Music generation uses GG’s current music interface;
 sound effects and speech use their existing ElevenLabs BYOK operations. Three
 existing fal 3D endpoints and direct Tripo H3.1/P1/P2 model generation return a
 primary GLB asset.
@@ -18,8 +23,8 @@ producer tests; there are no reserved executors or empty future subpaths.
 The configured [`@grida/agent`](../grida-ai-agent), its prompts/tools/skills, chat storage, workspace
 policy, HTTP routes, application defaults, and external-agent runtimes belong to
 their hosts. This package must not import their source, types, manifests, or test
-setup. `@grida/ai-models` supplies canonical facts; its explicit
-`@grida/ai-models/grida` entry supplies this SDK's existing bundled service
+setup. the pinned public `@grida/ai-models` release supplies canonical facts; its explicit
+`@grida/ai/catalogue` entry supplies this SDK's existing bundled service
 catalogue and schema-1 defaults. The SDK retains those Grida defaults and does
 not promise service-policy neutrality. A result contains bytes
 and a media type, never a host persistence receipt, workspace path, or `MediaItem`.
@@ -29,13 +34,14 @@ and a media type, never a host persistence receipt, workspace path, or `MediaIte
 Being AI-related or convenient to import is insufficient for admission. Shared
 code must own a tested, application-independent capability. Configured agents,
 host/framework adapters, and credential persistence stay outside. Service model
-defaults remain owned by `@grida/ai-models/grida` and are consumed explicitly here.
+defaults remain owned by `@grida/ai/catalogue` and are consumed explicitly here.
 Do not duplicate catalogue data, add a plugin registry, or invent universal schema
 or executor scaffolding to anticipate future operations.
 
 ## Discovery and JSON inputs
 
-`MediaOperations` describes the existing executable media operations without
+`MediaOperations` describes installed BYOK adapters and the typed GG Tripo
+file/rigging adapters without
 constructing a client, reading credentials, refreshing a catalogue, or making
 network requests. Its descriptors and schemas are deeply immutable and JSON
 serializable. They describe route support, not account access, credits, pricing,
@@ -67,8 +73,9 @@ if (parsed.kind === "image") {
 
 `list` optionally filters by `kind`, canonical `model_id`, concrete `provider`,
 and the explicit 3D `feature: "model-generation"`.
-The kinds are `image`, `video`, `music`, `sound-effect`, `text-to-speech`, and
-`three-d`. Discovery excludes `auto` and custom endpoints: each descriptor names
+The listed kinds are `image`, `video`, `sound-effect`, `text-to-speech`, and
+`three-d`. Current GG image, video and music offerings use the separate live
+discovery reader below. Offline discovery excludes `auto` and custom endpoints: each descriptor names
 one provider, binding, and input variant. Existing staged SFX, speech, and 3D
 operations remain discoverable with their actual `status`; discovery does not
 change catalogue publication policy. A retained deprecated image or video card
@@ -89,13 +96,17 @@ Pass `{ snapshot }` to pin an explicitly supplied catalogue. The constructor own
 a validated copy; later caller mutations cannot alter descriptors. Image and video
 use that view's bindings and capability facts, including explicit removals and
 the catalogue's exact-match legacy video fallback. Absent snapshot sections retain
-the existing bundled-section behavior. Audio and 3D use their existing fixed
-bundled contracts. There is no implicit refresh or provider discovery.
+the existing bundled-section behavior. BYOK speech, sound effects and 3D use their existing
+fixed native contracts. There is no implicit refresh or provider discovery in
+`MediaOperations`; its GG Tripo descriptors still require live offering admission
+before execution.
 
 Field contracts are authored in repository-root
-[`data/ai/inputs.json`](https://github.com/gridaco/grida/blob/main/data/ai/inputs.json).
+[`data/ai/native-inputs.json`](https://github.com/gridaco/grida/blob/main/data/ai/native-inputs.json).
 Generation produces `schemas/inputs.generated.json` for the TypeScript native
-parser and the Rust crate-local copy. The package bundles its local schema copy
+parser. Rust consumes the generated `crates/grida-ai/data/operations.json`
+asset, which embeds installed adapter contracts; it has no separate input or
+model-facts bundle. The package bundles its local schema copy
 into `dist`; it never imports repository data at runtime. Builds and typechecks
 reject stale generated source. `schemas/operations.generated.json`
 is the derived discovery projection; edit the input contracts or canonical model
@@ -140,6 +151,27 @@ serialization, filenames, persistence, and receipts. Image output has at most th
 accepted `n` items. Discovery neither executes nor adds a universal media executor;
 callers dispatch to the existing typed clients, including the exact 3D model union.
 
+## Current GG discovery and execution
+
+`@grida/ai/discovery` exposes `GGDiscoveryStore`, a dependency-light anonymous
+reader of `https://gateway.grida.ai/v1/models`, `/v1/endpoints` and
+`/schemas/operations.json`. Current GG offerings and known interface/schema
+compatibility come from these responses, never from a Vercel binding or the
+bundled model list. The store has one bounded snapshot, single-flight refresh,
+a one-minute fresh interval, five-minute maximum age and failure backoff. It
+never attaches credentials or seeds current availability from installed facts.
+Hosts should share one store through `gg_catalog` and dispose it with the host.
+
+`ImageClient`, `VideoClient` and `MusicClient` intersect the current offering
+with their implemented native controls. `GGOperationsClient` submits canonical
+JSON once through the fixed organization-scoped Grida product bridge
+`POST /api/v1/ai/operations`, then observes asynchronous work through
+`GET /api/v1/ai/jobs?request_id=…`. Both use the existing scoped GG token;
+account credentials and customer API keys are not required. Accepted-job lookup
+is independent of the current catalogue, and throttled polling honors bounded
+backoff without retrying generation. The public GG service remains responsible
+for canonical input validation, financial admission and settlement.
+
 ## Image operation
 
 ```ts
@@ -175,8 +207,9 @@ explicitly adopts the existing order: connected OpenRouter, Vercel AI Gateway, f
 Explicit choices check only that provider. The operation freezes the selected
 model, binding, provider, and reference cap. Generation reads the selected
 provider's key again; losing that credential fails without switching providers.
-No default model, filesystem read, or provider call occurs during resolution.
-A configured catalogue can refresh once on a model lookup miss.
+No default model, filesystem read, or inference call occurs during resolution.
+GG may refresh its anonymous current-offering snapshot; a configured BYOK
+catalogue can refresh once on a model lookup miss.
 
 References must be host-resolved HTTPS or inline image data URLs within the
 advertised cap. Reference resolution selects the catalogue's edit binding;
@@ -237,10 +270,11 @@ The frozen descriptor includes `input: "text" | "image" | "text-or-image"` from
 the selected catalogue binding. `image: true` selects a start-frame operation;
 its generation requires an authorized HTTPS `image_url`, or bounded image bytes
 where that exact operation's input schema declares `image`. A text selection rejects
-image inputs. Capability facts are owned by `@grida/ai-models`; absent facts in old
+image inputs. Capability facts are owned by the pinned public `@grida/ai-models` release; absent facts in old
 snapshots use only exact canonical/provider/binding matches to bundled facts.
 Changed, removed, or explicitly unknown bindings do not inherit capabilities.
-GG remains text-only and requires a text-eligible Vercel AI Gateway binding. The current fal
+GG follows the selected current JSON video operation, including HTTPS start-frame
+inputs when declared; it does not inherit Vercel eligibility. The current fal
 bindings and Vercel AI Gateway Grok require a start frame. OpenRouter uses `frame_images` with
 `first_frame`; the exact fal Wan binding uses `start_image_url`.
 
@@ -324,36 +358,32 @@ const operation = await music.resolve({
 });
 const result = await operation.generate({
   prompt: "Quiet ambient piano",
-  seed: 0,
   signal,
 });
 // result.audio: { data: Uint8Array; media_type: "audio/mpeg" }
 ```
 
-This operation serves exactly the bundled `google/lyria-3` and
-`google/lyria-3-pro` models through GG. It requires an explicit host transport,
-scoped-token source, and GG origin. It has no BYOK key capability, `auto` provider,
-audio catalogue refresh, or direct Replicate path. Broader image-input metadata
-on the upstream model cards does not make that input available through this
-text-only hosted contract. Sound effects and speech remain separate operations.
+This operation consumes currently offered GG music operations with a compatible
+JSON prompt input and an MP3 provider-reference result. Lyria is an example,
+not a hardcoded eligibility list. It requires an explicit host transport,
+scoped-token source and Grida product origin; a shared `gg_catalog` avoids
+separate discovery stores. It has no BYOK key capability or `auto` provider.
+Sound effects and speech remain separate operations.
 
-`resolve` returns an immutable model/provider/binding selection without network
-work. Generation trims the prompt and accepts 1–4096 **UTF-16 code units**, matching
-the hosted parser, plus an optional safe-integer seed (including zero) and abort
-signal. Extra input fields are rejected. The live scoped token is read for the
-single fixed `POST /api/v1/ai/music/generations`; no retries, refresh, or provider
-fallback occur. Video and music share one internal five-minute invocation
-lifecycle, including monotonic deadline checks, bounded stream reads, cancellation,
-and late-result cleanup. There is no public generic executor.
+`resolve` validates the current offering and captures its operation. Generation
+trims the prompt and accepts 1–4096 **UTF-16 code units**, plus an abort signal.
+An optional safe-integer seed is accepted only when the selected operation
+schema declares it; current Lyria does not. Extra input fields are rejected.
+The generic scoped product bridge submits once and observes that original job;
+there is no generation retry or provider fallback. A ten-minute invocation
+bounds submission, polling and credential-free result download, including
+cancellation and late-result cleanup.
 
-The response must match the selected model and GG provider and contain the
-existing inline MP3 wire fields. Encoded response size and a 32 MiB decoded ceiling
-are checked before decoding. Only a fresh byte array and `audio/mpeg` leave the
-operation; filenames, URLs, warnings, metadata, and persistence receipts are
-discarded without logging. No result URL is followed. The host derives its
-filename and owns persistence. The hosted server owns provider execution, output
-download/MP3 materialization, and metering. A supplied seed does not promise
-deterministic output.
+A successful job must contain an HTTPS `audio/mpeg` reference. The host-authorized
+download lane and a 32 MiB byte ceiling apply before a fresh byte array reaches
+the caller. URLs, metadata and persistence receipts do not leave the operation.
+The host owns its filename and persistence; GG owns metering. A supported seed
+does not promise deterministic output.
 
 `MusicClient.Failure` has the same code-only error shape as the other operations:
 `invalid_input`, `model_unavailable`, `gg_token_expired`, `insufficient_credits`,
@@ -707,8 +737,8 @@ must use public exports; source aliases are not a substitute for that proof.
 `TripoClient` supports H3.1, P1, and P2 Preview with either a Tripo BYOK key
 (`provider: "tripo"`) or Grida credits (`provider: "gg"`).
 Resolution and discovery use Grida's explicit bundled model-generation service
-membership from `@grida/ai-models/grida`; neutral facts remain in the root
-catalogue entry. Schema-1 text/image/video refreshes do not replace this family.
+membership from `@grida/ai/catalogue`; neutral facts come from the pinned public Models release through the
+`models` projection in the same entry. Schema-1 text/image/video refreshes do not replace this family.
 The `three-d` discovery kind names the output family; `feature: "model-generation"`
 names the operation, `model_id` names the model, and `variant` selects its input.
 Rigging has its own feature contract below; remeshing is not enabled.
@@ -902,7 +932,9 @@ Construct either client with `{ keys, http, gg, gg_base_url }` and explicitly
 select `provider: "gg"`. `gg` is the trusted host's `GgTokenSource`; it contains
 only a live scoped organization token. `keys` can be an empty reader in this
 lane. GG never reads the Tripo key, and explicit BYOK never reads the GG token.
-Neither lane falls back to the other. Offline discovery lists each lane
+Neither lane falls back to the other. GG resolution and submission also require
+the exact current endpoint; an installed descriptor cannot enable a retired
+GG operation. Offline adapter discovery lists each lane
 separately but does not establish an available token or sufficient credits.
 
 Normal `generate` / `check` inputs remain copied bytes with the same limits and

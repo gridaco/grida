@@ -3,12 +3,14 @@
 //! Media contracts and provider execution with explicit host-owned HTTP authority.
 mod catalogue;
 mod discovery;
+mod gateway;
 mod input;
 mod media;
 mod sse;
 mod tripo;
 pub use catalogue::{Catalog, Filter, Parsed, Selector};
 pub use discovery::{VoiceFilter, normalize_key};
+pub use gateway::GatewayCatalogue;
 pub use media::{Asset, ExecutionAuthority, MediaClient, MediaResult, TaskReceipt};
 use serde::{Deserialize, Serialize};
 pub use sse::{SseEventFramer, first_sse_event_end};
@@ -25,6 +27,7 @@ pub trait Transport: Send + Sync {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lane {
+    Discovery,
     Provider,
     Download,
     Upload,

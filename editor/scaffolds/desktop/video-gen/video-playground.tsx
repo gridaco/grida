@@ -1,11 +1,13 @@
 "use client";
 // GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
 
-import * as gridaGateway from "@/lib/desktop/gg-session";
+import { useVideoProviders } from "@/lib/desktop/video-providers";
+import { useGGModels } from "@/lib/desktop/gg-models";
+import { MediaModelAvailability } from "../shared/media-model-availability";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { cn } from "@app/ui/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@app/ui/components/dialog";
@@ -31,7 +33,6 @@ import {
 } from "@app/ui/ai-elements/prompt-input";
 import { video, type MediaItem } from "@/lib/desktop/bridge";
 import { VideoModelPicker } from "./video-model-picker";
-import { MediaModelAvailability } from "../shared/media-model-availability";
 
 /** Named prompt templates — motion-flavored starters, original to Grida. */
 const PROMPT_TEMPLATES: { name: string; prompt: string }[] = [
@@ -134,14 +135,26 @@ export function DesktopVideoPlayground({
   onGenerationBusyChange?: (busy: boolean) => void;
   onStoredMediaCreated?: (item: MediaItem) => void;
 } = {}) {
-  const [modelId, setModelId] = useState(
-    () =>
-      MediaModelAvailability.select(
-        models.video.listed_models(),
-        initialModelId,
-        models.video.default_id
-      )?.id ?? ""
-  );
+  const current = useGGModels();
+  const { state: providerState, refresh: refreshProviders } =
+    useVideoProviders();
+  const [selectedModelId, setModelId] = useState(initialModelId ?? "");
+  // Released binaries without discovery retain their former native default.
+  // An empty current snapshot on newer binaries never enables a hosted model.
+  const modelId =
+    current === null
+      ? selectedModelId ||
+        (MediaModelAvailability.select(
+          models.video.listed_models(),
+          undefined,
+          models.video.default_id
+        )?.id ??
+          "")
+      : selectedModelId;
+  const access = MediaModelAvailability.video(modelId, current, providerState);
+  const submitting = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [aspect, setAspect] = useState<string>(AUTO);
@@ -155,25 +168,39 @@ export function DesktopVideoPlayground({
   const remove = (id: string) =>
     setTiles((prev) => prev.filter((t) => t.id !== id));
 
-  const onSubmit = (message: PromptInputMessage) => {
-    void runGenerate(message.text);
-  };
+  const onSubmit = (message: PromptInputMessage) => runGenerate(message.text);
 
   const runGenerate = async (rawPrompt: string) => {
+    // PromptInput can receive another submit before React paints `busy`.
+    // Acquire synchronously before token/key preflight can yield.
+    if (submitting.current)
+      throw new Error("Video generation is already in progress.");
     const prompt = rawPrompt.trim();
-    if (!prompt) return;
-    // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh so a
-    // signed-in keyless user generates through the included provider.
-    // Never throws; BYOK runs are unaffected when it degrades.
-    const id = crypto.randomUUID();
-    const model_id = modelId;
-    setTiles((prev) => [
-      { id, prompt, model_id, status: "generating" },
-      ...prev,
-    ]);
-    onGenerationBusyChange?.(true);
+    if (!prompt || !modelId || !access.available)
+      throw new Error("Select an available video model.");
+    submitting.current = true;
+    setBusy(true);
+    setError(null);
+    let id: string | undefined;
     try {
-      await gridaGateway.ensureFresh();
+      onGenerationBusyChange?.(true);
+      const refreshed = await refreshProviders(modelId);
+      const refreshedAccess = MediaModelAvailability.video(
+        modelId,
+        current,
+        refreshed
+      );
+      if (!refreshedAccess.available)
+        throw new Error(
+          refreshedAccess.reason ?? "This video model is unavailable."
+        );
+      const tileId = crypto.randomUUID();
+      id = tileId;
+      const model_id = modelId;
+      setTiles((prev) => [
+        { id: tileId, prompt, model_id, status: "generating" },
+        ...prev,
+      ]);
       const res = await video.generate({
         model_id,
         prompt,
@@ -189,21 +216,28 @@ export function DesktopVideoPlayground({
         ? `data:${first.media_type};base64,${first.base64}`
         : undefined;
       setTiles((prev) =>
-        prev.map((t) =>
-          t.id === id
+        prev.map((tile) =>
+          tile.id === id
             ? src
-              ? { ...t, status: "done", src, media_type: first?.media_type }
-              : { ...t, status: "error", error: "No video returned" }
-            : t
+              ? { ...tile, status: "done", src, media_type: first?.media_type }
+              : { ...tile, status: "error", error: "No video returned" }
+            : tile
         )
       );
-    } catch (e) {
-      setTiles((prev) =>
-        prev.map((t) =>
-          t.id === id ? { ...t, status: "error", error: String(e) } : t
-        )
-      );
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setError(message);
+      if (id)
+        setTiles((prev) =>
+          prev.map((tile) =>
+            tile.id === id ? { ...tile, status: "error", error: message } : tile
+          )
+        );
+      // A failed preflight or busy rejection must not clear the provider-owned draft.
+      throw cause;
     } finally {
+      submitting.current = false;
+      setBusy(false);
       onGenerationBusyChange?.(false);
     }
   };
@@ -214,6 +248,18 @@ export function DesktopVideoPlayground({
     <div className="relative flex min-h-0 flex-1 flex-col">
       <header className="flex shrink-0 items-center justify-between px-6 py-4">
         <h1 className="text-2xl font-bold tracking-tight">Video</h1>
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : (
+          modelId &&
+          !access.available && (
+            <p role="status" className="text-sm text-muted-foreground">
+              {access.reason}
+            </p>
+          )
+        )}
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-40">
@@ -249,12 +295,16 @@ export function DesktopVideoPlayground({
             className="pointer-events-auto w-full max-w-2xl [&>div]:rounded-2xl [&>div]:bg-background/90 [&>div]:shadow-lg [&>div]:backdrop-blur"
           >
             <PromptInputBody>
-              <PromptInputTextarea placeholder="Describe the video you want to create…" />
+              <PromptInputTextarea
+                placeholder="Describe the video you want to create…"
+                disabled={busy}
+              />
             </PromptInputBody>
             <PromptInputFooter>
               <PromptInputTools>
-                <TemplateMenu />
+                <TemplateMenu disabled={busy} />
                 <SettingsMenu
+                  disabled={busy}
                   card={card}
                   aspect={aspect}
                   onAspect={setAspect}
@@ -263,16 +313,23 @@ export function DesktopVideoPlayground({
                 />
                 <VideoModelPicker
                   value={modelId}
+                  current={current}
+                  providers={providerState}
+                  disabled={busy}
                   onValueChange={(next) => {
                     // Model-scoped options don't carry over — a stale aspect
                     // ratio / duration the new model doesn't offer would fail.
                     setModelId(next);
+                    setError(null);
                     setAspect(AUTO);
                     setDuration({ label: AUTO });
                   }}
                 />
               </PromptInputTools>
-              <PromptInputSubmit />
+              <PromptInputSubmit
+                status={busy ? "submitted" : undefined}
+                disabled={busy || !modelId || !access.available}
+              />
             </PromptInputFooter>
           </PromptInput>
         </PromptInputProvider>
@@ -305,7 +362,7 @@ export function DesktopVideoPlayground({
   );
 }
 
-function TemplateMenu() {
+function TemplateMenu({ disabled }: { disabled?: boolean }) {
   const { textInput } = usePromptInputController();
   return (
     <DropdownMenu>
@@ -313,6 +370,7 @@ function TemplateMenu() {
         <PromptInputButton
           aria-label="Prompt templates"
           title="Prompt templates"
+          disabled={disabled}
         >
           <Sparkles className="size-4" />
         </PromptInputButton>
@@ -342,7 +400,9 @@ function SettingsMenu({
   onAspect,
   duration,
   onDuration,
+  disabled,
 }: {
+  disabled?: boolean;
   card: models.video.VideoModelCard | undefined;
   aspect: string;
   onAspect: (a: string) => void;
@@ -354,7 +414,11 @@ function SettingsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <PromptInputButton aria-label="Video settings" title="Video settings">
+        <PromptInputButton
+          aria-label="Video settings"
+          title="Video settings"
+          disabled={disabled}
+        >
           <SlidersHorizontal className="size-4" />
         </PromptInputButton>
       </DropdownMenuTrigger>

@@ -199,6 +199,15 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     res.writeHead(status, { "content-type": "application/json" });
     res.end(JSON.stringify(value));
   };
+  const discovery = JSON.parse(
+    await readFile(
+      new URL(
+        "../../crates/grida-ai/tests/fixtures/gateway-discovery.json",
+        import.meta.url
+      ),
+      "utf8"
+    )
+  );
   const handler = async (req, res) => {
     try {
       counts.set(req.url, (counts.get(req.url) ?? 0) + 1);
@@ -212,6 +221,32 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         await new Promise((resolve) => {
           releaseRoute = resolve;
         });
+      }
+      if (
+        ["/v1/models", "/v1/endpoints", "/schemas/operations.json"].includes(
+          req.url
+        )
+      ) {
+        assert.equal(req.method, "GET");
+        assert.equal(req.headers.authorization, undefined);
+        assert.equal(bytes.length, 0);
+        const schemas = req.url === "/schemas/operations.json";
+        if (schemas) {
+          res.writeHead(200, { "content-type": "application/schema+json" });
+          res.end(JSON.stringify(discovery.contracts));
+        } else
+          respond(
+            res,
+            req.url === "/v1/endpoints"
+              ? {
+                  object: "list",
+                  revision: discovery.models.revision,
+                  data: [],
+                  next_change_at: null,
+                }
+              : discovery.models
+          );
+        return;
       }
       if (req.url === "/auth/v1/oauth/token") {
         assert.equal(req.method, "POST");
@@ -243,9 +278,10 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         assert.equal(req.headers.authorization, `Bearer ${grant}`);
         assert.equal(req.method, "POST");
         const body = JSON.parse(bytes);
-        if (req.url === "/api/v1/ai/images/generations") {
-          assert.equal(body.model_id, "bfl/flux-2-pro");
-          assert.equal(typeof body.prompt, "string");
+        if (req.url === "/api/v1/ai/operations") {
+          assert.equal(body.operation_id, "image.bfl.flux-2-pro.text");
+          assert.equal(body.input.model, "bfl/flux-2-pro");
+          assert.equal(typeof body.input.prompt, "string");
           if (generationMode === "failure") {
             respond(res, { error: "synthetic failure" }, 503);
             return;
@@ -258,8 +294,9 @@ export async function proveInstalled({ binary, launcher, workdir }) {
             if (res.destroyed) return;
           }
           respond(res, {
-            images: Array.from({ length: body.n ?? 1 }, () => ({
-              base64: png.toString("base64"),
+            data: Array.from({ length: body.input.n ?? 1 }, () => ({
+              b64_json: png.toString("base64"),
+              media_type: "image/png",
             })),
           });
           return;
@@ -409,6 +446,62 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     );
     assert.equal(counts.size, 0);
     checks.push("installed_provider_configure_precedence_remove");
+    const offers = await run([
+      "ai",
+      "models",
+      "list",
+      "--provider",
+      "gg",
+      "--json",
+    ]);
+    assert.equal(offers.operations.length, 1);
+    assert.equal(offers.operations[0].model_id, "bfl/flux-2-pro");
+    assert.equal(offers.access.checked, false);
+    const inspected = await run([
+      "ai",
+      "models",
+      "inspect",
+      "--provider",
+      "gg",
+      "--model",
+      "bfl/flux-2-pro",
+      "--json",
+    ]);
+    assert.equal(inspected.input_schema.properties.n.maximum, 4);
+    assert.equal(inspected.gateway_operation.id, "image.bfl.flux-2-pro.text");
+    assert.equal(inspected.pricing.revision, "synthetic");
+    assert.deepEqual(
+      await run(["ai", "rigging", "list", "--provider", "gg", "--json"]),
+      []
+    );
+    const missingRig = await run(
+      [
+        "ai",
+        "rigging",
+        "check",
+        "--provider",
+        "gg",
+        "--mesh",
+        path.join(owned, "must-not-exist-for-discovery-proof.glb"),
+        "--json",
+      ],
+      { exit: 1 }
+    );
+    assert.equal(missingRig.error.code, "operation_unavailable");
+    const beforeByok = new Map(counts);
+    const byokRig = await run([
+      "ai",
+      "rigging",
+      "inspect",
+      "--provider",
+      "tripo",
+      "--feature",
+      "rig-check",
+      "--json",
+    ]);
+    assert.equal(byokRig.feature, "rig-check");
+    assert.deepEqual(counts, beforeByok);
+    checks.push("installed_anonymous_current_gg_discovery");
     const initial = await run(["auth", "storage", "show", "--json"]);
     assert.equal(initial.backend, "keyring");
     assert.equal(initial.initialized, false);
@@ -571,12 +664,12 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       receipt
     );
     checks.push("installed_gg_artifact_and_receipt");
-    const submitted = counts.get("/api/v1/ai/images/generations");
+    const submitted = counts.get("/api/v1/ai/operations");
     assert.equal(
       (await run(generate, { exit: 1 })).error.code,
       "output_unavailable"
     );
-    assert.equal(counts.get("/api/v1/ai/images/generations"), submitted);
+    assert.equal(counts.get("/api/v1/ai/operations"), submitted);
     checks.push("installed_no_overwrite_before_submission");
     await writeFile(path.join(owned, "image.png"), inputPng);
     env.OPENROUTER_API_KEY = " ";
@@ -607,7 +700,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       { exit: 1 }
     );
     assert.equal(failed.error.code, "generation_failed");
-    assert.equal(counts.get("/api/v1/ai/images/generations"), submitted + 1);
+    assert.equal(counts.get("/api/v1/ai/operations"), submitted + 1);
     checks.push("installed_no_paid_retry");
     generationMode = "cancel";
     const pending = new Promise((resolve) => {

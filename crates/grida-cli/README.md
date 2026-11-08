@@ -34,8 +34,15 @@ generation, and Tripo/GG rigging. Agent, render and MCP commands remain deferred
 The CLI invokes `grida-ai` through its typed media transport boundary and
 `grida-auth` through its account transport boundary. Those crates do not import
 CLI process or terminal state. Rust and the continuing TypeScript/web packages
-consume the shared neutral catalogue/schema files. The CLI uses its bundled
-catalogue without refreshing it or choosing a provider/model implicitly.
+consume shared generated adapter contracts. Explicit BYOK list/inspect uses the
+installed offline adapter inventory. GG list/inspect and generation refresh the
+public GG offering and operation schemas, then show only executable native
+interfaces. An unfiltered model list joins those two inventories. A discovery
+outage fails the GG read without silently substituting a stale model or provider.
+No credential is acquired for public discovery. `--available --provider gg`
+additionally checks cached organization eligibility; it is not a generation or
+provider-access probe. GG generation retains Grida login and organization-scoped
+authority; no separate public GG key is needed.
 
 ## Build and verify
 

@@ -1,0 +1,98 @@
+{
+  "models": {
+    "object": "list",
+    "revision": "synthetic-native-discovery",
+    "next_change_at": null,
+    "data": [
+      {
+        "id": "bfl/flux-2-pro",
+        "object": "model",
+        "gg": {
+          "interfaces": ["images.generations"],
+          "operation_ids": ["image.bfl.flux-2-pro.text"],
+          "pricing_context": "input",
+          "pricing": {
+            "currency": "USD",
+            "unit": "mill",
+            "revision": "synthetic",
+            "components": [
+              {
+                "id": "synthetic",
+                "meter": "generations",
+                "unit": "generation",
+                "rate_mills": "20",
+                "per_quantity": "1",
+                "quantity_rounding": {
+                  "mode": "none",
+                  "increment": null
+                },
+                "when": {}
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "contracts": {
+    "x-gg-operations": [
+      {
+        "operation_id": "image.bfl.flux-2-pro.text",
+        "model_id": "bfl/flux-2-pro",
+        "kind": "image",
+        "variant": "text",
+        "path": "/v1/images/generations",
+        "content_type": "application/json",
+        "request_view": "json",
+        "response_mode": "synchronous",
+        "delivery": "transient_base64",
+        "request_schema": {
+          "$ref": "#/$defs/Input"
+        },
+        "result_schema": {
+          "type": "object",
+          "required": ["data"],
+          "properties": {
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "b64_json": {
+                    "type": "string"
+                  },
+                  "media_type": {
+                    "enum": ["image/png"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ],
+    "$defs": {
+      "Input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "type": "string",
+            "const": "bfl/flux-2-pro"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "default": 1
+          }
+        },
+        "required": ["model", "prompt"]
+      }
+    }
+  }
+}

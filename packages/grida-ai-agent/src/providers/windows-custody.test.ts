@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 / GRIDA-SEC-014 — native provider composition on Windows.
 // GRIDA-SEC-006 — optional BYOK discovery must not block an existing GG grant.
 // GRIDA-GG: provider — strict native custody keeps automatic payer selection honest.
+import { ggDiscoveryFixture } from "./gg-discovery.fixture";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -79,7 +80,12 @@ describe.skipIf(!["darwin", "linux"].includes(process.platform))(
     });
 
     function deps() {
-      return { secrets, gg, gg_base_url: "https://grida.test" };
+      return {
+        secrets,
+        gg,
+        gg_base_url: "https://grida.test",
+        gg_catalog: ggDiscoveryFixture(),
+      };
     }
 
     function workspaceBindings() {

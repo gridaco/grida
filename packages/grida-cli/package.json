@@ -1,6 +1,6 @@
 {
   "name": "grida",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "private": false,
   "description": "The Grida command line: account access and tools, independent of Desktop.",
   "keywords": [

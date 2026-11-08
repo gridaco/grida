@@ -7,7 +7,7 @@
     "strict": true,
     "skipLibCheck": true,
     "declaration": true,
-    "types": ["node"],
+    "types": ["node", "vitest/globals"],
     "resolveJsonModule": true
   },
   "include": ["src"],

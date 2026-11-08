@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import {
   PromptInput,
   PromptInputBody,

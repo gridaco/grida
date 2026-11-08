@@ -1,6 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — discovery grants no provider or GG authority.
 // GRIDA-GG: provider — executable route facts do not establish scoped access or credits.
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "./catalogue/grida";
 import { InputSchema, type InputJsonSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
@@ -427,7 +427,7 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
     });
   }
   for (const card of Object.values(view.image.models)) {
-    for (const provider of [...models.image.providers, "gg"] as const) {
+    for (const provider of models.image.providers) {
       for (const references of [false, true]) {
         const route = MediaRoutes.image(card, provider, references);
         if (route)
@@ -445,7 +445,7 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
     }
   }
   for (const card of Object.values(view.video.models)) {
-    for (const provider of [...models.video.providers, "gg"] as const) {
+    for (const provider of models.video.providers) {
       for (const image of [false, true]) {
         const route = MediaRoutes.video(card, provider, image);
         if (route)
@@ -461,16 +461,6 @@ function descriptors(view: models.snapshot.View): MediaOperations.Descriptor[] {
           );
       }
     }
-  }
-  for (const card of Object.values(models.audio.music.models)) {
-    if (MediaRoutes.music(card.id))
-      add(
-        "music",
-        { model_id: card.id, binding_id: card.id, provider_id: "gg" },
-        "text",
-        card.status,
-        MediaInputs.music
-      );
   }
   if (MediaRoutes.soundEffect(MediaRoutes.soundEffectId))
     add(

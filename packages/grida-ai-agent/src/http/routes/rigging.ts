@@ -1,3 +1,4 @@
+import type { GGDiscoveryStore } from "@grida/ai";
 /**
  * GRIDA-SEC-004 — explicit mesh operations behind the existing daemon perimeter.
  * The SDK owns model/input semantics and provider execution. This adapter owns
@@ -17,6 +18,7 @@ export type RiggingRoutesDeps = {
   provider_http?: ProviderHttp;
   gg?: GridaGatewaySessionStore;
   gg_base_url?: string;
+  gg_catalog?: GGDiscoveryStore;
 };
 
 export function registerRiggingRoutes(app: Hono, deps: RiggingRoutesDeps) {
@@ -81,6 +83,7 @@ export function registerRiggingRoutes(app: Hono, deps: RiggingRoutesDeps) {
             http,
             gg: deps.gg,
             gg_base_url: deps.gg_base_url,
+            gg_catalog: deps.gg_catalog,
           });
           if (parsed.feature === "rig-check") {
             const operation = await client.resolve(parsed.selection);

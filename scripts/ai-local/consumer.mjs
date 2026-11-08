@@ -1,3 +1,4 @@
+import { ggFixture } from "./gg-fixture.mjs";
 // GRIDA-SEC-004 — a standalone host uses only the public SDK and synthetic transport.
 // GRIDA-SEC-006 — scoped GG state is opaque, memory-only, and rechecked at use.
 // GRIDA-GG: provider — these signature bytes do not prove real provider generation.
@@ -42,8 +43,8 @@ const {
   MediaOperations,
 } = await load("@grida/ai");
 const providers = await load("@grida/ai/providers");
-const { models } = await load("@grida/ai-models");
-const { catalog } = await load("@grida/ai-models/grida");
+const { models } = await load("@grida/ai/catalogue");
+const { catalog } = await load("@grida/ai/catalogue");
 const cases = [];
 async function check(name, run) {
   try {
@@ -73,7 +74,7 @@ const http = new ProviderHttp({
         `${key} ${scopedToken} synthetic-private-prompt upstream-body`
       );
     if (request.method === "POST")
-      assert.equal(body.prompt, "A synthetic image");
+      assert.equal(body.input?.prompt ?? body.prompt, "A synthetic image");
     if (url.origin === "https://openrouter.ai") {
       assert.equal(url.pathname, "/api/v1/images");
       assert.equal(authorization, `Bearer ${key}`);
@@ -108,9 +109,11 @@ const http = new ProviderHttp({
       });
     }
     assert.equal(url.origin, "https://gg.example.invalid");
-    assert.equal(url.pathname, "/api/v1/ai/images/generations");
+    assert.equal(url.pathname, "/api/v1/ai/operations");
     assert.equal(authorization, `Bearer ${scopedToken}`);
-    return Response.json({ images: [{ base64, media_type: "image/png" }] });
+    return Response.json({
+      data: [{ b64_json: base64, media_type: "image/png" }],
+    });
   },
   download: async (input, init) => {
     const request = new Request(input, init);
@@ -132,6 +135,7 @@ const client = new ImageClient({
   http,
   gg,
   gg_base_url: "https://gg.example.invalid",
+  gg_catalog: await ggFixture(load, [{ id: model, kind: "image" }]),
 });
 const generated = (result) => {
   assert.deepEqual(Object.keys(result), ["images"]);

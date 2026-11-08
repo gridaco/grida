@@ -26,7 +26,9 @@
  * precedence.
  */
 
-import { catalog as models } from "@grida/ai-models/grida";
+import type { GGDiscoveryStore } from "@grida/ai";
+import { AGENT_DEFAULT_TIER, type ModelTier } from "../tiers";
+import { catalog as models } from "@grida/ai/catalogue";
 import { catalogView, type ModelCatalogStore } from "./model-catalog";
 import type { TierModelIds } from "./byok";
 import type { ModelFactory } from "../agent";
@@ -129,6 +131,8 @@ export type ResolveDeps = {
   /** Origin the grida provider calls (e.g. `https://grida.co`). Host-
    *  injected; absent ⇒ the grida provider is disabled. */
   gg_base_url?: string;
+  /** Current anonymous GG offering; local facts never enable hosted execution. */
+  gg_catalog?: GGDiscoveryStore;
   /**
    * Native ChatGPT subscription provider. Optional construction-time config
    * keeps the provider dormant when a host has no approved OAuth/backend
@@ -151,6 +155,7 @@ export type ResolveOptions = {
   explicit?: string;
   /** Selected model, used to prevent a provider/model mismatch. */
   model_id?: string;
+  tier?: ModelTier;
 };
 
 export async function resolveProvider(
@@ -158,7 +163,12 @@ export async function resolveProvider(
   options: ResolveOptions = {}
 ): Promise<ResolvedProvider> {
   if (options.explicit) {
-    return await resolveExplicit(options.explicit, deps, options.model_id);
+    return await resolveExplicit(
+      options.explicit,
+      deps,
+      options.model_id,
+      options.tier
+    );
   }
   // One read for the whole resolution: a mid-resolution refresh must not
   // let the gate and the provider choice disagree about the catalogue.
@@ -196,9 +206,14 @@ export async function resolveProvider(
     // exact behavior; explicit choice always wins), before endpoints
     // (fresh signed-in users get included AI without configuring
     // anything). Resolves only with a LIVE session token.
-    const gridaResolved = maybeResolveGg(deps);
-    if (gridaResolved) return gridaResolved;
   }
+
+  const gridaResolved = await maybeResolveGg(
+    deps,
+    options.model_id,
+    options.tier
+  );
+  if (gridaResolved) return gridaResolved;
 
   if (deps.endpoints) {
     for (const endpoint of await deps.endpoints.list()) {
@@ -217,7 +232,8 @@ export async function resolveProvider(
 async function resolveExplicit(
   providerId: string,
   deps: ResolveDeps,
-  modelId?: string
+  modelId?: string,
+  tier?: ModelTier
 ): Promise<ResolvedProvider> {
   const view = catalogView(deps.catalog);
   if (isChatGptProviderId(providerId)) {
@@ -229,9 +245,7 @@ async function resolveExplicit(
     // Without a live token the pick surfaces as the existing 409
     // `provider_down` with `provider_id: "gg"` — the renderer maps
     // that to "Sign in to use included AI".
-    const resolved = isCatalogModel(view, modelId)
-      ? maybeResolveGg(deps)
-      : null;
+    const resolved = await maybeResolveGg(deps, modelId, tier);
     if (!resolved) throw new ProviderUnavailableError(providerId);
     return resolved;
   }
@@ -280,9 +294,16 @@ async function maybeResolveChatGpt(
  * is re-read per request inside the factory's fetch — this check only
  * gates resolution.
  */
-function maybeResolveGg(deps: ResolveDeps): ResolvedProvider | null {
+async function maybeResolveGg(
+  deps: ResolveDeps,
+  modelId?: string,
+  tier: ModelTier = AGENT_DEFAULT_TIER
+): Promise<ResolvedProvider | null> {
   const hosted = liveGgMediaDeps(deps);
-  if (!hosted) return null;
+  if (!hosted || !deps.gg_catalog) return null;
+  await deps.gg_catalog.ready();
+  const selected = modelId ?? catalogView(deps.catalog).tier_model_ids[tier];
+  if (!deps.gg_catalog.supports(selected, "chat.completions")) return null;
   return {
     provider_id: GG_PROVIDER_ID,
     kind: "gg",
@@ -293,7 +314,8 @@ function maybeResolveGg(deps: ResolveDeps): ResolvedProvider | null {
       // The STORE, not a snapshot of it: a background subagent asks for
       // its tier long after resolution, and must get the model the
       // catalogue names then.
-      () => catalogView(deps.catalog).tier_model_ids
+      () => catalogView(deps.catalog).tier_model_ids,
+      deps.gg_catalog
     ),
   };
 }

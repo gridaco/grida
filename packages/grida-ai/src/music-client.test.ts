@@ -1,543 +1,419 @@
-// GRIDA-SEC-004 / GRIDA-SEC-006 — GG music public input, safe bytes, and bounded authority.
-// GRIDA-GG: token — synthetic scoped credentials only; no services or paid generation.
+// GRIDA-SEC-004 / GRIDA-SEC-006 — current music offerings, original jobs and bounded results.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MusicClient, ProviderHttp, GridaGatewaySessionStore } from "./index";
-
-const ID = "google/lyria-3";
-const PRO = "google/lyria-3-pro";
-const TOKEN = "synthetic-private-scoped-token";
-const PROMPT = "synthetic-private-music-prompt";
-const ORIGIN = "https://gg.example";
+import { MusicClient, ProviderHttp } from "./index";
+import { fixtureGGDiscovery } from "./testing/gg-discovery";
+const ID = "fixture/new-music";
+const TOKEN = "synthetic-scoped-token";
 const DATA = new Uint8Array([0x49, 0x44, 0x33]);
-const BASE64 = "SUQz";
-function wire(model_id: string = ID) {
+const URL = "https://assets.example/music.mp3";
+function job(audio: unknown = { url: URL, media_type: "audio/mpeg" }) {
   return {
-    model_id,
-    provider_id: "gg",
-    audio: {
-      base64: BASE64,
-      media_type: "audio/mpeg",
-      file_name: `${model_id.split("/").at(-1)}.mp3`,
-    },
+    id: "req_music",
+    request_id: "req_music",
+    model: ID,
+    status: "succeeded",
+    result_status: "available",
+    result: { audio },
   };
 }
-function setup(overrides: Partial<MusicClient.Options> = {}) {
-  const request = vi.fn<typeof fetch>(async (_url, init) =>
-    Response.json(wire(JSON.parse(String(init?.body)).model_id))
+function setup() {
+  const request = vi.fn<typeof fetch>(async (url) =>
+    Response.json(
+      String(url).includes("/jobs?")
+        ? job()
+        : { id: "req_music", request_id: "req_music", result_status: "pending" }
+    )
   );
-  const download = vi.fn<typeof fetch>(async () => {
-    throw new Error(TOKEN);
-  });
+  const download = vi.fn<typeof fetch>(async () => new Response(DATA));
   const read = vi.fn<() => string | null>(() => TOKEN);
   const client = new MusicClient({
     http: new ProviderHttp({ request, download }),
     gg: { getAccessToken: read },
-    gg_base_url: ORIGIN,
-    ...overrides,
+    gg_base_url: "https://grida.example",
+    gg_catalog: fixtureGGDiscovery([{ id: ID, kind: "music" }]),
   });
   return { client, request, download, read };
 }
 async function failure(
   promise: Promise<unknown>,
-  code: MusicClient.FailureCode
+  code: MusicClient.FailureCode,
+  requestId?: string
 ) {
-  const error: unknown = await promise.catch((value: unknown) => value);
+  const error = await promise.catch((value) => value);
   expect(error).toBeInstanceOf(MusicClient.Failure);
   expect(error).toMatchObject({ code, message: code });
-  expect(JSON.parse(JSON.stringify(error))).toEqual({ code, message: code });
+  expect(JSON.parse(JSON.stringify(error))).toEqual({
+    code,
+    message: code,
+    ...(requestId ? { request_id: requestId } : {}),
+  });
   expect(String(error)).not.toMatch(/synthetic-|upstream|secret/);
   expect(error).not.toHaveProperty("cause");
-}
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => {
-    resolve = r;
-  });
-  return { promise, resolve };
 }
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
-
-describe("MusicClient public operation", () => {
-  it.each([ID, PRO])(
-    "serves %s through one fixed GG request with only bytes returned",
-    async (model_id) => {
-      const { client, request, download, read } = setup();
-      const operation = await client.resolve({ model_id, provider: "gg" });
-      expect(operation).toMatchObject({
-        model_id,
-        provider_id: "gg",
-        binding_id: model_id,
-      });
-      expect(Object.isFrozen(operation)).toBe(true);
-      expect(Object.keys(client)).toEqual([]);
-      expect(Object.getOwnPropertyNames(Object.getPrototypeOf(client))).toEqual(
-        ["constructor", "resolve"]
-      );
-      expect(JSON.stringify(operation)).not.toContain(TOKEN);
-      expect(request).not.toHaveBeenCalled();
-      expect(
-        await operation.generate({ prompt: `  ${PROMPT}  `, seed: 0 })
-      ).toEqual({ audio: { data: DATA, media_type: "audio/mpeg" } });
-      expect(request).toHaveBeenCalledOnce();
-      const [url, init] = request.mock.calls[0];
-      expect(url).toBe(`${ORIGIN}/api/v1/ai/music/generations`);
-      expect(init?.method).toBe("POST");
-      expect(new Headers(init?.headers).get("authorization")).toBe(
-        `Bearer ${TOKEN}`
-      );
-      expect(JSON.parse(String(init?.body))).toEqual({
-        model_id,
-        prompt: PROMPT,
-        seed: 0,
-      });
-      expect(read).toHaveBeenCalledTimes(2);
-      expect(download).not.toHaveBeenCalled();
-    }
-  );
-
-  it("captures the construction-time credential callable once and keeps it bound", async () => {
-    let gets = 0;
-    const gg = {
-      value: TOKEN,
-      get getAccessToken() {
-        gets++;
-        return function (this: { value: string }) {
-          return this.value;
-        };
-      },
-    };
-    const { client, request } = setup({ gg });
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    await operation.generate({ prompt: PROMPT });
-    expect(gets).toBe(1);
+describe("MusicClient current GG operation", () => {
+  it("runs a new ID using its discovered endpoint and returns only native MP3 bytes", async () => {
+    const { client, request, download } = setup();
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    expect(Object.isFrozen(selected)).toBe(true);
+    expect(Object.keys(client)).toEqual([]);
     expect(
-      new Headers(request.mock.calls[0][1]?.headers).get("authorization")
-    ).toBe(`Bearer ${TOKEN}`);
-  });
-
-  it.each(["auto", "replicate", "fal", "vercel"])(
-    "rejects unowned provider %s without token or transport work",
-    async (provider) => {
-      const { client, request, read } = setup();
-      await failure(
-        client.resolve({ model_id: ID, provider } as MusicClient.Selection),
-        "invalid_input"
-      );
-      expect(read).not.toHaveBeenCalled();
-      expect(request).not.toHaveBeenCalled();
-    }
-  );
-
-  it.each(["unknown/model", "__proto__", "google/veo-3.1"])(
-    "refuses unbound model %s before token lookup",
-    async (model_id) => {
-      const { client, request, read } = setup();
-      await failure(
-        client.resolve({ model_id, provider: "gg" }),
-        "model_unavailable"
-      );
-      expect(read).not.toHaveBeenCalled();
-      expect(request).not.toHaveBeenCalled();
-    }
-  );
-
-  it.each([
-    { prompt: " " },
-    { prompt: "a".repeat(4097) },
-    { prompt: "😀".repeat(2049) },
-    { prompt: PROMPT, seed: 1.5 },
-    { prompt: PROMPT, seed: Infinity },
-    { prompt: PROMPT, seed: null },
-    { prompt: PROMPT, images: [] },
-    { prompt: PROMPT, lyrics: "not a GG field" },
-    { prompt: PROMPT, n: 2 },
-    { prompt: PROMPT, duration: 30 },
-    { prompt: PROMPT, output_format: "wav" },
-  ])("rejects invalid or unrequested generation input", async (input) => {
-    const { client, read, request } = setup();
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    await failure(
-      operation.generate(input as MusicClient.Input),
-      "invalid_input"
-    );
-    expect(read).toHaveBeenCalledOnce();
-    expect(request).not.toHaveBeenCalled();
-  });
-
-  it("counts trimmed prompt length in UTF16 units, preserves the safe-integer seed range, and omits an absent seed", async () => {
-    const { client, request } = setup();
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    await operation.generate({
-      prompt: ` ${"😀".repeat(2048)} `,
-      seed: Number.MIN_SAFE_INTEGER,
-    });
-    expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
-      model_id: ID,
-      prompt: "😀".repeat(2048),
-      seed: Number.MIN_SAFE_INTEGER,
-    });
-    await operation.generate({ prompt: "short" });
-    expect(JSON.parse(String(request.mock.calls[1][1]?.body))).toEqual({
-      model_id: ID,
-      prompt: "short",
-    });
-  });
-
-  it("snapshots input getters once and contains throwing getters", async () => {
-    const { client, request } = setup();
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    let reads = 0;
-    await operation.generate({
-      get prompt() {
-        reads++;
-        return PROMPT;
-      },
-    });
-    expect(reads).toBe(1);
-    await failure(
-      operation.generate({
-        get prompt(): string {
-          throw new Error(TOKEN);
-        },
-      }),
-      "invalid_input"
-    );
-    await failure(
-      client.resolve({
-        get model_id(): string {
-          throw new Error(TOKEN);
-        },
-        provider: "gg",
-      }),
-      "invalid_input"
-    );
-    expect(request).toHaveBeenCalledOnce();
-  });
-
-  it("rechecks live scoped custody per submission and does not recall accepted output after clear", async () => {
-    const gg = new GridaGatewaySessionStore();
-    gg.set({ access_token: TOKEN, expires_at: Date.now() + 600_000 });
-    const { client, request } = setup({ gg });
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    gg.set({
-      access_token: "rotated-scoped",
-      expires_at: Date.now() + 600_000,
-    });
-    request.mockImplementation(async () => {
-      gg.clear();
-      return Response.json(wire());
-    });
-    expect(await operation.generate({ prompt: PROMPT })).toEqual({
+      await selected.generate({ prompt: "  A quiet piano melody  ", seed: 0 })
+    ).toEqual({
       audio: { data: DATA, media_type: "audio/mpeg" },
+      request_id: "req_music",
+    });
+    expect(request.mock.calls.map(([url]) => String(url))).toEqual([
+      "https://grida.example/api/v1/ai/operations",
+      "https://grida.example/api/v1/ai/jobs?request_id=req_music",
+    ]);
+    expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
+      operation_id: "music.fixture.new-music.generate",
+      input: { prompt: "A quiet piano melody", seed: 0 },
+    });
+    expect(download).toHaveBeenCalledWith(URL, {
+      signal: expect.any(AbortSignal),
     });
     expect(
-      new Headers(request.mock.calls[0][1]?.headers).get("authorization")
-    ).toBe("Bearer rotated-scoped");
-    await failure(operation.generate({ prompt: PROMPT }), "gg_token_expired");
-    expect(request).toHaveBeenCalledOnce();
+      new Headers(download.mock.calls[0][1]?.headers).has("authorization")
+    ).toBe(false);
   });
-
-  it("refuses absent and near-expiry scoped tokens", async () => {
-    const gg = new GridaGatewaySessionStore();
-    const { client, request } = setup({ gg });
+  it("does not infer availability from old Lyria IDs or accept another provider", async () => {
+    const { client, request, download } = setup();
     await failure(
-      client.resolve({ model_id: ID, provider: "gg" }),
-      "gg_token_expired"
+      client.resolve({ model_id: "google/lyria-3", provider: "gg" }),
+      "model_unavailable"
     );
-    gg.set({ access_token: TOKEN, expires_at: Date.now() + 10_000 });
     await failure(
-      client.resolve({ model_id: ID, provider: "gg" }),
-      "gg_token_expired"
+      client.resolve({ model_id: ID, provider: "fal" } as never),
+      "invalid_input"
     );
     expect(request).not.toHaveBeenCalled();
+    expect(download).not.toHaveBeenCalled();
   });
-
+  it("rechecks scoped custody for the submission and every original-job lookup", async () => {
+    const { client, request, read } = setup();
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    read.mockReturnValue("replacement-scoped-token");
+    await selected.generate({ prompt: "A piano" });
+    for (const [, init] of request.mock.calls)
+      expect(new Headers(init?.headers).get("authorization")).toBe(
+        "Bearer replacement-scoped-token"
+      );
+    read.mockReturnValue(null);
+    await failure(selected.generate({ prompt: "A piano" }), "gg_token_expired");
+    expect(request).toHaveBeenCalledTimes(2);
+  });
   it.each([
     [401, "gg_token_expired"],
     [402, "insufficient_credits"],
     [429, "generation_failed"],
     [503, "generation_failed"],
   ] as const)(
-    "does not retry or expose an HTTP%i response body",
+    "contains HTTP %i without retry or response leakage",
     async (status, code) => {
-      const { client, request } = setup();
-      request.mockImplementation(async () => new Response(TOKEN, { status }));
-      const operation = await client.resolve({ model_id: ID, provider: "gg" });
-      await failure(operation.generate({ prompt: PROMPT }), code);
+      const { client, request, download } = setup();
+      const selected = await client.resolve({ model_id: ID, provider: "gg" });
+      request.mockImplementation(
+        async () => new Response("upstream-secret", { status })
+      );
+      await failure(selected.generate({ prompt: "A piano" }), code);
       expect(request).toHaveBeenCalledOnce();
+      expect(download).not.toHaveBeenCalled();
     }
   );
-
-  it("contains transport/parser/credential exceptions and logs no upstream detail", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const { client, request, read } = setup();
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    request.mockRejectedValueOnce(
-      new Proxy(
-        {},
-        {
-          getPrototypeOf() {
-            throw new Error(TOKEN);
-          },
-        }
+  it.each([
+    { prompt: "" },
+    { prompt: "a", seed: 1.2 },
+    { prompt: "a", extra: "secret" },
+    { prompt: "x".repeat(4097) },
+  ])("rejects malformed native input before dispatch %j", async (input) => {
+    const { client, request } = setup();
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    await failure(
+      selected.generate(input as MusicClient.Input),
+      "invalid_input"
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+  it.each([
+    { url: "http://private.example/a.mp3", media_type: "audio/mpeg" },
+    {
+      url: "https://user:secret@assets.example/a.mp3",
+      media_type: "audio/mpeg",
+    },
+    { url: URL, media_type: "audio/wav" },
+    { media_type: "audio/mpeg" },
+    null,
+  ])(
+    "rejects unsupported result contracts without downloading %j",
+    async (audio) => {
+      const { client, request, download } = setup();
+      const selected = await client.resolve({ model_id: ID, provider: "gg" });
+      request.mockImplementation(async (url) =>
+        Response.json(
+          String(url).includes("/jobs?")
+            ? job(audio)
+            : { id: "req_music", request_id: "req_music" }
+        )
+      );
+      await failure(
+        selected.generate({ prompt: "A piano" }),
+        "invalid_response",
+        "req_music"
+      );
+      expect(download).not.toHaveBeenCalled();
+    }
+  );
+  it("does not expose the provider URL, filenames, warnings or secret metadata", async () => {
+    const { client, request } = setup();
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    request.mockImplementation(async (url) =>
+      Response.json(
+        String(url).includes("/jobs?")
+          ? {
+              ...job(),
+              warning: "secret",
+              input: "secret",
+              stored_media: "secret",
+            }
+          : { id: "req_music", request_id: "req_music" }
       )
     );
-    await failure(operation.generate({ prompt: PROMPT }), "generation_failed");
-    request.mockResolvedValueOnce(new Response(`{ secret ${TOKEN}`));
-    await failure(operation.generate({ prompt: PROMPT }), "generation_failed");
-    read.mockImplementation(() => {
-      throw new Error(TOKEN);
+    expect(await selected.generate({ prompt: "A piano" })).toEqual({
+      audio: { data: DATA, media_type: "audio/mpeg" },
+      request_id: "req_music",
     });
-    await failure(operation.generate({ prompt: PROMPT }), "generation_failed");
-    expect(request).toHaveBeenCalledTimes(2);
-    expect(warn).not.toHaveBeenCalled();
-    expect(log).not.toHaveBeenCalled();
-    expect(error).not.toHaveBeenCalled();
   });
-
-  it("discards filename, URLs, warnings, receipts, and extra provider metadata", async () => {
+  it("refuses private result targets and bounds the downloaded bytes", async () => {
     const { client, request, download } = setup();
-    request.mockResolvedValue(
-      Response.json({
-        ...wire(),
-        secret: TOKEN,
-        stored_media: [TOKEN],
-        warnings: [PROMPT],
-        audio: {
-          ...wire().audio,
-          file_name: "alternate-safe-name.mp3",
-          url: "https://untrusted.example/audio",
-          secret: TOKEN,
-        },
-      })
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    request.mockImplementation(async (url) =>
+      Response.json(
+        String(url).includes("/jobs?")
+          ? job({
+              url: "https://127.0.0.1/music.mp3",
+              media_type: "audio/mpeg",
+            })
+          : { id: "req_music", request_id: "req_music" }
+      )
     );
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    const result = await operation.generate({ prompt: PROMPT });
-    expect(result).toEqual({ audio: { data: DATA, media_type: "audio/mpeg" } });
-    expect(result.audio.data.constructor).toBe(Uint8Array);
+    await failure(
+      selected.generate({ prompt: "A piano" }),
+      "generation_failed",
+      "req_music"
+    );
     expect(download).not.toHaveBeenCalled();
-  });
-
-  it.each(
-    [
-      null,
-      { ...wire(), model_id: PRO },
-      { ...wire(), provider_id: "replicate" },
-      { ...wire(), audio: null },
-      { ...wire(), audio: { ...wire().audio, base64: "" } },
-      { ...wire(), audio: { ...wire().audio, base64: "!!!=" } },
-      { ...wire(), audio: { ...wire().audio, base64: "SUQ" } },
-      { ...wire(), audio: { ...wire().audio, media_type: "audio/wav" } },
-      { ...wire(), audio: { ...wire().audio, file_name: "../private.mp3" } },
-      { ...wire(), audio: { ...wire().audio, file_name: "private\\file.mp3" } },
-      {
-        ...wire(),
-        audio: {
-          url: "https://untrusted.example/audio",
-          media_type: "audio/mpeg",
-          file_name: "music.mp3",
-        },
-      },
-    ].map((response) => [response])
-  )("refuses malformed hosted result bindings and audio", async (response) => {
-    const { client, request, download } = setup();
-    request.mockResolvedValue(Response.json(response));
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    await failure(operation.generate({ prompt: PROMPT }), "invalid_response");
-    expect(request).toHaveBeenCalledOnce();
-    expect(download).not.toHaveBeenCalled();
-  });
-
-  it("refuses unused authority/configuration fields at construction", () => {
-    const http = new ProviderHttp({
-      request: vi.fn<typeof fetch>(),
-      download: vi.fn<typeof fetch>(),
-    });
-    expect(
-      () =>
-        new MusicClient({
-          http,
-          gg: { getAccessToken: () => TOKEN },
-          gg_base_url: ORIGIN,
-          keys: {},
-        } as MusicClient.Options)
-    ).toThrow("invalid_input");
-    expect(
-      () =>
-        new MusicClient({
-          http,
-          gg: { getAccessToken: () => TOKEN },
-          gg_base_url: "https://user:secret@gg.example",
+    request.mockImplementation(async (url) =>
+      Response.json(
+        String(url).includes("/jobs?")
+          ? job()
+          : { id: "req_music", request_id: "req_music" }
+      )
+    );
+    download.mockImplementation(
+      async () =>
+        new Response(DATA, {
+          headers: { "content-length": String(33 * 1024 * 1024) },
         })
-    ).toThrow("invalid_input");
+    );
+    await failure(
+      selected.generate({ prompt: "A piano" }),
+      "generation_failed",
+      "req_music"
+    );
+  });
+  it("aborts before submission without acquiring another credential", async () => {
+    const { client, request, read } = setup();
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    const before = read.mock.calls.length;
+    await failure(
+      selected.generate({ prompt: "A piano", signal: AbortSignal.abort() }),
+      "aborted"
+    );
+    expect(request).not.toHaveBeenCalled();
+    expect(read).toHaveBeenCalledTimes(before);
+  });
+  it("settles a host transport that ignores cancellation at the whole invocation deadline", async () => {
+    vi.useFakeTimers();
+    const { client, request } = setup();
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    request.mockImplementation(async () => new Promise<Response>(() => {}));
+    const check = failure(selected.generate({ prompt: "A piano" }), "timeout");
+    await vi.advanceTimersByTimeAsync(600_001);
+    await check;
+    expect(request).toHaveBeenCalledOnce();
   });
 });
 
-describe("music invocation bounds", () => {
-  it("lets a host cancellation timer run during an always-ready empty response stream", async () => {
-    const { client, request } = setup();
-    const controller = new AbortController();
-    let pulls = 0;
-    const cancel = vi.fn<() => void>();
-    const response = new Response(
-      new ReadableStream<Uint8Array>({
-        pull(stream) {
-          if (++pulls > 256) {
-            stream.error(new Error("fixture exhausted"));
-            return;
-          }
-          stream.enqueue(new Uint8Array());
-        },
-        cancel,
-      })
-    );
-    request.mockImplementation(async () => {
-      setTimeout(() => controller.abort(), 0);
-      return response;
+describe("music accepted work and result integrity", () => {
+  it("preserves availability classification when discovery withdraws the operation before dispatch", async () => {
+    const catalogue = fixtureGGDiscovery([{ id: ID, kind: "music" }]);
+    const request = vi.fn<typeof fetch>();
+    const client = new MusicClient({
+      http: new ProviderHttp({ request, download: vi.fn<typeof fetch>() }),
+      gg: { getAccessToken: () => TOKEN },
+      gg_base_url: "https://grida.example",
+      gg_catalog: catalogue,
     });
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    await failure(
-      operation.generate({ prompt: PROMPT, signal: controller.signal }),
-      "aborted"
-    );
-    expect(pulls).toBeLessThan(130);
-    expect(cancel).toHaveBeenCalledOnce();
-    expect(response.body!.locked).toBe(false);
-  });
-
-  it("aborts before token lookup/submission and contains abort-during-token rejected work", async () => {
-    const { client, request, read } = setup();
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    const controller = new AbortController();
-    controller.abort();
-    await failure(
-      operation.generate({ prompt: PROMPT, signal: controller.signal }),
-      "aborted"
-    );
-    expect(read).toHaveBeenCalledOnce();
-    const next = new AbortController();
-    read.mockImplementation(() => {
-      next.abort();
-      throw new Error(TOKEN);
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    vi.spyOn(catalogue, "ready").mockResolvedValue({
+      ...catalogue.view()!,
+      operations: [],
     });
     await failure(
-      operation.generate({ prompt: PROMPT, signal: next.signal }),
-      "aborted"
+      selected.generate({ prompt: "A piano" }),
+      "model_unavailable"
     );
     expect(request).not.toHaveBeenCalled();
   });
-
-  it("settles an ignored cancellation transport at the whole deadline and cancels late output", async () => {
+  it("accepts an original job completing after five minutes without another submission", async () => {
     vi.useFakeTimers();
     const { client, request } = setup();
-    const response = deferred<Response>();
-    request.mockReturnValue(response.promise);
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    const checked = failure(operation.generate({ prompt: PROMPT }), "timeout");
-    await vi.advanceTimersByTimeAsync(300_000);
-    await checked;
-    const cancel = vi.fn<() => void>();
-    response.resolve(new Response(new ReadableStream({ cancel })));
-    await vi.advanceTimersByTimeAsync(1);
-    expect(cancel).toHaveBeenCalledOnce();
-    expect(request).toHaveBeenCalledOnce();
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
-  it("refuses a token reader's late continuation before the deadline timer runs", async () => {
-    const { client, request, read } = setup();
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    let now = 0;
-    vi.spyOn(performance, "now").mockImplementation(() => now);
-    read.mockImplementation(() => {
-      now = 300_001;
-      return TOKEN;
-    });
-    await failure(operation.generate({ prompt: PROMPT }), "timeout");
-    expect(request).not.toHaveBeenCalled();
-  });
-
-  it("aborts and unlocks a stalled body without awaiting uncooperative cancellation", async () => {
-    const { client, request } = setup();
-    const started = deferred<void>();
-    const cancel = vi.fn<() => Promise<void>>(() => new Promise(() => {}));
-    const response = new Response(
-      new ReadableStream({
-        pull() {
-          started.resolve();
-        },
-        cancel,
-      })
-    );
-    request.mockResolvedValue(response);
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    const controller = new AbortController();
-    const checked = failure(
-      operation.generate({ prompt: PROMPT, signal: controller.signal }),
-      "aborted"
-    );
-    await started.promise;
-    await Promise.resolve();
-    controller.abort();
-    await checked;
-    expect(cancel).toHaveBeenCalledOnce();
-    expect(response.body!.locked).toBe(false);
-  });
-
-  it("rejects an oversized encoded envelope before reading its body", async () => {
-    const { client, request } = setup();
-    const cancel = vi.fn<() => void>();
-    const pull = vi.fn<() => void>();
-    request.mockResolvedValue(
-      new Response(new ReadableStream({ pull, cancel }), {
-        headers: {
-          "content-length": String(
-            Math.ceil((32 * 1024 * 1024) / 3) * 4 + 4097
-          ),
-        },
-      })
-    );
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    await failure(operation.generate({ prompt: PROMPT }), "invalid_response");
-    expect(cancel).toHaveBeenCalledOnce();
-    expect(pull.mock.calls.length).toBeLessThanOrEqual(1);
-  });
-
-  it("bounds chunked envelopes without trusting Content-Length", async () => {
-    const { client, request } = setup();
-    const cancel = vi.fn<() => void>();
-    request.mockResolvedValue(
-      new Response(
-        new ReadableStream({
-          pull(stream) {
-            stream.enqueue(new Uint8Array(1024 * 1024));
-          },
-          cancel,
-        })
+    const started = Date.now();
+    request.mockImplementation(async (url) =>
+      Response.json(
+        String(url).includes("/jobs?")
+          ? Date.now() - started > 300_000
+            ? job()
+            : {
+                ...job(),
+                status: "running",
+                result_status: "pending",
+                result: null,
+              }
+          : { id: "req_music" }
       )
     );
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    await failure(operation.generate({ prompt: PROMPT }), "invalid_response");
-    expect(cancel).toHaveBeenCalledOnce();
+    const selected = await client.resolve({ model_id: ID, provider: "gg" });
+    const pending = selected.generate({ prompt: "A piano" });
+    await vi.advanceTimersByTimeAsync(302_000);
+    expect(await pending).toEqual({
+      audio: { data: DATA, media_type: "audio/mpeg" },
+      request_id: "req_music",
+    });
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(1);
   });
+  it.each(["poll", "download", "timeout", "abort", "malformed-mp3"])(
+    "keeps the accepted receipt after %s failure without generating again",
+    async (stage) => {
+      vi.useFakeTimers();
+      const { client, request, download } = setup();
+      const abort = new AbortController();
+      request.mockImplementation(async (url) => {
+        if (!String(url).includes("/jobs?"))
+          return Response.json({ id: "req_music" });
+        if (stage === "timeout" || stage === "abort")
+          return new Promise<Response>(() => {});
+        if (stage === "poll") throw new Error("upstream-secret");
+        return Response.json(job());
+      });
+      if (stage === "download") download.mockRejectedValue(new Error("secret"));
+      if (stage === "malformed-mp3")
+        download.mockResolvedValue(new Response("<html>failure</html>"));
+      const selected = await client.resolve({ model_id: ID, provider: "gg" });
+      const code =
+        stage === "timeout"
+          ? "timeout"
+          : stage === "abort"
+            ? "aborted"
+            : stage === "malformed-mp3"
+              ? "invalid_response"
+              : "generation_failed";
+      const pending = failure(
+        selected.generate({ prompt: "A piano", signal: abort.signal }),
+        code,
+        "req_music"
+      );
+      await vi.advanceTimersByTimeAsync(1);
+      if (stage === "abort") abort.abort();
+      if (stage === "timeout") await vi.advanceTimersByTimeAsync(600_001);
+      await pending;
+      expect(
+        request.mock.calls.filter(([, init]) => init?.method === "POST")
+      ).toHaveLength(1);
+    }
+  );
+  it("does not retain unvalidated request identities in safe failures", () => {
+    expect(
+      new MusicClient.Failure("generation_failed", "secret-token").toJSON()
+    ).toEqual({ code: "generation_failed", message: "generation_failed" });
+  });
+});
 
-  it("checks the decoded32MiB ceiling before base64 allocation", async () => {
-    const { client, request } = setup();
-    const oversized = "A".repeat(Math.ceil((32 * 1024 * 1024) / 3) * 4);
-    request.mockResolvedValue(
-      Response.json({
-        ...wire(),
-        audio: { ...wire().audio, base64: oversized },
-      })
+describe("MusicClient original-job recovery", () => {
+  it("recovers paid music after authentication refresh without a catalogue or POST", async () => {
+    const catalogue = fixtureGGDiscovery([]);
+    const request = vi.fn<typeof fetch>(async () =>
+      Response.json({ ...job(), model: ID })
     );
-    const atobSpy = vi.spyOn(globalThis, "atob");
-    const operation = await client.resolve({ model_id: ID, provider: "gg" });
-    await failure(operation.generate({ prompt: PROMPT }), "invalid_response");
-    expect(atobSpy).not.toHaveBeenCalled();
+    const download = vi.fn<typeof fetch>(async () => new Response(DATA));
+    const ready = vi.spyOn(catalogue, "ready");
+    const client = new MusicClient({
+      http: new ProviderHttp({ request, download }),
+      gg: { getAccessToken: () => "replacement-token" },
+      gg_base_url: "https://grida.example",
+      gg_catalog: catalogue,
+    });
+    expect(
+      await client.recover({ request_id: "req_music", model_id: ID })
+    ).toEqual({
+      audio: { data: DATA, media_type: "audio/mpeg" },
+      request_id: "req_music",
+    });
+    expect(ready).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0][1]?.method).toBe("GET");
+    expect(String(request.mock.calls[0][0])).toMatch(
+      /jobs\?request_id=req_music$/
+    );
   });
+  it("rejects recovery of another model before downloading, retaining the receipt", async () => {
+    const { client, request, download } = setup();
+    request.mockResolvedValue(
+      Response.json({ ...job(), model: "fixture/other" })
+    );
+    await failure(
+      client.recover({ request_id: "req_music", model_id: ID }),
+      "invalid_response",
+      "req_music"
+    );
+    expect(download).not.toHaveBeenCalled();
+    expect(request.mock.calls[0][1]?.method).toBe("GET");
+  });
+  it("rejects malformed recovery identities without network or authority reads", async () => {
+    const { client, request, read } = setup();
+    await failure(
+      client.recover({ request_id: "https://secret.example", model_id: ID }),
+      "invalid_input"
+    );
+    expect(request).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+  });
+});
+
+it("rejects generated audio for a different model while preserving the accepted receipt", async () => {
+  const { client, request, download } = setup();
+  request.mockImplementation(async (url) =>
+    Response.json(
+      String(url).includes("/jobs?")
+        ? { ...job(), model: "fixture/other" }
+        : { id: "req_music" }
+    )
+  );
+  const selected = await client.resolve({ model_id: ID, provider: "gg" });
+  await failure(
+    selected.generate({ prompt: "A piano" }),
+    "invalid_response",
+    "req_music"
+  );
+  expect(download).not.toHaveBeenCalled();
+  expect(
+    request.mock.calls.filter(([, init]) => init?.method === "POST")
+  ).toHaveLength(1);
 });

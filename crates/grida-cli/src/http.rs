@@ -39,6 +39,7 @@ const API: &str = "https://grida.co";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lane {
+    Discovery,
     Provider,
     Download,
     Account,
@@ -114,6 +115,7 @@ enum Route {
     Token,
     Logout,
     Account,
+    Discovery,
 }
 
 #[derive(Clone)]
@@ -180,7 +182,7 @@ impl Transport {
             _ => {}
         }
         snapshot(route, &target, &mut request)?;
-        let seconds = if lane == Lane::Account {
+        let seconds = if matches!(lane, Lane::Discovery | Lane::Account) {
             15
         } else if route == Route::Gg && target.path().starts_with("/api/v1/ai/3d/") {
             780
@@ -220,6 +222,24 @@ impl Transport {
     }
 
     fn admit(&self, lane: Lane, url: &Url, method: &Method) -> Result<Route> {
+        if lane == Lane::Discovery {
+            let origin = url.origin().ascii_serialization();
+            let admitted_origin = (url.scheme() == "https"
+                && url.host_str() == Some("gateway.grida.ai")
+                && url.port().is_none())
+                || (self.gg_origin.as_deref() == Some(LOCAL_GG) && origin == LOCAL_GG);
+            return if admitted_origin
+                && url.query().is_none()
+                && *method == Method::GET
+                && matches!(
+                    url.path(),
+                    "/v1/models" | "/v1/endpoints" | "/schemas/operations.json"
+                ) {
+                Ok(Route::Discovery)
+            } else {
+                Err(Error::Failed)
+            };
+        }
         if lane == Lane::Account {
             return self.admit_account(url, method);
         }
@@ -235,11 +255,26 @@ impl Transport {
             return Err(Error::Failed);
         }
         if self.gg_origin.as_deref() == Some(url.origin().ascii_serialization().as_str()) {
+            if *method == Method::GET
+                && path == "/api/v1/ai/jobs"
+                && url.query().is_some_and(|q| {
+                    q.strip_prefix("request_id=").is_some_and(|id| {
+                        id.starts_with("req_")
+                            && id.len() <= 104
+                            && id
+                                .bytes()
+                                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+                    })
+                })
+            {
+                return Ok(Route::Gg);
+            }
             if *method == Method::POST
                 && url.query().is_none()
                 && matches!(
                     path,
-                    "/api/v1/ai/images/generations"
+                    "/api/v1/ai/operations"
+                        | "/api/v1/ai/images/generations"
                         | "/api/v1/ai/videos/generations"
                         | "/api/v1/ai/music/generations"
                         | "/api/v1/ai/3d/uploads"
@@ -487,7 +522,9 @@ impl Transport {
         } else {
             None
         };
-        let limit = request.max_response_bytes.min(if lane == Lane::Account {
+        let limit = request.max_response_bytes.min(if lane == Lane::Discovery {
+            2 * 1024 * 1024
+        } else if lane == Lane::Account {
             ACCOUNT_LIMIT
         } else {
             MAX_RESPONSE
@@ -601,7 +638,7 @@ fn snapshot(route: Route, target: &Url, request: &mut Request) -> Result<()> {
         let name = name.as_str();
         let common = matches!(name, "accept" | "content-type" | "user-agent");
         let allowed = match route {
-            Route::Download => matches!(name, "accept" | "user-agent"),
+            Route::Download | Route::Discovery => matches!(name, "accept" | "user-agent"),
             Route::Upload => common,
             Route::Elevenlabs => common || name == "xi-api-key",
             Route::Token => matches!(name, "accept" | "content-type"),
@@ -631,7 +668,11 @@ fn snapshot(route: Route, target: &Url, request: &mut Request) -> Result<()> {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
     match route {
-        Route::Download => {}
+        Route::Download | Route::Discovery => {
+            if route == Route::Discovery && !request.body.is_empty() {
+                return Err(Error::Failed);
+            }
+        }
         Route::Upload => {
             if content_type != "application/octet-stream"
                 || request.body.is_empty()

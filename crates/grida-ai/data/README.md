@@ -1,33 +1,29 @@
-# Generated runtime assets
+# Generated native adapter inventory
 
-These files are generated copies, **not authoring sources**. They are checked in
-inside the Cargo package so Rust builds are offline and do not require Node.
+`operations.json` is the one generated runtime asset. It contains installed BYOK
+adapter input/output contracts and explicit native Tripo GG file/rigging
+adapters. It is checked in so Cargo builds are offline and require no Node.
+GG image, video and music offerings and schemas are read at runtime from public
+discovery; this bundle is not the GG model inventory.
 
-- Canonical model facts: `data/ai/facts.json`.
-- Grida membership, preferences and tiers: `data/ai/service.json`.
-- Neutral operation field/input contracts: `data/ai/inputs.json`.
-- Schema-1 compatibility projection and ordering: the existing pure TypeScript
-  helpers in `packages/grida-ai-models/src/grida/`.
-- Operation discovery projection: `packages/grida-ai/src/media-operations.ts`
-  and `rigging-operations.ts`, consuming those shared sources.
+The projection consumes:
+
+- Canonical model facts: the pinned public `@grida/ai-models` release.
+- Product membership, preferences and tiers: `data/ai/presets.json`.
+- Implemented native input contracts: `data/ai/native-inputs.json`.
+- Operation projection: `packages/grida-ai/src/media-operations.ts` and
+  `rigging-operations.ts`.
 
 From the repository root:
 
 ```sh
-node packages/grida-ai-models/scripts/generate.mjs
-pnpm --filter @grida/ai-models build
+node scripts/ai-catalogue/generate.mjs
 pnpm --filter @grida/ai build
-node packages/grida-ai-models/scripts/generate.mjs --bundle
-node packages/grida-ai-models/scripts/generate.mjs --bundle --check
+node scripts/ai-catalogue/generate.mjs --bundle
+node scripts/ai-catalogue/generate.mjs --bundle --check
 ```
 
-`facts.json` preserves the authored `lower_snake_case` domain keys. Snapshot and
-service-view bundles retain the existing schema-1/public TypeScript spellings;
-the generator explicitly projects the named text-card and cost fields. Model
-and provider IDs and JSON Schema vocabulary are not renamed.
-
-The generator verifies that the compiled model package actually contains the
-projected authored JSON before producing bundles. Changes to neutral fields are checked
-against both the current TypeScript parser and the pinned migration baseline.
-All authoring lives in repository-root `data/ai/`; crate-local copies do not
-establish ownership. See the [shared data guide](../../../data/ai/README.md).
+The generator verifies that the compiled package contains the selected released
+facts before producing the bundle. Native and TypeScript adapters satisfy the
+same reviewed protocol fixtures. Do not edit the bundle or create a second native
+facts/snapshot/service catalogue. See the [shared data guide](../../../data/ai/README.md).

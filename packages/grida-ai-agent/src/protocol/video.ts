@@ -4,7 +4,7 @@
  * for the `/video/generate` route, no provider SDK imports.
  */
 
-import type { models } from "@grida/ai-models";
+import type { models } from "@grida/ai/catalogue";
 import type { MediaItem } from "@grida/daemon";
 
 /** A BYOK video provider (mirrors {@link models.video.VideoProvider}). */

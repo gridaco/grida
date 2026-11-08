@@ -16,6 +16,7 @@
 
 "use client";
 
+import { useGGModels } from "@/lib/desktop/gg-models";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat, useChat } from "@ai-sdk/react";
 import { AGENT_DEFAULT_MODE } from "@grida/agent";
@@ -389,11 +390,12 @@ export function AISidebarChat({
 
   // Exact native image formats come from the catalogue or an explicit custom
   // endpoint declaration. The broad `multimodal` flag never widens this set.
+  const ggModels = useGGModels();
   const providerFileMimes = useMemo(
     () =>
-      registered_models.resolve(modelId, endpoints, providerId)
+      registered_models.resolve(modelId, endpoints, providerId, ggModels)
         ?.imageInputMimes ?? [],
-    [modelId, providerId, endpoints]
+    [modelId, providerId, endpoints, ggModels]
   );
   // The active session row carries the rolled-up cost the context meter
   // surfaces alongside the (real) window %. This surface has no mode picker,

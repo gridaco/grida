@@ -1,3 +1,4 @@
+import { ggFixture } from "./gg-fixture.mjs";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — isolated public music operation, fixed scoped authority.
 // GRIDA-GG: provider — synthetic MP3 prefix bytes, no provider or account access.
 import assert from "node:assert/strict";
@@ -8,10 +9,10 @@ export async function proveMusic({ load, require, check }) {
   const model = "google/lyria-3";
   const prompt = "A synthetic melody";
   const data = new Uint8Array([0x49, 0x44, 0x33]);
-  const base64 = "SUQz";
   const initialToken = "synthetic-music-gg-no-authority";
   const rotatedToken = "synthetic-rotated-music-gg-no-authority";
   let token = initialToken;
+  let submittedModel = model;
   let mode = "success";
   let downloads = 0;
   let cancelledBodies = 0;
@@ -25,22 +26,40 @@ export async function proveMusic({ load, require, check }) {
   const http = new ProviderHttp({
     request: async (input, init) => {
       const request = new Request(input, init);
-      assert.equal(
-        request.url,
-        "https://gg.example.invalid/api/v1/ai/music/generations"
-      );
-      assert.equal(request.method, "POST");
+      const url = new URL(request.url);
+      assert.equal(url.origin, "https://gg.example.invalid");
       assert.equal(request.headers.get("authorization"), `Bearer ${token}`);
       assert.equal(request.headers.get("cookie"), null);
+      if (request.method === "GET") {
+        assert.equal(url.pathname, "/api/v1/ai/jobs");
+        assert.equal(url.search, "?request_id=req_music");
+        requests.push({ request_id: "req_music" });
+        return Response.json({
+          id: "req_music",
+          request_id: "req_music",
+          model: submittedModel,
+          status: "succeeded",
+          result_status: "available",
+          result: {
+            audio: {
+              url: "https://v3.fal.media/music.mp3",
+              media_type: "audio/mpeg",
+              private_metadata: token,
+            },
+          },
+        });
+      }
+      assert.equal(url.pathname, "/api/v1/ai/operations");
+      assert.equal(request.method, "POST");
       const body = await request.json();
       requests.push(body);
-      assert.deepEqual(Object.keys(body).sort(), [
-        "model_id",
-        "prompt",
-        "seed",
-      ]);
-      assert.equal(body.prompt, prompt);
-      assert.equal(body.seed, 0);
+      submittedModel =
+        body.operation_id === "music.google.lyria-3-pro.generate"
+          ? "google/lyria-3-pro"
+          : model;
+      assert.deepEqual(Object.keys(body).sort(), ["input", "operation_id"]);
+      assert.equal(body.input.prompt, prompt);
+      assert.equal(body.input.seed, 0);
       if (mode === "throw") throw new Error(`${token} ${prompt} upstream-body`);
       if (mode === "401" || mode === "402")
         return new Response(`${token} upstream-body`, { status: Number(mode) });
@@ -56,30 +75,29 @@ export async function proveMusic({ load, require, check }) {
               cancelledBodies++;
             },
           }),
-          { headers: { "content-length": String(64 * 1024 * 1024) } }
+          { headers: { "content-length": String(256 * 1024 * 1024) } }
         );
       return Response.json({
-        model_id: mode === "wrong_model" ? "unrequested/model" : body.model_id,
-        provider_id: "gg",
-        audio: {
-          base64,
-          media_type: "audio/mpeg",
-          file_name: "upstream-name.mp3",
-          private_metadata: token,
-        },
-        stored_media: { private_metadata: token },
-        url: "https://untrusted.example.invalid/music.mp3",
+        id: mode === "wrong_job" ? "wrong" : "req_music",
+        request_id: "req_music",
+        result_status: "pending",
       });
     },
-    download: async () => {
+    download: async (input, init) => {
+      assert.equal(String(input), "https://v3.fal.media/music.mp3");
+      assert.equal(new Headers(init?.headers).has("authorization"), false);
       downloads++;
-      throw new Error("Music cannot grant a download destination");
+      return new Response(data);
     },
   });
   const client = new MusicClient({
     http,
     gg,
     gg_base_url: "https://gg.example.invalid",
+    gg_catalog: await ggFixture(load, [
+      { id: model, kind: "music" },
+      { id: "google/lyria-3-pro", kind: "music" },
+    ]),
   });
   const failure = (code) => (error) => {
     assert(error instanceof MusicClient.Failure);
@@ -91,7 +109,10 @@ export async function proveMusic({ load, require, check }) {
     return true;
   };
   const generated = (result) => {
-    assert.deepEqual(result, { audio: { data, media_type: "audio/mpeg" } });
+    assert.deepEqual(result, {
+      request_id: "req_music",
+      audio: { data, media_type: "audio/mpeg" },
+    });
     assert.equal(result.audio.data.constructor, Uint8Array);
   };
   await check(
@@ -112,7 +133,7 @@ export async function proveMusic({ load, require, check }) {
       assert(Object.isFrozen(operation));
       assert(!JSON.stringify(operation).includes(token));
       generated(await operation.generate({ prompt: `  ${prompt}  `, seed: 0 }));
-      assert.equal(requests.length, before + 1);
+      assert.equal(requests.length, before + 2);
     });
   }
   await check(
@@ -169,7 +190,7 @@ export async function proveMusic({ load, require, check }) {
     ["401", "gg_token_expired"],
     ["402", "insufficient_credits"],
     ["throw", "generation_failed"],
-    ["wrong_model", "invalid_response"],
+    ["wrong_job", "invalid_response"],
     ["oversized", "invalid_response"],
   ]) {
     await check(
@@ -232,7 +253,7 @@ export async function proveMusic({ load, require, check }) {
       }
     }
   );
-  assert.equal(downloads, 0);
+  assert.equal(downloads, 3);
   assert.equal(cancelledBodies, 2);
   return {
     requests: requests.length,

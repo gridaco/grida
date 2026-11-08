@@ -112,63 +112,6 @@
     }
   },
   {
-    "id": "image/bfl/flux-2-max/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "bfl/flux-2-max",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "auto"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "bfl/flux-2-max",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
     "id": "image/bfl/flux-2-max/openrouter/references",
     "selector": {
       "kind": "image",
@@ -449,63 +392,6 @@
             "content-type": "image/png"
           },
           "base64": "iVBORw0KGgo="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
-    "id": "image/bfl/flux-2-pro/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "bfl/flux-2-pro",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "auto"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "bfl/flux-2-pro",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
         }
       }
     ],
@@ -816,63 +702,6 @@
     }
   },
   {
-    "id": "image/bytedance/seedream-5.0-lite/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "bytedance/seedream-5.0-lite",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "auto"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "bytedance/seedream-5.0-lite",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
     "id": "image/bytedance/seedream-5.0-lite/openrouter/references",
     "selector": {
       "kind": "image",
@@ -1153,63 +982,6 @@
             "content-type": "image/png"
           },
           "base64": "iVBORw0KGgo="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
-    "id": "image/bytedance/seedream-5.0-pro/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "bytedance/seedream-5.0-pro",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "auto"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "bytedance/seedream-5.0-pro",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
         }
       }
     ],
@@ -1520,63 +1292,6 @@
     }
   },
   {
-    "id": "image/google/gemini-3-pro-image/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "google/gemini-3-pro-image",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "auto"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "google/gemini-3-pro-image",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
     "id": "image/google/gemini-3-pro-image/openrouter/references",
     "selector": {
       "kind": "image",
@@ -1857,63 +1572,6 @@
             "content-type": "image/png"
           },
           "base64": "iVBORw0KGgo="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
-    "id": "image/google/gemini-3.1-flash-image-preview/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "google/gemini-3.1-flash-image-preview",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "auto"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "google/gemini-3.1-flash-image-preview",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
         }
       }
     ],
@@ -2334,64 +1992,6 @@
     }
   },
   {
-    "id": "image/openai/gpt-image-2.5-flare/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "openai/gpt-image-2.5-flare",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "transparent"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "openai/gpt-image-2.5-flare",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0,
-            "background": "transparent"
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
     "id": "image/openai/gpt-image-2.5-flare/openrouter/references",
     "selector": {
       "kind": "image",
@@ -2404,7 +2004,7 @@
       "size": "1024x1024",
       "aspect_ratio": "16:9",
       "quality": "medium",
-      "background": "auto",
+      "background": "transparent",
       "references": ["https://assets.example/image.png"]
     },
     "transcript": [
@@ -2424,6 +2024,8 @@
             "size": "1024x1024",
             "aspect_ratio": "16:9",
             "quality": "medium",
+            "background": "transparent",
+            "output_format": "png",
             "input_references": [
               {
                 "type": "image_url",
@@ -2467,7 +2069,7 @@
       "size": "1024x1024",
       "aspect_ratio": "16:9",
       "quality": "medium",
-      "background": "auto"
+      "background": "transparent"
     },
     "transcript": [
       {
@@ -2485,7 +2087,9 @@
             "n": 1,
             "size": "1024x1024",
             "aspect_ratio": "16:9",
-            "quality": "medium"
+            "quality": "medium",
+            "background": "transparent",
+            "output_format": "png"
           }
         },
         "response": {
@@ -2795,64 +2399,6 @@
     }
   },
   {
-    "id": "image/openai/gpt-image-2.5-sunburst/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "openai/gpt-image-2.5-sunburst",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "transparent"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "openai/gpt-image-2.5-sunburst",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0,
-            "background": "transparent"
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
     "id": "image/openai/gpt-image-2.5-sunburst/openrouter/references",
     "selector": {
       "kind": "image",
@@ -2865,7 +2411,7 @@
       "size": "1024x1024",
       "aspect_ratio": "16:9",
       "quality": "medium",
-      "background": "auto",
+      "background": "transparent",
       "references": ["https://assets.example/image.png"]
     },
     "transcript": [
@@ -2885,6 +2431,8 @@
             "size": "1024x1024",
             "aspect_ratio": "16:9",
             "quality": "medium",
+            "background": "transparent",
+            "output_format": "png",
             "input_references": [
               {
                 "type": "image_url",
@@ -2928,7 +2476,7 @@
       "size": "1024x1024",
       "aspect_ratio": "16:9",
       "quality": "medium",
-      "background": "auto"
+      "background": "transparent"
     },
     "transcript": [
       {
@@ -2946,7 +2494,9 @@
             "n": 1,
             "size": "1024x1024",
             "aspect_ratio": "16:9",
-            "quality": "medium"
+            "quality": "medium",
+            "background": "transparent",
+            "output_format": "png"
           }
         },
         "response": {
@@ -3054,7 +2604,7 @@
         "request": {
           "lane": "provider",
           "method": "POST",
-          "url": "https://queue.fal.run/fal-ai/gpt-image-2",
+          "url": "https://queue.fal.run/openai/gpt-image-2",
           "headers": {
             "authorization": "Key synthetic-key",
             "content-type": "application/json"
@@ -3133,63 +2683,6 @@
             "content-type": "image/png"
           },
           "base64": "iVBORw0KGgo="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
-    "id": "image/openai/gpt-image-2/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "openai/gpt-image-2",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "auto"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "openai/gpt-image-2",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
         }
       }
     ],
@@ -3500,63 +2993,6 @@
     }
   },
   {
-    "id": "image/recraft/recraft-v4.1/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "recraft/recraft-v4.1",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "auto"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "recraft/recraft-v4.1",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
     "id": "image/recraft/recraft-v4.1/openrouter/references",
     "selector": {
       "kind": "image",
@@ -3852,63 +3288,6 @@
     }
   },
   {
-    "id": "image/xai/grok-imagine-image-2.0/gg/text",
-    "selector": {
-      "kind": "image",
-      "model_id": "xai/grok-imagine-image-2.0",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "size": "1024x1024",
-      "aspect_ratio": "16:9",
-      "seed": 0,
-      "quality": "medium",
-      "background": "auto"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/images/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "xai/grok-imagine-image-2.0",
-            "prompt": " synthetic prompt ",
-            "n": 1,
-            "width": 1024,
-            "height": 1024,
-            "aspect_ratio": "16:9",
-            "quality": "medium",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpbWFnZXMiOlt7ImJhc2U2NCI6ImlWQk9SdzBLR2dvPSJ9XX0="
-        }
-      }
-    ],
-    "result": {
-      "images": [
-        {
-          "data": {
-            "base64": "iVBORw0KGgo="
-          },
-          "media_type": "image/png"
-        }
-      ]
-    }
-  },
-  {
     "id": "image/xai/grok-imagine-image-2.0/openrouter/references",
     "selector": {
       "kind": "image",
@@ -4089,98 +3468,6 @@
           "media_type": "image/png"
         }
       ]
-    }
-  },
-  {
-    "id": "music/google/lyria-3-pro/gg/text",
-    "selector": {
-      "kind": "music",
-      "model_id": "google/lyria-3-pro",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "seed": 0
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/music/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "google/lyria-3-pro",
-            "prompt": "synthetic prompt",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJtb2RlbF9pZCI6Imdvb2dsZS9seXJpYS0zLXBybyIsInByb3ZpZGVyX2lkIjoiZ2ciLCJhdWRpbyI6eyJiYXNlNjQiOiJBUUlEIiwibWVkaWFfdHlwZSI6ImF1ZGlvL21wZWciLCJmaWxlX25hbWUiOiJtdXNpYy5tcDMifX0="
-        }
-      }
-    ],
-    "result": {
-      "audio": {
-        "data": {
-          "base64": "AQID"
-        },
-        "media_type": "audio/mpeg"
-      }
-    }
-  },
-  {
-    "id": "music/google/lyria-3/gg/text",
-    "selector": {
-      "kind": "music",
-      "model_id": "google/lyria-3",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "seed": 0
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/music/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "google/lyria-3",
-            "prompt": "synthetic prompt",
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJtb2RlbF9pZCI6Imdvb2dsZS9seXJpYS0zIiwicHJvdmlkZXJfaWQiOiJnZyIsImF1ZGlvIjp7ImJhc2U2NCI6IkFRSUQiLCJtZWRpYV90eXBlIjoiYXVkaW8vbXBlZyIsImZpbGVfbmFtZSI6Im11c2ljLm1wMyJ9fQ=="
-        }
-      }
-    ],
-    "result": {
-      "audio": {
-        "data": {
-          "base64": "AQID"
-        },
-        "media_type": "audio/mpeg"
-      }
     }
   },
   {
@@ -6817,11 +6104,11 @@
     }
   },
   {
-    "id": "video/alibaba/wan-3.0/gg/text",
+    "id": "video/alibaba/wan-3.0/openrouter/text",
     "selector": {
       "kind": "video",
       "model_id": "alibaba/wan-3.0",
-      "provider": "gg",
+      "provider": "openrouter",
       "variant": "text"
     },
     "input": {
@@ -6836,18 +6123,18 @@
         "request": {
           "lane": "provider",
           "method": "POST",
-          "url": "https://gg.example/api/v1/ai/videos/generations",
+          "url": "https://openrouter.ai/api/v1/videos",
           "headers": {
-            "authorization": "Bearer synthetic-token",
+            "authorization": "Bearer synthetic-key",
             "content-type": "application/json"
           },
           "body": {
-            "model_id": "alibaba/wan-3.0",
+            "model": "alibaba/wan-3.0",
             "prompt": " synthetic prompt ",
             "aspect_ratio": "16:9",
-            "resolution": "1024x1024",
             "duration": 1,
-            "seed": 0
+            "seed": 0,
+            "size": "1024x1024"
           }
         },
         "response": {
@@ -6855,7 +6142,45 @@
           "headers": {
             "content-type": "application/json"
           },
-          "base64": "eyJ2aWRlb3MiOlt7ImJhc2U2NCI6IkFRSUQiLCJtZWRpYV90eXBlIjoidmlkZW8vbXA0In1dfQ=="
+          "base64": "eyJpZCI6InZpZGVvLXRlc3QifQ=="
+        }
+      },
+      {
+        "request": {
+          "lane": "provider",
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/videos/video-test",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": null
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json"
+          },
+          "base64": "eyJzdGF0dXMiOiJjb21wbGV0ZWQifQ=="
+        }
+      },
+      {
+        "request": {
+          "lane": "provider",
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/videos/video-test/content?index=0",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": null
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "video/mp4"
+          },
+          "base64": "AQID"
         }
       }
     ],
@@ -7105,108 +6430,6 @@
     }
   },
   {
-    "id": "video/bytedance/seedance-2.0/openrouter/image",
-    "selector": {
-      "kind": "video",
-      "model_id": "bytedance/seedance-2.0",
-      "provider": "openrouter",
-      "variant": "image"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "aspect_ratio": "16:9",
-      "resolution": "1024x1024",
-      "duration": 1,
-      "seed": 0,
-      "image_url": "https://assets.example/image.png"
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://openrouter.ai/api/v1/videos",
-          "headers": {
-            "authorization": "Bearer synthetic-key",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model": "bytedance/seedance-2.0",
-            "prompt": " synthetic prompt ",
-            "aspect_ratio": "16:9",
-            "duration": 1,
-            "seed": 0,
-            "size": "1024x1024",
-            "frame_images": [
-              {
-                "type": "image_url",
-                "image_url": {
-                  "url": "https://assets.example/image.png"
-                },
-                "frame_type": "first_frame"
-              }
-            ]
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJpZCI6InZpZGVvLXRlc3QifQ=="
-        }
-      },
-      {
-        "request": {
-          "lane": "provider",
-          "method": "GET",
-          "url": "https://openrouter.ai/api/v1/videos/video-test",
-          "headers": {
-            "authorization": "Bearer synthetic-key",
-            "content-type": "application/json"
-          },
-          "body": null
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJzdGF0dXMiOiJjb21wbGV0ZWQifQ=="
-        }
-      },
-      {
-        "request": {
-          "lane": "provider",
-          "method": "GET",
-          "url": "https://openrouter.ai/api/v1/videos/video-test/content?index=0",
-          "headers": {
-            "authorization": "Bearer synthetic-key",
-            "content-type": "application/json"
-          },
-          "body": null
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "video/mp4"
-          },
-          "base64": "AQID"
-        }
-      }
-    ],
-    "result": {
-      "videos": [
-        {
-          "data": {
-            "base64": "AQID"
-          },
-          "media_type": "video/mp4"
-        }
-      ]
-    }
-  },
-  {
     "id": "video/bytedance/seedance-2.0/openrouter/text",
     "selector": {
       "kind": "video",
@@ -7408,6 +6631,98 @@
     }
   },
   {
+    "id": "video/bytedance/seedance-2.5/openrouter/text",
+    "selector": {
+      "kind": "video",
+      "model_id": "bytedance/seedance-2.5",
+      "provider": "openrouter",
+      "variant": "text"
+    },
+    "input": {
+      "prompt": " synthetic prompt ",
+      "aspect_ratio": "16:9",
+      "resolution": "1024x1024",
+      "duration": 1,
+      "seed": 0
+    },
+    "transcript": [
+      {
+        "request": {
+          "lane": "provider",
+          "method": "POST",
+          "url": "https://openrouter.ai/api/v1/videos",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "bytedance/seedance-2.5",
+            "prompt": " synthetic prompt ",
+            "aspect_ratio": "16:9",
+            "duration": 1,
+            "seed": 0,
+            "size": "1024x1024"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json"
+          },
+          "base64": "eyJpZCI6InZpZGVvLXRlc3QifQ=="
+        }
+      },
+      {
+        "request": {
+          "lane": "provider",
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/videos/video-test",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": null
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json"
+          },
+          "base64": "eyJzdGF0dXMiOiJjb21wbGV0ZWQifQ=="
+        }
+      },
+      {
+        "request": {
+          "lane": "provider",
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/videos/video-test/content?index=0",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": null
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "video/mp4"
+          },
+          "base64": "AQID"
+        }
+      }
+    ],
+    "result": {
+      "videos": [
+        {
+          "data": {
+            "base64": "AQID"
+          },
+          "media_type": "video/mp4"
+        }
+      ]
+    }
+  },
+  {
     "id": "video/google/veo-3.1-fast/fal/image",
     "selector": {
       "kind": "video",
@@ -7517,11 +6832,11 @@
     }
   },
   {
-    "id": "video/google/veo-3.1-fast/gg/text",
+    "id": "video/google/veo-3.1-fast/openrouter/text",
     "selector": {
       "kind": "video",
       "model_id": "google/veo-3.1-fast",
-      "provider": "gg",
+      "provider": "openrouter",
       "variant": "text"
     },
     "input": {
@@ -7536,18 +6851,18 @@
         "request": {
           "lane": "provider",
           "method": "POST",
-          "url": "https://gg.example/api/v1/ai/videos/generations",
+          "url": "https://openrouter.ai/api/v1/videos",
           "headers": {
-            "authorization": "Bearer synthetic-token",
+            "authorization": "Bearer synthetic-key",
             "content-type": "application/json"
           },
           "body": {
-            "model_id": "google/veo-3.1-fast",
+            "model": "google/veo-3.1-fast",
             "prompt": " synthetic prompt ",
             "aspect_ratio": "16:9",
-            "resolution": "1024x1024",
             "duration": 1,
-            "seed": 0
+            "seed": 0,
+            "size": "1024x1024"
           }
         },
         "response": {
@@ -7555,7 +6870,45 @@
           "headers": {
             "content-type": "application/json"
           },
-          "base64": "eyJ2aWRlb3MiOlt7ImJhc2U2NCI6IkFRSUQiLCJtZWRpYV90eXBlIjoidmlkZW8vbXA0In1dfQ=="
+          "base64": "eyJpZCI6InZpZGVvLXRlc3QifQ=="
+        }
+      },
+      {
+        "request": {
+          "lane": "provider",
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/videos/video-test",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": null
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json"
+          },
+          "base64": "eyJzdGF0dXMiOiJjb21wbGV0ZWQifQ=="
+        }
+      },
+      {
+        "request": {
+          "lane": "provider",
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/videos/video-test/content?index=0",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": null
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "video/mp4"
+          },
+          "base64": "AQID"
         }
       }
     ],
@@ -7810,11 +7163,11 @@
     }
   },
   {
-    "id": "video/google/veo-3.1-lite/gg/text",
+    "id": "video/google/veo-3.1-lite/openrouter/text",
     "selector": {
       "kind": "video",
       "model_id": "google/veo-3.1-lite",
-      "provider": "gg",
+      "provider": "openrouter",
       "variant": "text"
     },
     "input": {
@@ -7829,18 +7182,18 @@
         "request": {
           "lane": "provider",
           "method": "POST",
-          "url": "https://gg.example/api/v1/ai/videos/generations",
+          "url": "https://openrouter.ai/api/v1/videos",
           "headers": {
-            "authorization": "Bearer synthetic-token",
+            "authorization": "Bearer synthetic-key",
             "content-type": "application/json"
           },
           "body": {
-            "model_id": "google/veo-3.1-lite",
+            "model": "google/veo-3.1-lite",
             "prompt": " synthetic prompt ",
             "aspect_ratio": "16:9",
-            "resolution": "1024x1024",
             "duration": 1,
-            "seed": 0
+            "seed": 0,
+            "size": "1024x1024"
           }
         },
         "response": {
@@ -7848,7 +7201,45 @@
           "headers": {
             "content-type": "application/json"
           },
-          "base64": "eyJ2aWRlb3MiOlt7ImJhc2U2NCI6IkFRSUQiLCJtZWRpYV90eXBlIjoidmlkZW8vbXA0In1dfQ=="
+          "base64": "eyJpZCI6InZpZGVvLXRlc3QifQ=="
+        }
+      },
+      {
+        "request": {
+          "lane": "provider",
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/videos/video-test",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": null
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json"
+          },
+          "base64": "eyJzdGF0dXMiOiJjb21wbGV0ZWQifQ=="
+        }
+      },
+      {
+        "request": {
+          "lane": "provider",
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/videos/video-test/content?index=0",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": null
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "video/mp4"
+          },
+          "base64": "AQID"
         }
       }
     ],
@@ -8083,60 +7474,6 @@
             "content-type": "video/mp4"
           },
           "base64": "AQID"
-        }
-      }
-    ],
-    "result": {
-      "videos": [
-        {
-          "data": {
-            "base64": "AQID"
-          },
-          "media_type": "video/mp4"
-        }
-      ]
-    }
-  },
-  {
-    "id": "video/google/veo-3.1/gg/text",
-    "selector": {
-      "kind": "video",
-      "model_id": "google/veo-3.1",
-      "provider": "gg",
-      "variant": "text"
-    },
-    "input": {
-      "prompt": " synthetic prompt ",
-      "aspect_ratio": "16:9",
-      "resolution": "1024x1024",
-      "duration": 1,
-      "seed": 0
-    },
-    "transcript": [
-      {
-        "request": {
-          "lane": "provider",
-          "method": "POST",
-          "url": "https://gg.example/api/v1/ai/videos/generations",
-          "headers": {
-            "authorization": "Bearer synthetic-token",
-            "content-type": "application/json"
-          },
-          "body": {
-            "model_id": "google/veo-3.1",
-            "prompt": " synthetic prompt ",
-            "aspect_ratio": "16:9",
-            "resolution": "1024x1024",
-            "duration": 1,
-            "seed": 0
-          }
-        },
-        "response": {
-          "status": 200,
-          "headers": {
-            "content-type": "application/json"
-          },
-          "base64": "eyJ2aWRlb3MiOlt7ImJhc2U2NCI6IkFRSUQiLCJtZWRpYV90eXBlIjoidmlkZW8vbXA0In1dfQ=="
         }
       }
     ],
@@ -8557,6 +7894,98 @@
           "method": "GET",
           "url": "https://v3.fal.media/result.mp4",
           "headers": {},
+          "body": null
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "video/mp4"
+          },
+          "base64": "AQID"
+        }
+      }
+    ],
+    "result": {
+      "videos": [
+        {
+          "data": {
+            "base64": "AQID"
+          },
+          "media_type": "video/mp4"
+        }
+      ]
+    }
+  },
+  {
+    "id": "video/xai/grok-imagine-video-1.5/openrouter/text",
+    "selector": {
+      "kind": "video",
+      "model_id": "xai/grok-imagine-video-1.5",
+      "provider": "openrouter",
+      "variant": "text"
+    },
+    "input": {
+      "prompt": " synthetic prompt ",
+      "aspect_ratio": "16:9",
+      "resolution": "1024x1024",
+      "duration": 1,
+      "seed": 0
+    },
+    "transcript": [
+      {
+        "request": {
+          "lane": "provider",
+          "method": "POST",
+          "url": "https://openrouter.ai/api/v1/videos",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "model": "x-ai/grok-imagine-video-1.5",
+            "prompt": " synthetic prompt ",
+            "aspect_ratio": "16:9",
+            "duration": 1,
+            "seed": 0,
+            "size": "1024x1024"
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json"
+          },
+          "base64": "eyJpZCI6InZpZGVvLXRlc3QifQ=="
+        }
+      },
+      {
+        "request": {
+          "lane": "provider",
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/videos/video-test",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
+          "body": null
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json"
+          },
+          "base64": "eyJzdGF0dXMiOiJjb21wbGV0ZWQifQ=="
+        }
+      },
+      {
+        "request": {
+          "lane": "provider",
+          "method": "GET",
+          "url": "https://openrouter.ai/api/v1/videos/video-test/content?index=0",
+          "headers": {
+            "authorization": "Bearer synthetic-key",
+            "content-type": "application/json"
+          },
           "body": null
         },
         "response": {

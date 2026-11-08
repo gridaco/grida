@@ -550,6 +550,7 @@ const bridge: DesktopBridge = {
   },
 
   providers: {
+    gg_models: () => agentClient.providers.gg_models(),
     list_endpoints: () => agentClient.providers.list_endpoints(),
     set_endpoint: async (config) => {
       await ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_SET, config);

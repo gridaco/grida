@@ -1,4 +1,5 @@
 // GRIDA-SEC-008 — explicit native-provider input validation pins.
+import { ggDiscoveryFixture } from "../providers/gg-discovery.fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -1386,6 +1387,7 @@ describe("parseRunBody — model/provider gates over the open registry (#806)", 
         : null,
   };
   const deps = {
+    gg_catalog: ggDiscoveryFixture(),
     workspace_registry: { findById: async () => null },
     endpoints,
   };

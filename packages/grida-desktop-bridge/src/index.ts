@@ -14,6 +14,7 @@ import type {
   AgentUIMessageChunk,
   ProviderId,
   EndpointProviderConfig,
+  GGModelsView,
   ProbedEndpointModel,
   ImageGenerateRequest,
   ImageGenerateResult,
@@ -428,6 +429,8 @@ export type DesktopBridge = {
    * feature-detect and hide the surface when absent.
    */
   providers?: {
+    /** Anonymous metadata is read by the native host; absent on older builds. */
+    gg_models?: () => Promise<GGModelsView>;
     list_endpoints: () => Promise<EndpointProviderConfig[]>;
     set_endpoint: (config: EndpointProviderConfig) => Promise<void>;
     delete_endpoint: (id: string) => Promise<void>;

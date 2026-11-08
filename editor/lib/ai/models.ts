@@ -4,7 +4,7 @@ import { fixtureGateway } from "./fixture-gateway";
  *
  * Owns the unbilled Library embedding provider ({@link vercelAiGateway}) and the
  * BYOK branch ({@link byok}). All catalogue data (text-model specs,
- * tier→spec map, lookup helpers) lives in `@grida/ai-models/grida` under
+ * tier→spec map, lookup helpers) lives in `@grida/ai/catalogue` under
  * its `catalog.text.*` namespace and is re-exported here under its
  * original editor-side names so existing call sites keep working
  * unchanged.
@@ -12,21 +12,21 @@ import { fixtureGateway } from "./fixture-gateway";
  * ## Updating models
  *
  * Grida membership, lifecycle, defaults, and tiers live in
- * `packages/grida-ai-models/src/grida/`. Factual capabilities, release provenance,
- * and provider rates live in `packages/grida-ai-models/src/models.ts`.
+ * `data/ai/presets.json`. Facts come from the released public Models package;
+ * GG owns its current hosted offering. See `data/ai/README.md`.
  *
  * @module
  */
 
 import { createGateway as createVercelAiGateway } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { catalog as _catalog, TIER_MODEL_IDS } from "@grida/ai-models/grida";
+import { catalog as _catalog, TIER_MODEL_IDS } from "@grida/ai/catalogue";
 
 // ---------------------------------------------------------------------------
 // Catalogue re-exports — keep the original editor-side names.
 // ---------------------------------------------------------------------------
 
-export type { ModelTier } from "@grida/ai-models/grida";
+export type { ModelTier } from "@grida/ai/catalogue";
 
 export type ModelCostPerMillion = _catalog.text.ModelCostPerMillion;
 export type ModelSpec = _catalog.text.ModelSpec;
@@ -38,7 +38,7 @@ export const modelSpecById = _catalog.text.modelSpecById;
 
 /**
  * Read-only map of tier → model spec, sourced from
- * `@grida/ai-models/grida`'s `catalog.text.byTier`. Same shape as before the
+ * `@grida/ai/catalogue`'s `catalog.text.byTier`. Same shape as before the
  * catalogue move so consumers can keep `import { models } from
  * "@/lib/ai/models"` and read `models[tier]`.
  */
@@ -46,7 +46,7 @@ export const models = _catalog.text.byTier;
 
 /**
  * Read-only map of tier → catalog model ID. Alias of `TIER_MODEL_IDS`
- * from `@grida/ai-models/grida`; the editor-side name stays `tiers` for
+ * from `@grida/ai/catalogue`; the editor-side name stays `tiers` for
  * backwards compatibility.
  */
 export const tiers = TIER_MODEL_IDS;

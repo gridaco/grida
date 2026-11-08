@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 
     // Preserve the product model allowlist before GG dispatch. Unlisted IDs
     // return the native model-not-found response without a paid submission.
-    if (!isHostedTextModel(req.model)) return modelNotFound(req.model);
+    if (!(await isHostedTextModel(req.model))) return modelNotFound(req.model);
 
     const decoded = decodeRequest(req);
     const model = grida.languageModel(req.model) as LanguageModelV3;

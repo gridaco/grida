@@ -76,6 +76,10 @@ writes fresh editor settings; restart the fixture editor after repeating it.
 | Native callback, first session  | `http://127.0.0.1:55435/callback` |
 | Native callback, second session | `http://127.0.0.1:55436/callback` |
 
+The editor launcher serves deterministic anonymous GG discovery on reserved loopback port 55438. It configures `GRIDA_AI_GATEWAY_ORIGIN` only for that fixture editor; no provider or execution endpoint is served.
+
+After the browser and native proofs, CI requires the loopback-only `/__fixture/verify` verdict to pass. A rejected credential/body/method attempt permanently fails that verdict for the launcher lifetime, even if later anonymous reads succeed.
+
 The fixture also reserves ports 55430 and 55437–55439. Start fails if any fixture
 port, container, volume, or another fixture's ownership lock is already in use.
 It does not stop or reset an existing stack.
@@ -208,8 +212,9 @@ synchronous memory sink. The account bearer goes only to the fixed native mint;
 the returned GG credential goes only to the configured origin's existing
 `GET /api/v1/ai/models`, then is discarded. Safe IPC/public results contain
 organization, expiry and model-list metadata, never the grant or account tokens.
-The model list imports the static catalog directly and requires no provider
-initialization. Minting uses the shared GG quota/member/sign policy and does not
+The model list consumes deterministic anonymous discovery documents from the
+fixture loopback server and requires no provider initialization or public
+network access. Minting uses the shared GG quota/member/sign policy and does not
 query or refresh credits.
 
 The local GG pass exercises two-user and removed-membership denial, wrong

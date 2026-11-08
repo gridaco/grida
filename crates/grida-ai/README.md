@@ -1,8 +1,11 @@
 # grida-ai
 
 Private Rust media domain used by the CLI. The crate discovers and validates the
-bundled image, video, audio, 3D generation and rigging contracts and executes
-their provider protocols through an explicitly supplied `Transport`.
+installed BYOK image, video, audio, 3D generation and rigging adapters and executes
+their provider protocols through an explicitly supplied `Transport`. GG model
+choices come from anonymous public discovery, intersected with the native
+interfaces and transports actually implemented here. A new GG model using a
+supported JSON interface needs no local model-ID enum or native release.
 
 The host owns credentials, scoped GG token expiry, DNS/route authorization, TLS,
 streaming response bounds, cancellation, local files and artifact persistence.
@@ -12,7 +15,28 @@ Returned failures contain stable codes and observed Tripo task receipts only.
 `Catalog::bundled` has no side effects. `parse_input` validates and owns JSON data
 before `MediaClient::execute` receives invocation authority. The executor checks
 the parsed contract again, preventing a changed public `Parsed` value from
-bypassing validation. `verify` and `voices` are explicitly networked operations.
+bypassing validation. Dynamic GG descriptors have a private frozen copy; changing
+the public descriptor cannot change its selected operation or validation schema.
+`verify`, `voices` and `gateway_catalogue` are explicitly networked operations.
+
+`gateway_catalogue` reads only `https://gateway.grida.ai/v1/models` and
+`/v1/endpoints` and `/schemas/operations.json`, without credentials.
+Expired HTTP metadata or a passed scheduled catalogue change is rejected;
+dedicated GG rigging/check commands require their current endpoint before file upload. Reads have a shared 15-second
+deadline, 2 MiB per document and bounded local-reference expansion. It never
+follows arbitrary schema URLs or falls back to bundled GG availability. BYOK
+selection remains offline. The CLI uses the current intersection for GG list,
+inspect and generation; cached account credit eligibility remains a separate
+optional access check.
+
+GG JSON execution posts to Grida's organization-scoped `/api/v1/ai/operations`
+bridge, never sends the product JWT to the public Gateway and never asks the user
+for a separate GG API key. Async work polls only the original request ID through
+`/api/v1/ai/jobs`; errors preserve that receipt without regenerating. Provider
+assets are downloaded through the existing credential-free, size-bounded lane.
+Multipart-only operations are not advertised by this JSON adapter. Existing
+Tripo local-file adapters remain explicit native contracts, intersected with the
+current GG model and variant before selection.
 
 Normal Cargo builds require neither Node nor schema generation. See
 [data/README.md](data/README.md) for generated asset ownership and
@@ -35,8 +59,8 @@ through an injected synthetic transport, plus native HTTP tests using local
 sockets. No provider credentials, account, Keychain approval or paid call is
 needed. The Rust workflow runs these tests on every relevant change.
 
-The checked-in baseline covers all 112 bundled operations, 5,451 input vectors
-and 1,110 provider fault vectors. Both successful and failing exchanges check
+The checked-in baseline covers every installed adapter, with accepted/rejected
+input vectors and provider fault vectors. Both successful and failing exchanges check
 method, destination, authorization lane, headers and body. Results and safe
 errors are checked too. Independently authored polling tests use Tokio's paused
 clock to cover queued/running/success, failure, cancellation during a wait and

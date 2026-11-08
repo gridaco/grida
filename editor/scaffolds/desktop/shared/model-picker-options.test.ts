@@ -3,12 +3,42 @@ import {
   CHATGPT_SUBSCRIPTION_MODEL_IDS,
   GG_PROVIDER_ID,
 } from "@grida/agent";
-import { catalog as _models } from "@grida/ai-models/grida";
+import { catalog } from "@grida/ai/catalogue";
+import type { CurrentGGModel } from "@/lib/desktop/gg-models";
 import { describe, expect, it } from "vitest";
 import {
   model_picker_options,
   type ModelPickerSelection,
 } from "./model-picker-options";
+
+const current: readonly CurrentGGModel[] = [
+  {
+    id: "test/new-text-not-in-bundle",
+    label: "Current GG text",
+    kind: "text",
+    created: 0,
+    owned_by: "test",
+    interfaces: ["chat.completions"],
+    input_modalities: ["text"],
+    output_modalities: ["text"],
+    operation_ids: [],
+    capabilities: {},
+    limits: {},
+  },
+  {
+    id: "test/image",
+    label: "Current image",
+    kind: "image",
+    created: 0,
+    owned_by: "test",
+    interfaces: ["images.generations"],
+    input_modalities: ["text"],
+    output_modalities: ["image"],
+    operation_ids: [],
+    capabilities: {},
+    limits: {},
+  },
+];
 
 describe("model_picker_options", () => {
   it("builds the ChatGPT Subscription group from the exact allowlist", () => {
@@ -28,6 +58,7 @@ describe("model_picker_options", () => {
   it("orders provider-owned groups and keeps every row tuple explicit", () => {
     const groups = model_picker_options.groups({
       chatGptReady: true,
+      ggModels: current,
       configuredByokProviderIds: ["vercel", "openrouter"],
       endpoints: [
         {
@@ -62,26 +93,39 @@ describe("model_picker_options", () => {
     }
   });
 
-  it("always exposes the full Grida credit-backed catalog", () => {
-    const grida = model_picker_options.grida();
-    const catalogIds = Object.keys(_models.text.catalog);
-
+  it("offers only live GG text interfaces without a bundled ID allowlist", () => {
+    const grida = model_picker_options.grida(current);
     expect(grida.label).toBe("Grida");
+    expect(grida.options).toEqual([
+      {
+        selection: {
+          provider_id: GG_PROVIDER_ID,
+          model_id: "test/new-text-not-in-bundle",
+        },
+        label: "Current GG text",
+      },
+    ]);
+    expect(model_picker_options.grida().options).toEqual([]);
+    expect(model_picker_options.grida([]).options).toEqual([]);
+    const incompatible = [{ ...current[0], interfaces: ["responses"] }];
+    expect(model_picker_options.grida(incompatible).options).toEqual([]);
+  });
+
+  it("preserves only installed native choices when a released bridge lacks discovery", () => {
+    const legacy = model_picker_options.grida(null);
+    expect(legacy.options.map((entry) => entry.selection.model_id)).toEqual(
+      catalog.text.listed_models().map((model) => model.id)
+    );
     expect(
-      new Set(grida.options.map((option) => option.selection.model_id))
-    ).toEqual(new Set(catalogIds));
-    expect(
-      grida.options.every(
-        (option) => option.selection.provider_id === GG_PROVIDER_ID
+      legacy.options.every(
+        (entry) => entry.selection.provider_id === GG_PROVIDER_ID
       )
     ).toBe(true);
+    expect(model_picker_options.grida([]).options).toEqual([]);
   });
 
   it("places every legacy model after active choices without removing its provider tuple", () => {
-    for (const group of [
-      model_picker_options.grida(),
-      ...model_picker_options.byok(["openrouter", "vercel"]),
-    ]) {
+    for (const group of model_picker_options.byok(["openrouter", "vercel"])) {
       const firstLegacy = group.options.findIndex(
         (option) => option.deprecated
       );
@@ -120,7 +164,7 @@ describe("model_picker_options", () => {
       .chatGpt()
       .options.map((option) => option.selection.model_id);
     const gridaIds = model_picker_options
-      .grida()
+      .grida(current)
       .options.map((option) => option.selection.model_id);
 
     const subscriptionOnly = subscriptionIds.filter(

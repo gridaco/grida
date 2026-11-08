@@ -1,6 +1,6 @@
 /** ElevenLabs Text to Speech generation wire contract. */
 
-import type { models } from "@grida/ai-models";
+import type { models } from "@grida/ai/catalogue";
 import type { MediaItem } from "@grida/daemon";
 import type { GeneratedMp3 } from "./generated-mp3";
 

@@ -3,6 +3,6 @@
   "compilerOptions": {
     "types": []
   },
-  "include": ["src/index.ts", "src/providers.ts"],
+  "include": ["src/index.ts", "src/providers.ts", "src/catalogue/index.ts"],
   "exclude": ["src/**/*.test.ts", "dist"]
 }

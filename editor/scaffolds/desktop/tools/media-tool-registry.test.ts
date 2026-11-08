@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import { DesktopMediaTool } from "./media-tool-registry";
 
 describe("DesktopMediaTool", () => {
@@ -101,14 +101,14 @@ describe("DesktopMediaTool", () => {
     );
   });
 
-  it("opens image generation on the shared Flare default when no model was chosen", () => {
+  it("uses the image default only when no model was chosen", () => {
     expect(
       DesktopMediaTool.resolveSelection("image-generator", null).initialModelId
     ).toBe("openai/gpt-image-2.5-flare");
     expect(
       DesktopMediaTool.resolveSelection("image-generator", "unknown-model")
         .initialModelId
-    ).toBe("openai/gpt-image-2.5-flare");
+    ).toBe("unknown-model");
   });
 
   it("preserves an explicit legacy image model instead of applying the new default", () => {
@@ -122,10 +122,10 @@ describe("DesktopMediaTool", () => {
     ).toBe("openai/gpt-image-2");
   });
 
-  it("preserves existing non-image generation defaults independently of list sorting", () => {
+  it("requires a video choice and preserves other native defaults", () => {
     expect(
       DesktopMediaTool.resolveSelection("video-generator", null).initialModelId
-    ).toBe("google/veo-3.1");
+    ).toBeNull();
     expect(
       DesktopMediaTool.resolveSelection("3d-generator", null).initialModelId
     ).toBe("fal-ai/hunyuan-3d/v3.1/pro/text-to-3d");
@@ -214,4 +214,11 @@ describe("DesktopMediaTool", () => {
       "/desktop/tools"
     );
   });
+});
+
+it("preserves a new explicit hosted media ID for current discovery to validate", () => {
+  expect(
+    DesktopMediaTool.resolveSelection("image-generator", "fixture/new-image")
+      .initialModelId
+  ).toBe("fixture/new-image");
 });

@@ -34,6 +34,18 @@ export namespace AgentNetworkPolicy {
   export const TRIPO_UPLOAD_GRANT_ID = "provider:tripo-upload";
   export const PROVIDER_ASSET_GRANT_ID = "download:provider-assets";
 
+  const GG_DISCOVERY_ORIGIN = "https://gateway.grida.ai";
+  const GG_DISCOVERY_PATHS = new Set([
+    "/v1/models",
+    "/v1/endpoints",
+    "/schemas/operations.json",
+  ]);
+  const GG_DISCOVERY_HEADERS = new Set([
+    "accept",
+    "accept-encoding",
+    "user-agent",
+  ]);
+
   const MAX_HEADER_COUNT = 128;
   const MAX_HEADER_BYTES = 64 * 1024;
   const MAX_HEADER_VALUE_BYTES = 16 * 1024;
@@ -92,6 +104,9 @@ export namespace AgentNetworkPolicy {
     ];
     const providerOrigins = [
       ...providerAssetOrigins,
+      // GRIDA-SEC-004 — anonymous catalogue discovery only. authorize() below
+      // confines this origin to three read-only paths and credential-free headers.
+      GG_DISCOVERY_ORIGIN,
       // GRIDA-SEC-008 — exact OAuth and inference authorities for the native
       // ChatGPT-subscription provider. Neither origin joins the download lane.
       "https://auth.openai.com",
@@ -187,6 +202,15 @@ export namespace AgentNetworkPolicy {
     }
 
     const headers = authorizeHeaders(grant.lane, metadata.headers);
+    if (
+      grant.id === BUILTIN_PROVIDER_GRANT_ID &&
+      url.origin === GG_DISCOVERY_ORIGIN &&
+      (method !== "GET" ||
+        url.search ||
+        !GG_DISCOVERY_PATHS.has(url.pathname) ||
+        [...headers.keys()].some((name) => !GG_DISCOVERY_HEADERS.has(name)))
+    )
+      throw new Error("GG discovery request is not allowed");
     // GRIDA-SEC-006 / GRIDA-GG: provider — the signed object URL is the sole
     // upload authority. Never forward an API key or replay through redirects.
     if (
@@ -212,6 +236,11 @@ export namespace AgentNetworkPolicy {
   export function maxRequestBodyBytes(
     request: AuthorizedRequest | null
   ): number {
+    if (
+      request?.grant.id === BUILTIN_PROVIDER_GRANT_ID &&
+      request.url.origin === GG_DISCOVERY_ORIGIN
+    )
+      return 0;
     if (
       request?.grant.id === TRIPO_UPLOAD_GRANT_ID &&
       request.method === "PUT" &&

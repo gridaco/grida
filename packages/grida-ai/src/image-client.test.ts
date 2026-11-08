@@ -1,7 +1,8 @@
+import { fixtureGGDiscovery } from "./testing/gg-discovery";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — public image authority, output, and no-retry contracts.
 // GRIDA-GG: token — synthetic scoped credentials only; no services or provider calls.
 import { describe, expect, it, vi } from "vitest";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "./catalogue/grida";
 import { ImageClient, ProviderHttp, GridaGatewaySessionStore } from "./index";
 
 const view = models.snapshot.view();
@@ -22,6 +23,10 @@ function setup(overrides: Partial<ImageClient.Options> = {}) {
   const client = new ImageClient({
     keys: { get },
     http: new ProviderHttp({ request, download }),
+    gg_catalog: fixtureGGDiscovery([
+      { id: card.id, kind: "image", background: false },
+      { id: "openai/gpt-image-2.5-flare", kind: "image", background: true },
+    ]),
     ...overrides,
   });
   return { client, request, download, get };
@@ -214,7 +219,13 @@ describe("ImageClient public operations", () => {
     });
     request.mockImplementation(async () =>
       Response.json({
-        images: [{ base64: BASE64, stored_media: { access_token: TOKEN } }],
+        data: [
+          {
+            b64_json: BASE64,
+            media_type: "image/png",
+            stored_media: { access_token: TOKEN },
+          },
+        ],
       })
     );
     const operation = await client.resolve({
@@ -234,20 +245,21 @@ describe("ImageClient public operations", () => {
     expect(get).not.toHaveBeenCalled();
     expect(download).not.toHaveBeenCalled();
     expect(request.mock.calls[0][0]).toBe(
-      "https://grida.example/api/v1/ai/images/generations"
+      "https://grida.example/api/v1/ai/operations"
     );
     expect(
       new Headers(request.mock.calls[0][1]?.headers).get("authorization")
     ).toBe("Bearer " + TOKEN + "-new");
     expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
-      model_id: card.id,
-      prompt: PROMPT,
-      n: 1,
-      width: 128,
-      height: 256,
-      aspect_ratio: "1:2",
-      seed: 0,
-      quality: "medium",
+      operation_id: `image.${card.id.replaceAll("/", ".")}.text`,
+      input: {
+        prompt: PROMPT,
+        n: 1,
+        size: "128x256",
+        aspect_ratio: "1:2",
+        seed: 0,
+        quality: "medium",
+      },
     });
   });
 
@@ -568,7 +580,7 @@ describe("ImageClient native background admission", () => {
     const { client, request, get } = setup();
     await failure(
       client.resolve({
-        model_id: "openai/gpt-image-2.5-flare",
+        model_id: "openai/gpt-image-2",
         provider: "openrouter",
         background: "transparent",
       }),
@@ -576,7 +588,7 @@ describe("ImageClient native background admission", () => {
     );
     expect(get).not.toHaveBeenCalled();
     const operation = await client.resolve({
-      model_id: "openai/gpt-image-2.5-flare",
+      model_id: "openai/gpt-image-2",
       provider: "openrouter",
     });
     get.mockClear();
@@ -610,4 +622,80 @@ describe("ImageClient native background admission", () => {
       expect(request).not.toHaveBeenCalled();
     }
   );
+});
+
+it("does not reinterpret exact image dimensions as an unrelated output tier", async () => {
+  const catalogue = fixtureGGDiscovery([{ id: card.id, kind: "image" }]);
+  const snapshot = await catalogue.ready();
+  const original = snapshot!.operations[0];
+  const operation = {
+    ...original,
+    input_schema: {
+      ...original.input_schema,
+      properties: {
+        ...(original.input_schema.properties as object),
+        size: { type: "string", enum: ["1K", "2K", "4K"] },
+      },
+    },
+  };
+  vi.spyOn(catalogue, "view").mockReturnValue({
+    ...snapshot!,
+    operations: [operation],
+  });
+  vi.spyOn(catalogue, "ready").mockResolvedValue({
+    ...snapshot!,
+    operations: [operation],
+  });
+  const { client, request } = setup({
+    gg: { getAccessToken: () => TOKEN },
+    gg_base_url: "https://grida.example",
+    gg_catalog: catalogue,
+  });
+  const selected = await client.resolve({ model_id: card.id, provider: "gg" });
+  await failure(
+    selected.generate({ prompt: PROMPT, size: "1536x1024" }),
+    "invalid_input"
+  );
+  expect(request).not.toHaveBeenCalled();
+});
+
+it("omits implicit image n only for a single-output schema and never drops a requested count", async () => {
+  const catalogue = fixtureGGDiscovery([{ id: card.id, kind: "image" }]);
+  const snapshot = await catalogue.ready();
+  const original = snapshot!.operations[0];
+  const properties = {
+    ...(original.input_schema.properties as Record<string, unknown>),
+  };
+  delete properties.n;
+  const operation = {
+    ...original,
+    input_schema: {
+      ...original.input_schema,
+      properties,
+      additionalProperties: false,
+    },
+  };
+  vi.spyOn(catalogue, "view").mockReturnValue({
+    ...snapshot!,
+    operations: [operation],
+  });
+  vi.spyOn(catalogue, "ready").mockResolvedValue({
+    ...snapshot!,
+    operations: [operation],
+  });
+  const { client, request } = setup({
+    gg: { getAccessToken: () => TOKEN },
+    gg_base_url: "https://grida.example",
+    gg_catalog: catalogue,
+  });
+  const selected = await client.resolve({ model_id: card.id, provider: "gg" });
+  expect(await selected.generate({ prompt: PROMPT })).toEqual({
+    images: [{ data: PNG, media_type: "image/png" }],
+  });
+  expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
+    operation_id: operation.id,
+    input: { prompt: PROMPT },
+  });
+  await failure(selected.generate({ prompt: PROMPT, n: 2 }), "invalid_input");
+  expect(request).toHaveBeenCalledOnce();
 });

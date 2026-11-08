@@ -18,7 +18,8 @@ import {
   type ByokProviderId,
   type EndpointProviderConfig,
 } from "@grida/agent";
-import { catalog as _models } from "@grida/ai-models/grida";
+import type { CurrentGGModel } from "@/lib/desktop/gg-models";
+import { catalog as _models } from "@grida/ai/catalogue";
 
 export type ModelPickerSelection = Readonly<{
   model_id: string;
@@ -61,8 +62,31 @@ export namespace model_picker_options {
   }
 
   /** Every hosted text model spends Grida credits through the `gg` provider. */
-  export function grida(): ModelPickerGroup {
-    return catalogProviderGroup(GG_PROVIDER_ID, GG_PROVIDER_METADATA.label);
+  export function grida(
+    current: readonly CurrentGGModel[] | null = []
+  ): ModelPickerGroup {
+    return {
+      id: GG_PROVIDER_ID,
+      label: GG_PROVIDER_METADATA.label,
+      // Old released hosts retain their existing native choices, not a live GG snapshot.
+      options:
+        current === null
+          ? modelOptions.map((model) => ({
+              selection: { provider_id: GG_PROVIDER_ID, model_id: model.id },
+              label: model.label,
+              deprecated: model.deprecated,
+            }))
+          : current
+              .filter(
+                (model) =>
+                  model.kind === "text" &&
+                  model.interfaces.includes("chat.completions")
+              )
+              .map((model) => ({
+                selection: { provider_id: GG_PROVIDER_ID, model_id: model.id },
+                label: model.label,
+              })),
+    };
   }
 
   /**
@@ -102,12 +126,13 @@ export namespace model_picker_options {
 
   export function groups(opts: {
     chatGptReady: boolean;
+    ggModels?: readonly CurrentGGModel[] | null;
     configuredByokProviderIds: readonly ByokProviderId[];
     endpoints: readonly EndpointProviderConfig[];
   }): ModelPickerGroup[] {
     return [
       ...(opts.chatGptReady ? [chatGpt()] : []),
-      grida(),
+      grida(opts.ggModels),
       ...byok(opts.configuredByokProviderIds),
       ...endpoints(opts.endpoints),
     ];

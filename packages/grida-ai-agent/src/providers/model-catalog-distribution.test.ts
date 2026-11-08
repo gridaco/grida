@@ -7,8 +7,9 @@
  * Every test here would fail against the pre-store code — that is the
  * point. `@grida/ai`'s model-catalog tests cover the store's own failure modes.
  */
+import { ggDiscoveryFixture } from "./gg-discovery.fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import { ModelCatalogStore } from "./model-catalog";
 import { resolveProvider, type ResolveDeps } from "./index";
 import {
@@ -103,12 +104,20 @@ function liveGgSession(): GridaGatewaySessionStore {
   return session;
 }
 
-function runDeps(catalog?: ModelCatalogStore): ParseRunBodyDeps {
+function runDeps(catalog?: ModelCatalogStore, gg = false): ParseRunBodyDeps {
   return {
     workspace_registry: {
       findById: async () => null,
     } as unknown as ParseRunBodyDeps["workspace_registry"],
     catalog,
+    ...(gg
+      ? {
+          gg_catalog: ggDiscoveryFixture([
+            ...Object.keys(models.text.catalog),
+            NEW_MODEL,
+          ]),
+        }
+      : {}),
   };
 }
 
@@ -220,7 +229,7 @@ describe("a model published after this binary shipped", () => {
         model_id: NEW_MODEL,
         provider_id: "gg",
       },
-      runDeps(store)
+      runDeps(store, true)
     );
     expect(result).not.toBeInstanceOf(Response);
     store.dispose();
@@ -265,6 +274,10 @@ describe("a tier retargeted after this binary shipped", () => {
       secrets: noSecrets,
       gg: liveGgSession(),
       gg_base_url: BASE_URL,
+      gg_catalog: ggDiscoveryFixture([
+        ...Object.keys(models.text.catalog),
+        NEW_MODEL,
+      ]),
       catalog: store,
     };
     const resolved = await resolveProvider(deps, {});
@@ -296,6 +309,10 @@ describe("a tier retargeted after this binary shipped", () => {
         secrets: noSecrets,
         gg: liveGgSession(),
         gg_base_url: BASE_URL,
+        gg_catalog: ggDiscoveryFixture([
+          ...Object.keys(models.text.catalog),
+          NEW_MODEL,
+        ]),
         catalog: store,
       },
       {}

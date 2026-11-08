@@ -31,8 +31,8 @@ Flags:
     --image   Only show models whose output modalities include "image".
     --all     Show all matches (combine with --image to list all image models).
 
-Output is formatted for quick reference when updating lib/ai/models.ts
-or lib/ai/ai.ts.
+Output is research only. Model facts are maintained by the public Models
+catalogue; see data/ai/README.md. Do not copy these results into product code.
 """
 
 import json

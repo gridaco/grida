@@ -55,6 +55,7 @@ impl grida_ai::Transport for MediaTransport {
             let lane = match r.lane {
                 grida_ai::Lane::Provider | grida_ai::Lane::Upload => http::Lane::Provider,
                 grida_ai::Lane::Download => http::Lane::Download,
+                grida_ai::Lane::Discovery => http::Lane::Discovery,
             };
             let mut request =
                 http::Request::new(r.method.parse().map_err(|_| failure())?, r.url, r.body);
@@ -140,7 +141,33 @@ async fn execute(
     token: CancellationToken,
     interrupted: Arc<AtomicBool>,
 ) -> Result<Output> {
-    let catalog = Catalog::bundled();
+    let live_gateway = match &invocation.command {
+        Command::ModelsInspect(model) | Command::Generate { model, .. } => {
+            model.provider == Provider::Gg
+        }
+        Command::ModelsList { provider, .. } => provider.is_none_or(|p| p == Provider::Gg),
+        Command::RiggingList { provider, .. } => provider.is_none_or(|p| p == MeshProvider::Gg),
+        Command::RiggingInspect { provider, .. }
+        | Command::RiggingCheck { provider, .. }
+        | Command::RiggingRun { provider, .. } => *provider == MeshProvider::Gg,
+        _ => false,
+    };
+    let catalog = if live_gateway {
+        let fixture_origin = if env.contains_key("GRIDA_CLI_LOCAL_CONFIG") {
+            Some(Host::open(&env)?.config.api_origin)
+        } else {
+            None
+        };
+        let client = media_client(fixture_origin.as_deref(), &token)?;
+        let offered = if let Some(origin) = fixture_origin.as_deref() {
+            client.gateway_catalogue_at(origin, token.clone()).await?
+        } else {
+            client.gateway_catalogue(token.clone()).await?
+        };
+        offered.overlay(Catalog::bundled())
+    } else {
+        Catalog::bundled()
+    };
     match invocation.command {
         Command::ModelsInspect(model) => {
             let d = input::inspect(&catalog, &model, None)?;
@@ -227,7 +254,7 @@ async fn execute(
                 if available {
                     "Access filter only; provider access and generation are unverified."
                 } else {
-                    "Bundled operations; access has not been checked."
+                    if live_gateway { "Current GG offerings and installed BYOK adapters; access has not been checked." } else { "Installed BYOK adapter inventory; access has not been checked." }
                 }
                 .into(),
             );
@@ -403,6 +430,7 @@ async fn execute(
             selector,
         } => {
             let selection = rig_selector(provider, &MeshOperation::Check);
+            catalog.inspect(&selection)?;
             let value = match source {
                 MeshSource::Json(s) => files::read_input(&s, &token).await?,
                 MeshSource::Mesh(path) => json!({"mesh":encoded_mesh(&path,&token).await?}),
@@ -419,6 +447,7 @@ async fn execute(
             selector,
         } => {
             let selection = rig_selector(provider, &MeshOperation::Rig { model });
+            catalog.inspect(&selection)?;
             let value = match source {
                 RiggingSource::Json(s) => files::read_input(&s, &token).await?,
                 RiggingSource::Mesh {
@@ -576,7 +605,8 @@ async fn generate(
             return rigging_check_output(findings, result.task);
         }
         let mut metadata = parsed.descriptor.clone();
-        if parsed.descriptor["feature"] == "rigging"
+        if (parsed.descriptor["feature"] == "rigging"
+            || parsed.descriptor.get("gateway_operation").is_some())
             && let Some(task) = result.task
         {
             metadata["task"] = serde_json::to_value(task).map_err(|_| unavailable())?;

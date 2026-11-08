@@ -107,6 +107,37 @@ test("the runner accepts a matching result and rejects false-green observations"
   );
 });
 
+test("offline vectors cannot freeze current GG model or rigging listings", () => {
+  for (const command of ["models", "rigging"]) {
+    for (const provider of [[], ["--provider", "gg"]]) {
+      const listing = {
+        ...example,
+        id: "selfcheck.current-gg",
+        argv: ["ai", command, "list", ...provider, "--json"],
+        expected: { exit: 0, stderr: "", stdout: { json: [] } },
+      };
+      assert.throws(
+        () => validateCases([listing]),
+        /Current GG listings require/
+      );
+      validateCases([{ ...listing, mode: "parse" }]);
+      validateCases([
+        {
+          ...listing,
+          expected: { ...listing.expected, exit: 1 },
+        },
+      ]);
+      validateCases([{ ...listing, argv: ["ai", command, "list", "--help"] }]);
+      validateCases([
+        {
+          ...listing,
+          argv: ["ai", command, "list", "--provider", "tripo", "--json"],
+        },
+      ]);
+    }
+  }
+});
+
 test("text/help checks reject empty or mismatched output", () => {
   const text = {
     ...example,
@@ -221,5 +252,62 @@ test("every advertised operation requires success, input refusal, failure and ca
   );
   assert.throws(() =>
     assertOperationVectors(descriptors, [wire], inputs, faults.slice(1))
+  );
+});
+
+test("current listing guard follows supported global and provider option spellings and placement", () => {
+  const vector = (argv) => ({
+    ...example,
+    id: "selfcheck.option-placement",
+    argv,
+    expected: { exit: 0, stderr: "", stdout: { json: [] } },
+  });
+  for (const command of ["models", "rigging"]) {
+    const current = [
+      ["--json", "ai", command, "list"],
+      ["ai", "--json", command, "list"],
+      ["ai", command, "--json", "list"],
+      ["--no-input", "ai", command, "list", "--json"],
+      ["--provider=gg", "--json", "ai", command, "list"],
+      ["ai", "--provider", "gg", command, "list", "--json"],
+      ["ai", command, "--provider=gg", "list", "--json"],
+      ["ai", command, "list", "--provider=gg", "--json"],
+    ];
+    for (const argv of current) {
+      assert.throws(
+        () => validateCases([vector(argv)]),
+        /Current GG listings require/
+      );
+      validateCases([{ ...vector(argv), mode: "parse" }]);
+    }
+    for (const argv of [
+      ["--provider=tripo", "--json", "ai", command, "list"],
+      ["--json", "ai", command, "--provider", "tripo", "list"],
+      ["ai", command, "list", "--provider=tripo", "--json"],
+      ["ai", command, "list", "--provider", "tripo", "--json"],
+    ])
+      validateCases([vector(argv)]);
+  }
+  assert.throws(
+    () =>
+      validateCases([
+        vector(["--kind=video", "ai", "models", "--json", "list"]),
+      ]),
+    /Current GG listings require/
+  );
+  assert.throws(
+    () =>
+      validateCases([
+        vector([
+          "ai",
+          "--org",
+          "studio",
+          "models",
+          "--available",
+          "list",
+          "--json",
+        ]),
+      ]),
+    /Current GG listings require/
   );
 });

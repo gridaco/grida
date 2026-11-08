@@ -5,7 +5,12 @@ import type {
   MusicGenerateResult,
 } from "@/lib/desktop/bridge";
 import type { GridaGatewaySessionState } from "@/lib/desktop/gg-session";
-import { generateMusicWithGgRecovery } from "./music-generation-controls";
+import {
+  generateMusicWithGgRecovery,
+  musicModelChoices,
+} from "./music-generation-controls";
+import { catalog } from "@grida/ai/catalogue";
+import type { CurrentGGModel } from "@/lib/desktop/gg-models";
 
 type Generate = (req: MusicGenerateRequest) => Promise<MusicGenerateResult>;
 type ForceRefresh = () => Promise<GridaGatewaySessionState>;
@@ -102,5 +107,87 @@ describe("generateMusicWithGgRecovery", () => {
     ).rejects.toThrow("gg_token_expired: second");
     expect(forceRefresh).toHaveBeenCalledTimes(1);
     expect(generate).toHaveBeenCalledTimes(2);
+  });
+  it.each([
+    Object.assign(new Error("gg_token_expired"), {
+      request_id: "req_accepted",
+    }),
+    new Error("gg_token_expired GG request: req_accepted."),
+  ])(
+    "recovers an accepted job with the same ID instead of another paid generation",
+    async (failure) => {
+      const generate = vi.fn<Generate>();
+      generate.mockRejectedValueOnce(failure).mockResolvedValueOnce(generated);
+      const forceRefresh = vi
+        .fn<ForceRefresh>()
+        .mockResolvedValue(activeSession);
+      await expect(
+        generateMusicWithGgRecovery(request, { generate, forceRefresh })
+      ).resolves.toBe(generated);
+      expect(generate).toHaveBeenCalledTimes(2);
+      expect(generate).toHaveBeenNthCalledWith(2, {
+        ...request,
+        request_id: "req_accepted",
+      });
+    }
+  );
+  it("keeps accepted identity visible if free recovery also fails", async () => {
+    const generate = vi.fn<Generate>();
+    generate
+      .mockRejectedValueOnce(
+        new Error("gg_token_expired GG request: req_accepted.")
+      )
+      .mockRejectedValueOnce(new Error("network unavailable"));
+    const forceRefresh = vi.fn<ForceRefresh>().mockResolvedValue(activeSession);
+    await expect(
+      generateMusicWithGgRecovery(request, { generate, forceRefresh })
+    ).rejects.toMatchObject({
+      request_id: "req_accepted",
+      message: "network unavailable GG request: req_accepted.",
+    });
+    expect(generate).toHaveBeenCalledTimes(2);
+  });
+  it("retains the accepted ID when session recovery cannot sign in", async () => {
+    const generate = vi
+      .fn<Generate>()
+      .mockRejectedValueOnce(
+        new Error("gg_token_expired GG request: req_accepted.")
+      );
+    const forceRefresh = vi
+      .fn<ForceRefresh>()
+      .mockResolvedValue({ kind: "signed_out" });
+    await expect(
+      generateMusicWithGgRecovery(request, { generate, forceRefresh })
+    ).rejects.toMatchObject({ request_id: "req_accepted" });
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("music offerings across released Desktop bridges", () => {
+  it("keeps the previous preset UI only for a binary without discovery", () => {
+    const installed = catalog.audio.music.listed_models();
+    expect(musicModelChoices(null)).toEqual(installed);
+    const selected = installed[0]!;
+    expect(musicModelChoices(null, [selected.id])).toEqual([selected]);
+    expect(musicModelChoices(null, [])).toEqual([]);
+  });
+  it("does not restore installed music after a new bridge reports no offering", () => {
+    expect(musicModelChoices([])).toEqual([]);
+  });
+  it("allows a current compatible GG music ID without a preset entry", () => {
+    const current: CurrentGGModel = {
+      id: "fixture/new-music",
+      label: "New music",
+      kind: "music",
+      created: 0,
+      owned_by: "fixture",
+      interfaces: ["endpoints"],
+      input_modalities: ["text"],
+      output_modalities: ["audio"],
+      operation_ids: ["music.fixture.new-music.generate"],
+      capabilities: {},
+      limits: {},
+    };
+    expect(musicModelChoices([current])).toEqual([current]);
   });
 });

@@ -10,7 +10,7 @@ import type { ThreeDClient } from "./three-d-client";
 
 const contract = (name: keyof typeof contracts): S.Schema =>
   structuredClone(contracts[name]) as S.Schema;
-/** Named built-in definitions; fields and limits are authored in data/ai/inputs.json at the repository root. */
+/** Named built-in definitions; fields and limits are authored in data/ai/native-inputs.json at the repository root. */
 export namespace MediaInputs {
   export const limits = Object.freeze({
     image: 64 * 1024 * 1024,

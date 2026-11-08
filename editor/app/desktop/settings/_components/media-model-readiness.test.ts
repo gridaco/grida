@@ -1,3 +1,4 @@
+import type { CurrentGGModel } from "@/lib/desktop/gg-models";
 import { describe, expect, it } from "vitest";
 import { MediaModelReadiness } from "./media-model-readiness";
 
@@ -51,5 +52,85 @@ describe("MediaModelReadiness.visual", () => {
       MediaModelReadiness.visual({ providers }, new Set(), null)
     ).toBeNull();
     expect(MediaModelReadiness.visual({ providers }, null, true)).toBe(true);
+  });
+});
+
+describe("current hosted media readiness", () => {
+  it("withdraws a native row when current GG no longer serves it", () => {
+    expect(
+      MediaModelReadiness.visual({ providers }, new Set(), true, false)
+    ).toBe(false);
+    expect(
+      MediaModelReadiness.visual(
+        { providers },
+        new Set(["openrouter"]),
+        true,
+        false
+      )
+    ).toBe(true);
+  });
+  it("accepts current GG independently from a Vercel BYOK binding", () => {
+    expect(
+      MediaModelReadiness.visual(
+        { providers: { fal: {} } },
+        new Set(),
+        true,
+        true
+      )
+    ).toBe(true);
+  });
+});
+
+describe("Settings current hosted interface readiness", () => {
+  const model: CurrentGGModel = {
+    id: "fixture/visual",
+    label: "Visual",
+    kind: "video",
+    created: 0,
+    owned_by: "fixture",
+    interfaces: ["videos"],
+    input_modalities: ["text"],
+    output_modalities: ["video"],
+    operation_ids: [],
+    capabilities: {},
+    limits: {},
+    client_supported_options: { video_text: true },
+  };
+  it("checks the exact generation interface and kind", () => {
+    expect(MediaModelReadiness.hosted(model.id, "video", [model])).toBe(true);
+    expect(
+      MediaModelReadiness.hosted(model.id, "video", [
+        { ...model, kind: "image" },
+      ])
+    ).toBe(false);
+    expect(
+      MediaModelReadiness.hosted(model.id, "video", [
+        { ...model, interfaces: ["endpoints"] },
+      ])
+    ).toBe(false);
+    expect(
+      MediaModelReadiness.hosted(model.id, "image", [
+        { ...model, kind: "image", interfaces: ["images.generations"] },
+      ])
+    ).toBe(true);
+    expect(
+      MediaModelReadiness.hosted(model.id, "image", [
+        { ...model, kind: "image", interfaces: ["endpoints"] },
+      ])
+    ).toBe(false);
+  });
+  it("does not mark image-only video operations ready for a text composer", () => {
+    expect(
+      MediaModelReadiness.hosted(model.id, "video", [
+        { ...model, client_supported_options: { video_text: false } },
+      ])
+    ).toBe(false);
+    expect(
+      MediaModelReadiness.hosted(model.id, "video", [
+        { ...model, client_supported_options: {} },
+      ])
+    ).toBe(false);
+    expect(MediaModelReadiness.hosted(model.id, "video", [])).toBe(false);
+    expect(MediaModelReadiness.hosted(model.id, "video", null)).toBeUndefined();
   });
 });

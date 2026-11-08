@@ -1,32 +1,35 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — bounded GG-only music, safe output, no account/BYOK authority.
 // GRIDA-GG: token — live scoped credential at the single submission; no mint or persistence.
-import { models } from "@grida/ai-models";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
-import { MediaRoutes } from "./media-routes";
+
 import {
   GridaGatewayAuthError,
   GridaGatewayCreditsError,
   gridaGatewayOrigin,
-  postHosted,
 } from "./gg";
 import type { GgTokenSource } from "./gg-session";
 import { ProviderHttp } from "./http";
 import { MediaRequest } from "./media-request";
+import { GGOperationsClient } from "./gg-operations";
+import {
+  GGDiscoveryStore,
+  supportsGGPromptOperation,
+  type GGOperation,
+} from "./gg-discovery";
 
 const MAX_BYTES = MediaInputs.limits.music;
-const MAX_BASE64_CHARACTERS = Math.ceil(MAX_BYTES / 3) * 4;
-const MAX_RESPONSE_BYTES = MAX_BASE64_CHARACTERS + 4 * 1024;
 
-/** Existing hosted Lyria operation. Hosts own scoped custody, egress, and persistence. */
+/** Current GG music interface. Hosts own scoped custody, egress, and persistence. */
 export class MusicClient {
   readonly #http: ProviderHttp;
   readonly #gg: GgTokenSource;
   readonly #origin: string;
+  readonly #catalog: GGDiscoveryStore;
 
   constructor(options: MusicClient.Options) {
     try {
-      exactKeys(options, ["http", "gg", "gg_base_url"]);
+      exactKeys(options, ["http", "gg", "gg_base_url", "gg_catalog"]);
       const { http, gg, gg_base_url } = options;
       const read = gg.getAccessToken;
       if (!(http instanceof ProviderHttp) || typeof read !== "function")
@@ -34,6 +37,8 @@ export class MusicClient {
       this.#http = http;
       this.#gg = { getAccessToken: read.bind(gg) };
       this.#origin = gridaGatewayOrigin(gg_base_url);
+      this.#catalog =
+        options.gg_catalog ?? new GGDiscoveryStore({ fetch: http.request });
     } catch {
       throw new MusicClient.Failure("invalid_input");
     }
@@ -42,10 +47,18 @@ export class MusicClient {
   async resolve(input: MusicClient.Selection): Promise<MusicClient.Resolved> {
     try {
       const id = selection(input);
-      if (!MediaRoutes.music(id))
-        throw new MusicClient.Failure("model_unavailable");
       if (!this.#gg.getAccessToken())
         throw new MusicClient.Failure("gg_token_expired");
+      const snapshot = await this.#catalog.ready();
+      const operation = snapshot?.operations.find(
+        (item) =>
+          item.model_id === id &&
+          item.kind === "music" &&
+          item.variant === "generate" &&
+          item.delivery === "provider_reference" &&
+          supportsGGPromptOperation(item)
+      );
+      if (!operation) throw new MusicClient.Failure("model_unavailable");
       const descriptor = Object.freeze({
         model_id: id,
         provider_id: "gg" as const,
@@ -53,7 +66,8 @@ export class MusicClient {
       });
       return Object.freeze({
         ...descriptor,
-        generate: (args: MusicClient.Input) => this.#generate(descriptor, args),
+        generate: (args: MusicClient.Input) =>
+          this.#generate(descriptor, args, operation),
       });
     } catch (error) {
       throw safeFailure(error);
@@ -62,51 +76,132 @@ export class MusicClient {
 
   async #generate(
     descriptor: MusicClient.Descriptor,
-    input: MusicClient.Input
+    input: MusicClient.Input,
+    operation: GGOperation
   ): Promise<MusicClient.Result> {
     let request: MediaRequest | undefined;
+    let requestId: string | undefined;
     try {
       const { prompt, seed, signal } = generationInput(input);
-      request = new MediaRequest(this.#http, signal);
+      const properties = operation.input_schema.properties;
+      if (
+        seed !== undefined &&
+        (!properties ||
+          typeof properties !== "object" ||
+          !Object.hasOwn(properties, "seed"))
+      )
+        throw new MusicClient.Failure("invalid_input");
+      request = new MediaRequest(this.#http, signal, 600_000);
       request.check();
-      const result = await request.wait(
-        postHosted<unknown>({
-          session: this.#gg,
-          url: new URL("/api/v1/ai/music/generations", this.#origin).toString(),
-          body: {
-            model_id: descriptor.model_id,
-            prompt,
-            ...(seed === undefined ? {} : { seed }),
-          },
-          scope: "music",
-          abortSignal: request.signal,
-          provider_http: request.transport(MAX_RESPONSE_BYTES),
-          max_response_bytes: MAX_RESPONSE_BYTES,
-        })
+      const client = new GGOperationsClient({
+        http: this.#http,
+        gg: this.#gg,
+        gg_base_url: this.#origin,
+        gg_catalog: this.#catalog,
+      });
+      const submitted = await request.wait(
+        client.submit(
+          operation.id,
+          { prompt, ...(seed === undefined ? {} : { seed }) },
+          request.signal
+        )
       );
-      request.check();
-      const audio = parseAudio(result, descriptor.model_id);
-      request.check();
-      return { audio };
+      if (
+        typeof submitted.id !== "string" ||
+        !/^req_[A-Za-z0-9_-]{1,160}$/.test(submitted.id)
+      )
+        throw new MusicClient.Failure("invalid_response");
+      requestId = submitted.id;
+      return await this.#result(
+        request,
+        client,
+        requestId,
+        descriptor.model_id
+      );
     } catch (error) {
       try {
         request?.check();
       } catch (abort) {
-        throw safeFailure(abort);
+        throw safeFailure(abort, requestId);
       }
-      throw safeFailure(error);
+      throw safeFailure(error, requestId);
     } finally {
       request?.dispose();
     }
   }
+  /** Resume only accepted work. No catalogue lookup or paid submission occurs. */
+  async recover(input: MusicClient.Recovery): Promise<MusicClient.Result> {
+    let request: MediaRequest | undefined;
+    let requestId: string | undefined;
+    try {
+      exactKeys(input, ["request_id", "model_id", "signal"]);
+      if (
+        typeof input.request_id !== "string" ||
+        !/^req_[A-Za-z0-9_-]{1,160}$/.test(input.request_id)
+      )
+        throw new MusicClient.Failure("invalid_input");
+      requestId = input.request_id;
+      const modelId = selection({ model_id: input.model_id, provider: "gg" });
+      request = new MediaRequest(this.#http, input.signal, 600_000);
+      const client = new GGOperationsClient({
+        http: this.#http,
+        gg: this.#gg,
+        gg_base_url: this.#origin,
+        gg_catalog: this.#catalog,
+      });
+      return await this.#result(request, client, requestId, modelId);
+    } catch (error) {
+      try {
+        request?.check();
+      } catch (abort) {
+        throw safeFailure(abort, requestId);
+      }
+      throw safeFailure(error, requestId);
+    } finally {
+      request?.dispose();
+    }
+  }
+  async #result(
+    request: MediaRequest,
+    client: GGOperationsClient,
+    requestId: string,
+    modelId?: string
+  ): Promise<MusicClient.Result> {
+    const job = await request.wait(client.wait(requestId, request.signal));
+    if (modelId !== undefined && job.model !== modelId)
+      throw new MusicClient.Failure("invalid_response");
+    const reference = job.result?.audio;
+    if (!reference || typeof reference !== "object" || Array.isArray(reference))
+      throw new MusicClient.Failure("invalid_response");
+    const audio = reference as Record<string, unknown>;
+    if (typeof audio.url !== "string" || audio.media_type !== "audio/mpeg")
+      throw new MusicClient.Failure("invalid_response");
+    let url: URL;
+    try {
+      url = new URL(audio.url);
+      if (url.protocol !== "https:" || url.username || url.password || url.hash)
+        throw 0;
+    } catch {
+      throw new MusicClient.Failure("invalid_response");
+    }
+    const result = await request.download(url, MAX_BYTES);
+    request.check();
+    if (!mp3Signature(result.data))
+      throw new MusicClient.Failure("invalid_response");
+    return {
+      audio: { data: result.data, media_type: "audio/mpeg" },
+      request_id: requestId,
+    };
+  }
 }
 
 export namespace MusicClient {
-  export type ModelId = models.audio.music.ModelId;
+  export type ModelId = string;
   export type Options = {
     http: ProviderHttp;
     gg: GgTokenSource;
     gg_base_url: string;
+    gg_catalog?: GGDiscoveryStore;
   };
   export type Selection = { model_id: string; provider: "gg" };
   export type Descriptor = Readonly<{
@@ -123,7 +218,14 @@ export namespace MusicClient {
     seed?: number;
     signal?: AbortSignal;
   };
+  export type Recovery = {
+    request_id: string;
+    model_id: string;
+    signal?: AbortSignal;
+  };
   export type Result = {
+    /** Validated original GG receipt, retained if host persistence later fails. */
+    request_id?: string;
     audio: { data: Uint8Array; media_type: "audio/mpeg" };
   };
   export type FailureCode =
@@ -137,13 +239,23 @@ export namespace MusicClient {
     | "generation_failed";
   export class Failure extends Error {
     readonly code: FailureCode;
-    constructor(code: FailureCode) {
+    readonly request_id?: string;
+    constructor(code: FailureCode, requestId?: string) {
       super(failureCode(code));
       this.name = "MusicFailure";
       this.code = failureCode(code);
+      if (
+        typeof requestId === "string" &&
+        /^req_[A-Za-z0-9_-]{1,160}$/.test(requestId)
+      )
+        this.request_id = requestId;
     }
-    toJSON(): { code: FailureCode; message: string } {
-      return { code: this.code, message: this.code };
+    toJSON(): { code: FailureCode; message: string; request_id?: string } {
+      return {
+        code: this.code,
+        message: this.code,
+        ...(this.request_id ? { request_id: this.request_id } : {}),
+      };
     }
   }
 }
@@ -164,8 +276,6 @@ function selection(value: MusicClient.Selection): MusicClient.ModelId {
   } catch {
     throw new MusicClient.Failure("invalid_input");
   }
-  if (!models.audio.music.is_model_id(model_id))
-    throw new MusicClient.Failure("model_unavailable");
   return model_id;
 }
 
@@ -174,49 +284,6 @@ function generationInput(value: MusicClient.Input): MusicClient.Input {
     return InputSchema.native(MediaInputs.music, value);
   } catch {
     throw new MusicClient.Failure("invalid_input");
-  }
-}
-
-/** Preserve existing hosted wire checks; only decoded audio leaves this operation. */
-
-function parseAudio(
-  value: unknown,
-  id: MusicClient.ModelId
-): MusicClient.Result["audio"] {
-  try {
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw 0;
-    const result = value as Record<string, unknown>;
-    if (
-      result.model_id !== id ||
-      result.provider_id !== "gg" ||
-      !result.audio ||
-      typeof result.audio !== "object" ||
-      Array.isArray(result.audio)
-    )
-      throw 0;
-    const audio = result.audio as Record<string, unknown>;
-    const { base64, media_type, file_name } = audio;
-    if (
-      typeof base64 !== "string" ||
-      !base64.length ||
-      base64.length > MAX_BASE64_CHARACTERS ||
-      !/^[A-Za-z0-9+/]+={0,2}$/.test(base64) ||
-      base64.length % 4 !== 0 ||
-      media_type !== "audio/mpeg" ||
-      typeof file_name !== "string" ||
-      !/^[^/\\]{1,128}\.mp3$/i.test(file_name)
-    )
-      throw 0;
-    const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
-    if ((base64.length / 4) * 3 - padding > MAX_BYTES) throw 0;
-    const decoded = atob(base64);
-    if (!decoded.length || decoded.length > MAX_BYTES) throw 0;
-    return {
-      data: Uint8Array.from(decoded, (character) => character.charCodeAt(0)),
-      media_type: "audio/mpeg",
-    };
-  } catch {
-    throw new MusicClient.Failure("invalid_response");
   }
 }
 
@@ -231,21 +298,26 @@ function exactKeys(value: unknown, allowed: readonly string[]): void {
   )
     throw 0;
 }
-function safeFailure(error: unknown): MusicClient.Failure {
+function safeFailure(error: unknown, requestId?: string): MusicClient.Failure {
   try {
     if (
       error instanceof MusicClient.Failure ||
+      error instanceof GGOperationsClient.Failure ||
       error instanceof MediaRequest.Failure
     )
-      return new MusicClient.Failure(error.code);
+      return new MusicClient.Failure(
+        error.code,
+        requestId ??
+          (error instanceof MusicClient.Failure ? error.request_id : undefined)
+      );
     if (error instanceof GridaGatewayAuthError)
-      return new MusicClient.Failure("gg_token_expired");
+      return new MusicClient.Failure("gg_token_expired", requestId);
     if (error instanceof GridaGatewayCreditsError)
-      return new MusicClient.Failure("insufficient_credits");
+      return new MusicClient.Failure("insufficient_credits", requestId);
   } catch {
     /* Unknown host errors can have throwing accessors. */
   }
-  return new MusicClient.Failure("generation_failed");
+  return new MusicClient.Failure("generation_failed", requestId);
 }
 function failureCode(value: unknown): MusicClient.FailureCode {
   return typeof value === "string" &&
@@ -261,4 +333,18 @@ function failureCode(value: unknown): MusicClient.FailureCode {
     ].includes(value)
     ? (value as MusicClient.FailureCode)
     : "generation_failed";
+}
+
+function mp3Signature(data: Uint8Array): boolean {
+  return (
+    (data.length >= 3 &&
+      data[0] === 0x49 &&
+      data[1] === 0x44 &&
+      data[2] === 0x33) ||
+    (data.length >= 2 &&
+      data[0] === 0xff &&
+      (data[1] & 0xe0) === 0xe0 &&
+      (data[1] & 0x18) !== 0x08 &&
+      (data[1] & 0x06) !== 0)
+  );
 }

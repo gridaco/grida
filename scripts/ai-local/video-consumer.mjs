@@ -1,3 +1,4 @@
+import { ggFixture } from "./gg-fixture.mjs";
 // GRIDA-SEC-004 / GRIDA-SEC-006 — a foreign host exercises only packed public exports.
 // GRIDA-GG: provider — synthetic video bytes and memory-only scoped authority.
 import assert from "node:assert/strict";
@@ -5,7 +6,7 @@ import assert from "node:assert/strict";
 export async function proveVideo({ load, require, check }) {
   const { VideoClient, ProviderHttp, GridaGatewaySessionStore } =
     await load("@grida/ai");
-  const { models } = await load("@grida/ai-models");
+  const { models } = await load("@grida/ai/catalogue");
   const model = "google/veo-3.1";
   const prompt = "A synthetic video";
   const frame = "https://assets.example.invalid/frame.png";
@@ -26,7 +27,7 @@ export async function proveVideo({ load, require, check }) {
       requests.push({ url: request.url, method: request.method });
       if (fail) throw new Error(`${key} ${token} ${prompt} upstream-body`);
       const body = request.method === "POST" ? await request.json() : undefined;
-      if (body) assert.equal(body.prompt, prompt);
+      if (body) assert.equal(body.input?.prompt ?? body.prompt, prompt);
       if (url.origin === "https://openrouter.ai") {
         assert.equal(authorization, `Bearer ${key}`);
         if (request.method === "POST") {
@@ -91,11 +92,35 @@ export async function proveVideo({ load, require, check }) {
         });
       }
       assert.equal(url.origin, "https://gg.example.invalid");
-      assert.equal(url.pathname, "/api/v1/ai/videos/generations");
       assert.equal(authorization, `Bearer ${token}`);
-      assert.equal(body.model_id, model);
-      assert.equal(body.image_url, undefined);
-      return Response.json({ videos: [{ base64, media_type: "video/mp4" }] });
+      if (request.method === "GET") {
+        assert.equal(url.pathname, "/api/v1/ai/jobs");
+        assert.equal(url.search, "?request_id=req_video");
+        return Response.json({
+          id: "req_video",
+          request_id: "req_video",
+          status: "succeeded",
+          result_status: "available",
+          result: {
+            videos: [
+              {
+                url: "https://v3.fal.media/video.mp4",
+                media_type: "video/mp4",
+              },
+            ],
+          },
+        });
+      }
+      assert.equal(url.pathname, "/api/v1/ai/operations");
+      assert.equal(
+        body.operation_id,
+        `video.${model.replaceAll("/", ".")}.text`
+      );
+      return Response.json({
+        id: "req_video",
+        request_id: "req_video",
+        result_status: "pending",
+      });
     },
     download: async (input, init) => {
       const request = new Request(input, init);
@@ -111,6 +136,7 @@ export async function proveVideo({ load, require, check }) {
     keys: { get: () => key },
     gg,
     gg_base_url: "https://gg.example.invalid",
+    gg_catalog: await ggFixture(load, [{ id: model, kind: "video" }]),
   });
   const failure = (code) => (error) => {
     assert(error instanceof VideoClient.Failure);
@@ -143,7 +169,10 @@ export async function proveVideo({ load, require, check }) {
         prompt,
         ...(provider !== "gg" ? { image_url: frame } : {}),
       });
-      assert.deepEqual(result, { videos: [{ data, media_type: "video/mp4" }] });
+      assert.deepEqual(result, {
+        ...(provider === "gg" ? { request_id: "req_video" } : {}),
+        videos: [{ data, media_type: "video/mp4" }],
+      });
       assert.equal(result.videos[0].data.constructor, Uint8Array);
       assert.equal(
         requests.slice(before).filter((request) => request.method === "POST")
@@ -162,7 +191,7 @@ export async function proveVideo({ load, require, check }) {
       );
       await assert.rejects(
         client.resolve({ model_id: model, provider: "gg", image: true }),
-        failure("input_unsupported")
+        failure("model_unavailable")
       );
       const operation = await client.resolve({
         model_id: model,
@@ -264,6 +293,6 @@ export async function proveVideo({ load, require, check }) {
       assert.equal(requests.length, before);
     }
   );
-  assert.equal(downloads.length, 1);
+  assert.equal(downloads.length, 2);
   return { requests: requests.length, downloads: downloads.length };
 }

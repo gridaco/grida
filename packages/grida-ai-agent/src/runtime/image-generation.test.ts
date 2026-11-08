@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — host reference/persistence behavior over the public image operation.
 // GRIDA-GG: provider — scoped image access stays inside the host transport.
+import { ggMediaDiscoveryFixture as fixtureGGDiscovery } from "../providers/gg-discovery.fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -58,6 +59,9 @@ describe("workspace image operation consumer", () => {
             options.get ?? (async (id: string) => options.keys?.[id] ?? null),
         } as unknown as SecretsStore,
         gg: options.gg,
+        gg_catalog: options.gg
+          ? fixtureGGDiscovery([{ id: MODEL, kind: "image", background: true }])
+          : undefined,
         gg_base_url: options.gg ? "https://grida.test" : undefined,
         provider_http: new ProviderHttp({ request, download }),
       }
@@ -227,13 +231,12 @@ describe("workspace image operation consumer", () => {
     });
     const { generate, request } = await build({
       gg,
-      request: async () =>
-        Response.json({ images: [{ base64: PNG, media_type: "image/png" }] }),
+      request: async () => Response.json({ data: [{ b64_json: PNG }] }),
     });
     const result = await generate({ prompt: "x" });
     expect(result.ok).toBe(true);
     expect(String(request.mock.calls[0][0])).toBe(
-      "https://grida.test/api/v1/ai/images/generations"
+      "https://grida.test/api/v1/ai/operations"
     );
     expect(
       new Headers(request.mock.calls[0][1]?.headers).get("authorization")

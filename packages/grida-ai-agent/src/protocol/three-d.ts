@@ -8,7 +8,7 @@
  * the renderer boundary (GRIDA-SEC-004).
  */
 
-import type { models } from "@grida/ai-models";
+import type { models } from "@grida/ai/catalogue";
 import type { MediaItem } from "@grida/daemon";
 
 export type FalTextToThreeDModelId = models.three_d.TextToThreeDModelId;

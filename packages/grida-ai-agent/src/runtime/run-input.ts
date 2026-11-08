@@ -8,6 +8,7 @@
  * catalog/provider/workspace validation details.
  */
 
+import type { GGDiscoveryStore } from "@grida/ai";
 import crypto from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import {
@@ -120,6 +121,7 @@ export type ParseRunBodyDeps = {
   chatgpt?: ChatGptProviderRuntime;
   /** The catalogue this gate admits from. Absent ⇒ the bundled one. */
   catalog?: ModelCatalogStore;
+  gg_catalog?: GGDiscoveryStore;
 };
 
 /**
@@ -235,7 +237,8 @@ export async function parseRunBody(
         (deps.chatgpt !== undefined &&
           isChatGptSubscriptionModelId(b.model_id)) ||
         (await isRegisteredModelId(b.model_id, deps)) ||
-        (await isCatalogueModelIdAfterRefresh(b.model_id, deps)));
+        (await isCatalogueModelIdAfterRefresh(b.model_id, deps)) ||
+        (await isCurrentGgModel(b.model_id, deps)));
     if (!allowed) {
       return Response.json(
         { error: `modelId not allowed: ${String(b.model_id)}` },
@@ -616,9 +619,7 @@ async function isModelAvailableFromProvider(
     return deps.chatgpt !== undefined && isChatGptSubscriptionModelId(modelId);
   }
   if (isGgProviderId(providerId)) {
-    // No refresh here: the model gate above already ran, and a second
-    // miss on the same request means the tuple is wrong, not stale.
-    return catalogView(deps.catalog).has(modelId);
+    return isCurrentGgModel(modelId, deps);
   }
   if (isByokProviderId(providerId)) {
     return (
@@ -1030,4 +1031,14 @@ function dataUrlDecodedBytes(dataUrl: string): number | null {
   if (len === 0) return 0;
   const padding = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
   return Math.max(0, Math.floor((len * 3) / 4) - padding);
+}
+
+/** Unknown GG IDs are allowed only through a currently served implemented wire. */
+async function isCurrentGgModel(
+  modelId: string,
+  deps: ParseRunBodyDeps
+): Promise<boolean> {
+  if (!deps.gg_catalog) return false;
+  await deps.gg_catalog.ready();
+  return deps.gg_catalog.supports(modelId, "chat.completions");
 }

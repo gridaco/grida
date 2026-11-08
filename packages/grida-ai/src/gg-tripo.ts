@@ -1,6 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — fixed upload destination; GG credentials never reach signed uploads.
 // GRIDA-GG: provider — scoped 3D requests and bounded streamed JSON results.
-import { catalog } from "@grida/ai-models/grida";
+import { catalog } from "./catalogue/grida";
 import type { GgTokenSource } from "./gg-session";
 import { gridaGatewayOrigin, readGgToken } from "./gg";
 import { InputSchema } from "./input-schema";

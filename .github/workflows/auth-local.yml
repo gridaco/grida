@@ -27,7 +27,6 @@ on:
       - "packages/grida-auth/**"
       - "packages/grida-account/**"
       - "packages/grida-home/**"
-      - "packages/grida-ai-models/**"
       - "data/ai/**"
       - "editor/lib/auth/**"
       - "editor/lib/gg/**"
@@ -158,7 +157,7 @@ jobs:
         run: |
           pnpm --filter @grida/auth typecheck
           pnpm --filter @grida/auth test
-          node --test scripts/auth-local/guards.test.mjs scripts/auth-local/network.test.mjs
+          node --test scripts/auth-local/guards.test.mjs scripts/auth-local/network.test.mjs scripts/auth-local/discovery.test.mjs
           node --test scripts/cli-local/native-proof.test.mjs
           node_modules/.bin/vitest run --config editor/vitest.oauth.config.ts
       - name: Build and pack the actual native host candidate
@@ -228,6 +227,9 @@ jobs:
           test "$AUTH_EDITOR_READY" = 1
           editor/node_modules/.bin/playwright test --config editor/playwright.auth.config.ts
           node scripts/cli-local/native-proof.mjs --state "$GRIDA_AUTH_TEST_STATE" --candidate "$AUTH_NATIVE_CANDIDATE"
+          # The launcher also checks on exit, but EXIT cleanup ignores wait status.
+          # A prior rejected request must fail this step even after clean reads.
+          curl --disable --noproxy '*' --fail --silent --show-error --output /dev/null --max-time 2 http://127.0.0.1:55438/__fixture/verify
       - name: Stop only the owned local fixture
         if: ${{ always() && steps.fixture.outputs.state != '' }}
         env:

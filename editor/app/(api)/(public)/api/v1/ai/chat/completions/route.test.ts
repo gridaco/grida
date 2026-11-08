@@ -18,6 +18,13 @@ import type { ProductBilling } from "@/lib/platform/product-billing";
 
 // Rate limits are pinned by their own module; route tests must NEVER
 // reach the real Upstash instance (vitest loads .env.local).
+vi.mock("@/lib/ai/openai-compat/hosted-models", () => ({
+  isHostedTextModel: async (id: string) =>
+    id.startsWith("openai/") ||
+    id.startsWith("anthropic/") ||
+    id.startsWith("google/"),
+}));
+
 vi.mock("@/lib/ai/openai-compat/limits", () => ({
   allowAiRequest: async () => ({ success: true }),
 }));

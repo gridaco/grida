@@ -113,7 +113,6 @@ jobs:
             --filter=@grida/desktop-bridge \
             --filter=@grida/agent \
             --filter=@grida/daemon \
-            --filter=@grida/ai-models \
             --filter=@grida/home
 
       - name: Import Apple signing certificate

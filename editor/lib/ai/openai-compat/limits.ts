@@ -20,6 +20,7 @@ type Limiter = {
 type LimiterName =
   | "chat"
   | "models"
+  | "jobs"
   | "images"
   | "video"
   | "music"
@@ -30,6 +31,9 @@ type LimiterName =
 const CONFIG: Record<LimiterName, { tokens: number; window: `${number} s` }> = {
   chat: { tokens: 60, window: "60 s" },
   models: { tokens: 60, window: "60 s" },
+  // 14 native generation admissions per ten minutes can poll every 2 seconds.
+  // Keep accepted-work retrieval separate from discovery and submission.
+  jobs: { tokens: 480, window: "60 s" },
   images: { tokens: 12, window: "60 s" },
   video: { tokens: 4, window: "600 s" },
   music: { tokens: 6, window: "600 s" },

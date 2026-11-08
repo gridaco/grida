@@ -1,0 +1,1179 @@
+import { catalog as models, TIER_MODEL_IDS } from "../../grida";
+
+function rateMatrix(
+  binding: models.video.VideoProviderBinding | null | undefined
+) {
+  if (binding?.pricing.type !== "per_second")
+    throw new Error("Not a per-second binding");
+  return binding.pricing.usd_per_second;
+}
+
+describe("bundled model release metadata", () => {
+  const cards: readonly { id: string; release?: models.ModelRelease }[] = [
+    ...Object.values(models.text.catalog),
+    ...Object.values(models.image.models).filter((card) => card !== undefined),
+    ...Object.values(models.audio.music.models),
+    ...Object.values(models.audio.sound_effects.models),
+    ...Object.values(models.audio.text_to_speech.models),
+    ...Object.values(models.three_d.models),
+    ...Object.values(models.three_d.model_generation.models),
+    ...Object.values(models.video.models).filter((card) => card !== undefined),
+    ...Object.values(models.image_tools.models),
+  ];
+  const grounded = cards.filter(
+    (card): card is { id: string; release: models.ModelRelease } =>
+      card.release !== undefined
+  );
+
+  it("grounds every built-in card with a valid HTTPS source", () => {
+    expect(
+      cards.filter((card) => !card.release).map((card) => card.id)
+    ).toEqual([]);
+    for (const card of grounded) {
+      expect(card.release.source_url).toMatch(/^https:\/\/[^\s]+$/);
+    }
+  });
+
+  it("stores real YYYY-MM-DD calendar dates and never guesses model dates", () => {
+    const dated = grounded.flatMap((card) =>
+      card.release.date === null
+        ? []
+        : [{ id: card.id, date: card.release.date }]
+    );
+    for (const release of dated) {
+      expect(release.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      const parsed = new Date(`${release.date}T00:00:00.000Z`);
+      expect(parsed.toISOString().slice(0, 10)).toBe(release.date);
+    }
+  });
+
+  it("uses null only for endpoints whose exact first day is unavailable", () => {
+    expect(
+      cards
+        .filter((card) => card.release?.date === null)
+        .map((card) => card.id)
+        .sort()
+    ).toEqual([
+      "851-labs/background-remover",
+      "recraft-ai/recraft-remove-background",
+    ]);
+    expect(
+      grounded
+        .filter((card) => card.release.date === null)
+        .map((card) => card.release.basis)
+    ).toEqual(["provider_endpoint", "provider_endpoint"]);
+  });
+
+  it("gives both Hunyuan routes the intrinsic model release", () => {
+    expect(
+      models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/text-to-3d"].release
+    ).toEqual(
+      models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"].release
+    );
+  });
+});
+
+describe("models.image.findImageModelCard", () => {
+  it("resolves a full Vercel AI Gateway id", () => {
+    const card = models.image.findImageModelCard("bfl/flux-pro-1.1");
+    expect(card?.id).toBe("bfl/flux-pro-1.1");
+    expect(card?.label).toBe("Flux Pro 1.1");
+  });
+
+  it("resolves the deprecated ProviderModel wrapper", () => {
+    const card = models.image.findImageModelCard({
+      provider: "vercel",
+      modelId: "bfl/flux-2-pro",
+    });
+    expect(card?.id).toBe("bfl/flux-2-pro");
+  });
+
+  it("resolves a bare name (the part after the vendor prefix)", () => {
+    // Same rule as `models.text.modelSpecById`: bare = post-slash segment.
+    const card = models.image.findImageModelCard("gpt-image-2");
+    expect(card?.id).toBe("openai/gpt-image-2");
+  });
+
+  it("returns null when the bare name matches no card", () => {
+    // "gpt-image" is a prefix of several OpenAI ids but is not the
+    // bare name of any of them — must refuse rather than guess.
+    expect(models.image.findImageModelCard("gpt-image")).toBeNull();
+  });
+
+  it("returns null for an unknown full id", () => {
+    expect(
+      models.image.findImageModelCard("unknown-vendor/imaginary-model")
+    ).toBeNull();
+  });
+
+  it("returns null for an empty input", () => {
+    expect(models.image.findImageModelCard("")).toBeNull();
+  });
+});
+
+describe("models.image catalogue invariants", () => {
+  it("every dict key resolves to a defined card", () => {
+    for (const id of Object.keys(models.image.models)) {
+      expect(models.image.models[id]).toBeDefined();
+    }
+  });
+
+  it("retains GPT Image 2 as a listed, deprecated model", () => {
+    const card = models.image.findImageModelCard("openai/gpt-image-2")!;
+    expect(card).toMatchObject({
+      id: "openai/gpt-image-2",
+      listed: true,
+      deprecated: true,
+    });
+    expect(models.image.listed_models()).toContain(card);
+  });
+
+  it("toCompact preserves id, label, release, pricing, speed_label, deprecated", () => {
+    const card = models.image.models["bfl/flux-pro-1.1"]!;
+    const compact = models.image.toCompact(card);
+    expect(compact).toEqual({
+      id: card.id,
+      label: card.label,
+      deprecated: card.deprecated,
+      short_description: card.short_description,
+      release: card.release,
+      speed_label: card.speed_label,
+      pricing: card.pricing,
+    });
+  });
+});
+
+describe("models.image provider-binding invariants", () => {
+  it("every card has at least one provider binding", () => {
+    for (const card of Object.values(models.image.models)) {
+      if (!card) continue;
+      expect(Object.keys(card.providers).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("each binding's provider field matches its key", () => {
+    for (const card of Object.values(models.image.models)) {
+      if (!card) continue;
+      for (const [key, b] of Object.entries(card.providers)) {
+        if (!b) continue;
+        expect(b.provider).toBe(key);
+      }
+    }
+  });
+
+  it("the card's primary provider has a matching binding", () => {
+    for (const card of Object.values(models.image.models)) {
+      if (!card) continue;
+      expect(card.providers[card.provider]).toBeDefined();
+    }
+  });
+
+  it.each(["flare", "sunburst"] as const)(
+    "lists GPT Image 2.5 %s on each verified provider with that provider's meter",
+    (variant) => {
+      const card = models.image.models[`openai/gpt-image-2.5-${variant}`]!;
+      expect(card).toMatchObject({
+        listed: true,
+        deprecated: false,
+        provider: "vercel",
+        release: { date: "2026-09-08", basis: "model" },
+        quality: {
+          options: ["auto", "low", "medium", "high", "xhigh", "max"],
+          default: "high",
+        },
+        constraints: {
+          step: 16,
+          max_edge: 3840,
+          min_pixels: 655360,
+          max_pixels: 8294400,
+          aspect_ratio: { max: 3 },
+        },
+      });
+      expect(Object.keys(card.providers).sort()).toEqual([
+        "fal",
+        "openrouter",
+        "vercel",
+      ]);
+      const vercelAiGatewayBinding = models.image.binding(card, "vercel")!;
+      expect(vercelAiGatewayBinding.id).toBe(card.id);
+      expect(vercelAiGatewayBinding.pricing).toEqual({
+        type: "per_token",
+        input: 5,
+        cached_input: 1.25,
+        output: 30,
+      });
+      expect(card.pricing).toEqual(vercelAiGatewayBinding.pricing);
+      expect(vercelAiGatewayBinding.references).toBeUndefined();
+      expect(models.image.supportsTransparentBackground(card, "vercel")).toBe(
+        true
+      );
+      const openrouter = models.image.binding(card, "openrouter")!;
+      expect(openrouter.id).toBe(card.id);
+      expect(openrouter.pricing).toMatchObject({
+        type: "per_token",
+        input: 5,
+        image_input: 8,
+        output: 30,
+      });
+      expect(openrouter.references).toEqual({ id: card.id, max: 16 });
+      expect(openrouter.transparent_background).toBe(true);
+      expect(models.image.binding(card, "fal")).toMatchObject({
+        id: `openai/gpt-image-2.5/${variant}/text-to-image`,
+        references: {
+          id: `openai/gpt-image-2.5/${variant}/edit`,
+          max: 16,
+        },
+        // All six rates are published by FAL for both generation and edits,
+        // in USD per million tokens (not OpenAI's old per-image tiers).
+        pricing: {
+          type: "per_token",
+          input: 5,
+          cached_input: 1.25,
+          image_input: 8,
+          cached_image_input: 2,
+          text_output: 10,
+          output: 30,
+        },
+      });
+    }
+  );
+
+  it("binding() resolves a present provider and nulls an absent one", () => {
+    const kontext = models.image.models["bfl/flux-kontext-max"]!;
+    expect(models.image.binding(kontext, "fal")?.id).toBe(
+      "fal-ai/flux-pro/kontext/max"
+    );
+    // Not on OpenRouter → no binding (why it is not listed).
+    expect(models.image.binding(kontext, "openrouter")).toBeNull();
+  });
+
+  it("prices Recraft V4.1 at the raster rate every provider publishes", () => {
+    // Written from the providers, not the card: Vercel AI Gateway feed `pricing.image`,
+    // OpenRouter `/images/models/.../endpoints` `cost_usd`, and fal's model
+    // page payload all say $0.035 (checked 2026-09-02). V3 is $0.04 on the
+    // same three, which is why V4.1 is listed and V3 is not.
+    const v41 = models.image.models["recraft/recraft-v4.1"]!;
+    expect(v41.listed).toBe(true);
+    for (const p of ["vercel", "fal", "openrouter"] as const) {
+      expect(models.image.binding(v41, p)?.pricing).toEqual({
+        type: "per_image_flat",
+        usd: 0.035,
+      });
+    }
+    expect(models.image.binding(v41, "fal")?.id).toBe(
+      "fal-ai/recraft/v4.1/text-to-image"
+    );
+    const v3 = models.image.models["recraft/recraft-v3"]!;
+    expect(v3).toMatchObject({ listed: false, deprecated: true });
+  });
+
+  it("prices Flux Kontext Pro at $0.04 and binds fal", () => {
+    // The card shipped at $0.05 while the Vercel AI Gateway feed's `pricing.image` is
+    // $0.04 — reachable over-deduction, since the hosted route gates on a
+    // Vercel AI Gateway binding rather than `listed`. fal's page states the same $0.04.
+    const kontext = models.image.models["bfl/flux-kontext-pro"]!;
+    expect(kontext.pricing).toEqual({ type: "per_image_flat", usd: 0.04 });
+    expect(models.image.binding(kontext, "vercel")?.pricing).toEqual({
+      type: "per_image_flat",
+      usd: 0.04,
+    });
+    expect(models.image.binding(kontext, "fal")).toMatchObject({
+      id: "fal-ai/flux-pro/kontext",
+      pricing: { type: "per_image_flat", usd: 0.04 },
+    });
+  });
+
+  it("prices Flux 2 Pro and Max at the per-megapixel baseline every provider publishes", () => {
+    // Vercel AI Gateway model page, OpenRouter `cost_usd`/megapixel, fal "first megapixel"
+    // — all $0.03 (Pro) and $0.07 (Max), 2026-09-02. Pro's Vercel AI Gateway binding had
+    // shipped at $0.06: a 2x hosted over-billing.
+    for (const [id, usd] of [
+      ["bfl/flux-2-pro", 0.03],
+      ["bfl/flux-2-max", 0.07],
+    ] as const) {
+      const card = models.image.models[id]!;
+      expect(card.listed).toBe(true);
+      expect(card.pricing).toEqual({ type: "per_image_flat", usd });
+      for (const p of ["vercel", "fal", "openrouter"] as const) {
+        expect(models.image.binding(card, p)?.pricing).toMatchObject({
+          type: "per_image_flat",
+          usd,
+        });
+      }
+    }
+  });
+
+  it("lists Seedream 5.0 and deprecates 4.5", () => {
+    // Vercel AI Gateway feed `pricing.image` $0.035 for both 5.0 cards; fal $0.035 (Lite);
+    // OpenRouter `cost_usd` $0.035 (Lite) / $0.045 (Pro 1K). 4.5 is $0.04 on
+    // Vercel AI Gateway and fal — dominated by Lite on price and generation.
+    const lite = models.image.models["bytedance/seedream-5.0-lite"]!;
+    expect(lite.listed).toBe(true);
+    for (const p of ["vercel", "fal", "openrouter"] as const) {
+      expect(models.image.binding(lite, p)?.pricing).toEqual({
+        type: "per_image_flat",
+        usd: 0.035,
+      });
+    }
+    const pro = models.image.models["bytedance/seedream-5.0-pro"]!;
+    expect(pro.listed).toBe(true);
+    expect(models.image.binding(pro, "vercel")?.pricing).toEqual({
+      type: "per_image_flat",
+      usd: 0.035,
+    });
+    expect(models.image.models["bytedance/seedream-4.5"]).toMatchObject({
+      listed: false,
+      deprecated: true,
+    });
+  });
+
+  it("prices Grok Imagine Image 2.0 by the quality×size tiers all providers share", () => {
+    const grok = models.image.models["xai/grok-imagine-image-2.0"]!;
+    const tiers = {
+      "low/1024x1024": 0.04,
+      "medium/1024x1024": 0.06,
+      "low/2048x2048": 0.06,
+      "medium/2048x2048": 0.08,
+    };
+    expect(grok.listed).toBe(true);
+    expect(grok.pricing).toEqual({ type: "per_image_tiered", tiers });
+    for (const p of ["vercel", "fal", "openrouter"] as const) {
+      expect(models.image.binding(grok, p)?.pricing).toEqual({
+        type: "per_image_tiered",
+        tiers,
+      });
+    }
+  });
+
+  it("keeps Muse Image 1.0 unlisted: OpenRouter lists it with no endpoint", () => {
+    const muse = models.image.models["meta/muse-image-1.0"]!;
+    expect(muse.listed).toBe(false);
+    expect(models.image.binding(muse, "openrouter")).toBeNull();
+    for (const p of ["vercel", "fal"] as const) {
+      expect(models.image.binding(muse, p)?.pricing).toMatchObject({
+        type: "per_image_flat",
+        usd: 0.01,
+      });
+    }
+  });
+
+  it("calls Gemini 3.1 Flash Image by its graduated ids, canonical key unchanged", () => {
+    const card = models.image.models["google/gemini-3.1-flash-image-preview"]!;
+    expect(models.image.binding(card, "vercel")?.id).toBe(
+      "google/gemini-3.1-flash-image"
+    );
+    expect(models.image.binding(card, "fal")?.id).toBe("fal-ai/nano-banana-2");
+    expect(models.image.binding(card, "openrouter")?.id).toBe(
+      "google/gemini-3.1-flash-image"
+    );
+  });
+
+  it("keeps image-to-image reachable on every new listed card", () => {
+    // Written from OpenRouter's `supported_parameters.input_references`
+    // (2026-09-02). Seedream 4.5 carried the catalogue's Seedream i2i route;
+    // unlisting it without giving 5.0 the same binding would have dropped
+    // Seedream editing from the BYOK surface.
+    for (const [id, max] of [
+      ["bytedance/seedream-5.0-pro", 14],
+      ["bytedance/seedream-5.0-lite", 14],
+      ["bfl/flux-2-max", 8],
+      ["xai/grok-imagine-image-2.0", 3],
+      ["recraft/recraft-v4.1", 1],
+    ] as const) {
+      const card = models.image.models[id]!;
+      expect(models.image.binding(card, "openrouter")?.references?.max).toBe(
+        max
+      );
+    }
+  });
+
+  it("listed_models returns only listed cards", () => {
+    for (const card of models.image.listed_models()) {
+      expect(card.listed).toBe(true);
+    }
+  });
+});
+
+describe("models.image.supportsTransparentBackground", () => {
+  // The model default is portable metadata; a serving provider may expose
+  // less, or have its own verified declaration while the model is unknown.
+  it.each([
+    ["inherits verified model support", true, undefined, true],
+    ["inherits an unsupported model", false, undefined, false],
+    ["keeps absent declarations unknown", undefined, undefined, false],
+    ["accepts explicit provider support", undefined, true, true],
+    ["allows a provider boolean to override the model", false, true, true],
+    ["honors an unsupported provider override", true, false, false],
+    ["lets an unverified provider mask model support", true, null, false],
+  ] as const)("%s", (_name, modelSupport, providerSupport, expected) => {
+    const base = models.image.models["openai/gpt-image-2"]!;
+    const card: models.image.ImageModelCard = {
+      ...base,
+      transparent_background: modelSupport,
+      providers: {
+        fal: {
+          ...base.providers.fal!,
+          transparent_background: providerSupport,
+        },
+      },
+    };
+    expect(models.image.supportsTransparentBackground(card, "fal")).toBe(
+      expected
+    );
+  });
+
+  it("never grants model support to a missing provider binding", () => {
+    const base = models.image.models["openai/gpt-image-2.5-flare"]!;
+    const card: models.image.ImageModelCard = {
+      ...base,
+      provider: "fal",
+      providers: { fal: base.providers.fal! },
+    };
+    expect(card.transparent_background).toBe(true);
+    expect(models.image.supportsTransparentBackground(card, "vercel")).toBe(
+      false
+    );
+  });
+
+  it("keeps provider overrides independent without mutating the card", () => {
+    const base = models.image.models["openai/gpt-image-2"]!;
+    const card = Object.freeze({
+      ...base,
+      transparent_background: true,
+      providers: Object.freeze({
+        fal: Object.freeze({ ...base.providers.fal! }),
+        openrouter: Object.freeze({
+          ...base.providers.openrouter!,
+          transparent_background: false,
+        }),
+        vercel: Object.freeze({
+          ...base.providers.vercel!,
+          transparent_background: null,
+        }),
+      }),
+    });
+    const before = JSON.stringify(card);
+    expect(models.image.supportsTransparentBackground(card, "openrouter")).toBe(
+      false
+    );
+    expect(models.image.supportsTransparentBackground(card, "vercel")).toBe(
+      false
+    );
+    expect(models.image.supportsTransparentBackground(card, "fal")).toBe(true);
+    expect(JSON.stringify(card)).toBe(before);
+  });
+
+  it("declares only verified native transparency and provider exposure", () => {
+    // Published fal schemas expose transparent backgrounds for GPT Image 2
+    // and both 2.5 variants. The pinned public Models release includes
+    // OpenRouter transparency for 2.5. Vercel AI Gateway publishes
+    // support for 2.5 but not GPT Image 2 (verified 2026-09-09 KST).
+    for (const id of [
+      "openai/gpt-image-2",
+      "openai/gpt-image-2.5-flare",
+      "openai/gpt-image-2.5-sunburst",
+    ]) {
+      const card = models.image.models[id]!;
+      expect(card.transparent_background).toBe(true);
+      expect(card.providers.fal?.transparent_background).toBeUndefined();
+      expect(models.image.supportsTransparentBackground(card, "fal")).toBe(
+        true
+      );
+      expect(models.image.supportsTransparentBackground(card, "vercel")).toBe(
+        id !== "openai/gpt-image-2"
+      );
+      expect(
+        models.image.supportsTransparentBackground(card, "openrouter")
+      ).toBe(id !== "openai/gpt-image-2");
+    }
+    const gpt2 = models.image.models["openai/gpt-image-2"]!;
+    expect(gpt2.providers.openrouter?.transparent_background).toBe(false);
+    expect(gpt2.providers.vercel?.transparent_background).toBeNull();
+    expect(
+      models.image.models["bfl/flux-pro-1.1"]?.transparent_background
+    ).toBeUndefined();
+  });
+});
+
+describe("models.audio.music catalogue invariants", () => {
+  it("lists only the Replicate-backed music ids", () => {
+    expect(models.audio.music.model_ids).toEqual([
+      "google/lyria-3",
+      "google/lyria-3-pro",
+    ]);
+    expect(models.audio.music.is_model_id("google/lyria-3")).toBe(true);
+    expect(models.audio.music.is_model_id("eleven_text_to_sound_v2")).toBe(
+      false
+    );
+  });
+
+  it("lists the integrated music models", () => {
+    expect(models.audio.music.listed_models().map((card) => card.id)).toEqual([
+      "google/lyria-3",
+      "google/lyria-3-pro",
+    ]);
+  });
+
+  it("grounds Lyria as image-conditioned music with Replicate's flat meter", () => {
+    for (const card of Object.values(models.audio.music.models)) {
+      expect(card.provider).toBe("replicate");
+      expect(card.input).toEqual({
+        modalities: ["text", "image"],
+        max_images: 10,
+      });
+      expect(card.output.default_format).toBe("mp3");
+      expect(card.output.sample_rate_hz).toBe(48_000);
+      expect(card.output.channels).toBe(2);
+      expect(card.pricing.type).toBe("per_run_flat");
+      expect(card.pricing.usd).toBeGreaterThan(0);
+      expect(card.avg_cost_usd).toBe(card.pricing.usd);
+    }
+  });
+});
+
+describe("models.audio.sound_effects catalogue invariants", () => {
+  it("keeps the exact ElevenLabs model staged", () => {
+    expect(models.audio.sound_effects.model_ids).toEqual([
+      "eleven_text_to_sound_v2",
+    ]);
+    expect(
+      models.audio.sound_effects.staged_models().map((card) => card.id)
+    ).toEqual(["eleven_text_to_sound_v2"]);
+  });
+
+  it("stores ElevenLabs' exact SFX id, IO limits, and provider-credit meter", () => {
+    const card = models.audio.sound_effects.models.eleven_text_to_sound_v2;
+    expect(card).toMatchObject({
+      id: "eleven_text_to_sound_v2",
+      vendor: "elevenlabs",
+      provider: "elevenlabs",
+      status: "staged",
+      input: { type: "text" },
+      output: {
+        default_format: "mp3",
+        formats: ["mp3"],
+        sample_rate_hz: 44_100,
+        duration: {
+          mode: "automatic_or_fixed",
+          min_seconds: 0.5,
+          max_seconds: 30,
+        },
+      },
+      pricing: {
+        type: "provider_credits",
+        automatic_duration_credits: 100,
+        specified_duration_credits_per_second: 11,
+      },
+      avg_cost_usd: null,
+    });
+  });
+});
+
+describe("models.audio.text_to_speech catalogue invariants", () => {
+  it("keeps the exact ElevenLabs v3 model staged", () => {
+    expect(models.audio.text_to_speech.model_ids).toEqual(["eleven_v3"]);
+    expect(
+      models.audio.text_to_speech.staged_models().map((card) => card.id)
+    ).toEqual(["eleven_v3"]);
+  });
+
+  it("grounds v3 audio tags, input limit, MP3 output, and character meter", () => {
+    const card = models.audio.text_to_speech.models.eleven_v3;
+    expect(card).toMatchObject({
+      id: "eleven_v3",
+      vendor: "elevenlabs",
+      provider: "elevenlabs",
+      status: "staged",
+      input: {
+        type: "text",
+        max_characters: 5_000,
+        audio_tags: true,
+      },
+      output: {
+        default_format: "mp3",
+        formats: ["mp3"],
+        sample_rate_hz: 44_100,
+        bit_rate_kbps: 128,
+      },
+      pricing: { type: "per_1000_characters", usd: 0.1 },
+    });
+  });
+});
+
+describe("models.three_d catalogue invariants", () => {
+  const expectedIds = [
+    "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+    "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+    "fal-ai/trellis-2",
+  ] as const;
+
+  it("uses exact fal endpoint ids and keeps every route staged", () => {
+    expect(models.three_d.three_d_model_ids).toEqual(expectedIds);
+    expect(models.three_d.text_to_three_d_model_ids).toEqual([
+      "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
+    ]);
+    expect(models.three_d.image_to_three_d_model_ids).toEqual([
+      "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d",
+      "fal-ai/trellis-2",
+    ]);
+    expect(models.three_d.listed_models()).toEqual([]);
+    expect(
+      models.three_d
+        .staged_models()
+        .map((card) => card.id)
+        .sort()
+    ).toEqual([...expectedIds].sort());
+
+    for (const [id, card] of Object.entries(models.three_d.models)) {
+      expect(card.id).toBe(id);
+      expect(card.provider).toBe("fal");
+      expect(card.status).toBe("staged");
+    }
+  });
+
+  it("keeps category, required input, and guaranteed output aligned", () => {
+    for (const card of Object.values(models.three_d.models)) {
+      expect(card.category).toBe(`3d/${card.input.type}-to-3d`);
+      expect(card.output.primary).toBe("glb");
+      expect(card.output.optional).not.toContain("glb");
+    }
+
+    const text = models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/text-to-3d"];
+    expect(text.input).toEqual({
+      type: "text",
+      max_utf8_characters: 1024,
+    });
+
+    const image =
+      models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"];
+    expect(image.input).toEqual({
+      type: "image",
+      min_images: 1,
+      max_images: 8,
+    });
+    expect(image.output.optional).toEqual(["fbx", "obj", "usdz"]);
+
+    expect(models.three_d.models["fal-ai/trellis-2"].output.optional).toEqual(
+      []
+    );
+  });
+
+  it("does not flatten Hunyuan surcharges or TRELLIS.2 resolution tiers", () => {
+    const text = models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/text-to-3d"];
+    expect(text.pricing).toEqual({
+      type: "per_generation_base_plus_surcharges",
+      base_usd: 0.375,
+      surcharges_usd: { pbr: 0.15, custom_face_count: 0.15 },
+    });
+
+    const image =
+      models.three_d.models["fal-ai/hunyuan-3d/v3.1/pro/image-to-3d"];
+    expect(image.pricing).toEqual({
+      type: "per_generation_base_plus_surcharges",
+      base_usd: 0.375,
+      surcharges_usd: {
+        pbr: 0.15,
+        multi_view: 0.15,
+        custom_face_count: 0.15,
+      },
+    });
+
+    const trellis = models.three_d.models["fal-ai/trellis-2"];
+    expect(trellis.pricing).toEqual({
+      type: "per_generation_by_resolution",
+      default_resolution: "1024",
+      usd_by_resolution: { "512": 0.25, "1024": 0.3, "1536": 0.35 },
+    });
+    expect(trellis.avg_cost_usd).toBe(
+      trellis.pricing.type === "per_generation_by_resolution"
+        ? trellis.pricing.usd_by_resolution[trellis.pricing.default_resolution]
+        : undefined
+    );
+  });
+});
+
+describe("models.video catalogue invariants", () => {
+  it("every dict key resolves to a defined card", () => {
+    for (const id of Object.keys(models.video.models)) {
+      expect(models.video.models[id]).toBeDefined();
+    }
+  });
+
+  it("only catalogues selectable video models with a supported provider binding", () => {
+    for (const card of Object.values(models.video.models)) {
+      if (!card) continue;
+      expect(card.listed).toBe(true);
+      expect(Object.keys(card.providers).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("each binding's provider field matches its key", () => {
+    for (const card of Object.values(models.video.models)) {
+      if (!card) continue;
+      for (const [key, b] of Object.entries(card.providers)) {
+        if (!b) continue;
+        expect(b.provider).toBe(key);
+      }
+    }
+  });
+
+  it("every binding prices the model's default (resolution, audio mode)", () => {
+    // Provider-selection is deferred, so the contract is route-agnostic: any
+    // provider the runtime later picks must be able to serve the default
+    // config. Every binding therefore prices `default.resolution` at the
+    // default audio mode.
+    for (const card of Object.values(models.video.models)) {
+      if (!card) continue;
+      const mode = card.default.audio ? "audio" : "silent";
+      const bindings = Object.values(card.providers).filter(
+        (binding) => !!binding
+      );
+      for (const binding of bindings.filter(
+        (binding) => binding.pricing.type === "per_second"
+      )) {
+        expect(
+          rateMatrix(binding)[card.default.resolution]?.[mode]
+        ).toBeGreaterThan(0);
+      }
+      for (const binding of bindings.filter(
+        (binding) => binding.pricing.type !== "per_second"
+      )) {
+        expect(binding.pricing).toMatchObject({ type: "provider_skus" });
+      }
+    }
+  });
+
+  it("prices Veo 3.1 with Vercel AI Gateway's full audio/resolution matrix", () => {
+    // Written from the provider, not from the card: these are the exact
+    // `video_duration_pricing` rows the Vercel AI Gateway's /v1/models feed
+    // returns for `google/veo-3.1-generate-001` (checked 2026-09-02).
+    // The card previously claimed audio-on-only at <=1080p, so a 4K request
+    // was rejected for want of a rate. Vercel AI Gateway meters both modes, and
+    // fal meters the same matrix.
+    // https://vercel.com/ai-gateway/models/veo-3.1-generate-001
+    const matrix = {
+      "720p": { audio: 0.4, silent: 0.2 },
+      "1080p": { audio: 0.4, silent: 0.2 },
+      "4k": { audio: 0.6, silent: 0.4 },
+    };
+    const veo = models.video.models["google/veo-3.1"]!;
+    for (const provider of ["vercel", "fal"] as const) {
+      expect(rateMatrix(models.video.binding(veo, provider))).toEqual(matrix);
+    }
+  });
+
+  it("prices Veo 3.1 Fast and Lite with the matrices Vercel AI Gateway and fal both publish", () => {
+    const fast = {
+      "720p": { audio: 0.15, silent: 0.1 },
+      "1080p": { audio: 0.15, silent: 0.1 },
+      "4k": { audio: 0.35, silent: 0.3 },
+    };
+    const lite = {
+      "720p": { audio: 0.05, silent: 0.03 },
+      "1080p": { audio: 0.08, silent: 0.05 },
+    };
+    for (const [id, matrix] of [
+      ["google/veo-3.1-fast", fast],
+      ["google/veo-3.1-lite", lite],
+    ] as const) {
+      const card = models.video.models[id]!;
+      for (const p of ["vercel", "fal"] as const) {
+        expect(rateMatrix(models.video.binding(card, p))).toEqual(matrix);
+      }
+    }
+  });
+
+  it("prices Wan 3.0 per resolution, audio bundled, identically on Vercel AI Gateway and fal", () => {
+    const wan = models.video.models["alibaba/wan-3.0"]!;
+    expect(wan).toMatchObject({ min_duration: 2, max_duration: 30 });
+    for (const p of ["vercel", "fal"] as const) {
+      expect(rateMatrix(models.video.binding(wan, p))).toEqual({
+        "480p": { audio: 0.05 },
+        "720p": { audio: 0.1 },
+        "1080p": { audio: 0.2 },
+      });
+    }
+  });
+
+  it("withholds a Vercel AI Gateway binding from token-metered Seedance", () => {
+    // Vercel AI Gateway serves both Seedance cards but bills `video_token_pricing`,
+    // which `PerSecondPricing` cannot express and the hosted route cannot
+    // pre-price. A per-second Vercel AI Gateway binding here would be invented — and
+    // was, on 2.0, until 2026-09-02. fal states per-second rates.
+    for (const id of ["bytedance/seedance-2.0", "bytedance/seedance-2.5"]) {
+      const card = models.video.models[id]!;
+      expect(models.video.binding(card, "vercel")).toBeNull();
+      expect(
+        rateMatrix(models.video.binding(card, "fal"))[card.default.resolution]
+          ?.audio
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("binding() resolves a present provider and nulls an absent one", () => {
+    const veo = models.video.models["google/veo-3.1"]!;
+    // fal keys the capability into the id — this is the image-to-video endpoint.
+    expect(models.video.binding(veo, "fal")?.id).toBe(
+      "fal-ai/veo3.1/image-to-video"
+    );
+    expect(models.video.binding(veo, "vercel")?.id).toBe(
+      "google/veo-3.1-generate-001"
+    );
+    // OpenRouter serves Veo + Seedance (verified rates).
+    expect(models.video.binding(veo, "openrouter")?.id).toBe("google/veo-3.1");
+
+    const grok = models.video.models["xai/grok-imagine-video-1.5"]!;
+    expect(grok).toMatchObject({ min_duration: 1, max_duration: 15 });
+    // Vercel AI Gateway serves every SpaceXAI model under `spacexai/`, so the call id is not
+    // this card's canonical `xai/` id. Reusing the canonical id here is a 404
+    // at call time — which is how the binding was first shipped.
+    // https://vercel.com/ai-gateway/models/grok-imagine-video-1.5
+    expect(models.video.binding(grok, "vercel")).toMatchObject({
+      id: "spacexai/grok-imagine-video-1.5",
+      pricing: {
+        usd_per_second: {
+          "480p": { audio: 0.08 },
+          "720p": { audio: 0.14 },
+          "1080p": { audio: 0.25 },
+        },
+        usd_per_input_image: 0.01,
+      },
+    });
+    expect(models.video.binding(grok, "fal")?.id).toBe(
+      "xai/grok-imagine-video/v1.5/image-to-video"
+    );
+    expect(models.video.binding(grok, "fal")?.pricing).toMatchObject({
+      usd_per_second: {
+        "480p": { audio: 0.08 },
+        "720p": { audio: 0.14 },
+        "1080p": { audio: 0.25 },
+      },
+      usd_per_input_image: 0.01,
+    });
+    expect(models.video.binding(grok, "fal")?.avg_cost_usd).toBe(0.71);
+    // The released provider endpoint qualifies this existing normalized adapter.
+    // Keep the SKU units opaque instead of treating cents/token meters as USD/s.
+    expect(models.video.binding(grok, "openrouter")).toMatchObject({
+      id: "x-ai/grok-imagine-video-1.5",
+      input: "text",
+      pricing: { type: "provider_skus" },
+    });
+  });
+
+  it("listed video models are enabled and each has at least one binding", () => {
+    const listed = models.video.listed_models();
+    expect(listed.length).toBeGreaterThan(0);
+    for (const card of listed) {
+      expect(card.listed).toBe(true);
+      // Video is fragmented (no universality guarantee) — only require that a
+      // listed model is servable by SOME provider.
+      expect(Object.keys(card.providers).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("models.text.byTier", () => {
+  it("pins the accepted capability and cost topology", () => {
+    expect(TIER_MODEL_IDS).toEqual({
+      nano: "openai/gpt-5.6-luna",
+      mini: "openai/gpt-5.6-terra",
+      pro: "openai/gpt-5.6-sol",
+      max: "openai/gpt-6-astra",
+    });
+    expect(new Set(Object.values(TIER_MODEL_IDS)).size).toBe(4);
+  });
+
+  // `nano` is the cheapest model still good enough for background work,
+  // so it must never cost more than `mini`. Guards the tier order against a
+  // repoint that quietly makes cheap work expensive.
+  it("keeps nano at or below mini on every cost bucket", () => {
+    const nano = models.text.byTier.nano.cost;
+    const mini = models.text.byTier.mini.cost;
+
+    // Cache buckets are optional per card. An absent bucket bills
+    // nothing, so it normalises to 0 — which keeps the comparison
+    // unconditional and still catches a nano card that bills for a
+    // bucket mini does not.
+    const buckets = [
+      ["input", nano.input, mini.input],
+      ["output", nano.output, mini.output],
+      ["cacheRead", nano.cacheRead ?? 0, mini.cacheRead ?? 0],
+      ["cacheWrite", nano.cacheWrite ?? 0, mini.cacheWrite ?? 0],
+    ] as const;
+
+    const violations = buckets
+      .filter(([, nanoRate, miniRate]) => nanoRate > miniRate)
+      .map(
+        ([bucket, nanoRate, miniRate]) =>
+          `${bucket}: nano ${nanoRate} > mini ${miniRate}`
+      );
+
+    expect(violations).toEqual([]);
+  });
+
+  it("exposes a spec for every tier", () => {
+    expect(models.text.byTier.nano).toBeDefined();
+    expect(models.text.byTier.mini).toBeDefined();
+    expect(models.text.byTier.pro).toBeDefined();
+    expect(models.text.byTier.max).toBeDefined();
+  });
+
+  it("each byTier spec has the matching id from TIER_MODEL_IDS", () => {
+    for (const tier of ["nano", "mini", "pro", "max"] as const) {
+      expect(models.text.byTier[tier].id).toBe(TIER_MODEL_IDS[tier]);
+    }
+  });
+});
+
+describe("models.text current catalogue", () => {
+  const longContext = {
+    inputTokensAbove: 272_000,
+    inputMultiplier: 2,
+    outputMultiplier: 1.5,
+  } as const;
+
+  const newModels = [
+    {
+      id: "openai/gpt-6-astra",
+      contextWindow: 1_050_000,
+      outputLimit: 128_000,
+      cost: {
+        input: 10,
+        output: 50,
+        cacheRead: 1,
+        cacheWrite: 12.5,
+        longContext,
+      },
+    },
+    {
+      id: "openai/gpt-5.6-sol",
+      contextWindow: 1_050_000,
+      outputLimit: 128_000,
+      // Deliberately below GPT-5.5's $5/$30 — Sol is the cheaper successor,
+      // and this card once carried 5.5's rates by mistake.
+      cost: {
+        input: 4,
+        output: 20,
+        cacheRead: 0.4,
+        cacheWrite: 5,
+        longContext,
+      },
+    },
+    {
+      id: "openai/gpt-5.6-terra",
+      contextWindow: 1_050_000,
+      outputLimit: 128_000,
+      cost: {
+        input: 2,
+        output: 12,
+        cacheRead: 0.2,
+        cacheWrite: 2.5,
+        longContext,
+      },
+    },
+    {
+      id: "openai/gpt-5.6-luna",
+      contextWindow: 1_050_000,
+      outputLimit: 128_000,
+      cost: {
+        input: 0.2,
+        output: 1.2,
+        cacheRead: 0.02,
+        cacheWrite: 0.25,
+        longContext,
+      },
+    },
+    {
+      id: "anthropic/claude-fable-5.1",
+      contextWindow: 1_000_000,
+      outputLimit: 128_000,
+      // Same card as Fable 5 apart from the cache read, which is the whole
+      // reason this entry is pinned separately.
+      cost: { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
+    },
+    {
+      id: "anthropic/claude-fable-5",
+      contextWindow: 1_000_000,
+      outputLimit: 128_000,
+      cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+    },
+    {
+      id: "anthropic/claude-opus-5",
+      contextWindow: 1_000_000,
+      outputLimit: 128_000,
+      cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+    },
+    {
+      id: "anthropic/claude-sonnet-5",
+      contextWindow: 1_000_000,
+      outputLimit: 128_000,
+      cost: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+    },
+    {
+      id: "google/gemini-3.8-flash",
+      contextWindow: 1_048_576,
+      outputLimit: 65_536,
+      // Steady state, not Google's promotional rate through 2026-12-31.
+      cost: { input: 1.5, output: 7.5, cacheRead: 0.15 },
+    },
+    {
+      id: "google/gemini-3.7-flash",
+      contextWindow: 1_048_576,
+      outputLimit: 65_536,
+      // Steady state, not Google's promotional rate through 2026-12-31.
+      cost: { input: 1.5, output: 7.5, cacheRead: 0.15 },
+    },
+    {
+      id: "google/gemini-3.1-pro-preview",
+      contextWindow: 1_048_576,
+      outputLimit: 65_536,
+      cost: {
+        input: 2,
+        output: 12,
+        cacheRead: 0.2,
+        longContext: {
+          inputTokensAbove: 200_000,
+          inputMultiplier: 2,
+          outputMultiplier: 1.5,
+        },
+      },
+    },
+  ] as const;
+
+  it.each(newModels)("stores the published $id rate card", (expected) => {
+    const spec = models.text.catalog[expected.id];
+    expect(spec.contextWindow).toBe(expected.contextWindow);
+    expect(spec.outputLimit).toBe(expected.outputLimit);
+    expect(spec.cost).toEqual(expected.cost);
+  });
+
+  it("pins the grounded Astra and Fable 5.1 release facts", () => {
+    expect(models.text.catalog["openai/gpt-6-astra"].release).toEqual({
+      date: "2026-09-04",
+      basis: "provider_endpoint",
+      source_url: "https://ai-gateway.vercel.sh/v1/models",
+    });
+    expect(models.text.catalog["anthropic/claude-fable-5.1"].release).toEqual({
+      date: "2026-09-01",
+      basis: "model",
+      source_url:
+        "https://platform.claude.com/docs/en/models/fable-5-1/overview",
+    });
+  });
+
+  it("keeps the published long-context rule on every affected OpenAI card", () => {
+    for (const id of [
+      "openai/gpt-5.5",
+      "openai/gpt-5.6-sol",
+      "openai/gpt-5.6-terra",
+      "openai/gpt-5.6-luna",
+      "openai/gpt-6-astra",
+    ] as const) {
+      expect(models.text.catalog[id].cost.longContext).toEqual(longContext);
+    }
+    expect(
+      models.text.catalog["openai/gpt-5.5-pro"].cost.longContext
+    ).toBeUndefined();
+  });
+
+  it("multiplies Gemini 3.1 Pro out to Google's published banded rates", () => {
+    // The catalogue stores base rates plus multipliers; Google publishes the
+    // banded rates directly. This is where the two are held to agree — the
+    // cost function's own tests assert totals, not rates.
+    const { input, output, cacheRead, longContext } =
+      models.text.catalog["google/gemini-3.1-pro-preview"].cost;
+    expect(longContext).toBeDefined();
+    expect(input * longContext!.inputMultiplier).toBe(4);
+    expect(cacheRead! * longContext!.inputMultiplier).toBeCloseTo(0.4);
+    expect(output * longContext!.outputMultiplier).toBe(18);
+  });
+
+  it("keeps catalogue lifecycle markers scoped to the requested models", () => {
+    expect(
+      models.text.catalog["openai/gpt-6-astra"].deprecated
+    ).toBeUndefined();
+    expect(
+      models.text.catalog["openai/gpt-5.6-sol"].deprecated
+    ).toBeUndefined();
+    expect(models.text.catalog["openai/gpt-5.5"].deprecated).toBe(true);
+    expect(
+      models.text.catalog["openai/gpt-5.5-pro"].deprecated
+    ).toBeUndefined();
+    expect(
+      models.text.catalog["anthropic/claude-fable-5.1"].deprecated
+    ).toBeUndefined();
+    expect(models.text.catalog["anthropic/claude-fable-5"].deprecated).toBe(
+      true
+    );
+    expect(
+      models.text.catalog["anthropic/claude-opus-5"].deprecated
+    ).toBeUndefined();
+    expect(models.text.catalog["anthropic/claude-opus-4.8"].deprecated).toBe(
+      true
+    );
+    expect(
+      models.text.catalog["google/gemini-3.8-flash"].deprecated
+    ).toBeUndefined();
+    expect(models.text.catalog["google/gemini-3.7-flash"].deprecated).toBe(
+      true
+    );
+  });
+});
+
+describe("models.text image-input MIME capabilities", () => {
+  const expectedByCreator = {
+    openai: ["image/png", "image/jpeg", "image/webp", "image/gif"],
+    anthropic: ["image/jpeg", "image/png", "image/gif", "image/webp"],
+    google: [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+      "image/heic",
+      "image/heif",
+    ],
+  } as const;
+
+  it("keeps every static entry explicit and consistent with broad support", () => {
+    for (const spec of Object.values(models.text.catalog)) {
+      expect(Array.isArray(spec.imageInputMimes)).toBe(true);
+      expect(spec.imageInputMimes.length === 0 || spec.multimodal).toBe(true);
+    }
+  });
+
+  it("preserves source-backed format differences between creators", () => {
+    for (const spec of Object.values(models.text.catalog)) {
+      const creator = spec.id.split(
+        "/",
+        1
+      )[0] as keyof typeof expectedByCreator;
+      expect(spec.imageInputMimes).toEqual(expectedByCreator[creator]);
+    }
+
+    expect(
+      models.text.catalog["google/gemini-3.8-flash"].imageInputMimes
+    ).toContain("image/heic");
+    expect(
+      models.text.catalog["openai/gpt-5.6-luna"].imageInputMimes
+    ).not.toContain("image/heic");
+  });
+});
+
+describe("models.text.displayLabel", () => {
+  it("returns the curated short name when present", () => {
+    const spec = models.text.catalog["anthropic/claude-opus-4.8"];
+    expect(spec.short_label).toBe("Opus 4.8");
+    expect(models.text.displayLabel(spec)).toBe("Opus 4.8");
+  });
+
+  it("falls back to the full label when short_label is unset", () => {
+    const spec = models.text.catalog["openai/gpt-5.6-luna"];
+    expect(spec.short_label).toBeUndefined();
+    expect(models.text.displayLabel(spec)).toBe(spec.label);
+  });
+
+  it("drops the 'Preview' suffix for the Gemini 3.1 Pro preview", () => {
+    const spec = models.text.catalog["google/gemini-3.1-pro-preview"];
+    expect(spec.label).toBe("Gemini 3.1 Pro Preview");
+    expect(models.text.displayLabel(spec)).toBe("Gemini 3.1 Pro");
+  });
+});

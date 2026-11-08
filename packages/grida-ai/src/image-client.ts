@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 — explicit provider authority, separate downloads, safe operation failures.
 // GRIDA-SEC-006 — scoped GG credential is re-read at use; no mint or persistent custody.
 // GRIDA-GG: token — explicit GG selection never falls back to BYOK.
-import { models } from "@grida/ai-models";
+import { models } from "./catalogue";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
@@ -9,6 +9,7 @@ import type { ImageModelV3 } from "@ai-sdk/provider";
 import { generateImage } from "ai";
 import { makeImageModelFor } from "./image-byok";
 import { GridaGatewayImageModel } from "./image-gg";
+import { GGOperationsClient } from "./gg-operations";
 import {
   GridaGatewayAuthError,
   GridaGatewayCreditsError,
@@ -18,6 +19,11 @@ import { liveGgMediaDeps, type GgTokenSource } from "./gg-session";
 import { ProviderHttp } from "./http";
 import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
 import { byokProvidersFor } from "./provider-ids";
+import {
+  GGDiscoveryStore,
+  supportsGGPromptOperation,
+  type GGOperation,
+} from "./gg-discovery";
 
 /** Catalogue-backed image operations. Construction supplies authority, never a default model. */
 export class ImageClient {
@@ -26,6 +32,7 @@ export class ImageClient {
   readonly #catalog?: ModelCatalogStore;
   readonly #gg?: GgTokenSource;
   readonly #ggBaseUrl?: string;
+  readonly #ggCatalog: GGDiscoveryStore;
 
   constructor(options: ImageClient.Options) {
     try {
@@ -37,6 +44,8 @@ export class ImageClient {
       this.#getKey = get.bind(keys);
       this.#http = http;
       this.#catalog = catalog;
+      this.#ggCatalog =
+        options.gg_catalog ?? new GGDiscoveryStore({ fetch: http.request });
       if (gg !== undefined) {
         const read = gg.getAccessToken.bind(gg);
         this.#gg = { getAccessToken: read };
@@ -53,20 +62,20 @@ export class ImageClient {
   async resolve(input: ImageClient.Selection): Promise<ImageClient.Resolved> {
     try {
       const selected = selection(input);
+      if (selected.provider === "gg")
+        return await this.#resolveHosted(selected);
       const view = await catalogViewOnMiss(
         this.#catalog,
         (v) => !v.image.cardById(selected.model_id)
       );
       const card = view.image.cardById(selected.model_id);
-      if (!MediaRoutes.imageModel(card))
+      if (!MediaRoutes.imageModel(card)) {
+        if (
+          selected.provider === "auto" &&
+          liveGgMediaDeps({ gg: this.#gg, gg_base_url: this.#ggBaseUrl })
+        )
+          return await this.#resolveHosted(selected);
         throw new ImageClient.Failure("model_unavailable");
-      if (selected.provider === "gg") {
-        if (selected.references)
-          throw new ImageClient.Failure("references_unsupported");
-        const route = MediaRoutes.image(card, "gg", false, selected.background);
-        if (!route) throw new ImageClient.Failure("provider_unavailable");
-        this.#hosted();
-        return this.#operation(route, selected.background);
       }
       const order =
         selected.provider === "auto"
@@ -87,20 +96,12 @@ export class ImageClient {
         if (!(await this.#key(provider))) continue;
         return this.#operation(route, selected.background);
       }
-      const hostedRoute = MediaRoutes.image(
-        card,
-        "gg",
-        false,
-        selected.background
-      );
       if (
         selected.provider === "auto" &&
         !selected.references &&
-        hostedRoute &&
         liveGgMediaDeps({ gg: this.#gg, gg_base_url: this.#ggBaseUrl })
-      ) {
-        return this.#operation(hostedRoute, selected.background);
-      }
+      )
+        return await this.#resolveHosted(selected);
 
       throw new ImageClient.Failure(
         selected.references && !referenceCapable
@@ -110,6 +111,42 @@ export class ImageClient {
     } catch (error) {
       throw safeFailure(error);
     }
+  }
+
+  async #resolveHosted(
+    selected: ImageClient.Selection
+  ): Promise<ImageClient.Resolved> {
+    if (selected.references)
+      throw new ImageClient.Failure("references_unsupported");
+    await this.#ggCatalog.ready();
+    const operation = this.#ggCatalog
+      .view()
+      ?.operations.find(
+        (item) =>
+          item.model_id === selected.model_id &&
+          item.path === "/v1/images/generations" &&
+          item.variant === "text" &&
+          supportsGGPromptOperation(item)
+      );
+    if (!operation) throw new ImageClient.Failure("model_unavailable");
+    const properties = operation.input_schema.properties as
+      | Record<string, { enum?: unknown[] }>
+      | undefined;
+    const native =
+      properties?.background?.enum?.includes("transparent") === true;
+    if (selected.background && selected.background !== "auto" && !native)
+      throw new ImageClient.Failure("provider_unavailable");
+    this.#hosted();
+    return this.#operation(
+      {
+        model_id: selected.model_id,
+        binding_id: selected.model_id,
+        provider_id: "gg",
+        ...(native ? { native_background: true as const } : {}),
+      },
+      selected.background,
+      operation
+    );
   }
 
   async #key(provider: ImageClient.ByokProvider): Promise<string | null> {
@@ -128,21 +165,23 @@ export class ImageClient {
 
   #operation(
     metadata: ImageClient.Descriptor,
-    background?: ImageClient.Background
+    background?: ImageClient.Background,
+    operation?: GGOperation
   ): ImageClient.Resolved {
     const capturedBackground = background === "auto" ? undefined : background;
     const descriptor = Object.freeze({ ...metadata });
     return Object.freeze({
       ...descriptor,
       generate: (input: ImageClient.Input) =>
-        this.#generate(descriptor, input, capturedBackground),
+        this.#generate(descriptor, input, capturedBackground, operation),
     });
   }
 
   async #generate(
     descriptor: ImageClient.Descriptor,
     input: ImageClient.Input,
-    capturedBackground?: "opaque" | "transparent"
+    capturedBackground?: "opaque" | "transparent",
+    operation?: GGOperation
   ): Promise<ImageClient.Result> {
     let signal: AbortSignal | undefined;
     try {
@@ -161,14 +200,19 @@ export class ImageClient {
       const provider = descriptor.provider_id;
       let model;
       if (provider === "gg") {
+        if (!operation) throw new ImageClient.Failure("model_unavailable");
         const hosted = this.#hosted();
         model = new GridaGatewayImageModel(
           hosted.session,
           hosted.base_url,
           descriptor.binding_id,
           this.#http,
+          operation,
+          this.#ggCatalog,
           background
         );
+        if (args.n > model.maxImagesPerCall)
+          throw new ImageClient.Failure("invalid_input");
       } else {
         const key = await this.#key(provider);
         if (!key) throw new ImageClient.Failure("provider_unavailable");
@@ -255,6 +299,7 @@ export namespace ImageClient {
     catalog?: ModelCatalogStore;
     gg?: GgTokenSource;
     gg_base_url?: string;
+    gg_catalog?: GGDiscoveryStore;
   };
   export type Selection = {
     model_id: string;
@@ -374,7 +419,10 @@ function exactKeys(value: unknown, allowed: readonly string[]): void {
 
 function safeFailure(error: unknown): ImageClient.Failure {
   try {
-    if (error instanceof ImageClient.Failure)
+    if (
+      error instanceof ImageClient.Failure ||
+      error instanceof GGOperationsClient.Failure
+    )
       return new ImageClient.Failure(error.code);
     if (error instanceof GridaGatewayAuthError)
       return new ImageClient.Failure("gg_token_expired");

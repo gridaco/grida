@@ -1,6 +1,8 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 / GRIDA-GG: provider — native funding authority.
 import { Hono } from "hono";
 import { GridaGatewaySessionStore, ProviderHttp } from "@grida/ai";
+import { GGDiscoveryStore } from "@grida/ai/discovery";
+import { ggTripoContractFixture } from "../../../../grida-ai/src/testing/gg-contract";
 import type { SecretsStore } from "@grida/daemon/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
@@ -70,7 +72,20 @@ function fixture(token = true) {
   const download = vi.fn<typeof fetch>(async () => {
     throw new Error("unexpected download");
   });
+  // Admission reads the actual public metadata shapes through the installed
+  // SDK parser. Keep these anonymous reads separate from paid product calls so
+  // the existing one-submit, no-BYOK-fallback and task-recovery assertions hold.
+  const metadata = ggTripoContractFixture();
+  const gg_catalog = new GGDiscoveryStore({
+    fetch: async (url, init) => {
+      expect(new Headers(init?.headers).has("authorization")).toBe(false);
+      const response = metadata.response(url);
+      if (!response) throw new Error("Unexpected discovery URL");
+      return response;
+    },
+  });
   const deps = {
+    gg_catalog,
     secrets: { _getKey: get } as unknown as SecretsStore,
     gg,
     gg_base_url: "https://grida.example",

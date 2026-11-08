@@ -7,7 +7,7 @@
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createGateway as createVercelAiGateway } from "@ai-sdk/gateway";
-import { TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models/grida";
+import { TIER_MODEL_IDS, type TierModelId } from "@grida/ai/catalogue";
 import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
 import { ProviderHttp } from "./http";

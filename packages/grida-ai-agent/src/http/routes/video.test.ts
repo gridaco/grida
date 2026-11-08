@@ -3,10 +3,11 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
+import { ggContractFixture } from "../../../../grida-ai/src/testing/gg-contract";
 import type { MediaItem } from "@grida/daemon";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
 import { registerVideoRoutes, type VideoRoutesDeps } from "./video";
-import { GridaGatewaySessionStore } from "@grida/ai";
+import { GGDiscoveryStore, GridaGatewaySessionStore } from "@grida/ai";
 import { ProviderHttp } from "../../providers/http";
 
 function fakeSecrets(keys: Record<string, string>): SecretsStore {
@@ -22,10 +23,19 @@ function appWith(
   extra: Partial<VideoRoutesDeps> = {}
 ) {
   const app = new Hono();
+  const metadata = ggContractFixture([{ id: VEO, kind: "video" }]);
   registerVideoRoutes(app, {
     secrets: fakeSecrets(keys),
     provider_http: providerHttp,
     media,
+    ...(extra.gg
+      ? {
+          gg_catalog: new GGDiscoveryStore({
+            fetch: async (url) =>
+              metadata.response(url) ?? new Response(null, { status: 404 }),
+          }),
+        }
+      : {}),
     ...extra,
   });
   return app;
@@ -451,23 +461,46 @@ describe("POST /video/generate", () => {
     const gg = new GridaGatewaySessionStore();
     gg.set({ access_token: "synthetic-gg", expires_at: Date.now() + 900_000 });
     const request = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-      expect(String(input)).toBe(
-        "https://grida.test/api/v1/ai/videos/generations"
-      );
       expect(new Headers(init?.headers).get("authorization")).toBe(
         "Bearer synthetic-gg"
       );
-      expect(JSON.parse(String(init?.body))).toEqual({
-        model_id: VEO,
-        prompt: "a wave",
-        duration: 8,
-      });
+      if (init?.method === "POST") {
+        return Response.json(
+          {
+            id: "req_video",
+            request_id: "req_video",
+            status: "pending",
+            result_status: "pending",
+            result: null,
+          },
+          { status: 202 }
+        );
+      }
+      expect(String(input)).toBe(
+        "https://grida.test/api/v1/ai/jobs?request_id=req_video"
+      );
       return Response.json({
-        videos: [{ base64: "YmFy", media_type: "video/mp4" }],
+        id: "req_video",
+        request_id: "req_video",
+        status: "succeeded",
+        result_status: "available",
+        result: {
+          videos: [
+            {
+              url: "https://assets.example/video.mp4",
+              media_type: "video/mp4",
+            },
+          ],
+        },
         metadata: "private-hosted-field",
       });
     });
-    const download = vi.fn<typeof globalThis.fetch>();
+    const download = vi.fn<typeof globalThis.fetch>(async (_input, init) => {
+      expect(new Headers(init?.headers).has("authorization")).toBe(false);
+      return new Response(Buffer.from("bar"), {
+        headers: { "content-type": "video/mp4" },
+      });
+    });
     const res = await post(
       appWith({}, new ProviderHttp({ request, download }), null, {
         gg,
@@ -486,8 +519,31 @@ describe("POST /video/generate", () => {
       provider_id: "gg",
       videos: [{ base64: "YmFy", media_type: "video/mp4" }],
     });
-    expect(request).toHaveBeenCalledOnce();
-    expect(download).not.toHaveBeenCalled();
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "POST")
+    ).toHaveLength(1);
+    expect(download).toHaveBeenCalledOnce();
+    expect(
+      request.mock.calls.map(([url, init]) => ({
+        url: String(url),
+        method: init?.method,
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      }))
+    ).toEqual([
+      {
+        url: "https://grida.test/api/v1/ai/operations",
+        method: "POST",
+        body: {
+          operation_id: "video.google.veo-3.1.text",
+          input: { prompt: "a wave", duration: 8 },
+        },
+      },
+      {
+        url: "https://grida.test/api/v1/ai/jobs?request_id=req_video",
+        method: "GET",
+        body: null,
+      },
+    ]);
   });
 
   it.each([

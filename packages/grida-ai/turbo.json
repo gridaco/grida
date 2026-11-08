@@ -5,7 +5,7 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/data/ai/**",
-        "$TURBO_ROOT$/packages/grida-ai-models/scripts/generate.mjs",
+        "$TURBO_ROOT$/scripts/ai-catalogue/**",
         "$TURBO_ROOT$/.oxfmtrc.jsonc"
       ]
     },
@@ -13,7 +13,7 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/data/ai/**",
-        "$TURBO_ROOT$/packages/grida-ai-models/scripts/generate.mjs",
+        "$TURBO_ROOT$/scripts/ai-catalogue/**",
         "$TURBO_ROOT$/.oxfmtrc.jsonc"
       ]
     },
@@ -21,7 +21,7 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/data/ai/**",
-        "$TURBO_ROOT$/packages/grida-ai-models/scripts/generate.mjs",
+        "$TURBO_ROOT$/scripts/ai-catalogue/**",
         "$TURBO_ROOT$/.oxfmtrc.jsonc"
       ]
     },
@@ -29,10 +29,22 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/data/ai/**",
-        "$TURBO_ROOT$/packages/grida-ai-models/scripts/generate.mjs",
+        "$TURBO_ROOT$/scripts/ai-catalogue/**",
         "$TURBO_ROOT$/.oxfmtrc.jsonc"
       ],
       "dependsOn": ["^build"]
+    },
+    "check:generated": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/data/ai/**",
+        "$TURBO_ROOT$/scripts/ai-catalogue/**",
+        "$TURBO_ROOT$/crates/grida-ai/data/**"
+      ],
+      "dependsOn": ["build"]
+    },
+    "generate": {
+      "cache": false
     }
   }
 }

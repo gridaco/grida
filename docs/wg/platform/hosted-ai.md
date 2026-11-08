@@ -121,149 +121,59 @@ permission to execute or a settled charge. The execution service owns admission
 and charging; consumers preserve its failures and never resubmit accepted work
 because a result download failed. See [AI credits](./billing/ai-credits.md).
 
-### 4. Catalogue distribution (credential-free)
+### 4. Model facts, offerings and client compatibility
 
-The model catalogue is compiled into every client that consumes it, so a
-shipped desktop binary can only ever see the catalogue it was built with.
-Adding a model or retargeting a tier used to require a release — while the
-renderer, served fresh from grida.co, would already be offering the new
-model. The result was a client whose own picker offered a model its own
-agent host rejected as unknown.
+There are three different questions, with different owners:
 
-The catalogue is therefore **published, not shipped**: authored in-repo
-(it is a curated product decision, not a scrape) and served at
-`GET /api/v1/models/catalog`.
+| Question                                                              | Source                                                                                                                                                                                   |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What is this model and what do providers document?                    | The pinned public `@grida/ai-models` release from [Models](https://github.com/gridaco/models).                                                                                           |
+| What can GG serve now, with which contract and price?                 | Anonymous [GG models](https://gateway.grida.ai/v1/models), [endpoints](https://gateway.grida.ai/v1/endpoints) and [operation schemas](https://gateway.grida.ai/schemas/operations.json). |
+| What does Grida recommend and what can this installed client execute? | `data/ai/presets.json` plus implemented native/BYOK and GG interface adapters.                                                                                                           |
 
-**One package, two explicit entries.** The factual `@grida/ai-models` entry
-describes identities, capabilities, verified provider bindings, and published
-rates independently of Grida. The `@grida/ai-models/grida` service entry selects offerings from those
-facts and owns listing, legacy status, request presets, tiers, and presentation
-preferences. A legacy offering remains a valid explicit choice; legacy is not
-a claim that an upstream provider has retired it. Removing service membership
-does not erase factual identity. The root entry never imports or re-exports
-service policy. The execution SDK keeps its existing Grida defaults by explicitly
-consuming the service entry; hosts do not need to inject a catalog to retain
-existing behavior.
+`@grida/ai/catalogue` joins a generated compatibility projection of the external
+facts with Grida's product presets. It owns lookup helpers, tier choices and the
+retained schema-1 codec; it does not author independent model facts or declare
+current GG availability. [The data guide](https://github.com/gridaco/grida/blob/main/data/ai/README.md) describes
+generation and native snapshots. Ordinary GG additions using an implemented
+interface are data updates; new input transports or output representations still
+require client code.
 
-**Recommendation is not authorization.** A service family may configure a
-default independently from a partial manual order. A default must be listed
-and nonlegacy. Presentation places that default first, other active offerings
-before legacy offerings, then applies explicit rank and a deterministic label
-and identifier tie-break. Unranked members remain present. Explicit user
-selections and surface-specific tier choices take precedence over the general
-recommendation. Provider availability and implemented adapter capabilities are
-checked separately at execution.
+**Current GG discovery.** TypeScript consumers and the native CLI read public GG
+metadata without credentials. The inventory is intersected with supported client
+interfaces; a Vercel binding does not imply GG support. Bounded shared caching
+avoids a discovery fetch per generation. Expired data cannot restore a retired
+hosted offering from the native bundle. Discovery failure is separate from
+provider-key availability, credit eligibility and execution authorization.
 
-- **The published snapshot IS the deployed gate.** That endpoint's body
-  and the server's own model allowlist are the same static import in the
-  same deploy artifact, so they cannot disagree. This is why the published
-  catalogue outranks a client's bundled one even when the binary is newer:
-  converging on it is converging on the table that will actually be
-  enforced.
-- **The bundle is the seed, and the floor.** A host answers from its
-  bundled catalogue immediately and forever if the network never comes
-  back. A bad snapshot can make a host mis-list; it can never leave one
-  with no catalogue at all.
-- **Wholesale replacement within each accepted section.** An invalid required
-  text section rejects the snapshot. Optional media sections retain the
-  independently fallible behavior described below. Each valid section REPLACES
-  its catalogue rather than merging: removing a model is the kill switch, and
-  a merge would defeat it on every installed client.
-- **Credential-free, and outside the token-gated glob.** A desktop
-  sidecar fetches this at boot, long before a renderer can push a
-  signed-in session token, so the route must accept no credential — while
-  `GRIDA-SEC-006` binds every `api/v1/ai` route to `verifyGgToken`
-  exclusively. Accepting no credential is stronger than accepting the
-  wrong one, but only while this route stays outside that family.
-- **Pricing is included, deliberately.** The "no pricing" rule on
-  `/api/v1/ai/models` guards the OpenAI-compatible surface against
-  client-side cost math drifting from the billing rail. This payload is
-  the source that FEEDS a host's local estimate and its compaction limits;
-  withholding rates is what would cause drift. The same numbers are
-  already public on the models page and in the pricing docs.
+**Product choices.** Defaults and tiers remain Grida-owned choices. An optional
+default must be active and listed. Explicit saved selections and chosen providers
+remain sticky; a recommendation or catalogue refresh does not silently select a
+different model, provider or credential. Product-specific background removal and
+upscaling remain native feature contracts. Library embedding model, dimensions
+and normalization remain persisted-data contracts, not live catalogue defaults.
 
-**Convergence.** A host refreshes at boot, on an interval, and once when a
-lookup misses. The miss refresh is the load-bearing one: it is awaited
-in-request, so the FIRST use of a newly published model succeeds instead of
-failing until some later tick. It is deliberately modality-agnostic — an
-image card the renderer just offered is exactly as publishable-since-boot
-as a text model, and both are reached through a picker served fresh from
-grida.co. A tier retarget produces no miss (the old target is still
-valid), so it converges on the interval instead.
+**BYOK and offline behavior.** The pinned public Models snapshot provides facts
+for installed adapters and offline display. Current hosts keep this immutable
+release pin rather than refreshing native facts from the legacy HTTP catalogue.
+A provider listing cannot manufacture an adapter. Exact provider SKU prices stay
+opaque; unqualified inputs are withheld rather than invented. Missing coarse
+estimates remain unknown. GG's current tariffs, reservation and settlement are
+service-owned; client catalogue costs are display estimates only.
 
-**Membership is asked exactly; identity is asked loosely.** A view answers
-two different questions and a call site must not confuse them. `has` is
-exact catalogue membership — the question a GATE asks, because whatever
-passes a gate is forwarded to a provider verbatim and only an exact
-catalogue id is one the provider recognizes. `modelSpecById` also matches
-a bare name and a date suffix — right when asking for a model's LIMITS or
-RATES, where a near-miss id is still that model. Using the loose one to
-gate silently widens what the host admits and converts a clean
-"unknown model" rejection into a provider-level failure mid-run.
+**Installed-client compatibility.** `GET /api/v1/models/catalog` retains the
+schema-1 text/image/video distribution protocol for older installed clients. Its
+`catalog.snapshot.legacy()` projection omits binding shapes that schema 1 cannot
+represent, including opaque SKU prices and absent historical cost estimates,
+without changing the current native seed. Existing section replacement and
+independent media fallback remain intact. This endpoint does not define current
+GG offerings or hosted authorization. Keep its contract until installed consumers
+have migrated.
 
-**Pinning.** `GRIDA_AGENT_DISABLE_MODELS_FETCH=1` freezes a daemon on its
-bundled catalogue — the one hatch for an air-gapped or version-pinned
-deployment. It works by handing the store the seed as its snapshot, which
-is the same mechanism that pins it to any supplied catalogue, so there is
-one code path rather than a family of overrides.
-
-**Schema.** Additive changes do not bump the schema major — clients ignore
-fields they do not know, so a new optional field is safe to publish. A
-breaking change publishes at a NEW path and bumps the major, leaving old
-clients on the old path or falling back to their seed. One rule follows
-from that: a model requiring new CLIENT CODE (a new provider kind) must
-never be published into an existing schema, because old clients will
-accept its data and then fail to drive it. Ordinary models are pure data
-and need no accompanying release.
-
-**Sections are independently fallible.** `text`, `image`, and `video` are
-validated separately: an unusable media section is dropped on its own and
-the consumer falls back to its bundled catalogue for that modality only.
-Only `text` is load-bearing enough to reject the whole payload, because a
-host with no text catalogue cannot run a turn at all. A broken image
-catalogue must never cost a host its ability to answer.
-
-**Schema-1 recommendations are additive.** Older clients ignore optional
-default and order fields; their existing membership and lifecycle fields must
-retain their meanings. Newer readers resolve recommendations against the same
-effective section as its model bindings. When a media section is dropped, its
-remote recommendations are dropped with it. The schema does not distinguish
-independent GG and BYOK service membership; server-side provider and request
-gates remain authoritative. Catalog data cannot add adapter code to an
-installed client.
-
-**Not every modality is published yet.** `text`, `image`, and `video` are.
-Music, sound effects, and 3D are still gated against the host's BUNDLED
-catalogue (`v.oneOf(models.audio.music.model_ids)` and its siblings in
-`packages/grida-ai-agent/src/http/routes/`), so adding a model in those
-families still needs a desktop release.
-
-That is a known gap, but it is NOT one more section away. Image and video
-cards fit the published shape because they carry open id unions,
-`listed: boolean`, and a `providers` map keyed by provider — which is what
-the media view is generic over. Music, sound-effect, and 3D cards carry
-closed literal id unions, a single `provider` field, and `status:
-"listed" | "staged"`, and their routes gate at body-validation level on the
-narrowed id (`three-d.ts` then indexes the card to drive per-model input
-validation). Publishing them means first changing those card shapes in
-`@grida/ai-models` — widening the id unions, reconciling `status` with
-`listed`, deciding whether a single-provider card grows a providers map —
-and only then adding a section. Two instantiations is also the minimum
-that justifies the current generic; stretching it over a third,
-incompatible shape before there is demand would be speculative. Image and
-video move monthly and are multi-provider; these three move roughly
-yearly and are single-provider hosted routes. Worth revisiting when one of
-those catalogues starts moving.
-
-**Closed vocabularies are validated as text on the wire.** Model vendor,
-speed label, and the like are closed unions in TypeScript but are accepted
-as plain strings when parsed, and an unknown _provider_ binding is dropped
-rather than rejecting its card. Otherwise publishing a model from a new
-vendor, or adding a provider, would be a breaking publish requiring a
-client release — the exact failure this system exists to remove. (Vercel AI
-Gateway learned this in public: it validated its model-kind field as a
-hard enum, so the day a new kind shipped the entire listing failed to
-parse for every client. It now accepts loosely and filters unknown rows.)
+**Accepted work.** A model disappearing from discovery prevents new selection;
+it does not erase an accepted job. Status/result recovery preserves the original
+job identity and authorization independently of a refreshed catalogue. A lost
+result or unavailable metadata never authorizes repeating an accepted paid call.
 
 ### 5. Relationship to provider selection
 

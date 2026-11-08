@@ -1,3 +1,4 @@
+import type { GGModelsView } from "./protocol/gg-models";
 // GRIDA-GG: provider — the `gg` client namespace (set/clear/status) (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — the agent tenant's HTTP transport.
@@ -185,6 +186,8 @@ export namespace AgentTransport {
     } as const;
 
     readonly providers = {
+      gg_models: async (): Promise<GGModelsView> =>
+        await this.getJson<GGModelsView>("/providers/gg/models"),
       /** Endpoint provider configs (issue #806) — readable plain config,
        *  unlike secrets. */
       list_endpoints: async (): Promise<EndpointProviderConfig[]> =>

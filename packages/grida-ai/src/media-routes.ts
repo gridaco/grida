@@ -1,9 +1,8 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 — credential-free eligibility shared by discovery and execution.
 // GRIDA-GG: provider — GG is an explicit route, never account authority or readiness.
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "./catalogue/grida";
 import type { ImageClient } from "./image-client";
 import type { VideoClient } from "./video-client";
-import type { MusicClient } from "./music-client";
 import type { ThreeDClient } from "./three-d-client";
 
 export namespace MediaRoutes {
@@ -23,24 +22,15 @@ export namespace MediaRoutes {
     references: boolean,
     background?: ImageClient.Background
   ): ImageClient.Descriptor | null {
-    if (!imageModel(card)) return null;
+    if (!imageModel(card) || provider === "gg") return null;
     const native_background = models.image.supportsTransparentBackground(
       card,
-      provider === "gg" ? "vercel" : provider
+      provider
     );
     if (background && background !== "auto" && !native_background) return null;
     const capability = native_background
       ? { native_background: true as const }
       : {};
-    if (provider === "gg")
-      return !references && models.image.binding(card, "vercel")
-        ? {
-            model_id: card.id,
-            binding_id: card.id,
-            provider_id: "gg",
-            ...capability,
-          }
-        : null;
     const binding = models.image.binding(card, provider);
     if (!binding || (references && !binding.references)) return null;
     return {
@@ -56,31 +46,21 @@ export namespace MediaRoutes {
     provider: VideoClient.Provider,
     image: boolean
   ): VideoClient.Descriptor | null {
-    if (!videoModel(card)) return null;
-    const byok = provider === "gg" ? "vercel" : provider;
+    if (!videoModel(card) || provider === "gg") return null;
+    const byok = provider;
     const binding = models.video.binding(card, byok);
     const mode = models.video.input(card, byok);
     if (
       !binding ||
-      (provider === "gg" && image) ||
       !(mode === "text-or-image" || mode === (image ? "image" : "text"))
     )
       return null;
     return {
       model_id: card.id,
       provider_id: provider,
-      binding_id: provider === "gg" ? card.id : binding.id,
-      input: provider === "gg" ? "text" : mode,
+      binding_id: binding.id,
+      input: mode,
     };
-  }
-  export function music(id: string): id is MusicClient.ModelId {
-    if (!models.audio.music.is_model_id(id)) return false;
-    const card = models.audio.music.models[id];
-    return (
-      card.status === "listed" &&
-      card.input.modalities.includes("text") &&
-      card.output.default_format === "mp3"
-    );
   }
   export const soundEffectId = "eleven_text_to_sound_v2";
   export function soundEffect(id: string): id is typeof soundEffectId {

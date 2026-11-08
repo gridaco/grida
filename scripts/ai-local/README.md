@@ -15,8 +15,8 @@ The package command runs cleanup/runtime-tool regressions followed by the full
 proof. The existing package-test CI runs it on pull requests and main. The proof
 can also be invoked directly with `node scripts/ai-local/proof.mjs`.
 
-The runner builds current [`@grida/ai`](../../packages/grida-ai/README.md) and
-[`@grida/ai-models`](../../packages/grida-ai-models/README.md) into a private
+The runner builds current [`@grida/ai`](../../packages/grida-ai/README.md), including
+its catalogue projection from the pinned public Models package, into a private
 temporary directory. It runs actual `npm pack` with lifecycle scripts disabled,
 offline mode, empty npm configuration, and a constructed environment. It then
 inflates each archive with Node's built-in gzip decoder, capped at 64 MiB per
@@ -31,9 +31,9 @@ platform remain absent.
 The public consumer runs once using ESM imports and once using CJS `require`.
 Both root and `/providers` exports must work; private media implementations and Grida
 agent, daemon, auth, account, CLI, Desktop and framework packages are unavailable.
-The factual `@grida/ai-models` root and service `@grida/ai-models/grida` entry
-must both load in ESM and CommonJS. Snapshot codecs and types come from the
-service entry; the SDK retains its bundled service defaults.
+The `/catalogue` entry must load in ESM and CommonJS. It provides native adapter
+facts, product presets and the schema-1 compatibility codec. Current GG offerings
+come from anonymous discovery, never a bundled provider binding.
 Synthetic transports exercise OpenRouter, Vercel AI Gateway, fal and scoped GG image
 generation and video submit/poll/result chains, input capability discovery, credential-free result downloads,
 explicit provider selection, missing credentials, single submission on failure,

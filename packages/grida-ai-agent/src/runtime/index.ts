@@ -106,7 +106,7 @@ import { buildReplayPrefix } from "./replay-prefix";
 import type { ChatMessageWithParts } from "../session/rows";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
-import type { catalog as models } from "@grida/ai-models/grida";
+import type { catalog as models } from "@grida/ai/catalogue";
 import { catalogView } from "../providers/model-catalog";
 import { isChatGptProviderId } from "../protocol/chatgpt";
 import { tierModelId as chatGptTierModelId } from "../providers/chatgpt";
@@ -698,6 +698,7 @@ export class AgentRuntime {
         provider = await resolveProvider(this.deps, {
           explicit: session.model?.provider_id,
           model_id: session.model?.model_id ?? undefined,
+          tier: session.model?.tier,
         });
       }
       const workspaceRoot =
@@ -814,14 +815,19 @@ export class AgentRuntime {
    * configs so downstream checks (the summarizer cap) reuse the same
    * snapshot instead of re-reading the store.
    */
-  private async limitsResolver(): Promise<LimitsResolution> {
+  private async limitsResolver(
+    model?: ChatModel | null
+  ): Promise<LimitsResolution> {
+    if (model?.provider_id === "gg") await this.deps.gg_catalog?.ready();
     // One read for the whole resolution, so every limit in a single
     // compaction decision comes from the same catalogue.
     const view = catalogView(this.deps.catalog);
+    const ggModels = this.deps.gg_catalog?.list("text") ?? [];
     const endpoints = this.deps.endpoints;
     if (!endpoints) {
       return {
-        resolve: (model) => resolveModelLimits(model, undefined, view),
+        resolve: (model) =>
+          resolveModelLimits(model, undefined, view, ggModels),
         configs: [],
         view,
       };
@@ -848,7 +854,7 @@ export class AgentRuntime {
           effective = { ...model, model_id: defaultId };
         }
       }
-      return resolveModelLimits(effective, applicableCustom, view);
+      return resolveModelLimits(effective, applicableCustom, view, ggModels);
     };
     return { resolve, configs, view };
   }
@@ -874,6 +880,12 @@ export class AgentRuntime {
   ): number | undefined {
     const providerId = model?.provider_id;
     if (!providerId) return undefined;
+    if (providerId === "gg") {
+      return clampSummarizerCap(
+        limits.resolve({ provider_id: "gg", tier: COMPACTOR_TIER })
+          .context_window
+      );
+    }
     if (isChatGptProviderId(providerId)) {
       const config = this.deps.chatgpt?.config;
       if (!config) return undefined;
@@ -918,7 +930,7 @@ export class AgentRuntime {
     if (!this.compaction_enabled) return false;
     const session = await this.deps.sessions_store.get(sessionId);
     if (!session) return false;
-    const limits = await this.limitsResolver();
+    const limits = await this.limitsResolver(session.model);
     const modelLimits = limits.resolve(session.model);
     if (
       !shouldCompact(session.total_tokens, modelLimits, this.compaction_config)
@@ -1069,6 +1081,7 @@ export class AgentRuntime {
           provider = await resolveProvider(this.deps, {
             explicit: explicitProviderId,
             model_id: effectiveReq.model_id,
+            tier: effectiveReq.tier,
           });
         } catch (err) {
           if (err instanceof ProviderUnavailableError) {
@@ -1740,6 +1753,7 @@ export class AgentRuntime {
       image_gen_enabled: this.deps.image_gen_enabled === true,
       image_model_id: this.deps.image_model_id,
       catalog: this.deps.catalog,
+      gg_catalog: this.deps.gg_catalog,
       // Host-level default for question resolution.
       interactive: this.deps.interactive === true,
       // Host-level default for design_search; per-run `req.library` overrides.
@@ -2146,6 +2160,7 @@ export class AgentRuntime {
         provider = await resolveProvider(this.deps, {
           explicit: session.model?.provider_id,
           model_id: session.model?.model_id,
+          tier: session.model?.tier,
         });
       } catch (err) {
         if (err instanceof ProviderUnavailableError) {
@@ -2162,7 +2177,7 @@ export class AgentRuntime {
         }
         throw err;
       }
-      const limits = await this.limitsResolver();
+      const limits = await this.limitsResolver(session.model);
       const result = await compactSession(
         {
           store: this.deps.sessions_store,

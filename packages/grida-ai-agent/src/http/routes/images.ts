@@ -1,3 +1,4 @@
+import type { GGDiscoveryStore } from "@grida/ai";
 /**
  * GRIDA-SEC-004 — `/images/generate` route (BYOK image generation, #908).
  *
@@ -44,6 +45,7 @@ export type ImagesRoutesDeps = {
   media?: MediaPersistence | null;
   /** Image catalogue for resolution; absent ⇒ the bundled one. */
   catalog?: ModelCatalogStore;
+  gg_catalog?: GGDiscoveryStore;
   // GRIDA-GG: provider — the optional hosted image arm.
   /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
   gg?: import("../../providers/gg-session").GridaGatewaySessionStore;
@@ -52,7 +54,7 @@ export type ImagesRoutesDeps = {
 };
 
 export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
-  const { secrets, gg, gg_base_url, provider_http, catalog } = deps;
+  const { secrets, gg, gg_base_url, provider_http, catalog, gg_catalog } = deps;
 
   app.post("/images/generate", async (c) => {
     const r = await body(c, {
@@ -86,7 +88,7 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
     let resolved;
     try {
       resolved = await resolveImageModel(
-        { secrets, gg, gg_base_url, provider_http, catalog },
+        { secrets, gg, gg_base_url, provider_http, catalog, gg_catalog },
         model_id,
         { ...(provider ? { explicit: provider } : {}), background }
       );

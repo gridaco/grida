@@ -1,4 +1,4 @@
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 
 export type DesktopMediaToolId =
   | "image-generator"
@@ -177,6 +177,17 @@ export namespace DesktopMediaTool {
   ): DesktopMediaToolSelection {
     const inferredTool = !toolValue ? inferFromModel(modelValue) : null;
     const tool = inferredTool ?? resolve(toolValue);
+    // Preserve explicit choices; the current host catalogue owns availability.
+    // Typed 3D/rigging adapters retain their explicit native input contracts.
+    if (
+      toolValue &&
+      modelValue &&
+      ["image-generator", "video-generator", "text-to-music"].includes(tool.id)
+    ) {
+      return { tool, initialModelId: modelValue };
+    }
+    if (tool.id === "video-generator" && !modelValue)
+      return { tool, initialModelId: null };
     if (tool.modelIds.length === 0) {
       return { tool, initialModelId: null };
     }

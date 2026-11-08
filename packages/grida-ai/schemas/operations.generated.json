@@ -61,65 +61,6 @@
   {
     "kind": "image",
     "model_id": "bfl/flux-2-max",
-    "provider_id": "gg",
-    "binding_id": "bfl/flux-2-max",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "bfl/flux-2-max",
     "provider_id": "openrouter",
     "binding_id": "black-forest-labs/flux.2-max",
     "references_max": 8,
@@ -313,65 +254,6 @@
     "model_id": "bfl/flux-2-pro",
     "provider_id": "fal",
     "binding_id": "fal-ai/flux-2-pro",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "bfl/flux-2-pro",
-    "provider_id": "gg",
-    "binding_id": "bfl/flux-2-pro",
     "variant": "text",
     "status": "listed",
     "input_schema": {
@@ -679,65 +561,6 @@
   {
     "kind": "image",
     "model_id": "bytedance/seedream-5.0-lite",
-    "provider_id": "gg",
-    "binding_id": "bytedance/seedream-5.0-lite",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "bytedance/seedream-5.0-lite",
     "provider_id": "openrouter",
     "binding_id": "bytedance-seed/seedream-5-0-lite",
     "references_max": 14,
@@ -931,65 +754,6 @@
     "model_id": "bytedance/seedream-5.0-pro",
     "provider_id": "fal",
     "binding_id": "bytedance/seedream/v5/pro/text-to-image",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "bytedance/seedream-5.0-pro",
-    "provider_id": "gg",
-    "binding_id": "bytedance/seedream-5.0-pro",
     "variant": "text",
     "status": "listed",
     "input_schema": {
@@ -1297,65 +1061,6 @@
   {
     "kind": "image",
     "model_id": "google/gemini-3-pro-image",
-    "provider_id": "gg",
-    "binding_id": "google/gemini-3-pro-image",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "google/gemini-3-pro-image",
     "provider_id": "openrouter",
     "binding_id": "google/gemini-3-pro-image-preview",
     "references_max": 14,
@@ -1549,65 +1254,6 @@
     "model_id": "google/gemini-3.1-flash-image-preview",
     "provider_id": "fal",
     "binding_id": "fal-ai/nano-banana-2",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "google/gemini-3.1-flash-image-preview",
-    "provider_id": "gg",
-    "binding_id": "google/gemini-3.1-flash-image-preview",
     "variant": "text",
     "status": "listed",
     "input_schema": {
@@ -1970,69 +1616,10 @@
   {
     "kind": "image",
     "model_id": "openai/gpt-image-2.5-flare",
-    "provider_id": "gg",
-    "binding_id": "openai/gpt-image-2.5-flare",
-    "native_background": true,
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto", "opaque", "transparent"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "openai/gpt-image-2.5-flare",
     "provider_id": "openrouter",
     "binding_id": "openai/gpt-image-2.5-flare",
     "references_max": 16,
+    "native_background": true,
     "variant": "references",
     "status": "listed",
     "input_schema": {
@@ -2067,7 +1654,7 @@
         },
         "background": {
           "type": "string",
-          "enum": ["auto"]
+          "enum": ["auto", "opaque", "transparent"]
         },
         "references": {
           "type": "array",
@@ -2100,6 +1687,7 @@
     "model_id": "openai/gpt-image-2.5-flare",
     "provider_id": "openrouter",
     "binding_id": "openai/gpt-image-2.5-flare",
+    "native_background": true,
     "variant": "text",
     "status": "listed",
     "input_schema": {
@@ -2134,7 +1722,7 @@
         },
         "background": {
           "type": "string",
-          "enum": ["auto"]
+          "enum": ["auto", "opaque", "transparent"]
         }
       },
       "required": ["prompt"]
@@ -2326,69 +1914,10 @@
   {
     "kind": "image",
     "model_id": "openai/gpt-image-2.5-sunburst",
-    "provider_id": "gg",
-    "binding_id": "openai/gpt-image-2.5-sunburst",
-    "native_background": true,
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto", "opaque", "transparent"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "openai/gpt-image-2.5-sunburst",
     "provider_id": "openrouter",
     "binding_id": "openai/gpt-image-2.5-sunburst",
     "references_max": 16,
+    "native_background": true,
     "variant": "references",
     "status": "listed",
     "input_schema": {
@@ -2423,7 +1952,7 @@
         },
         "background": {
           "type": "string",
-          "enum": ["auto"]
+          "enum": ["auto", "opaque", "transparent"]
         },
         "references": {
           "type": "array",
@@ -2456,6 +1985,7 @@
     "model_id": "openai/gpt-image-2.5-sunburst",
     "provider_id": "openrouter",
     "binding_id": "openai/gpt-image-2.5-sunburst",
+    "native_background": true,
     "variant": "text",
     "status": "listed",
     "input_schema": {
@@ -2490,7 +2020,7 @@
         },
         "background": {
           "type": "string",
-          "enum": ["auto"]
+          "enum": ["auto", "opaque", "transparent"]
         }
       },
       "required": ["prompt"]
@@ -2569,7 +2099,7 @@
     "kind": "image",
     "model_id": "openai/gpt-image-2",
     "provider_id": "fal",
-    "binding_id": "fal-ai/gpt-image-2",
+    "binding_id": "openai/gpt-image-2",
     "deprecated": true,
     "native_background": true,
     "variant": "text",
@@ -2612,66 +2142,6 @@
         "background": {
           "type": "string",
           "enum": ["auto", "opaque", "transparent"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "openai/gpt-image-2",
-    "provider_id": "gg",
-    "binding_id": "openai/gpt-image-2",
-    "deprecated": true,
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto"]
         }
       },
       "required": ["prompt"]
@@ -2885,65 +2355,6 @@
     "model_id": "recraft/recraft-v4.1",
     "provider_id": "fal",
     "binding_id": "fal-ai/recraft/v4.1/text-to-image",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "recraft/recraft-v4.1",
-    "provider_id": "gg",
-    "binding_id": "recraft/recraft-v4.1",
     "variant": "text",
     "status": "listed",
     "input_schema": {
@@ -3251,65 +2662,6 @@
   {
     "kind": "image",
     "model_id": "xai/grok-imagine-image-2.0",
-    "provider_id": "gg",
-    "binding_id": "xai/grok-imagine-image-2.0",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "n": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 16,
-          "default": 1
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+(?:\\.[0-9]+)?:[0-9]+(?:\\.[0-9]+)?$",
-          "x-grida-positive-pair": "finite-number"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "quality": {
-          "type": "string",
-          "x-grida-max-length": 128,
-          "x-grida-length-unit": "utf16"
-        },
-        "background": {
-          "type": "string",
-          "enum": ["auto"]
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "images",
-      "cardinality": "many",
-      "media_types": ["image/*"],
-      "max_items": "n",
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "image",
-    "model_id": "xai/grok-imagine-image-2.0",
     "provider_id": "openrouter",
     "binding_id": "x-ai/grok-imagine-image-2.0",
     "references_max": 3,
@@ -3496,80 +2848,6 @@
       "media_types": ["image/*"],
       "max_items": "n",
       "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "music",
-    "model_id": "google/lyria-3-pro",
-    "provider_id": "gg",
-    "binding_id": "google/lyria-3-pro",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-trim": true,
-          "x-grida-nonblank": true,
-          "x-grida-max-length": 4096,
-          "x-grida-length-unit": "utf16"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "audio",
-      "cardinality": "one",
-      "media_types": ["audio/mpeg"],
-      "max_items": 1,
-      "max_total_bytes": 33554432
-    }
-  },
-  {
-    "kind": "music",
-    "model_id": "google/lyria-3",
-    "provider_id": "gg",
-    "binding_id": "google/lyria-3",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-trim": true,
-          "x-grida-nonblank": true,
-          "x-grida-max-length": 4096,
-          "x-grida-length-unit": "utf16"
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        }
-      },
-      "required": ["prompt"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "audio",
-      "cardinality": "one",
-      "media_types": ["audio/mpeg"],
-      "max_items": 1,
-      "max_total_bytes": 33554432
     }
   },
   {
@@ -5921,7 +5199,7 @@
   {
     "kind": "video",
     "model_id": "alibaba/wan-3.0",
-    "provider_id": "gg",
+    "provider_id": "openrouter",
     "binding_id": "alibaba/wan-3.0",
     "variant": "text",
     "status": "listed",
@@ -6153,66 +5431,6 @@
     "model_id": "bytedance/seedance-2.0",
     "provider_id": "openrouter",
     "binding_id": "bytedance/seedance-2.0",
-    "variant": "image",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+:[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "resolution": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "duration": {
-          "type": "number",
-          "exclusiveMinimum": 0
-        },
-        "fps": {
-          "type": "number",
-          "exclusiveMinimum": 0
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        },
-        "image_url": {
-          "type": "string",
-          "x-grida-url": {
-            "schemes": ["https"],
-            "userinfo": false,
-            "fragments": false
-          }
-        }
-      },
-      "required": ["prompt", "image_url"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "videos",
-      "cardinality": "many",
-      "media_types": ["video/*"],
-      "max_items": 16,
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "video",
-    "model_id": "bytedance/seedance-2.0",
-    "provider_id": "openrouter",
-    "binding_id": "bytedance/seedance-2.0",
     "variant": "text",
     "status": "listed",
     "input_schema": {
@@ -6322,6 +5540,58 @@
   },
   {
     "kind": "video",
+    "model_id": "bytedance/seedance-2.5",
+    "provider_id": "openrouter",
+    "binding_id": "bytedance/seedance-2.5",
+    "variant": "text",
+    "status": "listed",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "x-grida-nonblank": true
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "pattern": "^[0-9]+:[0-9]+$",
+          "x-grida-positive-pair": "safe-integer"
+        },
+        "resolution": {
+          "type": "string",
+          "pattern": "^[0-9]+x[0-9]+$",
+          "x-grida-positive-pair": "safe-integer"
+        },
+        "duration": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fps": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["prompt"]
+    },
+    "output": {
+      "representation": "native",
+      "data": "Uint8Array",
+      "field": "videos",
+      "cardinality": "many",
+      "media_types": ["video/*"],
+      "max_items": 16,
+      "max_total_bytes": 67108864
+    }
+  },
+  {
+    "kind": "video",
     "model_id": "google/veo-3.1-fast",
     "provider_id": "fal",
     "binding_id": "fal-ai/veo3.1/fast/image-to-video",
@@ -6383,7 +5653,7 @@
   {
     "kind": "video",
     "model_id": "google/veo-3.1-fast",
-    "provider_id": "gg",
+    "provider_id": "openrouter",
     "binding_id": "google/veo-3.1-fast",
     "variant": "text",
     "status": "listed",
@@ -6707,7 +5977,7 @@
   {
     "kind": "video",
     "model_id": "google/veo-3.1-lite",
-    "provider_id": "gg",
+    "provider_id": "openrouter",
     "binding_id": "google/veo-3.1-lite",
     "variant": "text",
     "status": "listed",
@@ -6923,58 +6193,6 @@
         }
       },
       "required": ["prompt", "image_url"]
-    },
-    "output": {
-      "representation": "native",
-      "data": "Uint8Array",
-      "field": "videos",
-      "cardinality": "many",
-      "media_types": ["video/*"],
-      "max_items": 16,
-      "max_total_bytes": 67108864
-    }
-  },
-  {
-    "kind": "video",
-    "model_id": "google/veo-3.1",
-    "provider_id": "gg",
-    "binding_id": "google/veo-3.1",
-    "variant": "text",
-    "status": "listed",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "prompt": {
-          "type": "string",
-          "x-grida-nonblank": true
-        },
-        "aspect_ratio": {
-          "type": "string",
-          "pattern": "^[0-9]+:[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "resolution": {
-          "type": "string",
-          "pattern": "^[0-9]+x[0-9]+$",
-          "x-grida-positive-pair": "safe-integer"
-        },
-        "duration": {
-          "type": "number",
-          "exclusiveMinimum": 0
-        },
-        "fps": {
-          "type": "number",
-          "exclusiveMinimum": 0
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": -9007199254740991,
-          "maximum": 9007199254740991
-        }
-      },
-      "required": ["prompt"]
     },
     "output": {
       "representation": "native",
@@ -7265,6 +6483,58 @@
         }
       },
       "required": ["prompt", "image_url"]
+    },
+    "output": {
+      "representation": "native",
+      "data": "Uint8Array",
+      "field": "videos",
+      "cardinality": "many",
+      "media_types": ["video/*"],
+      "max_items": 16,
+      "max_total_bytes": 67108864
+    }
+  },
+  {
+    "kind": "video",
+    "model_id": "xai/grok-imagine-video-1.5",
+    "provider_id": "openrouter",
+    "binding_id": "x-ai/grok-imagine-video-1.5",
+    "variant": "text",
+    "status": "listed",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "x-grida-nonblank": true
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "pattern": "^[0-9]+:[0-9]+$",
+          "x-grida-positive-pair": "safe-integer"
+        },
+        "resolution": {
+          "type": "string",
+          "pattern": "^[0-9]+x[0-9]+$",
+          "x-grida-positive-pair": "safe-integer"
+        },
+        "duration": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fps": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["prompt"]
     },
     "output": {
       "representation": "native",

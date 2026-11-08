@@ -19,14 +19,14 @@
  * routes, and the renderer bridge.
  */
 
-import type { models } from "@grida/ai-models";
+import type { models } from "@grida/ai/catalogue";
 import {
   isByokProviderId,
   isChatGptProviderId,
   isGgProviderId,
 } from "./provider-ids";
 
-/** A model spec consumable by the open registry — `@grida/ai-models`'
+/** A model spec consumable by the open registry — `@grida/ai/catalogue`'
  *  custom spec (cost optional, capability flags explicit). This is the
  *  RESOLVED shape; the stored shape is {@link EndpointModelEntry}. */
 export type EndpointModelSpec = models.text.registry.CustomModelSpec;

@@ -151,7 +151,9 @@ inputOrgId })`. It resolves from: route param slug → request
    dispatch/metering and Platform owns shared financial billing. Retained native
    operations use Grida source admission/receipt integration;
    value imports of `replicate`, `openai`, `@ai-sdk/*`, `@anthropic-ai/sdk`
-   and the portable `@grida/ai` SDK are restricted to the reviewed seam allowlist.
+   and the portable `@grida/ai` execution SDK are restricted to the reviewed seam allowlist.
+   The exact `@grida/ai/catalogue` and `@grida/ai/discovery` metadata entries
+   are allowed independently: neither executes inference or acquires credentials.
    Enforced by oxlint
    `no-restricted-imports` ([editor/.oxlintrc.jsonc](editor/.oxlintrc.jsonc))
    and the CI audit script
@@ -454,6 +456,18 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    request headers and bodies while transporting them, but never persists,
    returns, or logs credentials or bodies; credential ownership and injection
    remain in the sidecar's provider layer.
+
+   Anonymous GG discovery has a separate, narrow permission: credential-free
+   `GET` requests to exactly `https://gateway.grida.ai/v1/models`,
+   `/v1/endpoints` and `/schemas/operations.json`, with no query or body and only
+   `Accept`, `Accept-Encoding` and `User-Agent` headers. It grants no inference
+   endpoint, alternate port, subdomain or download authority. The
+   [network policy](desktop/src/agent-network-policy.ts) and
+   [tests](desktop/src/agent-network-policy.test.ts) enforce that permission;
+   the [discovery reader](packages/grida-ai/src/gg-discovery.ts) bounds metadata
+   bytes, deadlines and cache age. Public metadata never carries a scoped token
+   or authorizes spending. Signed-in execution continues through the configured
+   Grida API origin; its JWT never goes to public GG discovery or asset hosts.
 
    Chromium supplies the operating system's effective proxy/PAC, VPN, DNS, and
    platform-trust behavior. Cached or integrated proxy authentication remains
@@ -923,7 +937,7 @@ Today:
 - [Shared image operation](packages/grida-ai/src/image-client.ts), [provider HTTP](packages/grida-ai/src/http.ts), [BYOK image adapters](packages/grida-ai/src/image-byok.ts), [GG request helpers](packages/grida-ai/src/gg.ts), [URL admission tests](packages/grida-ai/src/gg.test.ts), [GG image adapter](packages/grida-ai/src/image-gg.ts), and [provider entry](packages/grida-ai/src/providers.ts) — caller-selected provider authority, live credential reads, distinct request/download lanes, and safe image outcomes. The operation never retries a failed paid batch; requested multiple images may require multiple provider-sized batches. Existing agent imports delegate to these owners. The [SDK contract](packages/grida-ai/README.md) defines host responsibilities. [Image operation tests](packages/grida-ai/src/image-client.test.ts) and [download tests](packages/grida-ai/src/http.test.ts) pin credential isolation, safe failures and bounded asset reads. The [queue and URL helpers](packages/grida-ai/src/fetch-helpers.ts), [their tests](packages/grida-ai/src/fetch-helpers.test.ts), and [BYOK adapter tests](packages/grida-ai/src/image-byok.test.ts) preserve provider-owned polling and credential-free result downloads.
 - [HTTP image adapter tests](packages/grida-ai-agent/src/http/routes/images.test.ts) and [workspace image adapter tests](packages/grida-ai-agent/src/runtime/image-generation.test.ts) — existing admission and host persistence around the shared operation, reference capability before file reads, safe host failures, and no paid retry.
 - [Shared video operation](packages/grida-ai/src/video-client.ts), [provider adapters](packages/grida-ai/src/video-models.ts), and [bounded invocation](packages/grida-ai/src/media-request.ts) — video resolution and execution without host types. One submission uses the selected provider and a private invocation credential; a changed key cannot retarget an accepted job. The exact fal `fal-ai/veo3.1/lite/image-to-video` binding admits one HTTPS frame or PNG/JPEG/WebP bytes up to 8,000,000 bytes. Shared native/JSON rules expose that exact capability, bound base64 before decoding, snapshot bytes before credential lookup, and reject unsupported representations/options before generation authority. Its private adapter creates a bounded inline data URL and maps accepted numeric duration/dimensions to the documented fal wire. Other bindings retain HTTPS-only frame inputs; no filesystem read, upload route or new host grant is added. Submission, polling and result reads share a deadline and cancellation. Provider-owned URL restrictions and separate request/download lanes remain enforced; all result representations are bounded before bytes reach the host. HTTP admission, base64 wire responses and media persistence remain in the [video route](packages/grida-ai-agent/src/http/routes/video.ts), with a thin [resolver adapter](packages/grida-ai-agent/src/providers/resolve-video.ts). This replaces the former agent `video-byok.ts` owner. [Operation tests](packages/grida-ai/src/video-client.test.ts) pin provider wires, image input bounds/snapshots, credentials, cancellation, deadlines, hostile results and safe failures; [route tests](packages/grida-ai-agent/src/http/routes/video.test.ts) pin the host contract.
-- [Shared music operation](packages/grida-ai/src/music-client.ts) and [its tests](packages/grida-ai/src/music-client.test.ts) — GG-only text-to-music with no BYOK credential capability or direct Replicate access. The existing scoped token and host-authorized request lane carry one submission. The shared [media invocation](packages/grida-ai/src/media-request.ts) bounds its lifetime and response reads; only bounded MP3 bytes and MIME type leave the operation. The [music route](packages/grida-ai-agent/src/http/routes/music.ts) retains HTTP admission, canonical filenames and optional root-level storage receipts, pinned by [route tests](packages/grida-ai-agent/src/http/routes/music.test.ts). This replaces the former agent `gg-media.ts` music adapter.
+- [Shared music operation](packages/grida-ai/src/music-client.ts) and [its tests](packages/grida-ai/src/music-client.test.ts) — GG-only text-to-music with no BYOK credential capability or direct Replicate access. Current operation metadata selects a supported JSON contract; the scoped token stays on the Grida API submission and original-job status requests. Result MP3 bytes use only the credential-free, host-authorized asset lane. The shared [media invocation](packages/grida-ai/src/media-request.ts) bounds its lifetime and response reads; only bounded MP3 bytes and MIME type leave the operation, and download failure never resubmits generation. The [music route](packages/grida-ai-agent/src/http/routes/music.ts) retains HTTP admission, canonical filenames and optional root-level storage receipts, pinned by [route tests](packages/grida-ai-agent/src/http/routes/music.test.ts). This replaces the former agent `gg-media.ts` music adapter.
 - [Shared sound-effect operation](packages/grida-ai/src/sound-effect-client.ts) and [its tests](packages/grida-ai/src/sound-effect-client.test.ts) — the existing ElevenLabs BYOK model uses one fixed provider endpoint and a live key from the host's narrow reader. No GG credential or download destination is available. The shared [media invocation](packages/grida-ai/src/media-request.ts) bounds credential lookup, response reads and cancellation; only nonempty MP3 bytes within 16 MiB and a MIME type leave the operation. The [sound-effects route](packages/grida-ai-agent/src/http/routes/sound-effects.ts) and [its tests](packages/grida-ai-agent/src/http/routes/sound-effects.test.ts) retain admission, missing-key status, wire encoding, filenames and optional root-level receipts. Safe failures omit credential and upstream details. This replaces the former agent `elevenlabs-sound-effects.ts` adapter.
 - [Standalone package proof](scripts/ai-local/proof.mjs), [cleanup/report tests](scripts/ai-local/proof.test.mjs), [runtime guard](scripts/ai-local/network.cjs), [image consumer](scripts/ai-local/consumer.mjs), [video consumer](scripts/ai-local/video-consumer.mjs), [music consumer](scripts/ai-local/music-consumer.mjs), [sound-effect consumer](scripts/ai-local/sound-effect-consumer.mjs), [speech and voice consumer](scripts/ai-local/text-to-speech-consumer.mjs), [3D consumer](scripts/ai-local/three-d-consumer.mjs), and [guide](scripts/ai-local/README.md) — packed public exports with only declared production dependencies, synthetic transports, and guarded ambient network/credential/state access. No Grida host is installed or started.
 - [packages/grida-daemon/src/daemon.ts](packages/grida-daemon/src/daemon.ts) — daemon discovery contract: owner-only atomic registration + persistent credential, loopback-only records, authenticated probe.
@@ -1393,6 +1407,19 @@ levels into one.
    switch funding or resubmit. Native GG execution uses the shared memory store
    and does not read BYOK credentials; the CLI obtains a scoped grant through
    its existing explicit-organization exchange and clears it after the command.
+10. **Discovery does not carry execution authority** — anonymous public GG
+    metadata describes supported current interfaces. Native image/video/music
+    submission uses the fixed Grida API `/api/v1/ai/operations` bridge, which
+    verifies the org-bound scoped JWT and selects the upstream operation itself.
+    Original job status uses `/api/v1/ai/jobs`; it remains retrievable after a
+    catalogue change. The JWT never goes directly to `gateway.grida.ai` or to
+    a result URL. Music/video references are downloaded only through the bounded,
+    credential-free asset lane. A failed poll or asset read never authorizes a
+    second paid submission, a credential fallback or an organization change.
+    Validated accepted job IDs remain in safe music/video errors. Music session
+    refresh resumes that exact job with GET-only reads, without depending on
+    current catalogue membership. Job retrieval has its own per-user abuse
+    budget; it does not consume discovery or submission allowance.
 
 **Residual risks (accepted, documented).** Org-membership revocation is
 not re-checked within a token's 900-second window plus clock tolerance. The mint rate
@@ -1507,16 +1534,15 @@ governs the surface, this record governs its security half.
   isolation remains GRIDA-SEC-011/012; no generation or provider call is required.
 - [editor/app/desktop/auth/token/route.ts](editor/app/desktop/auth/token/route.ts) — the mint route (pinned by its `route.test.ts`).
 - `editor/app/(api)/(public)/api/v1/ai/**` — the hosted GG endpoints: OpenAI-compat chat/completions + models, Grida-native image/video/music generation and the four 3D feature routes. Verify with `verifyGgToken` EXCLUSIVELY; provider work is gated through the seam, and metered operations use actual receipts (pinned by route and seam contract tests).
-- `editor/app/(api)/(public)/api/v1/models/catalog/route.ts` — deliberately OUTSIDE the glob above, and deliberately unauthenticated: an agent host fetches the published model catalogue at boot, before any session token exists. It accepts NO credential (strictly stronger than accepting the wrong one), spends nothing, and returns only catalogue data already public on the models page. Listed here so it is not "fixed" into the token-gated family, which would break the boot fetch. See [catalogue distribution](docs/wg/platform/hosted-ai.md).
+- `editor/app/(api)/(public)/api/v1/models/catalog/route.ts` — deliberately OUTSIDE the glob above, and deliberately unauthenticated: older installed hosts fetch the schema-1 compatibility catalogue before any session token exists. It accepts NO credential (strictly stronger than accepting the wrong one), spends nothing, and returns only catalogue data already public on the models page. Listed here so it is not "fixed" into the token-gated family, which would break the boot fetch. See [catalogue distribution](docs/wg/platform/hosted-ai.md).
 - [editor/lib/ai/openai-compat/](editor/lib/ai/openai-compat/codec.ts) — the wire codec + error envelope + allowlist + rate limits.
-  The [allowlist test](editor/lib/ai/openai-compat/hosted-models.test.ts) pins direct
-  catalogue consumption without importing provider factories for a model-list read.
+  The [allowlist test](editor/lib/ai/openai-compat/hosted-models.test.ts) pins anonymous current GG discovery without importing provider factories for a model-list read.
 - [HTTP image adapter tests](packages/grida-ai-agent/src/http/routes/images.test.ts) and [workspace image adapter tests](packages/grida-ai-agent/src/runtime/image-generation.test.ts) — shared scoped GG execution behind existing host admission; expired authority and insufficient-credit status remain actionable.
 - [Standalone package proof](scripts/ai-local/proof.mjs), [cleanup/report tests](scripts/ai-local/proof.test.mjs), [runtime guard](scripts/ai-local/network.cjs), [image consumer](scripts/ai-local/consumer.mjs), [video consumer](scripts/ai-local/video-consumer.mjs), [music consumer](scripts/ai-local/music-consumer.mjs), and [guide](scripts/ai-local/README.md) — synthetic memory-only GG grants and fixed fake responses; proves package/credential routing without minting a real token or contacting a provider.
 - [Shared GG session store](packages/grida-ai/src/gg-session.ts) and [its tests](packages/grida-ai/src/gg-session.test.ts) — memory-only custody, 30s expiry slack and credential-free status. [The agent path](packages/grida-ai-agent/src/providers/gg-session.ts) re-exports that owner. Hosts supply the scoped grant; the SDK does not acquire or persist an account session.
 - [Shared GG request helpers](packages/grida-ai/src/gg.ts), [URL admission tests](packages/grida-ai/src/gg.test.ts), [image adapter](packages/grida-ai/src/image-gg.ts), [image operation](packages/grida-ai/src/image-client.ts), [provider entry](packages/grida-ai/src/providers.ts), and [SDK contract](packages/grida-ai/README.md) — one URL admission policy before per-request scoped-token reads, tested through each media consumer and public helper. `ImageClient` guarantees safe failure codes and exposes only generated content and provider/model descriptors. The lower-level GG helpers construct body-free 401/402/status errors but can propagate raw transport or parsing failures; their callers must apply an operation error boundary. Its [contract tests](packages/grida-ai/src/image-client.test.ts) pin credential replacement/expiry, explicit provider selection and safe failures.
-- [Shared video operation](packages/grida-ai/src/video-client.ts), [provider adapters](packages/grida-ai/src/video-models.ts), and [bounded invocation](packages/grida-ai/src/media-request.ts) — GG is text-to-video only and rereads the live scoped token immediately before its single POST. Clearing custody blocks a later invocation but cannot recall an accepted request. The operation bounds and validates the inline response, exposes safe failure codes, and never retries a paid submission or follows a GG result URL. It neither mints nor persists credentials. [Video operation tests](packages/grida-ai/src/video-client.test.ts) pin expiry, clearing custody, single submission and safe GG failures.
-- [Shared music operation](packages/grida-ai/src/music-client.ts) and [its tests](packages/grida-ai/src/music-client.test.ts) — the two bundled Lyria models use only the fixed GG music endpoint, with a live scoped token checked at resolution and submission. Each invocation submits once, validates the matching model/provider and bounded inline MP3, and exposes safe failures. The [shared media invocation](packages/grida-ai/src/media-request.ts) owns timeout/cancellation cleanup for music and video; it grants no credential or destination authority. The [music route](packages/grida-ai-agent/src/http/routes/music.ts) and [its tests](packages/grida-ai-agent/src/http/routes/music.test.ts) retain host admission and actionable GG status mapping. Mint, durable custody, entitlement and refresh remain host/server responsibilities.
+- [Current discovery](packages/grida-ai/src/gg-discovery.ts), [its tests](packages/grida-ai/src/gg-discovery.test.ts), [generic JSON client](packages/grida-ai/src/gg-operations.ts), [client tests](packages/grida-ai/src/gg-operations.test.ts), [Grida API bridge](editor/lib/api/gg-operations.ts) and [bridge tests](editor/lib/api/gg-operations.test.ts) — anonymous metadata is separate from organization-scoped submission and original-job recovery. The bridge chooses a fixed served path; caller data cannot select an origin, credential or organization.
+- [Shared video operation](packages/grida-ai/src/video-client.ts), [music operation](packages/grida-ai/src/music-client.ts) and their [video](packages/grida-ai/src/video-client.test.ts) / [music](packages/grida-ai/src/music-client.test.ts) tests — current GG JSON contracts use one scoped submission and retain its original job identity. Status reads stay on the Grida API origin; validated video/MP3 references use the bounded credential-free asset lane. Clearing custody blocks later authorized calls without recalling accepted work. No polling or download failure retries generation, mints authority or reads a BYOK credential. The [shared invocation](packages/grida-ai/src/media-request.ts) retains cancellation/deadline cleanup, and host routes retain admission, persistence and safe status mapping.
 - [packages/grida-ai-agent/src/http/routes/gg-auth.ts](packages/grida-ai-agent/src/http/routes/gg-auth.ts) — `/auth/gg/set|clear|status` behind the daemon perimeter; token never logged (pinned by its test).
 - [packages/grida-ai-agent/src/providers/gg.ts](packages/grida-ai-agent/src/providers/gg.ts) and [text adapter tests](packages/grida-ai-agent/src/providers/gg.test.ts) — hosted text adapter consuming shared GG helpers: URL admission before token reads, editor-origin-only egress, code-led typed status errors (401→`gg_token_expired`, 402→`insufficient_credits`). Those constructed status messages omit upstream bodies; transport/parsing failures still require the calling operation's safe error boundary.
 - The `gg` resolver arms ([providers/index.ts](packages/grida-ai-agent/src/providers/index.ts), resolve-image, resolve-video) — precedence: explicit wins; implicit BYOK → `gg` → endpoints. The `/secrets/*` allowlist keeps REJECTING the `gg` id (no key may be stored under it; pinned by `gg-auth.test.ts`).
@@ -2298,8 +2324,14 @@ the system browser launcher, or OS keyring availability.
 - [editor.mjs](scripts/auth-local/editor.mjs),
   [network.cjs](scripts/auth-local/network.cjs), and
   [native-probe.mjs](scripts/auth-local/native-probe.mjs) — isolated hosts.
+  [discovery.mjs](scripts/auth-local/discovery.mjs) supplies anonymous synthetic
+  model, endpoint and operation documents on loopback; it rejects execution,
+  credentials and request bodies. A latched loopback-only verdict is checked by CI
+  after both proofs; cleanup cannot hide a prior violation. No public Gateway
+  request is needed.
 - [guards.test.mjs](scripts/auth-local/guards.test.mjs),
-  [network.test.mjs](scripts/auth-local/network.test.mjs), and
+  [network.test.mjs](scripts/auth-local/network.test.mjs),
+  [discovery.test.mjs](scripts/auth-local/discovery.test.mjs), and
   [consumer proof](editor/e2e/auth-oauth.spec.mts) — adjacent verification.
 - [Dedicated Playwright config](editor/playwright.auth.config.ts),
   [ordinary Playwright config](editor/playwright.config.ts),
@@ -2538,7 +2570,12 @@ generation receipts without a fixed projection.
    public registration's HTTPS API origin or the fixed local fixture, with only
    image/video/music generation POST paths and the four exact
    `/api/v1/ai/3d/{uploads,model-generation,rig-check,rigging}` POST paths, with no
-   query parameters. Provider redirects are rejected without
+   query parameters. Current GG discovery additionally admits anonymous GETs to
+   exactly `https://gateway.grida.ai/v1/models`, `/v1/endpoints` and
+   `/schemas/operations.json`, with no authority, query or body. The current
+   operation bridge accepts POST `/api/v1/ai/operations`; original jobs use
+   GET `/api/v1/ai/jobs` with only a validated `request_id` query.
+   Provider redirects are rejected without
    replay. The download lane is HTTPS GET/HEAD with no credential, cookie, body or
    caller-selected Host header. Each connection and download redirect resolves
    fresh DNS, rejects the entire answer if any address is non-public, and pins one

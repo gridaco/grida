@@ -1,9 +1,29 @@
+import type { CurrentGGModel } from "@/lib/desktop/gg-models";
+
 type ProviderBoundModel = Readonly<{
   providers?: object;
 }>;
 
 /** Settings readiness for models resolved through BYOK or Grida hosted media. */
 export namespace MediaModelReadiness {
+  /** Only old binaries use the finite legacy hosted contract. */
+  export function hosted(
+    id: string,
+    kind: "image" | "video",
+    current: readonly CurrentGGModel[] | null
+  ): boolean | undefined {
+    if (current === null) return undefined;
+    return current.some(
+      (model) =>
+        model.id === id &&
+        model.kind === kind &&
+        (kind === "image"
+          ? model.interfaces.includes("images.generations")
+          : model.interfaces.includes("videos") &&
+            model.client_supported_options?.video_text === true)
+    );
+  }
+
   // GRIDA-GG: desktop — native feature support alone does not admit org credits.
   export function tripo(
     byok: boolean | null,
@@ -15,15 +35,16 @@ export namespace MediaModelReadiness {
     return false;
   }
   /**
-   * Hosted image/video resolution follows the catalogue's Vercel AI Gateway
-   * binding, while BYOK resolution intersects every connected provider with the exact
-   * bindings on this card. A pending source keeps the result pending unless
-   * the other source has already proved the model runnable.
+   * Current hosted discovery is independent of BYOK bindings. Only an older
+   * binary without discovery uses its finite Vercel-backed hosted contract.
+   * BYOK intersects connected providers with the exact native bindings.
+   * Pending readiness stays pending unless another source proves availability.
    */
   export function visual(
     model: ProviderBoundModel,
     connectedByokProviderIds: ReadonlySet<string> | null,
-    hostedActive: boolean | null
+    hostedActive: boolean | null,
+    currentHosted?: boolean
   ): boolean | null {
     const providers = model.providers;
     if (!providers) return false;
@@ -38,7 +59,8 @@ export namespace MediaModelReadiness {
     }
     if (
       hostedActive === true &&
-      Object.prototype.hasOwnProperty.call(providers, "vercel")
+      (currentHosted ??
+        Object.prototype.hasOwnProperty.call(providers, "vercel"))
     ) {
       return true;
     }

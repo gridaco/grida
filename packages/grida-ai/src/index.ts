@@ -24,3 +24,20 @@ export { TripoClient } from "./tripo-client";
 
 export { RiggingClient } from "./rigging-client";
 export { RiggingOperations } from "./rigging-operations";
+
+export {
+  GGDiscoveryStore,
+  GG_DISCOVERY_ORIGIN,
+  type GGDiscoveryOptions,
+  type GGDiscoverySnapshot,
+  type GGModel,
+  type GGEndpoint,
+  type GGOperation,
+} from "./gg-discovery";
+
+export {
+  gridaProviderOptions,
+  type GridaCallProviderOptions,
+} from "./provider-options";
+
+export { GGOperationsClient, type GGJob } from "./gg-operations";

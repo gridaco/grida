@@ -1,0 +1,1474 @@
+{
+  "models": {
+    "cards": {
+      "version": "1.20261108.1",
+      "url": "https://github.com/gridaco/models/releases/tag/v1.20261108.1",
+      "commit": "93b3802289a635197b8eb8d4095b71fa61d81dfc"
+    },
+    "data": [
+      {
+        "created": 1791244800.0,
+        "gg": {
+          "capabilities": {
+            "image_editing": true,
+            "image_generation": true,
+            "image_input": true,
+            "json_object": false,
+            "json_schema": false,
+            "music_generation": false,
+            "reasoning": false,
+            "seed": false,
+            "streaming": false,
+            "tools": false,
+            "video_generation": false
+          },
+          "card": {
+            "description": "Image generation and conversational editing at 1K, 2K and 4K.",
+            "lab": {
+              "id": "google",
+              "logo": {
+                "kind": "symbol",
+                "media_type": "image/png",
+                "url": "https://cdn.jsdelivr.net/npm/@grida/ai-models@1.20261108.1/logos/google.png"
+              },
+              "name": "Google",
+              "url": "https://ai.google/"
+            },
+            "label": "Gemini Nano Banana 2.1",
+            "release": {
+              "basis": "model",
+              "date": "2026-10-06",
+              "source_url": "https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/nano-banana-2-1"
+            }
+          },
+          "input_modalities": ["image", "text"],
+          "interface_limits": {
+            "images.edits": {
+              "request_bytes": 335544320.0,
+              "response_bytes": 293601280.0,
+              "synchronous_wait_seconds": 600.0
+            },
+            "images.generations": {
+              "request_bytes": 20971520.0,
+              "response_bytes": 293601280.0,
+              "synchronous_wait_seconds": 600.0
+            }
+          },
+          "interfaces": ["images.edits", "images.generations"],
+          "kind": "image",
+          "limits": {
+            "request_bytes": 20971520.0
+          },
+          "operation_ids": ["image.google.gemini-nano-banana-2.1.text"],
+          "output_modalities": ["image"],
+          "pricing": {
+            "components": [
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "references.fal_standard_cost_mills",
+                "meter": "fal_standard_cost_mills",
+                "per_quantity": "1",
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "1",
+                "unit": "mill",
+                "when": {
+                  "allOf": [
+                    {},
+                    {
+                      "properties": {
+                        "input": {
+                          "required": ["image"]
+                        }
+                      },
+                      "required": ["input"]
+                    }
+                  ]
+                }
+              },
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "text.fal_standard_cost_mills",
+                "meter": "fal_standard_cost_mills",
+                "per_quantity": "1",
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "1",
+                "unit": "mill",
+                "when": {
+                  "allOf": [
+                    {},
+                    {
+                      "properties": {
+                        "input": {
+                          "not": {
+                            "required": ["image"]
+                          }
+                        }
+                      },
+                      "required": ["input"]
+                    }
+                  ]
+                }
+              }
+            ],
+            "currency": "USD",
+            "measurement": "Charges use the listed measured usage components, conditions and quantity ranges. USD prices are expressed in mills.",
+            "revision": "2026-10-13.model-additions.1",
+            "unit": "mill"
+          },
+          "pricing_context": "input",
+          "request_schemas": {
+            "images.edits": {
+              "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/image.google.gemini-nano-banana-2.1.references.input"
+            },
+            "images.generations": {
+              "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/image.google.gemini-nano-banana-2.1.text.input"
+            }
+          },
+          "result_schemas": {
+            "images.edits": {
+              "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/ImageResponse_4"
+            },
+            "images.generations": {
+              "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/ImageResponse_4"
+            }
+          }
+        },
+        "id": "google/gemini-nano-banana-2.1",
+        "object": "model",
+        "owned_by": "google"
+      },
+      {
+        "created": 1771372800.0,
+        "gg": {
+          "capabilities": {
+            "image_editing": false,
+            "image_generation": false,
+            "image_input": true,
+            "json_object": false,
+            "json_schema": false,
+            "music_generation": true,
+            "reasoning": false,
+            "seed": false,
+            "streaming": false,
+            "tools": false,
+            "video_generation": false
+          },
+          "card": {
+            "description": "Generate 30-second 48kHz stereo music clips from text or images.",
+            "lab": {
+              "id": "google",
+              "logo": {
+                "kind": "symbol",
+                "media_type": "image/png",
+                "url": "https://cdn.jsdelivr.net/npm/@grida/ai-models@1.20261108.1/logos/google.png"
+              },
+              "name": "Google",
+              "url": "https://ai.google/"
+            },
+            "label": "Lyria 3",
+            "release": {
+              "basis": "model",
+              "date": "2026-02-18",
+              "source_url": "https://deepmind.google/models/model-cards/lyria-3/"
+            }
+          },
+          "input_modalities": ["image", "text"],
+          "interface_limits": {
+            "endpoints": {
+              "multipart": {
+                "content_type": "multipart/form-data",
+                "file_bytes": {
+                  "endImage": 20000000.0,
+                  "image": 20000000.0,
+                  "mesh": 60000000.0
+                },
+                "file_fields": ["image"],
+                "json_bytes": 1048576.0,
+                "json_part": "input",
+                "maximum_files": 4,
+                "request_bytes": 84934656.0,
+                "schema_applies": "Normalized input; omit each file field from input JSON. Selected operation limits still apply."
+              },
+              "request_bytes": 1048576.0
+            }
+          },
+          "interfaces": ["endpoints"],
+          "kind": "music",
+          "limits": {
+            "request_bytes": 20971520.0
+          },
+          "operation_ids": ["music.google.lyria-3.generate"],
+          "output_modalities": ["audio"],
+          "pricing": {
+            "components": [
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "fal_output_units",
+                "meter": "fal_output_units",
+                "per_quantity": "1",
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "40",
+                "unit": "generation",
+                "when": {}
+              }
+            ],
+            "currency": "USD",
+            "measurement": "Charges use the listed measured usage components, conditions and quantity ranges. USD prices are expressed in mills.",
+            "revision": "2026-11-08.lyria.1",
+            "unit": "mill"
+          },
+          "pricing_context": "input",
+          "request_schemas": {
+            "endpoints": {
+              "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/music.google.lyria-3.generate.input"
+            }
+          },
+          "result_schemas": {
+            "endpoints": {
+              "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/single_audio_result"
+            }
+          }
+        },
+        "id": "google/lyria-3",
+        "object": "model",
+        "owned_by": "google"
+      },
+      {
+        "created": 1788480000.0,
+        "gg": {
+          "capabilities": {
+            "image_input": true,
+            "json_object": true,
+            "json_schema": true,
+            "reasoning": true,
+            "seed": false,
+            "streaming": true,
+            "tools": true
+          },
+          "card": {
+            "description": null,
+            "lab": {
+              "id": "openai",
+              "logo": {
+                "kind": "symbol",
+                "media_type": "image/svg+xml",
+                "url": "https://cdn.jsdelivr.net/npm/@grida/ai-models@1.20261108.1/logos/openai.svg"
+              },
+              "name": "OpenAI",
+              "url": "https://openai.com/"
+            },
+            "label": "GPT-6 Astra",
+            "release": {
+              "basis": "provider_endpoint",
+              "date": "2026-09-04",
+              "source_url": "https://ai-gateway.vercel.sh/v1/models"
+            }
+          },
+          "input_modalities": ["image", "text"],
+          "interface_limits": {
+            "chat.completions": {
+              "request_bytes": 20971520.0
+            },
+            "responses": {
+              "request_bytes": 20971520.0
+            }
+          },
+          "interfaces": ["chat.completions", "responses"],
+          "kind": "text",
+          "limits": {
+            "context_tokens": 1050000.0,
+            "default_output_tokens": 4096.0,
+            "max_image_parts": 32.0,
+            "max_output_tokens": 128000.0,
+            "request_bytes": 20971520.0
+          },
+          "operation_ids": [],
+          "output_modalities": ["text"],
+          "parameters": ["stop", "reasoning", "reasoning_effort"],
+          "pricing": {
+            "components": [
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "input_tokens.0",
+                "meter": "input_tokens",
+                "per_quantity": "1",
+                "quantity_range": {
+                  "max": "272001",
+                  "meter": "total_input_tokens",
+                  "min": "0"
+                },
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "0.01000",
+                "unit": "token",
+                "when": {}
+              },
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "input_tokens.1",
+                "meter": "input_tokens",
+                "per_quantity": "1",
+                "quantity_range": {
+                  "max": null,
+                  "meter": "total_input_tokens",
+                  "min": "272001"
+                },
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "0.02000",
+                "unit": "token",
+                "when": {}
+              },
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "cached_input_tokens.0",
+                "meter": "cached_input_tokens",
+                "per_quantity": "1",
+                "quantity_range": {
+                  "max": "272001",
+                  "meter": "total_input_tokens",
+                  "min": "0"
+                },
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "0.001000",
+                "unit": "token",
+                "when": {}
+              },
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "cached_input_tokens.1",
+                "meter": "cached_input_tokens",
+                "per_quantity": "1",
+                "quantity_range": {
+                  "max": null,
+                  "meter": "total_input_tokens",
+                  "min": "272001"
+                },
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "0.002000",
+                "unit": "token",
+                "when": {}
+              },
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "output_tokens.0",
+                "meter": "output_tokens",
+                "per_quantity": "1",
+                "quantity_range": {
+                  "max": "272001",
+                  "meter": "total_input_tokens",
+                  "min": "0"
+                },
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "0.05000",
+                "unit": "token",
+                "when": {}
+              },
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "output_tokens.1",
+                "meter": "output_tokens",
+                "per_quantity": "1",
+                "quantity_range": {
+                  "max": null,
+                  "meter": "total_input_tokens",
+                  "min": "272001"
+                },
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "0.075000",
+                "unit": "token",
+                "when": {}
+              },
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "cache_write_tokens.0",
+                "meter": "cache_write_tokens",
+                "per_quantity": "1",
+                "quantity_range": {
+                  "max": "272001",
+                  "meter": "total_input_tokens",
+                  "min": "0"
+                },
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "0.0125000",
+                "unit": "token",
+                "when": {}
+              },
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "cache_write_tokens.1",
+                "meter": "cache_write_tokens",
+                "per_quantity": "1",
+                "quantity_range": {
+                  "max": null,
+                  "meter": "total_input_tokens",
+                  "min": "272001"
+                },
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "0.025000",
+                "unit": "token",
+                "when": {}
+              }
+            ],
+            "currency": "USD",
+            "measurement": "Charges use the listed measured usage components, conditions and quantity ranges. USD prices are expressed in mills.",
+            "revision": "2026-10-14.cache-writes.1",
+            "unit": "mill"
+          },
+          "pricing_context": "input",
+          "request_schemas": {
+            "chat.completions": {
+              "$ref": "https://gateway.grida.ai/schemas/text.json#/$defs/ChatRequest"
+            },
+            "responses": {
+              "$ref": "https://gateway.grida.ai/schemas/text.json#/$defs/ResponsesRequest"
+            }
+          }
+        },
+        "id": "openai/gpt-6-astra",
+        "object": "model",
+        "owned_by": "openai"
+      },
+      {
+        "created": 1793750400.0,
+        "gg": {
+          "capabilities": {
+            "image_editing": true,
+            "image_generation": true,
+            "image_input": true,
+            "json_object": false,
+            "json_schema": false,
+            "music_generation": false,
+            "reasoning": false,
+            "seed": false,
+            "streaming": false,
+            "tools": false,
+            "video_generation": false
+          },
+          "card": {
+            "description": "Image generation and editing for fast iteration.",
+            "lab": {
+              "id": "openai",
+              "logo": {
+                "kind": "symbol",
+                "media_type": "image/svg+xml",
+                "url": "https://cdn.jsdelivr.net/npm/@grida/ai-models@1.20261108.1/logos/openai.svg"
+              },
+              "name": "OpenAI",
+              "url": "https://openai.com/"
+            },
+            "label": "GPT Image 2.6 Flare",
+            "release": {
+              "basis": "model",
+              "date": "2026-11-04",
+              "source_url": "https://developers.openai.com/api/docs/changelog"
+            }
+          },
+          "input_modalities": ["image", "text"],
+          "interface_limits": {
+            "images.edits": {
+              "request_bytes": 335544320.0,
+              "response_bytes": 293601280.0,
+              "synchronous_wait_seconds": 600.0
+            },
+            "images.generations": {
+              "request_bytes": 20971520.0,
+              "response_bytes": 293601280.0,
+              "synchronous_wait_seconds": 600.0
+            }
+          },
+          "interfaces": ["images.edits", "images.generations"],
+          "kind": "image",
+          "limits": {
+            "request_bytes": 20971520.0
+          },
+          "operation_ids": ["image.openai.gpt-image-2.6-flare.text"],
+          "output_modalities": ["image"],
+          "pricing": {
+            "components": [
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "references.fal_output_units",
+                "meter": "fal_output_units",
+                "per_quantity": "1",
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "1000",
+                "unit": "provider_unit",
+                "when": {
+                  "allOf": [
+                    {},
+                    {
+                      "properties": {
+                        "input": {
+                          "required": ["image"]
+                        }
+                      },
+                      "required": ["input"]
+                    }
+                  ]
+                }
+              },
+              {
+                "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+                "id": "text.fal_output_units",
+                "meter": "fal_output_units",
+                "per_quantity": "1",
+                "quantity_rounding": {
+                  "increment": null,
+                  "mode": "none"
+                },
+                "rate_mills": "1000",
+                "unit": "provider_unit",
+                "when": {
+                  "allOf": [
+                    {},
+                    {
+                      "properties": {
+                        "input": {
+                          "not": {
+                            "required": ["image"]
+                          }
+                        }
+                      },
+                      "required": ["input"]
+                    }
+                  ]
+                }
+              }
+            ],
+            "currency": "USD",
+            "measurement": "Charges use the listed measured usage components, conditions and quantity ranges. USD prices are expressed in mills.",
+            "revision": "2026-11-05.family-bump",
+            "unit": "mill"
+          },
+          "pricing_context": "input",
+          "request_schemas": {
+            "images.edits": {
+              "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/image.openai.gpt-image-2.6-flare.references.input"
+            },
+            "images.generations": {
+              "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/image.openai.gpt-image-2.6-flare.text.input"
+            }
+          },
+          "reservation_policy": {
+            "basis": "estimate",
+            "customer_ceiling_enforced": true,
+            "id": "gg-gpt-image-estimate-v3",
+            "maximum_unsettled_per_organization": null
+          },
+          "result_schemas": {
+            "images.edits": {
+              "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/ImageResponse_10"
+            },
+            "images.generations": {
+              "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/Image26Response_10"
+            }
+          }
+        },
+        "id": "openai/gpt-image-2.6-flare",
+        "object": "model",
+        "owned_by": "openai"
+      }
+    ],
+    "next_change_at": null,
+    "object": "list",
+    "revision": "2026-11-08.lyria.1"
+  },
+  "endpoints": {
+    "cards": {
+      "version": "1.20261108.1",
+      "url": "https://github.com/gridaco/models/releases/tag/v1.20261108.1",
+      "commit": "93b3802289a635197b8eb8d4095b71fa61d81dfc"
+    },
+    "data": [
+      {
+        "card": {
+          "description": "Generate 30-second 48kHz stereo music clips from text or images.",
+          "lab": {
+            "id": "google",
+            "logo": {
+              "kind": "symbol",
+              "media_type": "image/png",
+              "url": "https://cdn.jsdelivr.net/npm/@grida/ai-models@1.20261108.1/logos/google.png"
+            },
+            "name": "Google",
+            "url": "https://ai.google/"
+          },
+          "label": "Lyria 3",
+          "release": {
+            "basis": "model",
+            "date": "2026-02-18",
+            "source_url": "https://deepmind.google/models/model-cards/lyria-3/"
+          }
+        },
+        "delivery": {
+          "input_retention_max_seconds": 86400.0,
+          "notes": "Original work is reconciled independently of result and provider URL expiry. No cancellation or URL lifetime extension.",
+          "provider_url_lifetime": "reported_per_result",
+          "result_retention_seconds": 86400.0,
+          "type": "provider_reference"
+        },
+        "detail_url": "https://gateway.grida.ai/v1/endpoints/music.google.lyria-3.generate",
+        "id": "music.google.lyria-3.generate",
+        "input_modalities": ["image", "text"],
+        "input_schema": {
+          "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/music.google.lyria-3.generate.input"
+        },
+        "kind": "music",
+        "limits": {
+          "execution_timeout_seconds": 86400.0,
+          "multipart": {
+            "content_type": "multipart/form-data",
+            "file_bytes": {
+              "endImage": 20000000.0,
+              "image": 20000000.0,
+              "mesh": 60000000.0
+            },
+            "file_fields": ["image"],
+            "json_bytes": 1048576.0,
+            "json_part": "input",
+            "maximum_files": 4,
+            "request_bytes": 84934656.0,
+            "schema_applies": "Normalized input; omit each file field from input JSON. Selected operation limits still apply."
+          },
+          "request_bytes": 1048576.0
+        },
+        "model": "google/lyria-3",
+        "name": "music.google.lyria-3.generate",
+        "object": "endpoint",
+        "operation": "music.google.lyria-3.generate",
+        "output_modalities": ["audio"],
+        "pricing": {
+          "components": [
+            {
+              "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+              "id": "fal_output_units",
+              "meter": "fal_output_units",
+              "per_quantity": "1",
+              "quantity_rounding": {
+                "increment": null,
+                "mode": "none"
+              },
+              "rate_mills": "40",
+              "unit": "generation",
+              "when": {}
+            }
+          ],
+          "currency": "USD",
+          "measurement": "Charges use the listed measured usage components, conditions and quantity ranges. USD prices are expressed in mills.",
+          "revision": "2026-11-08.lyria.1",
+          "unit": "mill"
+        },
+        "result_schema": {
+          "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/single_audio_result"
+        },
+        "schema_url": "https://gateway.grida.ai/schemas/operations.json#/$defs/music.google.lyria-3.generate.input",
+        "scope": "media",
+        "variant": "generate"
+      },
+      {
+        "card": {
+          "description": null,
+          "lab": {
+            "id": "tripo",
+            "logo": {
+              "kind": "lockup",
+              "media_type": "image/svg+xml",
+              "url": "https://cdn.jsdelivr.net/npm/@grida/ai-models@1.20261108.1/logos/tripo.svg"
+            },
+            "name": "Tripo",
+            "url": "https://www.tripo3d.ai/"
+          },
+          "label": "Tripo Rig Check",
+          "release": {
+            "basis": "provider_endpoint",
+            "date": null,
+            "source_url": "https://developers.tripo3d.ai/en/docs/animations-rig-check"
+          }
+        },
+        "delivery": {
+          "input_retention_max_seconds": 86400.0,
+          "notes": "Original work is reconciled independently of result and provider URL expiry. No cancellation or URL lifetime extension.",
+          "provider_url_lifetime": "reported_per_result",
+          "result_retention_seconds": 86400.0,
+          "type": "structured"
+        },
+        "detail_url": "https://gateway.grida.ai/v1/endpoints/three-d.tripo.rig-check",
+        "id": "three-d.tripo.rig-check",
+        "input_modalities": ["three-d"],
+        "input_schema": {
+          "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/three-d.tripo.rig-check.input"
+        },
+        "kind": "three-d",
+        "limits": {
+          "execution_timeout_seconds": 86400.0,
+          "multipart": {
+            "content_type": "multipart/form-data",
+            "file_bytes": {
+              "endImage": 20000000.0,
+              "image": 20000000.0,
+              "mesh": 60000000.0
+            },
+            "file_fields": ["mesh"],
+            "json_bytes": 1048576.0,
+            "json_part": "input",
+            "maximum_files": 4,
+            "request_bytes": 84934656.0,
+            "schema_applies": "Normalized input; omit each file field from input JSON. Selected operation limits still apply."
+          },
+          "request_bytes": 1048576.0
+        },
+        "model": null,
+        "name": "three-d.tripo.rig-check",
+        "object": "endpoint",
+        "operation": "three-d.tripo.rig-check",
+        "output_modalities": ["json"],
+        "pricing": {
+          "components": [
+            {
+              "description": "Measured usage billed at this component's rate when its conditions and quantity range apply.",
+              "id": "provider_credits",
+              "meter": "provider_credits",
+              "per_quantity": "1",
+              "quantity_rounding": {
+                "increment": null,
+                "mode": "none"
+              },
+              "rate_mills": "10",
+              "unit": "provider_credit",
+              "when": {}
+            }
+          ],
+          "currency": "USD",
+          "measurement": "Charges use the listed measured usage components, conditions and quantity ranges. USD prices are expressed in mills.",
+          "revision": "2026-10-12.m1",
+          "unit": "mill"
+        },
+        "result_schema": {
+          "$ref": "https://gateway.grida.ai/schemas/operations.json#/$defs/rig_check_result"
+        },
+        "schema_url": "https://gateway.grida.ai/schemas/operations.json#/$defs/three-d.tripo.rig-check.input",
+        "scope": "media",
+        "variant": "mesh"
+      }
+    ],
+    "next_change_at": null,
+    "object": "list",
+    "revision": "2026-11-08.lyria.1"
+  },
+  "operations": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://gateway.grida.ai/schemas/operations.json",
+    "title": "GG initial media contracts",
+    "description": "Select a family request root or exact model/operation entry. Images return synchronous byte responses; videos and specialized music/3D/rigging return jobs. Image-edit schemas describe parser-normalized descriptors. Video/3D accept JSON or direct multipart files as declared by x-gg-async-multipart and each operation. No reusable uploads, download proxy, cancellation or queue API.",
+    "x-gg-http": {
+      "request_roots": {
+        "POST /v1/images/generations": "#/$defs/ImageGenerationRequest",
+        "POST /v1/images/edits": "#/$defs/ImageEditRequest",
+        "POST /v1/videos": "#/$defs/VideoRequest"
+      },
+      "specialized_submit": "POST /v1/endpoints/{endpoint_id}",
+      "observe": "GET /v1/jobs/{job_id}",
+      "body": "Image/video family requests select model in the body. Specialized JSON bodies use endpoint inputs without a model or input wrapper. Async multipart uses one input JSON text part plus named file parts; normalize files to source references before schema validation. Select image edit by route and video variant by image presence. operation_id is attribution, not another POST route.",
+      "normalization": "Apply declared trims, then validate standard and semantic constraints. Defaults describe effective behavior, not automatic schema-validator insertion. Reject unsupported combinations.",
+      "unknown_fields": "Reject before paid dispatch; never silently truncate, change model or fan out.",
+      "common_schema": "https://gateway.grida.ai/schemas/api.json",
+      "discovery_schema_refs": "Use absolute schema references or bundle local definitions; detached fragments must not contain unresolved local refs.",
+      "image_limits": {
+        "generation_request_bytes": 20971520,
+        "edit_request_bytes": 335544320,
+        "edit_text_fields_bytes": 1048576,
+        "output_file_bytes": 20000000,
+        "output_aggregate_bytes": 200000000,
+        "response_bytes": 293601280
+      },
+      "async_request_bytes": 1048576,
+      "image_replay": "No response-byte replay or public image job. Accepted duplicates return 409 already_submitted with original request ID; use GET /v1/requests/{request_id}/billing or Console for charges. Loss of transient input/output does not authorize regeneration.",
+      "result_retention": "Async result JSON/provider references expire 86400s after terminal execution, independently of provider URL expiry. Image bytes are not durably retained.",
+      "async_multipart_request_bytes": 84934656
+    },
+    "x-gg-validation": {
+      "format": "Use format assertion for URI/date-time plus the semantic checks described by each definition. JSON values must be finite numbers; strings must contain valid Unicode scalar values.",
+      "x-gg-trim": "Before validation, remove leading/trailing code points U+0009\u2013U+000D, U+0020, U+00A0, U+1680, U+2000\u2013U+200A, U+2028, U+2029, U+202F, U+205F, U+3000 and U+FEFF. Preserve internal whitespace.",
+      "x-gg-max-length": "Maximum length in the unit named by x-gg-length-unit, applied after any trim.",
+      "x-gg-length-unit": "codepoints counts Unicode scalar values; utf16 counts UTF-16 code units.",
+      "x-gg-positive-pair": "Both colon/x-separated components must be strictly positive and satisfy safe-integer or finite-number as declared.",
+      "x-gg-resource-max-bytes": "Bound actual bytes obtained from the caller reference before paid submission. A Content-Length claim alone is insufficient.",
+      "x-gg-portable-glb": "Submitted mesh must be a GLB2 file, at least 20 bytes, within its resource byte bound. Require matching declared total length, first JSON chunk with length divisible by four and at most 4194304 bytes, valid UTF-8 JSON with asset.version 2.0, and at most one final BIN chunk with aligned matching length. Forbid buffers/images with any uri field and extensionsUsed/extensionsRequired containing EXT_meshopt_compression, KHR_draco_mesh_compression or KHR_texture_basisu. Validate lists and extension names structurally. No claim of complete mesh semantic validation. This requirement applies to input meshes, not provider output references.",
+      "cross_field_results": "Image data length cannot exceed effective n. Decode/validate each base64 and aggregate byte bounds; failure is delivery failure, not a free generation. Video returns at most one provider reference.",
+      "source_reference_policy": "Async video/specialized inputs use HTTPS references. Image edits use bounded transient multipart bytes. Never retain media bytes in durable payloads, files, object stores, logs or replay bodies.",
+      "x-gg-pixel-limits": "Parse WIDTHxHEIGHT as positive decimal integers. Enforce every declared per-axis maximum, divisibility, total-pixel bound and maximum ratio max(width,height)/min(width,height). These semantic assertions are mandatory.",
+      "x-gg-defaults": "Effective omitted-field values and fixed behavior. Derived resolution/aspect rules apply before dispatch. An auto behavior is not an extra accepted string value unless the field schema declares it.",
+      "x-gg-image-dimensions": "Validate the decoded input image dimensions against per-axis minimum/maximum before dispatch. Bounds describe the source image, not requested output size.",
+      "x-gg-resource-media-types": "Validate actual resource MIME against the declared set before dispatch; a URL filename or unverified Content-Type header is insufficient.",
+      "availability_ends_on": "Serving-route retirement date, without a promised provider time of day. GG accepts no new requests when the current UTC date is this date or later unless a compatible replacement is selected and the contract reviewed. Check discovery; no different model is selected silently.",
+      "x-gg-resource-max-pixels": "Maximum decoded source width times height; enforce together with per-axis and byte bounds. This is a source-resource limit, separate from requested output size."
+    },
+    "x-gg-meter-definitions": {
+      "fal_output_units": {
+        "unit": "provider_unit",
+        "description": "Exact normalized usage quantity in the original provider billing record. The admitted tariff identifies its model-specific unit and rate; it is not necessarily an image count, token count or duration."
+      },
+      "provider_credits": {
+        "unit": "provider_credit",
+        "description": "Exact decimal native provider usage units, separate from the organization USD balance. Fractional units are preserved."
+      }
+    },
+    "x-gg-operations": [
+      {
+        "model_id": "google/lyria-3",
+        "kind": "music",
+        "variant": "generate",
+        "request_schema": {
+          "$ref": "#/$defs/music.google.lyria-3.generate.input"
+        },
+        "result_schema": {
+          "$ref": "#/$defs/single_audio_result"
+        },
+        "delivery": "provider_reference",
+        "billing": {
+          "meters": [
+            {
+              "meter": "fal_output_units",
+              "unit": "generation"
+            }
+          ],
+          "tier_selectors": [],
+          "notes": "One original provider-billed audio generation at the admitted regular rate; reserve before dispatch and settle original request billing evidence. Duration, returned file count and missing evidence never substitute for billed units."
+        },
+        "feature": "music-generation",
+        "operation_id": "music.google.lyria-3.generate",
+        "endpoint_id": "music.google.lyria-3.generate",
+        "path": "/v1/endpoints/music.google.lyria-3.generate",
+        "content_type": "application/json",
+        "request_view": "json",
+        "response_mode": "job",
+        "x-gg-multipart-file-fields": ["image"]
+      },
+      {
+        "model_id": "google/gemini-nano-banana-2.1",
+        "kind": "image",
+        "variant": "text",
+        "request_schema": {
+          "$ref": "#/$defs/image.google.gemini-nano-banana-2.1.text.input"
+        },
+        "result_schema": {
+          "$ref": "#/$defs/ImageResponse_4"
+        },
+        "delivery": "transient_base64",
+        "billing": {
+          "meters": [
+            {
+              "meter": "fal_standard_cost_mills",
+              "unit": "mill"
+            }
+          ],
+          "tier_selectors": [],
+          "notes": "Charge the original measured regular token cost using the admitted discovery tariff. A temporary reservation covers the documented per-generation context and output limits for each requested image; it is not a flat image price. Unsupported search and additional media inputs are rejected."
+        },
+        "operation_id": "image.google.gemini-nano-banana-2.1.text",
+        "path": "/v1/images/generations",
+        "content_type": "application/json",
+        "request_view": "json",
+        "response_mode": "synchronous"
+      },
+      {
+        "model_id": "openai/gpt-image-2.6-flare",
+        "kind": "image",
+        "variant": "text",
+        "request_schema": {
+          "$ref": "#/$defs/image.openai.gpt-image-2.6-flare.text.input"
+        },
+        "result_schema": {
+          "$ref": "#/$defs/Image26Response_10"
+        },
+        "delivery": "transient_base64",
+        "billing": {
+          "meters": [
+            {
+              "meter": "fal_output_units",
+              "unit": "provider_unit"
+            }
+          ],
+          "tier_selectors": [],
+          "notes": "Charge the original measured quantity using the admitted discovery tariff. Model options affect provider usage; delivered output count is not billing evidence. Inspect discovery for the exact unit, rate and reservation policy."
+        },
+        "operation_id": "image.openai.gpt-image-2.6-flare.text",
+        "path": "/v1/images/generations",
+        "content_type": "application/json",
+        "request_view": "json",
+        "response_mode": "synchronous"
+      },
+      {
+        "model_id": null,
+        "kind": "three-d",
+        "variant": "mesh",
+        "request_schema": {
+          "$ref": "#/$defs/three-d.tripo.rig-check.input"
+        },
+        "result_schema": {
+          "$ref": "#/$defs/rig_check_result"
+        },
+        "delivery": "structured",
+        "billing": {
+          "meters": [
+            {
+              "meter": "provider_credits",
+              "unit": "provider_credit"
+            }
+          ],
+          "tier_selectors": [],
+          "notes": "Charge the original measured quantity using the admitted discovery tariff. Model options affect provider usage; delivered output count is not billing evidence. Inspect discovery for the exact unit, rate and reservation policy."
+        },
+        "feature": "rig-check",
+        "operation_id": "three-d.tripo.rig-check",
+        "endpoint_id": "three-d.tripo.rig-check",
+        "path": "/v1/endpoints/three-d.tripo.rig-check",
+        "content_type": "application/json",
+        "request_view": "json",
+        "response_mode": "job",
+        "x-gg-multipart-file-fields": ["mesh"]
+      }
+    ],
+    "$defs": {
+      "Image26Response_10": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "created": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "data": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "b64_json": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 26666668,
+                  "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+                  "contentEncoding": "base64"
+                },
+                "media_type": {
+                  "enum": ["image/png", "image/jpeg", "image/webp", "image/gif"]
+                }
+              },
+              "required": ["b64_json", "media_type"]
+            }
+          }
+        },
+        "required": ["created", "data"],
+        "x-gg-output-max-bytes": 20000000,
+        "x-gg-output-aggregate-max-bytes": 200000000,
+        "description": "GPT Image 2.6 generation response. Static raster images or GIF animations use the same canonical base64 envelope. GIFs have at most the requested frame count, up to 16; the sum of full-canvas pixels over all frames is at most 16,777,216. The effective requested output format is enforced. No durable media storage or download URL.",
+        "x-gg-output-max-gif-frames": 16,
+        "x-gg-output-max-gif-canvas-pixels-all-frames": 16777216,
+        "x-gg-output-max-gif-request-pixels": 8294400
+      },
+      "ImageResponse_4": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "created": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "data": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "b64_json": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 26666668,
+                  "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+                  "contentEncoding": "base64"
+                },
+                "media_type": {
+                  "enum": ["image/png", "image/jpeg", "image/webp"]
+                }
+              },
+              "required": ["b64_json", "media_type"]
+            }
+          }
+        },
+        "required": ["created", "data"],
+        "x-gg-output-max-bytes": 20000000,
+        "x-gg-output-aggregate-max-bytes": 200000000,
+        "description": "Synchronous compatible image response; no job or durable byte replay. At most effective n images. Verify decoded MIME, canonical base64 and byte bounds; schema contentEncoding is not a decoder. Additional usage fields may be returned."
+      },
+      "audio_reference": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "url": {
+            "$ref": "#/$defs/https_url"
+          },
+          "media_type": {
+            "const": "audio/mpeg"
+          },
+          "expires_at": {
+            "$ref": "#/$defs/expiry"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["url", "media_type", "expires_at"],
+        "description": "Credential-free provider MP3 reference. audio/mpeg is the selected output contract, not a claim that GG downloaded/validated audio bytes. Unknown expiry is null; links are not permanent. GG does not store, cache or proxy audio."
+      },
+      "expiry": {
+        "type": ["string", "null"],
+        "format": "date-time",
+        "description": "Observed provider expiry as RFC3339, or null when not established. Null never means permanent availability. Fetch/save outputs promptly; an expired link does not erase incurred usage or authorize regeneration."
+      },
+      "https_url": {
+        "type": "string",
+        "format": "uri",
+        "pattern": "^https://[^/?#@\\s]+(?:[/?][^#\\s]*)?$",
+        "description": "Absolute HTTPS URL without userinfo or fragment. Query signatures are permitted. Caller must own or be authorized to submit the resource. No authorization header or GG/provider secret is sent to fetch it. URL parsing, public-network authorization and bounded redirect/resource checks are required in addition to this schema. Input URLs must remain readable through provider consumption; there is no automatic paid resubmission after expiry."
+      },
+      "image.google.gemini-nano-banana-2.1.text.input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "type": "string",
+            "const": "google/gemini-nano-banana-2.1"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 50000,
+            "pattern": "\\S"
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "default": 1
+          },
+          "size": {
+            "type": "string",
+            "enum": ["1K", "2K", "4K"],
+            "default": "1K",
+            "description": "Output resolution tier; not an exact pixel pair."
+          },
+          "aspect_ratio": {
+            "default": "auto",
+            "type": "string",
+            "enum": [
+              "auto",
+              "21:9",
+              "16:9",
+              "3:2",
+              "4:3",
+              "5:4",
+              "1:1",
+              "4:5",
+              "3:4",
+              "2:3",
+              "9:16",
+              "4:1",
+              "1:4",
+              "8:1",
+              "1:8"
+            ]
+          },
+          "response_format": {
+            "type": "string",
+            "const": "b64_json",
+            "default": "b64_json"
+          }
+        },
+        "required": ["model", "prompt"],
+        "x-gg-defaults": {
+          "n": 1,
+          "size": "1K",
+          "aspect_ratio": "auto",
+          "safety_tolerance": "4",
+          "output_format": "png",
+          "limit_generations": true,
+          "enable_web_search": false,
+          "system_prompt": "",
+          "thinking_level": "minimal",
+          "sync_mode": false
+        },
+        "examples": [
+          {
+            "prompt": "A red ceramic teapot on a plain background",
+            "n": 1,
+            "size": "1K",
+            "aspect_ratio": "auto",
+            "model": "google/gemini-nano-banana-2.1"
+          }
+        ],
+        "description": "Model-specific JSON generation input. No mask, stream, file ID, provider selection or paid fan-out. Reject unsupported fields. size may be a documented model-specific preset/tier; no silent conversion."
+      },
+      "image.openai.gpt-image-2.6-flare.text.input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "type": "string",
+            "const": "openai/gpt-image-2.6-flare"
+          },
+          "prompt": {
+            "$ref": "#/$defs/nonblank",
+            "maxLength": 32000
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 1
+          },
+          "size": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/positive_pixel_pair",
+                "x-gg-pixel-limits": {
+                  "width_maximum": 3840,
+                  "height_maximum": 3840,
+                  "multiple_of": 16,
+                  "pixels_minimum": 655360,
+                  "pixels_maximum": 8294400,
+                  "aspect_ratio_maximum": 3
+                }
+              },
+              {
+                "type": "string",
+                "enum": ["auto", "landscape_4_3"]
+              }
+            ],
+            "default": "landscape_4_3"
+          },
+          "quality": {
+            "type": "string",
+            "enum": ["auto", "low", "medium", "high", "xhigh", "max"],
+            "default": "high"
+          },
+          "background": {
+            "type": "string",
+            "enum": ["auto", "opaque", "transparent"],
+            "default": "auto",
+            "description": "Transparent backgrounds require PNG or WebP output; transparent JPEG and GIF are rejected before dispatch."
+          },
+          "response_format": {
+            "type": "string",
+            "const": "b64_json",
+            "default": "b64_json"
+          },
+          "complexity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "default": "high",
+            "description": "Planning complexity, independent of rendering quality."
+          },
+          "output_format": {
+            "type": "string",
+            "enum": ["png", "jpeg", "webp", "gif"],
+            "default": "png"
+          },
+          "frame_count": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 16,
+            "description": "GIF only. Omitted GIF requests use 9 frames. All frames and n outputs must fit the aggregate request pixel budget."
+          },
+          "frame_duration_ms": {
+            "type": "integer",
+            "minimum": 20,
+            "maximum": 2000,
+            "description": "GIF only. Omitted GIF requests use 200ms per frame; provider rounds playback duration to 10ms."
+          }
+        },
+        "required": ["model", "prompt"],
+        "description": "GPT Image 2.6 generation supports bounded GIF or static PNG/JPEG/WebP output. No SVG, mask/markup, partial output, streaming or custom compression. Unsupported controls are rejected before dispatch.",
+        "x-gg-defaults": {
+          "n": 1,
+          "quality": "high",
+          "background": "auto",
+          "size": "landscape_4_3",
+          "output_format": "png",
+          "complexity": "high",
+          "sync_mode": false
+        },
+        "examples": [
+          {
+            "prompt": "A red ceramic teapot on a plain background",
+            "n": 1,
+            "size": "1024x1024",
+            "quality": "high",
+            "background": "opaque",
+            "model": "openai/gpt-image-2.6-flare"
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "anyOf": [
+                {
+                  "required": ["frame_count"]
+                },
+                {
+                  "required": ["frame_duration_ms"]
+                }
+              ]
+            },
+            "then": {
+              "properties": {
+                "output_format": {
+                  "const": "gif"
+                }
+              },
+              "required": ["output_format"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "background": {
+                  "const": "transparent"
+                }
+              },
+              "required": ["background"]
+            },
+            "then": {
+              "properties": {
+                "output_format": {
+                  "enum": ["png", "webp"]
+                }
+              }
+            }
+          }
+        ],
+        "x-gg-animation-limits": {
+          "output_format": "gif",
+          "generation_only": true,
+          "default_frames": 9,
+          "maximum_frames": 16,
+          "minimum_frame_pixels": 655360,
+          "maximum_request_pixels": 8294400,
+          "default_frame_duration_ms": 200,
+          "description": "Explicit dimensions \u00d7 n \u00d7 effective frame_count must fit this total. Auto uses a per-frame budget derived from this total, subject to minimum frame dimensions; combinations with no valid frame size are rejected."
+        }
+      },
+      "music.google.lyria-3.generate.input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "x-gg-trim": true,
+            "x-gg-max-length": 10000,
+            "x-gg-length-unit": "codepoints",
+            "pattern": "\\S",
+            "maxLength": 10000,
+            "description": "Music description; GG accepts at most 10,000 Unicode code points. Tempo, voice, lyrics and length are instructions, not guaranteed controls."
+          },
+          "image": {
+            "$ref": "#/$defs/music_source_image"
+          }
+        },
+        "required": ["prompt"],
+        "description": "One music generation from text and an optional image. No seed, duration, n, multiple-image or safety-bypass controls. Screening is enabled. Duration is not a billing multiplier.",
+        "x-gg-defaults": {
+          "enable_safety_checker": true
+        },
+        "examples": [
+          {
+            "prompt": "A gentle instrumental piano melody with a warm, hopeful mood."
+          }
+        ]
+      },
+      "music_source_image": {
+        "additionalProperties": false,
+        "description": "One optional public HTTPS PNG/JPEG image used as musical inspiration. GG limits: 20,000,000 bytes, 16,777,216 pixels, 8192 pixels per axis. MIME is detected from the fetched bytes; an optional media_type must match. GG validates and forwards transient bytes, not a mutable provider refetch.",
+        "properties": {
+          "media_type": {
+            "enum": ["image/png", "image/jpeg"],
+            "type": "string"
+          },
+          "url": {
+            "$ref": "#/$defs/https_url"
+          }
+        },
+        "required": ["url"],
+        "type": "object",
+        "x-gg-resource-max-bytes": 20000000,
+        "x-gg-resource-max-pixels": 16777216,
+        "x-gg-image-dimensions": {
+          "width_maximum": 8192,
+          "height_maximum": 8192
+        },
+        "x-gg-resource-media-types": ["image/png", "image/jpeg"]
+      },
+      "nonblank": {
+        "type": "string",
+        "pattern": "\\S",
+        "description": "At least one non-whitespace character. Preserve text unless the operation declares trimming."
+      },
+      "positive_pixel_pair": {
+        "type": "string",
+        "pattern": "^[0-9]+x[0-9]+$",
+        "x-gg-positive-pair": "safe-integer",
+        "description": "Width x height. Both decimal components must be positive safe integers; this syntax check does not establish that every size is supported by a model."
+      },
+      "rig_check_result": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "riggable": {
+            "type": "boolean"
+          },
+          "rig_type": {
+            "type": "string",
+            "enum": [
+              "biped",
+              "quadruped",
+              "hexapod",
+              "octopod",
+              "avian",
+              "serpentine",
+              "aquatic"
+            ]
+          }
+        },
+        "required": ["riggable", "rig_type"],
+        "description": "Eligibility observation, not a rigged artifact or a guarantee that later rigging will succeed."
+      },
+      "single_audio_result": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "audio": {
+            "$ref": "#/$defs/audio_reference"
+          },
+          "lyrics": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Optional provider-supplied generated lyrics or descriptions; not a guaranteed transcript, timing map or exact requested words."
+          }
+        },
+        "required": ["audio"]
+      },
+      "source_glb": {
+        "additionalProperties": false,
+        "description": "Caller-hosted reference replacing inline bytes. Actual MIME and the byte bound must be validated before paid submission. No file path, data URL, provider file token or upload destination is accepted.",
+        "properties": {
+          "media_type": {
+            "enum": ["model/gltf-binary"],
+            "type": "string"
+          },
+          "url": {
+            "$ref": "#/$defs/https_url"
+          }
+        },
+        "required": ["url", "media_type"],
+        "type": "object",
+        "x-gg-portable-glb": true,
+        "x-gg-resource-max-bytes": 60000000
+      },
+      "three-d.tripo.rig-check.input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mesh": {
+            "$ref": "#/$defs/source_glb"
+          }
+        },
+        "required": ["mesh"],
+        "x-gg-defaults": {},
+        "examples": [
+          {
+            "mesh": {
+              "url": "https://media.example.com/model.glb",
+              "media_type": "model/gltf-binary"
+            }
+          }
+        ]
+      }
+    },
+    "x-gg-input-media-policy": {
+      "image_max_bytes": 20000000,
+      "image_max_width": 8192,
+      "image_max_height": 8192,
+      "image_max_pixels": 16777216,
+      "aggregate_limit": "Accepted image count multiplied by the per-image bounds; endpoint-specific lower bounds take precedence.",
+      "description": "Input image bounds are GG service limits. Validate actual consumed bytes and decoded dimensions. Inputs exceeding a bound are rejected without silent resize or truncation."
+    },
+    "x-gg-contract": "2026-11-05.family-bumps.1",
+    "x-gg-multipart": {
+      "content_type": "multipart/form-data with boundary; identity content encoding",
+      "file_parts": "Exactly one image file or ordered repeated image[] files; do not mix names. Counts use the selected model schema. No other file parts, mask, URL/file-ID parts or client-supplied descriptors.",
+      "text_parts": "One part per scalar field. Strings are UTF-8; n/seed use JSON integer syntax, other fields stay strings. Unknown or duplicate scalar parts fail; filenames and multipart boundaries are not inference parameters.",
+      "schema_view": "Normalize image/image[] to image array; derive sha256, byte_length, actual media_type, decoded width/height from files. Apply the selected edit schema. Do not accept these descriptors as JSON uploads.",
+      "fingerprint": "Canonical normalized scalar fields plus ordered file SHA-256 hashes, lengths and actual MIME, plus price/cost headers. Exclude filenames/boundary. Same bytes in a new multipart envelope preserve identity.",
+      "custody": "Bound bytes while reading/decoding; keep them only in transient memory, never disk/temp spooling or durable JSON. A provider-native reference and submission identity may support original-work recovery, without retained GG media. Do not accept bytes beyond admission capacity."
+    },
+    "x-gg-async-multipart": {
+      "content_type": "multipart/form-data",
+      "json_part": "input",
+      "file_fields": [
+        "image",
+        "endImage",
+        "mesh",
+        "images.front",
+        "images.left",
+        "images.back",
+        "images.right"
+      ],
+      "request_max_bytes": 84934656,
+      "json_max_bytes": 1048576,
+      "maximum_files": 4,
+      "image_max_bytes": 20000000,
+      "mesh_max_bytes": 60000000,
+      "normalization": "Omit each supplied file field from input JSON. Video image/endImage normalize to a source URL; specialized music/3D sources normalize to {url, media_type}. Operation-specific source constraints apply to actual bytes. Filenames are ignored. No public file resource is created."
+    }
+  }
+}

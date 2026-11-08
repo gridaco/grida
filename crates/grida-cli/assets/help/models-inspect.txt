@@ -1,6 +1,7 @@
 Usage: grida ai models inspect --provider <provider> --model <id> [--kind <kind>] [--variant text|references|image|multiview] [--json]
 
 Show accepted inputs and a command example; --json prints the full schema.
+GG refreshes public discovery; BYOK uses installed offline adapter contracts.
 Kinds: image, video, music, sound-effect, text-to-speech, three-d.
 The kind is inferred when unambiguous; image/video default to text input.
 

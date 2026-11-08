@@ -33,6 +33,56 @@ export function validateCases(cases) {
     assert(value.stdin === undefined || typeof value.stdin === "string");
     assert([0, 1, 2].includes(value.expected.exit));
     assert.equal(typeof value.expected.stderr, "string");
+    // Current GG offerings require injected metadata, never an offline golden
+    // snapshot. Grammar is covered here; runtime offerings belong to installed.mjs.
+    // The native grammar permits listing options before, between and after
+    // command words, with string options written as --name value or --name=value.
+    // Normalize only this fixture guard's finite listing vocabulary, not CLI inputs.
+    const words = [];
+    let provider;
+    const flags = new Set([
+      "--json",
+      "--no-input",
+      "--available",
+      "--local-image",
+    ]);
+    const options = new Set([
+      "--provider",
+      "--modality",
+      "--kind",
+      "--org",
+      "--org-id",
+      "--feature",
+    ]);
+    for (let index = 0; index < value.argv.length; index++) {
+      const argument = value.argv[index];
+      if (flags.has(argument)) continue;
+      const separator = argument.indexOf("=");
+      const option = separator === -1 ? argument : argument.slice(0, separator);
+      if (options.has(option)) {
+        const selected =
+          separator === -1
+            ? value.argv[++index]
+            : argument.slice(separator + 1);
+        if (option === "--provider") provider = selected;
+      } else words.push(argument);
+    }
+    const listing =
+      words[0] === "ai" &&
+      ["models", "rigging"].includes(words[1]) &&
+      words[2] === "list";
+    const currentGG = provider === undefined || provider === "gg";
+    const control = value.argv.some((arg) =>
+      ["--help", "-h", "--version", "-V"].includes(arg)
+    );
+    assert(
+      !listing ||
+        !currentGG ||
+        control ||
+        value.mode === "parse" ||
+        value.expected.exit !== 0,
+      `Current GG listings require parser mode or an injected runtime fixture: ${value.id}`
+    );
     const stdout = value.expected.stdout;
     assert.equal(
       Object.keys(stdout).length,

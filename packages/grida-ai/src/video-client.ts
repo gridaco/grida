@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 — explicit video provider authority, bounded execution/results, safe failures.
 // GRIDA-SEC-006 — scoped GG is checked at submission; accepted work cannot be recalled.
 // GRIDA-GG: token — no account credentials, mint, persistence, or implicit provider switching.
-import { models } from "@grida/ai-models";
+import { models } from "./catalogue";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";
@@ -15,7 +15,13 @@ import { ProviderHttp } from "./http";
 import { catalogViewOnMiss, type ModelCatalogStore } from "./model-catalog";
 import { byokProvidersFor } from "./provider-ids";
 import { videoModels } from "./video-models";
+import { GGOperationsClient } from "./gg-operations";
 import { MediaRequest } from "./media-request";
+import {
+  GGDiscoveryStore,
+  supportsGGPromptOperation,
+  type GGOperation,
+} from "./gg-discovery";
 
 /** Catalogue-backed video execution. Hosts own keys, egress, inputs, and persistence. */
 export class VideoClient {
@@ -24,6 +30,7 @@ export class VideoClient {
   readonly #catalog?: ModelCatalogStore;
   readonly #gg?: GgTokenSource;
   readonly #ggBaseUrl?: string;
+  readonly #ggCatalog: GGDiscoveryStore;
 
   constructor(options: VideoClient.Options) {
     try {
@@ -33,6 +40,8 @@ export class VideoClient {
       this.#getKey = get.bind(keys);
       this.#http = http;
       this.#catalog = catalog;
+      this.#ggCatalog =
+        options.gg_catalog ?? new GGDiscoveryStore({ fetch: http.request });
       if (gg !== undefined)
         this.#gg = { getAccessToken: gg.getAccessToken.bind(gg) };
       if (gg_base_url !== undefined) {
@@ -46,22 +55,20 @@ export class VideoClient {
   async resolve(input: VideoClient.Selection): Promise<VideoClient.Resolved> {
     try {
       const selected = selection(input);
+      if (selected.provider === "gg")
+        return await this.#resolveHosted(selected);
       const view = await catalogViewOnMiss(
         this.#catalog,
         (v) => !v.video.cardById(selected.model_id)
       );
       const card = view.video.cardById(selected.model_id);
-      if (!MediaRoutes.videoModel(card))
+      if (!MediaRoutes.videoModel(card)) {
+        if (
+          selected.provider === "auto" &&
+          liveGgMediaDeps({ gg: this.#gg, gg_base_url: this.#ggBaseUrl })
+        )
+          return await this.#resolveHosted(selected);
         throw new VideoClient.Failure("model_unavailable");
-      const hostedRoute = MediaRoutes.video(
-        card,
-        "gg",
-        selected.image ?? false
-      );
-      if (selected.provider === "gg") {
-        if (!hostedRoute) throw new VideoClient.Failure("input_unsupported");
-        this.#hosted();
-        return this.#operation(hostedRoute, false);
       }
       const order =
         selected.provider === "auto"
@@ -83,11 +90,9 @@ export class VideoClient {
       }
       if (
         selected.provider === "auto" &&
-        hostedRoute &&
         liveGgMediaDeps({ gg: this.#gg, gg_base_url: this.#ggBaseUrl })
-      ) {
-        return this.#operation(hostedRoute, false);
-      }
+      )
+        return await this.#resolveHosted(selected);
 
       throw new VideoClient.Failure(
         capable ? "provider_unavailable" : "input_unsupported"
@@ -95,6 +100,33 @@ export class VideoClient {
     } catch (error) {
       throw safeFailure(error);
     }
+  }
+
+  async #resolveHosted(
+    selected: VideoClient.Selection
+  ): Promise<VideoClient.Resolved> {
+    await this.#ggCatalog.ready();
+    const operation = this.#ggCatalog
+      .view()
+      ?.operations.find(
+        (item) =>
+          item.model_id === selected.model_id &&
+          item.path === "/v1/videos" &&
+          item.variant === (selected.image ? "image" : "text") &&
+          supportsGGPromptOperation(item, selected.image)
+      );
+    if (!operation) throw new VideoClient.Failure("model_unavailable");
+    this.#hosted();
+    return this.#operation(
+      {
+        model_id: selected.model_id,
+        binding_id: selected.model_id,
+        provider_id: "gg",
+        input: selected.image ? "image" : "text",
+      },
+      selected.image ?? false,
+      operation
+    );
   }
 
   async #key(provider: VideoClient.ByokProvider): Promise<string | null> {
@@ -113,28 +145,32 @@ export class VideoClient {
 
   #operation(
     metadata: VideoClient.Descriptor,
-    image: boolean
+    image: boolean,
+    operation?: GGOperation
   ): VideoClient.Resolved {
     const descriptor = Object.freeze({ ...metadata });
     return Object.freeze({
       ...descriptor,
       generate: (input: VideoClient.Input) =>
-        this.#generate(descriptor, image, input),
+        this.#generate(descriptor, image, input, operation),
     });
   }
 
   async #generate(
     descriptor: VideoClient.Descriptor,
     image: boolean,
-    input: VideoClient.Input
+    input: VideoClient.Input,
+    operation?: GGOperation
   ): Promise<VideoClient.Result> {
     let request: MediaRequest | undefined;
+    let requestId: string | undefined;
     try {
       const args = generationInput(input, image, descriptor);
       request = new MediaRequest(this.#http, args.signal);
       request.check();
       let raw: videoModels.Video[];
       if (descriptor.provider_id === "gg") {
+        if (!operation) throw new VideoClient.Failure("model_unavailable");
         const hosted = this.#hosted();
         raw = await request.wait(
           videoModels.hosted(
@@ -142,7 +178,12 @@ export class VideoClient {
             hosted.base_url,
             descriptor.binding_id,
             args,
-            request
+            request,
+            operation,
+            this.#ggCatalog,
+            (id) => {
+              requestId = id;
+            }
           )
         );
       } else {
@@ -197,14 +238,14 @@ export class VideoClient {
         });
       }
       request.check();
-      return { videos };
+      return { videos, ...(requestId ? { request_id: requestId } : {}) };
     } catch (error) {
       try {
         request?.check();
       } catch (abort) {
-        throw safeFailure(abort);
+        throw safeFailure(abort, requestId);
       }
-      throw safeFailure(error);
+      throw safeFailure(error, requestId);
     } finally {
       request?.dispose();
     }
@@ -223,6 +264,7 @@ export namespace VideoClient {
     catalog?: ModelCatalogStore;
     gg?: GgTokenSource;
     gg_base_url?: string;
+    gg_catalog?: GGDiscoveryStore;
   };
   export type Selection = {
     model_id: string;
@@ -258,7 +300,10 @@ export namespace VideoClient {
     data: Uint8Array;
     media_type: "image/png" | "image/jpeg" | "image/webp";
   };
-  export type Result = { videos: { data: Uint8Array; media_type: string }[] };
+  export type Result = {
+    videos: { data: Uint8Array; media_type: string }[];
+    request_id?: string;
+  };
   export type FailureCode =
     | "invalid_input"
     | "model_unavailable"
@@ -273,13 +318,23 @@ export namespace VideoClient {
     | "unsupported_untrusted_result_origin";
   export class Failure extends Error {
     readonly code: FailureCode;
-    constructor(code: FailureCode) {
+    readonly request_id?: string;
+    constructor(code: FailureCode, requestId?: string) {
       super(failureCode(code));
       this.name = "VideoFailure";
       this.code = failureCode(code);
+      if (
+        typeof requestId === "string" &&
+        /^req_[A-Za-z0-9_-]{1,160}$/.test(requestId)
+      )
+        this.request_id = requestId;
     }
-    toJSON(): { code: FailureCode; message: string } {
-      return { code: this.code, message: this.code };
+    toJSON(): { code: FailureCode; message: string; request_id?: string } {
+      return {
+        code: this.code,
+        message: this.code,
+        ...(this.request_id ? { request_id: this.request_id } : {}),
+      };
     }
   }
 }
@@ -369,21 +424,26 @@ function exactKeys(value: unknown, allowed: readonly string[]): void {
 function isProvider(value: string): value is VideoClient.ByokProvider {
   return (models.video.providers as readonly string[]).includes(value);
 }
-function safeFailure(error: unknown): VideoClient.Failure {
+function safeFailure(error: unknown, requestId?: string): VideoClient.Failure {
   try {
     if (
       error instanceof VideoClient.Failure ||
+      error instanceof GGOperationsClient.Failure ||
       error instanceof MediaRequest.Failure
     )
-      return new VideoClient.Failure(error.code);
+      return new VideoClient.Failure(
+        error.code,
+        requestId ??
+          (error instanceof VideoClient.Failure ? error.request_id : undefined)
+      );
     if (error instanceof GridaGatewayAuthError)
-      return new VideoClient.Failure("gg_token_expired");
+      return new VideoClient.Failure("gg_token_expired", requestId);
     if (error instanceof GridaGatewayCreditsError)
-      return new VideoClient.Failure("insufficient_credits");
+      return new VideoClient.Failure("insufficient_credits", requestId);
   } catch {
     /* Unknown host errors can have throwing accessors. */
   }
-  return new VideoClient.Failure("generation_failed");
+  return new VideoClient.Failure("generation_failed", requestId);
 }
 function failureCode(value: unknown): VideoClient.FailureCode {
   return typeof value === "string" &&

@@ -1,5 +1,5 @@
 // GRIDA-SEC-004 — fixed ElevenLabs voice/speech authority, safe projections, bounded execution.
-import { models } from "@grida/ai-models";
+import { models } from "./catalogue";
 import { InputSchema } from "./input-schema";
 import { MediaInputs } from "./media-inputs";
 import { MediaRoutes } from "./media-routes";

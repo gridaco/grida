@@ -47,11 +47,11 @@ import {
   OpenRouterLogo,
   VercelLogo,
 } from "@grida/react-icons/logos";
-// Pull the catalog from the framework-free `@grida/ai-models/grida` entry,
+// Pull the catalog from the framework-free `@grida/ai/catalogue` entry,
 // NOT the editor's `@/lib/ai/models` seam — that seam constructs server
 // providers (live keys) and is lint-blocked from the desktop renderer
 // (GRIDA-SEC-004). This entry is pure data and renderer-safe.
-import { catalog as _models } from "@grida/ai-models/grida";
+import { catalog as _models } from "@grida/ai/catalogue";
 import type {
   ChatSessionRow,
   EndpointProviderConfig,
@@ -65,6 +65,7 @@ import {
   GG_PROVIDER_ID,
   isChatGptSubscriptionModelId,
 } from "@grida/agent";
+import { useGGModels } from "@/lib/desktop/gg-models";
 import * as gridaGateway from "@/lib/desktop/gg-session";
 import { useChatGptSubscription } from "@/lib/desktop/chatgpt-subscription-react";
 import {
@@ -111,14 +112,16 @@ export function DesktopModelPicker({
     chatGptState.kind === "ready" ? chatGptState.status : null;
   const chatGptReady = chatGptStatus?.ready === true;
   const configuredByokProviderIds = useConfiguredTextByokProviderIds();
+  const ggModels = useGGModels();
   const groups = useMemo(
     () =>
       model_picker_options.groups({
         chatGptReady,
+        ggModels,
         configuredByokProviderIds,
         endpoints,
       }),
-    [chatGptReady, configuredByokProviderIds, endpoints]
+    [chatGptReady, ggModels, configuredByokProviderIds, endpoints]
   );
   const selectedCommandValue = useMemo(() => {
     for (const group of groups) {
@@ -129,7 +132,10 @@ export function DesktopModelPicker({
     }
     return undefined;
   }, [groups, value]);
-  const modelLabel = model_picker_options.label(value, endpoints);
+  const modelLabel =
+    (value.provider_id === GG_PROVIDER_ID
+      ? ggModels?.find((model) => model.id === value.model_id)?.label
+      : undefined) ?? model_picker_options.label(value, endpoints);
   const usesChatGpt = model_picker_options.usesChatGpt(value);
   const providerLabel = usesChatGpt
     ? "ChatGPT Subscription"
@@ -295,9 +301,10 @@ export function ModelToolCallNotice({
 }) {
   // Memoized: this renders inside chat panels that re-render per streamed
   // token, and resolve() rebuilds the flattened spec list each call.
+  const ggModels = useGGModels();
   const spec = useMemo(
-    () => registered_models.resolve(modelId, endpoints, providerId),
-    [modelId, providerId, endpoints]
+    () => registered_models.resolve(modelId, endpoints, providerId, ggModels),
+    [modelId, providerId, endpoints, ggModels]
   );
   if (!spec || spec.tool_call) return null;
   return (
@@ -364,6 +371,7 @@ export function useModelPickerState({
     chatGptState.kind === "ready" && chatGptState.status.ready;
   const isKnownId = (id: string | undefined | null): id is string =>
     (typeof id === "string" && isChatGptSubscriptionModelId(id)) ||
+    (initialProviderId === "gg" && typeof id === "string" && id === initial) ||
     isCatalogId(id) ||
     (typeof id === "string" && registeredIds.has(id));
 
@@ -432,7 +440,11 @@ export function useModelPickerState({
     // committing, so we don't lock in the default and skip the real seed.
     if (!row) return;
     const stored = row.model?.model_id;
-    if (isKnownId(stored)) {
+    if (
+      typeof stored === "string" &&
+      stored.length > 0 &&
+      (row.model?.provider_id === "gg" || isKnownId(stored))
+    ) {
       setSelection({
         model_id: stored,
         ...(row.model?.provider_id

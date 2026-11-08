@@ -489,3 +489,28 @@ describe("clampSummarizerCap", () => {
     expect(clampSummarizerCap(512)).toBe(512);
   });
 });
+
+it("sizes new GG models from the current offering without applying it to BYOK", () => {
+  const current = [
+    {
+      id: "fixture/small-gg",
+      limits: { context_tokens: 8192, max_output_tokens: 1024 },
+    },
+  ];
+  expect(
+    resolveModelLimits(
+      { provider_id: "gg", model_id: "fixture/small-gg" },
+      undefined,
+      undefined,
+      current
+    )
+  ).toEqual({ context_window: 8192, output_limit: 1024 });
+  expect(
+    resolveModelLimits(
+      { provider_id: "openrouter", model_id: "fixture/small-gg" },
+      undefined,
+      undefined,
+      current
+    ).context_window
+  ).not.toBe(8192);
+});

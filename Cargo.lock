@@ -864,6 +864,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "time",
  "tokio",
  "tokio-util",
  "url",
@@ -894,7 +895,7 @@ dependencies = [
 
 [[package]]
 name = "grida-cli"
-version = "0.5.4"
+version = "0.5.5"
 dependencies = [
  "base64 0.22.1",
  "bytes",

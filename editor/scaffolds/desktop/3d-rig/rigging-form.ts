@@ -1,4 +1,4 @@
-import { catalog } from "@grida/ai-models/grida";
+import { catalog } from "@grida/ai/catalogue";
 import type { RiggingGenerateRequest } from "@/lib/desktop/bridge";
 import { LocalGltfBundle } from "../media-formats/local-gltf-bundle";
 

@@ -33,7 +33,7 @@ import {
   CardTitle,
 } from "@app/ui/components/card";
 import { Skeleton } from "@app/ui/components/skeleton";
-import { catalog as models } from "@grida/ai-models/grida";
+import { catalog as models } from "@grida/ai/catalogue";
 import {
   AlibabaCloudLogo,
   BlackForestLabsLogo,
@@ -74,6 +74,8 @@ import {
   type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
 import * as gridaGateway from "@/lib/desktop/gg-session";
+import { useGGModels } from "@/lib/desktop/gg-models";
+import { musicModelChoices } from "@/scaffolds/desktop/audio-gen/music-generation-controls";
 import Link from "next/link";
 import {
   DesktopPageContent,
@@ -434,7 +436,7 @@ const BYOK_PROVIDER_LOGOS: Partial<
 };
 
 const MODEL_VENDOR_LOGOS: Partial<
-  Record<models.Vendor, React.ComponentType<React.ComponentProps<"svg">>>
+  Record<string, React.ComponentType<React.ComponentProps<"svg">>>
 > = {
   alibaba: AlibabaCloudLogo,
   openai: OpenAILogo,
@@ -1002,7 +1004,18 @@ function MediaModelsSection({
   const riggingModels = riggingSupported
     ? models.three_d.rigging.listed_models()
     : [];
-  const musicModels = musicSupported ? models.audio.music.listed_models() : [];
+  const currentGG = useGGModels();
+  const musicModels = musicSupported
+    ? musicModelChoices(currentGG).map((model) => ({
+        ...model,
+        short_description:
+          models.audio.music.models[model.id as models.audio.music.ModelId]
+            ?.short_description ?? "Music generation",
+        vendor:
+          currentGG?.find((current) => current.id === model.id)?.owned_by ??
+          "google",
+      }))
+    : [];
   const soundEffectModels = soundEffectSupported
     ? models.audio.sound_effects.ordered_models()
     : [];
@@ -1110,7 +1123,8 @@ function MediaModelsSection({
               MediaModelReadiness.visual(
                 card,
                 connectedVisualProviders,
-                hostedMediaReady
+                hostedMediaReady,
+                MediaModelReadiness.hosted(card.id, "image", currentGG)
               )
             }
             hrefForModel={mediaToolHref}
@@ -1125,7 +1139,8 @@ function MediaModelsSection({
               MediaModelReadiness.visual(
                 card,
                 connectedVisualProviders,
-                hostedMediaReady
+                hostedMediaReady,
+                MediaModelReadiness.hosted(card.id, "video", currentGG)
               )
             }
             hrefForModel={mediaToolHref}
@@ -1176,7 +1191,7 @@ function MediaModelsSection({
             title="Music · Grida included"
             models={musicModels}
             readyForModel={() => musicReady}
-            hrefForModel={mediaToolHref}
+            hrefForModel={(id) => DesktopMediaTool.href("text-to-music", id)}
             actionLabel="Open in music generator"
           />
         )}
@@ -1207,7 +1222,7 @@ type MediaModelCard = {
   id: string;
   label: string;
   short_description: string;
-  vendor: models.Vendor;
+  vendor: string;
   provider?: string;
   providers?: object;
   deprecated?: boolean;
@@ -1293,8 +1308,10 @@ function MediaModelRow({
   );
 }
 
-function MediaVendorLogo({ vendor }: { vendor: models.Vendor }) {
-  const Logo = MODEL_VENDOR_LOGOS[vendor];
+function MediaVendorLogo({ vendor }: { vendor: string }) {
+  const Logo = Object.hasOwn(MODEL_VENDOR_LOGOS, vendor)
+    ? MODEL_VENDOR_LOGOS[vendor]
+    : undefined;
   if (!Logo) {
     return (
       <span
