@@ -202,6 +202,14 @@ verifies the exact retained bytes before dispatch. A fork or compaction can
 omit earlier image content and records that omission. Image steering, earlier
 message replacement, and shared WebSocket intake are unavailable.
 
+An admitted turn can offer `crop_retained_image` when its captured context
+contains a retained PNG owned by the chat. The tool uses the most recent such
+image and takes a rectangle in original pixel coordinates. It writes a private
+PNG working copy with a 256 KiB output limit and returns its identity, the
+source version and digest, and the resulting dimensions and digest. The copy
+is retained with the chat state. A missing copy with a previous receipt reports
+unavailability. Preview and export need a separate capability.
+
 The host advances waiting work after verified settlement while admission is
 open. Observation stays independent of scheduling. After a restart, Resume
 Queue can wake retained waiting work, and Resume Task checks captured settings

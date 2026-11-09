@@ -240,6 +240,14 @@ input. Queued input and provider context can use the original after restart.
 An unsupported profile or unavailable original produces an error for the
 whole request.
 
+The native `crop_retained_image` tool receives only the most recent retained
+PNG in the admitted chat's captured context. It uses the original coordinates
+and atomically saves a bounded derivative in that chat's working area. The
+result records the source and working-copy identities and their digests. The
+copy is retained with the chat state, and an interrupted write with uncertain
+publication requires inspection before a new edit. Publication to a project or
+another destination is a separate operation.
+
 The native library also provides the read-only `read_file`, `list_files`, and
 `search_text` adapters for macOS and Linux. They use the turn's selected
 directory and recheck current grants and protected roots before opening a

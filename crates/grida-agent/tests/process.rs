@@ -257,6 +257,19 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         Reply::InputCount(_) => unreachable!("count responses use the JSON endpoint"),
         #[cfg(unix)]
         Reply::Tool(name, arguments) => {
+            if protocol == ProviderProtocol::Responses {
+                let identity = uuid::Uuid::new_v4().simple().to_string();
+                let item = json!({
+                    "type": "response.output_item.done", "output_index": 0, "item": {
+                        "type": "function_call", "id": format!("fc_{identity}"), "call_id": format!("call_{identity}"),
+                        "name": name, "arguments": arguments, "status": "completed"
+                    }
+                });
+                let terminal = json!({"type":"response.completed", "response":{
+                    "status":"completed", "usage":{"input_tokens":5,"output_tokens":3}
+                }});
+                return format!("data: {item}\n\ndata: {terminal}\n\n");
+            }
             assert_eq!(protocol, ProviderProtocol::OpenAiCompatible);
             return fixture_tool_body(name, arguments);
         }

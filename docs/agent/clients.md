@@ -39,6 +39,12 @@ provider receives it when the conversation uses it. Chat history identifies
 the retained image. An unsupported, invalid, or missing image stops the
 request with an error. [OpenAI image input guide](https://developers.openai.com/api/docs/guides/images-vision)
 
+You can ask the agent to crop the most recent retained PNG in the chat. It
+saves the crop as a working copy in private chat storage. The original and
+project files stay intact. The tool returns the copy's identity and dimensions.
+Keep the chat state to retain the copy across restarts. If the copy disappears,
+the agent reports it as unavailable.
+
 ## Run a task from a script
 
 Replace the example paths, endpoint, and model with your selected values.

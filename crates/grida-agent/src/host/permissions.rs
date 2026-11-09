@@ -27,16 +27,44 @@ pub struct Approvals {
 
 pub(super) struct ToolAuthority {
     base: Arc<ExecutionAuthority>,
-    permissions: Arc<TurnPermissions>,
+    permissions: Option<Arc<TurnPermissions>>,
+    image: Option<Arc<image_tools::TurnImage>>,
+}
+
+impl ToolAuthority {
+    pub(super) fn bind(
+        base: Arc<ExecutionAuthority>,
+        permissions: Option<Arc<TurnPermissions>>,
+        image: Option<Arc<image_tools::TurnImage>>,
+    ) -> Option<Arc<Self>> {
+        if permissions.is_none() && image.is_none() {
+            return None;
+        }
+        Some(Arc::new(Self {
+            base,
+            permissions,
+            image,
+        }))
+    }
 }
 
 impl AuthorityValidator for ToolAuthority {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
-        if self.permissions.handles(&request.selection) {
-            self.permissions.validate(request)
-        } else {
-            self.base.validate(request)
+        if let Some(image) = self
+            .image
+            .as_ref()
+            .filter(|image| image.handles(&request.selection))
+        {
+            return image.validate(request);
         }
+        if let Some(permissions) = self
+            .permissions
+            .as_ref()
+            .filter(|scope| scope.handles(&request.selection))
+        {
+            return permissions.validate(request);
+        }
+        self.base.validate(request)
     }
 }
 
@@ -46,11 +74,21 @@ impl ToolGate for ToolAuthority {
         admission: ToolAdmission,
         context: AdmissionContext,
     ) -> BoxFuture<'_, Result<ToolDecision>> {
-        if self.permissions.handles(&admission.grants) {
-            self.permissions.decide(admission, context)
-        } else {
-            self.base.decide(admission, context)
+        if let Some(image) = self
+            .image
+            .as_ref()
+            .filter(|image| image.handles(&admission.grants))
+        {
+            return image.decide(admission, context);
         }
+        if let Some(permissions) = self
+            .permissions
+            .as_ref()
+            .filter(|scope| scope.handles(&admission.grants))
+        {
+            return permissions.decide(admission, context);
+        }
+        self.base.decide(admission, context)
     }
 }
 
@@ -79,18 +117,12 @@ impl Host {
         &self,
         capture: &PermissionCapture,
         binding: agent_kit_core::turn::TurnBinding,
-        base: Arc<ExecutionAuthority>,
-    ) -> Result<(Arc<TurnPermissions>, Arc<ToolAuthority>)> {
+    ) -> Result<Arc<TurnPermissions>> {
         let profile = self
             .permissions
             .as_ref()
             .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?;
-        let permissions = profile.bind(capture, binding, self.store.clone(), true)?;
-        let authorization = Arc::new(ToolAuthority {
-            base,
-            permissions: permissions.clone(),
-        });
-        Ok((permissions, authorization))
+        profile.bind(capture, binding, self.store.clone(), true)
     }
 
     pub async fn approvals(&self, session: SessionId, turn: TurnId) -> Result<Approvals> {

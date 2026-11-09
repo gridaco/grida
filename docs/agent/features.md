@@ -19,7 +19,8 @@ questions, configuration tools, branching, earlier-message revision, and
 explicit compaction. A trusted permission profile can enable native file and
 command tools, with approval for additional access through private supervising
 ACP. A supported Responses model can receive a retained PNG through private
-stdio ACP. The standalone MCP host exposes the headless presentation result.
+stdio ACP and crop it in a private working copy. The standalone MCP host exposes
+the headless presentation result.
 These entrypoints and their availability are described in the
 [client guide](./clients.md). Desktop acceptance remains separate.
 

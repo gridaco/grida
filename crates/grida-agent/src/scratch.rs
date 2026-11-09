@@ -153,6 +153,21 @@ impl ScratchScope {
             Err(unsupported())
         }
     }
+
+    pub(crate) fn replace_working(
+        &mut self,
+        receipt: &WorkingCopyReceipt,
+        bytes: &[u8],
+        before_publish: impl FnOnce() -> Result<()>,
+    ) -> Result<()> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return self.inner.replace_working(receipt, bytes, before_publish);
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (receipt, bytes, before_publish);
+            Err(unsupported())
+        }
+    }
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -386,6 +401,47 @@ mod native {
             })
         }
 
+        pub(super) fn replace_working(
+            &mut self,
+            receipt: &WorkingCopyReceipt,
+            bytes: &[u8],
+            before_publish: impl FnOnce() -> Result<()>,
+        ) -> Result<()> {
+            let (key, mut source) = self.open_asset(&receipt.asset)?;
+            if receipt.id.as_str() != format!("working/{key}") {
+                return Err(working_unavailable());
+            }
+            let marker = self
+                .sources
+                .read(&format!("{key}.working"))?
+                .ok_or_else(working_unavailable)?;
+            if marker.metadata().map_err(io_failure)?.len() != 0 {
+                return Err(invalid_storage());
+            }
+            verify(&mut source, &receipt.asset, &mut io::sink())?;
+            let name = working_name(&key, &receipt.asset.name);
+            let current = self.work.read(&name)?.ok_or_else(working_unavailable)?;
+            let (_, usage) = self.occupancy()?;
+            let current_size = current.metadata().map_err(io_failure)?.len();
+            let other_bytes = usage
+                .bytes
+                .checked_sub(current_size)
+                .ok_or_else(invalid_storage)?;
+            if bytes.len() as u64 > self.limits.max_work_bytes - other_bytes {
+                return Err(limit());
+            }
+            self.work.stage(
+                |file| file.write_all(bytes).map_err(io_failure),
+                |temp| {
+                    self.validate()?;
+                    self.work.check_file(&name, &current)?;
+                    before_publish()?;
+                    unix::renameat(&self.work.file, temp, &self.work.file, name.as_str())
+                        .map_err(io_failure)
+                },
+            )
+        }
+
         fn validate(&self) -> Result<()> {
             self.protected.check(&self.base.path)?;
             check_base(&self.base.path)?;
@@ -533,6 +589,24 @@ mod native {
         }
 
         fn publish<T>(&self, name: &str, write: impl FnOnce(&mut File) -> Result<T>) -> Result<T> {
+            self.stage(write, |temp| {
+                unix::linkat(&self.file, temp, &self.file, name, AtFlags::empty()).map_err(
+                    |error| {
+                        if error == Errno::EXIST {
+                            conflict()
+                        } else {
+                            io_failure(error)
+                        }
+                    },
+                )
+            })
+        }
+
+        fn stage<T>(
+            &self,
+            write: impl FnOnce(&mut File) -> Result<T>,
+            publish: impl FnOnce(&str) -> Result<()>,
+        ) -> Result<T> {
             let temp = format!(".stage-{}", Uuid::new_v4());
             let mut file: File = unix::openat(
                 &self.file,
@@ -549,26 +623,17 @@ mod native {
                 Ok(value)
             })();
             let published = prepared.and_then(|value| {
-                unix::linkat(
-                    &self.file,
-                    temp.as_str(),
-                    &self.file,
-                    name,
-                    AtFlags::empty(),
-                )
-                .map_err(|error| {
-                    if error == Errno::EXIST {
-                        conflict()
-                    } else {
-                        io_failure(error)
-                    }
-                })?;
+                publish(&temp)?;
                 Ok(value)
             });
             let cleanup = unix::unlinkat(&self.file, temp.as_str(), AtFlags::empty());
             match published {
                 Ok(value) => {
-                    cleanup.map_err(|_| uncertain())?;
+                    if let Err(error) = cleanup
+                        && error != Errno::NOENT
+                    {
+                        return Err(uncertain());
+                    }
                     unix::fsync(&self.file).map_err(|_| uncertain())?;
                     Ok(value)
                 }

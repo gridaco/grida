@@ -9,11 +9,15 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 const IMAGE_MODEL: &str = "gpt-5.4";
 
 fn png(pixel: [u8; 3]) -> Vec<u8> {
+    encode_png(1, 1, &pixel)
+}
+
+fn encode_png(width: u32, height: u32, pixels: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut encoder = png::Encoder::new(&mut bytes, 1, 1);
+    let mut encoder = png::Encoder::new(&mut bytes, width, height);
     encoder.set_color(png::ColorType::Rgb);
     let mut writer = encoder.write_header().unwrap();
-    writer.write_image_data(&pixel).unwrap();
+    writer.write_image_data(pixels).unwrap();
     writer.finish().unwrap();
     bytes
 }
@@ -292,4 +296,186 @@ async fn unsupported_and_malformed_image_intakes_never_dispatch_the_text_subset(
     }
     assert!(endpoint.requests.try_recv().is_err());
     endpoint.done().await;
+}
+
+#[tokio::test]
+async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_original() {
+    use sha2::{Digest, Sha256};
+    use std::fs;
+
+    const TOOL: &str = "crop_retained_image";
+    let digest = |bytes: &[u8]| {
+        Sha256::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    };
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    fs::write(workspace.path().join("keep.txt"), "authored").unwrap();
+    let original = encode_png(2, 2, &[255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0]);
+    let data = STANDARD.encode(&original);
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![
+            Reply::Tool(TOOL, r#"{"x":1,"y":0,"width":1,"height":2}"#),
+            Reply::Finished("Saved the crop."),
+            Reply::Finished("The chat still has its attachment."),
+            Reply::Tool(TOOL, r#"{"x":0,"y":0,"width":1,"height":2}"#),
+            Reply::Finished("The earlier working copy is unavailable."),
+            Reply::Finished("This chat has no image."),
+        ],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let mut client = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    client.request("initialize", extension_initialize()).await;
+    let created = client
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let crop = client
+        .request(
+            "session/prompt",
+            json!({
+                "sessionId":session, "prompt":[
+                    {"type":"text","text":"Crop the right half into a working copy."},
+                    {"type":"image","mimeType":"image/png","data":data},
+                ]
+            }),
+        )
+        .await;
+    assert_eq!(crop["result"]["stopReason"], "end_turn", "{crop}");
+    let request = endpoint.request().await;
+    assert_eq!(request["tools"][0]["name"], TOOL);
+    let result = last_tool_result(endpoint.request().await);
+    assert_eq!(result["status"], "succeeded", "{result}");
+    let receipt = &result["structured"];
+    assert_eq!(receipt["retention"], "chat_state");
+    assert_eq!(receipt["width"], 1);
+    assert_eq!(receipt["height"], 2);
+    assert_eq!(receipt["sourceSha256"], digest(&original));
+    assert!(!receipt.to_string().contains(state.to_str().unwrap()));
+    client.close().await;
+
+    let scope = fs::read_dir(state.join("retained-inputs"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let source = fs::read_dir(scope.join("sources"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "asset")
+        })
+        .unwrap();
+    assert!(fs::read(&source).unwrap().ends_with(&original));
+    let work = fs::read_dir(scope.join("work"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let edited = fs::read(&work).unwrap();
+    assert_eq!(receipt["sha256"], digest(&edited));
+    assert_eq!(
+        receipt["workingCopyId"],
+        format!("working/{}", work.file_stem().unwrap().to_str().unwrap())
+    );
+    let mut reader = png::Decoder::new(std::io::Cursor::new(&edited))
+        .read_info()
+        .unwrap();
+    let mut pixels = vec![0; reader.output_buffer_size().unwrap()];
+    let frame = reader.next_frame(&mut pixels).unwrap();
+    assert_eq!((frame.width, frame.height), (1, 2));
+    assert_eq!(pixels, [0, 255, 0, 255, 255, 0]);
+
+    let mut restarted = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    restarted
+        .request("initialize", extension_initialize())
+        .await;
+    let load = restarted
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    assert!(load["result"].is_object(), "{load}");
+    let resumed = restarted
+        .request(
+            "session/prompt",
+            json!({"sessionId":session,"prompt":[{"type":"text","text":"Continue this chat."}]}),
+        )
+        .await;
+    assert_eq!(resumed["result"]["stopReason"], "end_turn", "{resumed}");
+    let retained = endpoint.request().await;
+    assert_eq!(retained["tools"][0]["name"], TOOL);
+    assert!(
+        retained["input"]
+            .to_string()
+            .contains(&format!("data:image/png;base64,{data}"))
+    );
+    assert_eq!(fs::read(&work).unwrap(), edited);
+    fs::remove_file(&work).unwrap();
+    let lost = restarted
+        .request(
+            "session/prompt",
+            json!({
+                "sessionId":session,"prompt":[{"type":"text","text":"Crop the left half."}],
+            }),
+        )
+        .await;
+    assert_eq!(lost["result"]["stopReason"], "end_turn", "{lost}");
+    assert_eq!(endpoint.request().await["tools"][0]["name"], TOOL);
+    let unavailable = last_tool_result(endpoint.request().await);
+    assert_eq!(unavailable["status"], "failed", "{unavailable}");
+    assert_eq!(
+        unavailable["content"][0],
+        "scratch_working_copy_unavailable"
+    );
+    assert!(!work.exists());
+    let created = restarted
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let other = created["result"]["sessionId"].as_str().unwrap();
+    let other_chat = restarted
+        .request(
+            "session/prompt",
+            json!({"sessionId":other,"prompt":[{"type":"text","text":"Start a separate chat."}]}),
+        )
+        .await;
+    assert_eq!(
+        other_chat["result"]["stopReason"], "end_turn",
+        "{other_chat}"
+    );
+    assert!(endpoint.request().await.get("tools").is_none());
+    restarted.close().await;
+    assert!(fs::read(&source).unwrap().ends_with(&original));
+    assert_eq!(
+        fs::read_to_string(workspace.path().join("keep.txt")).unwrap(),
+        "authored"
+    );
+    assert_eq!(fs::read_dir(workspace.path()).unwrap().count(), 1);
+    endpoint.done().await;
+}
+
+fn last_tool_result(request: Value) -> Value {
+    let output = request["input"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .rev()
+        .find(|part| part["type"] == "function_call_output")
+        .unwrap();
+    serde_json::from_str(output["output"].as_str().unwrap()).unwrap()
 }

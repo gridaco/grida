@@ -8,16 +8,16 @@ use agent_kit_core::{ArtifactId, BindingId, ChangeId, ErrorKind, Fingerprint, Re
 use base64::{Engine, engine::general_purpose::STANDARD};
 use sha2::{Digest, Sha256};
 use std::fmt;
-use std::io::Cursor;
+use std::io::{BufRead, Cursor, Seek};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 const MIME: &str = "image/png";
 const NAME: &str = "image.png";
 const LOCATOR: &str = "retained-input:";
-const MAX_IMAGE_BYTES: usize = 256 * 1024;
+pub(super) const MAX_IMAGE_BYTES: usize = 256 * 1024;
 const MAX_PIXELS: u64 = 4 * 1024 * 1024;
-const MAX_DECODED_BYTES: usize = 8 * 1024 * 1024;
+pub(super) const MAX_DECODED_BYTES: usize = 8 * 1024 * 1024;
 const LIMITS: ScratchLimits = ScratchLimits {
     max_assets: 16,
     max_asset_bytes: MAX_IMAGE_BYTES as u64,
@@ -132,26 +132,40 @@ impl Images {
     }
 
     pub(super) fn resolve(&self, media: &MediaRef, maximum: usize) -> Result<Vec<u8>> {
-        let asset: AssetRef = media
-            .locator
-            .strip_prefix(LOCATOR)
-            .filter(|value| value.len() <= 1024)
-            .and_then(|value| serde_json::from_str(value).ok())
-            .ok_or_else(invalid_reference)?;
-        if media.id != *asset.id()
-            || media.access_scope != scope_id(asset.owner())?
-            || media.media_type != MIME
-            || media.retention != Retention::Retained
-            || asset.name() != NAME
-            || asset.version() != 1
-        {
-            return Err(invalid_reference());
-        }
+        let asset = asset_ref(media)?;
+        self.with_scope(asset.owner(), |scope| {
+            scope.read_retained(&asset, maximum.min(MAX_IMAGE_BYTES))
+        })
+    }
+
+    pub(super) fn with_scope<T>(
+        &self,
+        owner: &SessionId,
+        operate: impl FnOnce(&mut ScratchScope) -> Result<T>,
+    ) -> Result<T> {
         let _access = self.access.lock().unwrap();
         let protected = ProtectedRoots::new(vec![])?;
-        let scope = ScratchScope::open(&self.base, asset.owner().clone(), LIMITS, &protected)?;
-        scope.read_retained(&asset, maximum.min(MAX_IMAGE_BYTES))
+        let mut scope = ScratchScope::open(&self.base, owner.clone(), LIMITS, &protected)?;
+        operate(&mut scope)
     }
+}
+
+pub(super) fn asset_ref(media: &MediaRef) -> Result<AssetRef> {
+    let asset: AssetRef = media
+        .locator
+        .strip_prefix(LOCATOR)
+        .filter(|value| value.len() <= 1024)
+        .and_then(|value| serde_json::from_str(value).ok())
+        .ok_or_else(invalid_reference)?;
+    if !is_retained_image(media)
+        || media.id != *asset.id()
+        || media.access_scope != scope_id(asset.owner())?
+        || asset.name() != NAME
+        || asset.version() != 1
+    {
+        return Err(invalid_reference());
+    }
+    Ok(asset)
 }
 
 pub(super) fn media(asset: &AssetRef) -> Result<MediaRef> {
@@ -190,12 +204,7 @@ fn scope_id(owner: &SessionId) -> Result<BindingId> {
 
 fn validate_png(bytes: &[u8]) -> Result<()> {
     let mut source = Cursor::new(bytes);
-    let mut decoder = png::Decoder::new(&mut source);
-    decoder.set_limits(png::Limits {
-        bytes: MAX_DECODED_BYTES,
-    });
-    decoder.set_ignore_text_chunk(true);
-    decoder.set_ignore_iccp_chunk(true);
+    let mut decoder = decoder(&mut source);
     let header = decoder.read_header_info().map_err(|_| invalid_png())?;
     if u64::from(header.width) * u64::from(header.height) > MAX_PIXELS {
         return Err(image_too_large());
@@ -220,6 +229,16 @@ fn validate_png(bytes: &[u8]) -> Result<()> {
         return Err(invalid_png());
     }
     Ok(())
+}
+
+pub(super) fn decoder<R: BufRead + Seek>(source: R) -> png::Decoder<R> {
+    let mut decoder = png::Decoder::new(source);
+    decoder.set_limits(png::Limits {
+        bytes: MAX_DECODED_BYTES,
+    });
+    decoder.set_ignore_text_chunk(true);
+    decoder.set_ignore_iccp_chunk(true);
+    decoder
 }
 
 fn invalid_png() -> agent_kit_core::Error {

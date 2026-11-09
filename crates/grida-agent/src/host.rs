@@ -3,6 +3,7 @@
 mod compaction;
 mod goals;
 mod history;
+mod image_tools;
 mod images;
 mod lifecycle;
 pub(crate) mod live;
@@ -870,18 +871,32 @@ impl Host {
             .permission_capture
             .as_ref()
             .map(|capture| {
-                self.bind_permissions(
-                    capture,
-                    claim.lease.binding().clone(),
-                    execution.authorization.clone(),
-                )
-                .map_err(|_| problem(ErrorKind::Uncertain, "admitted_permission_unavailable"))
+                self.bind_permissions(capture, claim.lease.binding().clone())
+                    .map_err(|_| problem(ErrorKind::Uncertain, "admitted_permission_unavailable"))
             })
             .transpose()?;
+        let image = execution
+            .images
+            .as_ref()
+            .map(|images| {
+                image_tools::TurnImage::bind(
+                    images.clone(),
+                    claim.lease.binding(),
+                    &history.messages,
+                    &prepared.messages,
+                )
+            })
+            .transpose()?
+            .flatten();
+        let tool_authority = permissions::ToolAuthority::bind(
+            execution.authorization.clone(),
+            permission_scope.clone(),
+            image.clone(),
+        );
         let goal_authority = if prepared.goal.is_some() {
             let (validator, gate): (Arc<dyn AuthorityValidator>, Arc<dyn ToolGate>) =
-                match &permission_scope {
-                    Some((_, authorization)) => (authorization.clone(), authorization.clone()),
+                match &tool_authority {
+                    Some(authorization) => (authorization.clone(), authorization.clone()),
                     None => (
                         execution.authorization.clone(),
                         execution.authorization.clone(),
@@ -905,7 +920,7 @@ impl Host {
                     .with_authorization(goal.clone(), goal.clone())
             })
             .or_else(|| {
-                permission_scope.as_ref().map(|(_, authorization)| {
+                tool_authority.as_ref().map(|authorization| {
                     execution
                         .runtime
                         .with_authorization(authorization.clone(), authorization.clone())
@@ -922,11 +937,14 @@ impl Host {
         let mut authority = execution.authority.clone();
         let operations = opened.turn.operations();
         let mut inventory = Inventory::new();
-        let command = if let Some((permissions, _)) = permission_scope {
+        let command = if let Some(permissions) = permission_scope {
             permissions.insert(&mut inventory, &mut authority.tools)?
         } else {
             None
         };
+        if let Some(image) = image {
+            image.insert(&mut inventory, &mut authority.tools)?;
+        }
         if prepared.questions {
             execution
                 .questions
