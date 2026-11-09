@@ -852,6 +852,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
   native build input to fixed architecture-checked executables in application
   resources outside the archive. The build output directory is deployment-owned.
   Launch-time trust and helper identity remain enforced by the native host.
+- [Native agent process owner](desktop/src/main/native-agent-process.ts) and
+  [its fixtures](desktop/src/main/native-agent-process.test.ts) start the fixed
+  resource executable without a shell. They select the child environment,
+  negotiate ACP on private pipes, bound frames and outstanding requests, and
+  keep the child under ownership through EOF shutdown. Only projected error
+  codes cross the process diagnostics boundary. Renderer authorization and
+  cutover are separate from this process contract.
 
 - Portable Rust provider contracts: [crates/grida-ai/src/catalogue.rs](crates/grida-ai/src/catalogue.rs),
   [crates/grida-ai/src/discovery.rs](crates/grida-ai/src/discovery.rs),
