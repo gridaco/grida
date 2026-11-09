@@ -185,13 +185,26 @@ fn queue_call(
     let operation_id = operations.operation_id(&tool_key)?;
     work.push(Box::pin(async move {
         let view = operations.view();
-        let recorded_grants = view
-            .state
-            .operations()
-            .get(&operation_id)
-            .filter(|operation| operation.outcome().is_some())
-            .map(|operation| operation.record.grants.clone());
-        let grants = recorded_grants.or(selected_grants);
+        let grants = match (view.operation(&operation_id), selected_grants) {
+            (Some(recorded), _) if recorded.outcome().is_some() => {
+                Some(recorded.record.grants.clone())
+            }
+            (Some(recorded), Some(selected)) => {
+                let authority = &recorded.record.grants.authority;
+                if selected.authority.principal != authority.principal
+                    || selected.authority.scope != authority.scope
+                {
+                    return (
+                        call,
+                        Err(Error::new(ErrorKind::Conflict, "operation_identity_reused")),
+                    );
+                }
+                // A fresh selection keeps this tool eligible. Dispatch still
+                // validates the exact authority recorded with the action.
+                Some(recorded.record.grants.clone())
+            }
+            (_, selected) => selected,
+        };
         let Some(grants) = grants else {
             return (
                 call,

@@ -779,6 +779,16 @@ async fn deferred_gate_keeps_question_and_runs_independent_inference() {
         operations.invoke(key.clone(), invocation(1)).await.unwrap(),
         InvokeOutcome::Deferred(_)
     ));
+    let mut changed = invocation(1);
+    changed.grants.authority.binding = BindingId::new("renewed").unwrap();
+    assert_eq!(
+        operations
+            .invoke(key.clone(), changed)
+            .await
+            .unwrap_err()
+            .kind,
+        ErrorKind::Conflict
+    );
     operations
         .infer(
             OperationKey::new("independent").unwrap(),
@@ -2018,6 +2028,97 @@ async fn completed_step_replays_with_replaced_execution_grants() {
     assert_eq!(first, replay);
     assert_eq!(provider.starts.load(Ordering::SeqCst), 1);
     assert_eq!(tool.calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn deferred_step_reuses_recorded_grants_only_with_current_compatible_selection() {
+    for allowed in [true, false] {
+        let provider = tool_provider();
+        let tool = CounterTool::new(None);
+        let authority = Authority::allowed();
+        let runtime = runtime(provider.clone(), &tool, Arc::new(Ask), authority.clone());
+        let ephemeral = EphemeralJournal::create(binding()).unwrap();
+        let mut turn = runtime.open(ephemeral.lease).await.unwrap().turn;
+        let input = request(&provider, &inventory(&tool));
+        let plan = |tool_grants| StepPlan {
+            key: OperationKey::new("step").unwrap(),
+            request: input.clone(),
+            inference_grants: grants(),
+            tool_grants,
+            tools: inventory(&tool),
+        };
+        let first = turn.step(plan(tool_grants())).await.unwrap();
+        assert!(matches!(first.tools[0].outcome, InvokeOutcome::Deferred(_)));
+        let view = turn.view();
+        let recorded = view
+            .state
+            .operations()
+            .values()
+            .find(|operation| operation.record.source_call.is_some())
+            .unwrap();
+        assert!(recorded.attempts.is_empty());
+        ephemeral
+            .control
+            .resolve(
+                ChangeId::new("answer").unwrap(),
+                view.state.controls().revision,
+                question().id,
+                envelope("yes"),
+            )
+            .await
+            .unwrap();
+
+        let mut fresh = grants();
+        fresh.authority.binding = BindingId::new("fresh-host").unwrap();
+        fresh.grants = vec![GrantId::new("fresh-grant").unwrap()];
+        let selection = |grants| BTreeMap::from([(tool.definition.id.clone(), grants)]);
+        let mut other_scope = fresh.clone();
+        other_scope.authority.scope = ScopeId::new("other-workspace").unwrap();
+        let mut other_principal = fresh.clone();
+        other_principal.authority.principal = PrincipalId::new("other-user").unwrap();
+        for (grants, expected) in [
+            (BTreeMap::new(), ErrorKind::Unavailable),
+            (selection(other_scope), ErrorKind::Conflict),
+            (selection(other_principal), ErrorKind::Conflict),
+        ] {
+            assert_eq!(turn.step(plan(grants)).await.unwrap_err().kind, expected);
+        }
+        assert_eq!(tool.calls.load(Ordering::SeqCst), 0);
+        assert!(
+            authority
+                .requests
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|request| request.operation != recorded.record.id)
+        );
+
+        authority.allowed.store(allowed, Ordering::SeqCst);
+        let resumed = turn.step(plan(selection(fresh))).await.unwrap();
+        let InvokeOutcome::Complete(outcome) = &resumed.tools[0].outcome else {
+            panic!("an answered tool must receive a disposition");
+        };
+        let expected = if allowed {
+            OutcomeStatus::Succeeded
+        } else {
+            OutcomeStatus::Failed
+        };
+        assert_eq!(outcome.status, expected);
+        assert_eq!(tool.calls.load(Ordering::SeqCst), usize::from(allowed));
+        assert_eq!(provider.starts.load(Ordering::SeqCst), 1);
+        let current = turn.view();
+        let operation = current.operation(&recorded.record.id).unwrap();
+        assert_eq!(operation.record.grants, recorded.record.grants);
+        assert_eq!(operation.attempts.len(), usize::from(allowed));
+        assert_eq!(
+            authority.requests.lock().unwrap().last(),
+            Some(&AuthorityRequest {
+                operation: recorded.record.id.clone(),
+                action: recorded.record.input.fingerprint(),
+                selection: recorded.record.grants.clone(),
+            })
+        );
+    }
 }
 
 #[tokio::test]

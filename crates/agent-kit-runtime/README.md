@@ -36,6 +36,10 @@ identity. Current controls are checked before execution. Denied work receives a
 definite nonexecution result. Inference grants and each tool's grants are supplied
 separately. Missing tool authority never falls back to provider authority.
 Completed results remain readable independently of current execution grants.
+For a prepared tool, a compatible current selection can retain its original
+grant references. Dispatch still requires the host to authorize that exact
+action under current authority. Removing the selection or changing its
+principal or scope prevents pending execution.
 
 Each local owner captures its admission control revision. Pause and Cancel
 interrupt older owners even when a control reader sees only the latest snapshot
@@ -51,8 +55,9 @@ successor must reconcile that state before new dependent work.
 provider or executor. For an interrupted inference, it reconstructs observed
 call declarations from the original call IDs retained on admitted child tools.
 `recover_tool` invokes the executor's explicit recovery contract with current
-authority, bounded capacity, cancellation, and a deadline. The master can use
-`cancel_prepared` and `withdraw_input` to account for unstarted work and open
+authority, bounded capacity, cancellation, and a deadline.
+`reconcile_tool` accepts an explicit current inventory for a turn-bound executor.
+The master can use `cancel_prepared` and `withdraw_input` to account for unstarted work and open
 interactions before settling a stopped turn. Those operations perform no
 executor work.
 

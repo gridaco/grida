@@ -834,8 +834,19 @@ impl TurnOperations {
     }
 
     pub async fn recover_tool(&self, key: OperationKey) -> Result<ToolOutcome> {
-        self.inner.ensure_open()?;
         let id = self.operation_id(&key)?;
+        self.reconcile_tool(id, self.inner.services.tools.clone())
+            .await
+    }
+
+    /// Reconcile a recorded tool operation with the inventory captured by its
+    /// current turn owner. The recorded definition and attempt still apply.
+    pub async fn reconcile_tool(
+        &self,
+        id: OperationId,
+        inventory: InventorySnapshot,
+    ) -> Result<ToolOutcome> {
+        self.inner.ensure_open()?;
         let _serial = self.inner.serial.lock().await;
         let state = self.inner.refresh().await?;
         let operation = state
@@ -890,7 +901,7 @@ impl TurnOperations {
         self.inner
             .authorize(&operation.record, &owner.admission, deadline)
             .await?;
-        let prepared = self.inner.services.tools.restore(invocation.clone())?;
+        let prepared = inventory.restore(invocation.clone())?;
         let receipts: Vec<_> = operation
             .attempts
             .iter()

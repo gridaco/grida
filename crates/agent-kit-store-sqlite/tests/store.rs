@@ -1655,3 +1655,82 @@ async fn resuming_a_paused_turn_claims_exclusively_and_keeps_its_unanswered_wait
         "request_identity_reused",
     );
 }
+
+#[tokio::test]
+async fn stopped_turns_reject_late_answers_and_external_history() {
+    let (_directory, store) = store().await;
+    store
+        .submit(session(), submission("input", "hello"))
+        .await
+        .unwrap();
+    let acquired = claim(&store, "claim", vec![change("input")]).await;
+    let wait = WaitId::new("question").unwrap();
+    commit(
+        &acquired,
+        "stop",
+        vec![
+            JournalAction::OpenWait(WaitRecord {
+                id: wait.clone(),
+                request: payload("choose"),
+                response: ResponseContract {
+                    schema: SchemaId::new("test.text").unwrap(),
+                    version: 1,
+                },
+                answer: None,
+                withdrawn: false,
+            }),
+            JournalAction::Control(agent_kit_core::turn::ControlDirective::Cancel),
+        ],
+    )
+    .await;
+    let state = acquired.lease.journal().load().await.unwrap();
+    let records = vec![HistoryRecord::Message(Message {
+        id: MessageId::new("late").unwrap(),
+        role: Role::User,
+        phase: None,
+        content: vec![Content::Text("late".into())],
+        provenance: Provenance {
+            source: "client".into(),
+            kind: ProvenanceKind::Supplied,
+            fingerprint: None,
+        },
+    })];
+    for action in [
+        SessionControl::Resolve {
+            turn: turn(),
+            expected: state.controls().revision,
+            wait: wait.clone(),
+            answer: payload("late"),
+        },
+        SessionControl::AppendHistory {
+            turn: turn(),
+            expected: state.controls().revision,
+            expected_history: state.history().position(),
+            records: records.clone(),
+        },
+        SessionControl::ResolveAndAppend {
+            turn: turn(),
+            expected: state.controls().revision,
+            expected_history: state.history().position(),
+            wait: wait.clone(),
+            answer: payload("late"),
+            records,
+        },
+    ] {
+        assert_error(
+            store
+                .control(ControlRequest {
+                    id: change("late"),
+                    session: session(),
+                    expected_revision: store.inspect(session()).await.unwrap().revision,
+                    action,
+                })
+                .await,
+            ErrorKind::InvalidState,
+            "turn_cancelled",
+        );
+        let current = acquired.lease.journal().load().await.unwrap();
+        assert_eq!(current.position(), state.position());
+        assert!(current.waits().get(&wait).unwrap().is_pending());
+    }
+}

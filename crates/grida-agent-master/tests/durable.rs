@@ -253,6 +253,7 @@ impl Provider for ScriptProvider {
 struct EchoTool {
     definition: ToolDefinition,
     calls: AtomicUsize,
+    uncertain: AtomicBool,
 }
 impl EchoTool {
     fn new() -> Self {
@@ -267,6 +268,7 @@ impl EchoTool {
                 recovery: RecoveryKind::Unavailable,
             },
             calls: AtomicUsize::new(0),
+            uncertain: AtomicBool::new(false),
         }
     }
 }
@@ -284,6 +286,9 @@ impl Tool for EchoTool {
     }
     fn invoke(&self, invocation: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
         self.calls.fetch_add(1, Ordering::SeqCst);
+        if self.uncertain.load(Ordering::SeqCst) {
+            return Box::pin(async { ToolOutcome::uncertain() });
+        }
         let ToolArguments::Json(arguments) = invocation.arguments() else {
             unreachable!()
         };
@@ -324,6 +329,7 @@ struct Fixture {
     provider: Arc<ScriptProvider>,
     tool: Arc<EchoTool>,
     inventory: InventorySnapshot,
+    max_operations: usize,
 }
 impl Fixture {
     fn new(script: Script) -> Self {
@@ -350,6 +356,7 @@ impl Fixture {
             provider,
             tool,
             inventory: inventory.snapshot(&[tool_id()]).unwrap(),
+            max_operations: 64,
         }
     }
     fn store(&self) -> SqliteStore {
@@ -381,7 +388,7 @@ impl Fixture {
             authority: Arc::new(Granted(self.grants())),
             gate,
             limits: ExecutionLimits {
-                max_operations: 64,
+                max_operations: self.max_operations,
                 max_concurrent_inferences: 1,
                 max_concurrent_tools: 2,
                 max_output_bytes: 64 * 1024,
@@ -478,6 +485,7 @@ enum PublicationInterruption {
     ControlBeforeBoundary(ControlDirective),
     InputAfterCommit,
     QuestionAfterCommit,
+    InputBeforeBoundary,
 }
 
 /// Injects a boundary event after provider/tool outcomes are durable.
@@ -496,6 +504,7 @@ impl TurnJournal for InterruptPublication {
             if matches!(
                 self.interruption,
                 PublicationInterruption::ControlBeforeBoundary(_)
+                    | PublicationInterruption::InputBeforeBoundary
             ) {
                 let previous = self.loads_before_control.fetch_update(
                     Ordering::SeqCst,
@@ -503,10 +512,18 @@ impl TurnJournal for InterruptPublication {
                     |remaining| remaining.checked_sub(1),
                 );
                 if previous == Ok(1) {
-                    let PublicationInterruption::ControlBeforeBoundary(directive) =
-                        self.interruption
-                    else {
-                        unreachable!()
+                    let action = match self.interruption {
+                        PublicationInterruption::ControlBeforeBoundary(directive) => {
+                            JournalAction::Control(directive)
+                        }
+                        PublicationInterruption::InputBeforeBoundary => {
+                            JournalAction::AppendHistory(vec![HistoryRecord::Message(message(
+                                "late-input",
+                                Role::User,
+                                Content::Text("Apply this correction".into()),
+                            ))])
+                        }
+                        _ => unreachable!(),
                     };
                     let state = self.lease.journal().load().await?;
                     let change = JournalChange::new(
@@ -514,7 +531,7 @@ impl TurnJournal for InterruptPublication {
                         state.binding().clone(),
                         state.position(),
                         state.controls().revision,
-                        vec![JournalAction::Control(directive)],
+                        vec![action],
                     )?;
                     self.lease.journal().commit(change).await?;
                 }
@@ -564,7 +581,8 @@ impl TurnJournal for InterruptPublication {
                     ErrorKind::Unavailable,
                     "publication_interrupted",
                 )),
-                PublicationInterruption::ControlBeforeBoundary(_) => {
+                PublicationInterruption::ControlBeforeBoundary(_)
+                | PublicationInterruption::InputBeforeBoundary => {
                     let receipt = self.lease.journal().commit(change).await?;
                     self.loads_before_control.store(2, Ordering::SeqCst);
                     Ok(receipt)
@@ -1140,6 +1158,250 @@ async fn fresh_authority_replaces_only_a_request_that_never_dispatched() {
         assert_eq!(account.steps, 1);
         assert!(account.unresolved.is_empty());
         assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+        store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn unstarted_requests_cannot_renew_under_another_principal_or_scope() {
+    for replace_principal in [true, false] {
+        let fixture = Fixture::new(Script::Answer);
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let lease = intercept_publication(claim.lease, PublicationInterruption::BeforeDispatch);
+        let opened = fixture.runtime().open(lease).await.unwrap();
+        assert!(
+            fixture
+                .master(2, "Be concise")
+                .run(opened.turn, input())
+                .await
+                .is_err()
+        );
+        drop(store);
+        let store = fixture.reopen().await;
+        {
+            let mut authority = fixture.provider.authority.lock().unwrap();
+            if replace_principal {
+                authority.principal = PrincipalId::new("another-principal").unwrap();
+            } else {
+                authority.scope = ScopeId::new("another-scope").unwrap();
+            }
+        }
+        let claim = fixture.recover(&store).await;
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let result = fixture
+            .master(2, "Be concise")
+            .run(opened.turn, input())
+            .await;
+        assert!(matches!(result, Err(error) if error.code == "continuation_authority_changed"));
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+    }
+}
+
+#[tokio::test]
+async fn a_correction_received_before_dispatch_replaces_the_unsent_request() {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let lease = intercept_publication(claim.lease, PublicationInterruption::BeforeDispatch);
+    let opened = fixture.runtime().open(lease).await.unwrap();
+    assert!(
+        fixture
+            .master(1, "Be concise")
+            .run(opened.turn, input())
+            .await
+            .is_err()
+    );
+    let view = store.inspect(session_id()).await.unwrap();
+    let current = view.current.unwrap();
+    store
+        .control(ControlRequest {
+            id: change_id("steer-unsent"),
+            session: session_id(),
+            expected_revision: view.revision,
+            action: SessionControl::AppendHistory {
+                turn: turn_id(),
+                expected: current.controls.revision,
+                expected_history: current.history_position,
+                records: vec![HistoryRecord::Message(message(
+                    "correction",
+                    Role::User,
+                    Content::Text("Use this correction".into()),
+                ))],
+            },
+        })
+        .await
+        .unwrap();
+    let claim = fixture.recover(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(1, "Be concise")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected corrected request settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    {
+        let requests = fixture.provider.requests.lock().unwrap();
+        assert!(
+            requests[0]
+                .messages
+                .iter()
+                .any(|message| message.id.as_str() == "correction")
+        );
+    }
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_retained_preparation_limit_settles_without_dispatching_its_replacement() {
+    let mut fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let lease = intercept_publication(claim.lease, PublicationInterruption::BeforeDispatch);
+    let opened = fixture.runtime().open(lease).await.unwrap();
+    assert!(
+        fixture
+            .master(1, "Be concise")
+            .run(opened.turn, input())
+            .await
+            .is_err()
+    );
+    drop(store);
+    let store = fixture.reopen().await;
+    fixture.provider.authority.lock().unwrap().binding = BindingId::new("fresh-host").unwrap();
+    fixture.max_operations = 1;
+    let claim = fixture.recover(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(1, "Be concise")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected limit settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.failure.unwrap().code, "operation_limit");
+    assert!(account.unresolved.is_empty());
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
+async fn steering_racing_uncertain_settlement_never_admits_more_work() {
+    let fixture = Fixture::new(Script::ToolThenAnswer);
+    fixture.tool.uncertain.store(true, Ordering::SeqCst);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let lease = intercept_publication(claim.lease, PublicationInterruption::InputBeforeBoundary);
+    let opened = fixture.runtime().open(lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Be concise")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected uncertain settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Uncertain);
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
+async fn legacy_completion_checks_the_original_request_before_settling() {
+    for add_input in [false, true] {
+        let fixture = Fixture::new(Script::Answer);
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let lease = intercept_publication(
+            claim.lease,
+            PublicationInterruption::ControlAfterCommit(ControlDirective::Pause),
+        );
+        let opened = fixture.runtime().open(lease).await.unwrap();
+        assert!(matches!(
+            fixture
+                .master(4, "Be concise")
+                .run(opened.turn, input())
+                .await
+                .unwrap(),
+            MasterOutcome::Suspended(_)
+        ));
+        let view = store.inspect(session_id()).await.unwrap();
+        let current = view.current.unwrap();
+        let ClaimOutcome::Acquired(claim) = store
+            .claim(ClaimRequest {
+                id: change_id("resume"),
+                session: session_id(),
+                expected_revision: view.revision,
+                selection: TurnSelection::ResumePaused {
+                    turn: turn_id(),
+                    epoch: current.binding.epoch,
+                    position: current.position,
+                    control_revision: current.controls.revision,
+                },
+            })
+            .await
+            .unwrap()
+        else {
+            panic!("expected resumed owner")
+        };
+        let state = claim.lease.journal().load().await.unwrap();
+        let checkpoint = state.checkpoint().unwrap();
+        let mut legacy: serde_json::Value = serde_json::from_slice(checkpoint.bytes()).unwrap();
+        legacy.as_object_mut().unwrap().remove("request_history");
+        legacy.as_object_mut().unwrap().remove("request_generation");
+        let checkpoint = Envelope::new(
+            checkpoint.schema().clone(),
+            checkpoint.version(),
+            serde_json::to_vec(&legacy).unwrap(),
+        )
+        .unwrap();
+        let mut actions = vec![JournalAction::SetCheckpoint(checkpoint)];
+        if add_input {
+            actions.push(JournalAction::AppendHistory(vec![HistoryRecord::Message(
+                message(
+                    "new-input",
+                    Role::User,
+                    Content::Text("Apply this correction".into()),
+                ),
+            )]));
+        }
+        claim
+            .lease
+            .journal()
+            .commit(
+                JournalChange::new(
+                    change_id("legacy-state"),
+                    state.binding().clone(),
+                    state.position(),
+                    state.controls().revision,
+                    actions,
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let MasterOutcome::Settled(receipt) = fixture
+            .master(4, "Be concise")
+            .run(opened.turn, input())
+            .await
+            .unwrap()
+        else {
+            panic!("expected legacy settlement")
+        };
+        assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+        assert_eq!(
+            fixture.provider.calls.load(Ordering::SeqCst),
+            if add_input { 2 } else { 1 }
+        );
         store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
     }
 }

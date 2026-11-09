@@ -227,6 +227,33 @@ impl SqliteStore {
         .await
     }
 
+    /// Read the immutable submissions selected by a turn without issuing a lease.
+    pub async fn turn_submissions(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+    ) -> Result<Vec<Submission>> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            load_turn(connection, &session, &turn)?;
+            turn_inputs(connection, &session, &turn)
+        })
+        .await
+    }
+
+    /// Read a caller-owned view from one committed turn snapshot without a lease.
+    /// The projection runs under the store lock and must be a pure in-memory transform.
+    pub async fn inspect_turn_with<T: Send + 'static>(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+        project: impl FnOnce(&TurnState) -> Result<T> + Send + 'static,
+    ) -> Result<T> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            project(&load_turn(connection, &session, &turn)?)
+        })
+        .await
+    }
+
     /// Read committed history in turn creation and record append order.
     ///
     /// A `before_turn` cut excludes that turn and all subsequent turns. The
@@ -236,6 +263,20 @@ impl SqliteStore {
         &self,
         session: SessionId,
         before_turn: Option<TurnId>,
+    ) -> Result<Vec<HistoryRecord>> {
+        self.history_with(session, before_turn, |state| {
+            state.history().records().to_vec()
+        })
+        .await
+    }
+
+    /// Apply a caller-owned per-turn projection within the same bounded read.
+    /// The projection runs under the store lock and must be a pure in-memory transform.
+    pub async fn history_with(
+        &self,
+        session: SessionId,
+        before_turn: Option<TurnId>,
+        project: impl Fn(&TurnState) -> Vec<HistoryRecord> + Send + 'static,
     ) -> Result<Vec<HistoryRecord>> {
         execute(Arc::clone(&self.inner), move |_, connection| {
             load_session(connection, &session)?;
@@ -279,11 +320,11 @@ impl SqliteStore {
                     return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
                 }
                 let state = decode_turn(snapshot, &session, &turn)?;
-                let records = state.history().records();
+                let records = project(&state);
                 if history.len() + records.len() > MAX_HISTORY_RECORDS {
                     return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
                 }
-                for record in records {
+                for record in &records {
                     result_bytes += encode(record)?.len() + usize::from(!history.is_empty());
                     if result_bytes > MAX_HISTORY_BYTES {
                         return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
@@ -709,6 +750,16 @@ impl SessionStore for SqliteStore {
                     return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
                 }
                 let mut state = load_turn(&transaction, &request.session, turn)?;
+                if state.controls().cancelled
+                    && actions.iter().any(|action| {
+                        matches!(
+                            action,
+                            JournalAction::AppendHistory(_) | JournalAction::ResolveWait { .. }
+                        )
+                    })
+                {
+                    return Err(error(ErrorKind::InvalidState, "turn_cancelled"));
+                }
                 let change = JournalChange::new(
                     request.id.clone(),
                     state.binding().clone(),

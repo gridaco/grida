@@ -23,10 +23,21 @@ User input arriving after a prepared request is incorporated before a successful
 turn settles. An unanswered interaction preserves the unfinished turn through
 suspension, releasing the worker until an explicit resumption.
 
-A prepared request with obsolete execution authority can be retired only when
-it has no dispatched attempt. Its replacement receives a new operation identity
-under current authority and preserves the inference-step allowance. Dispatched
-attempts retain their recorded outcomes and uncertainty.
+A prepared request can be retired for new input or renewed execution authority
+only when it has no dispatched attempt. Authority renewal preserves its provider,
+principal and scope. Its replacement receives a new operation identity and
+preserves the inference-step allowance. Dispatched attempts retain their recorded
+outcomes and uncertainty, including when new input races settlement.
+
+The model history projection places responses before corrections absent from
+their prepared requests. It retains published content and tool exchanges while
+the journal preserves receipt order. Hosts can use the same projection for
+preceding turns.
+
+Turn-bound question tools support immediate registration and answer-dependent
+deferral. Responses can be a suggested choice, free text, or a skip. Their
+schema and reply validation live with the tools. The host chooses which styles
+to offer and how to deliver questions to its clients.
 
 Completion accounts expose typed output-limit, refusal, and step-limit reasons
 for client adapters. Provider failure classifications remain available in the

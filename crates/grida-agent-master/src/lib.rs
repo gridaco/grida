@@ -1,6 +1,8 @@
 //! Bounded conversational policy composed over the reusable execution runtime.
 
 pub mod configuration;
+pub mod history;
+pub mod questions;
 pub mod usage;
 
 use agent_kit_core::authority::GrantSelection;
@@ -11,7 +13,9 @@ use agent_kit_core::inference::{
 };
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::InventorySnapshot;
-use agent_kit_core::turn::{SettlementReceipt, SuspensionReceipt, TurnOutcome};
+use agent_kit_core::turn::{
+    OperationInput, OperationOutcome, SettlementReceipt, SuspensionReceipt, TurnOutcome,
+};
 use agent_kit_core::{
     Envelope, Error, ErrorKind, Fingerprint, MessageId, OperationId, Result, SchemaId,
 };
@@ -175,7 +179,7 @@ impl Master {
             }
             if let Some(outcome) = continuation.outcome.clone() {
                 if outcome.status == OutcomeStatus::Succeeded
-                    && has_new_input(&view, continuation.request_history)
+                    && has_new_input(&turn, &continuation)?
                 {
                     continuation.outcome = None;
                     continue;
@@ -221,8 +225,9 @@ impl Master {
             let request = match &continuation.request {
                 Some(request) => request.clone(),
                 None => {
-                    continuation.request_history = Some(turn.view().state.history().position());
-                    let request = match self.prepare(&turn) {
+                    let input_view = turn.view();
+                    continuation.request_history = Some(input_view.state.history().position());
+                    let request = match self.prepare(&input_view) {
                         Ok(request) => request,
                         Err(error) => {
                             let mut outcome = self.account(
@@ -287,6 +292,35 @@ impl Master {
                             Some(outcome) => return Ok(outcome),
                             None => continue,
                         }
+                    }
+                    if error.kind == ErrorKind::LimitExceeded
+                        && error.code == "operation_limit"
+                        && current
+                            .state
+                            .operations()
+                            .values()
+                            .all(|operation| operation.outcome().is_some())
+                    {
+                        let mut outcome = self.account(
+                            &turn,
+                            OutcomeStatus::Failed,
+                            continuation.step,
+                            "Execution reached the configured operation limit.",
+                            None,
+                            None,
+                        )?;
+                        let mut account =
+                            read_account(outcome.account.as_ref().expect("master account"))?;
+                        account.failure = Some(error);
+                        outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+                        continuation.request = None;
+                        continuation.outcome = Some(outcome);
+                        turn.checkpoint(
+                            OperationKey::new(format!("{step_key}/execution-rejected"))?,
+                            encode(CONTINUATION_SCHEMA, &continuation)?,
+                        )
+                        .await?;
+                        continue;
                     }
                     return Err(error);
                 }
@@ -489,19 +523,53 @@ impl Master {
         let Some(request) = &continuation.request else {
             return Ok(false);
         };
-        if request.binding().authority == self.authority.inference.authority {
+        let key = continuation.step_key();
+        let operation = turn.operation(&OperationKey::new(key.clone())?)?;
+        if operation
+            .as_ref()
+            .is_some_and(|operation| !operation.attempts.is_empty())
+        {
             return Ok(false);
         }
-        let key = continuation.step_key();
-        if let Some(operation) = turn.operation(&OperationKey::new(key.clone())?)? {
-            if !operation.attempts.is_empty() {
-                return Ok(false);
-            }
-            if operation.outcome().is_none() {
-                turn.operations()
-                    .cancel_prepared(operation.record.id)
-                    .await?;
-            }
+        let new_input = turn
+            .view()
+            .state
+            .history()
+            .records()
+            .iter()
+            .enumerate()
+            .any(|(index, record)| {
+                let HistoryRecord::Message(message) = record;
+                message.role == Role::User
+                    && match continuation.request_history {
+                        Some(position) => index as u64 >= position.0,
+                        None => !request.request().messages.contains(message),
+                    }
+            });
+        if !new_input && request.binding().authority == self.authority.inference.authority {
+            return Ok(false);
+        }
+        let previous = &request.binding().authority;
+        let current = &self.authority.inference.authority;
+        if previous.principal != current.principal || previous.scope != current.scope {
+            return Err(Error::new(
+                ErrorKind::Conflict,
+                "continuation_authority_changed",
+            ));
+        }
+        let refreshed = self.provider.prepare(request.request().clone())?;
+        if refreshed.binding().provider != request.binding().provider {
+            return Err(Error::new(
+                ErrorKind::Conflict,
+                "continuation_provider_changed",
+            ));
+        }
+        if let Some(operation) = operation
+            && operation.outcome().is_none()
+        {
+            turn.operations()
+                .cancel_prepared(operation.record.id)
+                .await?;
         }
         continuation.request = None;
         continuation.request_generation = continuation
@@ -516,8 +584,7 @@ impl Master {
         Ok(true)
     }
 
-    fn prepare(&self, turn: &Turn) -> Result<PreparedRequest> {
-        let view = turn.view();
+    fn prepare(&self, view: &TurnView) -> Result<PreparedRequest> {
         let mut messages = Vec::new();
         if !self.config.instructions.is_empty() {
             messages.push(Message {
@@ -533,9 +600,9 @@ impl Master {
             });
         }
         messages.extend(self.history.iter().cloned());
-        messages.extend(view.state.history().records().iter().map(|record| {
+        messages.extend(history::project(&view.state).into_iter().map(|record| {
             let HistoryRecord::Message(message) = record;
-            message.clone()
+            message
         }));
         let request = self.provider.prepare(InferenceRequest {
             model: self.config.model.clone(),
@@ -670,6 +737,7 @@ impl Master {
         outcome: TurnOutcome,
         basis: &TurnView,
     ) -> Result<Option<MasterOutcome>> {
+        let may_continue = outcome.status == OutcomeStatus::Succeeded;
         match turn
             .try_finish(CompletionDraft {
                 expected_control: basis.state.controls().revision,
@@ -680,7 +748,7 @@ impl Master {
         {
             FinishOutcome::Settled(receipt) => Ok(Some(MasterOutcome::Settled(*receipt))),
             FinishOutcome::Continue(error) if error.kind == ErrorKind::Conflict => {
-                if turn.view().state.history().position() != basis.state.history().position() {
+                if may_continue && has_new_input(turn, continuation)? {
                     continuation.outcome = None;
                     continuation.request = None;
                 }
@@ -711,11 +779,29 @@ impl Master {
     }
 }
 
-fn has_new_input(view: &TurnView, after: Option<HistoryPosition>) -> bool {
-    let Some(after) = after else {
-        return false;
+fn has_new_input(turn: &Turn, continuation: &Continuation) -> Result<bool> {
+    let view = turn.view();
+    let Some(after) = continuation.request_history else {
+        let previous = match continuation.step.checked_sub(1) {
+            Some(step) => turn.operation(&OperationKey::new(format!("conversation/{step}"))?)?,
+            None => None,
+        };
+        let consumed = previous.as_ref().and_then(|operation| {
+            let OperationInput::Inference(request) = &operation.record.input else {
+                return None;
+            };
+            matches!(operation.outcome(), Some(OperationOutcome::Inference(outcome))
+                if outcome.status == InferenceStatus::Completed)
+            .then_some(&request.request().messages)
+        });
+        return Ok(view.state.history().records().iter().any(|record| {
+            let HistoryRecord::Message(message) = record;
+            message.role == Role::User
+                && consumed.is_none_or(|messages| !messages.contains(message))
+        }));
     };
-    view.state
+    Ok(view
+        .state
         .history()
         .records()
         .iter()
@@ -723,7 +809,7 @@ fn has_new_input(view: &TurnView, after: Option<HistoryPosition>) -> bool {
         .any(|(index, record)| {
             let HistoryRecord::Message(message) = record;
             index as u64 >= after.0 && message.role == Role::User
-        })
+        }))
 }
 
 pub fn read_account(envelope: &Envelope) -> Result<Account> {

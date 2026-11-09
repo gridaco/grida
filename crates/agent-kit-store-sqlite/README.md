@@ -50,3 +50,8 @@ selects the history available before that turn. Projection reads the retained
 snapshots without modifying them or acquiring a turn lease. It returns an
 explicit limit error if the result exceeds 4,096 records or 8 MiB encoded, or
 the scan exceeds 4,096 turns or 128 MiB of stored snapshots.
+
+Caller-owned pure projections can inspect a committed turn or transform each
+turn's history within those bounded reads. They acquire no execution lease.
+External answers and history contributions are rejected after cancellation,
+while the turn owner can still record already-observed outcomes.
