@@ -72,4 +72,17 @@ describe("Desktop preload agent seam", () => {
     );
     expect(preloadSource).not.toContain("agentClient.media");
   });
+
+  it("delivers native chat updates only to the matching preload subscription", () => {
+    expect(preloadSource).toContain(
+      "nativeChatHandlers.get(payload.subscriptionId)"
+    );
+    expect(preloadSource).toContain(
+      "subscriber.attachmentId !== payload.attachmentId"
+    );
+    expect(preloadSource).toContain("subscriber.onUpdate(payload.update)");
+    expect(preloadSource).toContain(
+      'window.addEventListener("pagehide", () => nativeChatHandlers.clear())'
+    );
+  });
 });

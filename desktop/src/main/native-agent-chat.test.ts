@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
+import type { NativeChatStreamUpdate } from "@grida/desktop-bridge";
 import {
   NativeAgentChat,
   type NativeAgentChatLaunch,
@@ -117,6 +118,10 @@ it.runIf(Boolean(packaged))(
       client = await NativeAgentChat.start(launch);
       const session = await client.create();
       const other = await client.create();
+      const updates: NativeChatStreamUpdate[] = [];
+      const otherUpdates: NativeChatStreamUpdate[] = [];
+      client.subscribe(session, (update) => updates.push(update));
+      client.subscribe(other, (update) => otherUpdates.push(update));
       await expect(client.observe({ id: session.id })).rejects.toThrow(
         "native_chat_attachment_required"
       );
@@ -131,6 +136,19 @@ it.runIf(Boolean(packaged))(
           turnId: expect.any(String),
         })
       );
+      await vi.waitFor(() => {
+        expect(updates).toContainEqual(
+          expect.objectContaining({
+            kind: "text",
+            role: "assistant",
+            turnId: accepted.turnId,
+            offsetBytes: 0,
+            text: "Working",
+            replace: false,
+          })
+        );
+      });
+      expect(otherUpdates).toEqual([]);
       expect(
         await client.submit(
           session,

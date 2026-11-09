@@ -35,6 +35,16 @@ accept bounded inline mesh bytes, never input paths or provider URLs.
 Desktop still owns Electron IPC channel names, preload implementation, native
 window/dialog/shell behavior, and AgentHost supervision.
 
+`nativeChat` is an optional Desktop namespace. Check `available()` in the
+current workspace before using it. The app issues an attachment for each
+renderer that creates or loads a chat. Submit keeps the caller's input ID.
+Pause, Resume, and Stop use an observation issued for that attachment.
+Streamed text carries message and turn IDs, a UTF-8 byte offset, and a
+replacement flag. A resync notice or local delivery limit ends confidence in
+the streamed view. The retained snapshot remains the source for task state.
+Navigating away releases attachments and subscriptions while accepted work
+stays owned by the native host.
+
 ## Anti-goals
 
 - Not an Electron IPC package.

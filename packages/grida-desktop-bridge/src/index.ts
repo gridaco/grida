@@ -62,6 +62,9 @@ import type {
   WorkspaceWriteFileResult,
 } from "@grida/daemon";
 
+import type { DesktopNativeChat } from "./native-chat";
+export type * from "./native-chat";
+
 export const DESKTOP_BRIDGE_PROTOCOL = 1 as const;
 
 export type DesktopNativeCapabilities = {
@@ -237,6 +240,7 @@ export type DesktopBridge = {
   app: { version: string; platform: string };
   caps: DesktopCapabilities;
   handshake: () => Promise<HandshakeResponse>;
+  nativeChat?: DesktopNativeChat;
   /**
    * Grida account lifecycle owned by the native entry controller. Optional
    * because older protocol-1 hosts let individual renderer windows sign out

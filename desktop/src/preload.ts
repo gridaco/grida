@@ -34,6 +34,7 @@ import {
   type DesktopHostAppInfo,
   type HandshakeResponse,
   type NavigationState,
+  type NativeChatUpdate,
   type OpenDialogOptions,
   type SaveDialogOptions,
   type TerminalCreateOptions,
@@ -88,6 +89,36 @@ const agentRuns = new Map<string, AbortController>();
 // two subscribers to the same session never collide (cf. `agentRuns`, keyed by
 // session). Each owns an AbortController that `unsubscribe_status` trips.
 const statusSubs = new Map<string, AbortController>();
+
+const nativeChatHandlers = new Map<
+  string,
+  {
+    attachmentId: string;
+    onUpdate: (update: NativeChatUpdate) => void;
+  }
+>();
+ipcRenderer.on(
+  IPC_CHANNELS.NATIVE_CHAT_UPDATE,
+  (
+    _event,
+    payload: {
+      subscriptionId: string;
+      attachmentId: string;
+      update: NativeChatUpdate;
+    }
+  ) => {
+    if (location.pathname !== "/desktop/workspace") return;
+    const subscriber = nativeChatHandlers.get(payload.subscriptionId);
+    if (!subscriber || subscriber.attachmentId !== payload.attachmentId) return;
+    if (payload.update.kind === "closed")
+      nativeChatHandlers.delete(payload.subscriptionId);
+    try {
+      subscriber.onUpdate(payload.update);
+    } catch {
+      /* Consumers own their updates. */
+    }
+  }
+);
 
 async function handshake(): Promise<HandshakeResponse> {
   return await agentClient.handshake();
@@ -200,20 +231,27 @@ function installDesktopNavigationGuard(): void {
   const pushState = window.history.pushState.bind(window.history);
   window.history.pushState = (data, unused, url) => {
     assertAllowed(url);
-    return pushState(data, unused, url);
+    const before = window.location.href;
+    pushState(data, unused, url);
+    if (window.location.href !== before) nativeChatHandlers.clear();
   };
 
   const replaceState = window.history.replaceState.bind(window.history);
   window.history.replaceState = (data, unused, url) => {
     assertAllowed(url);
-    return replaceState(data, unused, url);
+    const before = window.location.href;
+    replaceState(data, unused, url);
+    if (window.location.href !== before) nativeChatHandlers.clear();
   };
 
   window.addEventListener("popstate", () => {
+    nativeChatHandlers.clear();
     if (!isDesktopPath(window.location.pathname)) {
       window.location.replace("/desktop/welcome");
     }
   });
+  window.addEventListener("pagehide", () => nativeChatHandlers.clear());
+  window.addEventListener("hashchange", () => nativeChatHandlers.clear());
 }
 
 /**
@@ -326,6 +364,62 @@ const bridge: DesktopBridge = {
   },
 
   handshake,
+
+  nativeChat: {
+    available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
+    create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
+    load: (sessionId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),
+    detach: async (attachmentId) => {
+      for (const [id, subscriber] of nativeChatHandlers) {
+        if (subscriber.attachmentId === attachmentId)
+          nativeChatHandlers.delete(id);
+      }
+      await ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_DETACH, attachmentId);
+    },
+    submit: (attachmentId, inputId, text) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+        attachmentId,
+        inputId,
+        text
+      ),
+    inputReceipt: (attachmentId, inputId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
+        attachmentId,
+        inputId
+      ),
+    observe: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
+    control: (attachmentId, control) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CONTROL,
+        attachmentId,
+        control
+      ),
+    subscribe: async (attachmentId, onUpdate) => {
+      if (nativeChatHandlers.size >= 8)
+        throw new Error("native_chat_subscription_limit");
+      const id = crypto.randomUUID();
+      nativeChatHandlers.set(id, { attachmentId, onUpdate });
+      try {
+        await ipcRenderer.invoke(
+          IPC_CHANNELS.NATIVE_CHAT_SUBSCRIBE,
+          attachmentId,
+          id
+        );
+        return id;
+      } catch (error) {
+        nativeChatHandlers.delete(id);
+        throw error;
+      }
+    },
+    unsubscribe: async (id) => {
+      nativeChatHandlers.delete(id);
+      await ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_UNSUBSCRIBE, id);
+    },
+  },
 
   account: {
     sign_out: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_SIGN_OUT),

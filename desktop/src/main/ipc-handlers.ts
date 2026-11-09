@@ -57,6 +57,7 @@ import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
 import { ipc_sender } from "./ipc-sender";
 import { DesktopMediaHost } from "./media-host";
 import { DesktopMediaRoot } from "./media-root";
+import { NativeChatIpc, type ActiveNativeChat } from "./native-chat-ipc";
 
 // `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
 // build-time constant once at module init rather than per call.
@@ -87,6 +88,7 @@ const mediaHost = new DesktopMediaHost({
 
 type RegisterIpcHandlersOptions = {
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
+  resolve_native_chat?: (window: BrowserWindow) => ActiveNativeChat | null;
   on_onboarding_complete?: (input: {
     window: BrowserWindow;
     workspace_id?: string;
@@ -97,6 +99,12 @@ type RegisterIpcHandlersOptions = {
 };
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
+  const nativeChat = new NativeChatIpc(EDITOR_ORIGIN, (sender) => {
+    const window = BrowserWindow.fromWebContents(sender);
+    return window && options.resolve_ipc_role(window) === "main"
+      ? (options.resolve_native_chat?.(window) ?? null)
+      : null;
+  });
   /**
    * GRIDA-SEC-004 / GRIDA-SEC-005 — every native IPC invoke must pass both
    * structural URL admission and the controller-owned window/role capability
@@ -133,6 +141,43 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     if (!info) throw new Error("agent sidecar not ready");
     return info;
   });
+
+  guarded(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE, (event) =>
+    nativeChat.available(event)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_CREATE, (event) => nativeChat.create(event));
+  guarded(IPC_CHANNELS.NATIVE_CHAT_LOAD, (event, id: string) =>
+    nativeChat.load(event, id)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_DETACH, (event, id: string) =>
+    nativeChat.detach(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+    (event, id: string, input: string, text: string) =>
+      nativeChat.submit(event, id, input, text)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
+    (event, id: string, input: string) =>
+      nativeChat.inputReceipt(event, id, input)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, (event, id: string) =>
+    nativeChat.observe(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_CONTROL,
+    (event, id: string, control: unknown) =>
+      nativeChat.control(event, id, control)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBSCRIBE,
+    (event, id: string, subscription: string) =>
+      nativeChat.subscribe(event, id, subscription)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_UNSUBSCRIBE, (event, subscription: string) =>
+    nativeChat.unsubscribe(event, subscription)
+  );
 
   // GRIDA-SEC-004 — onboarding never receives AGENT_SERVER_INFO. These
   // handlers keep the daemon bearer and the chosen absolute path on the

@@ -878,6 +878,15 @@ lazy reads, read-only mutation, and symlink escape refusal.
   session, turn, and revisions. A reconnect requires a new attachment before
   the same scoped control can be retried. [Process tests](desktop/src/main/native-agent-chat.test.ts)
   cover cross-session rejection, stale controls, and continuation after restart.
+- [Native chat IPC](desktop/src/main/native-chat-ipc.ts) is available only to
+  the current top-level workspace frame under the existing authenticated
+  window guard. Its attachments and observed control revisions are issued in
+  main. A copied handle or workspace URL alone confers no access. Navigation
+  invalidates the frame's attachments and observation delivery. The
+  [preload](desktop/src/preload.ts) forwards bounded text and resync payloads
+  through the [typed bridge](packages/grida-desktop-bridge/src/native-chat.ts).
+  [IPC fixtures](desktop/src/main/native-chat-ipc.test.ts) exercise frame and
+  workspace isolation, exact control targeting, and navigation cleanup.
 - The [native text observer](crates/grida-agent/src/acp/live.rs) projects
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery

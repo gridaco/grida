@@ -4,6 +4,9 @@ import { IPC_CHANNELS, type IpcChannel } from "../bridge/contract";
 import { ipc_admission } from "./ipc-admission";
 
 const allChannels = Object.values(IPC_CHANNELS) as IpcChannel[];
+const nativeChat = allChannels.filter((channel) =>
+  channel.startsWith("grida:native-chat:")
+);
 
 describe("ipc_admission", () => {
   it("gives sign-in only browser launch and read-only title-bar state", () => {
@@ -41,8 +44,29 @@ describe("ipc_admission", () => {
     expect(allowedFor("onboarding", "/desktop/auth/sign-in")).toEqual([]);
   });
 
-  it("admits every registered bridge channel on the exact Tools route", () => {
-    expect(allowedFor("main", "/desktop/tools")).toEqual(allChannels);
+  it("admits the Tools route with its separate native media capabilities", () => {
+    expect(allowedFor("main", "/desktop/tools")).toEqual(
+      allChannels.filter((channel) => !nativeChat.includes(channel))
+    );
+  });
+
+  it("admits native chat only on the exact main workspace route", () => {
+    expect(
+      allowedFor("main", "/desktop/workspace").filter((channel) =>
+        nativeChat.includes(channel)
+      )
+    ).toEqual(nativeChat);
+    for (const route of [
+      "/desktop",
+      "/desktop/settings",
+      "/desktop/workspace/extra",
+    ]) {
+      expect(
+        allowedFor("main", route).some((channel) =>
+          nativeChat.includes(channel)
+        )
+      ).toBe(false);
+    }
   });
 
   it("keeps durable media capabilities exclusive to the exact Tools route", () => {

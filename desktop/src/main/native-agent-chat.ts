@@ -1,6 +1,13 @@
 // GRIDA-SEC-004 — attached native chat controls owned by Electron main.
 import fs from "node:fs/promises";
 import path from "node:path";
+import type {
+  NativeChatAcceptance,
+  NativeChatControlReceipt,
+  NativeChatSnapshot,
+  NativeChatStreamUpdate,
+  NativeChatTurn,
+} from "@grida/desktop-bridge";
 import {
   NativeAgentProcess,
   type NativeAgentLaunch,
@@ -13,6 +20,7 @@ const CAPABILITIES = {
   "co.grida/session/stop": 1,
   "co.grida/session/pause": 1,
   "co.grida/session/resume": 1,
+  "co.grida/session/updates": 1,
 } as const;
 const TURN_DISPOSITIONS = [
   "running",
@@ -34,6 +42,7 @@ const INPUT_DISPOSITIONS = [
   "withdrawn",
 ] as const;
 const MAX_TEXT_BYTES = 512 * 1024;
+const MAX_UPDATE_BYTES = 8 * 1024;
 const IDENTITY = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 
 export type NativeAgentChatLaunch = Omit<
@@ -45,41 +54,6 @@ export type NativeAgentChatLaunch = Omit<
 };
 
 export type NativeChatSession = Readonly<{ id: string }>;
-export type NativeChatTurn = Readonly<{
-  turnId: string;
-  epoch: number;
-  journalPosition: number;
-  historyPosition: number;
-  controlRevision: number;
-  paused: boolean;
-  cancelled: boolean;
-  disposition: (typeof TURN_DISPOSITIONS)[number];
-  status: (typeof TURN_STATUSES)[number] | null;
-}>;
-export type NativeChatSnapshot = Readonly<{
-  sessionId: string;
-  sessionRevision: number;
-  queuedInputs: number;
-  admissionPaused: boolean;
-  current: NativeChatTurn | null;
-  latest: NativeChatTurn | null;
-}>;
-export type NativeChatAcceptance = Readonly<{
-  sessionId: string;
-  inputId: string;
-  inputPosition: number;
-  turnId: string | null;
-  disposition: (typeof INPUT_DISPOSITIONS)[number];
-  replacementInputId?: string;
-}>;
-export type NativeChatControlReceipt = Readonly<{
-  sessionId: string;
-  turnId: string;
-  requestId: string;
-  sessionRevision: number;
-  journalPosition: number;
-}>;
-
 type TaskBasis = Readonly<{
   sessionId: string;
   turnId: string;
@@ -94,6 +68,11 @@ const observed = new WeakMap<NativeChatSnapshot, string>();
 
 export class NativeAgentChat {
   private readonly attached = new Map<string, NativeChatSession>();
+  private readonly loading = new Map<string, Promise<NativeChatSession>>();
+  private readonly listeners = new Map<
+    string,
+    Set<(update: NativeChatStreamUpdate) => void>
+  >();
   private closed = false;
 
   private constructor(
@@ -113,15 +92,18 @@ export class NativeAgentChat {
       (launch.workspace !== undefined && launch.workspace.primary.path !== cwd)
     )
       throw new Error("native_chat_workspace_invalid");
+    let client: NativeAgentChat | undefined;
     const process = await NativeAgentProcess.start({
       ...launch,
       capabilities: CAPABILITIES,
+      onSessionUpdate: (params) => client?.publish(params),
     });
-    return new NativeAgentChat(
+    client = new NativeAgentChat(
       process,
       cwd,
       JSON.stringify([launch.stateDirectory, cwd])
     );
+    return client;
   }
 
   async create(): Promise<NativeChatSession> {
@@ -140,14 +122,21 @@ export class NativeAgentChat {
     const id = identity(sessionId);
     const existing = this.attached.get(id);
     if (existing) return existing;
-    object(
-      await this.process.request("session/load", {
+    const loading = this.loading.get(id);
+    if (loading) return loading;
+    const requested = this.process
+      .request("session/load", {
         sessionId: id,
         cwd: this.cwd,
         mcpServers: [],
       })
-    );
-    return this.attach(id);
+      .then((reply) => {
+        object(reply);
+        return this.attach(id);
+      })
+      .finally(() => this.loading.delete(id));
+    this.loading.set(id, requested);
+    return requested;
   }
 
   async submit(
@@ -256,7 +245,73 @@ export class NativeAgentChat {
   close(): Promise<void> {
     this.closed = true;
     this.attached.clear();
+    this.listeners.clear();
     return this.process.close();
+  }
+
+  subscribe(
+    session: NativeChatSession,
+    listener: (update: NativeChatStreamUpdate) => void
+  ): () => void {
+    const id = this.requireAttached(session);
+    let listeners = this.listeners.get(id);
+    if (!listeners) {
+      listeners = new Set();
+      this.listeners.set(id, listeners);
+    }
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+      if (!listeners.size && this.listeners.get(id) === listeners)
+        this.listeners.delete(id);
+    };
+  }
+
+  private publish(params: unknown): void {
+    try {
+      const notification = object(params);
+      const listeners = this.listeners.get(identity(notification.sessionId));
+      if (!listeners) return;
+      const update = object(notification.update);
+      const role =
+        update.sessionUpdate === "agent_message_chunk"
+          ? "assistant"
+          : update.sessionUpdate === "user_message_chunk"
+            ? "user"
+            : null;
+      if (!role) return;
+      const attribution = object(
+        object(notification._meta)["co.grida/session/updates"]
+      );
+      const content = object(update.content);
+      if (
+        content.type !== "text" ||
+        typeof content.text !== "string" ||
+        Buffer.byteLength(content.text) > MAX_UPDATE_BYTES
+      )
+        return;
+      const projected: NativeChatStreamUpdate =
+        attribution.resyncRequired === true && content.text === ""
+          ? Object.freeze({ kind: "resync" })
+          : Object.freeze({
+              kind: "text",
+              role,
+              text: content.text,
+              messageId: identity(update.messageId),
+              turnId: identity(attribution.turnId),
+              offsetBytes: revision(attribution.offsetBytes),
+              replace: flag(attribution.replace),
+            });
+      for (const listener of listeners) {
+        try {
+          listener(projected);
+        } catch {
+          /* Observers have independent lifetimes. */
+        }
+      }
+    } catch {
+      // Unknown or unattributed ACP events do not enter the renderer bridge.
+    }
   }
 
   private async control(
