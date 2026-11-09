@@ -8,3 +8,8 @@ Continuation records retain the prepared request before execution. Publishing
 conversation history and the next continuation is atomic, so restart can reuse
 recorded operations without repeating their effects. Runtime and storage retain
 their own execution and ownership contracts.
+
+The host can supply preceding conversation history as an immutable projection.
+It is included in model context without copying it into each turn's records.
+The continuation identity includes this projection so recovery cannot silently
+replace the context on which the turn was based.

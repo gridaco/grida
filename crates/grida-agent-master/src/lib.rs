@@ -52,6 +52,7 @@ pub struct Master {
     provider: Arc<dyn Provider>,
     tools: InventorySnapshot,
     authority: MasterAuthority,
+    history: Vec<Message>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -78,7 +79,14 @@ impl Master {
             provider,
             tools,
             authority,
+            history: Vec::new(),
         })
+    }
+
+    /// Supply an immutable projection of preceding conversation turns.
+    pub fn with_history(mut self, history: Vec<Message>) -> Self {
+        self.history = history;
+        self
     }
 
     pub async fn run(&self, mut turn: Turn, input: Vec<Message>) -> Result<MasterOutcome> {
@@ -284,7 +292,7 @@ impl Master {
     }
 
     fn continuation(&self, turn: &Turn) -> Result<Continuation> {
-        let fingerprint = Fingerprint::of(&self.config)?;
+        let fingerprint = Fingerprint::of(&(&self.config, &self.history))?;
         let view = turn.view();
         match view.state.checkpoint() {
             None => Ok(Continuation {
@@ -323,6 +331,7 @@ impl Master {
                 },
             });
         }
+        messages.extend(self.history.iter().cloned());
         messages.extend(view.state.history().records().iter().map(|record| {
             let HistoryRecord::Message(message) = record;
             message.clone()

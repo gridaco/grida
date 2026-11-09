@@ -1,5 +1,6 @@
 //! SQLite persistence for session admission and the bound execution journal.
 
+use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlReader, ControlRevision, ControlSnapshot,
     JournalAction, JournalChange, TurnBinding, TurnJournal, TurnState, bind_lease,
@@ -26,6 +27,10 @@ const SCHEMA_VERSION: i64 = 1;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_HISTORY_TURNS: i64 = 4_096;
+const MAX_HISTORY_RECORDS: usize = 4_096;
+const MAX_HISTORY_BYTES: usize = 8 * 1024 * 1024;
+const MAX_HISTORY_SCAN_BYTES: usize = 128 * 1024 * 1024;
 
 const SCHEMA: &str = "
 CREATE TABLE sessions (
@@ -166,6 +171,75 @@ impl SqliteStore {
                 _lock: lock,
             }),
         })
+    }
+
+    /// Read committed history in turn creation and record append order.
+    ///
+    /// A `before_turn` cut excludes that turn and all subsequent turns. The
+    /// cut must identify a turn in the supplied session. Projection is bounded
+    /// and returns `history_projection_limit` if a full result would exceed it.
+    pub async fn history(
+        &self,
+        session: SessionId,
+        before_turn: Option<TurnId>,
+    ) -> Result<Vec<HistoryRecord>> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            load_session(connection, &session)?;
+            let before = before_turn
+                .map(|turn| {
+                    connection
+                        .query_row(
+                            "SELECT ordinal FROM turns WHERE session=?1 AND id=?2",
+                            params![session.as_str(), turn.as_str()],
+                            |row| row.get::<_, i64>(0),
+                        )
+                        .optional()
+                        .map_err(database_error)?
+                        .ok_or_else(|| error(ErrorKind::InvalidInput, "turn_missing"))
+                })
+                .transpose()?;
+            let mut query = connection
+                .prepare(
+                    "SELECT id,snapshot FROM turns
+                     WHERE session=?1 AND (?2 IS NULL OR ordinal<?2)
+                     ORDER BY ordinal LIMIT ?3",
+                )
+                .map_err(database_error)?;
+            let mut rows = query
+                .query(params![session.as_str(), before, MAX_HISTORY_TURNS + 1])
+                .map_err(database_error)?;
+            let mut history = Vec::new();
+            let mut scanned_turns = 0;
+            let mut scanned_bytes = 0;
+            let mut result_bytes = 2;
+            while let Some(row) = rows.next().map_err(database_error)? {
+                let turn = TurnId::new(row.get::<_, String>(0).map_err(database_error)?)?;
+                let snapshot = row
+                    .get_ref(1)
+                    .map_err(database_error)?
+                    .as_blob()
+                    .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
+                scanned_turns += 1;
+                scanned_bytes += snapshot.len();
+                if scanned_turns > MAX_HISTORY_TURNS || scanned_bytes > MAX_HISTORY_SCAN_BYTES {
+                    return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
+                }
+                let state = decode_turn(snapshot, &session, &turn)?;
+                let records = state.history().records();
+                if history.len() + records.len() > MAX_HISTORY_RECORDS {
+                    return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
+                }
+                for record in records {
+                    result_bytes += encode(record)?.len() + usize::from(!history.is_empty());
+                    if result_bytes > MAX_HISTORY_BYTES {
+                        return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
+                    }
+                    history.push(record.clone());
+                }
+            }
+            Ok(history)
+        })
+        .await
     }
 
     fn acquire(&self, request: ClaimRequest) -> BoxFuture<'_, Result<ClaimOutcome>> {
@@ -868,10 +942,14 @@ fn load_turn(connection: &Connection, session: &SessionId, turn: &TurnId) -> Res
         .optional()
         .map_err(database_error)?
         .ok_or_else(|| error(ErrorKind::InvalidInput, "turn_missing"))?;
+    decode_turn(&bytes, session, turn)
+}
+
+fn decode_turn(bytes: &[u8], session: &SessionId, turn: &TurnId) -> Result<TurnState> {
     if bytes.len() > MAX_SNAPSHOT_BYTES {
         return Err(error(ErrorKind::LimitExceeded, "turn_snapshot_too_large"));
     }
-    let state: TurnState = decode(&bytes)?;
+    let state: TurnState = decode(bytes)?;
     if &state.binding().session != session || &state.binding().turn != turn {
         return Err(error(
             ErrorKind::InvalidState,

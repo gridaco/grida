@@ -33,3 +33,10 @@ Each input uses the core's bounded versioned envelope. A single turn snapshot is
 limited to 64 MiB. An over-limit write is rejected before its transaction commits.
 These bounds are storage admission limits. Retention and cleanup policy belong to
 the host.
+
+`SqliteStore::history` reads committed records in turn creation order and
+preserves their append order within each turn. An optional exclusive turn cut
+selects the history available before that turn. Projection reads the retained
+snapshots without modifying them or acquiring a turn lease. It returns an
+explicit limit error if the result exceeds 4,096 records or 8 MiB encoded, or
+the scan exceeds 4,096 turns or 128 MiB of stored snapshots.

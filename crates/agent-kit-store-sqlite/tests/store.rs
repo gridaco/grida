@@ -1,9 +1,12 @@
-use agent_kit_core::messages::OutcomeStatus;
+use agent_kit_core::history::HistoryRecord;
+use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::turn::{
     CommitReceipt, ControlRevision, JournalAction, JournalChange, JournalPosition,
     ResponseContract, TurnOutcome, WaitRecord,
 };
-use agent_kit_core::{ChangeId, Envelope, ErrorKind, Result, SchemaId, SessionId, TurnId, WaitId};
+use agent_kit_core::{
+    ChangeId, Envelope, ErrorKind, MessageId, Result, SchemaId, SessionId, TurnId, WaitId,
+};
 use agent_kit_sessions::{
     ClaimOutcome, ClaimRequest, ClaimedTurn, ControlRequest, CreateSession, DriverOutcome,
     RecoveryRequest, RunDisposition, SessionControl, SessionStore, Sessions, Submission,
@@ -893,4 +896,134 @@ async fn cancelled_suspension_can_be_claimed_only_for_finalization() {
     )
     .await;
     assert!(store.inspect(session()).await.unwrap().current.is_none());
+}
+
+fn history_message(id: &str, text: &str) -> HistoryRecord {
+    HistoryRecord::Message(Message {
+        id: MessageId::new(id).unwrap(),
+        role: Role::User,
+        phase: None,
+        content: vec![Content::Text(text.into())],
+        provenance: Provenance {
+            source: "fixture".into(),
+            kind: ProvenanceKind::Supplied,
+            fingerprint: None,
+        },
+    })
+}
+
+async fn finish_history_turn(
+    store: &SqliteStore,
+    session: SessionId,
+    turn: &str,
+    records: Vec<HistoryRecord>,
+) -> TurnId {
+    let input = submission(&format!("input-{turn}"), "hello");
+    store.submit(session.clone(), input.clone()).await.unwrap();
+    let view = store.inspect(session.clone()).await.unwrap();
+    let id = TurnId::new(turn).unwrap();
+    let request = ClaimRequest {
+        id: change(&format!("claim-{turn}")),
+        session,
+        expected_revision: view.revision,
+        selection: TurnSelection::New {
+            turn: id.clone(),
+            inputs: vec![input.id],
+        },
+    };
+    let ClaimOutcome::Acquired(claim) = store.claim(request).await.unwrap() else {
+        panic!("expected new turn")
+    };
+    commit(
+        &claim,
+        "finish",
+        vec![
+            JournalAction::AppendHistory(records),
+            JournalAction::Settle(TurnOutcome {
+                status: OutcomeStatus::Succeeded,
+                account: None,
+                evidence: vec![],
+            }),
+        ],
+    )
+    .await;
+    id
+}
+
+#[tokio::test]
+async fn history_preserves_turn_creation_and_append_order_after_reopen() {
+    let (directory, store) = store().await;
+    let first_records = vec![
+        history_message("z-first", "one"),
+        history_message("z-second", "two"),
+    ];
+    let first = finish_history_turn(&store, session(), "turn-z", first_records.clone()).await;
+    let other = SessionId::new("other").unwrap();
+    store
+        .create(CreateSession {
+            id: other.clone(),
+            request: change("create"),
+            configuration: payload("other"),
+        })
+        .await
+        .unwrap();
+    let foreign_turn = finish_history_turn(
+        &store,
+        other,
+        "foreign",
+        vec![history_message("foreign-message", "different session")],
+    )
+    .await;
+    let second_records = vec![history_message("a-first", "three")];
+    let second = finish_history_turn(&store, session(), "turn-a", second_records.clone()).await;
+    store
+        .submit(session(), submission("pending", "still queued"))
+        .await
+        .unwrap();
+    drop(store);
+
+    let reopened = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    let before = reopened.inspect(session()).await.unwrap();
+    assert_eq!(
+        reopened.history(session(), None).await.unwrap(),
+        [first_records.clone(), second_records].concat()
+    );
+    assert_eq!(
+        reopened.history(session(), Some(second)).await.unwrap(),
+        first_records
+    );
+    assert!(
+        reopened
+            .history(session(), Some(first))
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_error(
+        reopened.history(session(), Some(foreign_turn)).await,
+        ErrorKind::InvalidInput,
+        "turn_missing",
+    );
+    assert_eq!(reopened.inspect(session()).await.unwrap(), before);
+}
+
+#[tokio::test]
+async fn oversized_history_is_refused_without_returning_a_partial_projection() {
+    let (_directory, store) = store().await;
+    let records = (0..4_097)
+        .map(|i| history_message(&format!("message-{i}"), "text"))
+        .collect();
+    let turn = finish_history_turn(&store, session(), "large-turn", records).await;
+    assert_error(
+        store.history(session(), None).await,
+        ErrorKind::LimitExceeded,
+        "history_projection_limit",
+    );
+    assert!(
+        store
+            .history(session(), Some(turn))
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }

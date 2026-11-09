@@ -1,6 +1,7 @@
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
 };
+use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
     InferenceControl, InferenceOutcome, InferenceRequest, InferenceRun, InferenceStatus,
     InferenceUpdate, InputFormat, Modality, ModelCapabilities, PreparedRequest, Provider,
@@ -1014,4 +1015,174 @@ async fn cancellation_racing_with_settlement_reconsiders_the_stale_basis() {
     assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
+async fn previous_turns_supply_model_context_without_copying_transcript_records() {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(_) = fixture
+        .master(4, "Be concise")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected first settlement")
+    };
+    drop(store);
+    let store = fixture.reopen().await;
+    let follow_up = message(
+        "follow-up",
+        Role::User,
+        Content::Text("Continue the conversation".into()),
+    );
+    let submission = Submission {
+        id: change_id("follow-up"),
+        payload: envelope("Continue the conversation"),
+    };
+    store
+        .submit(session_id(), submission.clone())
+        .await
+        .unwrap();
+    let second_turn = TurnId::new("follow-up-turn").unwrap();
+    let request = ClaimRequest {
+        id: change_id("claim-follow-up"),
+        session: session_id(),
+        expected_revision: store.inspect(session_id()).await.unwrap().revision,
+        selection: TurnSelection::New {
+            turn: second_turn.clone(),
+            inputs: vec![submission.id],
+        },
+    };
+    let ClaimOutcome::Acquired(claim) = store.claim(request).await.unwrap() else {
+        panic!("expected second claim")
+    };
+    assert!(
+        claim
+            .lease
+            .journal()
+            .load()
+            .await
+            .unwrap()
+            .history()
+            .records()
+            .is_empty()
+    );
+    let preceding: Vec<_> = store
+        .history(session_id(), Some(second_turn))
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|record| {
+            let HistoryRecord::Message(message) = record;
+            message
+        })
+        .collect();
+    assert_eq!(
+        preceding
+            .iter()
+            .map(|message| message.id.as_str())
+            .collect::<Vec<_>>(),
+        ["input", "answer-0"]
+    );
+
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Be concise")
+        .with_history(preceding.clone())
+        .run(opened.turn, vec![follow_up.clone()])
+        .await
+        .unwrap()
+    else {
+        panic!("expected second settlement")
+    };
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+    let persisted = store.history(session_id(), None).await.unwrap();
+    let ids: Vec<_> = persisted
+        .iter()
+        .map(|record| {
+            let HistoryRecord::Message(message) = record;
+            message.id.as_str()
+        })
+        .collect();
+    assert_eq!(ids, ["input", "answer-0", "follow-up", "answer-1"]);
+    let requests = fixture.provider.requests.lock().unwrap();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[1].messages[0].role, Role::System);
+    assert_eq!(&requests[1].messages[1..3], preceding.as_slice());
+    assert_eq!(requests[1].messages[3..], [follow_up]);
+}
+
+#[tokio::test]
+async fn a_recovered_turn_requires_the_same_preceding_context() {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let preceding = vec![message(
+        "prior",
+        Role::User,
+        Content::Text("original context".into()),
+    )];
+    let claim = fixture.claim(&store).await;
+    let opened = fixture
+        .runtime()
+        .open(interrupted(claim.lease))
+        .await
+        .unwrap();
+    assert!(
+        fixture
+            .master(4, "Be concise")
+            .with_history(preceding.clone())
+            .run(opened.turn, input())
+            .await
+            .is_err()
+    );
+    drop(store);
+
+    let store = fixture.reopen().await;
+    let claim = fixture.recover(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let changed = vec![message(
+        "prior",
+        Role::User,
+        Content::Text("changed context".into()),
+    )];
+    let Err(error) = fixture
+        .master(4, "Be concise")
+        .with_history(changed)
+        .run(opened.turn, input())
+        .await
+    else {
+        panic!("expected changed context to be rejected")
+    };
+    assert_eq!(error.kind, ErrorKind::Conflict);
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    drop(store);
+
+    let store = fixture.reopen().await;
+    let ClaimOutcome::Acquired(claim) = store
+        .recover(RecoveryRequest {
+            id: change_id("recover-original-context"),
+            session: session_id(),
+            turn: turn_id(),
+            expected_epoch: 2,
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected recovery owner")
+    };
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Be concise")
+        .with_history(preceding)
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected original context to settle")
+    };
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
 }
