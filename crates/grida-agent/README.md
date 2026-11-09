@@ -284,3 +284,9 @@ Only the private supervising stdio client can negotiate
 Continuation rechecks the launch profile and native identity before dispatch.
 Unverified command cleanup surfaces uncertainty and stops automatic queue
 advancement.
+
+The embedded host can accept an explicit goal with `Host::start_goal` and read
+its state with `Host::inspect_goal`. The initial work uses the ordinary owned
+queue. Its claim and resource reservation commit together. Only the reserved
+turn sees the goal inspection and report tools. Native process clients do not
+yet have goal controls or automatic continuation.

@@ -1,12 +1,14 @@
 //! Product composition and ownership for native agent turns.
 
 mod compaction;
+mod goals;
 mod history;
 mod lifecycle;
 mod permissions;
 mod questions;
 mod skills;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
+pub use goals::{GoalInspection, GoalRequest, GoalView};
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use permissions::{Approvals, PendingApproval};
@@ -212,6 +214,8 @@ struct StoredPrompt {
     permission_capture: Option<crate::permissions::PermissionCapture>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     guidance: Option<crate::skills::CapturedGuidance>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    goal: Option<GoalRequest>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -289,6 +293,7 @@ struct PreparedInput {
     captured: Option<ConfigurationSnapshot>,
     permission_capture: Option<crate::permissions::PermissionCapture>,
     guidance: Option<Message>,
+    goal: Option<GoalRequest>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -733,7 +738,28 @@ impl Host {
             .map(|input| self.prepare_input(execution, input, InputAuthority::RequireCaptured))
             .transpose()?;
         let claimed = match claim_request {
-            WorkerClaim::Select(request) => self.store.claim(request).await?,
+            WorkerClaim::Select(request) => {
+                let change = match (input.as_ref(), prepared.as_ref(), &request.selection) {
+                    (Some(input), Some(prepared), TurnSelection::New { .. }) => prepared
+                        .goal
+                        .as_ref()
+                        .map(|goal| {
+                            goals::claim_update(
+                                &view,
+                                &input.id,
+                                turn,
+                                goal,
+                                prepared.config.max_steps,
+                            )
+                        })
+                        .transpose()?,
+                    _ => None,
+                };
+                match change {
+                    Some(change) => self.store.claim_with_driver_state(request, change).await?,
+                    None => self.store.claim(request).await?,
+                }
+            }
             WorkerClaim::Recover(request) => self.store.recover(request).await?,
         };
         drop(configuration_admission);
@@ -766,11 +792,39 @@ impl Host {
                 .map_err(|_| problem(ErrorKind::Uncertain, "admitted_permission_unavailable"))
             })
             .transpose()?;
-        let runtime = permission_scope.as_ref().map(|(_, authorization)| {
-            execution
-                .runtime
-                .with_authorization(authorization.clone(), authorization.clone())
-        });
+        let goal_authority = if prepared.goal.is_some() {
+            let (validator, gate): (Arc<dyn AuthorityValidator>, Arc<dyn ToolGate>) =
+                match &permission_scope {
+                    Some((_, authorization)) => (authorization.clone(), authorization.clone()),
+                    None => (
+                        execution.authorization.clone(),
+                        execution.authorization.clone(),
+                    ),
+                };
+            Some(
+                goals::GoalAuthority::bind(&claim, validator, gate)
+                    .await
+                    .map_err(|_| {
+                        problem(ErrorKind::Uncertain, "admitted_goal_authority_unavailable")
+                    })?,
+            )
+        } else {
+            None
+        };
+        let runtime = goal_authority
+            .as_ref()
+            .map(|goal| {
+                execution
+                    .runtime
+                    .with_authorization(goal.clone(), goal.clone())
+            })
+            .or_else(|| {
+                permission_scope.as_ref().map(|(_, authorization)| {
+                    execution
+                        .runtime
+                        .with_authorization(authorization.clone(), authorization.clone())
+                })
+            });
         let (opened, closing) = self
             .open_owned_turn_with_runtime(
                 session,
@@ -803,6 +857,9 @@ impl Host {
                 &mut inventory,
                 &mut authority.tools,
             )?;
+        }
+        if let Some(goal) = goal_authority {
+            goal.insert(&mut inventory, &mut authority.tools)?;
         }
         let selected = authority.tools.keys().cloned().collect::<Vec<_>>();
         let tools = inventory.snapshot(&selected)?;
@@ -933,6 +990,7 @@ impl Host {
                     configuration_permission,
                     permission_capture,
                     guidance,
+                    goal: None,
                 },
             )?,
         })
@@ -954,6 +1012,7 @@ impl Host {
             captured,
             permission_capture,
             guidance,
+            goal,
         ) = match input.payload.version() {
             1 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 authority.validate(None, &execution.authority.inference.authority)?;
@@ -963,6 +1022,7 @@ impl Host {
                     None,
                     false,
                     crate::ConfigurationPermission::Disabled,
+                    None,
                     None,
                     None,
                     None,
@@ -993,6 +1053,10 @@ impl Host {
                     config.instructions.push_str("\n\n");
                     config.instructions.push_str(crate::skills::GUIDANCE_POLICY);
                 }
+                if stored.goal.is_some() {
+                    config.instructions.push_str("\n\n");
+                    config.instructions.push_str(goals::INSTRUCTIONS);
+                }
                 config.max_steps = stored.max_steps.unwrap_or(1);
                 config.max_output_tokens =
                     stored.max_output_tokens.unwrap_or(config.max_output_tokens);
@@ -1008,6 +1072,7 @@ impl Host {
                         stored.permission_capture
                     },
                     guidance,
+                    if cancellation_only { None } else { stored.goal },
                 )
             }
             _ => {
@@ -1035,6 +1100,7 @@ impl Host {
             captured,
             permission_capture,
             guidance,
+            goal,
         })
     }
 

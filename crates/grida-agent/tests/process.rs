@@ -28,6 +28,9 @@ mod compaction;
 #[path = "process/configuration_tools.rs"]
 mod configuration_tools;
 #[cfg(unix)]
+#[path = "process/goals.rs"]
+mod goals;
+#[cfg(unix)]
 #[path = "process/history.rs"]
 mod history;
 #[cfg(unix)]

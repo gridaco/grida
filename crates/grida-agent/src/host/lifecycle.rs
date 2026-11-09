@@ -464,7 +464,7 @@ pub(super) fn check_input(input: &Submission, parts: &[PromptPart]) -> Result<()
         }
         2 => {
             let previous: StoredPrompt = decode_input(input)?;
-            previous.parts == parts
+            previous.goal.is_none() && previous.parts == parts
         }
         _ => {
             return Err(problem(
