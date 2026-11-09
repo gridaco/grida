@@ -2,7 +2,7 @@ use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
 use grida_agent::host::Host;
 use grida_agent::process::{self, RunOptions};
-use grida_agent::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol, acp};
+use grida_agent::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol, acp, mcp};
 use serde_json::json;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -100,6 +100,22 @@ fn command() -> Command {
                 ),
         ))
         .subcommand(
+            Command::new("serve-mcp")
+                .about("Serve reviewed Grida tools without starting a model session")
+                .arg(
+                    Arg::new("listen")
+                        .long("listen")
+                        .value_name("LOOPBACK_MCP_URL")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("server-token-env")
+                        .long("server-token-env")
+                        .value_name("ENVIRONMENT_VARIABLE")
+                        .required(true),
+                ),
+        )
+        .subcommand(
             Command::new("inspect")
                 .about("Read a persisted session without running a prompt")
                 .arg(state_dir())
@@ -176,6 +192,16 @@ fn launch(command: Command) -> Command {
 
 async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let (name, args) = matches.subcommand().expect("required subcommand");
+    if name == "serve-mcp" {
+        let options = mcp::ListenOptions::from_environment(
+            args.get_one::<String>("listen")
+                .expect("required listen address"),
+            args.get_one::<String>("server-token-env")
+                .expect("required token environment"),
+        )?;
+        mcp::serve_headless(options, process::shutdown_signal()).await?;
+        return Ok(0);
+    }
     let state_dir = args
         .get_one::<PathBuf>("state-dir")
         .expect("required state dir");

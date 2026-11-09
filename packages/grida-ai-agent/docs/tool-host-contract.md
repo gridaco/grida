@@ -47,7 +47,8 @@ issues a lease for one capability at one registered endpoint. The native
 adapter and direct callers use the same invocation method. The first
 executor implements the non-interactive `surface_open` result. Its
 `requested: false` result reports that no presentation was requested.
-Production editor registration and MCP transport remain to be connected.
+The standalone MCP service exposes this definition through the same lease.
+Production editor registration remains a separate binding.
 
 ## Catalog and capability requirements
 
@@ -154,15 +155,16 @@ map to call correlation and cancellation. Executor-specific job controls are
 ordinary advertised capabilities. Tool search remains the built-in master's
 exposure policy. MCP clients can use standard discovery directly.
 
-The initial proposed public transport is an explicitly enabled, authenticated
+The public transport starts with an explicitly enabled, authenticated
 loopback MCP Streamable HTTP endpoint owned by the Rust host. Desktop's ACP
 stdio connection has its own lifecycle. Apply the selected MCP transport's origin
 and authentication checks before dispatch. Remote exposure and a stdio bridge
 can be added as deployment bindings when required.
 
-Pin a supported MCP revision and compatible SDK before the first wire fixtures.
-The reviewed specification is 2026-07-28. Its lifecycle, metadata, and transport
-requirements govern the MCP adapter.
+The service pins the official Rust SDK and supports the 2026-07-28 and
+2025-11-25 wire revisions without retaining MCP sessions. The
+2026-07-28 lifecycle, metadata, and transport requirements govern the current
+binding.
 [MCP tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools),
 [Streamable HTTP](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http).
 

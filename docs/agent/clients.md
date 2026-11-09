@@ -165,6 +165,27 @@ Each WebSocket text message carries one ACP JSON-RPC object. Closing a client
 connection detaches its observers while the host continues its accepted work.
 Stopping the service requests suspension of the work it owns.
 
+## Connect a local MCP client
+
+The standalone tool host serves MCP without opening a chat or contacting a
+model provider. Generate a separate local token and launch the tool host.
+
+```sh
+export GRIDA_MCP_SERVER_TOKEN="$(openssl rand -hex 32)"
+
+target/debug/grida-agent serve-mcp \
+  --listen http://127.0.0.1:8766/mcp \
+  --server-token-env GRIDA_MCP_SERVER_TOKEN
+```
+
+Configure your client for Streamable HTTP at the same address and send the
+token in an `Authorization: Bearer …` header. The service accepts native
+clients on the exact numeric loopback address. It supports MCP revisions
+2026-07-28 and 2025-11-25.
+
+The headless service offers `surface_open`. Its result reports that no
+presentation was requested because no editor is attached.
+
 ## Use durable client operations
 
 A capable client can opt in to individual version-1 operations through

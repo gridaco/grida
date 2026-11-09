@@ -10,6 +10,7 @@ pub mod gg;
 pub mod host;
 mod http;
 pub mod launch_permissions;
+pub mod mcp;
 pub mod permissions;
 pub mod process;
 pub mod scratch;

@@ -871,6 +871,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
   A missing or mismatched reply retains the original call binding and an
   uncertain outcome. The executor still owns authorization at its boundary,
   including Electron sender validation when it routes to an editor.
+- The [MCP listener](crates/grida-agent/src/mcp.rs) and
+  [its process fixtures](crates/grida-agent/tests/mcp.rs) bind a separate,
+  explicitly enabled local service to a numeric loopback address. It checks
+  the exact authority and path, rejects browser origins, and authenticates each
+  request before the SDK can route it. The bearer value is removed before
+  dispatch. This listener exposes only the selected headless capability and
+  opens no chat, provider, credential, or workspace store.
 
 - Portable Rust provider contracts: [crates/grida-ai/src/catalogue.rs](crates/grida-ai/src/catalogue.rs),
   [crates/grida-ai/src/discovery.rs](crates/grida-ai/src/discovery.rs),
