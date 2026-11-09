@@ -1913,6 +1913,14 @@ trusted merely because it is “local.”
    ID can refresh only their exact captured record. The adapter consumes every
    non-success body and maps it to a bounded code-led error before the AI SDK
    or agent stream can observe it.
+   The native broker captures an opaque scope from the persisted account and
+   sign-in lineage plus the configured registration and exact Responses route.
+   It accepts the selected stateless request shape and rereads that lineage
+   before dispatch. Rotation can refresh the same connection. Records without
+   a lineage require sign-in before native selection. OAuth execution uses the
+   strict disk reader shared by credential mutations and ignores the generic
+   test environment override. Failed Responses return bounded status, request
+   identity, and retry timing without upstream response bodies.
 6. **Session/provider identity is sticky.** A new provider-unqualified
    compatible conversation may prefer a ready ChatGPT connection. Once
    persisted, the provider/model pair is reused for continuations and queued

@@ -55,6 +55,12 @@ export type ChatGptAccessCredentials = Readonly<{
   account_id: string;
 }>;
 
+type ChatGptConnection = Readonly<{
+  scope: string;
+  access(): Promise<ChatGptAccessCredentials>;
+  validate(): Promise<void>;
+}>;
+
 export type ChatGptCredentialErrorCode =
   | "chatgpt_not_signed_in"
   | "chatgpt_account_missing"
@@ -134,6 +140,7 @@ export class ChatGptCredentialManager {
     task: Promise<ChatGptAccessCredentials>;
   } | null = null;
   private generation = 0;
+  private signingOut = 0;
 
   constructor(
     private readonly auth: AuthStore,
@@ -290,7 +297,12 @@ export class ChatGptCredentialManager {
       completion.abort.abort();
     }
     this.completing.clear();
-    await this.auth.remove(CHATGPT_PROVIDER_ID);
+    this.signingOut += 1;
+    try {
+      await this.auth.remove(CHATGPT_PROVIDER_ID);
+    } finally {
+      this.signingOut -= 1;
+    }
   }
 
   async status(): Promise<ChatGptSubscriptionStatus> {
@@ -308,9 +320,69 @@ export class ChatGptCredentialManager {
   }
 
   async getAccessCredentials(): Promise<ChatGptAccessCredentials> {
-    const entry = await this.requireEntry();
+    return this.accessForEntry(await this.requireEntry());
+  }
+
+  /** Capture one durable OAuth connection without refreshing or retaining its keys. */
+  async captureConnection(): Promise<ChatGptConnection> {
+    const generation = this.generation;
+    const requireCurrent = async () => {
+      const entry = await this.requireEntry();
+      if (generation !== this.generation || this.signingOut > 0)
+        throw new ChatGptCredentialError("chatgpt_not_signed_in");
+      if (this.completing.size > 0)
+        throw new ChatGptCredentialError("chatgpt_credential_changed");
+      return entry;
+    };
+    const entry = await requireCurrent();
+    const accountId = entry.account_id;
+    const credentialId = entry.metadata?.credential_id;
+    if (
+      typeof accountId !== "string" ||
+      !accountId ||
+      typeof credentialId !== "string" ||
+      !/^[a-zA-Z0-9_-]{1,128}$/.test(credentialId)
+    )
+      throw new ChatGptCredentialError("chatgpt_reauthentication_required");
+    const matchingEntry = async () => {
+      const live = await requireCurrent();
+      const liveId = live.metadata?.credential_id;
+      if (
+        live.account_id !== accountId ||
+        typeof liveId !== "string" ||
+        !timingSafeTextEqual(liveId, credentialId)
+      )
+        throw new ChatGptCredentialError("chatgpt_credential_changed");
+      return live;
+    };
+    const scope = crypto
+      .createHash("sha256")
+      .update(
+        JSON.stringify([
+          "grida-chatgpt-oauth-connection-v1",
+          this.config.authorize_url,
+          this.config.token_url,
+          this.config.client_id,
+          this.config.redirect_uris,
+          this.config.scopes,
+          Object.entries(this.config.authorization_parameters ?? {}).sort(),
+          accountId,
+          credentialId,
+        ])
+      )
+      .digest("hex");
+    return Object.freeze({
+      scope,
+      access: async () => this.accessForEntry(await matchingEntry()),
+      validate: async () => {
+        await matchingEntry();
+      },
+    });
+  }
+
+  private accessForEntry(entry: OAuthEntry): Promise<ChatGptAccessCredentials> {
     if (isFresh(entry, this.now(), this.refreshSkewMs)) {
-      return this.capture(entry);
+      return Promise.resolve(this.capture(entry));
     }
     return this.refresh(entry, false);
   }
@@ -522,7 +594,7 @@ export class ChatGptCredentialManager {
   }
 
   private async readEntry(): Promise<OAuthEntry | null> {
-    const entry = await this.auth.get(CHATGPT_PROVIDER_ID);
+    const entry = await this.auth.getStoredOAuth(CHATGPT_PROVIDER_ID);
     if (
       !entry ||
       entry.type !== "oauth" ||

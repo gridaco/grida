@@ -9,6 +9,7 @@
  */
 
 import { createOpenAI } from "@ai-sdk/openai";
+import { createHash } from "node:crypto";
 import type {
   JSONObject,
   LanguageModelV3CallOptions,
@@ -24,12 +25,24 @@ import {
 import type { ModelTier } from "../tiers";
 import {
   ChatGptCredentialError,
+  type ChatGptAccessCredentials,
   type ChatGptCredentialManager,
   type ChatGptOAuthConfig,
 } from "./chatgpt-credentials";
 import { ProviderHttp } from "./http";
 
 const RESPONSES_SUFFIX = "/responses";
+const MAX_NATIVE_REQUEST_BYTES = 1024 * 1024;
+const NATIVE_FIELDS = new Set([
+  "model",
+  "input",
+  "instructions",
+  "tools",
+  "reasoning",
+  "stream",
+  "store",
+  "include",
+]);
 
 export type ChatGptProviderConfig = Readonly<{
   oauth: ChatGptOAuthConfig;
@@ -44,6 +57,13 @@ export type ChatGptProviderConfig = Readonly<{
 export type ChatGptProviderRuntime = Readonly<{
   config: ChatGptProviderConfig;
   credentials: ChatGptCredentialManager;
+}>;
+
+export type NativeChatGptConnection = Readonly<{
+  scope: string;
+  target: string;
+  model: ChatGptSubscriptionModelId;
+  request(body: Uint8Array, signal: AbortSignal): Promise<Response | null>;
 }>;
 
 export type ChatGptProviderErrorCode =
@@ -174,31 +194,18 @@ export namespace ChatGptProvider {
       if (requestUrl !== exactResponsesUrl) {
         throw new ChatGptProviderError("chatgpt_unexpected_endpoint");
       }
-      let credential = await runtime.credentials.getAccessCredentials();
-      let response = await requestWithCredential(
-        providerHttp,
-        input,
-        init,
-        runtime.config.originator,
-        credential
+      const response = await requestWithRetry(
+        runtime.credentials,
+        () => runtime.credentials.getAccessCredentials(),
+        (credential) =>
+          requestWithCredential(
+            providerHttp,
+            input,
+            init,
+            runtime.config.originator,
+            credential
+          )
       );
-      if (response.status === 401) {
-        await discardBody(response);
-        credential =
-          await runtime.credentials.refreshAfterUnauthorized(credential);
-        response = await requestWithCredential(
-          providerHttp,
-          input,
-          init,
-          runtime.config.originator,
-          credential
-        );
-        if (response.status === 401) {
-          await discardBody(response);
-          await runtime.credentials.invalidateAfterUnauthorized(credential);
-          throw new ChatGptCredentialError("chatgpt_reauthentication_required");
-        }
-      }
       if (response.status === 403) {
         await discardBody(response);
         throw new ChatGptProviderError("chatgpt_subscription_unavailable");
@@ -219,6 +226,81 @@ export namespace ChatGptProvider {
       }
       return response;
     };
+  }
+
+  /** Bind the native transport to one model and one durable OAuth connection. */
+  export async function captureNative(
+    runtime: ChatGptProviderRuntime,
+    model: string,
+    providerHttp: ProviderHttp
+  ): Promise<NativeChatGptConnection> {
+    validate(runtime.config);
+    if (!isChatGptSubscriptionModelId(model))
+      throw new ChatGptProviderError("chatgpt_model_not_available");
+    const connection = await runtime.credentials.captureConnection();
+    const target = new URL(runtime.config.responses_url).href;
+    const originator = runtime.config.originator;
+    const scope = createHash("sha256")
+      .update(
+        JSON.stringify([
+          "grida-chatgpt-native-responses-v1",
+          connection.scope,
+          target,
+          originator,
+        ])
+      )
+      .digest("hex");
+    const wireModel = toWireModelId(model);
+    return Object.freeze({
+      scope,
+      target,
+      model,
+      async request(body: Uint8Array, signal: AbortSignal) {
+        if (
+          signal.aborted ||
+          body.length === 0 ||
+          body.length > MAX_NATIVE_REQUEST_BYTES
+        )
+          return null;
+        const bytes = Uint8Array.from(body);
+        if (!validNativeRequest(bytes, wireModel)) return null;
+        const init: RequestInit = {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            accept: "text/event-stream",
+          },
+          body: bytes.buffer,
+          signal,
+          redirect: "manual",
+        };
+        try {
+          const response = await requestWithRetry(
+            runtime.credentials,
+            connection.access,
+            async (credential) => {
+              await connection.validate();
+              signal.throwIfAborted();
+              return await requestWithCredential(
+                providerHttp,
+                target,
+                init,
+                originator,
+                credential
+              );
+            }
+          );
+          if (response.ok) return response;
+          await discardBody(response);
+          return nativeErrorResponse(response);
+        } catch (error) {
+          if (!(error instanceof ChatGptCredentialError)) throw error;
+          return new Response(null, {
+            status: error.code === "chatgpt_token_refresh_failed" ? 503 : 401,
+          });
+        }
+      },
+    });
   }
 }
 
@@ -282,6 +364,66 @@ function requestUrlOf(input: string | URL | Request): string {
   return new URL(
     input instanceof Request ? input.url : input.toString()
   ).toString();
+}
+
+async function requestWithRetry(
+  manager: ChatGptCredentialManager,
+  access: () => Promise<ChatGptAccessCredentials>,
+  request: (credential: ChatGptAccessCredentials) => Promise<Response>
+): Promise<Response> {
+  let credential = await access();
+  let response = await request(credential);
+  if (response.status !== 401) return response;
+  await discardBody(response);
+  credential = await manager.refreshAfterUnauthorized(credential);
+  response = await request(credential);
+  if (response.status !== 401) return response;
+  await discardBody(response);
+  await manager.invalidateAfterUnauthorized(credential);
+  throw new ChatGptCredentialError("chatgpt_reauthentication_required");
+}
+
+function validNativeRequest(bytes: Uint8Array, model: string): boolean {
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    return false;
+  }
+  return (
+    !!body &&
+    typeof body === "object" &&
+    !Array.isArray(body) &&
+    Object.keys(body).every((key) => NATIVE_FIELDS.has(key)) &&
+    body.model === model &&
+    body.stream === true &&
+    body.store === false &&
+    typeof body.instructions === "string" &&
+    Array.isArray(body.input) &&
+    (body.tools === undefined ||
+      (Array.isArray(body.tools) &&
+        body.tools.every(
+          (tool: unknown) =>
+            typeof tool === "object" &&
+            tool !== null &&
+            "type" in tool &&
+            tool.type === "function"
+        ))) &&
+    Array.isArray(body.include) &&
+    body.include.length === 1 &&
+    body.include[0] === "reasoning.encrypted_content"
+  );
+}
+
+function nativeErrorResponse(response: Response): Response {
+  const headers = new Headers();
+  const requestId = response.headers.get("x-request-id");
+  if (requestId && /^[a-z0-9_.:-]{1,128}$/i.test(requestId))
+    headers.set("x-request-id", requestId);
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter && /^\d{1,12}$/.test(retryAfter))
+    headers.set("retry-after", retryAfter);
+  return new Response(null, { status: response.status, headers });
 }
 
 function requestWithCredential(
