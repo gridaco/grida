@@ -63,8 +63,16 @@ async function fixture() {
     model: "fixture",
   };
   const { NativeAgentCutover } = await import("./native-agent-cutover");
+  const prepare = async (credentialHome?: string) => {
+    vi.resetModules();
+    const { NativeAgentCutover } = await import("./native-agent-cutover");
+    return NativeAgentCutover.prepare(credentialHome);
+  };
   return {
     NativeAgentCutover,
+    start: async (options = launch) =>
+      (await prepare(options.credentialHome)).startWorkspace("work", options),
+    child,
     launch,
     nativeState,
     checkpoint,
@@ -98,11 +106,16 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
   it("preserves a verified archive when the native executable is unavailable and resumes interrupted publication", async () => {
     const test = await fixture();
     writeLegacy(test.database, test.scratchBase);
-    const first = test.NativeAgentCutover.start(test.launch);
-    await expect(test.NativeAgentCutover.start(test.launch)).rejects.toThrow(
+    const first = test.NativeAgentCutover.prepare();
+    await expect(test.NativeAgentCutover.prepare()).rejects.toThrow(
       "native_chat_cutover_in_progress"
     );
-    await expect(first).rejects.toThrow(
+    const prepared = await first;
+    await expect(test.NativeAgentCutover.prepare()).rejects.toThrow(
+      "native_chat_cutover_already_prepared"
+    );
+    expect(fs.readdirSync(test.nativeState)).toEqual(["cutover.json"]);
+    await expect(prepared.startWorkspace("work", test.launch)).rejects.toThrow(
       "native_agent_installation_unavailable"
     );
     const receipt = JSON.parse(fs.readFileSync(test.checkpoint, "utf8"));
@@ -121,14 +134,20 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
       )
     ).toBe("four");
     expect(fs.existsSync(test.database)).toBe(true);
-    expect(fs.readdirSync(test.nativeState)).toEqual(["cutover.json"]);
+    expect(fs.readdirSync(test.nativeState).sort()).toEqual([
+      "cutover.json",
+      "workspaces",
+    ]);
 
     const pending = path.join(test.nativeState, ".cutover.pending");
     fs.writeFileSync(pending, "{ interrupted", { mode: 0o600 });
-    await expect(test.NativeAgentCutover.start(test.launch)).rejects.toThrow(
+    await expect(test.start()).rejects.toThrow(
       "native_agent_installation_unavailable"
     );
-    expect(fs.readdirSync(test.nativeState)).toEqual(["cutover.json"]);
+    expect(fs.readdirSync(test.nativeState).sort()).toEqual([
+      "cutover.json",
+      "workspaces",
+    ]);
     expect(JSON.parse(fs.readFileSync(test.checkpoint, "utf8"))).toEqual(
       receipt
     );
@@ -138,7 +157,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
       path.join(archived, "scratch", "ses_fixture", "note.txt"),
       "modified"
     );
-    await expect(test.NativeAgentCutover.start(test.launch)).rejects.toThrow(
+    await expect(test.start()).rejects.toThrow(
       "Legacy chat archive: invalid_receipt"
     );
     expect(
@@ -151,7 +170,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     writeLegacy(test.database, test.scratchBase);
     const command = path.join(test.scratchBase, "commands", "cmd-uncertain");
     fs.mkdirSync(command, { recursive: true, mode: 0o700 });
-    await expect(test.NativeAgentCutover.start(test.launch)).rejects.toThrow(
+    await expect(test.start()).rejects.toThrow(
       "legacy_chat_command_drain_unverified"
     );
     expect(fs.existsSync(command)).toBe(true);
@@ -161,7 +180,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     fs.mkdirSync(test.nativeState, { mode: 0o700 });
     const foreign = path.join(test.nativeState, "foreign");
     fs.writeFileSync(foreign, "keep");
-    await expect(test.NativeAgentCutover.start(test.launch)).rejects.toThrow(
+    await expect(test.start()).rejects.toThrow(
       "native_chat_cutover_unowned_state"
     );
     expect(fs.readFileSync(foreign, "utf8")).toBe("keep");
@@ -171,7 +190,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
   it("keeps the native store separate from credential custody before any archive work", async () => {
     const test = await fixture();
     await expect(
-      test.NativeAgentCutover.start({
+      test.start({
         ...test.launch,
         credentialHome: test.nativeState,
       })
@@ -183,7 +202,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
   it("captures later legacy commits when the first native startup never became ready", async () => {
     const test = await fixture();
     writeLegacy(test.database, test.scratchBase);
-    await expect(test.NativeAgentCutover.start(test.launch)).rejects.toThrow(
+    await expect(test.start()).rejects.toThrow(
       "native_agent_installation_unavailable"
     );
     const first = JSON.parse(fs.readFileSync(test.checkpoint, "utf8"));
@@ -193,7 +212,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     } finally {
       writer.close();
     }
-    await expect(test.NativeAgentCutover.start(test.launch)).rejects.toThrow(
+    await expect(test.start()).rejects.toThrow(
       "native_agent_installation_unavailable"
     );
     const second = JSON.parse(fs.readFileSync(test.checkpoint, "utf8"));
@@ -220,15 +239,17 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     async () => {
       const test = await fixture();
       writeLegacy(test.database, test.scratchBase);
-      await expect(test.NativeAgentCutover.start(test.launch)).rejects.toThrow(
+      await expect(test.start()).rejects.toThrow(
         "native_agent_installation_unavailable"
       );
       const before = JSON.parse(fs.readFileSync(test.checkpoint, "utf8"));
       const launch = { ...test.launch, resourcesPath: nativeResources! };
-      const first = await test.NativeAgentCutover.start(launch);
+      const first = await test.start(launch);
       let id: string;
       try {
-        expect(first.stateDirectory).toBe(test.nativeState);
+        expect(path.dirname(first.stateDirectory)).toBe(
+          path.join(test.nativeState, "workspaces")
+        );
         expect(first.archive).toEqual(
           expect.objectContaining({
             id: before.archiveId,
@@ -249,13 +270,54 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
       } finally {
         await first.chat.close();
       }
-      const resumed = await test.NativeAgentCutover.start(launch);
+      const resumed = await test.start(launch);
       try {
         expect(await resumed.chat.load(id)).toEqual({ id });
+        expect(resumed.stateDirectory).toBe(first.stateDirectory);
         expect(resumed.archive).toEqual(first.archive);
         expect(fs.existsSync(test.database)).toBe(true);
       } finally {
         await resumed.chat.close();
+      }
+    },
+    15000
+  );
+
+  it.runIf(Boolean(nativeResources))(
+    "opens two private workspace stores under one prepared archive",
+    async () => {
+      const test = await fixture();
+      writeLegacy(test.database, test.scratchBase);
+      const prepared = await test.NativeAgentCutover.prepare();
+      const one = { ...test.launch, resourcesPath: nativeResources! };
+      const two = { ...one, cwd: test.child("other-workspace") };
+      const results = await Promise.allSettled([
+        prepared.startWorkspace("one", one),
+        prepared.startWorkspace("two", two),
+      ]);
+      try {
+        const [first, second] = results.map((result) => {
+          if (result.status === "rejected") throw result.reason;
+          return result.value;
+        });
+        expect(first.stateDirectory).not.toBe(second.stateDirectory);
+        expect(first.archive).toEqual(second.archive);
+        const session = await first.chat.create();
+        await expect(second.chat.load(session.id)).rejects.toThrow(
+          "session_missing"
+        );
+        expect(
+          JSON.parse(fs.readFileSync(test.checkpoint, "utf8")).nativeReady
+        ).toBe(true);
+        expect(fs.readdirSync(test.archiveRoot)).toHaveLength(1);
+      } finally {
+        await Promise.all(
+          results.map((result) =>
+            result.status === "fulfilled"
+              ? result.value.chat.close()
+              : undefined
+          )
+        );
       }
     },
     15000

@@ -20,6 +20,7 @@ export namespace DesktopDaemon {
     provider_http: ProviderHttpTransport;
     agent:
       | false
+      | "native-chat"
       | {
           scratch_base: string;
           skills_root?: string;
@@ -42,9 +43,13 @@ export namespace DesktopDaemon {
       gg_base_url: opts.editor_base_url,
       provider_http: opts.provider_http,
     };
-    if (opts.agent === false) {
+    if (opts.agent === false || opts.agent === "native-chat") {
       const { createMediaDaemon } = await import("@grida/agent/media-server");
-      return createMediaDaemon(shared);
+      return createMediaDaemon(
+        opts.agent === "native-chat"
+          ? { ...shared, endpoint_settings: true }
+          : shared
+      );
     }
 
     const { createAgentDaemon } = await import("@grida/agent/server");

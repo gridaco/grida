@@ -11,6 +11,7 @@ import {
 } from "./native-agent-chat";
 
 const STATE_DIRECTORY = "native-chat";
+const WORKSPACES_DIRECTORY = "workspaces";
 const CHECKPOINT = "cutover.json";
 const PENDING = ".cutover.pending";
 const CHECKPOINT_BYTES = 4096;
@@ -29,26 +30,38 @@ type Ready = Readonly<{
   archive: Awaited<ReturnType<LegacyChatArchive["snapshotQuiesced"]>>;
 }>;
 
-export class NativeAgentCutover {
-  private static starting = false;
+type Launch = Omit<NativeAgentChatLaunch, "stateDirectory">;
 
-  static async start(
-    launch: Omit<NativeAgentChatLaunch, "stateDirectory">
-  ): Promise<Ready> {
+export class NativeAgentCutover {
+  private static preparing = false;
+  private static prepared = false;
+  private publication: Promise<void> | undefined;
+
+  private constructor(
+    private readonly stateDirectory: string,
+    private readonly checkpoint: Checkpoint,
+    readonly archive: Ready["archive"]
+  ) {}
+
+  /** Verify the shared legacy cutoff before starting any workspace engine. */
+  static async prepare(credentialHome?: string): Promise<NativeAgentCutover> {
     if (process.platform !== "darwin" && process.platform !== "linux")
       throw new Error("native_chat_cutover_platform_unsupported");
-    if (this.starting) throw new Error("native_chat_cutover_in_progress");
-    this.starting = true;
+    if (this.preparing) throw new Error("native_chat_cutover_in_progress");
+    if (this.prepared) throw new Error("native_chat_cutover_already_prepared");
+    this.preparing = true;
     try {
-      return await this.startSealed(launch);
+      const prepared = await this.prepareSealed(credentialHome);
+      this.prepared = true;
+      return prepared;
     } finally {
-      this.starting = false;
+      this.preparing = false;
     }
   }
 
-  private static async startSealed(
-    launch: Omit<NativeAgentChatLaunch, "stateDirectory">
-  ): Promise<Ready> {
+  private static async prepareSealed(
+    credentialHome: string | undefined
+  ): Promise<NativeAgentCutover> {
     const source = await sealLegacyChatForColdStart();
     const desktop = await fs.realpath(source.desktopUserDataPath);
     checkDirectory(await fs.lstat(desktop), false);
@@ -59,7 +72,7 @@ export class NativeAgentCutover {
         source.scratchBase,
         source.providerHome,
         source.mediaRoot,
-        launch.credentialHome,
+        credentialHome,
       ]
         .filter((root): root is string => root !== undefined)
         .map(intendedLocation)
@@ -80,7 +93,8 @@ export class NativeAgentCutover {
     let cutoff = previous?.archiveId
       ? await archive.verify(previous.archiveId)
       : null;
-    if (!previous?.nativeReady) {
+    let checkpoint = previous;
+    if (!checkpoint?.nativeReady) {
       // An interrupted first startup has not exposed any native chat. Capture
       // the latest sealed legacy cutoff and independently verify publication.
       const captured = await archive.snapshotQuiesced();
@@ -88,29 +102,62 @@ export class NativeAgentCutover {
       await ensureState(stateDirectory);
       if (!previous && !(await emptyDirectory(stateDirectory)))
         throw new Error("native_chat_cutover_unowned_state");
-      await writeCheckpoint(stateDirectory, {
+      checkpoint = {
         version: 1,
         source: sourceKey,
         archiveId: cutoff?.id ?? null,
         nativeReady: false,
-      });
+      };
+      await writeCheckpoint(stateDirectory, checkpoint);
     }
+    return new NativeAgentCutover(stateDirectory, checkpoint, cutoff);
+  }
 
+  async startWorkspace(workspaceId: string, launch: Launch): Promise<Ready> {
+    const canonicalCwd = path.isAbsolute(launch.cwd)
+      ? await fs.realpath(launch.cwd).catch(() => null)
+      : null;
+    if (
+      !/^[A-Za-z0-9_-]{1,128}$/.test(workspaceId) ||
+      (launch.workspace !== undefined && launch.workspace.id !== workspaceId) ||
+      canonicalCwd !== launch.cwd ||
+      overlaps(launch.cwd, this.stateDirectory)
+    )
+      throw new Error("native_chat_workspace_invalid");
+    if (
+      launch.credentialHome &&
+      overlaps(
+        await intendedLocation(launch.credentialHome),
+        this.stateDirectory
+      )
+    )
+      throw new Error("native_chat_cutover_state_overlap");
+    const workspaces = path.join(this.stateDirectory, WORKSPACES_DIRECTORY);
+    const key = createHash("sha256")
+      .update(JSON.stringify([workspaceId, launch.cwd]))
+      .digest("hex");
+    const stateDirectory = path.join(workspaces, key);
+    await ensureState(workspaces);
     const chat = await NativeAgentChat.start({ ...launch, stateDirectory });
-    if (!previous?.nativeReady) {
-      try {
-        await writeCheckpoint(stateDirectory, {
-          version: 1,
-          source: sourceKey,
-          archiveId: cutoff?.id ?? null,
-          nativeReady: true,
-        });
-      } catch (error) {
-        await chat.close();
-        throw error;
-      }
+    try {
+      await this.markReady();
+    } catch (error) {
+      await chat.close();
+      throw error;
     }
-    return { chat, stateDirectory, archive: cutoff };
+    return { chat, stateDirectory, archive: this.archive };
+  }
+
+  private async markReady(): Promise<void> {
+    if (this.checkpoint.nativeReady) return;
+    this.publication ??= writeCheckpoint(this.stateDirectory, {
+      ...this.checkpoint,
+      nativeReady: true,
+    }).catch((error: unknown) => {
+      this.publication = undefined;
+      throw error;
+    });
+    await this.publication;
   }
 }
 
@@ -210,14 +257,20 @@ async function writeCheckpoint(
 ): Promise<void> {
   const staging = path.join(directory, PENDING);
   const file = await fs.open(staging, "wx", 0o600);
+  let published = false;
   try {
-    await file.writeFile(JSON.stringify(record));
-    await file.sync();
+    try {
+      await file.writeFile(JSON.stringify(record));
+      await file.sync();
+    } finally {
+      await file.close();
+    }
+    await fs.rename(staging, path.join(directory, CHECKPOINT));
+    published = true;
+    await syncDirectory(directory);
   } finally {
-    await file.close();
+    if (!published) await fs.unlink(staging).catch(() => undefined);
   }
-  await fs.rename(staging, path.join(directory, CHECKPOINT));
-  await syncDirectory(directory);
 }
 
 async function syncDirectory(directory: string): Promise<void> {

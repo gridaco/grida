@@ -456,7 +456,7 @@ export class AgentSidecarSupervisor {
       `--user-data=${this.user_data_path}`,
       `--provider-home=${this.provider_home}`,
       `--media-root=${this.media_root}`,
-      `--agent=${agentEnabled ? "enabled" : "disabled"}`,
+      `--agent=${agentEnabled ? "enabled" : this.coldStartSource ? "native-chat" : "disabled"}`,
       ...(this.scratchBase ? [`--scratch-base=${this.scratchBase}`] : []),
       // Host-bundled skills dir (repo-root `skills/`) — the built-in skills the
       // agent advertises + loads on demand. Read-only; omitted if unresolved.

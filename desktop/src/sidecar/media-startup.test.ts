@@ -320,11 +320,37 @@ describe("built Desktop media startup", () => {
         runtime,
         fetchProvider,
         generation: 2,
+        nativeChat: true,
       });
-      expect((await active.post("/handshake")).status).toBe(200);
+      const retained = await active.post("/handshake");
+      expect(retained.status).toBe(200);
+      expect((await retained.json()).capabilities).toMatchObject({
+        agent: false,
+        sessions: false,
+        providers: true,
+        shell: false,
+      });
       await fs.writeFile(path.join(root, "allow-custody"), "enabled", {
         mode: 0o600,
       });
+      const config = {
+        id: "local_fixture",
+        base_url: "http://127.0.0.1:11434/v1",
+        models: [{ id: "fixture-model" }],
+      };
+      expect(
+        (await active.post("/providers/endpoints/set", { config })).status
+      ).toBe(200);
+      expect(
+        await (await active.post("/providers/endpoints/list")).json()
+      ).toEqual([config]);
+      expect(
+        await (
+          await active.post("/secrets/has", { provider_id: config.id })
+        ).json()
+      ).toEqual({ has: false });
+      expect((await active.get("/sessions")).status).toBe(404);
+      expect((await active.post("/agent/run")).status).toBe(404);
       expect(
         await (
           await active.post("/secrets/has", { provider_id: "elevenlabs" })
@@ -372,6 +398,7 @@ type StartOptions = {
   runtime: { executable: string; electron: boolean };
   fetchProvider: (url: string, init: RequestInit) => Promise<Response>;
   generation: number;
+  nativeChat?: boolean;
 };
 
 class Sidecar {
@@ -415,7 +442,7 @@ class Sidecar {
         "--require",
         path.join(fixture, "media-startup-guard.cjs"),
         path.join(options.output, "sidecar.cjs"),
-        "--agent=disabled",
+        options.nativeChat ? "--agent=native-chat" : "--agent=disabled",
         `--user-data=${options.userData}`,
         `--media-root=${options.mediaRoot}`,
         `--editor-base-url=${origin}`,

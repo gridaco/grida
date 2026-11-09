@@ -115,8 +115,12 @@ if (!mediaRoot) {
 }
 const requiredMediaRoot = mediaRoot;
 const agentMode = getCliArg("agent") ?? "enabled";
-if (agentMode !== "enabled" && agentMode !== "disabled") {
-  console.error("[agent-sidecar] fatal: --agent must be enabled or disabled");
+if (
+  agentMode !== "enabled" &&
+  agentMode !== "disabled" &&
+  agentMode !== "native-chat"
+) {
+  console.error("[agent-sidecar] fatal: invalid agent composition");
   process.exit(1);
 }
 const scratchBase = getCliArg("scratch-base");
@@ -191,15 +195,17 @@ async function main() {
     projects_root: projectsRoot,
     editor_base_url: runtimeEditorBaseUrl,
     agent:
-      agentMode === "disabled"
-        ? false
-        : {
+      agentMode === "enabled"
+        ? {
             // The enabled-mode argv guard above requires this host authority.
             scratch_base: requiredScratchBase!,
             skills_root: skillsRoot,
             sandbox_enforced: sandboxEnforced,
             shell_executor: sandboxEnforced ? network.shellExecutor : undefined,
-          },
+          }
+        : agentMode === "native-chat"
+          ? "native-chat"
+          : false,
     // issue #974 — provider traffic follows Electron/Chromium's system network
     // route while the sidecar and its raw children remain under the SRT wrap.
     provider_http: network.providerHttp,
