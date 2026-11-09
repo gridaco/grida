@@ -5,6 +5,7 @@ pub mod configuration;
 pub mod conversation_seed;
 pub mod goals;
 pub mod history;
+pub mod hooks;
 pub mod questions;
 pub mod usage;
 pub mod wakeups;

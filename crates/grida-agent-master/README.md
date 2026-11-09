@@ -80,3 +80,12 @@ fixed at first registration, and the same recorded answer can be replayed.
 Pause holds due delivery. Cancel Wake-up clears automatic delivery, while
 Stop closes the task's admission. The host supplies a clock, grants and timer
 delivery, and claims any continuation through the usual task controls.
+
+Completion-check policy runs captured, ordered handler revisions against one
+successful candidate. The host supplies reviewed handler inventory and current
+grants. Required failures block the candidate and observational failures remain
+diagnostic. An interrupted handler retains its recorded uncertainty. Recovery
+uses the original candidate and result without repeating effects. The caller
+settles against the original control and history positions and adds check
+evidence to the final account after review. Handler registration and executable
+dispatch stay with the host.
