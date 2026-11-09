@@ -255,7 +255,7 @@ async fn paused_task_resumes_after_restart_with_retained_input_and_steering() {
     terminate_shared_server(second_host).await;
 }
 
-async fn wait_for_partial_prompt(socket: &mut SharedSocket, session: &str) {
+pub(super) async fn wait_for_partial_prompt(socket: &mut SharedSocket, session: &str) {
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message;
 

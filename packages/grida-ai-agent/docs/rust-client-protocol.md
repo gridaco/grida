@@ -100,19 +100,43 @@ A queue basis contains `sessionId`, `requestId`, and
 summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
 `journalPosition`, and turn `epoch` for conditional operations.
 
-| Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                     |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `submit`, `enqueue`                      | `sessionId`, `inputId`, ACP `prompt`. Submit selects idle work. Enqueue accepts waiting work. Both return `inputPosition`, `disposition`, and the `turnId` once selected. |
-| `snapshot`                               | `sessionId`. Read the bounded session summary without claiming work.                                                                                                      |
-| `input`                                  | `sessionId`, `inputId`. Read the accepted prompt, captured settings, and retained receipt.                                                                                |
-| `replace`                                | Queue basis in `queue`, `inputId`, `replacementInputId`, ACP `prompt`. Retain the slot and supersede the prior input.                                                     |
-| `withdraw`, `reorder`                    | Queue basis in `queue`, plus `inputId` or the complete ordered `inputIds` list.                                                                                           |
-| `resume-queue`                           | Flat queue basis. Reopen queue admission and schedule eligible waiting work.                                                                                              |
-| `stop`, `pause`                          | Flat task basis. Return the committed control receipt. Stop also pauses queue admission. Pause becomes verified when the turn reports `suspended`.                        |
-| `resume`                                 | Task basis in `task`, `expectedEpoch`, `expectedJournalPosition`. Claim the verified suspension and clear its task pause. Return the claimed turn summary.                |
-| `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                               |
-| `questions`                              | `sessionId`, `turnId`. Read pending question identities, prompts, choices, and the current control/history basis.                                                         |
-| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed answer and its correlated contribution.                                            |
+| Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                       |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submit`, `enqueue`                      | `sessionId`, `inputId`, ACP `prompt`. Submit selects idle work. Enqueue accepts waiting work. Both return `inputPosition`, `disposition`, and the `turnId` once selected.   |
+| `snapshot`                               | `sessionId`. Read the bounded session summary without claiming work.                                                                                                        |
+| `input`                                  | `sessionId`, `inputId`. Read the accepted prompt, captured settings, and retained receipt.                                                                                  |
+| `replace`                                | Queue basis in `queue`, `inputId`, `replacementInputId`, ACP `prompt`. Retain the slot and supersede the prior input.                                                       |
+| `withdraw`, `reorder`                    | Queue basis in `queue`, plus `inputId` or the complete ordered `inputIds` list.                                                                                             |
+| `resume-queue`                           | Flat queue basis. Reopen queue admission and schedule eligible waiting work.                                                                                                |
+| `stop`, `pause`                          | Flat task basis. Return the committed control receipt. Stop also pauses queue admission. Pause becomes verified when the turn reports `suspended`.                          |
+| `resume`                                 | Task basis in `task`, `expectedEpoch`, `expectedJournalPosition`. Claim the verified suspension and clear its task pause. Return the claimed turn summary.                  |
+| `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                                 |
+| `questions`                              | `sessionId`, `turnId`. Read pending question identities, prompts, choices, and the current control/history basis.                                                           |
+| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed answer and its correlated contribution.                                              |
+| `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                |
+| `fork`                                   | `sessionId`, `requestId`, `expectedHistory`, and `anchor`. Return the independent `sessionId` for a committed prefix through that message.                                  |
+| `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `allowConfigurationChanges`. Return the installed view and accepted input. |
+
+History returns `basis`, `sessionRevision`, up to 128 `messages`, `nextOffset`,
+and optional `seed` provenance. Echo the basis as `expectedHistory` on later
+pages and writes. A changed basis requires a fresh history read. Anchors are
+scoped to the selected view and carry either a local turn and message ID or an
+inherited message ID. `view` can read an earlier retained view. Standard session
+load replays the current view in the same causal order.
+
+A fork leaves source ownership unchanged and starts with no active work. Load
+its returned ID with the same workspace to attach it. An earlier-message revision
+cuts strictly before the chosen editable user message and atomically accepts the
+replacement in the same session. It requires idle work and an empty queue.
+Stop a running or input-required turn before revising. Existing admission
+pause still applies. Prior turns and input receipts remain
+retained. Portable seeds expose categorized omission counts and carry no source
+execution grants, pending interactions, or usage. The agent receives a notice
+about omitted media, tool data, or provider continuation in the selected view.
+The revised input captures current settings and uses the same explicit
+configuration-change opt-in as a new submission. Retrying a revision returns
+its original receipt. Retained queued work after restart needs explicit Resume
+Queue.
 
 A duplicate input compares the original prompt and returns its retained
 disposition, including supersession or withdrawal. Changes reuse the caller's

@@ -54,6 +54,7 @@ pub struct RetainedRecord {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RetainedHistory {
     pub basis: HistoryBasis,
+    pub session_revision: SessionRevision,
     pub seed: Option<HistorySeed>,
     pub records: Vec<RetainedRecord>,
 }
@@ -104,8 +105,8 @@ impl SqliteStore {
         project: impl Fn(&TurnState) -> Vec<HistoryRecord> + Send + 'static,
     ) -> Result<RetainedHistory> {
         execute(Arc::clone(&self.inner), move |_, connection| {
-            load_session(connection, &session)?;
-            read_history(connection, &session, selection, &project)
+            let revision = load_session(connection, &session)?.revision;
+            read_history(connection, &session, revision, selection, &project)
         })
         .await
     }
@@ -134,10 +135,11 @@ impl SqliteStore {
             )? {
                 return Ok(receipt);
             }
-            load_session(&transaction, &request.source)?;
+            let revision = load_session(&transaction, &request.source)?.revision;
             let history = read_history(
                 &transaction,
                 &request.source,
+                revision,
                 HistorySelection::Current,
                 &project,
             )?;
@@ -203,7 +205,7 @@ impl SqliteStore {
             if queued {
                 return Err(error(ErrorKind::Conflict, "history_revision_requires_empty_queue"));
             }
-            let history = read_history(&transaction, id, HistorySelection::Current, &project)?;
+            let history = read_history(&transaction, id, session.revision, HistorySelection::Current, &project)?;
             require_basis(&history.basis, &request.expected_history)?;
             let end: i64 = transaction.query_row(
                 "SELECT COALESCE(MAX(ordinal),0) FROM turns WHERE session=?1",
@@ -377,6 +379,7 @@ fn select_view(
 fn read_history(
     connection: &Connection,
     session: &SessionId,
+    session_revision: SessionRevision,
     selection: HistorySelection,
     project: &TurnProjection,
 ) -> Result<RetainedHistory> {
@@ -440,6 +443,7 @@ fn read_history(
             tail: snapshots.last().map(|(tail, _)| tail.clone()),
             fingerprint: Fingerprint::of(&(session, view.id, view.seed_identity, snapshots))?,
         },
+        session_revision,
         seed: view.seed,
         records,
     })

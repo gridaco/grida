@@ -145,7 +145,7 @@ impl Host {
         })
     }
 
-    async fn check_ready_capacity(&self, session: &SessionId) -> Result<()> {
+    pub(super) async fn check_ready_capacity(&self, session: &SessionId) -> Result<()> {
         let work = self.work.lock().await;
         if work.active.len() >= MAX_ACTIVE_RUNS
             && work.ready.len() >= MAX_READY_SESSIONS

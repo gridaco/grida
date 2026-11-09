@@ -155,21 +155,31 @@ During `initialize`, a client puts value `1` under each supported
 `agentCapabilities._meta`. Each custom method prefixes its capability key
 with an underscore.
 
-| Capability                                        | Behavior                                                                         |
-| ------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `co.grida/session/submit`                         | Accept an identified prompt for an idle session.                                 |
-| `co.grida/session/snapshot`                       | Read revisions, ordered queue settings, and turn summaries.                      |
-| `co.grida/session/enqueue`, `input`               | Accept waiting work or read an accepted input and its settings.                  |
-| `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting work with revision checks and retained receipts.                    |
-| `co.grida/session/pause`, `resume`, `steer`       | Pause an exact turn, claim a verified suspension, or add a correction.           |
-| `co.grida/session/stop`, `resume-queue`           | Stop the current turn and pause admission, or reopen queue admission separately. |
-| `co.grida/config/inspect`, `update`, `reload`     | Read, change, or activate the host's reviewed defaults.                          |
+| Capability                                        | Behavior                                                                            |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `co.grida/session/submit`                         | Accept an identified prompt for an idle session.                                    |
+| `co.grida/session/snapshot`                       | Read revisions, ordered queue settings, and turn summaries.                         |
+| `co.grida/session/enqueue`, `input`               | Accept waiting work or read an accepted input and its settings.                     |
+| `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting work with revision checks and retained receipts.                       |
+| `co.grida/session/pause`, `resume`, `steer`       | Pause an exact turn, claim a verified suspension, or add a correction.              |
+| `co.grida/session/stop`, `resume-queue`           | Stop the current turn and pause admission, or reopen queue admission separately.    |
+| `co.grida/session/history`, `fork`, `revise`      | Read message anchors, branch a committed prefix, or revise an earlier user message. |
+| `co.grida/config/inspect`, `update`, `reload`     | Read, change, or activate the host's reviewed defaults.                             |
 
 Standard `session/prompt` streams its response. Durable submission and enqueue
 acknowledge accepted input independently of completion. Exact input retries
 return retained dispositions. Exact control retries reconcile their committed
 request IDs. Read the [native client protocol](../../packages/grida-ai-agent/docs/rust-client-protocol.md)
 for field names and revision bases.
+
+Forks capture committed context and can leave the source running. Attach the
+new session through `session/load`. Earlier-message revisions require an idle
+session with an empty queue. The original view remains readable, and the
+replacement is accepted under the current settings. Explicit admission pause
+still applies. Retained context carries portable text and provenance, with
+omissions for provider continuation and restricted source material. Clients
+receive categorized omission counts. The agent receives a notice when relevant
+context such as media or tool data was omitted.
 
 Queue advancement follows verified settlement while admission is open.
 Loading a session observes retained state. Resume Queue explicitly lets

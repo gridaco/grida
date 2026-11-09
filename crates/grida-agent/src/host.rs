@@ -1,7 +1,9 @@
 //! Product composition and ownership for native agent turns.
 
+mod history;
 mod lifecycle;
 mod questions;
+pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use questions::{PendingQuestion, Questions};
 
@@ -372,7 +374,13 @@ impl Host {
             return Err(problem(ErrorKind::Conflict, "session_workspace_mismatch"));
         }
         Ok(SessionSnapshot {
-            messages: self.history(id, None).await?,
+            messages: self
+                .store
+                .history_with(id, None, grida_agent_master::history::project)
+                .await?
+                .into_iter()
+                .map(|HistoryRecord::Message(message)| message)
+                .collect(),
         })
     }
 
@@ -645,7 +653,7 @@ impl Host {
             ClaimOutcome::Acquired(claim) => claim,
             ClaimOutcome::Existing(_) => return Ok(None),
         };
-        let prepared = match prepared {
+        let mut prepared = match prepared {
             Some(prepared) => prepared,
             None => {
                 let [input] = claim.inputs.as_slice() else {
@@ -714,13 +722,19 @@ impl Host {
                 .reconcile(&operations, &tools)
                 .await?;
         }
+        if let Some(disclosure) = history.disclosure {
+            if !prepared.config.instructions.is_empty() {
+                prepared.config.instructions.push_str("\n\n");
+            }
+            prepared.config.instructions.push_str(&disclosure);
+        }
         let master = Master::new(
             prepared.config,
             execution.provider.clone(),
             tools,
             authority,
         )?
-        .with_history(history)
+        .with_history(history.messages)
         .with_input_limit(prepared.limit);
         Ok(Some(Admitted {
             master,
@@ -1147,33 +1161,6 @@ impl Host {
         self.execution
             .as_deref()
             .ok_or_else(|| problem(ErrorKind::Unavailable, "provider_configuration_required"))
-    }
-
-    async fn history(
-        &self,
-        session: SessionId,
-        before_turn: Option<TurnId>,
-    ) -> Result<Vec<Message>> {
-        Ok(self
-            .store
-            .history(session, before_turn)
-            .await?
-            .into_iter()
-            .map(|HistoryRecord::Message(message)| message)
-            .collect())
-    }
-    async fn provider_history(
-        &self,
-        session: SessionId,
-        before_turn: Option<TurnId>,
-    ) -> Result<Vec<Message>> {
-        Ok(self
-            .store
-            .history_with(session, before_turn, grida_agent_master::history::project)
-            .await?
-            .into_iter()
-            .map(|HistoryRecord::Message(message)| message)
-            .collect())
     }
 }
 

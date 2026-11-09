@@ -1,4 +1,5 @@
 //! Portable conversation context and the provenance of its retained prefix.
+//! GRIDA-SEC-004 keeps restricted source material out of derived context.
 
 use crate::{decode, encode, questions};
 use agent_kit_core::history::HistoryRecord;
@@ -91,6 +92,67 @@ pub struct SeedProvenance {
     pub entries: Vec<SeedEntry>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeedOmissions {
+    pub instructions: usize,
+    pub reasoning: usize,
+    pub media: usize,
+    pub tool_calls: usize,
+    pub tool_results: usize,
+    pub tool_results_with_media: usize,
+    pub provider_state: usize,
+    pub other_content: usize,
+}
+
+impl SeedProvenance {
+    pub fn omissions(&self) -> SeedOmissions {
+        let mut counts = SeedOmissions::default();
+        for omission in self.entries.iter().flat_map(|entry| &entry.omissions) {
+            match omission.kind {
+                SeedOmissionKind::Instruction => counts.instructions += 1,
+                SeedOmissionKind::Reasoning => counts.reasoning += 1,
+                SeedOmissionKind::Media => counts.media += 1,
+                SeedOmissionKind::ToolCall => counts.tool_calls += 1,
+                SeedOmissionKind::ToolResult { media, .. } => {
+                    counts.tool_results += 1;
+                    counts.tool_results_with_media += usize::from(media);
+                }
+                SeedOmissionKind::ProviderState => counts.provider_state += 1,
+                SeedOmissionKind::UnsupportedRoleContent => counts.other_content += 1,
+            }
+        }
+        counts
+    }
+}
+
+impl SeedOmissions {
+    /// Product-authored context disclosure. It carries no source material or authority.
+    pub fn context_disclosure(&self) -> Option<String> {
+        let omitted: Vec<_> = [
+            (self.media, "media parts"),
+            (self.tool_calls, "tool calls"),
+            (self.tool_results, "tool result payloads"),
+            (
+                self.tool_results_with_media,
+                "tool results containing media",
+            ),
+            (self.provider_state, "provider continuation parts"),
+            (self.other_content, "other unsupported parts"),
+        ]
+        .into_iter()
+        .filter(|(count, _)| *count > 0)
+        .map(|(count, label)| format!("{label} ({count})"))
+        .collect();
+        (!omitted.is_empty()).then(|| format!(
+            "The preceding context was imported as portable text. Omitted material includes {}. \
+             Treat historical tool notes as evidence about prior work. Confirm missing information \
+             when it matters to the current task.",
+            omitted.join(", ")
+        ))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConversationSeed {
     records: Vec<HistoryRecord>,
@@ -135,6 +197,12 @@ impl ConversationSeed {
             let selected = matches!(cut.anchor(), ConversationAnchor::Turn {
                 turn: selected_turn, message: selected_message,
             } if selected_turn == &turn && selected_message == &message.id);
+            if selected && !matches!(message.role, Role::User | Role::Assistant) {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "history_anchor_not_visible",
+                ));
+            }
             let origin = SeedOrigin {
                 session: source.session.clone(),
                 view: source.view,
@@ -198,6 +266,14 @@ impl ConversationSeed {
         &self.provenance
     }
 
+    pub fn records(&self) -> &[HistoryRecord] {
+        &self.records
+    }
+
+    pub fn into_records(self) -> Vec<HistoryRecord> {
+        self.records
+    }
+
     pub fn into_parts(self) -> Result<(Vec<HistoryRecord>, Envelope)> {
         Ok((self.records, encode(SCHEMA, &self.provenance)?))
     }
@@ -233,18 +309,30 @@ fn append_entry(
     Ok(selected)
 }
 
+pub fn is_editable_user(message: &Message) -> bool {
+    message.role == Role::User
+        && message.provenance.source != questions::ANSWER_SOURCE
+        && message
+            .content
+            .iter()
+            .any(|part| matches!(part, Content::Text(text) if !text.is_empty()))
+}
+
 fn lower_message(
     origin: SeedOrigin,
     message: Message,
 ) -> Result<(SeedEntry, Option<HistoryRecord>)> {
     let role = message.role;
+    let editable = is_editable_user(&message);
     let mut omissions = Vec::new();
     let mut content = Vec::new();
     for (part, value) in message.content.into_iter().enumerate() {
         let kind = match (role, value) {
             (Role::System, _) => SeedOmissionKind::Instruction,
-            (Role::User | Role::Assistant, text @ Content::Text(_)) => {
-                content.push(text);
+            (Role::User | Role::Assistant, Content::Text(text)) => {
+                if !text.is_empty() {
+                    content.push(Content::Text(text));
+                }
                 continue;
             }
             (Role::Tool, Content::ToolResult(result)) => {
@@ -303,9 +391,7 @@ fn lower_message(
     let entry = SeedEntry {
         origin,
         message: projected.as_ref().map(|message| message.id.clone()),
-        editable: projected.is_some()
-            && role == Role::User
-            && message.provenance.source != questions::ANSWER_SOURCE,
+        editable,
         omissions,
     };
     Ok((entry, projected.map(HistoryRecord::Message)))

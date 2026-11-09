@@ -3,7 +3,7 @@ use super::lifecycle::{
 };
 use super::*;
 
-async fn question_socket(url: &str, questions: bool) -> SharedSocket {
+pub(super) async fn question_socket(url: &str, questions: bool) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
@@ -20,7 +20,7 @@ async fn question_socket(url: &str, questions: bool) -> SharedSocket {
     socket
 }
 
-async fn question_list(socket: &mut SharedSocket, session: &str, turn: &str) -> Value {
+pub(super) async fn question_list(socket: &mut SharedSocket, session: &str, turn: &str) -> Value {
     let listed = ws_rpc(
         socket,
         40,

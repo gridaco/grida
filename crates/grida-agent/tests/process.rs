@@ -22,6 +22,9 @@ use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 #[path = "process/configuration_tools.rs"]
 mod configuration_tools;
 #[cfg(unix)]
+#[path = "process/history.rs"]
+mod history;
+#[cfg(unix)]
 #[path = "process/lifecycle.rs"]
 mod lifecycle;
 #[cfg(unix)]
@@ -1387,6 +1390,9 @@ fn extension_initialize() -> Value {
             "co.grida/session/steer":1,
             "co.grida/session/pause":1,
             "co.grida/session/resume":1,
+            "co.grida/session/history":1,
+            "co.grida/session/fork":1,
+            "co.grida/session/revise":1,
             "co.grida/config/inspect":1,
             "co.grida/config/update":1,
             "co.grida/config/reload":1
