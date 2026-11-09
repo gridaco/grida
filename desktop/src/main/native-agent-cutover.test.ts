@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultScratchBase } from "@grida/agent/sandbox";
 import type { NativeAgentChatLaunch } from "./native-agent-chat";
+import { NativeWorkspaceAgents } from "./native-workspace-agents";
 
 const electron = vi.hoisted(() => ({ temp: "", userData: "", media: "" }));
 vi.mock("electron", () => ({
@@ -319,6 +320,66 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
           )
         );
       }
+    },
+    15000
+  );
+
+  it.runIf(Boolean(nativeResources))(
+    "shares workspace startup across windows and drains all retained ownership",
+    async () => {
+      const test = await fixture();
+      const prepared = await test.NativeAgentCutover.prepare();
+      const workspace = { id: "work", root: test.launch.cwd };
+      const release = vi.fn<() => void>();
+      const launch = { ...test.launch, resourcesPath: nativeResources! };
+      const prepare = vi.fn<
+        () => Promise<{ launch: typeof launch; release: () => void }>
+      >(async () => ({ launch, release }));
+      const owners = new NativeWorkspaceAgents(prepared, prepare);
+      let id: string;
+      try {
+        const first = owners.open(workspace);
+        const second = owners.open(workspace);
+        expect(owners.current(workspace.id)).toBeNull();
+        const active = await first;
+        expect(await second).toBe(active);
+        expect(owners.current(workspace.id)).toBe(active);
+        expect(prepare).toHaveBeenCalledTimes(1);
+        await expect(
+          owners.open({ ...workspace, root: test.child("other-root") })
+        ).rejects.toThrow("native_workspace_root_changed");
+        id = (await active.chat.create()).id;
+      } finally {
+        await owners.close();
+      }
+      expect(owners.current(workspace.id)).toBeNull();
+      expect(release).toHaveBeenCalledTimes(1);
+      await expect(owners.open(workspace)).rejects.toThrow(
+        "native_workspace_closing"
+      );
+      const restarted = new NativeWorkspaceAgents(prepared, prepare);
+      try {
+        const active = await restarted.open(workspace);
+        expect(await active.chat.load(id)).toEqual({ id });
+      } finally {
+        await restarted.close();
+      }
+      expect(release).toHaveBeenCalledTimes(2);
+      const began = Promise.withResolvers<void>();
+      const resolveLaunch = Promise.withResolvers<void>();
+      const pending = new NativeWorkspaceAgents(prepared, async (_, signal) => {
+        began.resolve();
+        await resolveLaunch.promise;
+        expect(signal.aborted).toBe(true);
+        return { launch, release };
+      });
+      const result = pending.open(workspace);
+      await began.promise;
+      const drained = pending.close();
+      resolveLaunch.resolve();
+      await expect(result).rejects.toThrow("native_workspace_closing");
+      await drained;
+      expect(release).toHaveBeenCalledTimes(3);
     },
     15000
   );

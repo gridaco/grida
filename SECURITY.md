@@ -890,6 +890,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
   session, turn, and revisions. A reconnect requires a new attachment before
   the same scoped control can be retried. [Process tests](desktop/src/main/native-agent-chat.test.ts)
   cover cross-session rejection, stale controls, and continuation after restart.
+- [Desktop workspace ownership](desktop/src/main/native-workspace-agents.ts)
+  shares one startup across requests for the same registered workspace and
+  canonical root. It bounds concurrent engine ownership and withdraws lookup
+  when shutdown begins. It drains pending launches and closes each native
+  child before releasing that child's provider connection. Window navigation
+  and observer teardown do not close the workspace engine.
 - [Native chat IPC](desktop/src/main/native-chat-ipc.ts) is available only to
   the current top-level workspace frame under the existing authenticated
   window guard. Its attachments and observed control revisions are issued in
