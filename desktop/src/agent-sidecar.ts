@@ -10,13 +10,10 @@
  * full agent composition before importing chat. Both use `@grida/daemon`'s
  * perimeter and the same package-owned media adapters.
  *
- * Spawned by `desktop/src/main/agent-sidecar-supervisor.ts` as
- * `child_process.spawn(electron, [this script], { env: {
- * ELECTRON_RUN_AS_NODE: '1' } })` **wrapped by srt**
- * (`@anthropic-ai/sandbox-runtime`). The wrap applies an OS-level
- * Seatbelt (macOS) or bubblewrap (Linux) profile that scopes
- * filesystem read/write and outbound network — any child process
- * the sidecar spawns inherits the same profile.
+ * The Desktop supervisor uses Electron-as-Node under its compatibility
+ * SRT profile on macOS and Linux. The packaged retained-media launcher
+ * uses an exact macOS Seatbelt profile and mounts only media and provider
+ * settings. Both profiles scope filesystem access and direct networking.
  *
  * Electron-as-node means the runtime is Node, not the renderer
  * sandbox; no Electron APIs are available here, by design — the
@@ -30,13 +27,13 @@
  *   stdin              framed host→sidecar control and provider responses
  *   Node IPC           main-accepted connected daemon sockets only
  *   process.argv[2+]   optional `--key=value` flags. Currently:
- *                        --agent=enabled|disabled
- *                          Host launch choice; enabled by default. Disabled
- *                          does not require scratch or discover skills.
+ *                        --agent=enabled|disabled|native-chat
+ *                          Host launch choice; enabled by default. Media
+ *                          compositions do not load scratch or skills.
+ *                        --retained-media-scope=1
+ *                          Private packaged launcher selection with native-chat.
  *                        --user-data=<absolute path>
- *                          the agent home dir (`~/.grida/agent`, resolved
- *                          via `@grida/home`). We can't import that (or
- *                          `electron`) here, so the supervisor forwards it.
+ *                          The host-owned agent data or retained settings root.
  *                        --scratch-base=<absolute path>
  *                          Electron-main-resolved temp authority root. This is
  *                          intentionally resolved before SRT rewrites TMPDIR.
@@ -136,6 +133,14 @@ const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
 // disabled, so a future supervisor bug that drops the flag can't silently
 // expose an unsandboxed shell.
 const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
+const retainedMediaScope = getCliArg("retained-media-scope");
+if (
+  retainedMediaScope !== undefined &&
+  (retainedMediaScope !== "1" || agentMode !== "native-chat" || sandboxEnforced)
+) {
+  console.error("[agent-sidecar] fatal: invalid retained media scope");
+  process.exit(1);
+}
 // GRIDA-SEC-004 — host-injected managed root for auto-created projects
 // (`~/Documents/Grida Projects`). The supervisor owns the path fact and forwards it;
 // absent (e.g. a future supervisor bug) means auto-create simply refuses.
@@ -192,6 +197,7 @@ async function main() {
     user_data_path: requiredUserDataPath,
     provider_home: providerHome,
     media_root: requiredMediaRoot,
+    retained_media_scope: retainedMediaScope === "1",
     projects_root: projectsRoot,
     editor_base_url: runtimeEditorBaseUrl,
     agent:

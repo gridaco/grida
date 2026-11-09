@@ -373,6 +373,41 @@ that satisfies the credential-service boundary because they do not expose
 local file or process authority to the model. Missing local-agent containment
 does not authorize those local capabilities.
 
+## Retained media process
+
+The packaged retained-media launcher on macOS arm64 uses a deny-by-default
+Seatbelt policy. Trusted Main supplies the packaged Electron executable, an
+isolated settings directory, the shared provider custody directory, the
+app-managed media directory, and a private temporary directory. The runtime
+and system libraries are read-only. Only Electron and the fixed macOS ACL
+reader can execute under the profile. Clean shutdown evidence covers the
+owned media process. Descendant closure requires separate verification.
+
+The child inherits the existing framed provider pipes and one Node IPC
+channel for already-accepted sockets. Main still owns the daemon listener.
+The kernel denies direct listening and connections. The retained composition
+serves media and provider settings. It withholds file, workspace, recents,
+chat, and command routes. Settings use the supplied directory and any
+replacement of legacy settings custody requires separate admission.
+
+Desktop keeps its existing SRT launch while the editor uses the sidecar's
+file, recents, and workspace routes. Open-file registration, workspace
+registration and lookup, and ranged workspace media still use that owner.
+Main's workspace Trash helper covers one path-checked native operation.
+Moving file I/O out of the compatibility process requires equivalent
+per-workspace containment and the existing exact registered-handle checks.
+
+The packaged native fixture uses synthetic provider responses and verifies
+retained media, shared custody, transferred sockets, and clean shutdown.
+Its kernel probe exercises denied direct network, unrelated file access,
+symlink traversal, and shell execution. To run the fixture, set
+`GRIDA_TEST_RETAINED_MEDIA_EXECUTABLE` to the packaged executable's absolute
+canonical path and run `pnpm --dir desktop exec vitest run src/sidecar/media-startup.test.ts`.
+
+Linux arm64 Node has a separate feasibility check for Node IPC and socket
+transfer under bubblewrap and native seccomp. A Linux Electron package and
+Windows launch require their own qualification.
+
 ## Replacement gates
 
 The current whole-sidecar boundary may be re-scoped only when all of these are

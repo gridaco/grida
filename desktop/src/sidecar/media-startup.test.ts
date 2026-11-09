@@ -5,6 +5,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import fs from "node:fs/promises";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +19,7 @@ import { AgentNetworkAuthority } from "../main/agent-network-authority";
 import { AgentDaemonSocketHost } from "../main/agent-daemon-socket-host";
 import { LegacyChatArchive } from "../main/legacy-chat-archive";
 import { LegacyChatSourceLease } from "../main/legacy-chat-source-lease";
+import { RetainedMediaLaunch } from "../main/retained-media-launch";
 
 const desktop = fileURLToPath(new URL("../..", import.meta.url));
 const fixture = fileURLToPath(new URL("./testing/", import.meta.url));
@@ -36,6 +38,253 @@ const password = "synthetic-desktop-media-password-123456789";
 const key = "synthetic-elevenlabs-key";
 const ggToken = "synthetic-scoped-gg-token";
 const audio = Buffer.from([0x49, 0x44, 0x33, 0x04]);
+
+const packagedExecutable = process.env.GRIDA_TEST_RETAINED_MEDIA_EXECUTABLE;
+
+describe.skipIf(
+  process.platform !== "darwin" ||
+    process.arch !== "arm64" ||
+    !packagedExecutable
+)("packaged retained media confinement", () => {
+  it("refuses overlapping, missing, aliased, or public authority roots", async () => {
+    const scope = await packagedScope();
+    try {
+      const { settings, temporary } = scope.options;
+      expect(() =>
+        RetainedMediaLaunch.prepare({ ...scope.options, media: settings })
+      ).toThrow("retained_media_scope_overlap");
+      expect(() =>
+        RetainedMediaLaunch.prepare({
+          ...scope.options,
+          media: path.join(scope.root, "missing"),
+        })
+      ).toThrow("retained_media_path_invalid");
+      const alias = path.join(scope.root, "alias");
+      await fs.symlink(temporary, alias);
+      expect(() =>
+        RetainedMediaLaunch.prepare({ ...scope.options, temporary: alias })
+      ).toThrow("retained_media_path_invalid");
+      await fs.chmod(temporary, 0o755);
+      expect(() => RetainedMediaLaunch.prepare(scope.options)).toThrow(
+        "retained_media_directory_invalid"
+      );
+    } finally {
+      await fs.rm(scope.root, { recursive: true, force: true });
+    }
+  });
+
+  it("serves media and provider settings over the existing private handles", async () => {
+    const scope = await packagedScope();
+    let active: Sidecar | undefined;
+    try {
+      let providerRequests = 0;
+      active = await Sidecar.startRetained(scope.options, async (url, init) => {
+        expect(url).toBe(
+          "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128"
+        );
+        expect(new Headers(init.headers).get("xi-api-key")).toBe(key);
+        providerRequests++;
+        return new Response(audio, {
+          headers: { "content-type": "audio/mpeg" },
+        });
+      });
+      const handshake = await active.post("/handshake");
+      expect(handshake.status).toBe(200);
+      expect((await handshake.json()).capabilities).toMatchObject({
+        files: false,
+        recent: false,
+        workspaces: false,
+        agent: false,
+        sessions: false,
+        shell: false,
+        providers: true,
+        sound_effects: true,
+      });
+      for (const route of [
+        "/workspaces/list",
+        "/files/register",
+        "/recent/list",
+        "/agent/run",
+      ]) {
+        expect((await active.post(route)).status).toBe(404);
+      }
+      const config = {
+        id: "local_fixture",
+        base_url: "http://127.0.0.1:11434/v1",
+        models: [{ id: "fixture-model" }],
+      };
+      expect(
+        (await active.post("/providers/endpoints/set", { config })).status
+      ).toBe(200);
+      expect(
+        await (await active.post("/providers/endpoints/list")).json()
+      ).toEqual([config]);
+      expect(
+        (
+          await active.post("/secrets/set", {
+            provider_id: "elevenlabs",
+            key,
+          })
+        ).status
+      ).toBe(200);
+      const sfx = await active.post("/audio/sound-effects/generate", {
+        model_id: "eleven_text_to_sound_v2",
+        prompt: "A door closes",
+      });
+      expect(sfx.status).toBe(200);
+      await expectReceipt(scope.options.media, (await sfx.json()).stored_media);
+      expect(providerRequests).toBe(1);
+      await active.stop();
+      active = undefined;
+      expect(
+        JSON.parse(
+          await fs.readFile(
+            path.join(scope.options.settings, "endpoints.json"),
+            "utf8"
+          )
+        )
+      ).toEqual([config]);
+    } finally {
+      await active?.stop(false);
+      await fs.rm(scope.root, { recursive: true, force: true });
+    }
+  });
+
+  it("denies direct network and out-of-scope files under the same kernel profile", async () => {
+    const scope = await packagedScope();
+    const listener = net.createServer();
+    let child: ChildProcess | undefined;
+    let exited: Promise<number | null> | undefined;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        listener.once("error", reject);
+        listener.listen(0, "127.0.0.1", resolve);
+      });
+      let accepted = 0;
+      listener.on("connection", (socket) => {
+        accepted++;
+        socket.destroy();
+      });
+      const address = listener.address();
+      assert(address && typeof address !== "string");
+      const outside = path.join(scope.root, "outside.txt");
+      const probe = path.join(scope.options.temporary, "probe.cjs");
+      await fs.writeFile(outside, "outside the retained scope");
+      await fs.symlink(outside, path.join(scope.options.temporary, "alias"));
+      await fs.writeFile(
+        probe,
+        `
+          const { spawnSync } = require("node:child_process");
+          const fs = require("node:fs");
+          const net = require("node:net");
+          const result = (action) => {
+            try { action(); return "allowed"; } catch (error) { return error.code; }
+          };
+          const events = (socket, event) => new Promise((resolve) => {
+            socket.once("error", (error) => resolve(error.code));
+            socket.once(event, () => { resolve("allowed"); socket.close?.(); socket.destroy?.(); });
+          });
+          const outbound = net.connect(Number(process.argv[3]), "127.0.0.1");
+          const inbound = net.createServer().listen(0, "127.0.0.1");
+          Promise.all([events(outbound, "connect"), events(inbound, "listening")]).then(([connect, listen]) => {
+            const data = {
+              connect,
+              listen,
+              read: result(() => fs.readFileSync(process.argv[2])),
+              alias: result(() => fs.readFileSync("alias")),
+              write: result(() => fs.writeFileSync(process.argv[2], "modified")),
+              exec: spawnSync("/bin/sh", ["-c", "exit 0"]).error?.code ?? "allowed",
+              own: result(() => fs.writeFileSync("own", "yes")),
+            };
+            process.send(data, () => process.exit(0));
+          });
+        `
+      );
+      const plan = RetainedMediaLaunch.prepare(scope.options);
+      child = spawn(
+        "/usr/bin/sandbox-exec",
+        [
+          ...plan.sandboxArgs,
+          plan.executable,
+          probe,
+          outside,
+          String(address.port),
+        ],
+        {
+          cwd: plan.cwd,
+          env: plan.env,
+          stdio: ["pipe", "pipe", "pipe", "ipc"],
+        }
+      );
+      let diagnostics = "";
+      child.stderr!.on("data", (chunk) => {
+        diagnostics = (diagnostics + String(chunk)).slice(-4096);
+      });
+      exited = new Promise((resolve) => child!.once("close", resolve));
+      deadline = setTimeout(() => child?.kill("SIGKILL"), 5000);
+      const result = await new Promise<Record<string, string>>(
+        (resolve, reject) => {
+          child!.once("message", (message) =>
+            resolve(message as Record<string, string>)
+          );
+          child!.once("error", reject);
+          child!.once("close", (status) =>
+            reject(new Error(`probe exited ${status}: ${diagnostics}`))
+          );
+        }
+      );
+      expect(result.own).toBe("allowed");
+      for (const operation of [
+        "connect",
+        "listen",
+        "read",
+        "alias",
+        "write",
+        "exec",
+      ]) {
+        assert.match(result[operation], /^(?:EACCES|EPERM)$/, operation);
+      }
+      expect(accepted).toBe(0);
+      expect(await exited).toBe(0);
+      expect(await fs.readFile(outside, "utf8")).toBe(
+        "outside the retained scope"
+      );
+    } finally {
+      clearTimeout(deadline);
+      if (child?.exitCode === null && child.signalCode === null)
+        child.kill("SIGKILL");
+      await exited;
+      listener.close();
+      await fs.rm(scope.root, { recursive: true, force: true });
+    }
+  });
+});
+
+async function packagedScope() {
+  assert(packagedExecutable);
+  const root = await fs.realpath(
+    await fs.mkdtemp(path.join(os.tmpdir(), "grida-retained-media-"))
+  );
+  const options = {
+    executable: packagedExecutable,
+    settings: path.join(root, "settings"),
+    providerHome: path.join(root, "custody"),
+    media: path.join(root, "media"),
+    temporary: path.join(root, "temporary"),
+    editorBaseUrl: origin,
+  };
+  for (const directory of [
+    options.settings,
+    options.providerHome,
+    path.join(options.providerHome, "providers"),
+    options.media,
+    options.temporary,
+  ]) {
+    await fs.mkdir(directory, { mode: 0o700 });
+  }
+  return { root, options };
+}
 
 describe("built Desktop media startup", () => {
   it("serves media through real private channels without agent startup or ambient networking", async () => {
@@ -572,11 +821,28 @@ class Sidecar {
         stdio: ["pipe", "pipe", "pipe", "ipc"],
       }
     );
-    const sidecar = new Sidecar(
+    return await Sidecar.initialize(
       child,
       options.fetchProvider,
       options.legacyScratch !== undefined
     );
+  }
+  static async startRetained(
+    options: RetainedMediaLaunch.Options,
+    fetchProvider: StartOptions["fetchProvider"]
+  ): Promise<Sidecar> {
+    return await Sidecar.initialize(
+      RetainedMediaLaunch.start(options),
+      fetchProvider,
+      false
+    );
+  }
+  private static async initialize(
+    child: ChildProcess,
+    fetchProvider: StartOptions["fetchProvider"],
+    legacy: boolean
+  ) {
+    const sidecar = new Sidecar(child, fetchProvider, legacy);
     let startupTimer: ReturnType<typeof setTimeout>;
     const deadline = new Promise<never>((_resolve, reject) => {
       startupTimer = setTimeout(

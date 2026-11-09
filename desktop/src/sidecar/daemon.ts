@@ -15,6 +15,7 @@ export namespace DesktopDaemon {
     user_data_path: string;
     provider_home?: string;
     media_root: string;
+    retained_media_scope?: boolean;
     projects_root?: string;
     editor_base_url: string;
     provider_http: ProviderHttpTransport;
@@ -30,6 +31,9 @@ export namespace DesktopDaemon {
   };
 
   export async function create(opts: Options): Promise<DaemonServer> {
+    if (opts.retained_media_scope && opts.agent !== "native-chat") {
+      throw new Error("retained_media_scope_invalid");
+    }
     const shared: MediaDaemonOptions = {
       password: opts.password,
       user_data_path: opts.user_data_path,
@@ -47,7 +51,13 @@ export namespace DesktopDaemon {
       const { createMediaDaemon } = await import("@grida/agent/media-server");
       return createMediaDaemon(
         opts.agent === "native-chat"
-          ? { ...shared, endpoint_settings: true }
+          ? {
+              ...shared,
+              endpoint_settings: true,
+              capabilities: opts.retained_media_scope
+                ? { files: false, recent: false, workspaces: false }
+                : undefined,
+            }
           : shared
       );
     }
