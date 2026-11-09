@@ -25,10 +25,11 @@ state-directory path and a project directory. Keep the state directory to retain
 your chats across process restarts. One host process owns a state directory at a
 time.
 
-Choose a text model and an OpenAI-compatible base URL that supports streamed
-chat completions. HTTPS endpoints and numeric-loopback HTTP endpoints are
-accepted. Put a required bearer credential in an environment variable before
-starting the host. `--credential-env` names that variable.
+Choose a text model and a base URL for its protocol. Chat Completions is the
+default. Use `--provider responses`, `--provider anthropic`, or
+`--provider gemini` for the corresponding streaming protocol. The host accepts
+HTTPS endpoints and loopback HTTP endpoints. When a credential is required,
+set it in an environment variable and select that variable with `--credential-env`.
 
 ## Run a task from a script
 
@@ -181,6 +182,7 @@ Each suffix in a grouped row uses the displayed prefix and is negotiated separat
 | `co.grida/session/pause`, `resume`, `steer`       | Pause a turn, resume its verified suspension, or send a correction to that turn.     |
 | `co.grida/session/stop`, `resume-queue`           | Stop a turn and pause queue advancement, then reopen queue admission when ready.     |
 | `co.grida/session/questions`, `answer-question`   | Inspect pending questions and submit a correlated choice, free-text answer, or skip. |
+| `co.grida/session/history`, `fork`, `revise`      | Browse retained message anchors, branch a chat, or replace an earlier text message.  |
 | `co.grida/config/inspect`, `update`, `reload`     | Inspect, change, or reload the host defaults.                                        |
 
 Use ordinary `session/prompt` for a streamed reply. Use durable submission or
@@ -203,8 +205,22 @@ their existing text-only profile.
 
 Configuration changes apply to later accepted inputs. Existing inputs retain
 their captured defaults. An explicit hard context-input cap requires supported
-counting for the complete request. If counting is unavailable, the turn reports
-that failure before sending a model request.
+counting for the complete request. A remote counter receives the prepared input.
+If counting is unavailable or the input exceeds the cap, the turn records a
+failure before generation. [Agent configuration](../reference/agent-configuration.md).
+
+### Branch or revise a chat
+
+Read a history page to select a committed message and its basis. A fork creates
+a separate chat from that prefix while the source can continue running. Open
+the new chat to send its first prompt. The copied context includes portable text
+and reports omitted media, tool material, and provider continuation.
+
+Revising an earlier text message requires an idle chat and an empty queue. The
+host saves the previous view and accepts the replacement with fresh input
+settings and permissions. A paused queue still needs Resume Queue. Use the
+document or file owner's editing controls to undo changes made during earlier
+work. The history operations retain evidence of those earlier effects.
 
 The [feature catalog](./features.md) describes the wider agent experience and
 the availability of its product features.
