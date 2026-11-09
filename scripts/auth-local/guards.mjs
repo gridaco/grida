@@ -20,6 +20,13 @@ export const fixture = Object.freeze({
 });
 
 export const guards = {
+  editorRewrites(rewrites) {
+    assert(Array.isArray(rewrites), "Expected the editor rewrite list");
+    // This auth-only snapshot does not serve blog content. Its public proxy
+    // would either contact the hosted blog or recurse if aimed at this editor.
+    return rewrites.filter(({ source }) => !/^\/blog(?:\/|$)/.test(source));
+  },
+
   images({ auth, postgres }) {
     // The pinned CLI can fall back between Supabase-owned image registries.
     // Admit exact repositories; retain the Auth release and PostgreSQL major.
