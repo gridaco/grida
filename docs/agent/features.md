@@ -14,6 +14,11 @@ Rust rebuild so existing capabilities and unfinished work remain visible.
 The current column covers the shared agent package and its Desktop wiring, with
 external-driver differences called out where relevant.
 
+The source-built Rust host also supports bounded text tasks, durable turn
+records, and standard ACP v1 stdio clients. Its [client guide](./clients.md)
+describes the verified entrypoints. Feature acceptance for the complete native
+product remains recorded separately from those component and process checks.
+
 Each feature records the current fact, the intended user outcome, and any limit
 that changes what a person can rely on. The linked behavior
 expands the user situation and expected outcome. Tests provide evidence for those
@@ -25,7 +30,7 @@ in this review. Present means the described path exists. Partial identifies a
 narrower implementation than the proposed behavior. Absent means the reviewed
 native implementation has no corresponding feature path.
 
-**Rebuild status — proposed.** Retain, extend, and add describe the target
+**Rebuild status — implementation in progress.** Retain, extend, and add describe the target
 contract. Every rebuild entry still needs implementation and acceptance evidence.
 Deferred and Open identify an explicit scope limit or an undecided product feature.
 

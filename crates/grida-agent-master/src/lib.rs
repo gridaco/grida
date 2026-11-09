@@ -6,7 +6,8 @@ pub mod usage;
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
-    FailureKind, InferenceRequest, InferenceStatus, MeasurementKind, PreparedRequest, Provider,
+    FailureKind, InferenceFailure, InferenceRequest, InferenceStatus, MeasurementKind,
+    PreparedRequest, Provider,
 };
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::InventorySnapshot;
@@ -43,6 +44,8 @@ pub struct Account {
     pub stop_reason: Option<StopReason>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure: Option<Error>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inference_failure: Option<InferenceFailure>,
     #[serde(default)]
     pub inference_usage: usage::InferenceUsage,
 }
@@ -169,6 +172,7 @@ impl Master {
                     continuation.step,
                     "The configured step limit was reached.",
                     Some(StopReason::StepLimit),
+                    None,
                 )?;
                 match self
                     .finish(&mut turn, &mut continuation, outcome, &view)
@@ -189,6 +193,7 @@ impl Master {
                                 OutcomeStatus::Failed,
                                 continuation.step,
                                 "The model input could not be prepared with the selected configuration.",
+                                None,
                                 None,
                             )?;
                             let mut account =
@@ -292,62 +297,83 @@ impl Master {
             let interrupted_by_pause = step.inference.failure.as_ref().is_some_and(|failure| {
                 failure.kind == FailureKind::Cancelled && failure.code == "turn_paused"
             });
-            let outcome = if current.state.controls().cancelled {
-                Some(self.cancelled_outcome(&turn, continuation.step).await?)
-            } else if uncertain {
-                Some(self.account(
-                    &turn,
-                    OutcomeStatus::Uncertain,
-                    continuation.step,
-                    "An operation has an unconfirmed outcome.",
-                    None,
-                )?)
-            } else if interrupted_by_pause {
-                None
-            } else {
-                match step.inference.status {
-                    InferenceStatus::Completed if step.tools.is_empty() => {
-                        let text = answer(&step.inference.messages);
-                        Some(self.account(
-                            &turn,
-                            OutcomeStatus::Succeeded,
-                            continuation.step,
-                            &text,
-                            None,
-                        )?)
-                    }
-                    InferenceStatus::Completed => None,
-                    InferenceStatus::Interrupted if continuation.interrupted => None,
-                    InferenceStatus::Interrupted => Some(self.account(
+            let outcome =
+                if current.state.controls().cancelled {
+                    Some(self.cancelled_outcome(&turn, continuation.step).await?)
+                } else if uncertain {
+                    Some(self.account(
                         &turn,
                         OutcomeStatus::Uncertain,
                         continuation.step,
-                        "The model response was interrupted.",
+                        "An operation has an unconfirmed outcome.",
                         None,
-                    )?),
-                    InferenceStatus::Limited => Some(self.account(
-                        &turn,
-                        OutcomeStatus::Failed,
-                        continuation.step,
-                        "The model reached its output limit.",
-                        Some(StopReason::OutputLimit),
-                    )?),
-                    InferenceStatus::Refused => Some(self.account(
-                        &turn,
-                        OutcomeStatus::Failed,
-                        continuation.step,
-                        "The model declined the request.",
-                        Some(StopReason::Refused),
-                    )?),
-                    InferenceStatus::Failed => Some(self.account(
-                        &turn,
-                        OutcomeStatus::Failed,
-                        continuation.step,
-                        "The model request failed.",
-                        None,
-                    )?),
-                }
-            };
+                        step.inference.failure.as_ref(),
+                    )?)
+                } else if interrupted_by_pause {
+                    None
+                } else {
+                    match step.inference.status {
+                        InferenceStatus::Completed if step.tools.is_empty() => {
+                            let text = answer(&step.inference.messages);
+                            Some(self.account(
+                                &turn,
+                                OutcomeStatus::Succeeded,
+                                continuation.step,
+                                &text,
+                                None,
+                                step.inference.failure.as_ref(),
+                            )?)
+                        }
+                        InferenceStatus::Completed => None,
+                        InferenceStatus::Interrupted if continuation.interrupted => None,
+                        InferenceStatus::Interrupted => Some(self.account(
+                            &turn,
+                            OutcomeStatus::Uncertain,
+                            continuation.step,
+                            "The model response was interrupted.",
+                            None,
+                            step.inference.failure.as_ref(),
+                        )?),
+                        InferenceStatus::Limited
+                            if step.inference.failure.as_ref().is_some_and(|failure| {
+                                failure.kind == FailureKind::ContextLimit
+                            }) =>
+                        {
+                            Some(self.account(
+                                &turn,
+                                OutcomeStatus::Failed,
+                                continuation.step,
+                                "The model reached its context limit.",
+                                None,
+                                step.inference.failure.as_ref(),
+                            )?)
+                        }
+                        InferenceStatus::Limited => Some(self.account(
+                            &turn,
+                            OutcomeStatus::Failed,
+                            continuation.step,
+                            "The model reached its output limit.",
+                            Some(StopReason::OutputLimit),
+                            step.inference.failure.as_ref(),
+                        )?),
+                        InferenceStatus::Refused => Some(self.account(
+                            &turn,
+                            OutcomeStatus::Failed,
+                            continuation.step,
+                            "The model declined the request.",
+                            Some(StopReason::Refused),
+                            step.inference.failure.as_ref(),
+                        )?),
+                        InferenceStatus::Failed => Some(self.account(
+                            &turn,
+                            OutcomeStatus::Failed,
+                            continuation.step,
+                            "The model request failed.",
+                            None,
+                            step.inference.failure.as_ref(),
+                        )?),
+                    }
+                };
             continuation.request = None;
             continuation.interrupted = false;
             continuation.outcome = outcome;
@@ -484,6 +510,7 @@ impl Master {
             steps,
             "Work was stopped.",
             None,
+            None,
         )
     }
 
@@ -508,6 +535,7 @@ impl Master {
                     continuation.step,
                     "Work was stopped.",
                     None,
+                    None,
                 )?;
             }
             continuation.request = None;
@@ -529,6 +557,7 @@ impl Master {
         steps: u32,
         text: &str,
         stop_reason: Option<StopReason>,
+        inference_failure: Option<&InferenceFailure>,
     ) -> Result<TurnOutcome> {
         let view = turn.view();
         let evidence = view.state.operations().keys().cloned().collect();
@@ -550,6 +579,7 @@ impl Master {
                     unresolved,
                     stop_reason,
                     failure: None,
+                    inference_failure: inference_failure.cloned(),
                     inference_usage: usage::InferenceUsage::from_turn(&view.state)?,
                 },
             )?),

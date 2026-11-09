@@ -3,9 +3,10 @@ use agent_kit_core::authority::{
 };
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
-    InferenceControl, InferenceOutcome, InferenceRequest, InferenceRun, InferenceStatus,
-    InferenceUpdate, InputFormat, InputMeasurement, MeasurementKind, Modality, ModelCapabilities,
-    PreparedRequest, Provider, ProviderBinding, ProviderEvent, UsageObservation,
+    FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceRequest,
+    InferenceRun, InferenceStatus, InferenceUpdate, InputFormat, InputMeasurement, MeasurementKind,
+    Modality, ModelCapabilities, PreparedRequest, Provider, ProviderBinding, ProviderEvent,
+    UsageObservation,
 };
 use agent_kit_core::messages::{
     Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
@@ -105,6 +106,7 @@ fn input() -> Vec<Message> {
 enum Script {
     Answer,
     UsageAnswer,
+    Failure(FailureKind),
     ToolThenAnswer,
     ToolAndDeferred,
     Tools,
@@ -206,8 +208,25 @@ impl Provider for ScriptProvider {
         } else {
             vec![]
         };
+        let (status, failure) = if let Script::Failure(kind) = self.script {
+            let status = if matches!(kind, FailureKind::ContextLimit | FailureKind::OutputLimit) {
+                InferenceStatus::Limited
+            } else {
+                InferenceStatus::Failed
+            };
+            (
+                status,
+                Some(InferenceFailure {
+                    kind,
+                    code: "fixture_failure".into(),
+                    retry_after_ms: None,
+                }),
+            )
+        } else {
+            (InferenceStatus::Completed, None)
+        };
         let outcome = InferenceOutcome {
-            status: InferenceStatus::Completed,
+            status,
             messages: vec![Message {
                 id: MessageId::new(format!("answer-{index}"))?,
                 role: Role::Assistant,
@@ -220,7 +239,7 @@ impl Provider for ScriptProvider {
                 },
             }],
             usage,
-            failure: None,
+            failure,
             receipt: None,
         };
         events.push(ProviderEvent::Finished(outcome));
@@ -1513,4 +1532,37 @@ async fn persisted_usage_keeps_latest_cumulative_values_and_separate_categories(
             .any(|observation| observation.category == "cached_input_tokens"
                 && observation.quantity == 2)
     );
+}
+
+#[tokio::test]
+async fn provider_failure_classification_survives_the_completion_account() {
+    for kind in [
+        FailureKind::ContextLimit,
+        FailureKind::OutputLimit,
+        FailureKind::Authentication,
+    ] {
+        let fixture = Fixture::new(Script::Failure(kind));
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let MasterOutcome::Settled(receipt) = fixture
+            .master(4, "Be concise")
+            .run(opened.turn, input())
+            .await
+            .unwrap()
+        else {
+            panic!("expected failed settlement")
+        };
+        assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
+        let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+        assert_eq!(account.inference_failure.unwrap().kind, kind);
+        if kind == FailureKind::OutputLimit {
+            assert_eq!(
+                account.stop_reason,
+                Some(grida_agent_master::StopReason::OutputLimit)
+            );
+        } else {
+            assert_eq!(account.stop_reason, None);
+        }
+    }
 }

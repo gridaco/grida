@@ -20,7 +20,9 @@ the conversation before settlement. Completion and suspension validate the
 control and history positions on which the master made its decision.
 
 Completion accounts expose typed output-limit, refusal, and step-limit reasons
-for client adapters. Reviewed default-setting definitions live here, while the
+for client adapters. Provider failure classifications remain available in the
+account, with context exhaustion separate from output-limit exhaustion.
+Reviewed default-setting definitions live here, while the
 native host owns their persistence and user operations.
 
 A supplied hard input limit measures the complete prepared provider request.
