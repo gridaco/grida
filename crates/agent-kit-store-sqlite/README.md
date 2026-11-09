@@ -28,6 +28,8 @@ its policy. Earlier databases upgrade with empty driver state.
 Conditional submission keeps ordinary input identity while fencing admission
 at the observed session revision. A new claim can reserve driver state in the
 same transaction that claims the input and issues ownership.
+Derived driver controls bind an opaque caller intent before computing the new
+state. An exact retry returns the original receipt even after later changes.
 
 A live lease blocks recovery of its turn. Dropping it makes interrupted execution
 eligible for an explicit recovery request. Reopening the database preserves the

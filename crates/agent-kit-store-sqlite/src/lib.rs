@@ -1,6 +1,7 @@
 //! SQLite persistence for session admission and the bound execution journal.
 
 pub mod context;
+pub mod driver;
 pub mod history;
 
 use agent_kit_core::driver_state::{DriverStateChange, DriverStateSnapshot};
@@ -660,192 +661,9 @@ impl SessionStore for SqliteStore {
             )? {
                 return Ok(receipt);
             }
-            let mut session = load_session(&transaction, &request.session)?;
+            let session = load_session(&transaction, &request.session)?;
             require_revision(&session, request.expected_revision)?;
-            let state_revision = session.driver_state.revision();
-            let action = match &request.action {
-                SessionControl::PauseAdmission => {
-                    session.paused = true;
-                    None
-                }
-                SessionControl::ResumeAdmission => {
-                    session.paused = false;
-                    None
-                }
-                SessionControl::ReplaceQueued { input, replacement } => {
-                    let order = queued_order(&transaction, &request.session, input)?;
-                    if find_input(&transaction, &request.session, &replacement.id)?.is_some() {
-                        return Err(error(ErrorKind::Conflict, "input_identity_reused"));
-                    }
-                    transaction.execute(
-                        "UPDATE submissions SET queue_order=NULL,replacement_id=?3 WHERE session=?1 AND id=?2",
-                        params![request.session.as_str(), input.as_str(), replacement.id.as_str()],
-                    ).map_err(database_error)?;
-                    let receipt = insert_input(
-                        &transaction,
-                        &request.session,
-                        &mut session,
-                        replacement,
-                        Some(order),
-                    )?;
-                    save_request(
-                        &transaction,
-                        &request.session,
-                        "submit",
-                        &replacement.id,
-                        Fingerprint::of(replacement)?,
-                        &receipt,
-                    )?;
-                    None
-                }
-                SessionControl::WithdrawQueued { input } => {
-                    queued_order(&transaction, &request.session, input)?;
-                    transaction.execute(
-                        "UPDATE submissions SET queue_order=NULL,withdrawn=1 WHERE session=?1 AND id=?2",
-                        params![request.session.as_str(), input.as_str()],
-                    ).map_err(database_error)?;
-                    None
-                }
-                SessionControl::ReorderQueued { inputs } => {
-                    reorder_queue(&transaction, &request.session, inputs)?;
-                    None
-                }
-                SessionControl::AppendHistory {
-                    turn,
-                    expected,
-                    expected_history,
-                    records,
-                } => {
-                    let state = load_turn(&transaction, &request.session, turn)?;
-                    if state.history().position() != *expected_history {
-                        return Err(error(ErrorKind::Conflict, "history_position_changed"));
-                    }
-                    if records.is_empty() {
-                        return Err(error(ErrorKind::InvalidInput, "empty_history_contribution"));
-                    }
-                    Some((
-                        turn,
-                        *expected,
-                        vec![JournalAction::AppendHistory(records.clone())],
-                    ))
-                }
-                SessionControl::Turn {
-                    turn,
-                    expected,
-                    directive,
-                } => Some((turn, *expected, vec![JournalAction::Control(*directive)])),
-                SessionControl::Resolve {
-                    turn,
-                    expected,
-                    wait,
-                    answer,
-                } => Some((
-                    turn,
-                    *expected,
-                    vec![JournalAction::ResolveWait {
-                        wait: wait.clone(),
-                        answer: answer.clone(),
-                    }],
-                )),
-                SessionControl::ResolveAndAppend {
-                    turn,
-                    expected,
-                    expected_history,
-                    wait,
-                    answer,
-                    records,
-                } => {
-                    let state = load_turn(&transaction, &request.session, turn)?;
-                    if state.history().position() != *expected_history {
-                        return Err(error(ErrorKind::Conflict, "history_position_changed"));
-                    }
-                    if records.is_empty() {
-                        return Err(error(ErrorKind::InvalidInput, "empty_history_contribution"));
-                    }
-                    Some((
-                        turn,
-                        *expected,
-                        vec![
-                            JournalAction::ResolveWait {
-                                wait: wait.clone(),
-                                answer: answer.clone(),
-                            },
-                            JournalAction::AppendHistory(records.clone()),
-                        ],
-                    ))
-                }
-                SessionControl::PauseAndCancel { turn, expected } => {
-                    session.paused = true;
-                    Some((
-                        turn,
-                        *expected,
-                        vec![JournalAction::Control(ControlDirective::Cancel)],
-                    ))
-                }
-                SessionControl::DriverState {
-                    change,
-                    turn: Some(control),
-                } => Some((
-                    &control.turn,
-                    control.expected,
-                    vec![
-                        JournalAction::SetDriverState(change.clone()),
-                        JournalAction::Control(control.directive),
-                    ],
-                )),
-                SessionControl::DriverState { change, turn: None } => {
-                    if session.active_turn.is_some() {
-                        return Err(error(
-                            ErrorKind::Conflict,
-                            "driver_state_requires_turn_control",
-                        ));
-                    }
-                    session.driver_state.apply(change.clone())?;
-                    None
-                }
-            };
-            let turn_receipt = if let Some((turn, expected, actions)) = action {
-                if session.active_turn.as_ref() != Some(turn) {
-                    return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
-                }
-                let mut state = load_turn(&transaction, &request.session, turn)?;
-                if state.driver_state() != &session.driver_state {
-                    return Err(error(ErrorKind::Conflict, "driver_state_snapshot_mismatch"));
-                }
-                if state.controls().cancelled
-                    && actions.iter().any(|action| {
-                        matches!(
-                            action,
-                            JournalAction::AppendHistory(_) | JournalAction::ResolveWait { .. }
-                        )
-                    })
-                {
-                    return Err(error(ErrorKind::InvalidState, "turn_cancelled"));
-                }
-                let change = JournalChange::new(
-                    request.id.clone(),
-                    state.binding().clone(),
-                    state.position(),
-                    expected,
-                    actions,
-                )?;
-                let receipt = state.apply(change)?;
-                session.driver_state = state.driver_state().clone();
-                save_turn(&transaction, &state)?;
-                Some(receipt)
-            } else {
-                None
-            };
-            bump_revision(&mut session)?;
-            save_session(&transaction, &request.session, &session)?;
-            let receipt = ControlReceipt {
-                session: request.session.clone(),
-                request: request.id.clone(),
-                revision: session.revision,
-                turn: turn_receipt,
-                driver_state_revision: (state_revision != session.driver_state.revision())
-                    .then_some(session.driver_state.revision()),
-            };
+            let receipt = apply_control(&transaction, &request, session, None)?;
             save_request(
                 &transaction,
                 &request.session,
@@ -1161,6 +979,202 @@ fn save_session(
         )
         .map_err(database_error)?;
     Ok(())
+}
+
+fn apply_control(
+    transaction: &Transaction<'_>,
+    request: &ControlRequest,
+    mut session: SessionRecord,
+    active: Option<TurnState>,
+) -> Result<ControlReceipt> {
+    let state_revision = session.driver_state.revision();
+    let action = match &request.action {
+        SessionControl::PauseAdmission => {
+            session.paused = true;
+            None
+        }
+        SessionControl::ResumeAdmission => {
+            session.paused = false;
+            None
+        }
+        SessionControl::ReplaceQueued { input, replacement } => {
+            let order = queued_order(transaction, &request.session, input)?;
+            if find_input(transaction, &request.session, &replacement.id)?.is_some() {
+                return Err(error(ErrorKind::Conflict, "input_identity_reused"));
+            }
+            transaction.execute(
+                "UPDATE submissions SET queue_order=NULL,replacement_id=?3 WHERE session=?1 AND id=?2",
+                params![request.session.as_str(), input.as_str(), replacement.id.as_str()],
+            ).map_err(database_error)?;
+            let receipt = insert_input(
+                transaction,
+                &request.session,
+                &mut session,
+                replacement,
+                Some(order),
+            )?;
+            save_request(
+                transaction,
+                &request.session,
+                "submit",
+                &replacement.id,
+                Fingerprint::of(replacement)?,
+                &receipt,
+            )?;
+            None
+        }
+        SessionControl::WithdrawQueued { input } => {
+            queued_order(transaction, &request.session, input)?;
+            transaction.execute(
+                "UPDATE submissions SET queue_order=NULL,withdrawn=1 WHERE session=?1 AND id=?2",
+                params![request.session.as_str(), input.as_str()],
+            ).map_err(database_error)?;
+            None
+        }
+        SessionControl::ReorderQueued { inputs } => {
+            reorder_queue(transaction, &request.session, inputs)?;
+            None
+        }
+        SessionControl::AppendHistory {
+            turn,
+            expected,
+            expected_history,
+            records,
+        } => {
+            let state = load_turn(transaction, &request.session, turn)?;
+            if state.history().position() != *expected_history {
+                return Err(error(ErrorKind::Conflict, "history_position_changed"));
+            }
+            if records.is_empty() {
+                return Err(error(ErrorKind::InvalidInput, "empty_history_contribution"));
+            }
+            Some((
+                turn,
+                *expected,
+                vec![JournalAction::AppendHistory(records.clone())],
+            ))
+        }
+        SessionControl::Turn {
+            turn,
+            expected,
+            directive,
+        } => Some((turn, *expected, vec![JournalAction::Control(*directive)])),
+        SessionControl::Resolve {
+            turn,
+            expected,
+            wait,
+            answer,
+        } => Some((
+            turn,
+            *expected,
+            vec![JournalAction::ResolveWait {
+                wait: wait.clone(),
+                answer: answer.clone(),
+            }],
+        )),
+        SessionControl::ResolveAndAppend {
+            turn,
+            expected,
+            expected_history,
+            wait,
+            answer,
+            records,
+        } => {
+            let state = load_turn(transaction, &request.session, turn)?;
+            if state.history().position() != *expected_history {
+                return Err(error(ErrorKind::Conflict, "history_position_changed"));
+            }
+            if records.is_empty() {
+                return Err(error(ErrorKind::InvalidInput, "empty_history_contribution"));
+            }
+            Some((
+                turn,
+                *expected,
+                vec![
+                    JournalAction::ResolveWait {
+                        wait: wait.clone(),
+                        answer: answer.clone(),
+                    },
+                    JournalAction::AppendHistory(records.clone()),
+                ],
+            ))
+        }
+        SessionControl::PauseAndCancel { turn, expected } => {
+            session.paused = true;
+            Some((
+                turn,
+                *expected,
+                vec![JournalAction::Control(ControlDirective::Cancel)],
+            ))
+        }
+        SessionControl::DriverState {
+            change,
+            turn: Some(control),
+        } => Some((
+            &control.turn,
+            control.expected,
+            vec![
+                JournalAction::SetDriverState(change.clone()),
+                JournalAction::Control(control.directive),
+            ],
+        )),
+        SessionControl::DriverState { change, turn: None } => {
+            if session.active_turn.is_some() {
+                return Err(error(
+                    ErrorKind::Conflict,
+                    "driver_state_requires_turn_control",
+                ));
+            }
+            session.driver_state.apply(change.clone())?;
+            None
+        }
+    };
+    let turn_receipt = if let Some((turn, expected, actions)) = action {
+        if session.active_turn.as_ref() != Some(turn) {
+            return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
+        }
+        let mut state = match active {
+            Some(state) => state,
+            None => load_turn(transaction, &request.session, turn)?,
+        };
+        if state.driver_state() != &session.driver_state {
+            return Err(error(ErrorKind::Conflict, "driver_state_snapshot_mismatch"));
+        }
+        if state.controls().cancelled
+            && actions.iter().any(|action| {
+                matches!(
+                    action,
+                    JournalAction::AppendHistory(_) | JournalAction::ResolveWait { .. }
+                )
+            })
+        {
+            return Err(error(ErrorKind::InvalidState, "turn_cancelled"));
+        }
+        let change = JournalChange::new(
+            request.id.clone(),
+            state.binding().clone(),
+            state.position(),
+            expected,
+            actions,
+        )?;
+        let receipt = state.apply(change)?;
+        session.driver_state = state.driver_state().clone();
+        save_turn(transaction, &state)?;
+        Some(receipt)
+    } else {
+        None
+    };
+    bump_revision(&mut session)?;
+    save_session(transaction, &request.session, &session)?;
+    let receipt = ControlReceipt {
+        session: request.session.clone(),
+        request: request.id.clone(),
+        revision: session.revision,
+        turn: turn_receipt,
+        driver_state_revision: (state_revision != session.driver_state.revision())
+            .then_some(session.driver_state.revision()),
+    };
+    Ok(receipt)
 }
 
 fn insert_input(

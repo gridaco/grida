@@ -2569,3 +2569,72 @@ async fn reserved_claim_retries_without_allocating_again_and_leaves_stale_work_q
         InputDisposition::Claimed { turn: turn() }
     );
 }
+
+#[tokio::test]
+async fn a_derived_control_replays_original_intent_without_recomputing_new_state() {
+    use agent_kit_core::driver_state::DriverStateRevision;
+    use agent_kit_core::turn::ControlDirective;
+    use agent_kit_store_sqlite::driver::{DriverControlPlan, DriverControlRequest};
+
+    let (directory, store) = store().await;
+    let accepted = submission("work", "start work");
+    store.submit(session(), accepted.clone()).await.unwrap();
+    let owned = claim(&store, "claim", vec![accepted.id]).await;
+    let before = store.inspect(session()).await.unwrap();
+    let request = DriverControlRequest {
+        id: change("pause-intent"),
+        session: session(),
+        expected_revision: before.revision,
+        expected_state: DriverStateRevision(0),
+        intent: payload("pause the owned work"),
+    };
+    let receipt = store
+        .control_driver_state(request.clone(), |state, current| {
+            assert!(state.is_initial());
+            assert_eq!(current.unwrap().binding.turn, turn());
+            Ok(DriverControlPlan {
+                value: Some(payload("paused driver state")),
+                directive: Some(ControlDirective::Pause),
+            })
+        })
+        .await
+        .unwrap();
+    assert_eq!(receipt.driver_state_revision, Some(DriverStateRevision(1)));
+    let paused = owned.lease.journal().load().await.unwrap();
+    assert!(paused.controls().paused);
+    assert_eq!(
+        paused.driver_state().value(),
+        Some(&payload("paused driver state"))
+    );
+    drop(owned);
+    drop(store);
+
+    let reopened = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    assert_eq!(
+        reopened
+            .control_driver_state(request.clone(), |_, _| panic!("replayed the decision"))
+            .await
+            .unwrap(),
+        receipt
+    );
+    let reused = DriverControlRequest {
+        intent: payload("clear"),
+        ..request
+    };
+    assert_error(
+        reopened
+            .control_driver_state(reused, |_, _| panic!("accepted changed intent"))
+            .await,
+        ErrorKind::Conflict,
+        "request_identity_reused",
+    );
+    assert_eq!(
+        reopened
+            .inspect(session())
+            .await
+            .unwrap()
+            .driver_state
+            .value(),
+        Some(&payload("paused driver state"))
+    );
+}

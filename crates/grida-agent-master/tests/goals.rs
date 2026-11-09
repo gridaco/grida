@@ -508,3 +508,39 @@ fn goal_report_refuses_objective_mutation_and_incomplete_criteria() {
         "goal_report_criteria_incomplete"
     );
 }
+
+#[test]
+fn explicitly_resuming_the_same_objective_keeps_the_existing_allocation() {
+    let mut goal = goal(3, 6);
+    let work = turn("paused");
+    let original = goal.basis().clone();
+    goal.reserve(&original, work.clone(), limit(3)).unwrap();
+    goal.set_paused(&original, true).unwrap();
+    let paused = goal.basis().clone();
+    let before = goal.remaining();
+    let mut goal = Goal::decode(&goal.encode().unwrap()).unwrap();
+    goal.resume_reserved(&paused, &work).unwrap();
+    assert!(!goal.paused());
+    assert_eq!(goal.reservation().unwrap().basis, *goal.basis());
+    assert_ne!(goal.reservation().unwrap().basis, original);
+    assert_eq!(goal.remaining(), before);
+    assert!(grida_agent_master::goals::tools::for_work(&goal, &work).is_ok());
+
+    goal.set_paused(&goal.basis().clone(), true).unwrap();
+    goal.revise(
+        &goal.basis().clone(),
+        Objective {
+            description: "Different work".into(),
+            criteria: vec!["A different check passes".into()],
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        goal.resume_reserved(&goal.basis().clone(), &work)
+            .unwrap_err()
+            .code,
+        "goal_reserved_resume_mismatch"
+    );
+    assert!(goal.paused());
+    assert_eq!(goal.remaining(), before);
+}

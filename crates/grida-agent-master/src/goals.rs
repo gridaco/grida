@@ -4,7 +4,8 @@ pub(crate) mod settlement;
 pub mod tools;
 
 use agent_kit_core::{
-    ChangeId, Envelope, Error, ErrorKind, OperationId, Result, SchemaId, ToolCallId, TurnId,
+    ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, Result, SchemaId, ToolCallId,
+    TurnId,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -70,6 +71,8 @@ pub struct Reservation {
     pub inference_steps: NonZeroU32,
     /// Reported steps so far if the previous outcome was uncertain.
     pub uncertain_steps: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    objective_fingerprint: Option<Fingerprint>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -282,6 +285,52 @@ impl Goal {
         Ok(())
     }
 
+    /// Resume the existing reserved turn under the unchanged objective.
+    /// Earlier proposals retain their original basis and cannot complete it.
+    pub fn resume_reserved(&mut self, expected: &Basis, turn: &TurnId) -> Result<()> {
+        self.require_editable(expected)?;
+        let objective = Fingerprint::of(&self.state.objective)?;
+        if !self.paused()
+            || self.status() != Status::Active
+            || self.reservation().is_none_or(|value| {
+                &value.turn != turn || value.objective_fingerprint != Some(objective)
+            })
+        {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "goal_reserved_resume_mismatch",
+            ));
+        }
+        self.set_paused(expected, false)?;
+        self.state
+            .reservation
+            .as_mut()
+            .expect("checked reservation")
+            .basis = self.state.basis.clone();
+        Ok(())
+    }
+
+    /// An explicit resume can reconsider a blocked idle goal within its same
+    /// remaining allowance. Unreconciled work keeps its reservation.
+    pub fn resume_idle(&mut self, expected: &Basis) -> Result<()> {
+        self.require_editable(expected)?;
+        if self.reservation().is_some() {
+            return Err(problem(ErrorKind::Conflict, "goal_work_reserved"));
+        }
+        if self.status() == Status::Exhausted {
+            return Err(problem(
+                ErrorKind::LimitExceeded,
+                "goal_allowance_exhausted",
+            ));
+        }
+        if self.paused() || matches!(self.status(), Status::Blocked(_)) {
+            self.advance_basis()?;
+            self.state.paused = false;
+            self.state.status = Status::Active;
+        }
+        Ok(())
+    }
+
     /// The scheduler must persist this with admission before starting work.
     pub fn reserve(
         &mut self,
@@ -315,6 +364,7 @@ impl Goal {
             basis: expected.clone(),
             inference_steps,
             uncertain_steps: None,
+            objective_fingerprint: Some(Fingerprint::of(&self.state.objective)?),
         };
         self.state.reservation = Some(reservation.clone());
         Ok(reservation)
