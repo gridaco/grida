@@ -1,6 +1,6 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — selected workspace roots and protected paths.
 
-use agent_kit_core::{BindingId, Error, ErrorKind, Result};
+use agent_kit_core::{BindingId, Error, ErrorKind, Fingerprint, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -108,6 +108,15 @@ impl ProtectedRoots {
         validate_absolute(path)?;
         let resolved = canonical_nearest(path)?;
         self.check_resolved(path, &resolved)
+    }
+
+    pub(crate) fn scope_paths(&self) -> Vec<PathBuf> {
+        self.roots
+            .iter()
+            .flat_map(|(path, captured)| [path.clone(), captured.clone()])
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
     }
 
     fn check_resolved(&self, path: &Path, resolved: &Path) -> Result<()> {
@@ -239,6 +248,32 @@ impl WorkspaceSnapshot {
         })
     }
 
+    /// Resolve context for permission evaluation without issuing a grant.
+    pub(crate) fn permission_directory(
+        &self,
+        directory: Option<&BindingId>,
+        protected: &ProtectedRoots,
+    ) -> Result<&DirectoryBinding> {
+        let directory = directory
+            .or(self.primary.as_ref())
+            .ok_or_else(|| problem(ErrorKind::Unavailable, "workspace_directory_required"))?;
+        let binding = self.directory(directory)?;
+        binding.check_root(protected)?;
+        Ok(binding)
+    }
+
+    pub(crate) fn permission_identity(&self, protected: &ProtectedRoots) -> Result<Fingerprint> {
+        let roots = self
+            .directories
+            .values()
+            .map(|binding| {
+                binding.check_root(protected)?;
+                binding.permission_identity()
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Fingerprint::of(&(&self.id, self.revision, &self.primary, roots))
+    }
+
     fn directory(&self, id: &BindingId) -> Result<&DirectoryBinding> {
         self.directories
             .get(id)
@@ -252,6 +287,20 @@ impl DirectoryBinding {
     }
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub(crate) fn pinned_directory(&self) -> &fs::File {
+        &self._pin
+    }
+
+    pub(crate) fn permission_identity(&self) -> Result<Fingerprint> {
+        Fingerprint::of(&(
+            &self.spec.id,
+            &self.spec.generation,
+            &self.root,
+            self.identity,
+        ))
     }
 
     #[cfg(unix)]

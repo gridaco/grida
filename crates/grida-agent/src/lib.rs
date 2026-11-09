@@ -9,6 +9,7 @@ pub mod file_tools;
 pub mod gg;
 pub mod host;
 mod http;
+pub mod permissions;
 pub mod process;
 pub mod scratch;
 pub mod workspace;

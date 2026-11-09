@@ -64,6 +64,20 @@ impl Bound {
         })
     }
 
+    fn captured(&self) -> Result<(&PathIdentity, std::time::SystemTime)> {
+        let created = self
+            ._pin
+            .metadata()
+            .and_then(|metadata| metadata.created())
+            .map_err(|_| {
+                refused(
+                    ErrorKind::Unsupported,
+                    "sandbox_capture_identity_unavailable",
+                )
+            })?;
+        Ok((&self.identity, created))
+    }
+
     fn includes(&self, path: &Path) -> bool {
         if self.directory {
             path.starts_with(&self.identity.path)
@@ -206,8 +220,8 @@ pub(super) struct Prepared {
     valid_until: Instant,
     max_output_bytes: usize,
     support: Support,
-    _grants: GrantSelection,
-    _revision: BindingId,
+    grants: GrantSelection,
+    revision: BindingId,
 }
 
 impl Installation {
@@ -386,8 +400,8 @@ impl Installation {
             max_output_bytes,
             support,
             valid_until: scope.valid_until,
-            _grants: scope.grants.clone(),
-            _revision: scope.revision.clone(),
+            grants: scope.grants.clone(),
+            revision: scope.revision.clone(),
         })
     }
 
@@ -503,6 +517,95 @@ fn support(termination: Termination) -> Result<Support> {
 pub(super) use process::Running;
 
 impl Prepared {
+    pub(super) fn capture_fingerprint(&self) -> Result<Fingerprint> {
+        let Task::Command {
+            executable,
+            arguments,
+            cwd,
+            environment,
+        } = &self.launch.task
+        else {
+            return Err(refused(
+                ErrorKind::InvalidState,
+                "sandbox_capture_process_required",
+            ));
+        };
+        let environment: BTreeMap<_, _> = environment
+            .iter()
+            .filter(|(name, _)| !matches!(name.as_str(), "TMPDIR" | "TMP" | "TEMP"))
+            .collect();
+        let semantic_input =
+            Fingerprint::of(&(executable, arguments, cwd, environment, &self.stdin))?;
+        let roots = self
+            .locations
+            .iter()
+            .filter(|location| location.bound.path() != self.temporary.path())
+            .map(|location| {
+                let access = match location.access {
+                    Access::Read => "read",
+                    Access::Write => "write",
+                    Access::Runtime => "runtime",
+                };
+                #[cfg(target_os = "linux")]
+                let destination = location.destination.as_path();
+                #[cfg(target_os = "macos")]
+                let destination = location.bound.path();
+                Ok((access, destination, location.bound.captured()?))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let process = self
+            .anchors
+            .iter()
+            .skip(1)
+            .map(Bound::captured)
+            .collect::<Result<Vec<_>>>()?;
+        let termination = match self.support.termination {
+            Termination::ProcessGroup => "process_group",
+            Termination::AllDescendants => "all_descendants",
+        };
+        #[cfg(target_os = "macos")]
+        let launchers = [self.helper.executable.sha256];
+        #[cfg(target_os = "linux")]
+        let launchers = [
+            self.helper.executable.sha256,
+            self.bubblewrap.executable.sha256,
+        ];
+        Fingerprint::of(&(
+            semantic_input,
+            roots,
+            process,
+            termination,
+            launchers,
+            &self.grants,
+            &self.revision,
+        ))
+    }
+
+    pub(super) fn validate_working_root(&self, root: &File) -> Result<()> {
+        let Task::Command { cwd, .. } = &self.launch.task else {
+            return Err(refused(
+                ErrorKind::InvalidState,
+                "sandbox_capture_process_required",
+            ));
+        };
+        let metadata = root
+            .metadata()
+            .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_working_root_unavailable"))?;
+        if metadata.is_dir()
+            && self.locations.iter().any(|location| {
+                location.access != Access::Runtime
+                    && location.bound.path() != self.temporary.path()
+                    && location.bound.identity.device == metadata.dev()
+                    && location.bound.identity.inode == metadata.ino()
+                    && location.bound.includes(cwd)
+            })
+        {
+            Ok(())
+        } else {
+            Err(refused(ErrorKind::Conflict, "sandbox_working_root_changed"))
+        }
+    }
+
     pub(super) fn spawn(self, cancellation: CancellationToken) -> Result<Running> {
         if self.valid_until <= Instant::now() || cancellation.is_cancelled() {
             return Err(refused(ErrorKind::InvalidState, "sandbox_admission_closed"));

@@ -991,6 +991,7 @@ Today:
 - `desktop/src/main/agent-network-host.ts` and `agent-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization, per-spawn built-in/custom grant state, and the capped private dispatch seam into the command host.
 - `desktop/src/main/agent-command-host.ts` and `main/sandbox/manager.ts` — main-owned finite-command execution: canonical exact-root validation, shared-scratch/secret/media-root denies, own-scratch/workspace/private-temp grants, a fixed no-network policy, fresh per-command SRT wrapping, raw spawn only after the wrapper succeeds, and terminal cleanup before abort acknowledgement. The long-lived sidecar may persist generated media; an individual model-authored command cannot read or mutate that library.
 - The native command adapter retains the authorized scope, owns cleanup across runtime cancellation, and reconciles the original attempt. [Adapter](crates/grida-agent/src/command.rs) and [tests](crates/grida-agent/tests/commands.rs).
+- The native [permission owner](crates/grida-agent/src/permissions.rs) resolves an explicit host profile, binds a durable decision to one action and its captured scope, and fences revocation at command spawn. [Sandbox preparation](crates/agent-kit-sandbox/src/native.rs) checks the exact opened directory and captures executable and scope identity. [Native permission tests](crates/grida-agent/tests/permissions.rs) cover decline, restart, identity changes and revocation.
 - The native [workspace bindings](crates/grida-agent/src/workspace.rs) and [retained input store](crates/grida-agent/src/scratch.rs) separate captured locations from current grants and enforce supplied protected roots. Working-copy receipts retain their source identity. [Workspace tests](crates/grida-agent/tests/workspace.rs) and [scratch tests](crates/grida-agent/tests/scratch.rs) exercise replacement, traversal, private publication and restart.
 - The native [read-only file adapters](crates/grida-agent/src/file_tools.rs) revalidate the turn's selected directory against current grants and protected roots. [Native path opening](crates/grida-agent/src/file_tools/native.rs) uses pinned directory handles and refuses link traversal. [File tool tests](crates/grida-agent/tests/file_tools.rs) cover grant revocation and protected files.
 - The native [history extension](crates/grida-agent/src/acp/extensions/history.rs) requires a negotiated operation and an attached source session. The [host](crates/grida-agent/src/host/history.rs) binds a derivation to committed history and keeps a fork in the source workspace. The [portable projection](crates/grida-agent-master/src/conversation_seed.rs) copies visible text with omission evidence and keeps raw tool data, provider state, and grants out of the seed. [Native process tests](crates/grida-agent/tests/process/history.rs) cover attachment, source ownership, and fresh tool permissions.
@@ -2885,7 +2886,9 @@ durable or discard unrelated OAuth records.
    granting reads. Desktop's finite-command policy denies this exact directory
    while its long-lived credential host retains custody access. Native read-only
    adapters require a current directory grant and recheck supplied protected
-   roots before opening a target and delivering results. No renderer can
+   roots before opening a target and delivering results. The native permission
+   profile carries the same protected paths into finite command confinement.
+   An approve-once decision remains bounded by those denials. No renderer can
    configure or remove these protections.
 
 8. **Credential continuity stays in private custody.** The native agent can
@@ -2946,6 +2949,8 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [native provider HTTP dispatch](crates/grida-agent/src/http.rs),
   [native agent custody tests](crates/grida-agent/tests/custody.rs),
   [native workspace protection](crates/grida-agent/src/workspace.rs),
+  [native permission admission](crates/grida-agent/src/permissions.rs),
+  [native permission tests](crates/grida-agent/tests/permissions.rs),
   [native file adapters](crates/grida-agent/src/file_tools.rs),
   [native file opens](crates/grida-agent/src/file_tools/native.rs),
   [file adapter tests](crates/grida-agent/tests/file_tools.rs),

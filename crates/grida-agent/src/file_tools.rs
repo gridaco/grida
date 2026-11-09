@@ -30,11 +30,12 @@ pub struct FileAuthority {
 }
 
 pub type CurrentFileAuthority = dyn Fn() -> Result<FileAuthority> + Send + Sync;
+type InvocationAuthority = dyn Fn(&Invocation) -> Result<FileAuthority> + Send + Sync;
 
 /// Captures directory selection for one turn and checks live grants at use.
 pub struct FileTools {
     captured: Arc<WorkspaceSnapshot>,
-    current: Arc<CurrentFileAuthority>,
+    current: Arc<InvocationAuthority>,
     workers: Arc<Semaphore>,
 }
 
@@ -44,6 +45,13 @@ impl FileTools {
     pub fn new(
         captured: Arc<WorkspaceSnapshot>,
         current: Arc<CurrentFileAuthority>,
+    ) -> Result<Self> {
+        Self::with_authority(captured, Arc::new(move |_| current()))
+    }
+
+    pub(crate) fn with_authority(
+        captured: Arc<WorkspaceSnapshot>,
+        current: Arc<InvocationAuthority>,
     ) -> Result<Self> {
         if !cfg!(any(target_os = "macos", target_os = "linux")) {
             return Err(problem(
@@ -167,6 +175,7 @@ impl Tool for FileTool {
                     .min(self.definition.max_output_bytes),
                 deadline,
                 cancellation: cancellation.clone(),
+                invocation,
             };
             if let Err(error) = budget.check() {
                 return stopped(&error);
@@ -204,10 +213,20 @@ impl Tool for FileTool {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Request {
-    directory: Option<BindingId>,
-    path: Option<PathBuf>,
-    query: Option<String>,
+pub(crate) struct Request {
+    pub(crate) directory: Option<BindingId>,
+    pub(crate) path: Option<PathBuf>,
+    pub(crate) query: Option<String>,
+}
+
+pub(crate) fn read_request(invocation: &Invocation) -> Result<Request> {
+    let operation = match invocation.definition().id.as_str() {
+        "read_file" => Operation::Read,
+        "list_files" => Operation::List,
+        "search_text" => Operation::Search,
+        _ => return Err(problem(ErrorKind::Unsupported, "file_tool_unavailable")),
+    };
+    operation.parse(invocation.arguments())
 }
 
 impl Operation {
@@ -260,6 +279,7 @@ struct Budget {
     output: usize,
     deadline: Instant,
     cancellation: CancellationToken,
+    invocation: Invocation,
 }
 
 impl Budget {
@@ -294,8 +314,13 @@ fn problem(kind: ErrorKind, code: &'static str) -> Error {
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
 impl FileTools {
-    fn execute(&self, _: Operation, request: Request, _: &Budget) -> Result<ToolOutcome> {
-        let _ = (&self.captured, &self.current, request.directory);
+    fn execute(&self, _: Operation, request: Request, budget: &Budget) -> Result<ToolOutcome> {
+        let _ = (
+            &self.captured,
+            &self.current,
+            request.directory,
+            &budget.invocation,
+        );
         Err(problem(
             ErrorKind::Unsupported,
             "file_tools_platform_unsupported",

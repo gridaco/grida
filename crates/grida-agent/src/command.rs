@@ -7,14 +7,14 @@ use agent_kit_core::tools::{
     ToolOutcome,
 };
 use agent_kit_core::{
-    AttemptId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint, OperationId,
-    Result, SchemaId, ToolId,
+    AttemptId, BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint,
+    OperationId, Result, SchemaId, ToolId,
 };
 use agent_kit_sandbox::{
-    Backend, Completion, Descendants, ExecutionScope, ProcessEvidence, ProcessSpec, Sandbox,
-    StopReason, Termination,
+    Backend, Completion, Descendants, ExecutionScope, PreparedProcess, ProcessEvidence,
+    ProcessSpec, RunningProcess, Sandbox, StopReason, Termination,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
@@ -55,7 +55,7 @@ impl CommandQuiescence {
     }
 }
 
-/// A host-owned capability for one immutable execution scope.
+/// A host-owned finite command supervisor.
 ///
 /// Keep this handle and its Tokio runtime alive through `stop_and_wait` before
 /// releasing resources that depend on native cleanup. The runtime can settle an invocation as uncertain
@@ -64,10 +64,32 @@ impl CommandQuiescence {
 // GRIDA-SEC-004: finite command authority and cleanup stay with the host.
 pub struct CommandTool {
     sandbox: Arc<Sandbox>,
-    scope: ExecutionScope,
+    scope: CommandScope,
     timeout: Duration,
     definition: ToolDefinition,
     activity: Arc<Activity>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandAccess {
+    Read,
+    ReadWrite,
+}
+
+type ResolveCommand = dyn Fn(&Invocation) -> Result<AuthorizedCommand> + Send + Sync;
+type SpawnCommand =
+    dyn Fn(PreparedProcess, CancellationToken) -> Result<RunningProcess> + Send + Sync;
+
+enum CommandScope {
+    Fixed(Box<ExecutionScope>),
+    Authorized(Arc<ResolveCommand>),
+}
+
+pub(crate) struct AuthorizedCommand {
+    pub scope: ExecutionScope,
+    pub expected: Fingerprint,
+    pub spawn: Arc<SpawnCommand>,
 }
 
 impl CommandTool {
@@ -76,6 +98,22 @@ impl CommandTool {
     pub fn new(
         sandbox: Arc<Sandbox>,
         scope: ExecutionScope,
+        limits: CommandLimits,
+    ) -> Result<Self> {
+        Self::with_scope(sandbox, CommandScope::Fixed(Box::new(scope)), limits)
+    }
+
+    pub(crate) fn authorized(
+        sandbox: Arc<Sandbox>,
+        limits: CommandLimits,
+        resolve: Arc<ResolveCommand>,
+    ) -> Result<Self> {
+        Self::with_scope(sandbox, CommandScope::Authorized(resolve), limits)
+    }
+
+    fn with_scope(
+        sandbox: Arc<Sandbox>,
+        scope: CommandScope,
         limits: CommandLimits,
     ) -> Result<Self> {
         if limits.timeout.is_zero()
@@ -88,26 +126,35 @@ impl CommandTool {
                 "invalid_command_limits",
             ));
         }
+        let scoped = matches!(scope, CommandScope::Authorized(_));
+        let mut schema = json!({
+            "type": "object",
+            "properties": {
+                "program": {"type": "string"},
+                "args": {"type": "array", "items": {"type": "string"}},
+                "cwd": {"type": "string"},
+                "env": {"type": "object", "additionalProperties": {"type": "string"}},
+                "stdin": {"type": "string"}
+            },
+            "required": ["program", "args", "cwd"],
+            "additionalProperties": false
+        });
+        let mut description = "Run one finite program in the granted workspace or scratch scope. Supply an absolute program path, argument array, and absolute working directory. The program receives explicit environment values, sandbox-owned temporary directory variables, and a bounded UTF-8 stdin string. Network access is denied. Output is bounded UTF-8 text with replacement characters for invalid bytes. Use an explicit interpreter when shell syntax is required.".to_owned();
+        if scoped {
+            schema["properties"]["directory"] = json!({"type":"string"});
+            schema["properties"]["access"] = json!({"enum":["read","read_write"]});
+            schema["required"] = json!(["program", "args", "cwd", "access"]);
+            description.push_str(" Select read or read_write access explicitly. Use a named directory ID or omit it for the captured primary. The working directory must be inside that directory.");
+        }
         Ok(Self {
             sandbox,
             scope,
             timeout: limits.timeout,
             definition: ToolDefinition {
                 id: ToolId::new("run_command")?,
-                version: 1,
-                description: "Run one finite program in the granted workspace or scratch scope. Supply an absolute program path, argument array, and absolute working directory. The program receives explicit environment values, sandbox-owned temporary directory variables, and a bounded UTF-8 stdin string. Network access is denied. Output is bounded UTF-8 text with replacement characters for invalid bytes. Use an explicit interpreter when shell syntax is required.".into(),
-                input: InputFormat::Json(json!({
-                    "type": "object",
-                    "properties": {
-                        "program": {"type": "string"},
-                        "args": {"type": "array", "items": {"type": "string"}},
-                        "cwd": {"type": "string"},
-                        "env": {"type": "object", "additionalProperties": {"type": "string"}},
-                        "stdin": {"type": "string"}
-                    },
-                    "required": ["program", "args", "cwd"],
-                    "additionalProperties": false
-                })),
+                version: if scoped { 2 } else { 1 },
+                description,
+                input: InputFormat::Json(schema),
                 max_input_bytes: limits.max_input_bytes,
                 max_output_bytes: limits.max_output_bytes,
                 recovery: RecoveryKind::Reconcile,
@@ -152,7 +199,12 @@ impl Tool for CommandTool {
     }
 
     fn validate(&self, arguments: &ToolArguments) -> Result<()> {
-        CommandArguments::parse(arguments, self.definition.max_input_bytes).map(|_| ())
+        CommandArguments::parse(
+            arguments,
+            self.definition.max_input_bytes,
+            matches!(self.scope, CommandScope::Authorized(_)),
+        )
+        .map(|_| ())
     }
 
     fn invoke(
@@ -167,6 +219,7 @@ impl Tool for CommandTool {
             let arguments = match CommandArguments::parse(
                 invocation.arguments(),
                 self.definition.max_input_bytes,
+                matches!(self.scope, CommandScope::Authorized(_)),
             ) {
                 Ok(arguments) => arguments,
                 Err(error) => return ToolOutcome::failed(&error.code),
@@ -178,7 +231,13 @@ impl Tool for CommandTool {
                 return ToolOutcome::failed("command_output_limit_unavailable");
             }
             let now = Instant::now();
-            let mut scope = self.scope.clone();
+            let (mut scope, authorization) = match &self.scope {
+                CommandScope::Fixed(scope) => ((**scope).clone(), None),
+                CommandScope::Authorized(resolve) => match resolve(&invocation) {
+                    Ok(authority) => (authority.scope, Some((authority.expected, authority.spawn))),
+                    Err(error) => return ToolOutcome::failed(&error.code),
+                },
+            };
             scope.valid_until = scope.valid_until.min(now + self.timeout);
             if let Some(deadline) = context.deadline {
                 scope.valid_until = scope.valid_until.min(deadline);
@@ -202,20 +261,13 @@ impl Tool for CommandTool {
             ) {
                 return ToolOutcome::failed(&error.code);
             }
-            let spec = ProcessSpec {
-                executable: arguments.program,
-                arguments: arguments.args,
-                cwd: arguments.cwd,
-                environment: arguments.env,
-                stdin: arguments.stdin.into_bytes(),
-                timeout: self.timeout,
-                max_output_bytes: maximum,
-            };
+            let spec = arguments.into_spec(self.timeout, maximum);
             let (send, receive) = oneshot::channel();
             let sandbox = Arc::clone(&self.sandbox);
             let activity = Arc::clone(&self.activity);
             runtime.spawn(async move {
-                let (outcome, verified) = execute(sandbox, spec, scope, cancellation).await;
+                let (outcome, verified) =
+                    execute(sandbox, spec, scope, authorization, cancellation).await;
                 activity.finish(&identity.operation, outcome.clone(), verified);
                 let _ = send.send(outcome);
             });
@@ -244,18 +296,20 @@ impl Tool for CommandTool {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct CommandArguments {
-    program: PathBuf,
-    args: Vec<String>,
-    cwd: PathBuf,
+pub(crate) struct CommandArguments {
+    pub(crate) program: PathBuf,
+    pub(crate) args: Vec<String>,
+    pub(crate) cwd: PathBuf,
     #[serde(default)]
-    env: BTreeMap<String, String>,
+    pub(crate) env: BTreeMap<String, String>,
     #[serde(default)]
-    stdin: String,
+    pub(crate) stdin: String,
+    pub(crate) directory: Option<BindingId>,
+    pub(crate) access: Option<CommandAccess>,
 }
 
 impl CommandArguments {
-    fn parse(arguments: &ToolArguments, maximum: usize) -> Result<Self> {
+    pub(crate) fn parse(arguments: &ToolArguments, maximum: usize, scoped: bool) -> Result<Self> {
         let ToolArguments::Json(value) = arguments else {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -267,6 +321,16 @@ impl CommandArguments {
         }
         let command: Self = serde_json::from_value(value.clone())
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "command_arguments_invalid"))?;
+        if (scoped
+            && (command.access.is_none()
+                || value.get("directory").is_some_and(|value| value.is_null())))
+            || (!scoped && (value.get("access").is_some() || value.get("directory").is_some()))
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "command_access_invalid",
+            ));
+        }
         if !valid_path(&command.program) || !valid_path(&command.cwd) {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -284,6 +348,18 @@ impl CommandArguments {
             ));
         }
         Ok(command)
+    }
+
+    pub(crate) fn into_spec(self, timeout: Duration, max_output_bytes: usize) -> ProcessSpec {
+        ProcessSpec {
+            executable: self.program,
+            arguments: self.args,
+            cwd: self.cwd,
+            environment: self.env,
+            stdin: self.stdin.into_bytes(),
+            timeout,
+            max_output_bytes,
+        }
     }
 }
 
@@ -440,6 +516,7 @@ async fn execute(
     sandbox: Arc<Sandbox>,
     spec: ProcessSpec,
     scope: ExecutionScope,
+    authorization: Option<(Fingerprint, Arc<SpawnCommand>)>,
     cancellation: CancellationToken,
 ) -> (ToolOutcome, bool) {
     let maximum = spec.max_output_bytes;
@@ -456,7 +533,16 @@ async fn execute(
         if stop.is_cancelled() {
             return Ok(None);
         }
-        prepared.spawn(stop).map(Some)
+        match authorization {
+            None => prepared.spawn(stop),
+            Some((expected, spawn)) => {
+                if prepared.capture_fingerprint()? != expected {
+                    return Err(Error::new(ErrorKind::Conflict, "command_capture_changed"));
+                }
+                spawn(prepared, stop)
+            }
+        }
+        .map(Some)
     })
     .await;
     match running {
@@ -619,7 +705,9 @@ mod tests {
                 .extend(extra.as_object().unwrap().clone());
             ToolArguments::Json(value)
         };
-        assert!(CommandArguments::parse(&input(json!({"stdin":"\u{0000}café"})), 4096).is_ok());
+        assert!(
+            CommandArguments::parse(&input(json!({"stdin":"\u{0000}café"})), 4096, false).is_ok()
+        );
         for invalid in [
             json!({"program":"sh"}),
             json!({"cwd":"/tmp/../tmp"}),
@@ -628,10 +716,10 @@ mod tests {
             json!({"network":true}),
             json!({"env":{"VISIBLE":42}}),
         ] {
-            assert!(CommandArguments::parse(&input(invalid), 4096).is_err());
+            assert!(CommandArguments::parse(&input(invalid), 4096, false).is_err());
         }
         assert_eq!(
-            CommandArguments::parse(&input(json!({})), 1)
+            CommandArguments::parse(&input(json!({})), 1, false)
                 .err()
                 .unwrap()
                 .code,

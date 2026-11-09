@@ -78,7 +78,7 @@ impl FileTools {
 
     fn root(&self, directory: Option<&BindingId>, budget: &Budget) -> Result<Root> {
         budget.check()?;
-        let live = (self.current)()?;
+        let live = (self.current)(&budget.invocation)?;
         budget.check()?;
         let target = self.captured.select(
             directory,

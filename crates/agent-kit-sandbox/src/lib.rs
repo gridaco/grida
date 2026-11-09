@@ -1,7 +1,7 @@
 //! Finite commands under a host-issued, denied-network native scope.
 
 use agent_kit_core::authority::GrantSelection;
-use agent_kit_core::{BindingId, CancellationToken, Error, ErrorKind, Result};
+use agent_kit_core::{BindingId, CancellationToken, Error, ErrorKind, Fingerprint, Result};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
@@ -195,6 +195,34 @@ impl Sandbox {
 }
 
 impl PreparedProcess {
+    /// Identity of the process input and the exact native paths captured in
+    /// this preparation. Output limits, deadlines and private temporary
+    /// directories are execution bounds rather than part of this identity.
+    pub fn capture_fingerprint(&self) -> Result<Fingerprint> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            self.native.capture_fingerprint()
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            Err(unavailable())
+        }
+    }
+
+    /// Require the prepared working directory to belong to this exact
+    /// host-opened read or write root, including its native identity.
+    pub fn validate_working_root(&self, root: &std::fs::File) -> Result<()> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            self.native.validate_working_root(root)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = root;
+            Err(unavailable())
+        }
+    }
+
     /// Consume this exact preparation after the caller's admission barrier.
     pub fn spawn(self, cancellation: CancellationToken) -> Result<RunningProcess> {
         #[cfg(any(target_os = "macos", target_os = "linux"))]

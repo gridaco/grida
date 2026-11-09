@@ -34,6 +34,26 @@ impl Runtime {
         })
     }
 
+    /// Bind a turn-specific authority and gate while retaining the runtime's
+    /// shared inference and tool admission capacity.
+    pub fn with_authorization(
+        &self,
+        authority: Arc<dyn agent_kit_core::authority::AuthorityValidator>,
+        gate: Arc<dyn ToolGate>,
+    ) -> Self {
+        Self {
+            services: Arc::new(ExecutionServices {
+                providers: self.services.providers.clone(),
+                tools: self.services.tools.clone(),
+                authority,
+                gate,
+                limits: self.services.limits.clone(),
+            }),
+            inference_permits: self.inference_permits.clone(),
+            tool_permits: self.tool_permits.clone(),
+        }
+    }
+
     pub async fn open(&self, lease: TurnLease) -> Result<OpenedTurn> {
         let state = lease.journal().load().await?;
         state.validate()?;
