@@ -1,0 +1,22 @@
+[package]
+name = "agent-kit-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json.workspace = true
+futures-core = "0.3"
+futures-channel = "0.3"
+futures-util = "0.3"
+tokio-util = "0.7"
+sha2 = "0.11"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "time"] }
+
+[lints]
+workspace = true

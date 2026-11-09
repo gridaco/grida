@@ -14,6 +14,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "agent-kit-core"
+version = "0.1.0"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "agent-kit-runtime"
+version = "0.1.0"
+dependencies = [
+ "agent-kit-core",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "agent-kit-sessions"
+version = "0.1.0"
+dependencies = [
+ "agent-kit-core",
+ "serde",
+]
+
+[[package]]
+name = "agent-kit-store-sqlite"
+version = "0.1.0"
+dependencies = [
+ "agent-kit-core",
+ "agent-kit-sessions",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -853,6 +899,21 @@ dependencies = [
  "cfg-if",
  "libc",
  "r-efi",
+]
+
+[[package]]
+name = "grida-agent-master"
+version = "0.1.0"
+dependencies = [
+ "agent-kit-core",
+ "agent-kit-runtime",
+ "agent-kit-sessions",
+ "agent-kit-store-sqlite",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

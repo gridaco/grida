@@ -1,0 +1,84 @@
+# agent-kit-runtime
+
+Live agent turns over the public `agent-kit-core` contracts. The caller supplies
+providers, captured tools, an authority validator, a tool-admission gate, limits,
+and an ephemeral or persistent `TurnLease`.
+
+## Ownership
+
+`Runtime::open` consumes the lease and returns one `Turn` controller plus a
+read-only `TurnObserver`. The controller supplies cloneable `TurnOperations` for
+concurrent inference, tool work, and questions. Dropping an observer detaches it.
+Dropping the controller closes admission and cancels the local execution scopes.
+In-flight operations keep the lease until their local execution exits. Verified
+settlement or suspension releases ownership and leaves old handles inactive.
+
+The master chooses requests, tools, retry policy, and completion. The host owns
+authorization and the meaning of its gate. Executors own domain behavior and
+supported recovery. Each operation uses a child cancellation scope and bounded
+execution capacity. Finished inference releases its permit before tool or
+question work can keep a turn waiting.
+
+## Durable operations
+
+Operation keys identify logical work within a turn. The runtime derives stable
+journal and attempt identities from them. Repeating the same captured input
+returns its recorded result or attaches to the local execution. Changed input
+under an existing key fails. A recorded attempt whose owner disappeared remains
+uncertain until explicitly accounted for or recovered.
+
+Preparation commits before dispatch. Provider and tool controls carry the
+admitted attempt identity, and recovery retains the attempt being reconciled.
+The authority validator checks the exact
+captured action after the product gate. The host can activate an existing
+pending grant during review while preserving the recorded principal and grant
+identity. Current controls are checked before execution. Denied work receives a
+definite nonexecution result. Inference grants and each tool's grants are supplied
+separately. Missing tool authority never falls back to provider authority.
+Completed results remain readable independently of current execution grants.
+
+Journal acknowledgment loss triggers readback using the same change identity.
+If the committed disposition cannot be established, admission freezes. A
+successor must reconcile that state before new dependent work.
+
+`record_interruption` records an orphan attempt's uncertainty without calling a
+provider or executor. For an interrupted inference, it reconstructs observed
+call declarations from the original call IDs retained on admitted child tools.
+`recover_tool` invokes the executor's explicit recovery contract with current
+authority, bounded capacity, cancellation, and a deadline. The master can use
+`cancel_prepared` and `withdraw_input` to account for unstarted work and open
+interactions before settling a stopped turn. Those operations perform no
+executor work.
+
+## Steps and history
+
+A step consumes one prepared inference and its captured inventory. Complete tool
+calls can start while later response items stream. Every admitted child retains
+its inference origin and original provider call ID before effects. A later
+inference failure preserves those outcomes.
+
+`StepOutcome.history` is a candidate projection of durable inference and tool
+results. The master installs it together with its next checkpoint using
+`publish_continuation`. Replaying a completed step reconstructs the candidate
+without requiring a live provider or the old tool inventory. Deferred tool work
+returns its wait identity and leaves transcript installation to continuation.
+
+Suspension and settlement validate the master's exact control and history basis.
+A concurrent change rejects that decision. Terminal commits never silently
+rebase onto newer input or controls.
+
+## Verification
+
+Run from the repository root.
+
+```sh
+cargo test -p agent-kit-runtime --locked
+cargo clippy -p agent-kit-runtime --all-targets --locked -- -D warnings
+cargo fmt -p agent-kit-runtime --check
+```
+
+Contract tests exercise simple-master publication, key replay and conflict,
+concurrent duplicate calls, streaming tool dispatch, lost acknowledgments,
+unknown commits, orphan recovery, questions, controller/observer lifetime,
+authority activation, and terminal-control races. Persistent-store and product
+integration are exercised by their consuming crates.

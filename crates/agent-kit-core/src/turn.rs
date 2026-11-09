@@ -1,0 +1,1176 @@
+use crate::authority::GrantSelection;
+use crate::history::{History, HistoryRecord};
+use crate::inference::{InferenceOutcome, PreparedRequest};
+use crate::messages::OutcomeStatus;
+use crate::tools::{Invocation, ToolOutcome};
+use crate::{
+    AttemptId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, Result,
+    SchemaId, SessionId, ToolCallId, TurnId, WaitId,
+};
+use futures_channel::oneshot;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TurnBinding {
+    pub session: SessionId,
+    pub turn: TurnId,
+    pub epoch: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct JournalPosition(pub u64);
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct ControlRevision(pub u64);
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ControlSnapshot {
+    pub binding: TurnBinding,
+    pub revision: ControlRevision,
+    pub paused: bool,
+    pub cancelled: bool,
+}
+
+impl ControlSnapshot {
+    pub fn admits_work(&self) -> bool {
+        !self.paused && !self.cancelled
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum OperationInput {
+    Inference(PreparedRequest),
+    Tool(Invocation),
+}
+
+impl OperationInput {
+    pub fn fingerprint(&self) -> Fingerprint {
+        match self {
+            Self::Inference(request) => request.fingerprint(),
+            Self::Tool(invocation) => invocation.fingerprint(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OperationRecord {
+    pub id: OperationId,
+    pub input: OperationInput,
+    #[serde(default)]
+    pub origin: Option<OperationId>,
+    #[serde(default)]
+    pub source_call: Option<ToolCallId>,
+    pub grants: GrantSelection,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum OperationOutcome {
+    Inference(InferenceOutcome),
+    Tool(ToolOutcome),
+}
+
+impl OperationOutcome {
+    pub fn is_uncertain(&self) -> bool {
+        match self {
+            Self::Inference(outcome) => {
+                outcome.status == crate::inference::InferenceStatus::Interrupted
+            }
+            Self::Tool(outcome) => outcome.status == OutcomeStatus::Uncertain,
+        }
+    }
+    pub fn is_success(&self) -> bool {
+        match self {
+            Self::Inference(outcome) => {
+                outcome.status == crate::inference::InferenceStatus::Completed
+            }
+            Self::Tool(outcome) => outcome.status == OutcomeStatus::Succeeded,
+        }
+    }
+
+    fn can_reject_prepared(&self) -> bool {
+        match self {
+            Self::Tool(result) => matches!(
+                result.status,
+                OutcomeStatus::Failed | OutcomeStatus::Cancelled
+            ),
+            Self::Inference(result) => result.status == crate::inference::InferenceStatus::Failed,
+        }
+    }
+    fn matches(&self, input: &OperationInput) -> bool {
+        matches!(
+            (self, input),
+            (Self::Inference(_), OperationInput::Inference(_))
+                | (Self::Tool(_), OperationInput::Tool(_))
+        )
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AttemptRecord {
+    pub id: AttemptId,
+    pub outcome: Option<OperationOutcome>,
+    #[serde(default)]
+    pub prior_outcomes: Vec<OperationOutcome>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OperationState {
+    pub record: OperationRecord,
+    pub attempts: Vec<AttemptRecord>,
+    #[serde(default)]
+    pub rejection: Option<OperationOutcome>,
+}
+
+impl OperationState {
+    pub fn is_running(&self) -> bool {
+        self.attempts
+            .last()
+            .is_some_and(|attempt| attempt.outcome.is_none())
+    }
+    pub fn is_uncertain(&self) -> bool {
+        self.outcome().is_some_and(OperationOutcome::is_uncertain)
+    }
+    pub fn outcome(&self) -> Option<&OperationOutcome> {
+        self.rejection.as_ref().or_else(|| {
+            self.attempts
+                .last()
+                .and_then(|attempt| attempt.outcome.as_ref())
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResponseContract {
+    pub schema: SchemaId,
+    pub version: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WaitRecord {
+    pub id: WaitId,
+    pub request: Envelope,
+    pub response: ResponseContract,
+    pub answer: Option<Envelope>,
+    pub withdrawn: bool,
+}
+
+impl WaitRecord {
+    pub fn is_pending(&self) -> bool {
+        self.answer.is_none() && !self.withdrawn
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlDirective {
+    Pause,
+    Resume,
+    Cancel,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TurnOutcome {
+    pub status: OutcomeStatus,
+    pub account: Option<Envelope>,
+    pub evidence: Vec<OperationId>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum JournalAction {
+    Prepare(Box<OperationRecord>),
+    StartAttempt {
+        operation: OperationId,
+        attempt: AttemptId,
+    },
+    RejectPrepared {
+        operation: OperationId,
+        outcome: OperationOutcome,
+    },
+    CompleteAttempt {
+        operation: OperationId,
+        attempt: AttemptId,
+        outcome: OperationOutcome,
+    },
+    ReconcileAttempt {
+        operation: OperationId,
+        attempt: AttemptId,
+        outcome: OperationOutcome,
+    },
+    AppendHistory(Vec<HistoryRecord>),
+    OpenWait(WaitRecord),
+    ResolveWait {
+        wait: WaitId,
+        answer: Envelope,
+    },
+    WithdrawWait(WaitId),
+    SetCheckpoint(Envelope),
+    Control(ControlDirective),
+    Suspend,
+    Settle(TurnOutcome),
+}
+
+impl JournalAction {
+    pub fn prepare(record: OperationRecord) -> Self {
+        Self::Prepare(Box::new(record))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JournalChange {
+    id: ChangeId,
+    binding: TurnBinding,
+    expected: JournalPosition,
+    control: ControlRevision,
+    actions: Vec<JournalAction>,
+    fingerprint: Fingerprint,
+    content_fingerprint: Fingerprint,
+}
+
+impl JournalChange {
+    pub fn new(
+        id: ChangeId,
+        binding: TurnBinding,
+        expected: JournalPosition,
+        control: ControlRevision,
+        actions: Vec<JournalAction>,
+    ) -> Result<Self> {
+        if binding.epoch == 0 || actions.is_empty() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "invalid_journal_change",
+            ));
+        }
+        let fingerprint = Fingerprint::of(&(&binding, expected, control, &actions))?;
+        let content_fingerprint = Fingerprint::of(&actions)?;
+        Ok(Self {
+            id,
+            binding,
+            expected,
+            control,
+            actions,
+            fingerprint,
+            content_fingerprint,
+        })
+    }
+    pub fn id(&self) -> &ChangeId {
+        &self.id
+    }
+    pub fn binding(&self) -> &TurnBinding {
+        &self.binding
+    }
+    pub fn expected(&self) -> JournalPosition {
+        self.expected
+    }
+    pub fn control_revision(&self) -> ControlRevision {
+        self.control
+    }
+    pub fn actions(&self) -> &[JournalAction] {
+        &self.actions
+    }
+    pub fn fingerprint(&self) -> Fingerprint {
+        self.fingerprint
+    }
+    pub fn content_fingerprint(&self) -> Fingerprint {
+        self.content_fingerprint
+    }
+}
+
+impl<'de> Deserialize<'de> for JournalChange {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Data {
+            id: ChangeId,
+            binding: TurnBinding,
+            expected: JournalPosition,
+            control: ControlRevision,
+            actions: Vec<JournalAction>,
+            fingerprint: Fingerprint,
+            content_fingerprint: Fingerprint,
+        }
+        let data = Data::deserialize(deserializer)?;
+        let value = Self::new(
+            data.id,
+            data.binding,
+            data.expected,
+            data.control,
+            data.actions,
+        )
+        .map_err(serde::de::Error::custom)?;
+        if value.fingerprint != data.fingerprint
+            || value.content_fingerprint != data.content_fingerprint
+        {
+            return Err(serde::de::Error::custom("journal fingerprint mismatch"));
+        }
+        Ok(value)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecordedPosition {
+    pub change: ChangeId,
+    pub binding: TurnBinding,
+    pub position: JournalPosition,
+    pub fingerprint: Fingerprint,
+    pub content_fingerprint: Fingerprint,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SettlementReceipt {
+    pub record: RecordedPosition,
+    pub outcome: TurnOutcome,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SuspensionReceipt {
+    pub record: RecordedPosition,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum CommitReceipt {
+    Recorded(RecordedPosition),
+    Suspended(SuspensionReceipt),
+    Settled(SettlementReceipt),
+}
+
+impl CommitReceipt {
+    pub fn record(&self) -> &RecordedPosition {
+        match self {
+            Self::Recorded(record) => record,
+            Self::Suspended(receipt) => &receipt.record,
+            Self::Settled(receipt) => &receipt.record,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct TurnState {
+    binding: TurnBinding,
+    position: JournalPosition,
+    controls: ControlSnapshot,
+    history: History,
+    operations: BTreeMap<OperationId, OperationState>,
+    waits: BTreeMap<WaitId, WaitRecord>,
+    checkpoint: Option<Envelope>,
+    suspended: bool,
+    outcome: Option<TurnOutcome>,
+    receipts: BTreeMap<ChangeId, CommitReceipt>,
+}
+
+impl TurnState {
+    pub fn new(binding: TurnBinding) -> Result<Self> {
+        if binding.epoch == 0 {
+            return Err(Error::new(ErrorKind::InvalidInput, "invalid_writer_epoch"));
+        }
+        Ok(Self {
+            controls: ControlSnapshot {
+                binding: binding.clone(),
+                revision: ControlRevision(0),
+                paused: false,
+                cancelled: false,
+            },
+            binding,
+            position: JournalPosition(0),
+            history: History::new(),
+            operations: BTreeMap::new(),
+            waits: BTreeMap::new(),
+            checkpoint: None,
+            suspended: false,
+            outcome: None,
+            receipts: BTreeMap::new(),
+        })
+    }
+    pub fn binding(&self) -> &TurnBinding {
+        &self.binding
+    }
+    pub fn position(&self) -> JournalPosition {
+        self.position
+    }
+    pub fn controls(&self) -> &ControlSnapshot {
+        &self.controls
+    }
+    pub fn history(&self) -> &History {
+        &self.history
+    }
+    pub fn operations(&self) -> &BTreeMap<OperationId, OperationState> {
+        &self.operations
+    }
+    pub fn waits(&self) -> &BTreeMap<WaitId, WaitRecord> {
+        &self.waits
+    }
+    pub fn checkpoint(&self) -> Option<&Envelope> {
+        self.checkpoint.as_ref()
+    }
+    pub fn outcome(&self) -> Option<&TurnOutcome> {
+        self.outcome.as_ref()
+    }
+    pub fn is_suspended(&self) -> bool {
+        self.suspended
+    }
+    pub fn receipt(&self, id: &ChangeId) -> Option<&CommitReceipt> {
+        self.receipts.get(id)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.binding.epoch == 0 || self.controls.binding != self.binding {
+            return Err(Error::new(ErrorKind::InvalidState, "invalid_turn_binding"));
+        }
+        self.history.validate()?;
+        let mut attempts = std::collections::BTreeSet::new();
+        for (id, state) in &self.operations {
+            self.validate_source_call(&state.record)?;
+            if state
+                .record
+                .origin
+                .as_ref()
+                .is_some_and(|origin| origin == id || !self.operations.contains_key(origin))
+            {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    "invalid_operation_origin",
+                ));
+            }
+            let mut ancestors = std::collections::BTreeSet::new();
+            let mut origin = state.record.origin.as_ref();
+            while let Some(parent) = origin {
+                if !ancestors.insert(parent) {
+                    return Err(Error::new(
+                        ErrorKind::InvalidState,
+                        "cyclic_operation_origin",
+                    ));
+                }
+                origin = self
+                    .operations
+                    .get(parent)
+                    .and_then(|state| state.record.origin.as_ref());
+            }
+            if state.rejection.as_ref().is_some_and(|outcome| {
+                !outcome.matches(&state.record.input) || !outcome.can_reject_prepared()
+            }) {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    "invalid_prepared_rejection",
+                ));
+            }
+            if id != &state.record.id {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    "invalid_operation_identity",
+                ));
+            }
+            if state.rejection.is_some() && !state.attempts.is_empty() {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    "invalid_rejected_operation",
+                ));
+            }
+            for (index, attempt) in state.attempts.iter().enumerate() {
+                if attempt
+                    .prior_outcomes
+                    .iter()
+                    .any(|outcome| !outcome.matches(&state.record.input) || !outcome.is_uncertain())
+                {
+                    return Err(Error::new(
+                        ErrorKind::InvalidState,
+                        "invalid_reconciliation_history",
+                    ));
+                }
+                if !attempts.insert(&attempt.id)
+                    || (attempt.outcome.is_none() && index + 1 != state.attempts.len())
+                    || attempt
+                        .outcome
+                        .as_ref()
+                        .is_some_and(|outcome| !outcome.matches(&state.record.input))
+                {
+                    return Err(Error::new(
+                        ErrorKind::InvalidState,
+                        "invalid_attempt_history",
+                    ));
+                }
+            }
+        }
+        for (id, wait) in &self.waits {
+            if id != &wait.id
+                || wait.response.version == 0
+                || (wait.withdrawn && wait.answer.is_some())
+                || wait.answer.as_ref().is_some_and(|answer| {
+                    answer.schema() != &wait.response.schema
+                        || answer.version() != wait.response.version
+                })
+            {
+                return Err(Error::new(ErrorKind::InvalidState, "invalid_wait_state"));
+            }
+        }
+        let positions: std::collections::BTreeSet<_> = self
+            .receipts
+            .values()
+            .map(|receipt| receipt.record().position.0)
+            .collect();
+        if self.receipts.len() as u64 != self.position.0
+            || positions.len() != self.receipts.len()
+            || positions
+                .iter()
+                .enumerate()
+                .any(|(index, position)| *position != index as u64 + 1)
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                "invalid_journal_positions",
+            ));
+        }
+        let settlements: Vec<_> = self
+            .receipts
+            .values()
+            .filter_map(|receipt| match receipt {
+                CommitReceipt::Settled(receipt) => Some(receipt),
+                _ => None,
+            })
+            .collect();
+        match (&self.outcome, settlements.as_slice()) {
+            (Some(outcome), [receipt]) if outcome == &receipt.outcome => {}
+            (Some(_), _) => {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    "invalid_settlement_receipt",
+                ));
+            }
+            (None, []) => {}
+            (None, _) => {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    "unexpected_settlement_receipt",
+                ));
+            }
+        }
+        for (id, receipt) in &self.receipts {
+            let record = receipt.record();
+            if id != &record.change
+                || record.position.0 == 0
+                || record.position > self.position
+                || record.binding.session != self.binding.session
+                || record.binding.turn != self.binding.turn
+                || record.binding.epoch > self.binding.epoch
+            {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    "invalid_commit_receipt",
+                ));
+            }
+        }
+        if self.outcome.is_some()
+            && (self
+                .operations
+                .values()
+                .any(|state| state.outcome().is_none())
+                || self.waits.values().any(WaitRecord::is_pending))
+        {
+            return Err(Error::new(ErrorKind::InvalidState, "invalid_settled_state"));
+        }
+        Ok(())
+    }
+
+    /// Storage calls this only after establishing exclusive ownership of the new epoch.
+    pub fn rebind(&mut self, binding: TurnBinding) -> Result<()> {
+        if binding.session != self.binding.session
+            || binding.turn != self.binding.turn
+            || binding.epoch <= self.binding.epoch
+            || self.outcome.is_some()
+        {
+            return Err(Error::new(ErrorKind::Conflict, "invalid_writer_transition"));
+        }
+        self.binding = binding.clone();
+        self.controls.binding = binding;
+        self.suspended = false;
+        Ok(())
+    }
+
+    /// Validate a complete transition before publishing any of its changes.
+    pub fn apply(&mut self, change: JournalChange) -> Result<CommitReceipt> {
+        if let Some(receipt) = self.receipts.get(&change.id) {
+            return if receipt.record().fingerprint == change.fingerprint {
+                Ok(receipt.clone())
+            } else {
+                Err(Error::new(ErrorKind::Conflict, "change_identity_reused"))
+            };
+        }
+        if change.binding != self.binding
+            || change.expected != self.position
+            || change.control != self.controls.revision
+        {
+            return Err(Error::new(ErrorKind::Conflict, "stale_journal_change"));
+        }
+        let settles = change
+            .actions
+            .iter()
+            .filter(|action| matches!(action, JournalAction::Settle(_)))
+            .count();
+        let suspends = change
+            .actions
+            .iter()
+            .filter(|action| matches!(action, JournalAction::Suspend))
+            .count();
+        if settles + suspends > 1 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "multiple_lifecycle_transitions",
+            ));
+        }
+        let mut next = self.clone();
+        for action in change.actions {
+            next.apply_action(action)?;
+        }
+        next.position =
+            JournalPosition(self.position.0.checked_add(1).ok_or_else(|| {
+                Error::new(ErrorKind::LimitExceeded, "journal_position_overflow")
+            })?);
+        let record = RecordedPosition {
+            change: change.id.clone(),
+            binding: next.binding.clone(),
+            position: next.position,
+            fingerprint: change.fingerprint,
+            content_fingerprint: change.content_fingerprint,
+        };
+        let receipt = if settles == 1 {
+            CommitReceipt::Settled(SettlementReceipt {
+                record,
+                outcome: next
+                    .outcome
+                    .clone()
+                    .expect("settlement action records its outcome"),
+            })
+        } else if suspends == 1 {
+            CommitReceipt::Suspended(SuspensionReceipt { record })
+        } else {
+            CommitReceipt::Recorded(record)
+        };
+        next.receipts.insert(change.id, receipt.clone());
+        *self = next;
+        Ok(receipt)
+    }
+
+    fn validate_source_call(&self, record: &OperationRecord) -> Result<()> {
+        let Some(call) = &record.source_call else {
+            return Ok(());
+        };
+        let origin = record
+            .origin
+            .as_ref()
+            .and_then(|id| self.operations.get(id));
+        if !matches!(record.input, OperationInput::Tool(_))
+            || !origin
+                .is_some_and(|origin| matches!(origin.record.input, OperationInput::Inference(_)))
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "invalid_source_call_origin",
+            ));
+        }
+        if self.operations.values().any(|other| {
+            other.record.id != record.id
+                && other.record.origin == record.origin
+                && other.record.source_call.as_ref() == Some(call)
+        }) {
+            return Err(Error::new(
+                ErrorKind::Conflict,
+                "source_call_already_recorded",
+            ));
+        }
+        Ok(())
+    }
+
+    fn admits_work(&self) -> Result<()> {
+        if !self.controls.admits_work() || self.suspended || self.outcome.is_some() {
+            return Err(Error::new(ErrorKind::InvalidState, "admission_closed"));
+        }
+        Ok(())
+    }
+
+    fn bump_control(&mut self) -> Result<()> {
+        self.controls.revision.0 = self
+            .controls
+            .revision
+            .0
+            .checked_add(1)
+            .ok_or_else(|| Error::new(ErrorKind::LimitExceeded, "control_revision_overflow"))?;
+        Ok(())
+    }
+
+    fn apply_action(&mut self, action: JournalAction) -> Result<()> {
+        if self.outcome.is_some() && !matches!(action, JournalAction::ReconcileAttempt { .. }) {
+            return Err(Error::new(ErrorKind::InvalidState, "turn_settled"));
+        }
+        match action {
+            JournalAction::Prepare(record) => {
+                self.admits_work()?;
+                let record = *record;
+                self.validate_source_call(&record)?;
+                if record.origin.as_ref().is_some_and(|origin| {
+                    origin == &record.id || !self.operations.contains_key(origin)
+                }) {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "invalid_operation_origin",
+                    ));
+                }
+                if let OperationInput::Inference(request) = &record.input
+                    && request.binding().authority != record.grants.authority
+                {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "inference_authority_mismatch",
+                    ));
+                }
+                if self.operations.contains_key(&record.id) {
+                    return Err(Error::new(ErrorKind::Conflict, "operation_exists"));
+                }
+                if let OperationInput::Tool(invocation) = &record.input
+                    && invocation.id() != &record.id
+                {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "invocation_identity_mismatch",
+                    ));
+                }
+                self.operations.insert(
+                    record.id.clone(),
+                    OperationState {
+                        record,
+                        attempts: vec![],
+                        rejection: None,
+                    },
+                );
+            }
+            JournalAction::StartAttempt { operation, attempt } => {
+                self.admits_work()?;
+                if self
+                    .operations
+                    .values()
+                    .any(|state| state.attempts.iter().any(|old| old.id == attempt))
+                {
+                    return Err(Error::new(ErrorKind::Conflict, "attempt_exists"));
+                }
+                let state = self
+                    .operations
+                    .get_mut(&operation)
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidState, "operation_missing"))?;
+                if state.rejection.is_some() {
+                    return Err(Error::new(ErrorKind::InvalidState, "operation_rejected"));
+                }
+                if state.is_running() {
+                    return Err(Error::new(ErrorKind::InvalidState, "attempt_running"));
+                }
+                if state
+                    .outcome()
+                    .is_some_and(|outcome| outcome.is_success() || outcome.is_uncertain())
+                {
+                    return Err(Error::new(
+                        ErrorKind::InvalidState,
+                        "operation_requires_new_identity_or_reconciliation",
+                    ));
+                }
+                state.attempts.push(AttemptRecord {
+                    id: attempt,
+                    outcome: None,
+                    prior_outcomes: vec![],
+                });
+            }
+            JournalAction::RejectPrepared { operation, outcome } => {
+                let state = self
+                    .operations
+                    .get_mut(&operation)
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidState, "operation_missing"))?;
+                if !state.attempts.is_empty()
+                    || state.rejection.is_some()
+                    || !outcome.matches(&state.record.input)
+                    || !outcome.can_reject_prepared()
+                {
+                    return Err(Error::new(
+                        ErrorKind::InvalidState,
+                        "invalid_prepared_rejection",
+                    ));
+                }
+                state.rejection = Some(outcome);
+            }
+            JournalAction::CompleteAttempt {
+                operation,
+                attempt,
+                outcome,
+            } => {
+                let state = self
+                    .operations
+                    .get_mut(&operation)
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidState, "operation_missing"))?;
+                if !outcome.matches(&state.record.input) {
+                    return Err(Error::new(ErrorKind::InvalidInput, "outcome_kind_mismatch"));
+                }
+                let active = state
+                    .attempts
+                    .last_mut()
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidState, "attempt_missing"))?;
+                if active.id != attempt || active.outcome.is_some() {
+                    return Err(Error::new(ErrorKind::Conflict, "attempt_outcome_conflict"));
+                }
+                active.outcome = Some(outcome);
+            }
+            JournalAction::ReconcileAttempt {
+                operation,
+                attempt,
+                outcome,
+            } => {
+                let state = self
+                    .operations
+                    .get_mut(&operation)
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidState, "operation_missing"))?;
+                if !outcome.matches(&state.record.input) {
+                    return Err(Error::new(ErrorKind::InvalidInput, "outcome_kind_mismatch"));
+                }
+                let active = state
+                    .attempts
+                    .last_mut()
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidState, "attempt_missing"))?;
+                if active.id != attempt
+                    || !active
+                        .outcome
+                        .as_ref()
+                        .is_some_and(OperationOutcome::is_uncertain)
+                {
+                    return Err(Error::new(ErrorKind::Conflict, "attempt_not_uncertain"));
+                }
+                if let Some(previous) = active.outcome.replace(outcome) {
+                    active.prior_outcomes.push(previous);
+                }
+            }
+            JournalAction::AppendHistory(records) => {
+                self.history.append(self.history.position(), &records)?;
+            }
+            JournalAction::OpenWait(wait) => {
+                self.admits_work()?;
+                if wait.response.version == 0
+                    || !wait.is_pending()
+                    || self.waits.contains_key(&wait.id)
+                {
+                    return Err(Error::new(ErrorKind::InvalidInput, "invalid_wait"));
+                }
+                self.waits.insert(wait.id.clone(), wait);
+                self.bump_control()?;
+            }
+            JournalAction::ResolveWait { wait, answer } => {
+                let record = self
+                    .waits
+                    .get_mut(&wait)
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidState, "wait_missing"))?;
+                if !record.is_pending()
+                    || answer.schema() != &record.response.schema
+                    || answer.version() != record.response.version
+                {
+                    return Err(Error::new(ErrorKind::Conflict, "wait_response_mismatch"));
+                }
+                record.answer = Some(answer);
+                self.bump_control()?;
+            }
+            JournalAction::WithdrawWait(wait) => {
+                let record = self
+                    .waits
+                    .get_mut(&wait)
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidState, "wait_missing"))?;
+                if !record.is_pending() {
+                    return Err(Error::new(ErrorKind::Conflict, "wait_already_resolved"));
+                }
+                record.withdrawn = true;
+                self.bump_control()?;
+            }
+            JournalAction::SetCheckpoint(checkpoint) => {
+                self.checkpoint = Some(checkpoint);
+            }
+            JournalAction::Control(directive) => {
+                match directive {
+                    ControlDirective::Pause => self.controls.paused = true,
+                    ControlDirective::Resume if !self.controls.cancelled => {
+                        self.controls.paused = false
+                    }
+                    ControlDirective::Resume => {
+                        return Err(Error::new(ErrorKind::InvalidState, "turn_cancelled"));
+                    }
+                    ControlDirective::Cancel => self.controls.cancelled = true,
+                }
+                self.bump_control()?;
+            }
+            JournalAction::Suspend => {
+                if self.operations.values().any(OperationState::is_running) {
+                    return Err(Error::new(ErrorKind::InvalidState, "work_still_running"));
+                }
+                self.suspended = true;
+            }
+            JournalAction::Settle(outcome) => {
+                if self
+                    .operations
+                    .values()
+                    .any(|state| state.outcome().is_none())
+                    || self.waits.values().any(WaitRecord::is_pending)
+                {
+                    return Err(Error::new(ErrorKind::InvalidState, "work_unsettled"));
+                }
+                if outcome
+                    .evidence
+                    .iter()
+                    .any(|id| !self.operations.contains_key(id))
+                {
+                    return Err(Error::new(ErrorKind::InvalidInput, "evidence_missing"));
+                }
+                self.suspended = false;
+                self.outcome = Some(outcome);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'de> Deserialize<'de> for TurnState {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Data {
+            binding: TurnBinding,
+            position: JournalPosition,
+            controls: ControlSnapshot,
+            history: History,
+            operations: BTreeMap<OperationId, OperationState>,
+            waits: BTreeMap<WaitId, WaitRecord>,
+            checkpoint: Option<Envelope>,
+            suspended: bool,
+            outcome: Option<TurnOutcome>,
+            receipts: BTreeMap<ChangeId, CommitReceipt>,
+        }
+        let value = Data::deserialize(deserializer)?;
+        let state = Self {
+            binding: value.binding,
+            position: value.position,
+            controls: value.controls,
+            history: value.history,
+            operations: value.operations,
+            waits: value.waits,
+            checkpoint: value.checkpoint,
+            suspended: value.suspended,
+            outcome: value.outcome,
+            receipts: value.receipts,
+        };
+        state.validate().map_err(serde::de::Error::custom)?;
+        Ok(state)
+    }
+}
+
+pub trait TurnJournal: Send + Sync {
+    fn binding(&self) -> &TurnBinding;
+    fn load(&self) -> BoxFuture<'_, Result<TurnState>>;
+    fn commit(&self, change: JournalChange) -> BoxFuture<'_, Result<CommitReceipt>>;
+    fn lookup(&self, change: ChangeId) -> BoxFuture<'_, Result<Option<CommitReceipt>>>;
+}
+
+pub trait ControlReader: Send + Sync {
+    fn binding(&self) -> &TurnBinding;
+    fn read(&self) -> BoxFuture<'_, Result<ControlSnapshot>>;
+    fn changed(&self, after: ControlRevision) -> BoxFuture<'_, Result<ControlSnapshot>>;
+}
+
+pub struct TurnLease {
+    journal: Box<dyn TurnJournal>,
+    controls: Arc<dyn ControlReader>,
+}
+
+impl TurnLease {
+    pub fn binding(&self) -> &TurnBinding {
+        self.journal.binding()
+    }
+    pub fn journal(&self) -> &dyn TurnJournal {
+        self.journal.as_ref()
+    }
+    pub fn controls(&self) -> &dyn ControlReader {
+        self.controls.as_ref()
+    }
+}
+
+pub fn bind_lease(
+    binding: TurnBinding,
+    journal: Box<dyn TurnJournal>,
+    controls: Arc<dyn ControlReader>,
+) -> Result<TurnLease> {
+    if binding.epoch == 0 || journal.binding() != &binding || controls.binding() != &binding {
+        return Err(Error::new(ErrorKind::Conflict, "turn_binding_mismatch"));
+    }
+    Ok(TurnLease { journal, controls })
+}
+
+struct MemoryState {
+    state: TurnState,
+    listeners: Vec<oneshot::Sender<ControlSnapshot>>,
+}
+
+struct MemoryJournal {
+    binding: TurnBinding,
+    inner: Arc<Mutex<MemoryState>>,
+}
+
+impl TurnJournal for MemoryJournal {
+    fn binding(&self) -> &TurnBinding {
+        &self.binding
+    }
+    fn load(&self) -> BoxFuture<'_, Result<TurnState>> {
+        Box::pin(async {
+            Ok(self
+                .inner
+                .lock()
+                .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_poisoned"))?
+                .state
+                .clone())
+        })
+    }
+    fn commit(&self, change: JournalChange) -> BoxFuture<'_, Result<CommitReceipt>> {
+        Box::pin(async move {
+            let mut inner = self
+                .inner
+                .lock()
+                .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_poisoned"))?;
+            let old = inner.state.controls.revision;
+            let receipt = inner.state.apply(change)?;
+            if inner.state.controls.revision != old {
+                let snapshot = inner.state.controls.clone();
+                for listener in inner.listeners.drain(..) {
+                    let _ = listener.send(snapshot.clone());
+                }
+            }
+            Ok(receipt)
+        })
+    }
+    fn lookup(&self, change: ChangeId) -> BoxFuture<'_, Result<Option<CommitReceipt>>> {
+        Box::pin(async move {
+            Ok(self
+                .inner
+                .lock()
+                .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_poisoned"))?
+                .state
+                .receipt(&change)
+                .cloned())
+        })
+    }
+}
+
+impl ControlReader for MemoryJournal {
+    fn binding(&self) -> &TurnBinding {
+        &self.binding
+    }
+    fn read(&self) -> BoxFuture<'_, Result<ControlSnapshot>> {
+        Box::pin(async {
+            Ok(self
+                .inner
+                .lock()
+                .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_poisoned"))?
+                .state
+                .controls
+                .clone())
+        })
+    }
+    fn changed(&self, after: ControlRevision) -> BoxFuture<'_, Result<ControlSnapshot>> {
+        Box::pin(async move {
+            let receiver = {
+                let mut inner = self
+                    .inner
+                    .lock()
+                    .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_poisoned"))?;
+                if inner.state.controls.revision != after {
+                    return Ok(inner.state.controls.clone());
+                }
+                inner.listeners.retain(|sender| !sender.is_canceled());
+                let (sender, receiver) = oneshot::channel();
+                inner.listeners.push(sender);
+                receiver
+            };
+            receiver
+                .await
+                .map_err(|_| Error::new(ErrorKind::Unavailable, "control_reader_closed"))
+        })
+    }
+}
+
+pub struct EphemeralJournal;
+pub struct EphemeralTurn {
+    pub lease: TurnLease,
+    pub control: EphemeralControl,
+}
+pub struct EphemeralControl {
+    journal: MemoryJournal,
+}
+
+impl EphemeralJournal {
+    pub fn create(binding: TurnBinding) -> Result<EphemeralTurn> {
+        let inner = Arc::new(Mutex::new(MemoryState {
+            state: TurnState::new(binding.clone())?,
+            listeners: vec![],
+        }));
+        let journal = MemoryJournal {
+            binding: binding.clone(),
+            inner: Arc::clone(&inner),
+        };
+        let controls = MemoryJournal {
+            binding: binding.clone(),
+            inner: Arc::clone(&inner),
+        };
+        let control = EphemeralControl {
+            journal: MemoryJournal {
+                binding: binding.clone(),
+                inner,
+            },
+        };
+        Ok(EphemeralTurn {
+            lease: bind_lease(binding, Box::new(journal), Arc::new(controls))?,
+            control,
+        })
+    }
+}
+
+impl EphemeralControl {
+    pub async fn change(
+        &self,
+        id: ChangeId,
+        expected: ControlRevision,
+        directive: ControlDirective,
+    ) -> Result<CommitReceipt> {
+        self.apply(id, expected, JournalAction::Control(directive))
+            .await
+    }
+    pub async fn resolve(
+        &self,
+        id: ChangeId,
+        expected: ControlRevision,
+        wait: WaitId,
+        answer: Envelope,
+    ) -> Result<CommitReceipt> {
+        self.apply(id, expected, JournalAction::ResolveWait { wait, answer })
+            .await
+    }
+    async fn apply(
+        &self,
+        id: ChangeId,
+        expected: ControlRevision,
+        action: JournalAction,
+    ) -> Result<CommitReceipt> {
+        let actions = vec![action];
+        if let Some(receipt) = self.journal.lookup(id.clone()).await? {
+            if receipt.record().content_fingerprint == Fingerprint::of(&actions)? {
+                return Ok(receipt);
+            }
+            return Err(Error::new(ErrorKind::Conflict, "change_identity_reused"));
+        }
+        let state = self.journal.load().await?;
+        let change =
+            JournalChange::new(id, state.binding.clone(), state.position, expected, actions)?;
+        self.journal.commit(change).await
+    }
+}

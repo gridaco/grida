@@ -1,0 +1,194 @@
+use crate::execution::fingerprint_name;
+use crate::*;
+use agent_kit_core::history::HistoryRecord;
+use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role, ToolResult};
+use agent_kit_core::{MessageId, ToolCallId};
+use futures_util::stream::{FuturesUnordered, StreamExt};
+use std::pin::Pin;
+use tokio::sync::mpsc;
+
+type ToolWork =
+    Pin<Box<dyn std::future::Future<Output = (ToolCall, Result<InvokeOutcome>)> + Send>>;
+
+impl Turn {
+    /// Execute one response and its complete tool calls. Transcript installation
+    /// remains a separate atomic publication with the master's continuation.
+    pub async fn step(&mut self, plan: StepPlan) -> Result<StepOutcome> {
+        let operations = self.operations();
+        let origin = operations.operation_id(&plan.key)?;
+        let replay = self.view().state.operations().contains_key(&origin);
+        if !replay {
+            let mut offered = plan.request.request().tools.clone();
+            offered.sort_by(|left, right| left.id.cmp(&right.id));
+            if offered != plan.tools.offers()? {
+                return Err(Error::new(ErrorKind::Conflict, "step_inventory_mismatch"));
+            }
+        }
+        let (sender, mut receiver) = mpsc::channel(self.inner_capacity());
+        let inference = operations.infer_updates(
+            plan.key.clone(),
+            plan.request.clone(),
+            plan.inference_grants.clone(),
+            Some(sender),
+        );
+        tokio::pin!(inference);
+        let mut completed_inference = None;
+        let mut calls = BTreeMap::<ToolCallId, ToolCall>::new();
+        let mut results = BTreeMap::new();
+        let mut work = FuturesUnordered::<ToolWork>::new();
+        let mut input_closed = false;
+        while completed_inference.is_none() || !input_closed || !work.is_empty() {
+            tokio::select! {
+                outcome = &mut inference, if completed_inference.is_none() => {
+                    if let Ok(outcome) = &outcome {
+                        for message in &outcome.messages {
+                            for content in &message.content {
+                                if let Content::ToolCall(call) = content {
+                                    queue_call(&operations, &plan, &origin, call.clone(), &mut calls, &mut work, replay)?;
+                                }
+                            }
+                        }
+                    }
+                    completed_inference = Some(outcome);
+                }
+                call = receiver.recv(), if !input_closed => {
+                    match call {
+                        Some(call) => queue_call(&operations, &plan, &origin, call, &mut calls, &mut work, replay)?,
+                        None => input_closed = true,
+                    }
+                }
+                result = work.next(), if !work.is_empty() => {
+                    if let Some((call, result)) = result { results.insert(call.id, result?); }
+                }
+            }
+        }
+        let inference = completed_inference
+            .ok_or_else(|| Error::new(ErrorKind::InvalidState, "inference_missing"))??;
+        let tools: Vec<_> = calls
+            .into_values()
+            .map(|call| {
+                let outcome = results
+                    .remove(&call.id)
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidState, "tool_outcome_missing"))?;
+                Ok(StepToolOutcome { call, outcome })
+            })
+            .collect::<Result<_>>()?;
+        let history = if tools
+            .iter()
+            .any(|tool| matches!(tool.outcome, InvokeOutcome::Deferred(_)))
+        {
+            vec![]
+        } else {
+            candidate_history(&origin, &inference, &tools)?
+        };
+        Ok(StepOutcome {
+            inference,
+            tools,
+            history,
+        })
+    }
+
+    fn inner_capacity(&self) -> usize {
+        self.inner.max_operations()
+    }
+}
+
+fn queue_call(
+    operations: &TurnOperations,
+    plan: &StepPlan,
+    origin: &OperationId,
+    call: ToolCall,
+    calls: &mut BTreeMap<ToolCallId, ToolCall>,
+    work: &mut FuturesUnordered<ToolWork>,
+    replay: bool,
+) -> Result<()> {
+    if let Some(existing) = calls.get(&call.id) {
+        if existing != &call {
+            return Err(Error::new(ErrorKind::Conflict, "tool_call_identity_reused"));
+        }
+        return Ok(());
+    }
+    calls.insert(call.id.clone(), call.clone());
+    let tool_key = OperationKey::new(fingerprint_name("tool", &(&plan.key, &call.id))?)?;
+    let operations = operations.clone();
+    let inventory = plan.tools.clone();
+    let selected_grants = plan.tool_grants.get(&call.tool).cloned();
+    let origin = origin.clone();
+    let operation_id = operations.operation_id(&tool_key)?;
+    work.push(Box::pin(async move {
+        let view = operations.view();
+        let recorded_grants = view
+            .state
+            .operations()
+            .get(&operation_id)
+            .filter(|operation| operation.outcome().is_some())
+            .map(|operation| operation.record.grants.clone());
+        let grants = recorded_grants.or(selected_grants);
+        let Some(grants) = grants else {
+            return (
+                call,
+                Err(Error::new(ErrorKind::Unavailable, "tool_authority_missing")),
+            );
+        };
+        let result = operations
+            .invoke_captured(
+                tool_key,
+                PlannedInvocation {
+                    tool: call.tool.clone(),
+                    arguments: call.arguments.clone(),
+                    grants,
+                },
+                inventory,
+                Some(origin),
+                Some(call.id.clone()),
+            )
+            .await;
+        let result = match result {
+            Err(error)
+                if error.kind == ErrorKind::InvalidInput
+                    || (!replay && error.code == "tool_unavailable") =>
+            {
+                Ok(InvokeOutcome::Complete(ToolOutcome::failed(&error.code)))
+            }
+            result => result,
+        };
+        (call, result)
+    }));
+    Ok(())
+}
+
+fn candidate_history(
+    origin: &OperationId,
+    inference: &InferenceOutcome,
+    tools: &[StepToolOutcome],
+) -> Result<Vec<HistoryRecord>> {
+    let mut records: Vec<_> = inference
+        .messages
+        .iter()
+        .cloned()
+        .map(HistoryRecord::Message)
+        .collect();
+    for tool in tools {
+        let InvokeOutcome::Complete(outcome) = &tool.outcome else {
+            continue;
+        };
+        records.push(HistoryRecord::Message(Message {
+            id: MessageId::new(fingerprint_name("result", &(origin, &tool.call.id))?)?,
+            role: Role::Tool,
+            phase: None,
+            content: vec![Content::ToolResult(ToolResult {
+                call: tool.call.id.clone(),
+                status: outcome.status,
+                content: outcome.content.clone(),
+                structured: outcome.structured.clone(),
+                truncated: outcome.truncated,
+            })],
+            provenance: Provenance {
+                source: "tool".into(),
+                kind: ProvenanceKind::Observed,
+                fingerprint: None,
+            },
+        }));
+    }
+    Ok(records)
+}

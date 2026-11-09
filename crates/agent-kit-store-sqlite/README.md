@@ -1,0 +1,35 @@
+# agent-kit-store-sqlite
+
+SQLite implementation of durable session acceptance, claims, controls, and the
+shared execution journal. It accepts an explicit database path in an existing
+application-owned directory.
+
+The adapter uses WAL with synchronous FULL commits. Session metadata, immutable
+submissions, request receipts, and individual turn snapshots have separate
+records. A turn commit updates its snapshot and any terminal session disposition
+in the same transaction. Earlier turns are retained independently.
+
+One opened database holds an exclusive operating-system lock for its lifetime.
+Store clones and bound journal handles share that owner. Another process or store
+must wait until ownership is released. Different sessions execute independently
+while short database transactions serialize. Database I/O runs on blocking
+workers. The host needs a Tokio runtime to poll asynchronous operations.
+
+A live lease blocks recovery of its turn. Dropping it makes interrupted execution
+eligible for an explicit recovery request. Reopening the database preserves the
+turn's operations and outcomes, and recovery advances its writer epoch. Inspection
+reports state without starting or resuming execution. Explicit recovery can
+also reacquire a released cancelled suspension to record its final disposition.
+Cancellation remains active during that recovery. The adapter supplies no
+clock-based takeover.
+
+On Unix, the parent directory must exclude group/other access. Database and lock
+files use owner-only permissions, and existing symlinks or hard-linked files are
+rejected. Other platforms rely on the host's application-directory access policy.
+The lock file is retained so its identity remains stable across opens.
+
+A session admits at most 256 queued inputs and 32 MiB of encoded pending payloads.
+Each input uses the core's bounded versioned envelope. A single turn snapshot is
+limited to 64 MiB. An over-limit write is rejected before its transaction commits.
+These bounds are storage admission limits. Retention and cleanup policy belong to
+the host.
