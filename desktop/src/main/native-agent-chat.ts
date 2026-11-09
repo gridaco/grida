@@ -6,6 +6,8 @@ import type {
   NativeChatAcceptance,
   NativeChatApprovalDecision,
   NativeChatControlReceipt,
+  NativeChatGoalControl,
+  NativeChatGoalReceipt,
   NativeChatMessage,
   NativeChatPage,
   NativeChatQuestion,
@@ -19,6 +21,10 @@ import type {
   NativeChatTurn,
 } from "@grida/desktop-bridge";
 import type { NativeApprovalReview } from "./native-agent-permissions";
+import {
+  NativeAgentGoals,
+  type NativeGoalInspection,
+} from "./native-agent-goals";
 import {
   NativeAgentProcess,
   type NativeAgentLaunch,
@@ -40,6 +46,9 @@ const CAPABILITIES = {
   "co.grida/session/updates": 1,
   "co.grida/session/questions": 1,
   "co.grida/session/answer-question": 1,
+  "co.grida/goal/start": 1,
+  "co.grida/goal/inspect": 1,
+  "co.grida/goal/control": 1,
 } as const;
 const TURN_DISPOSITIONS = [
   "running",
@@ -111,6 +120,9 @@ type TranscriptCapture = {
 };
 
 export class NativeAgentChat {
+  private readonly goals = new NativeAgentGoals((method, params) =>
+    this.process.request(method, params)
+  );
   private readonly attached = new Map<string, NativeChatSession>();
   private readonly loading = new Map<string, Promise<NativeChatSession>>();
   private readonly transcripts = new Map<string, TranscriptCapture>();
@@ -448,6 +460,42 @@ export class NativeAgentChat {
       prompt: textPrompt(input.text),
     });
     return controlReceipt(result, task);
+  }
+
+  async goal(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot
+  ): Promise<NativeGoalInspection> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const goal = await this.goals.inspect(sessionId, snapshot.sessionRevision);
+    this.requireAttached(session);
+    return goal;
+  }
+
+  async startGoal(
+    session: NativeChatSession,
+    inputId: string,
+    request: unknown
+  ): Promise<NativeChatAcceptance> {
+    const sessionId = this.requireAttached(session);
+    const accepted = await this.goals.start(
+      sessionId,
+      identity(inputId),
+      request
+    );
+    return acceptance(accepted, sessionId, inputId);
+  }
+
+  controlGoal(
+    session: NativeChatSession,
+    inspection: NativeGoalInspection,
+    change: NativeChatGoalControl
+  ): Promise<NativeChatGoalReceipt> {
+    return this.goals.control(
+      this.requireAttached(session),
+      inspection,
+      change
+    );
   }
 
   async transcript(

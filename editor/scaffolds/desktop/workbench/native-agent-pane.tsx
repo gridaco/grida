@@ -20,6 +20,7 @@ import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentComposerInput } from "../shared/agent-composer-input";
 import { QueuedMessageRows } from "../shared/queued-messages";
+import { NativeGoalPanel } from "./native-goal-panel";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
 const APPROVAL_ACTION = {
@@ -67,6 +68,8 @@ export function NativeAgentPane({
   const canResume =
     turn?.disposition === "suspended" && turn.paused && !turn.cancelled;
   const canStop = !!turn && !turn.cancelled;
+  const goalTurn =
+    !!turn && state.goal?.goal?.reservation?.turnId === turn.turnId;
   const approval =
     turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
       ? state.approvals[0]
@@ -237,6 +240,7 @@ export function NativeAgentPane({
                     disabled={
                       queueDisabled ||
                       !!state.queueDraft ||
+                      state.goalPending === inputId ||
                       !bridge.queuedText ||
                       !bridge.editQueue ||
                       queue.items[index].preview === null
@@ -412,6 +416,13 @@ export function NativeAgentPane({
           />
         </div>
       )}
+      {bridge.goal && bridge.startGoal && (
+        <NativeGoalPanel
+          key={state.scope}
+          controller={controller}
+          view={state}
+        />
+      )}
       <div className="shrink-0 p-3">
         <AgentComposerInput
           key={state.scope}
@@ -434,7 +445,7 @@ export function NativeAgentPane({
           onStop={() => void controller.control("stop")}
           toolbarStart={
             <>
-              {running ? (
+              {running && !goalTurn ? (
                 <Button
                   type="button"
                   variant="ghost"
@@ -444,7 +455,7 @@ export function NativeAgentPane({
                 >
                   Pause
                 </Button>
-              ) : canResume ? (
+              ) : canResume && (!goalTurn || !state.goal?.goal?.paused) ? (
                 <Button
                   type="button"
                   variant="ghost"

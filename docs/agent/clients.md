@@ -342,6 +342,11 @@ can inspect the retained attempt after reconnecting.
 
 ### Work toward a persistent goal
 
+In the native Desktop workspace pane, **Add goal** opens the goal form.
+**Start goal** accepts the work and the allowance you entered. Automatic
+continuation is off until you select it. An accepted goal waits in the
+retained queue until its first work turn is reserved.
+
 Start a goal in an idle chat with an empty queue. Supply an objective, its
 success criteria, and separate allowances for work turns and inference steps.
 Opt in to automatic continuation when you start the goal. The next reserved
@@ -354,11 +359,13 @@ Pause and Resume preserve the allowance for the same suspended turn. Revising
 the objective or clearing the goal stops its current work. The prior
 turn's evidence and uncertainty remain available. A model report alone
 does not establish completion.
+In Desktop, **Stop** ends the current turn and retains the goal's state.
 Clear an active or blocked goal before replacing an earlier message in the
 same chat. A fork starts independently.
 
-After a host restart, inspect the goal and its latest turn. Use Recover to
-reconsider eligible work under the original allowance and authorization.
+After a host restart, inspect the goal and its latest turn. An ACP client can
+use Recover to reconsider eligible work under the original allowance and
+authorization.
 Work with an interrupted dispatch remains recorded against its existing turn.
 
 Negotiate the version-1 capabilities `co.grida/goal/start`, `co.grida/goal/inspect`,

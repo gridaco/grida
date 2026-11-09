@@ -131,6 +131,28 @@ function setup() {
     async steer(session, observed, input) {
       return this.pause(session, observed, input.requestId);
     },
+    async goal(session, observed) {
+      return {
+        sessionId: session.id,
+        sessionRevision: observed.sessionRevision,
+        stateRevision: 0,
+        basis: null,
+        goal: null,
+      };
+    },
+    async startGoal(session, inputId) {
+      return this.enqueue(session, inputId, "fixture goal");
+    },
+    async controlGoal(session, observed, change) {
+      return {
+        sessionId: session.id,
+        requestId: change.requestId,
+        sessionRevision: observed.sessionRevision + 1,
+        stateRevision: observed.stateRevision + 1,
+        turnId: null,
+        journalPosition: null,
+      };
+    },
     async approvals() {
       return [];
     },
@@ -201,6 +223,59 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("issues goal controls only for the attached frame's inspected basis", async () => {
+    const { ipc, first, second, chat } = setup();
+    const one = await ipc.create(first.event);
+    const two = await ipc.load(second.event, one.sessionId);
+    const basis = await ipc.observe(first.event, one.attachmentId);
+    const inspect = {
+      sessionId: one.sessionId,
+      sessionRevision: basis.snapshot.sessionRevision,
+      stateRevision: 2,
+      basis: { goal: "goal", revision: 2 },
+      goal: {
+        goalId: "goal",
+        objective: "Finish the fixture",
+        criteria: ["Verify it"],
+        allowance: { workTurns: 1, inferenceSteps: 8 },
+        automatic: false,
+        state: { status: "active" },
+        paused: false,
+        progress: null,
+        spent: { workTurns: 0, inferenceSteps: 0 },
+        remaining: { workTurns: 1, inferenceSteps: 8 },
+        reservation: null,
+      },
+    } as const;
+    vi.spyOn(chat, "goal").mockResolvedValue(inspect);
+    const control = vi.spyOn(chat, "controlGoal");
+    const { observationId } = await ipc.goal(
+      first.event,
+      one.attachmentId,
+      basis.observationId
+    );
+    const pause = { observationId, requestId: "pause-goal", action: "pause" };
+    await expect(
+      ipc.controlGoal(second.event, two.attachmentId, pause)
+    ).rejects.toThrow("native_chat_goal_observation_unavailable");
+    await expect(
+      ipc.controlGoal(first.event, one.attachmentId, {
+        ...pause,
+        action: "accept_proposal",
+      })
+    ).rejects.toThrow("native_chat_goal_control_invalid");
+    await ipc.controlGoal(first.event, one.attachmentId, pause);
+    expect(control).toHaveBeenCalledExactlyOnceWith(
+      { id: one.sessionId },
+      inspect,
+      pause
+    );
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    await expect(
+      ipc.controlGoal(first.event, one.attachmentId, pause)
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+  });
+
   it("rechecks navigation after queued replacement preflight and keeps steering scoped", async () => {
     const { ipc, first, second, chat } = setup();
     const one = await ipc.create(first.event);

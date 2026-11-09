@@ -945,6 +945,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   automatic claim on the captured goal revision, allowance and original
   settings. It revalidates current authority before dispatch. A generated
   turn receives neither new access nor configuration-change permission.
+  The [Desktop goal adapter](desktop/src/main/native-agent-goals.ts) retains
+  the exact goal, driver, and session revisions behind a frame-scoped token.
+  Goal inspection is read-only. Desktop starts work through explicit user
+  acceptance of the objective and allowance.
 - The [Desktop approval coordinator](desktop/src/main/native-agent-permissions.ts)
   derives a read profile from main-owned workspace selection. An approval
   answer takes a review issued by the coordinator for the exact session,

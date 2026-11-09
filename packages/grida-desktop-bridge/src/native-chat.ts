@@ -97,6 +97,68 @@ export type NativeChatSteer = Readonly<{
   text: string;
 }>;
 
+export type NativeChatGoalUsage = Readonly<{
+  workTurns: number;
+  inferenceSteps: number;
+}>;
+
+export type NativeChatGoalRequest = Readonly<{
+  objective: string;
+  criteria: readonly string[];
+  allowance: NativeChatGoalUsage;
+  automatic: boolean;
+}>;
+
+export type NativeChatGoalStatus =
+  | { status: "active" | "complete" | "exhausted" | "cleared" }
+  | {
+      status: "blocked";
+      reason:
+        | "needs_input"
+        | "capability_unavailable"
+        | "no_progress"
+        | "unverified_completion"
+        | "uncertain_work";
+    };
+
+export type NativeChatGoal = Readonly<
+  NativeChatGoalRequest & {
+    goalId: string;
+    state: NativeChatGoalStatus;
+    paused: boolean;
+    progress: string | null;
+    spent: NativeChatGoalUsage;
+    remaining: NativeChatGoalUsage;
+    reservation: Readonly<{
+      turnId: string;
+      inferenceSteps: number;
+      uncertain: boolean;
+    }> | null;
+  }
+>;
+
+export type NativeChatGoalObservation = Readonly<{
+  observationId: string | null;
+  goal: NativeChatGoal | null;
+}>;
+
+export type NativeChatGoalAction = "pause" | "resume" | "clear";
+
+export type NativeChatGoalControl = Readonly<{
+  observationId: string;
+  requestId: string;
+  action: NativeChatGoalAction;
+}>;
+
+export type NativeChatGoalReceipt = Readonly<{
+  sessionId: string;
+  requestId: string;
+  sessionRevision: number;
+  stateRevision: number;
+  turnId: string | null;
+  journalPosition: number | null;
+}>;
+
 export type NativeChatControlReceipt = Readonly<{
   sessionId: string;
   turnId: string;
@@ -195,6 +257,19 @@ export type DesktopNativeChat = {
     attachmentId: string,
     input: NativeChatSteer
   ): Promise<NativeChatControlReceipt>;
+  goal?(
+    attachmentId: string,
+    observationId: string
+  ): Promise<NativeChatGoalObservation>;
+  startGoal?(
+    attachmentId: string,
+    inputId: string,
+    request: NativeChatGoalRequest
+  ): Promise<NativeChatAcceptance>;
+  controlGoal?(
+    attachmentId: string,
+    change: NativeChatGoalControl
+  ): Promise<NativeChatGoalReceipt>;
   approvals?(
     attachmentId: string,
     observationId: string

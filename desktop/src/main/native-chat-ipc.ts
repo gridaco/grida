@@ -5,6 +5,8 @@ import type {
   NativeChatAttachment,
   NativeChatApproval,
   NativeChatControlReceipt,
+  NativeChatGoalObservation,
+  NativeChatGoalReceipt,
   NativeChatControlResult,
   NativeChatObservation,
   NativeChatPage,
@@ -25,6 +27,7 @@ import type {
   NativeQuestionReview,
 } from "./native-agent-chat";
 import type { NativeApprovalReview } from "./native-agent-permissions";
+import type { NativeGoalInspection } from "./native-agent-goals";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
@@ -50,6 +53,9 @@ export type ActiveNativeChat = Readonly<{
     | "queuedText"
     | "editQueue"
     | "steer"
+    | "goal"
+    | "startGoal"
+    | "controlGoal"
     | "approvals"
     | "answerApproval"
     | "questions"
@@ -68,6 +74,7 @@ type Attachment = {
   observations: Map<string, NativeChatSnapshot>;
   approvals: Map<string, NativeApprovalReview>;
   questions: Map<string, NativeQuestionReview>;
+  goals: Map<string, NativeGoalInspection>;
 };
 
 type Subscription = { attachment: Attachment; stop(): void };
@@ -358,6 +365,82 @@ export class NativeChatIpc {
     return receipt;
   }
 
+  async goal(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string
+  ): Promise<NativeChatGoalObservation> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = requireObservation(attachment, observationId);
+    const inspection = await owner.active.chat.goal(
+      attachment.session,
+      snapshot
+    );
+    this.revalidate(owner, attachment);
+    const token =
+      inspection.goal &&
+      retainReview(
+        attachment.goals,
+        inspection,
+        (left, right) =>
+          left.sessionId === right.sessionId &&
+          left.sessionRevision === right.sessionRevision &&
+          left.stateRevision === right.stateRevision &&
+          left.basis?.goal === right.basis?.goal &&
+          left.basis?.revision === right.basis?.revision
+      );
+    return { observationId: token, goal: inspection.goal };
+  }
+
+  async startGoal(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    inputId: string,
+    request: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const accepted = await owner.active.chat.startGoal(
+      attachment.session,
+      inputId,
+      request
+    );
+    this.revalidate(owner, attachment);
+    return accepted;
+  }
+
+  async controlGoal(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    input: unknown
+  ): Promise<NativeChatGoalReceipt> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const change = record(input);
+    if (
+      !change ||
+      Object.keys(change).length !== 3 ||
+      !token(change.observationId) ||
+      typeof change.requestId !== "string" ||
+      (change.action !== "pause" &&
+        change.action !== "resume" &&
+        change.action !== "clear")
+    )
+      throw new Error("native_chat_goal_control_invalid");
+    const inspection = attachment.goals.get(change.observationId);
+    if (!inspection)
+      throw new Error("native_chat_goal_observation_unavailable");
+    const receipt = await owner.active.chat.controlGoal(
+      attachment.session,
+      inspection,
+      {
+        observationId: change.observationId,
+        requestId: change.requestId,
+        action: change.action,
+      }
+    );
+    this.revalidate(owner, attachment);
+    return receipt;
+  }
+
   async approvals(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -568,6 +651,7 @@ export class NativeChatIpc {
         observations: new Map(),
         approvals: new Map(),
         questions: new Map(),
+        goals: new Map(),
       };
       owner.attachments.set(attachment.id, attachment);
       return { attachmentId: attachment.id, sessionId: session.id };

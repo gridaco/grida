@@ -424,6 +424,25 @@ const bridge: DesktopBridge = {
       ),
     steer: (attachmentId, input) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STEER, attachmentId, input),
+    goal: (attachmentId, observationId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_GOAL,
+        attachmentId,
+        observationId
+      ),
+    startGoal: (attachmentId, inputId, request) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_START_GOAL,
+        attachmentId,
+        inputId,
+        request
+      ),
+    controlGoal: (attachmentId, change) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CONTROL_GOAL,
+        attachmentId,
+        change
+      ),
     approvals: (attachmentId, observationId) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_APPROVALS,

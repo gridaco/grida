@@ -4,6 +4,10 @@ import type {
   NativeChatApprovalDecision,
   NativeChatAttachment,
   NativeChatControl,
+  NativeChatGoalAction,
+  NativeChatGoalControl,
+  NativeChatGoalObservation,
+  NativeChatGoalRequest,
   NativeChatMessage,
   NativeChatObservation,
   NativeChatPage,
@@ -42,6 +46,9 @@ export type NativeChatView = Readonly<{
   queueLoading: boolean;
   queueDraft: Readonly<{ inputId: string; text: string }> | null;
   steering: boolean;
+  goal: NativeChatGoalObservation | null;
+  goalReady: boolean;
+  goalPending: string | null;
   loading: boolean;
   acting: boolean;
   repairing: boolean;
@@ -66,6 +73,11 @@ type Scope = {
   pendingQueueChange?: { key: string; change: NativeChatQueueChange };
   steeringTarget?: string;
   pendingSteering?: NativeChatSteer;
+  goalRevision?: number;
+  goalNeedsRefresh?: boolean;
+  awaitingGoalId?: string;
+  pendingGoalStart?: { key: string; inputId: string };
+  pendingGoalControl?: NativeChatGoalControl;
   replay: boolean;
   pending?: { text: string; inputId: string; mode: "submit" | "enqueue" };
   awaitingTurn?: string;
@@ -90,6 +102,9 @@ const EMPTY: NativeChatView = Object.freeze({
   queueLoading: false,
   queueDraft: null,
   steering: false,
+  goal: null,
+  goalReady: false,
+  goalPending: null,
   loading: false,
   acting: false,
   repairing: false,
@@ -241,6 +256,9 @@ export class NativeChatController {
       queueLoading: false,
       queueDraft: null,
       steering: false,
+      goal: null,
+      goalReady: false,
+      goalPending: null,
       loading: sessionId !== null,
       acting: false,
       repairing: false,
@@ -282,6 +300,151 @@ export class NativeChatController {
       !turn.cancelled &&
       (turn.disposition === "running" || turn.disposition === "suspended")
     );
+  }
+
+  get canStartGoal(): boolean {
+    const scope = this.scope;
+    const snapshot = scope?.observation?.snapshot;
+    const goal = this.view.goal?.goal;
+    return (
+      !!scope &&
+      !!this.bridge.goal &&
+      !!this.bridge.startGoal &&
+      !this.view.loading &&
+      !this.view.acting &&
+      !this.view.goalPending &&
+      (!scope.attachment || this.view.goalReady) &&
+      !snapshot?.current &&
+      !snapshot?.queuedInputs &&
+      !snapshot?.admissionPaused &&
+      (!goal ||
+        (!goal.reservation &&
+          (goal.state.status === "complete" ||
+            goal.state.status === "cleared")))
+    );
+  }
+
+  canControlGoal(action: NativeChatGoalAction): boolean {
+    const goal = this.view.goal?.goal;
+    const snapshot = this.scope?.observation?.snapshot;
+    const current = snapshot?.current;
+    if (
+      !this.bridge.controlGoal ||
+      !this.view.goalReady ||
+      this.view.acting ||
+      !goal ||
+      goal.state.status === "cleared" ||
+      (current && current.turnId !== goal.reservation?.turnId)
+    )
+      return false;
+    if (action === "clear") return true;
+    if (action === "pause")
+      return (
+        goal.state.status === "active" &&
+        !goal.paused &&
+        !current?.cancelled &&
+        (!!current || goal.automatic)
+      );
+    if (
+      snapshot?.admissionPaused ||
+      goal.state.status === "exhausted" ||
+      goal.state.status === "complete" ||
+      goal.reservation?.uncertain
+    )
+      return false;
+    return current
+      ? goal.paused &&
+          current.paused &&
+          !current.cancelled &&
+          current.disposition === "suspended"
+      : goal.automatic &&
+          !goal.reservation &&
+          (goal.paused || goal.state.status === "blocked");
+  }
+
+  async startGoal(request: NativeChatGoalRequest): Promise<boolean> {
+    const scope = this.scope;
+    if (!scope || !this.canStartGoal || !this.bridge.startGoal) return false;
+    const problem = goalRequestProblem(request);
+    if (problem) {
+      this.update({ error: problem });
+      return false;
+    }
+    const key = JSON.stringify(request);
+    const pending =
+      scope.pendingGoalStart?.key === key
+        ? scope.pendingGoalStart
+        : { key, inputId: crypto.randomUUID() };
+    scope.pendingGoalStart = pending;
+    this.update({ acting: true, error: null });
+    try {
+      await this.open(scope);
+      const attachment = this.attachment(scope);
+      const receipt = await this.bridge.startGoal(
+        attachment.attachmentId,
+        pending.inputId,
+        request
+      );
+      if (
+        receipt.disposition === "withdrawn" ||
+        receipt.disposition === "superseded"
+      )
+        throw new Error("native_chat_goal_start_unavailable");
+      scope.pendingGoalStart = undefined;
+      if (!this.owns(scope)) return false;
+      scope.awaitingGoalId =
+        this.view.goal?.goal?.goalId === receipt.inputId
+          ? undefined
+          : receipt.inputId;
+      scope.replay = true;
+      this.update({ goalPending: scope.awaitingGoalId ?? null });
+      await this.refresh(scope);
+      return true;
+    } catch {
+      if (this.owns(scope)) {
+        this.update({
+          error: "Couldn't confirm the goal start. Your draft is still here.",
+        });
+        await this.refresh(scope);
+      }
+      return false;
+    } finally {
+      if (this.owns(scope)) this.update({ acting: false });
+    }
+  }
+
+  async controlGoal(action: NativeChatGoalAction): Promise<void> {
+    const scope = this.scope;
+    const observationId = this.view.goal?.observationId;
+    if (
+      !scope?.attachment ||
+      !observationId ||
+      !this.bridge.controlGoal ||
+      !this.canControlGoal(action)
+    )
+      return;
+    const change =
+      scope.pendingGoalControl?.action === action
+        ? scope.pendingGoalControl
+        : { action, observationId, requestId: crypto.randomUUID() };
+    scope.pendingGoalControl = change;
+    this.update({ acting: true, error: null });
+    try {
+      await this.bridge.controlGoal(scope.attachment.attachmentId, change);
+      scope.pendingGoalControl = undefined;
+    } catch (error) {
+      if (revisionChanged(error)) scope.pendingGoalControl = undefined;
+      if (this.owns(scope))
+        this.update({
+          error:
+            "Couldn't confirm the goal control. Check the goal and try again.",
+        });
+    } finally {
+      if (this.owns(scope)) {
+        await this.refresh(scope);
+        if (this.owns(scope)) this.update({ acting: false });
+      }
+    }
   }
 
   private get needsQueue(): boolean {
@@ -426,7 +589,8 @@ export class NativeChatController {
       !this.queueCurrent ||
       !this.bridge.queuedText ||
       this.view.acting ||
-      this.view.queueDraft
+      this.view.queueDraft ||
+      this.view.goalPending === inputId
     )
       return;
     this.update({ acting: true, error: null });
@@ -475,7 +639,8 @@ export class NativeChatController {
       !scope?.attachment ||
       !scope.observation ||
       !this.bridge.editQueue ||
-      this.view.acting
+      this.view.acting ||
+      (action.action === "replace" && this.view.goalPending === action.inputId)
     )
       return;
     const observationId =
@@ -721,6 +886,7 @@ export class NativeChatController {
         await Promise.all([
           this.refreshApprovals(scope, attachment, next),
           this.refreshQuestions(scope, attachment, next),
+          this.refreshGoal(scope, attachment, next),
         ]);
         if (!this.owns(scope)) return;
         if (!replay) return;
@@ -758,7 +924,9 @@ export class NativeChatController {
             (scope.observation?.snapshot.queuedInputs &&
               !scope.observation.snapshot.admissionPaused) ||
             scope.replay ||
-            scope.awaitingTurn)
+            scope.awaitingTurn ||
+            scope.awaitingGoalId ||
+            scope.goalNeedsRefresh)
         ) {
           scope.timer = setTimeout(() => {
             void this.refresh(scope);
@@ -794,6 +962,58 @@ export class NativeChatController {
     } catch {
       if (this.owns(scope))
         this.update({ approvalError: "Couldn't load the permission request." });
+    }
+  }
+
+  private async refreshGoal(
+    scope: Scope,
+    attachment: NativeChatAttachment,
+    observation: NativeChatObservation
+  ): Promise<void> {
+    if (!this.bridge.goal || !this.bridge.startGoal) return;
+    const snapshot = observation.snapshot;
+    if (scope.goalRevision === snapshot.sessionRevision) return;
+    if (this.view.goalReady) this.update({ goalReady: false });
+    scope.goalNeedsRefresh = false;
+    try {
+      const goal = await this.bridge.goal(
+        attachment.attachmentId,
+        observation.observationId
+      );
+      if (!this.owns(scope)) return;
+      scope.goalRevision = snapshot.sessionRevision;
+      if (scope.awaitingGoalId) {
+        if (goal.goal?.goalId === scope.awaitingGoalId) {
+          scope.awaitingGoalId = undefined;
+        } else {
+          const receipt = await this.bridge
+            .inputReceipt(attachment.attachmentId, scope.awaitingGoalId)
+            .catch(() => undefined);
+          if (!this.owns(scope)) return;
+          if (
+            receipt &&
+            receipt.disposition !== "queued" &&
+            receipt.disposition !== "claimed"
+          ) {
+            scope.awaitingGoalId = undefined;
+            this.update({
+              error: "The accepted goal is no longer waiting to start.",
+            });
+          }
+        }
+      }
+      this.update({
+        goal,
+        goalReady: true,
+        goalPending: scope.awaitingGoalId ?? null,
+      });
+    } catch (error) {
+      if (!this.owns(scope)) return;
+      scope.goalNeedsRefresh =
+        error instanceof Error &&
+        error.message.includes("native_chat_goal_changed");
+      if (!scope.goalNeedsRefresh && this.view.goal?.goal)
+        this.update({ error: "Couldn't refresh this goal." });
     }
   }
 
@@ -1086,8 +1306,28 @@ function describe(error: unknown, fallback: string): string {
 function revisionChanged(error: unknown): boolean {
   return (
     error instanceof Error &&
-    /stale_session_revision|stale_journal_change|history_position_changed|native_chat_(observation_unavailable|queue_changed)/.test(
+    /stale_session_revision|stale_journal_change|history_position_changed|driver_state_revision_changed|goal_revision_changed|native_chat_(observation_unavailable|queue_changed|goal_observation_unavailable)/.test(
       error.message
     )
   );
+}
+
+function goalRequestProblem(request: NativeChatGoalRequest): string | null {
+  if (!request.objective.trim() || utf8.encode(request.objective).length > 8192)
+    return "Enter a goal objective of at most 8 KiB.";
+  if (
+    !request.criteria.length ||
+    request.criteria.length > 16 ||
+    request.criteria.some(
+      (line) => !line.trim() || utf8.encode(line).length > 1024
+    )
+  )
+    return "Enter 1–16 success criteria, each at most 1 KiB.";
+  if (
+    [request.allowance.workTurns, request.allowance.inferenceSteps].some(
+      (limit) => !Number.isSafeInteger(limit) || limit < 1 || limit > 0xffffffff
+    )
+  )
+    return "Enter a positive whole number for each allowance.";
+  return null;
 }

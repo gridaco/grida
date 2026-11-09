@@ -385,6 +385,66 @@ it("retries steering exactly after a lost reply and never falls through to the q
   controller.disconnect();
 });
 
+it("starts a goal only on explicit acceptance and reuses its exact input on retry", async () => {
+  const { bridge, controller } = fixture();
+  const request = {
+    objective: "Prepare the export",
+    criteria: ["Verify the output"],
+    allowance: { workTurns: 3, inferenceSteps: 32 },
+    automatic: false,
+  };
+  let goalId: string | null = null;
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const observation = await observe(id);
+    return {
+      ...observation,
+      observationId: goalId ? "goal-started" : observation.observationId,
+      snapshot: { ...observation.snapshot, sessionRevision: goalId ? 3 : 2 },
+    };
+  };
+  bridge.goal = async () =>
+    goalId
+      ? {
+          observationId: "goal-3",
+          goal: {
+            ...request,
+            goalId,
+            state: { status: "active" },
+            paused: false,
+            progress: "Preparing the export",
+            spent: { workTurns: 0, inferenceSteps: 0 },
+            remaining: request.allowance,
+            reservation: null,
+          },
+        }
+      : { observationId: null, goal: null };
+  const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+    async (sessionId, inputId) => {
+      goalId = inputId;
+      return {
+        sessionId,
+        inputId,
+        disposition: "queued",
+        inputPosition: 1,
+        turnId: null,
+      };
+    }
+  );
+  start.mockRejectedValueOnce(new Error("fixture lost reply"));
+  bridge.startGoal = start;
+  await controller.select("chat-a");
+  expect(start).not.toHaveBeenCalled();
+  expect(await controller.startGoal(request)).toBe(false);
+  expect(controller.read().error).toContain("Your draft is still here");
+  expect(await controller.startGoal(request)).toBe(true);
+  expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
+  expect(controller.read().goal?.goal?.state).toEqual({ status: "active" });
+  expect(controller.read().goalPending).toBeNull();
+  expect(controller.canStartGoal).toBe(false);
+  controller.disconnect();
+});
+
 it("uses the readiness probe and preserves native mode through startup failure", async () => {
   const { bridge } = fixture();
   const availability = vi.spyOn(bridge, "available");

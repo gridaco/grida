@@ -220,6 +220,21 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     nativeChat.steer(event, id, input)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_GOAL,
+    (event, id: string, observation: string) =>
+      nativeChat.goal(event, id, observation)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_START_GOAL,
+    (event, id: string, inputId: string, request: unknown) =>
+      nativeChat.startGoal(event, id, inputId, request)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_CONTROL_GOAL,
+    (event, id: string, change: unknown) =>
+      nativeChat.controlGoal(event, id, change)
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_APPROVALS,
     (event, id: string, observation: string) =>
       nativeChat.approvals(event, id, observation)
