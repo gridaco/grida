@@ -8,13 +8,13 @@ pub mod usage;
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::history::{HistoryPosition, HistoryRecord};
 use agent_kit_core::inference::{
-    FailureKind, InferenceFailure, InferenceRequest, InferenceStatus, MeasurementKind,
-    PreparedRequest, Provider,
+    FailureKind, InferenceFailure, InferenceRequest, InferenceStatus, PreparedRequest, Provider,
 };
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::InventorySnapshot;
 use agent_kit_core::turn::{
-    OperationInput, OperationOutcome, SettlementReceipt, SuspensionReceipt, TurnOutcome,
+    OperationInput, OperationOutcome, OperationState, SettlementReceipt, SuspensionReceipt,
+    TurnOutcome,
 };
 use agent_kit_core::{
     Envelope, Error, ErrorKind, Fingerprint, MessageId, OperationId, Result, SchemaId,
@@ -357,7 +357,6 @@ impl Master {
                     None => continue,
                 }
             }
-            continuation.step += 1;
             let uncertain = step.tools.iter().any(|tool| {
                 matches!(&tool.outcome,
                 InvokeOutcome::Complete(outcome) if outcome.status == OutcomeStatus::Uncertain)
@@ -365,6 +364,17 @@ impl Master {
             let interrupted_by_pause = step.inference.failure.as_ref().is_some_and(|failure| {
                 failure.kind == FailureKind::Cancelled && failure.code == "turn_paused"
             });
+            if interrupted_by_pause
+                && !current.state.controls().cancelled
+                && turn
+                    .operation(&OperationKey::new(step_key.clone())?)?
+                    .as_ref()
+                    .is_some_and(paused_before_generation)
+            {
+                // The next pass retires this request under the current controls.
+                continue;
+            }
+            continuation.step += 1;
             let outcome =
                 if current.state.controls().cancelled {
                     Some(self.cancelled_outcome(&turn, continuation.step).await?)
@@ -432,14 +442,26 @@ impl Master {
                             Some(StopReason::Refused),
                             step.inference.failure.as_ref(),
                         )?),
-                        InferenceStatus::Failed => Some(self.account(
-                            &turn,
-                            OutcomeStatus::Failed,
-                            continuation.step,
-                            "The model request failed.",
-                            None,
-                            step.inference.failure.as_ref(),
-                        )?),
+                        InferenceStatus::Failed => {
+                            let failure = step.inference.failure.as_ref();
+                            let explanation = match failure.map(|failure| failure.code.as_str()) {
+                                Some("input_token_limit") => {
+                                    "The prepared request exceeds the configured input limit."
+                                }
+                                Some(
+                                    "input_measurement_unavailable" | "input_bound_unavailable",
+                                ) => "The selected model cannot verify the configured input limit.",
+                                _ => "The model request failed.",
+                            };
+                            Some(self.account(
+                                &turn,
+                                OutcomeStatus::Failed,
+                                continuation.step,
+                                explanation,
+                                None,
+                                failure,
+                            )?)
+                        }
                     }
                 };
             continuation.request = None;
@@ -546,7 +568,14 @@ impl Master {
                         None => !request.request().messages.contains(message),
                     }
             });
-        if !new_input && request.binding().authority == self.authority.inference.authority {
+        let missing_limit = self
+            .input_limit
+            .is_some_and(|limit| request.input_limit() != Some(limit));
+        if !new_input
+            && !missing_limit
+            && !operation.as_ref().is_some_and(paused_before_generation)
+            && request.binding().authority == self.authority.inference.authority
+        {
             return Ok(false);
         }
         let previous = &request.binding().authority;
@@ -611,19 +640,10 @@ impl Master {
             max_output_tokens: Some(self.config.max_output_tokens),
             extension: None,
         })?;
-        if let Some(limit) = self.input_limit {
-            let measurement = self.provider.measure_input(&request)?;
-            if measurement.kind == MeasurementKind::Estimate {
-                return Err(Error::new(
-                    ErrorKind::Unsupported,
-                    "input_bound_unavailable",
-                ));
-            }
-            if measurement.tokens > limit.get() {
-                return Err(Error::new(ErrorKind::LimitExceeded, "input_token_limit"));
-            }
+        match self.input_limit {
+            Some(limit) => request.with_input_limit(limit),
+            None => Ok(request),
         }
-        Ok(request)
     }
 
     async fn cancelled_outcome(&self, turn: &Turn, steps: u32) -> Result<TurnOutcome> {
@@ -719,7 +739,16 @@ impl Master {
                     steps,
                     unresolved,
                     stop_reason,
-                    failure: None,
+                    failure: inference_failure.and_then(|failure| {
+                        let kind = match failure.code.as_str() {
+                            "input_measurement_unavailable" | "input_bound_unavailable" => {
+                                ErrorKind::Unsupported
+                            }
+                            "input_token_limit" => ErrorKind::LimitExceeded,
+                            _ => return None,
+                        };
+                        Some(Error::new(kind, &failure.code))
+                    }),
                     inference_failure: inference_failure.cloned(),
                     inference_usage: usage::InferenceUsage::from_turn(&view.state)?,
                 },
@@ -777,6 +806,12 @@ impl Master {
             SuspendOutcome::Continue(error) => Err(error),
         }
     }
+}
+
+fn paused_before_generation(operation: &OperationState) -> bool {
+    operation.attempts.is_empty()
+        && matches!(&operation.rejection, Some(OperationOutcome::Inference(outcome))
+            if outcome.failure.as_ref().is_some_and(|failure| failure.kind == FailureKind::Cancelled && failure.code == "turn_paused"))
 }
 
 fn has_new_input(turn: &Turn, continuation: &Continuation) -> Result<bool> {

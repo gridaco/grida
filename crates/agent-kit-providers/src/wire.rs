@@ -61,7 +61,11 @@ impl WireStream {
     pub(crate) async fn next(&mut self) -> Incoming {
         loop {
             if let Some(request) = self.request.take() {
-                match self.transport.send(request, self.control.clone()).await {
+                match self
+                    .transport
+                    .send(request, self.control.request_control())
+                    .await
+                {
                     Ok(mut response) => {
                         let evidence = response.request_id.take().and_then(receipt);
                         self.response = Some(response);
@@ -190,7 +194,10 @@ fn receipt(id: String) -> Option<Envelope> {
     .ok()
 }
 
-async fn read_http_error(mut response: TransportResponse, maximum: usize) -> InferenceFailure {
+pub(crate) async fn read_http_error(
+    mut response: TransportResponse,
+    maximum: usize,
+) -> InferenceFailure {
     if matches!(response.status, 401..=403) {
         return classify_error(response.status, None, response.retry_after_ms);
     }

@@ -16,6 +16,7 @@ and resolves it to the approved destination.
 | ----------------------------- | ---------------------------------------------- |
 | `ChatCompletions`             | `chat/completions`                             |
 | `OpenAiResponses`             | `responses`                                    |
+| `OpenAiResponsesInputTokens`  | `responses/input_tokens`                       |
 | `AnthropicMessages`           | `messages`                                     |
 | `GeminiStreamGenerateContent` | `models/{model}:streamGenerateContent?alt=sse` |
 
@@ -79,6 +80,14 @@ stream ends without verified completion, the visible prefix and available
 usage survive without publishing a tool call from that stream. Stopping the
 local reader closes its stream. Remote execution and charges follow the
 provider's contract.
+
+The Responses API profile can measure the prepared input before generation.
+It sends the same model, input items, instructions, tool definitions, and
+reasoning settings to the input token count endpoint. Generation controls such
+as streaming and the output limit are separate. The adapter reads a bounded
+JSON response and preserves the provider's failure classification. A host must
+authorize this operation at the approved API destination. The subscription
+profile leaves this measurement unavailable. [Token counting guide](https://developers.openai.com/api/docs/guides/token-counting) · [Count endpoint reference](https://developers.openai.com/api/reference/resources/responses/subresources/input_tokens/methods/count)
 
 Completed calls still require executor schema preflight and authority checks.
 A stream failure retains the valid prefix and available usage and request

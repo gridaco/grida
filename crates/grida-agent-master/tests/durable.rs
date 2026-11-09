@@ -6,7 +6,7 @@ use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceRequest,
     InferenceRun, InferenceStatus, InferenceUpdate, InputFormat, InputMeasurement, MeasurementKind,
     Modality, ModelCapabilities, PreparedRequest, Provider, ProviderBinding, ProviderEvent,
-    UsageObservation,
+    RequestControl, UsageObservation,
 };
 use agent_kit_core::messages::{
     Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
@@ -118,6 +118,7 @@ struct ScriptProvider {
     requests: Mutex<Vec<InferenceRequest>>,
     measurement: Mutex<Option<InputMeasurement>>,
     measured_requests: Mutex<Vec<InferenceRequest>>,
+    hold_next_count: Mutex<Option<Arc<tokio::sync::Notify>>>,
     authority: Mutex<AuthorityBinding>,
 }
 
@@ -131,6 +132,28 @@ impl Provider for ScriptProvider {
             .lock()
             .unwrap()
             .ok_or_else(|| Error::new(ErrorKind::Unsupported, "input_measurement_unavailable"))
+    }
+
+    fn measure_input_async<'a>(
+        &'a self,
+        request: &'a PreparedRequest,
+        _: RequestControl,
+    ) -> BoxFuture<'a, std::result::Result<InputMeasurement, InferenceFailure>> {
+        Box::pin(async move {
+            let result = self
+                .measure_input(request)
+                .map_err(|error| InferenceFailure {
+                    kind: FailureKind::Configuration,
+                    code: error.code,
+                    retry_after_ms: None,
+                });
+            let held = self.hold_next_count.lock().unwrap().take();
+            if let Some(entered) = held {
+                entered.notify_one();
+                std::future::pending::<()>().await;
+            }
+            result
+        })
     }
 
     fn capabilities(&self, _: &ModelId) -> Result<ModelCapabilities> {
@@ -346,6 +369,7 @@ impl Fixture {
             requests: Mutex::new(vec![]),
             measurement: Mutex::new(None),
             measured_requests: Mutex::new(vec![]),
+            hold_next_count: Mutex::new(None),
             authority: Mutex::new(authority()),
         });
         let tool = Arc::new(EchoTool::new());
@@ -2061,4 +2085,103 @@ async fn provider_failure_classification_survives_the_completion_account() {
             assert_eq!(account.stop_reason, None);
         }
     }
+}
+
+#[tokio::test]
+async fn pausing_an_input_count_preserves_the_last_generation_step() {
+    let fixture = Fixture::new(Script::Answer);
+    *fixture.provider.measurement.lock().unwrap() = Some(InputMeasurement {
+        tokens: 100,
+        kind: MeasurementKind::Exact,
+    });
+    let entered = Arc::new(tokio::sync::Notify::new());
+    *fixture.provider.hold_next_count.lock().unwrap() = Some(entered.clone());
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let operations = opened.turn.operations();
+    let limit = std::num::NonZeroU64::new(100);
+    let master = fixture.master(1, "Be concise").with_input_limit(limit);
+    let worker = tokio::spawn(async move { master.run(opened.turn, input()).await.unwrap() });
+    tokio::time::timeout(Duration::from_secs(2), entered.notified())
+        .await
+        .unwrap();
+    let view = store.inspect(session_id()).await.unwrap();
+    store
+        .control(ControlRequest {
+            id: change_id("pause-during-count"),
+            session: session_id(),
+            expected_revision: view.revision,
+            action: SessionControl::Turn {
+                turn: turn_id(),
+                expected: view.current.unwrap().controls.revision,
+                directive: ControlDirective::Pause,
+            },
+        })
+        .await
+        .unwrap();
+    let MasterOutcome::Suspended(suspension) = tokio::time::timeout(Duration::from_secs(2), worker)
+        .await
+        .unwrap()
+        .unwrap()
+    else {
+        panic!("expected durable suspension after pausing the count");
+    };
+    store
+        .verify(CommitReceipt::Suspended(suspension))
+        .await
+        .unwrap();
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+    let view = operations.view();
+    let [original] = view.state.operations().values().collect::<Vec<_>>()[..] else {
+        panic!("expected one prepared operation");
+    };
+    assert!(original.attempts.is_empty());
+
+    let view = store.inspect(session_id()).await.unwrap();
+    let current = view.current.unwrap();
+    let ClaimOutcome::Acquired(claim) = store
+        .claim(ClaimRequest {
+            id: change_id("resume-after-count"),
+            session: session_id(),
+            expected_revision: view.revision,
+            selection: TurnSelection::ResumePaused {
+                turn: turn_id(),
+                epoch: current.binding.epoch,
+                position: current.position,
+                control_revision: current.controls.revision,
+            },
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected resumed owner");
+    };
+    let resumed = fixture.runtime().open(claim.lease).await.unwrap();
+    let operations = resumed.turn.operations();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(1, "Be concise")
+        .with_input_limit(limit)
+        .run(resumed.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected the resumed task to settle");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.steps, 1);
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.provider.measured_requests.lock().unwrap().len(), 2);
+    let view = operations.view();
+    assert_eq!(view.state.operations().len(), 2);
+    assert_eq!(
+        view.state
+            .operations()
+            .values()
+            .map(|operation| operation.attempts.len())
+            .sum::<usize>(),
+        1
+    );
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
 }

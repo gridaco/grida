@@ -120,7 +120,10 @@ async fn prepare_is_read_only_and_dispatch_uses_the_bound_route() {
         ErrorKind::Unsupported
     );
     assert!(transport.requests.lock().unwrap().is_empty());
-    let run = provider.start(prepared, control("attempt-1")).unwrap();
+    let mut lifetime = control("attempt-1");
+    lifetime.deadline = Some(std::time::Instant::now() + Duration::from_secs(5));
+    let deadline = lifetime.deadline;
+    let run = provider.start(prepared, lifetime).unwrap();
     assert!(transport.requests.lock().unwrap().is_empty());
     assert_eq!(run.finish().await.status, InferenceStatus::Completed);
     let requests = transport.requests.lock().unwrap();
@@ -133,7 +136,7 @@ async fn prepare_is_read_only_and_dispatch_uses_the_bound_route() {
     assert_eq!(body["stream_options"]["include_usage"], true);
     assert_eq!(body["max_completion_tokens"], 32);
     assert_eq!(body["messages"][0]["role"], "user");
-    assert_eq!(control.attempt, AttemptId::new("attempt-1").unwrap());
+    assert_eq!(control.deadline, deadline);
 }
 
 #[tokio::test]

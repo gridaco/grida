@@ -3,9 +3,10 @@ use agent_kit_core::authority::{
 };
 use agent_kit_core::history::{HistoryPosition, HistoryRecord};
 use agent_kit_core::inference::{
-    InferenceControl, InferenceOutcome, InferenceRequest, InferenceRun, InferenceStatus,
-    InferenceUpdate, InputFormat, Modality, ModelCapabilities, PreparedRequest, Provider,
-    ProviderBinding, ProviderEvent,
+    FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceRequest,
+    InferenceRun, InferenceStatus, InferenceUpdate, InputFormat, InputMeasurement, MeasurementKind,
+    Modality, ModelCapabilities, PreparedRequest, Provider, ProviderBinding, ProviderEvent,
+    RequestControl,
 };
 use agent_kit_core::messages::{
     Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role, ToolArguments, ToolCall,
@@ -20,16 +21,17 @@ use agent_kit_core::turn::{
     TurnBinding, TurnJournal, TurnLease, TurnOutcome, TurnState, WaitRecord, bind_lease,
 };
 use agent_kit_core::{
-    BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, GrantId, MessageId, ModelId,
-    PrincipalId, ProviderId, Result, SchemaId, ScopeId, SessionId, ToolCallId, ToolId, TurnId,
-    WaitId,
+    BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, GrantId, MessageId,
+    ModelId, PrincipalId, ProviderId, Result, SchemaId, ScopeId, SessionId, ToolCallId, ToolId,
+    TurnId, WaitId,
 };
 use agent_kit_runtime::*;
 use futures_util::{StreamExt, stream};
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroU64;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::{Notify, mpsc};
 
 fn grants() -> GrantSelection {
@@ -315,16 +317,13 @@ fn inventory(tool: &Arc<CounterTool>) -> agent_kit_core::tools::InventorySnapsho
 }
 
 fn runtime(
-    provider: Arc<ScriptedProvider>,
+    provider: Arc<dyn Provider>,
     tool: &Arc<CounterTool>,
     gate: Arc<dyn ToolGate>,
     authority: Arc<Authority>,
 ) -> Runtime {
     Runtime::new(ExecutionServices {
-        providers: BTreeMap::from([(
-            ProviderId::new("test").unwrap(),
-            provider as Arc<dyn Provider>,
-        )]),
+        providers: BTreeMap::from([(ProviderId::new("test").unwrap(), provider)]),
         tools: inventory(tool),
         authority,
         gate,
@@ -2162,4 +2161,320 @@ async fn executors_receive_the_admitted_attempt_identity() {
         tool.attempts.lock().unwrap()[0],
         view.state.operations()[&tool_id].attempts[0].id
     );
+}
+
+struct CountedProvider {
+    inner: Arc<ScriptedProvider>,
+    measured: Mutex<Vec<(Fingerprint, RequestControl)>>,
+    generation_deadline: Mutex<Option<Instant>>,
+    entered: Notify,
+    release: Option<Notify>,
+    result: std::result::Result<InputMeasurement, InferenceFailure>,
+}
+
+impl CountedProvider {
+    fn new(
+        blocked: bool,
+        result: std::result::Result<InputMeasurement, InferenceFailure>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            inner: ScriptedProvider::complete(),
+            measured: Mutex::default(),
+            generation_deadline: Mutex::default(),
+            entered: Notify::new(),
+            release: blocked.then(Notify::new),
+            result,
+        })
+    }
+
+    fn exact(blocked: bool) -> Arc<Self> {
+        Self::new(
+            blocked,
+            Ok(InputMeasurement {
+                tokens: 100,
+                kind: MeasurementKind::Exact,
+            }),
+        )
+    }
+
+    fn bounded_request(&self, tool: &Arc<CounterTool>) -> PreparedRequest {
+        request(&self.inner, &inventory(tool))
+            .with_input_limit(NonZeroU64::new(100).unwrap())
+            .unwrap()
+    }
+}
+
+impl Provider for CountedProvider {
+    fn capabilities(&self, model: &ModelId) -> Result<ModelCapabilities> {
+        self.inner.capabilities(model)
+    }
+
+    fn prepare(&self, request: InferenceRequest) -> Result<PreparedRequest> {
+        self.inner.prepare(request)
+    }
+
+    fn measure_input_async<'a>(
+        &'a self,
+        request: &'a PreparedRequest,
+        control: RequestControl,
+    ) -> BoxFuture<'a, std::result::Result<InputMeasurement, InferenceFailure>> {
+        Box::pin(async move {
+            self.measured
+                .lock()
+                .unwrap()
+                .push((request.fingerprint(), control));
+            self.entered.notify_one();
+            if let Some(release) = &self.release {
+                release.notified().await;
+            }
+            self.result.clone()
+        })
+    }
+
+    fn start(&self, request: PreparedRequest, control: InferenceControl) -> Result<InferenceRun> {
+        *self.generation_deadline.lock().unwrap() = control.deadline;
+        self.inner.start(request, control)
+    }
+}
+
+#[tokio::test]
+async fn exact_count_and_generation_share_authority_identity_and_deadline() {
+    let provider = CountedProvider::exact(false);
+    let tool = CounterTool::new(None);
+    let authority = Authority::allowed();
+    let runtime = runtime(provider.clone(), &tool, Arc::new(Allow), authority.clone());
+    let turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let key = OperationKey::new("bounded").unwrap();
+    let prepared = provider.bounded_request(&tool);
+    let fingerprint = prepared.fingerprint();
+    let outcome = turn
+        .operations()
+        .infer(key.clone(), prepared.clone(), grants())
+        .await
+        .unwrap();
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    assert!(outcome.usage.is_empty());
+    let record = turn.operation(&key).unwrap().unwrap();
+    assert_eq!(record.attempts.len(), 1);
+    {
+        let authorized = authority.requests.lock().unwrap();
+        assert_eq!(authorized.len(), 2);
+        assert_eq!(authorized[0], authorized[1]);
+        assert_eq!(authorized[0].action, fingerprint);
+        assert_eq!(authorized[0].operation, record.record.id);
+        let counts = provider.measured.lock().unwrap();
+        assert_eq!(counts.len(), 1);
+        assert_eq!(counts[0].0, fingerprint);
+        assert!(counts[0].1.deadline.is_some());
+        assert_eq!(
+            counts[0].1.deadline,
+            *provider.generation_deadline.lock().unwrap()
+        );
+        assert!(counts[0].1.cancellation.is_cancelled());
+    }
+    let changed = prepared
+        .clone()
+        .with_input_limit(NonZeroU64::new(101).unwrap())
+        .unwrap();
+    assert_eq!(
+        turn.operations()
+            .infer(key.clone(), changed, grants())
+            .await
+            .unwrap_err()
+            .kind,
+        ErrorKind::Conflict,
+    );
+    assert_eq!(
+        turn.operations()
+            .infer(key, prepared, grants())
+            .await
+            .unwrap(),
+        outcome
+    );
+    assert_eq!(provider.measured.lock().unwrap().len(), 1);
+    assert_eq!(provider.inner.starts.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn a_count_needs_authority_and_cannot_outlive_revocation() {
+    let provider = CountedProvider::exact(true);
+    let tool = CounterTool::new(None);
+    let authority = Authority::allowed();
+    let runtime = runtime(provider.clone(), &tool, Arc::new(Allow), authority.clone());
+    let turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let prepared = provider.bounded_request(&tool);
+    authority.allowed.store(false, Ordering::SeqCst);
+    let denied = turn
+        .operations()
+        .infer(
+            OperationKey::new("denied").unwrap(),
+            prepared.clone(),
+            grants(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(denied.failure.unwrap().code, "grant_denied");
+    assert!(provider.measured.lock().unwrap().is_empty());
+
+    authority.allowed.store(true, Ordering::SeqCst);
+    let key = OperationKey::new("revoked").unwrap();
+    let operation = turn.operations();
+    let worker = {
+        let key = key.clone();
+        tokio::spawn(async move { operation.infer(key, prepared, grants()).await.unwrap() })
+    };
+    tokio::time::timeout(Duration::from_secs(1), provider.entered.notified())
+        .await
+        .unwrap();
+    assert!(turn.operation(&key).unwrap().unwrap().attempts.is_empty());
+    authority.allowed.store(false, Ordering::SeqCst);
+    provider.release.as_ref().unwrap().notify_one();
+    let rejected = tokio::time::timeout(Duration::from_secs(1), worker)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(rejected.failure.unwrap().code, "grant_denied");
+    assert_eq!(provider.inner.starts.load(Ordering::SeqCst), 0);
+    let record = turn.operation(&key).unwrap().unwrap();
+    assert!(record.attempts.is_empty());
+    assert!(record.rejection.is_some());
+}
+
+#[tokio::test]
+async fn pause_and_cancel_interrupt_counting_with_no_generation_attempt() {
+    for (directive, code) in [
+        (ControlDirective::Pause, "turn_paused"),
+        (ControlDirective::Cancel, "turn_cancelled"),
+    ] {
+        let provider = CountedProvider::exact(true);
+        let tool = CounterTool::new(None);
+        let runtime = runtime(
+            provider.clone(),
+            &tool,
+            Arc::new(Allow),
+            Authority::allowed(),
+        );
+        let ephemeral = EphemeralJournal::create(binding()).unwrap();
+        let turn = runtime.open(ephemeral.lease).await.unwrap().turn;
+        let prepared = provider.bounded_request(&tool);
+        let key = OperationKey::new("interrupted-count").unwrap();
+        let operation = turn.operations();
+        let worker = {
+            let key = key.clone();
+            tokio::spawn(async move { operation.infer(key, prepared, grants()).await.unwrap() })
+        };
+        tokio::time::timeout(Duration::from_secs(1), provider.entered.notified())
+            .await
+            .unwrap();
+        ephemeral
+            .control
+            .change(
+                ChangeId::new("stop-count").unwrap(),
+                turn.view().state.controls().revision,
+                directive,
+            )
+            .await
+            .unwrap();
+        let rejected = tokio::time::timeout(Duration::from_secs(1), worker)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(rejected.status, InferenceStatus::Failed);
+        assert_eq!(
+            rejected.failure.unwrap(),
+            InferenceFailure {
+                kind: FailureKind::Cancelled,
+                code: code.into(),
+                retry_after_ms: None,
+            }
+        );
+        let record = turn.operation(&key).unwrap().unwrap();
+        assert!(record.attempts.is_empty());
+        assert!(record.rejection.is_some());
+        assert!(
+            provider.measured.lock().unwrap()[0]
+                .1
+                .cancellation
+                .is_cancelled()
+        );
+        assert_eq!(provider.inner.starts.load(Ordering::SeqCst), 0);
+    }
+}
+
+#[tokio::test]
+async fn a_typed_count_failure_has_no_generation_usage_or_attempt() {
+    let failure = InferenceFailure {
+        kind: FailureKind::RateLimit,
+        code: "rate_limit".into(),
+        retry_after_ms: Some(750),
+    };
+    let provider = CountedProvider::new(false, Err(failure.clone()));
+    let tool = CounterTool::new(None);
+    let runtime = runtime(
+        provider.clone(),
+        &tool,
+        Arc::new(Allow),
+        Authority::allowed(),
+    );
+    let turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let key = OperationKey::new("count-rate-limit").unwrap();
+    let outcome = turn
+        .operations()
+        .infer(key.clone(), provider.bounded_request(&tool), grants())
+        .await
+        .unwrap();
+    assert_eq!(outcome.failure, Some(failure));
+    assert!(outcome.usage.is_empty());
+    let record = turn.operation(&key).unwrap().unwrap();
+    assert!(record.attempts.is_empty());
+    assert!(record.rejection.is_some());
+    assert_eq!(provider.inner.starts.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_expired_count_rejects_before_generation() {
+    let provider = CountedProvider::exact(true);
+    let tool = CounterTool::new(None);
+    let runtime = runtime(
+        provider.clone(),
+        &tool,
+        Arc::new(Allow),
+        Authority::allowed(),
+    );
+    let turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let prepared = provider.bounded_request(&tool);
+    let key = OperationKey::new("slow-count").unwrap();
+    let worker = {
+        let key = key.clone();
+        let operations = turn.operations();
+        tokio::spawn(async move { operations.infer(key, prepared, grants()).await.unwrap() })
+    };
+    provider.entered.notified().await;
+    tokio::time::advance(Duration::from_secs(6)).await;
+    let rejected = worker.await.unwrap();
+    assert_eq!(rejected.failure.unwrap().code, "deadline");
+    assert!(turn.operation(&key).unwrap().unwrap().attempts.is_empty());
+    assert!(
+        provider.measured.lock().unwrap()[0]
+            .1
+            .cancellation
+            .is_cancelled()
+    );
+    assert_eq!(provider.inner.starts.load(Ordering::SeqCst), 0);
 }

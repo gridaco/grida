@@ -3,13 +3,14 @@ use crate::messages::{
     Content, Message, Provenance, ProvenanceKind, ProviderState, Role, ToolArguments, ToolCall,
 };
 use crate::{
-    AttemptId, BindingId, CancellationToken, Envelope, Error, ErrorKind, Fingerprint, MessageId,
-    ModelId, ProviderId, Result, ToolId,
+    AttemptId, BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint,
+    MessageId, ModelId, ProviderId, Result, ToolId,
 };
 use futures_core::stream::BoxStream;
 use futures_util::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+use std::num::NonZeroU64;
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -125,6 +126,8 @@ pub struct PreparedRequest {
     request: InferenceRequest,
     binding: ProviderBinding,
     capabilities: ModelCapabilities,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input_limit: Option<NonZeroU64>,
     fingerprint: Fingerprint,
 }
 
@@ -141,9 +144,23 @@ impl PreparedRequest {
             request,
             binding,
             capabilities,
+            input_limit: None,
             fingerprint,
         })
     }
+
+    /// Bind a caller-selected input token ceiling to this request's identity.
+    pub fn with_input_limit(mut self, limit: NonZeroU64) -> Result<Self> {
+        self.input_limit = Some(limit);
+        self.fingerprint =
+            Fingerprint::of(&(&self.request, &self.binding, &self.capabilities, limit))?;
+        Ok(self)
+    }
+
+    pub fn input_limit(&self) -> Option<NonZeroU64> {
+        self.input_limit
+    }
+
     pub fn request(&self) -> &InferenceRequest {
         &self.request
     }
@@ -167,11 +184,18 @@ impl<'de> Deserialize<'de> for PreparedRequest {
             request: InferenceRequest,
             binding: ProviderBinding,
             capabilities: ModelCapabilities,
+            #[serde(default)]
+            input_limit: Option<NonZeroU64>,
             fingerprint: Fingerprint,
         }
         let data = Data::deserialize(deserializer)?;
-        let request = Self::from_validated(data.request, data.binding, data.capabilities)
+        let mut request = Self::from_validated(data.request, data.binding, data.capabilities)
             .map_err(serde::de::Error::custom)?;
+        if let Some(limit) = data.input_limit {
+            request = request
+                .with_input_limit(limit)
+                .map_err(serde::de::Error::custom)?;
+        }
         if request.fingerprint != data.fingerprint {
             return Err(serde::de::Error::custom("request fingerprint mismatch"));
         }
@@ -190,6 +214,22 @@ pub trait Provider: Send + Sync {
             "input_measurement_unavailable",
         ))
     }
+    /// Measure this exact prepared input within the caller's admitted request
+    /// scope. Remote implementations use the supplied cancellation and deadline.
+    fn measure_input_async<'a>(
+        &'a self,
+        request: &'a PreparedRequest,
+        _control: RequestControl,
+    ) -> BoxFuture<'a, std::result::Result<InputMeasurement, InferenceFailure>> {
+        Box::pin(async move {
+            self.measure_input(request)
+                .map_err(|error| InferenceFailure {
+                    kind: FailureKind::Configuration,
+                    code: error.code,
+                    retry_after_ms: None,
+                })
+        })
+    }
     /// Failure here guarantees that dispatch has not begun.
     fn start(&self, request: PreparedRequest, control: InferenceControl) -> Result<InferenceRun>;
 }
@@ -201,6 +241,22 @@ pub struct InferenceControl {
     /// Provider adapters enforce this deadline in their transport.
     pub deadline: Option<Instant>,
     pub max_output_bytes: usize,
+}
+
+impl InferenceControl {
+    pub fn request_control(&self) -> RequestControl {
+        RequestControl {
+            cancellation: self.cancellation.clone(),
+            deadline: self.deadline,
+        }
+    }
+}
+
+/// Lifetime of an authorized provider request.
+#[derive(Clone)]
+pub struct RequestControl {
+    pub cancellation: CancellationToken,
+    pub deadline: Option<Instant>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

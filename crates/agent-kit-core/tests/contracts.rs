@@ -430,6 +430,54 @@ fn preparation_rejects_unsupported_capabilities_and_changed_fingerprints() {
     );
 }
 
+#[test]
+fn an_input_limit_changes_prepared_identity_and_roundtrips() {
+    use agent_kit_core::inference::PreparedRequest;
+    use std::num::NonZeroU64;
+
+    let prepared = PreparedRequest::from_validated(
+        request(),
+        ProviderBinding {
+            provider: ProviderId::new("provider").unwrap(),
+            authority: authority(),
+        },
+        capabilities(),
+    )
+    .unwrap();
+    let unbounded = serde_json::to_value(&prepared).unwrap();
+    assert!(unbounded.get("input_limit").is_none());
+    assert_eq!(
+        prepared.fingerprint(),
+        Fingerprint::of(&(
+            prepared.request(),
+            prepared.binding(),
+            prepared.capabilities()
+        ))
+        .unwrap()
+    );
+    assert_eq!(
+        serde_json::from_value::<PreparedRequest>(unbounded).unwrap(),
+        prepared
+    );
+
+    let limit = NonZeroU64::new(123).unwrap();
+    let bounded = prepared.clone().with_input_limit(limit).unwrap();
+    assert_ne!(bounded.fingerprint(), prepared.fingerprint());
+    assert_eq!(bounded.request(), prepared.request());
+    let mut encoded = serde_json::to_value(&bounded).unwrap();
+    assert_eq!(encoded["input_limit"], 123);
+    assert_eq!(
+        serde_json::from_value::<PreparedRequest>(encoded.clone())
+            .unwrap()
+            .input_limit(),
+        Some(limit)
+    );
+    encoded["input_limit"] = 124.into();
+    assert!(serde_json::from_value::<PreparedRequest>(encoded.clone()).is_err());
+    encoded.as_object_mut().unwrap().remove("input_limit");
+    assert!(serde_json::from_value::<PreparedRequest>(encoded).is_err());
+}
+
 #[tokio::test]
 async fn tool_preflight_precedes_execution_and_retains_definition() {
     let tool = Arc::new(EchoTool::new());

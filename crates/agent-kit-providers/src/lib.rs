@@ -7,7 +7,7 @@ mod responses;
 mod sse;
 mod wire;
 
-use agent_kit_core::inference::{InferenceControl, ProviderBinding};
+use agent_kit_core::inference::{ProviderBinding, RequestControl};
 use agent_kit_core::{BoxFuture, Error, ErrorKind, ModelId, Result};
 use futures_core::stream::BoxStream;
 
@@ -30,6 +30,7 @@ pub struct TransportRequest {
 pub enum TransportOperation {
     ChatCompletions,
     OpenAiResponses,
+    OpenAiResponsesInputTokens,
     AnthropicMessages,
     GeminiStreamGenerateContent { model: ModelId },
 }
@@ -57,7 +58,7 @@ pub trait StreamingTransport: Send + Sync {
     fn send(
         &self,
         request: TransportRequest,
-        control: InferenceControl,
+        control: RequestControl,
     ) -> BoxFuture<'_, std::result::Result<TransportResponse, TransportFailure>>;
 }
 

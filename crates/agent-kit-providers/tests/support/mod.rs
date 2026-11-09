@@ -1,4 +1,6 @@
-use agent_kit_core::inference::{InferenceControl, InferenceRequest, InputFormat, ToolOffer};
+use agent_kit_core::inference::{
+    InferenceControl, InferenceRequest, InputFormat, RequestControl, ToolOffer,
+};
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
 use agent_kit_core::{
     AttemptId, BoxFuture, CancellationToken, Fingerprint, MessageId, ModelId, ToolId,
@@ -15,7 +17,7 @@ type Reply = Result<TransportResponse, TransportFailure>;
 
 pub(super) struct FixtureTransport {
     replies: Mutex<VecDeque<Reply>>,
-    pub(super) requests: Mutex<Vec<(TransportRequest, InferenceControl)>>,
+    pub(super) requests: Mutex<Vec<(TransportRequest, RequestControl)>>,
 }
 
 impl FixtureTransport {
@@ -28,7 +30,7 @@ impl FixtureTransport {
 }
 
 impl StreamingTransport for FixtureTransport {
-    fn send(&self, request: TransportRequest, control: InferenceControl) -> BoxFuture<'_, Reply> {
+    fn send(&self, request: TransportRequest, control: RequestControl) -> BoxFuture<'_, Reply> {
         self.requests.lock().unwrap().push((request, control));
         let reply = self
             .replies

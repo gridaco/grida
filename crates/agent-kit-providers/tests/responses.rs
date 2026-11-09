@@ -2,8 +2,8 @@ mod support;
 
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::inference::{
-    FailureKind, InferenceOutcome, InferenceRequest, InferenceStatus, InferenceUpdate, Modality,
-    ModelCapabilities, Provider, ProviderBinding,
+    FailureKind, InferenceOutcome, InferenceRequest, InferenceStatus, InferenceUpdate,
+    InputMeasurement, MeasurementKind, Modality, ModelCapabilities, Provider, ProviderBinding,
 };
 use agent_kit_core::messages::{
     Content, Message, MessagePhase, OutcomeStatus, ResultContent, Role, ToolCall, ToolResult,
@@ -562,4 +562,213 @@ async fn bounded_arguments_and_unoffered_tools_never_enter_the_outcome() {
     assert_eq!(unoffered.status, InferenceStatus::Interrupted);
     assert_eq!(unoffered.failure.unwrap().code, "unoffered_tool_call");
     assert!(unoffered.messages.is_empty());
+}
+
+#[tokio::test]
+async fn api_counts_the_same_prepared_input_used_for_generation() {
+    let prior = [
+        item(
+            0,
+            json!({
+                "type": "reasoning",
+                "id": "rs_seed",
+                "encrypted_content": "retained-ciphertext",
+                "summary": []
+            }),
+        ),
+        call(1, "fc_seed", r#"{"value":"echo"}"#),
+        completed(None),
+    ];
+    let measured = br#"{"object":"response.input_tokens","input_tokens":143}"#;
+    let transport = FixtureTransport::new([
+        Ok(response(prior.into_iter().map(frame), false)),
+        Ok(response(measured.chunks(3).map(<[u8]>::to_vec), false)),
+        Ok(response(
+            [answer("msg_2", "Echo."), completed(None)]
+                .into_iter()
+                .map(frame),
+            false,
+        )),
+    ]);
+    let provider = adapter(transport.clone(), ResponsesEndpoint::Api, "replay", "live");
+    let mut input = tool_request();
+    input.messages.insert(
+        0,
+        message(
+            "rules",
+            Role::System,
+            vec![Content::Text("Preserve the tool exchange.".into())],
+        ),
+    );
+    let earlier = run(&provider, input.clone(), "earlier").await;
+    assert_eq!(earlier.status, InferenceStatus::Completed);
+    let call_id = first_call(&earlier).id.clone();
+    input.messages.extend(earlier.messages);
+    input.messages.push(message(
+        "result",
+        Role::Tool,
+        vec![Content::ToolResult(ToolResult {
+            call: call_id,
+            status: OutcomeStatus::Succeeded,
+            content: vec![ResultContent::Text("echo".into())],
+            structured: None,
+            truncated: false,
+        })],
+    ));
+
+    let prepared = provider.prepare(input).unwrap();
+    let mut lifetime = control("next");
+    lifetime.deadline = Some(std::time::Instant::now() + Duration::from_secs(10));
+    assert_eq!(
+        provider
+            .measure_input_async(&prepared, lifetime.request_control())
+            .await
+            .unwrap(),
+        InputMeasurement {
+            tokens: 143,
+            kind: MeasurementKind::Exact
+        },
+    );
+    let deadline = lifetime.deadline;
+    assert_eq!(
+        provider
+            .start(prepared, lifetime)
+            .unwrap()
+            .finish()
+            .await
+            .status,
+        InferenceStatus::Completed,
+    );
+
+    let sent = transport.requests.lock().unwrap();
+    assert_eq!(
+        sent[1].0.operation,
+        TransportOperation::OpenAiResponsesInputTokens
+    );
+    assert_eq!(sent[2].0.operation, TransportOperation::OpenAiResponses);
+    assert_eq!(sent[1].0.binding, sent[2].0.binding);
+    assert_eq!(sent[1].1.deadline, deadline);
+    assert_eq!(sent[2].1.deadline, deadline);
+    assert!(sent[1].0.max_response_bytes <= 4096);
+    let count: Value = serde_json::from_slice(&sent[1].0.body).unwrap();
+    let mut generation: Value = serde_json::from_slice(&sent[2].0.body).unwrap();
+    let generation = generation.as_object_mut().unwrap();
+    for field in ["stream", "store", "include", "max_output_tokens"] {
+        assert!(generation.remove(field).is_some());
+    }
+    assert_eq!(count.as_object().unwrap(), generation);
+    assert_eq!(count["model"], "wire-model");
+    assert_eq!(count["instructions"], "Preserve the tool exchange.");
+    assert_eq!(count["tools"][0]["name"], "echo");
+    assert_eq!(count["reasoning"]["effort"], "xhigh");
+    assert_eq!(
+        count["input"][1]["encrypted_content"],
+        "retained-ciphertext"
+    );
+    assert_eq!(count["input"][2]["call_id"], "call_remote");
+    assert_eq!(count["input"][3]["call_id"], "call_remote");
+}
+
+#[tokio::test]
+async fn count_requires_the_api_profile_and_the_original_binding() {
+    let transport = FixtureTransport::new([]);
+    let subscription = adapter(
+        transport.clone(),
+        ResponsesEndpoint::Subscription,
+        "replay",
+        "live",
+    );
+    let mut input = request();
+    input.max_output_tokens = None;
+    let prepared = subscription.prepare(input).unwrap();
+    let lifetime = control("fixture").request_control();
+    let failure = subscription
+        .measure_input_async(&prepared, lifetime.clone())
+        .await
+        .unwrap_err();
+    assert_eq!(failure.kind, FailureKind::Configuration);
+    assert_eq!(failure.code, "input_measurement_unavailable");
+
+    let api = adapter(transport.clone(), ResponsesEndpoint::Api, "replay", "live");
+    assert_eq!(
+        api.measure_input_async(&prepared, lifetime.clone())
+            .await
+            .unwrap_err()
+            .code,
+        "prepared_provider_binding_changed",
+    );
+    let prepared = api.prepare(request()).unwrap();
+    lifetime.cancellation.cancel();
+    assert_eq!(
+        api.measure_input_async(&prepared, lifetime)
+            .await
+            .unwrap_err()
+            .kind,
+        FailureKind::Cancelled,
+    );
+    assert!(transport.requests.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn count_preserves_typed_http_failures_and_rejects_invalid_counts() {
+    for (status, body, kind, code) in [
+        (
+            401,
+            r#"{"error":{"code":"authentication_error"}}"#,
+            FailureKind::Authentication,
+            "authentication_required",
+        ),
+        (
+            429,
+            r#"{"error":{"code":"rate_limit_error"}}"#,
+            FailureKind::RateLimit,
+            "rate_limit",
+        ),
+        (
+            429,
+            r#"{"error":{"code":"insufficient_quota"}}"#,
+            FailureKind::Quota,
+            "quota_exhausted",
+        ),
+        (
+            200,
+            r#"{"object":"response.input_tokens","input_tokens":-1}"#,
+            FailureKind::Protocol,
+            "input_measurement_invalid",
+        ),
+        (
+            200,
+            r#"{"object":"other","input_tokens":4}"#,
+            FailureKind::Protocol,
+            "input_measurement_invalid",
+        ),
+    ] {
+        let mut reply = response([body.as_bytes().to_vec()], false);
+        reply.status = status;
+        reply.retry_after_ms = Some(750);
+        let transport = FixtureTransport::new([Ok(reply)]);
+        let provider = adapter(transport, ResponsesEndpoint::Api, "replay", "live");
+        let failure = provider
+            .measure_input_async(
+                &provider.prepare(request()).unwrap(),
+                control("fixture").request_control(),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(failure.kind, kind);
+        assert_eq!(failure.code, code);
+        assert_eq!(failure.retry_after_ms, (status != 200).then_some(750));
+    }
+
+    let transport = FixtureTransport::new([Ok(response([vec![b' '; 4097]], false))]);
+    let provider = adapter(transport, ResponsesEndpoint::Api, "replay", "live");
+    let failure = provider
+        .measure_input_async(
+            &provider.prepare(request()).unwrap(),
+            control("fixture").request_control(),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(failure.kind, FailureKind::Protocol);
+    assert_eq!(failure.code, "input_measurement_invalid");
 }

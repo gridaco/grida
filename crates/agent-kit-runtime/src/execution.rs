@@ -1,7 +1,10 @@
 use crate::*;
 use agent_kit_core::authority::AuthorityRequest;
 use agent_kit_core::history::HistoryRecord;
-use agent_kit_core::inference::{FailureKind, InferenceControl, InferenceFailure, InferenceStatus};
+use agent_kit_core::inference::{
+    FailureKind, InferenceControl, InferenceFailure, InferenceStatus, MeasurementKind,
+    RequestControl,
+};
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind};
 use agent_kit_core::tools::{InvocationContext, InvocationRecovery};
 use agent_kit_core::turn::{
@@ -9,6 +12,7 @@ use agent_kit_core::turn::{
     OperationInput, OperationOutcome, OperationRecord, TurnLease, WaitRecord,
 };
 use agent_kit_core::{AttemptId, CancellationToken, ChangeId, Fingerprint, MessageId};
+use std::num::NonZeroU64;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
@@ -397,19 +401,39 @@ impl TurnOperations {
                 return self.reject_inference(&id, "deadline", FailureKind::Cancelled).await;
             }
         };
-        if let Err(error) = self
-            .inner
-            .authorize(&record, &owner.admission, deadline)
+        if let Err(failure) = self
+            .authorize_inference(&record, &owner.admission, deadline)
             .await
         {
             drop(permit);
-            if let Some(code) = owner.admission.interruption_code() {
-                return self
-                    .reject_inference(&id, code, FailureKind::Cancelled)
-                    .await;
+            return self.reject_inference_failure(&id, failure).await;
+        }
+        if let Some(limit) = request.input_limit() {
+            if let Err(failure) = check_input_limit(
+                provider.as_ref(),
+                &request,
+                limit,
+                &owner.admission,
+                deadline,
+            )
+            .await
+            {
+                drop(permit);
+                return self.reject_inference_failure(&id, failure).await;
             }
+            // A count can outlive the grants or control state it began with.
+            if let Err(failure) = self
+                .authorize_inference(&record, &owner.admission, deadline)
+                .await
+            {
+                drop(permit);
+                return self.reject_inference_failure(&id, failure).await;
+            }
+        }
+        if Instant::now() >= deadline {
+            drop(permit);
             return self
-                .reject_inference(&id, &error.code, FailureKind::Configuration)
+                .reject_inference(&id, "deadline", FailureKind::Cancelled)
                 .await;
         }
         let attempt = match self.inner.start_attempt(&owner).await {
@@ -421,8 +445,14 @@ impl TurnOperations {
             }
             Err(error) => return Err(error),
         };
-        if let Err(error) = owner.admission.ensure_pending() {
-            let outcome = inference_failure(&error.code, FailureKind::Cancelled);
+        let cancellation = owner
+            .admission
+            .cancellation
+            .is_cancelled()
+            .then(|| owner.admission.cancellation_code())
+            .or_else(|| (Instant::now() >= deadline).then_some("deadline"));
+        if let Some(code) = cancellation {
+            let outcome = inference_failure(code, FailureKind::Cancelled);
             self.inner
                 .complete(&id, &attempt, OperationOutcome::Inference(outcome.clone()))
                 .await?;
@@ -497,11 +527,40 @@ impl TurnOperations {
         code: &str,
         kind: FailureKind,
     ) -> Result<InferenceOutcome> {
-        let outcome = inference_failure(code, kind);
+        self.reject_inference_failure(id, admission_failure(code, kind))
+            .await
+    }
+
+    async fn reject_inference_failure(
+        &self,
+        id: &OperationId,
+        failure: InferenceFailure,
+    ) -> Result<InferenceOutcome> {
+        let outcome = failed_inference(failure);
         self.inner
             .reject(id, OperationOutcome::Inference(outcome.clone()))
             .await?;
         Ok(outcome)
+    }
+
+    async fn authorize_inference(
+        &self,
+        record: &OperationRecord,
+        admission: &Admission,
+        deadline: Instant,
+    ) -> std::result::Result<(), InferenceFailure> {
+        self.inner
+            .authorize(record, admission, deadline)
+            .await
+            .map_err(|error| {
+                if let Some(code) = admission.interruption_code() {
+                    admission_failure(code, FailureKind::Cancelled)
+                } else if error.code == "deadline" {
+                    admission_failure("deadline", FailureKind::Cancelled)
+                } else {
+                    admission_failure(&error.code, FailureKind::Configuration)
+                }
+            })
     }
 
     pub async fn invoke(
@@ -957,17 +1016,59 @@ impl TurnOperations {
 }
 
 fn inference_failure(code: &str, kind: FailureKind) -> InferenceOutcome {
+    failed_inference(admission_failure(code, kind))
+}
+
+fn admission_failure(code: &str, kind: FailureKind) -> InferenceFailure {
+    InferenceFailure {
+        kind,
+        code: code.into(),
+        retry_after_ms: None,
+    }
+}
+
+fn failed_inference(failure: InferenceFailure) -> InferenceOutcome {
     InferenceOutcome {
         status: InferenceStatus::Failed,
         messages: vec![],
         usage: vec![],
-        failure: Some(InferenceFailure {
-            kind,
-            code: code.into(),
-            retry_after_ms: None,
-        }),
+        failure: Some(failure),
         receipt: None,
     }
+}
+
+async fn check_input_limit(
+    provider: &dyn Provider,
+    request: &PreparedRequest,
+    limit: NonZeroU64,
+    admission: &Admission,
+    deadline: Instant,
+) -> std::result::Result<(), InferenceFailure> {
+    let cancellation = admission.cancellation.child_token();
+    let _cancel_on_drop = cancellation.clone().drop_guard();
+    let control = RequestControl {
+        cancellation,
+        deadline: Some(deadline),
+    };
+    let measurement = tokio::select! {
+        biased;
+        _ = admission.cancellation.cancelled() => return Err(admission_failure(admission.cancellation_code(), FailureKind::Cancelled)),
+        _ = tokio::time::sleep_until(deadline.into()) => return Err(admission_failure("deadline", FailureKind::Cancelled)),
+        result = provider.measure_input_async(request, control) => result?,
+    };
+    if measurement.kind == MeasurementKind::Estimate {
+        return Err(admission_failure(
+            "input_bound_unavailable",
+            FailureKind::Configuration,
+        ));
+    }
+    if measurement.tokens > limit.get() {
+        return Err(admission_failure(
+            "input_token_limit",
+            FailureKind::ContextLimit,
+        ));
+    }
+    Ok(())
 }
 
 fn retain_calls(

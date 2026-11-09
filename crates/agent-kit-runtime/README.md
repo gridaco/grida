@@ -36,6 +36,13 @@ identity. Current controls are checked before execution. Denied work receives a
 definite nonexecution result. Inference grants and each tool's grants are supplied
 separately. Missing tool authority never falls back to provider authority.
 Completed results remain readable independently of current execution grants.
+
+A prepared request can carry an input token ceiling. Its measurement shares
+the inference owner's permit, authority, and absolute deadline. The runtime
+rechecks authority before beginning a generation attempt. A provider can
+receive the prepared input for counting even when the generation is refused.
+A failed, estimated, or excessive count records a rejection before generation
+and carries no generation usage. A completed outcome replays from the journal.
 For a prepared tool, a compatible current selection can retain its original
 grant references. Dispatch still requires the host to authorize that exact
 action under current authority. Removing the selection or changing its

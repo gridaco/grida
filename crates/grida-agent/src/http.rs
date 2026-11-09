@@ -3,7 +3,7 @@
 use crate::custody::{CapturedCredential, CredentialFormat, CredentialSource};
 
 use agent_kit_core::authority::AuthorityBinding;
-use agent_kit_core::inference::{InferenceControl, ProviderBinding};
+use agent_kit_core::inference::{ProviderBinding, RequestControl};
 use agent_kit_core::{
     BindingId, BoxFuture, Error, ErrorKind, Fingerprint, ModelId, PrincipalId, ProviderId, Result,
     ScopeId,
@@ -220,7 +220,7 @@ impl StreamingTransport for HttpTransport {
     fn send(
         &self,
         request: TransportRequest,
-        control: InferenceControl,
+        control: RequestControl,
     ) -> BoxFuture<'_, std::result::Result<TransportResponse, TransportFailure>> {
         Box::pin(async move {
             if request.binding != self.binding || request.operation != self.operation {

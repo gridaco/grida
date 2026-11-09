@@ -23,10 +23,10 @@ User input arriving after a prepared request is incorporated before a successful
 turn settles. An unanswered interaction preserves the unfinished turn through
 suspension, releasing the worker until an explicit resumption.
 
-A prepared request can be retired for new input or renewed execution authority
-only when it has no dispatched attempt. Authority renewal preserves its provider,
-principal and scope. Its replacement receives a new operation identity and
-preserves the inference-step allowance. Dispatched attempts retain their recorded
+A prepared request can be retired for new input, a pre-dispatch Pause, or
+renewed execution authority only when it has no dispatched attempt. Authority
+renewal preserves its provider, principal and scope. Its replacement receives a
+new operation identity and preserves the inference-step allowance. Dispatched attempts retain their recorded
 outcomes and uncertainty, including when new input races settlement.
 
 The model history projection places responses before corrections absent from
@@ -45,8 +45,9 @@ account, with context exhaustion separate from output-limit exhaustion.
 Reviewed default-setting definitions live here, while the
 native host owns their persistence and user operations.
 
-A supplied hard input limit measures the complete prepared provider request.
-It requires an exact count or conservative bound before dispatch. An unavailable
+A supplied hard input limit binds to the complete prepared provider request.
+It requires an exact count or conservative bound before generation. A remote
+counter receives that input under the selected provider authority. An unavailable
 counter, estimate, or excessive input produces a persisted failed account.
 Automatic budgeting leaves that optional measurement to the selected policy.
 

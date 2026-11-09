@@ -1,22 +1,29 @@
 mod stream;
 
-use crate::wire::{function_name, short_identity, text_profile, tool_result};
-use crate::{StreamLimits, StreamingTransport, TransportOperation, TransportRequest};
+use crate::wire::{function_name, read_http_error, short_identity, text_profile, tool_result};
+use crate::{
+    StreamLimits, StreamingTransport, TransportFailure, TransportOperation, TransportRequest,
+};
 use agent_kit_core::inference::{
-    InferenceControl, InferenceRequest, InferenceRun, InputFormat, ModelCapabilities,
-    PreparedRequest, Provider, ProviderBinding,
+    FailureKind, InferenceControl, InferenceFailure, InferenceRequest, InferenceRun, InputFormat,
+    InputMeasurement, MeasurementKind, ModelCapabilities, PreparedRequest, Provider,
+    ProviderBinding, RequestControl,
 };
 use agent_kit_core::messages::{
     Content, Message, MessagePhase, ProvenanceKind, ProviderState, Role,
 };
 use agent_kit_core::{
-    BindingId, Envelope, Error, ErrorKind, Fingerprint, ModelId, ProviderId, Result, SchemaId,
-    ToolCallId, ToolId,
+    BindingId, BoxFuture, Envelope, Error, ErrorKind, Fingerprint, ModelId, ProviderId, Result,
+    SchemaId, ToolCallId, ToolId,
 };
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::time::Instant;
+
+const COUNT_RESPONSE_BYTES: usize = 4096;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -115,12 +122,12 @@ impl Responses {
         }
     }
 
-    fn encode(
+    fn encode_input(
         &self,
         request: &InferenceRequest,
         profile: &ResponsesProfile,
         scope: &ReplayScope,
-    ) -> Result<EncodedRequest> {
+    ) -> Result<(Value, BTreeMap<String, ToolId>)> {
         if request.extension.is_some() {
             return Err(Error::new(
                 ErrorKind::Unsupported,
@@ -208,8 +215,8 @@ impl Responses {
             }));
         }
         let mut body = json!({
-            "model": profile.wire_model, "stream": true, "store": false, "input": input,
-            "instructions": instructions.join("\n\n"), "include": ["reasoning.encrypted_content"]
+            "model": profile.wire_model, "input": input,
+            "instructions": instructions.join("\n\n")
         });
         if !tools.is_empty() {
             body["tools"] = tools.into();
@@ -217,14 +224,116 @@ impl Responses {
         if let Some(effort) = profile.reasoning_effort {
             body["reasoning"] = json!({"effort": effort});
         }
+        Ok((body, names))
+    }
+
+    fn encode(
+        &self,
+        request: &InferenceRequest,
+        profile: &ResponsesProfile,
+        scope: &ReplayScope,
+    ) -> Result<EncodedRequest> {
+        let (mut body, names) = self.encode_input(request, profile, scope)?;
+        body["stream"] = true.into();
+        body["store"] = false.into();
+        body["include"] = json!(["reasoning.encrypted_content"]);
         if let Some(maximum) = request.max_output_tokens {
             body["max_output_tokens"] = maximum.into();
         }
-        let body = serde_json::to_vec(&body).map_err(|_| encoding_error())?;
-        if body.len() > self.limits.max_request_bytes {
+        Ok(EncodedRequest {
+            body: self.encode_body(&body)?,
+            names,
+        })
+    }
+
+    fn encode_body(&self, body: &Value) -> Result<Vec<u8>> {
+        let bytes = serde_json::to_vec(body).map_err(|_| encoding_error())?;
+        if bytes.len() > self.limits.max_request_bytes {
             return Err(Error::new(ErrorKind::LimitExceeded, "request_byte_limit"));
         }
-        Ok(EncodedRequest { body, names })
+        Ok(bytes)
+    }
+
+    fn prepared_model(&self, request: &PreparedRequest) -> Result<&ResponsesProfile> {
+        let profile = self.model(&request.request().model)?;
+        if request.binding() != &self.binding || request.capabilities() != &profile.capabilities {
+            return Err(Error::new(
+                ErrorKind::Conflict,
+                "prepared_provider_binding_changed",
+            ));
+        }
+        Ok(profile)
+    }
+
+    async fn count(
+        &self,
+        request: &PreparedRequest,
+        control: RequestControl,
+    ) -> std::result::Result<InputMeasurement, InferenceFailure> {
+        if self.endpoint != ResponsesEndpoint::Api {
+            return Err(count_failure(
+                "input_measurement_unavailable",
+                FailureKind::Configuration,
+            ));
+        }
+        let body = (|| {
+            let profile = self.prepared_model(request)?;
+            let scope = self.scope(&request.request().model, profile);
+            let (body, _) = self.encode_input(request.request(), profile, &scope)?;
+            self.encode_body(&body)
+        })()
+        .map_err(|error| count_failure(&error.code, FailureKind::Configuration))?;
+        if control.cancellation.is_cancelled() {
+            return Err(count_failure("cancelled", FailureKind::Cancelled));
+        }
+        if control
+            .deadline
+            .is_some_and(|deadline| deadline <= Instant::now())
+        {
+            return Err(count_failure("deadline", FailureKind::Cancelled));
+        }
+        let maximum = self.limits.max_response_bytes.min(COUNT_RESPONSE_BYTES);
+        let mut response = self
+            .transport
+            .send(
+                TransportRequest {
+                    binding: self.binding.clone(),
+                    operation: TransportOperation::OpenAiResponsesInputTokens,
+                    body,
+                    max_response_bytes: maximum,
+                },
+                control,
+            )
+            .await
+            .map_err(|failure| match failure {
+                TransportFailure::Unavailable => {
+                    count_failure("input_measurement_unavailable", FailureKind::Configuration)
+                }
+                TransportFailure::Interrupted => {
+                    count_failure("input_measurement_interrupted", FailureKind::Transient)
+                }
+            })?;
+        if !(200..300).contains(&response.status) {
+            return Err(read_http_error(response, maximum).await);
+        }
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.body.next().await {
+            let chunk = chunk.map_err(|_| {
+                count_failure("input_measurement_interrupted", FailureKind::Transient)
+            })?;
+            if chunk.is_empty() || chunk.len() > maximum.saturating_sub(bytes.len()) {
+                return Err(invalid_count());
+            }
+            bytes.extend(chunk);
+        }
+        let count: CountResponse = serde_json::from_slice(&bytes).map_err(|_| invalid_count())?;
+        if count.object != "response.input_tokens" {
+            return Err(invalid_count());
+        }
+        Ok(InputMeasurement {
+            tokens: count.input_tokens,
+            kind: MeasurementKind::Exact,
+        })
     }
 }
 
@@ -240,14 +349,16 @@ impl Provider for Responses {
         PreparedRequest::from_validated(request, self.binding.clone(), profile.capabilities.clone())
     }
 
+    fn measure_input_async<'a>(
+        &'a self,
+        request: &'a PreparedRequest,
+        control: RequestControl,
+    ) -> BoxFuture<'a, std::result::Result<InputMeasurement, InferenceFailure>> {
+        Box::pin(self.count(request, control))
+    }
+
     fn start(&self, request: PreparedRequest, control: InferenceControl) -> Result<InferenceRun> {
-        let profile = self.model(&request.request().model)?;
-        if request.binding() != &self.binding || request.capabilities() != &profile.capabilities {
-            return Err(Error::new(
-                ErrorKind::Conflict,
-                "prepared_provider_binding_changed",
-            ));
-        }
+        let profile = self.prepared_model(&request)?;
         let scope = self.scope(&request.request().model, profile);
         let encoded = self.encode(request.request(), profile, &scope)?;
         let transport = Arc::clone(&self.transport);
@@ -262,6 +373,24 @@ impl Provider for Responses {
             stream::events(transport, request, control, limits, scope, encoded.names)
         }))
     }
+}
+
+#[derive(Deserialize)]
+struct CountResponse {
+    object: String,
+    input_tokens: u64,
+}
+
+fn count_failure(code: &str, kind: FailureKind) -> InferenceFailure {
+    InferenceFailure {
+        kind,
+        code: code.into(),
+        retry_after_ms: None,
+    }
+}
+
+fn invalid_count() -> InferenceFailure {
+    count_failure("input_measurement_invalid", FailureKind::Protocol)
 }
 
 struct EncodedRequest {
