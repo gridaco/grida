@@ -15,10 +15,12 @@ The current column covers the shared agent package and its Desktop wiring, with
 external-driver differences called out where relevant.
 
 The source-built Rust host supports bounded text tasks, durable controls,
-questions, configuration tools and standard ACP v1 clients. Its
-[client guide](./clients.md) describes the verified entrypoints. Native file and
-command adapters have separate platform checks. Complete Desktop feature
-acceptance remains separate from component and process checks.
+questions, configuration tools, branching, earlier-message revision, and
+explicit compaction. A trusted permission profile can enable native file and
+command tools, with approval for additional access through private supervising
+ACP. The standalone MCP host exposes the headless presentation result.
+These entrypoints and their availability are described in the
+[client guide](./clients.md). Desktop acceptance remains separate.
 
 Each feature records the current fact, the intended user outcome, and any limit
 that changes what a person can rely on. The linked behavior
