@@ -1,6 +1,8 @@
 // GRIDA-SEC-010 / GRIDA-SEC-013 / GRIDA-SEC-014 — arguments cannot introduce implicit authority.
 use std::collections::HashSet;
+use std::path::PathBuf;
 
+use agent_kit_core::{ModelId, SessionId};
 use clap::{Arg, ArgAction, ArgMatches, Command as ClapCommand, parser::ValueSource};
 use unicode_general_category::{GeneralCategory, get_general_category};
 
@@ -44,6 +46,27 @@ pub struct Options {
 pub struct Invocation {
     pub options: Options,
     pub command: Command,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentCommand {
+    pub state_dir: PathBuf,
+    pub model: ModelId,
+    pub max_output_tokens: u64,
+    pub selector: Option<Selector>,
+    pub action: AgentAction,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AgentAction {
+    Run {
+        cwd: PathBuf,
+        session: Option<SessionId>,
+        prompt: Option<String>,
+        questions: bool,
+        deadline_ms: u64,
+    },
+    ServeStdio,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,6 +131,7 @@ pub enum Command {
     /// `grida fx …`: Grida FX's command line. The npm launcher hands it to `@grida/fx` before
     /// this executable runs; its arguments belong to FX and are not read here.
     Fx,
+    Agent(AgentCommand),
     AuthLogin {
         storage: Option<Storage>,
         no_browser: bool,
@@ -176,6 +200,8 @@ const BOOLEANS: &[&str] = &[
     "available",
     "local-image",
     "key-stdin",
+    "stdio",
+    "questions",
 ];
 const STRINGS: &[&str] = &[
     "storage",
@@ -198,6 +224,11 @@ const STRINGS: &[&str] = &[
     "image",
     "voice",
     "out",
+    "state-dir",
+    "cwd",
+    "session",
+    "deadline-ms",
+    "max-output-tokens",
 ];
 const REPEATED: &[&str] = &["reference", "param"];
 const REQUEST_FLAGS: &[&str] = &[
@@ -358,6 +389,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
         "ai providers",
         "ai voices",
         "ai rigging",
+        "agent",
     ]
     .contains(&topic.as_str())
     {
@@ -365,6 +397,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
         return invocation(Command::Help(Topic::parse(&topic)?));
     }
     let command = match topic.as_str() {
+        "agent run" | "agent serve" => Command::Agent(parse_agent(&tokens, topic == "agent run")?),
         "ai rigging list" => {
             tokens.allowed(true, &["provider", "feature"])?;
             Command::RiggingList {
@@ -508,6 +541,65 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
         },
     };
     invocation(command)
+}
+
+fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
+    let mut allowed = vec![
+        "provider",
+        "state-dir",
+        "model",
+        "max-output-tokens",
+        "org",
+        "org-id",
+        "no-input",
+    ];
+    if run {
+        allowed.extend(["cwd", "session", "prompt", "questions", "deadline-ms"]);
+    } else {
+        allowed.push("stdio");
+    }
+    tokens.allowed(false, &allowed)?;
+    if tokens.required("provider")? != "gg" || (!run && !tokens.flag("stdio")) {
+        return Err(Failure::usage());
+    }
+    let absolute = |name| {
+        let value = PathBuf::from(tokens.required(name)?);
+        value
+            .is_absolute()
+            .then_some(value)
+            .ok_or_else(Failure::usage)
+    };
+    let integer = |name, default, maximum| {
+        let value = tokens
+            .value(name)
+            .unwrap_or(default)
+            .parse::<u64>()
+            .map_err(|_| Failure::usage())?;
+        (value > 0 && value <= maximum)
+            .then_some(value)
+            .ok_or_else(Failure::usage)
+    };
+    Ok(AgentCommand {
+        state_dir: absolute("state-dir")?,
+        model: ModelId::new(tokens.required("model")?).map_err(|_| Failure::usage())?,
+        max_output_tokens: integer("max-output-tokens", "4096", 65_536)?,
+        selector: tokens.organization()?,
+        action: if run {
+            AgentAction::Run {
+                cwd: absolute("cwd")?,
+                session: tokens
+                    .value("session")
+                    .map(SessionId::new)
+                    .transpose()
+                    .map_err(|_| Failure::usage())?,
+                prompt: tokens.value("prompt").map(str::to_owned),
+                questions: tokens.flag("questions"),
+                deadline_ms: integer("deadline-ms", "120000", 600_000)?,
+            }
+        } else {
+            AgentAction::ServeStdio
+        },
+    })
 }
 
 fn parse_rigging(tokens: &Tokens, run: bool) -> Result<Command, Failure> {

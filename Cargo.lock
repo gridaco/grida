@@ -1185,10 +1185,14 @@ dependencies = [
 name = "grida-cli"
 version = "0.5.5"
 dependencies = [
+ "agent-kit-core",
+ "agent-kit-providers",
  "base64 0.22.1",
  "bytes",
  "clap",
  "crossterm",
+ "futures-util",
+ "grida-agent",
  "grida-ai",
  "grida-auth",
  "http",

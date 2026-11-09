@@ -2,8 +2,8 @@
 use serde_json::{Map, Value, json};
 
 use crate::{
-    Command, GenerationSource, Invocation, MeshOperation, MeshSource, ModelSelection, Request,
-    RiggingSource, Selector,
+    AgentAction, Command, GenerationSource, Invocation, MeshOperation, MeshSource, ModelSelection,
+    Request, RiggingSource, Selector,
 };
 
 type Object = Map<String, Value>;
@@ -71,6 +71,37 @@ pub fn project(invocation: &Invocation) -> Value {
         }
         Command::Version => "version",
         Command::Fx => "fx",
+        Command::Agent(agent) => {
+            put(&mut object, "provider", "gg");
+            put(&mut object, "model", agent.model.as_str());
+            put(&mut object, "stateDir", json!(agent.state_dir));
+            put(&mut object, "maxOutputTokens", agent.max_output_tokens);
+            selector(&mut object, &agent.selector);
+            match &agent.action {
+                AgentAction::Run {
+                    cwd,
+                    session,
+                    prompt,
+                    questions,
+                    deadline_ms,
+                } => {
+                    put(&mut object, "cwd", json!(cwd));
+                    optional(
+                        &mut object,
+                        "session",
+                        session.as_ref().map(|id| id.as_str()),
+                    );
+                    optional(&mut object, "prompt", prompt.as_deref());
+                    put(&mut object, "questions", *questions);
+                    put(&mut object, "deadlineMs", *deadline_ms);
+                    "agent run"
+                }
+                AgentAction::ServeStdio => {
+                    put(&mut object, "stdio", true);
+                    "agent serve"
+                }
+            }
+        }
         Command::Docs(topic) => {
             put(&mut object, "topic", topic.name());
             "docs"

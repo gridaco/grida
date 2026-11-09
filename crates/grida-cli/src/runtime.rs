@@ -524,39 +524,18 @@ async fn authority(
     token: &CancellationToken,
 ) -> Result<(ExecutionAuthority, Option<String>)> {
     if provider == "gg" {
-        check(token)?;
-        let env = env.clone();
-        let selected = selector.cloned();
-        let handle = tokio::runtime::Handle::current();
-        let worker_token = token.clone();
-        let authority = tokio::task::spawn_blocking(move || -> Result<_> {
-            let host = Host::open(&env)?;
-            let client = account::open(&host, None, handle)?;
-            check(&worker_token)?;
-            let org = account::select(&client, selected.as_ref())?;
-            check(&worker_token)?;
-            client
-                .request_gg_with(org.id, |grant| {
-                    if worker_token.is_cancelled() {
-                        return Err(grida_auth::Error::new("cancelled"));
-                    }
-                    let origin = grant.api_origin().to_owned();
-                    Ok((
-                        ExecutionAuthority::Gateway {
-                            token: grant.token().into(),
-                            base_url: origin.clone(),
-                            expires_at_ms: parse_date(grant.expires_at())
-                                .map_err(|_| grida_auth::Error::new("invalid_response"))?,
-                        },
-                        Some(origin),
-                    ))
-                })
-                .map_err(account::failure)
+        account::with_gg(env.clone(), selector.cloned(), token.clone(), |grant| {
+            let origin = grant.api_origin().to_owned();
+            Ok((
+                ExecutionAuthority::Gateway {
+                    token: grant.token().into(),
+                    base_url: origin.clone(),
+                    expires_at_ms: grant.expires_at_ms(),
+                },
+                Some(origin),
+            ))
         })
         .await
-        .map_err(|_| unavailable())??;
-        check(token)?;
-        Ok(authority)
     } else {
         let credentials = Credentials::open(env, Some(provider), key_stdin, token).await?;
         let key = credentials.key(provider).ok_or_else(|| {
@@ -910,12 +889,6 @@ fn usd(cents: i64) -> String {
         absolute / 100,
         absolute % 100
     )
-}
-
-fn parse_date(value: &str) -> Result<i64> {
-    time::OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339)
-        .map(|d| (d.unix_timestamp_nanos() / 1_000_000) as i64)
-        .map_err(|_| unavailable())
 }
 
 #[cfg(all(test, any(target_os = "macos", target_os = "linux")))]

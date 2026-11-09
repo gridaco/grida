@@ -921,3 +921,264 @@ async fn discovery_uses_a_real_credential_free_connection_with_an_independent_bo
     );
     server.await.unwrap();
 }
+
+fn chat_request() -> Request {
+    super::gg_chat::chat_http_request(
+        format!("{API}/api/v1/ai/chat/completions"),
+        HeaderValue::from_static("Bearer synthetic-chat-grant"),
+        b"{}".to_vec(),
+        32,
+    )
+}
+
+fn chat_expiry() -> std::time::SystemTime {
+    std::time::SystemTime::now() + Duration::from_secs(30)
+}
+
+fn chat_control() -> agent_kit_core::inference::RequestControl {
+    agent_kit_core::inference::RequestControl {
+        cancellation: CancellationToken::new(),
+        deadline: None,
+    }
+}
+
+#[tokio::test]
+async fn gg_chat_rejects_other_destinations_and_expired_grants_before_connect() {
+    use agent_kit_providers::TransportFailure::Unavailable;
+
+    let (mut transport, listener, _) = fixture().await;
+    assert!(matches!(
+        transport
+            .stream_chat(chat_request(), chat_expiry(), chat_control())
+            .await,
+        Err(Unavailable)
+    ));
+    transport.gg_origin = Some(API.into());
+    for target in [
+        "https://other.example/api/v1/ai/chat/completions",
+        "https://grida.co/api/v1/ai/chat/completions?model=other",
+        "https://grida.co/api/v1/auth/gg",
+        "https://grida.co/api/v1/ai/operations",
+    ] {
+        let mut request = chat_request();
+        request.url = target.into();
+        assert!(matches!(
+            transport
+                .stream_chat(request, chat_expiry(), chat_control())
+                .await,
+            Err(Unavailable)
+        ));
+    }
+    assert!(matches!(
+        transport
+            .stream_chat(chat_request(), std::time::SystemTime::now(), chat_control())
+            .await,
+        Err(Unavailable)
+    ));
+    let control = chat_control();
+    control.cancellation.cancel();
+    assert!(matches!(
+        transport
+            .stream_chat(chat_request(), chat_expiry(), control)
+            .await,
+        Err(Unavailable)
+    ));
+    assert!(
+        timeout(Duration::from_millis(50), listener.accept())
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn gg_chat_rechecks_expiry_after_the_tls_handshake() {
+    let (mut transport, listener, tls) = fixture().await;
+    transport.gg_origin = Some(API.into());
+    let request = chat_request();
+    let expires_at = std::time::SystemTime::now() + Duration::from_secs(1);
+    let server = tokio::spawn(async move {
+        let (socket, _) = timeout(FIXTURE_WAIT, listener.accept())
+            .await
+            .unwrap()
+            .unwrap();
+        let wait = expires_at
+            .duration_since(std::time::SystemTime::now())
+            .unwrap_or_default();
+        tokio::time::sleep(wait + Duration::from_millis(20)).await;
+        let mut socket = tls.accept(socket).await.unwrap();
+        let mut byte = [0];
+        let closed = timeout(FIXTURE_WAIT, socket.read(&mut byte)).await.unwrap();
+        assert!(closed.is_err() || closed.unwrap() == 0);
+    });
+    assert!(matches!(
+        timeout(
+            FIXTURE_WAIT,
+            transport.stream_chat(request, expires_at, chat_control())
+        )
+        .await
+        .unwrap(),
+        Err(agent_kit_providers::TransportFailure::Unavailable)
+    ));
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn gg_chat_streams_before_eof_and_drop_closes_the_owned_connection() {
+    use futures_util::StreamExt;
+
+    let (mut transport, listener, tls) = fixture().await;
+    transport.gg_origin = Some(API.into());
+    let server = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let mut socket = tls.accept(socket).await.unwrap();
+        let request = String::from_utf8(received(&mut socket).await).unwrap();
+        assert!(request.starts_with("POST /api/v1/ai/chat/completions HTTP/1.1\r\n"));
+        assert!(request.contains("authorization: Bearer synthetic-chat-grant\r\n"));
+        assert!(request.contains("accept: text/event-stream\r\n"));
+        assert!(!request.contains("cookie"));
+        socket.write_all(
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nx-request-id: req_fixture\r\nretry-after: 3\r\n\r\n4\r\ndata\r\n"
+        ).await.unwrap();
+        let mut byte = [0];
+        let closed = timeout(FIXTURE_WAIT, socket.read(&mut byte)).await.unwrap();
+        assert!(closed.is_err() || closed.unwrap() == 0);
+    });
+    let mut response = timeout(
+        FIXTURE_WAIT,
+        transport.stream_chat(chat_request(), chat_expiry(), chat_control()),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(response.request_id.as_deref(), Some("req_fixture"));
+    assert_eq!(response.retry_after_ms, Some(3000));
+    assert_eq!(
+        timeout(FIXTURE_WAIT, response.body.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+        b"data"
+    );
+    drop(response);
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn gg_chat_cancellation_after_dispatch_cannot_report_unavailable() {
+    let (mut transport, listener, tls) = fixture().await;
+    transport.gg_origin = Some(API.into());
+    let (seen, dispatched) = tokio::sync::oneshot::channel();
+    let server = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let mut socket = tls.accept(socket).await.unwrap();
+        received(&mut socket).await;
+        seen.send(()).unwrap();
+        let mut byte = [0];
+        let closed = timeout(FIXTURE_WAIT, socket.read(&mut byte)).await.unwrap();
+        assert!(closed.is_err() || closed.unwrap() == 0);
+    });
+    let control = chat_control();
+    let cancellation = control.cancellation.clone();
+    let response = transport.stream_chat(chat_request(), chat_expiry(), control);
+    tokio::pin!(response);
+    tokio::select! {
+        _ = &mut response => panic!("response returned before the server sent headers"),
+        result = timeout(FIXTURE_WAIT, dispatched) => result.unwrap().unwrap(),
+    }
+    cancellation.cancel();
+    assert!(matches!(
+        timeout(FIXTURE_WAIT, &mut response).await.unwrap(),
+        Err(agent_kit_providers::TransportFailure::Interrupted)
+    ));
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn gg_chat_response_bounds_keep_receipts_and_refuse_redirects() {
+    use agent_kit_providers::TransportFailure::Interrupted;
+    use futures_util::StreamExt;
+
+    for (status, headers, expect_body_error) in [
+        ("200 OK", "Content-Length: 100\r\n", true),
+        ("200 OK", "Transfer-Encoding: chunked\r\n", true),
+        (
+            "307 Temporary Redirect",
+            "Location: /api/v1/ai/chat/completions\r\nContent-Length: 100\r\n",
+            false,
+        ),
+    ] {
+        let (mut transport, listener, tls) = fixture().await;
+        transport.gg_origin = Some(API.into());
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let mut socket = tls.accept(socket).await.unwrap();
+            received(&mut socket).await;
+            let payload = if headers.starts_with("Transfer-Encoding") {
+                "6\r\nexcess\r\n"
+            } else {
+                ""
+            };
+            let response =
+                format!("HTTP/1.1 {status}\r\nx-request-id: req_fixture\r\n{headers}\r\n{payload}");
+            socket.write_all(response.as_bytes()).await.unwrap();
+            let mut byte = [0];
+            let closed = timeout(FIXTURE_WAIT, socket.read(&mut byte)).await.unwrap();
+            assert!(closed.is_err() || closed.unwrap() == 0);
+            assert!(
+                timeout(Duration::from_millis(50), listener.accept())
+                    .await
+                    .is_err()
+            );
+        });
+        let mut request = chat_request();
+        request.max_response_bytes = 3;
+        let mut response = timeout(
+            FIXTURE_WAIT,
+            transport.stream_chat(request, chat_expiry(), chat_control()),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(response.request_id.as_deref(), Some("req_fixture"));
+        let body = timeout(FIXTURE_WAIT, response.body.next()).await.unwrap();
+        if expect_body_error {
+            assert_eq!(body, Some(Err(Interrupted)));
+        } else {
+            assert_eq!(response.status, 307);
+            assert_eq!(body, None);
+        }
+        server.await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn gg_chat_deadline_still_applies_after_response_headers() {
+    use futures_util::StreamExt;
+
+    let (mut transport, listener, tls) = fixture().await;
+    transport.gg_origin = Some(API.into());
+    let server = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let mut socket = tls.accept(socket).await.unwrap();
+        received(&mut socket).await;
+        socket
+            .write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n")
+            .await
+            .unwrap();
+        let mut byte = [0];
+        let closed = timeout(FIXTURE_WAIT, socket.read(&mut byte)).await.unwrap();
+        assert!(closed.is_err() || closed.unwrap() == 0);
+    });
+    let mut control = chat_control();
+    control.deadline = Some(std::time::Instant::now() + Duration::from_secs(1));
+    let mut response = transport
+        .stream_chat(chat_request(), chat_expiry(), control)
+        .await
+        .unwrap();
+    assert_eq!(
+        timeout(FIXTURE_WAIT, response.body.next()).await.unwrap(),
+        Some(Err(agent_kit_providers::TransportFailure::Interrupted))
+    );
+    server.await.unwrap();
+}

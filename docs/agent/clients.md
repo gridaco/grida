@@ -82,6 +82,32 @@ an answer is needed, the process verifies suspension and returns `input_required
 with the session, turn, and pending question identities. A capable service client
 can answer the retained question through the same state directory.
 
+## Use your Grida login
+
+On macOS or Linux, the source-built `grida` CLI can run an explicitly selected
+Gateway chat model under your existing Grida account. Build with
+`cargo build -p grida-cli --locked` and sign in with
+`target/debug/grida auth login` if needed. Select a funding organization
+with `--org` or `--org-id` when your account has multiple organizations.
+
+```sh
+printf '%s' 'Explain this concept briefly.' | target/debug/grida agent run \
+  --provider gg --model MODEL_ID --org ORGANIZATION_SLUG \
+  --state-dir /absolute/path/to/agent-state --cwd /absolute/path/to/project \
+  --no-input
+```
+
+For an ACP client, use `target/debug/grida agent serve --stdio` with the same
+provider, model, organization, and state-directory options. The client supplies
+the project directory when opening a session. Keep the same model, account, and
+organization to continue a saved chat. Gateway requests use the selected
+organization's credits.
+
+Each invocation acquires one short-lived Gateway grant. If a service's grant
+expires, restart it to acquire a fresh grant. The client can reopen the retained
+chat after restart. Requests already accepted by Gateway may finish under their
+original grant.
+
 ## Connect an ACP client
 
 Configure the client to launch the executable with these arguments.

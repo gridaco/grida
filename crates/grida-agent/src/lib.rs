@@ -4,9 +4,11 @@ pub mod acp;
 pub mod command;
 pub mod configuration;
 mod custody;
+pub mod gg;
 pub mod host;
+mod http;
+pub mod process;
 pub mod scratch;
 pub mod workspace;
-mod http;
 
 pub use http::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol};

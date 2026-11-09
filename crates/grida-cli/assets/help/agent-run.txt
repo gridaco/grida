@@ -1,0 +1,15 @@
+Usage: grida agent run --provider gg --model ID --state-dir DIRECTORY --cwd DIRECTORY
+
+Options:
+  --prompt TEXT             Use this prompt. Omit to read bounded UTF-8 from stdin.
+  --session ID              Continue a settled chat with its original project and model.
+  --org SLUG | --org-id ID  Select a funding organization.
+  --max-output-tokens N     Output-token allowance, default 4096.
+  --deadline-ms N           Task deadline, default 120000.
+  --questions               Allow input-required outcomes for structured questions.
+  --no-input                Run without terminal interaction.
+
+Use absolute project and state directory paths. Results are JSON Lines on
+stdout; diagnostics use stderr. Sign in first with grida auth login.
+
+Documentation: https://grida.co/docs/cli/agent

@@ -22,9 +22,13 @@ required-features = ["conformance"]
 conformance = []
 
 [dependencies]
+agent-kit-core = { path = "../agent-kit-core" }
+agent-kit-providers = { path = "../agent-kit-providers" }
+grida-agent = { path = "../grida-agent" }
 grida-ai = { path = "../grida-ai" }
 grida-auth = { path = "../grida-auth" }
 clap.workspace = true
+futures-util = "0.3"
 serde_json.workspace = true
 unicode-general-category.workspace = true
 bytes = "1"

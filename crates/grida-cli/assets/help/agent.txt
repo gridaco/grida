@@ -1,0 +1,11 @@
+Grida Agent — headless tasks and ACP
+
+Commands:
+  run      Run one prompt and print JSON Lines
+  serve    Serve an Agent Client Protocol client over stdio
+
+Select --provider gg and a Gateway chat model explicitly. These commands use
+your existing Grida login and the selected organization's Gateway capacity.
+Use --org or --org-id when your account has multiple organizations.
+
+Documentation: https://grida.co/docs/cli/agent

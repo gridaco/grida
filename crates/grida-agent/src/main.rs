@@ -1,21 +1,16 @@
-use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
-use grida_agent::host::{Host, PromptPart, PromptRequest, RunResult, change_id};
+use grida_agent::host::Host;
+use grida_agent::process::{self, RunOptions};
 use grida_agent::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol, acp};
-use grida_agent_master::read_account;
-use serde::Serialize;
 use serde_json::json;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-const MAX_STDIN_BYTES: usize = 512 * 1024;
 const DEFAULT_RUN_TIMEOUT_MS: u64 = 120_000;
 const MAX_RUN_TIMEOUT_MS: u64 = 600_000;
-const STOP_TIMEOUT: Duration = Duration::from_secs(8);
 
 fn main() -> ExitCode {
     let matches = command().get_matches();
@@ -181,7 +176,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         let host = Host::open(state_dir, None)?;
         let id = SessionId::new(args.get_one::<String>("session").expect("required session"))?;
         let view = host.inspect(id).await?;
-        write_record(&json!({
+        process::write_record(&json!({
             "schema_version": 1,
             "kind": "session",
             "session_id": view.session,
@@ -235,181 +230,31 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         None
     };
     let host = Arc::new(Host::open(state_dir, Some(provider))?);
-    if let Some(listener) = listener {
-        let result = tokio::select! {
-            result = acp::serve_websocket(host.clone(), listener) => result.map(|()| 0),
-            result = shutdown_signal() => result.map(|()| 130),
-        };
-        host.shutdown().await?;
-        return result;
-    }
     if name == "serve" {
-        tokio::select! {
-            result = acp::serve_stdio(host.clone()) => match result {
-                Ok(()) => {}
-                Err(acp::ServeError::Shutdown(error)) => return Err(error),
-                Err(acp::ServeError::Protocol(error)) => {
-                    eprintln!("grida-agent: ACP connection ended: {error}");
-                    return Err(problem(ErrorKind::Unavailable, "acp_connection_failed"));
-                }
-            },
-            result = shutdown_signal() => {
-                result?;
-                host.shutdown().await?;
-                return Ok(130);
-            }
-        }
-        return Ok(0);
+        return process::serve(host, listener, process::shutdown_signal()).await;
     }
-    let deadline = Duration::from_millis(
-        args.get_one::<u64>("deadline-ms")
-            .copied()
-            .unwrap_or(DEFAULT_RUN_TIMEOUT_MS),
-    );
-    let result = run(&host, args, deadline).await;
-    host.shutdown().await?;
-    result
-}
-
-async fn run(host: &Host, args: &ArgMatches, timeout: Duration) -> Result<u8> {
-    let deadline = tokio::time::Instant::now() + timeout;
-    let signal = shutdown_signal();
-    tokio::pin!(signal);
-    let mut accepted = tokio::select! {
-        result = tokio::time::timeout_at(deadline, admit_run(host, args)) => result
-            .map_err(|_| problem(ErrorKind::Unavailable, "run_deadline_reached"))??,
-        result = &mut signal => {
-            result?;
-            return Ok(130);
-        }
-    };
-    write_record(&json!({
-        "schema_version": 1,
-        "kind": "accepted",
-        "session_id": accepted.session,
-        "turn_id": accepted.turn,
-        "input_id": accepted.input,
-    }))
-    .await?;
-    let result = tokio::select! {
-        result = &mut accepted.completion => result,
-        result = &mut signal => {
-            result?;
-            tokio::time::timeout(STOP_TIMEOUT, async {
-                host.cancel(accepted.session.clone(), accepted.turn.clone()).await?;
-                Ok::<_, Error>((&mut accepted.completion).await)
-            })
-            .await
-            .map_err(|_| problem(ErrorKind::Uncertain, "run_stop_unverified"))??
-        }
-        _ = tokio::time::sleep_until(deadline) => {
-            host.shutdown().await?;
-            accepted.completion.await
-        }
-    }
-    .map_err(|_| problem(ErrorKind::Uncertain, "run_worker_disconnected"))??;
-    let (disposition, account, code, questions) = match result {
-        RunResult::Settled(outcome) => {
-            let (disposition, code) = match outcome.status {
-                OutcomeStatus::Succeeded => ("succeeded", 0),
-                OutcomeStatus::Failed => ("failed", 1),
-                OutcomeStatus::Cancelled => ("cancelled", 130),
-                OutcomeStatus::Uncertain => ("uncertain", 5),
-            };
-            let account = outcome.account.as_ref().map(read_account).transpose()?;
-            (disposition, account, code, None)
-        }
-        RunResult::Suspended => ("suspended", None, 4, None),
-        RunResult::InputRequired(pending) => ("input_required", None, 6, Some(pending.questions)),
-    };
-    let mut finished = json!({
-        "schema_version": 1,
-        "kind": "finished",
-        "session_id": accepted.session,
-        "turn_id": accepted.turn,
-        "input_id": accepted.input,
-        "disposition": disposition,
-        "account": account,
-    });
-    if let Some(questions) = questions {
-        finished["questions"] = json!(questions);
-    }
-    write_record(&finished).await?;
-    Ok(code)
-}
-
-async fn admit_run(host: &Host, args: &ArgMatches) -> Result<grida_agent::host::AcceptedRun> {
-    let cwd = args.get_one::<PathBuf>("cwd").expect("required cwd");
-    let prompt = match args.get_one::<String>("prompt") {
-        Some(prompt) => prompt.clone(),
-        None => read_prompt().await?,
-    };
-    if prompt.trim().is_empty() {
-        return Err(problem(ErrorKind::InvalidInput, "empty_prompt"));
-    }
-    let session = selected_session(host, cwd, args.get_one::<String>("session")).await?;
-    host.start_prompt(PromptRequest {
-        id: change_id()?,
-        session,
-        parts: vec![PromptPart::Text { text: prompt }],
-        questions: args.get_flag("questions"),
-    })
+    process::run(
+        &host,
+        RunOptions {
+            cwd: args
+                .get_one::<PathBuf>("cwd")
+                .expect("required cwd")
+                .clone(),
+            session: args
+                .get_one::<String>("session")
+                .map(SessionId::new)
+                .transpose()?,
+            prompt: args.get_one::<String>("prompt").cloned(),
+            questions: args.get_flag("questions"),
+            timeout: Duration::from_millis(
+                args.get_one::<u64>("deadline-ms")
+                    .copied()
+                    .unwrap_or(DEFAULT_RUN_TIMEOUT_MS),
+            ),
+        },
+        process::shutdown_signal(),
+    )
     .await
-}
-
-async fn selected_session(host: &Host, cwd: &Path, id: Option<&String>) -> Result<SessionId> {
-    if let Some(id) = id {
-        let session = SessionId::new(id)?;
-        host.load_session(session.clone(), cwd.into()).await?;
-        Ok(session)
-    } else {
-        host.new_session(cwd.into()).await
-    }
-}
-
-async fn read_prompt() -> Result<String> {
-    let mut bytes = Vec::new();
-    tokio::io::stdin()
-        .take(MAX_STDIN_BYTES as u64 + 1)
-        .read_to_end(&mut bytes)
-        .await
-        .map_err(|_| problem(ErrorKind::Unavailable, "prompt_read_failed"))?;
-    if bytes.len() > MAX_STDIN_BYTES {
-        return Err(problem(ErrorKind::LimitExceeded, "prompt_too_large"));
-    }
-    String::from_utf8(bytes).map_err(|_| problem(ErrorKind::InvalidInput, "prompt_must_be_utf8"))
-}
-
-async fn write_record(record: &impl Serialize) -> Result<()> {
-    let mut bytes = serde_json::to_vec(record)
-        .map_err(|_| problem(ErrorKind::InvalidState, "output_encoding_failed"))?;
-    bytes.push(b'\n');
-    let mut stdout = tokio::io::stdout();
-    let result = tokio::time::timeout(Duration::from_secs(5), async {
-        stdout.write_all(&bytes).await?;
-        stdout.flush().await
-    })
-    .await;
-    match result {
-        Ok(Ok(())) => Ok(()),
-        _ => Err(problem(ErrorKind::Unavailable, "output_delivery_failed")),
-    }
-}
-
-async fn shutdown_signal() -> Result<()> {
-    let unavailable = || problem(ErrorKind::Unavailable, "signal_listener_unavailable");
-    #[cfg(unix)]
-    {
-        let mut termination =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                .map_err(|_| unavailable())?;
-        tokio::select! {
-            _ = termination.recv() => Ok(()),
-            interrupt = tokio::signal::ctrl_c() => interrupt.map_err(|_| unavailable()),
-        }
-    }
-    #[cfg(not(unix))]
-    tokio::signal::ctrl_c().await.map_err(|_| unavailable())
 }
 
 fn problem(kind: ErrorKind, code: &'static str) -> Error {

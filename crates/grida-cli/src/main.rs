@@ -36,6 +36,19 @@ fn run() -> io::Result<u8> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
+    if let Command::Agent(command) = invocation.command {
+        let result = runtime.block_on(grida_cli::agent::dispatch(command));
+        runtime.shutdown_timeout(std::time::Duration::from_millis(250));
+        return match result {
+            Ok(exit) => Ok(exit),
+            Err(error) => output::domain_failure(
+                error,
+                false,
+                &mut io::stdout().lock(),
+                &mut io::stderr().lock(),
+            ),
+        };
+    }
     let result = runtime.block_on(runtime::run(invocation));
     let mut stdout = io::stdout().lock();
     let mut stderr = io::stderr().lock();

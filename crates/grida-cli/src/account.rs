@@ -1,11 +1,12 @@
 // GRIDA-SEC-010 / GRIDA-SEC-015 — fixed account operations and scoped GG grants.
+// GRIDA-SEC-006 / GRIDA-GG: token — current profile acceptance of scoped authority.
 use crate::{
     Selector, Storage,
     error::{Error, Result},
-    host::Host,
+    host::{Environment, Host},
     http,
 };
-use grida_auth::{AuthClient, Backend, Organization, OrganizationsPage};
+use grida_auth::{AuthClient, Backend, GgGrant, Organization, OrganizationsPage};
 use serde_json::{Value, json};
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
@@ -122,6 +123,45 @@ pub fn select(client: &AuthClient, selected: Option<&Selector>) -> Result<Organi
     select_from(selected, |after| {
         client.organizations(after).map_err(failure)
     })
+}
+
+/// Resolve current membership and transfer only the scoped grant to the
+/// synchronous, memory-only acceptance callback.
+pub(crate) async fn with_gg<T: Send + 'static>(
+    env: Environment,
+    selected: Option<Selector>,
+    cancel: CancellationToken,
+    accept: impl FnOnce(&GgGrant) -> grida_auth::Result<T> + Send + 'static,
+) -> Result<T> {
+    let check = |cancel: &CancellationToken| {
+        if cancel.is_cancelled() {
+            Err(Error::cancelled())
+        } else {
+            Ok(())
+        }
+    };
+    check(&cancel)?;
+    let runtime = tokio::runtime::Handle::current();
+    let worker = cancel.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let host = Host::open(&env)?;
+        let client = open(&host, None, runtime)?;
+        check(&worker)?;
+        let organization = select(&client, selected.as_ref())?;
+        check(&worker)?;
+        client
+            .request_gg_with(organization.id, |grant| {
+                if worker.is_cancelled() {
+                    return Err(grida_auth::Error::new("cancelled"));
+                }
+                accept(grant)
+            })
+            .map_err(failure)
+    })
+    .await
+    .map_err(|_| Error::new("unavailable", "Grida could not complete this command."))?;
+    check(&cancel)?;
+    result
 }
 fn select_from(
     selected: Option<&Selector>,

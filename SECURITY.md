@@ -1367,6 +1367,13 @@ levels into one.
    Completion drops invocation authority; it neither
    persists, refreshes nor automatically re-mints a GG grant. CLI destination and
    output controls are independently registered under GRIDA-SEC-013.
+   The CLI agent obtains one scoped grant per owned run or service invocation
+   through the same synchronous handoff. Its session selection binds the
+   registered API origin, verified account subject, organization and model.
+   Only a matching live authority can prepare the fixed chat POST. The CLI
+   HTTP owner checks expiry again after connection setup and before sending.
+   A later launch can select the same chat with a fresh grant for the same
+   scope. The native service's single grant expires without an automatic mint.
    The shared media/provider host composition owns exactly one GG store for
    all mounted media and optional agent routes. Stopping that composition
    clears its store after the daemon drains active requests. Restarting can
@@ -1458,6 +1465,13 @@ limitation tracked in [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-
   [crates/grida-cli/src/http_tests.rs](crates/grida-cli/src/http_tests.rs).
   These preserve this boundary. Rust conformance adapters, where present, are
   feature-gated and excluded from the distributed executable.
+
+- Native chat composition uses the [account owner](crates/grida-cli/src/account.rs),
+  [CLI adapter](crates/grida-cli/src/agent.rs), [typed grant](crates/grida-agent/src/gg.rs),
+  [host authority](crates/grida-agent/src/host.rs), and
+  [streaming HTTP owner](crates/grida-cli/src/http/gg_chat.rs).
+  The [native process proof](scripts/cli-contracts/installed.mjs) exercises a
+  scoped run, continued ACP chat and changed-organization refusal.
 
 - [Windows provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — optional BYOK discovery preserves existing GG eligibility without swallowing custody errors.
 
@@ -2603,6 +2617,10 @@ generation receipts without a fixed projection.
    cookie jar or pooled connection. Header/body sizes, DNS/connect time, total
    request lifetime and streamed responses are bounded; SDK-specific limits may
    be lower. The hosted 3D request alone receives a 780-second lifecycle allowance.
+   The separate native agent transport admits the exact GG chat-completions
+   POST at the grant's registered origin. It reuses address validation, TLS and
+   HTTP framing, and bounds the live stream by bytes and deadline. The media
+   lane retains its separate routes.
    The separate signed-upload branch permits only HTTPS PUT to
    `tripo-data.s3.us-west-2.amazonaws.com`, an `application/octet-stream` byte
    body of at most 60,000,000 bytes, and harmless content headers. It accepts no
@@ -2717,6 +2735,9 @@ those services or replace GRIDA-SEC-011's real local OAuth proof.
   DNS pinning, TLS authority, credential-free redirects and bounded streams.
   Hosted GG authority reuses the public [CLI registration](crates/grida-cli/src/host.rs),
   whose metadata remains governed by GRIDA-SEC-010.
+- The [GG chat stream](crates/grida-cli/src/http/gg_chat.rs) and
+  [transport tests](crates/grida-cli/src/http_tests.rs) reuse direct native
+  admission and hold one connection until completion, cancellation, or drop.
 - [Input/artifact owner](crates/grida-cli/src/files.rs) and
   [tests](crates/grida-cli/src/files.rs) — explicit input, publication
   preflight, no overwrite and partial-save reporting.
@@ -3013,6 +3034,8 @@ interchangeable. Public application registration/API keys are not user identity.
    Its BYOK branch opens provider custody without opening native account custody.
    Errors do not switch the selected provider or funding path. Completion drops
    invocation authority; interruption is checked before a subsequent mint or submission.
+   Native agent chat uses the same scoped handoff for explicitly selected GG
+   execution, with its own host-owned conversation state.
 2. **Account ingress is not GG ingress.** The native bearer owner admits only
    the configured issuer/client and required user/session/expiry claims, then
    verifies the same bearer at fixed live OAuth userinfo. Cookies and GG tokens
@@ -3046,6 +3069,8 @@ incident investigations out of the architectural guarantee.
 - Rust [account composition](crates/grida-cli/src/account.rs) and [runtime](crates/grida-cli/src/runtime.rs)
   acquire a scoped GG grant for the selected organization, independently of provider custody.
   Account transport and media transport are distinct capabilities; no account token enters media execution.
+- The [native agent command](crates/grida-cli/src/agent.rs) receives only the
+  scoped chat connection under the same account handoff.
 - [CLI media composition](crates/grida-cli/src/runtime.rs) and
   [tests](scripts/cli-contracts/installed.mjs) — real SDK handoff, BYOK/account
   independence, missing-key failure, no stale grant reuse or credential output.

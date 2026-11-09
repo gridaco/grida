@@ -1,5 +1,6 @@
 // GRIDA-SEC-010 / GRIDA-SEC-013 / GRIDA-SEC-015 — real installed executable,
 // disposable local OAuth/account/GG endpoints, no Node network or clock preloads.
+// GRIDA-SEC-006 / GRIDA-GG: provider — scoped chat authority through the native entrypoint.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -13,6 +14,7 @@ import {
 } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
+import { createInterface } from "node:readline";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -195,6 +197,10 @@ export async function proveInstalled({ binary, launcher, workdir }) {
   let heldRoute;
   let routeReached;
   let releaseRoute;
+  let issuedGrant = grant;
+  let chatOrganization = organization;
+  let chatStatus = 200;
+  const chatRequests = [];
   const respond = (res, value, status = 200) => {
     res.writeHead(status, { "content-type": "application/json" });
     res.end(JSON.stringify(value));
@@ -274,6 +280,55 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         res.end();
         return;
       }
+      if (req.url === "/api/v1/ai/chat/completions") {
+        assert.equal(req.headers.authorization, `Bearer ${issuedGrant}`);
+        assert.equal(req.headers.accept, "text/event-stream");
+        assert.equal(req.method, "POST");
+        const body = JSON.parse(bytes);
+        assert.equal(body.model, "openai/fixture-chat");
+        assert.equal(body.stream, true);
+        assert.equal(body.stream_options.include_usage, true);
+        assert.equal(body.max_completion_tokens, 4096);
+        chatRequests.push(body);
+        if (chatStatus !== 200) {
+          respond(
+            res,
+            { error: { message: "private-upstream-error" } },
+            chatStatus
+          );
+          return;
+        }
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "x-request-id": "fixture-gg-chat",
+        });
+        res.write(
+          `data: ${JSON.stringify({
+            id: "fixture-gg-chat",
+            choices: [
+              {
+                index: 0,
+                delta: { role: "assistant", content: "Scoped reply" },
+              },
+            ],
+          })}\n\n`
+        );
+        res.end(
+          `data: ${JSON.stringify({
+            id: "fixture-gg-chat",
+            choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+          })}\n\ndata: ${JSON.stringify({
+            id: "fixture-gg-chat",
+            choices: [],
+            usage: {
+              prompt_tokens: 10,
+              completion_tokens: 3,
+              total_tokens: 13,
+            },
+          })}\n\ndata: [DONE]\n\n`
+        );
+        return;
+      }
       if (req.url.startsWith("/api/v1/ai/")) {
         assert.equal(req.headers.authorization, `Bearer ${grant}`);
         assert.equal(req.method, "POST");
@@ -309,7 +364,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         return;
       }
       if (req.url === "/api/v1/account/organizations") {
-        respond(res, { organizations: [organization], next_cursor: null });
+        respond(res, { organizations: [chatOrganization], next_cursor: null });
         return;
       }
       if (req.url === "/api/v1/account/credits?organization_id=1") {
@@ -326,11 +381,13 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         return;
       }
       if (req.url === "/api/v1/auth/gg") {
-        assert.deepEqual(JSON.parse(bytes), { organization_id: 1 });
+        assert.deepEqual(JSON.parse(bytes), {
+          organization_id: chatOrganization.id,
+        });
         respond(res, {
-          token: grant,
+          token: issuedGrant,
           expires_at: new Date(Date.now() + 600000).toISOString(),
-          organization,
+          organization: chatOrganization,
         });
         return;
       }
@@ -350,7 +407,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     });
     children.add(operation);
     operation.closed.then(() => children.delete(operation));
-    operation.child.stdin.end(stdin);
+    if (stdin !== null) operation.child.stdin.end(stdin);
     return operation;
   }
   async function run(argv, { stdin = "", exit = 0 } = {}) {
@@ -359,11 +416,142 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(r.code, exit, r.stderr || r.stdout);
     assertInstalledStderr(r);
     if (failure) throw failure;
-    for (const secret of [account, refresh, grant])
+    for (const secret of [account, refresh, grant, issuedGrant])
       assert(!r.stdout.includes(secret));
     return argv.includes("--json") ? JSON.parse(r.stdout) : r.stdout;
   }
   const checks = [];
+  async function checkAgent() {
+    const settings = [
+      "--provider",
+      "gg",
+      "--model",
+      "openai/fixture-chat",
+      "--state-dir",
+      path.join(owned, "native-agent"),
+    ];
+    const task = ["agent", "run", ...settings, "--cwd", owned, "--no-input"];
+    const records = (stdout) =>
+      stdout
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+    issuedGrant = "synthetic.agent.first";
+    const [accepted, finished] = records(
+      await run(task, { stdin: "Remember this fixture." })
+    );
+    assert.equal(accepted.kind, "accepted");
+    assert.equal(finished.kind, "finished");
+    assert.equal(finished.turn_id, accepted.turn_id);
+    assert.equal(finished.disposition, "succeeded");
+    assert.equal(chatRequests.length, 1);
+
+    issuedGrant = "synthetic.agent.renewed";
+    const service = start(["agent", "serve", "--stdio", ...settings], null);
+    const lines = createInterface({ input: service.child.stdout });
+    const output = lines[Symbol.asyncIterator]();
+    const updates = [];
+    async function rpc(id, method, params) {
+      service.child.stdin.write(
+        JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"
+      );
+      for (;;) {
+        const line = await output.next();
+        assert.equal(line.done, false, "agent ACP disconnected before reply");
+        const reply = JSON.parse(line.value);
+        if (reply.id === id) {
+          assert.equal(reply.error, undefined);
+          return reply.result;
+        }
+        assert.equal(reply.method, "session/update");
+        updates.push(reply.params.update);
+      }
+    }
+    try {
+      assert.equal(
+        (await rpc(1, "initialize", { protocolVersion: 1 })).protocolVersion,
+        1
+      );
+      const sessionId = accepted.session_id;
+      await rpc(2, "session/load", { sessionId, cwd: owned, mcpServers: [] });
+      assert.equal(chatRequests.length, 1, "load is observational");
+      const result = await rpc(3, "session/prompt", {
+        sessionId,
+        prompt: [{ type: "text", text: "Use the saved context." }],
+      });
+      assert.equal(result.stopReason, "end_turn");
+      assert(updates.some((update) => update.content?.text === "Scoped reply"));
+      service.child.stdin.end();
+      const stopped = await service.result;
+      assert.equal(stopped.code, 0, stopped.stderr);
+      assertInstalledStderr(stopped);
+      assert(!stopped.stdout.includes(issuedGrant));
+    } finally {
+      lines.close();
+    }
+    assert.equal(chatRequests.length, 2);
+    assert(
+      chatRequests[1].messages.some(
+        (message) => message.content === "Remember this fixture."
+      )
+    );
+    assert(
+      chatRequests[1].messages.some(
+        (message) => message.content === "Scoped reply"
+      )
+    );
+
+    chatOrganization = {
+      id: 2,
+      name: "other-fixture",
+      display_name: "Other fixture",
+    };
+    issuedGrant = "synthetic.agent.other";
+    const changed = await start([
+      ...task,
+      "--session",
+      accepted.session_id,
+      "--org-id",
+      "2",
+      "--prompt",
+      "Must stay local.",
+    ]).result;
+    assert.equal(changed.code, 1);
+    assert.match(changed.stderr, /session_execution_configuration_changed/);
+    assert.equal(changed.stdout, "");
+    assert.equal(
+      chatRequests.length,
+      2,
+      "different organization cannot dispatch saved session"
+    );
+
+    chatOrganization = organization;
+    issuedGrant = "synthetic.agent.no-credits";
+    chatStatus = 402;
+    const [, rejected] = records(
+      await run(
+        [
+          ...task,
+          "--session",
+          accepted.session_id,
+          "--prompt",
+          "One request only.",
+        ],
+        { exit: 1 }
+      )
+    );
+    assert.equal(rejected.disposition, "failed");
+    assert.equal(rejected.account.inference_failure.code, "payment_required");
+    assert.equal(
+      chatRequests.length,
+      3,
+      "credit refusal is never retried or moved to another provider"
+    );
+    assert(!JSON.stringify(rejected).includes("private-upstream-error"));
+    issuedGrant = grant;
+    chatStatus = 200;
+    checks.push("installed_native_agent_scoped_chat");
+  }
   async function cancelAt(route, argv) {
     heldRoute = route;
     const reached = new Promise((resolve) => {
@@ -724,6 +912,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     );
     releaseResponse?.();
     checks.push("installed_signal_cancellation");
+    await checkAgent();
     const logout = await run(["auth", "logout", "--json"]);
     assert.equal(logout.revocation, "confirmed");
     assert.equal(

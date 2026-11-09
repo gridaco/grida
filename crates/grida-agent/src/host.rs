@@ -6,24 +6,25 @@ pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use questions::{PendingQuestion, Questions};
 
 use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
+use crate::gg::GgConnection;
 use crate::http::{CompatibleOutputLimitField, HttpTransport, ProviderOptions, ProviderProtocol};
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
 };
 use agent_kit_core::history::{HistoryPosition, HistoryRecord};
-use agent_kit_core::inference::{Modality, ModelCapabilities, Provider};
+use agent_kit_core::inference::{Modality, ModelCapabilities, Provider, ProviderBinding};
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::Inventory;
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlRevision, JournalPosition, TurnOutcome,
 };
 use agent_kit_core::{
-    BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, MessageId,
+    BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, MessageId, ModelId,
     PrincipalId, Result, SchemaId, ScopeId, SessionId, TurnId,
 };
 use agent_kit_providers::{
     Anthropic, Gemini, GeminiProfile, ModelProfile, OpenAiCompatible, OutputLimitField,
-    StreamLimits,
+    StreamLimits, StreamingTransport,
 };
 use agent_kit_runtime::{ExecutionLimits, ExecutionServices, Runtime, TurnUpdate};
 use agent_kit_sessions::{
@@ -54,6 +55,13 @@ const MAX_TURN_STEPS: u32 = 8;
 const UPDATE_CAPACITY: usize = 128;
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(8);
 const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
+const PROVIDER_LIMITS: StreamLimits = StreamLimits {
+    max_request_bytes: 1024 * 1024,
+    max_response_bytes: 4 * 1024 * 1024,
+    max_event_bytes: 256 * 1024,
+    max_tool_calls: 8,
+    max_tool_argument_bytes: 64 * 1024,
+};
 
 #[derive(Clone)]
 pub struct Host {
@@ -257,24 +265,59 @@ struct SessionConfiguration {
     execution: Fingerprint,
 }
 
+/// The selected model and explicit output allowance for the scoped GG host.
+pub struct GgOptions {
+    pub model: ModelId,
+    pub max_output_tokens: u64,
+}
+
 impl Host {
     pub fn open(state_dir: &Path, provider: Option<ProviderOptions>) -> Result<Self> {
+        Self::open_with(
+            state_dir,
+            provider.map(|options| || Execution::new(state_dir, options)),
+        )
+    }
+
+    // GRIDA-SEC-006 / GRIDA-GG: provider — bind execution to the admitted scope.
+    /// Embed a host with a current, invocation-owned grant and its approved
+    /// transport. The transport receives no account credentials.
+    pub fn open_gg(
+        state_dir: &Path,
+        options: GgOptions,
+        connection: Arc<GgConnection>,
+        transport: Arc<dyn StreamingTransport>,
+    ) -> Result<Self> {
+        connection.validate()?;
+        if !(1..=65_536).contains(&options.max_output_tokens) {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "invalid_output_token_limit",
+            ));
+        }
+        Self::open_with(
+            state_dir,
+            Some(|| Execution::new_gg(options, connection, transport)),
+        )
+    }
+
+    fn open_with(
+        state_dir: &Path,
+        execution: Option<impl FnOnce() -> Result<Execution>>,
+    ) -> Result<Self> {
         let database = state_dir.join("runtime.sqlite");
-        if provider.is_some() {
+        if execution.is_some() {
             prepare_state_dir(state_dir)?;
         } else if !database.is_file() {
             return Err(problem(ErrorKind::Unavailable, "agent_state_unavailable"));
         }
         let store = Arc::new(SqliteStore::open(database)?);
-        let configuration = provider
+        let configuration = execution
             .as_ref()
             .map(|_| Configuration::open(state_dir))
             .transpose()?
             .map(Arc::new);
-        let execution = provider
-            .map(|options| Execution::new(state_dir, options))
-            .transpose()?
-            .map(Arc::new);
+        let execution = execution.map(|open| open()).transpose()?.map(Arc::new);
         Ok(Self {
             store,
             execution,
@@ -1055,20 +1098,7 @@ impl Execution {
         let transport = Arc::new(HttpTransport::new(state_dir, &options)?);
         let configuration = transport.selection();
         let binding = transport.binding().clone();
-        let capabilities = ModelCapabilities {
-            revision: BindingId::new(format!("{}-text-tools-v1", options.protocol.as_str()))?,
-            input_modalities: [Modality::Text].into_iter().collect(),
-            json_tools: true,
-            text_tools: false,
-            max_output_tokens: None,
-        };
-        let limits = StreamLimits {
-            max_request_bytes: 1024 * 1024,
-            max_response_bytes: 4 * 1024 * 1024,
-            max_event_bytes: 256 * 1024,
-            max_tool_calls: 8,
-            max_tool_argument_bytes: 64 * 1024,
-        };
+        let capabilities = text_capabilities(options.protocol.as_str())?;
         let provider: Arc<dyn Provider> = match options.protocol {
             ProviderProtocol::OpenAiCompatible => Arc::new(OpenAiCompatible::new(
                 binding.clone(),
@@ -1086,13 +1116,13 @@ impl Execution {
                     },
                 )]),
                 transport.clone(),
-                limits,
+                PROVIDER_LIMITS,
             )?),
             ProviderProtocol::Anthropic => Arc::new(Anthropic::new(
                 binding.clone(),
                 BTreeMap::from([(options.model.clone(), capabilities)]),
                 transport.clone(),
-                limits,
+                PROVIDER_LIMITS,
             )?),
             ProviderProtocol::Gemini => Arc::new(Gemini::new(
                 binding.clone(),
@@ -1107,9 +1137,64 @@ impl Execution {
                     },
                 )]),
                 transport.clone(),
-                limits,
+                PROVIDER_LIMITS,
             )?),
         };
+        Self::compose(
+            configuration,
+            legacy_configuration,
+            options.model,
+            options.max_output_tokens,
+            provider,
+            binding,
+            Credential::Http(transport),
+        )
+    }
+
+    fn new_gg(
+        options: GgOptions,
+        connection: Arc<GgConnection>,
+        transport: Arc<dyn StreamingTransport>,
+    ) -> Result<Self> {
+        let configuration = Fingerprint::of(&(
+            "gg-chat-selection-v1",
+            connection.scope_fingerprint(),
+            &options.model,
+        ))?;
+        let binding = connection.binding().clone();
+        let provider = Arc::new(OpenAiCompatible::new(
+            binding.clone(),
+            BTreeMap::from([(
+                options.model.clone(),
+                ModelProfile {
+                    capabilities: text_capabilities("gg")?,
+                    output_limit: OutputLimitField::CompletionTokens,
+                    include_usage: true,
+                },
+            )]),
+            transport,
+            PROVIDER_LIMITS,
+        )?);
+        Self::compose(
+            configuration,
+            configuration,
+            options.model,
+            options.max_output_tokens,
+            provider,
+            binding,
+            Credential::Gg(connection),
+        )
+    }
+
+    fn compose(
+        configuration: Fingerprint,
+        legacy_configuration: Fingerprint,
+        model: ModelId,
+        max_output_tokens: u64,
+        provider: Arc<dyn Provider>,
+        binding: ProviderBinding,
+        credential: Credential,
+    ) -> Result<Self> {
         let inference = GrantSelection {
             authority: binding.authority,
             grants: Vec::new(),
@@ -1121,7 +1206,7 @@ impl Execution {
             authority: Arc::new(ExecutionAuthority {
                 inference: inference.clone(),
                 questions: questions.clone(),
-                transport,
+                credential,
             }),
             gate: questions.clone(),
             limits: ExecutionLimits {
@@ -1138,10 +1223,10 @@ impl Execution {
             legacy_configuration,
             runtime,
             config: MasterConfig {
-                model: options.model,
+                model,
                 instructions: "You are Grida Agent, a helpful assistant.".into(),
                 max_steps: MAX_TURN_STEPS,
-                max_output_tokens: options.max_output_tokens,
+                max_output_tokens,
             },
             provider,
             authority: MasterAuthority {
@@ -1153,10 +1238,25 @@ impl Execution {
     }
 }
 
+fn text_capabilities(protocol: &str) -> Result<ModelCapabilities> {
+    Ok(ModelCapabilities {
+        revision: BindingId::new(format!("{protocol}-text-tools-v1"))?,
+        input_modalities: [Modality::Text].into_iter().collect(),
+        json_tools: true,
+        text_tools: false,
+        max_output_tokens: None,
+    })
+}
+
+enum Credential {
+    Http(Arc<HttpTransport>),
+    Gg(Arc<GgConnection>),
+}
+
 struct ExecutionAuthority {
     inference: GrantSelection,
     questions: Arc<questions::QuestionAccess>,
-    transport: Arc<HttpTransport>,
+    credential: Credential,
 }
 
 impl AuthorityValidator for ExecutionAuthority {
@@ -1171,7 +1271,10 @@ impl AuthorityValidator for ExecutionAuthority {
                     "provider_authority_unavailable",
                 ));
             }
-            self.transport.validate_credential().await
+            match &self.credential {
+                Credential::Http(transport) => transport.validate_credential().await,
+                Credential::Gg(connection) => connection.validate(),
+            }
         })
     }
 }
@@ -1320,7 +1423,7 @@ fn decode_input<T: serde::de::DeserializeOwned>(input: &Submission) -> Result<T>
         .map_err(|_| problem(ErrorKind::InvalidState, "invalid_submission"))
 }
 
-fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
+pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
     if parts.is_empty() || parts.len() > MAX_PROMPT_PARTS {
         return Err(problem(ErrorKind::InvalidInput, "invalid_prompt_parts"));
     }
@@ -1329,6 +1432,11 @@ fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
     if bytes.len() > MAX_PROMPT_BYTES {
         return Err(problem(ErrorKind::LimitExceeded, "prompt_too_large"));
     }
+    Ok(())
+}
+
+fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
+    validate_prompt_parts(parts)?;
     let content = parts
         .iter()
         .map(|part| match part {
