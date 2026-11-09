@@ -21,7 +21,7 @@ type Slot = {
   root: string;
   opened: Promise<Owner>;
   visible: Promise<ActiveNativeChat>;
-  active?: ActiveNativeChat;
+  owner?: Owner;
 };
 
 export class NativeWorkspaceAgents {
@@ -39,7 +39,8 @@ export class NativeWorkspaceAgents {
 
   current(workspaceId: string): ActiveNativeChat | null {
     if (this.stopping.signal.aborted) return null;
-    return this.slots.get(workspaceId)?.active ?? null;
+    const active = this.slots.get(workspaceId)?.owner?.active;
+    return active?.chat.connected ? active : null;
   }
 
   async open(workspace: Project): Promise<ActiveNativeChat> {
@@ -49,16 +50,32 @@ export class NativeWorkspaceAgents {
     if (existing) {
       if (existing.root !== root)
         throw new Error("native_workspace_root_changed");
-      return existing.visible;
-    }
-    if (this.slots.size >= MAX_LIVE_WORKSPACES)
+      const chat = existing.owner?.active.chat;
+      if (!chat || chat.connected) return existing.visible;
+      if (!chat.hasExited)
+        throw new Error("native_workspace_disconnect_pending");
+    } else if (this.slots.size >= MAX_LIVE_WORKSPACES) {
       throw new Error("native_workspace_capacity_reached");
+    }
 
-    const opened = Promise.resolve().then(() => this.start({ id, root }));
-    const visible = opened.then(({ active }) => {
+    const opened = Promise.resolve().then(async () => {
+      if (existing?.owner) {
+        // Exit was observed by the process owner. The store will reconcile
+        // retained work; replacing the connection is not a retry of a turn.
+        try {
+          await existing.owner.active.chat.close();
+        } catch {
+          // Work cleanup can remain unverified after an abrupt child exit.
+        } finally {
+          existing.owner.release?.();
+        }
+      }
+      return await this.start({ id, root });
+    });
+    const visible = opened.then((owner) => {
       if (this.stopping.signal.aborted) throw closing();
-      slot.active = active;
-      return active;
+      slot.owner = owner;
+      return owner.active;
     });
     const slot: Slot = { root, opened, visible };
     this.slots.set(id, slot);

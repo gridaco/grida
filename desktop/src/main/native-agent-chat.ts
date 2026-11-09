@@ -89,6 +89,14 @@ export class NativeAgentChat {
   >();
   private closed = false;
 
+  get connected(): boolean {
+    return !this.closed && this.process.connected;
+  }
+
+  get hasExited(): boolean {
+    return this.process.hasExited;
+  }
+
   private constructor(
     private readonly process: NativeAgentProcess,
     private readonly cwd: string,

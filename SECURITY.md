@@ -896,6 +896,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   when shutdown begins. It drains pending launches and closes each native
   child before releasing that child's provider connection. Window navigation
   and observer teardown do not close the workspace engine.
+  A disconnected child stops serving attachments. The workspace can be reopened
+  after the process owner observes exit. Reopening does not replay interrupted
+  provider work, and the old provider connection is released before launch.
 - [Native chat IPC](desktop/src/main/native-chat-ipc.ts) is available only to
   the current top-level workspace frame under the existing authenticated
   window guard. Its attachments and observed control revisions are issued in

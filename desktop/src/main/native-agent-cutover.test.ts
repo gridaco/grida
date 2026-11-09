@@ -383,4 +383,76 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     },
     15000
   );
+
+  it.runIf(Boolean(nativeResources))(
+    "reopens a disconnected workspace without redispatching interrupted work",
+    async () => {
+      const test = await fixture();
+      const prepared = await test.NativeAgentCutover.prepare();
+      const workspace = { id: "work", root: test.launch.cwd };
+      const resourcesPath = test.child("crash-resources");
+      const executableDir = path.join(resourcesPath, "native-agent");
+      fs.mkdirSync(executableDir, { mode: 0o700 });
+      const original = path.join(
+        nativeResources!,
+        "native-agent",
+        "grida-agent"
+      );
+      const pidFile = path.join(resourcesPath, "fixture.pid");
+      const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+      fs.writeFileSync(
+        path.join(executableDir, "grida-agent"),
+        `#!/bin/sh\nprintf '%s' "$$" > ${quote(pidFile)}\nexec ${quote(original)} "$@"\n`,
+        { mode: 0o700 }
+      );
+      const requested = Promise.withResolvers<void>();
+      let attempts = 0;
+      const release = vi.fn<() => void>();
+      const owners = new NativeWorkspaceAgents(prepared, async () => ({
+        launch: {
+          ...test.launch,
+          resourcesPath,
+          providerNetwork: {
+            prepare: () => async () => {
+              attempts += 1;
+              requested.resolve();
+              return new Response(new ReadableStream(), {
+                headers: { "content-type": "text/event-stream" },
+              });
+            },
+          },
+        },
+        release,
+      }));
+      try {
+        const first = await owners.open(workspace);
+        const session = await first.chat.create();
+        const accepted = await first.chat.submit(
+          session,
+          "crash-fixture",
+          "Hold this attempt"
+        );
+        await requested.promise;
+        const pid = Number(fs.readFileSync(pidFile, "utf8"));
+        expect(pid).toBeGreaterThan(1);
+        process.kill(pid, "SIGKILL");
+        await vi.waitFor(() => expect(owners.current(workspace.id)).toBeNull());
+        const replacement = await owners.open(workspace);
+        expect(replacement).not.toBe(first);
+        expect(release).toHaveBeenCalledTimes(1);
+        const reopened = await replacement.chat.load(session.id);
+        expect(
+          (await replacement.chat.observe(reopened)).current
+        ).toMatchObject({
+          turnId: accepted.turnId,
+          disposition: "interrupted",
+        });
+        expect(attempts).toBe(1);
+      } finally {
+        await owners.close();
+      }
+      expect(release).toHaveBeenCalledTimes(2);
+    },
+    15_000
+  );
 });

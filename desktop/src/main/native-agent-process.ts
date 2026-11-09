@@ -51,6 +51,7 @@ export class NativeAgentProcess {
   private buffered = 0;
   private nextId = 1;
   private ready = false;
+  private observedExit = false;
   private shutdown: Promise<void> | undefined;
   private failure: Error | undefined;
 
@@ -69,6 +70,7 @@ export class NativeAgentProcess {
     let diagnostics = "";
     this.exited = new Promise((resolve) => {
       child.once("close", (code, signal) => {
+        this.observedExit = true;
         const diagnostic = /^grida-agent: ([a-z0-9_]{1,96})$/m.exec(
           diagnostics
         )?.[1];
@@ -92,6 +94,14 @@ export class NativeAgentProcess {
           .subarray(0, 4096 - diagnostics.length)
           .toString("utf8");
     });
+  }
+
+  get connected(): boolean {
+    return this.ready && !this.failure && !this.shutdown;
+  }
+
+  get hasExited(): boolean {
+    return this.observedExit;
   }
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
