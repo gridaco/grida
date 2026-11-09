@@ -73,12 +73,18 @@ Stop for that turn and reports its verified disposition. Reaching the run
 deadline after acceptance requests suspension. If output is unavailable,
 inspect the retained turn by its accepted IDs.
 
+Pass `--questions` to let a tool-capable model request input. If work reaches
+a question it still needs answered, `run` preserves the turn and emits a
+`finished` record with `input_required` and the pending `questions`. The
+process exits so an automation can hand the retained session to an ACP client.
+
 | Exit | Meaning                                              |
 | ---- | ---------------------------------------------------- |
 | 0    | Successful run, inspection, or clean stdio shutdown  |
 | 1    | Failed request, runtime failure, or delivery failure |
 | 4    | Verified suspension returned by the run              |
 | 5    | Uncertain execution or unverified host shutdown      |
+| 6    | Verified suspension for an identified question       |
 | 130  | Stopped run or process signal                        |
 
 `inspect` reads the latest and current persisted turn state without provider
@@ -92,6 +98,17 @@ SDK. Prompts accept text and resource-link descriptors. References travel as
 text context and confer no file or network access. Session loading replays
 committed text before its reply and leaves work ownership with the host.
 The prompt response follows the last delivered update and verified outcome.
+
+Clients can negotiate both `co.grida/session/questions` and
+`co.grida/session/answer-question` at version `1`. Prompts accepted through the
+product submit and queue extensions then capture question availability. Plain
+`session/prompt` uses the portable ACP flow. A pending question is listed by
+session and turn ID with its wait ID, question text, and suggested choices.
+An answer uses that wait ID and the current revisions. Free text, a suggested
+choice, and skipping are supported. A suspended turn can continue when its
+pending answers arrive. An explicit Pause still requires Resume. Repeating an
+accepted answer request returns its original receipt and can wake an answered
+turn after a reconnect.
 
 Stdout carries only newline-delimited protocol frames. The host bounds each
 frame to 1 MiB, admits at most 16 unanswered requests per connection, and

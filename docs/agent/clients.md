@@ -71,10 +71,16 @@ disposition when output remains available.
 | 1         | Failed request, execution, or output delivery          |
 | 4         | Verified suspension                                    |
 | 5         | Uncertain execution or unverified shutdown             |
+| 6         | Input required with a retained question                |
 | 130       | Stopped task or process signal                         |
 
 After an output failure, use the accepted identifiers to inspect retained state.
 An uncertain outcome requires reconciliation before repeating effects.
+
+Use `run --questions` to enable structured questions in an embedded run. When
+an answer is needed, the process verifies suspension and returns `input_required`
+with the session, turn, and pending question identities. A capable service client
+can answer the retained question through the same state directory.
 
 ## Connect an ACP client
 
@@ -137,16 +143,18 @@ A capable client can opt in to individual version-1 operations through
 `clientCapabilities._meta` during initialization. The host advertises the same
 keys in `agentCapabilities._meta`. A custom method adds `_` before its capability
 key, such as `_co.grida/session/snapshot`.
+Each suffix in a grouped row uses the displayed prefix and is negotiated separately.
 
-| Capability key                                    | Operation                                                                        |
-| ------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `co.grida/session/submit`                         | Accept a prompt for an idle session under a client-chosen input ID.              |
-| `co.grida/session/snapshot`                       | Read revisions, waiting inputs in order, and the current or latest turn.         |
-| `co.grida/session/enqueue`, `input`               | Queue a prompt and read its retained content, settings, and disposition.         |
-| `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting inputs using the current queue revision.                            |
-| `co.grida/session/pause`, `resume`, `steer`       | Pause a turn, resume its verified suspension, or send a correction to that turn. |
-| `co.grida/session/stop`, `resume-queue`           | Stop a turn and pause queue advancement, then reopen queue admission when ready. |
-| `co.grida/config/inspect`, `update`, `reload`     | Inspect, change, or reload the host defaults.                                    |
+| Capability key                                    | Operation                                                                            |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `co.grida/session/submit`                         | Accept a prompt for an idle session under a client-chosen input ID.                  |
+| `co.grida/session/snapshot`                       | Read revisions, waiting inputs in order, and the current or latest turn.             |
+| `co.grida/session/enqueue`, `input`               | Queue a prompt and read its retained content, settings, and disposition.             |
+| `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting inputs using the current queue revision.                                |
+| `co.grida/session/pause`, `resume`, `steer`       | Pause a turn, resume its verified suspension, or send a correction to that turn.     |
+| `co.grida/session/stop`, `resume-queue`           | Stop a turn and pause queue advancement, then reopen queue admission when ready.     |
+| `co.grida/session/questions`, `answer-question`   | Inspect pending questions and submit a correlated choice, free-text answer, or skip. |
+| `co.grida/config/inspect`, `update`, `reload`     | Inspect, change, or reload the host defaults.                                        |
 
 Use ordinary `session/prompt` for a streamed reply. Use durable submission or
 enqueue when your client needs acceptance separately from completion. Give each
@@ -160,6 +168,11 @@ accepted settings. A changed provider credential can make the retained task
 unavailable for resumption. Stop pauses queue advancement, which you can
 reopen separately with Resume Queue. Opening a session after restart only
 loads its retained state.
+
+Negotiate both question operations to enable question tools for new inputs.
+An answer can resume suspended work when its other conditions allow execution.
+An explicit Pause remains effective after the answer. Ordinary ACP prompts keep
+their existing text-only profile.
 
 Configuration changes apply to later accepted inputs. Existing inputs retain
 their captured defaults. An explicit hard context-input cap requires supported

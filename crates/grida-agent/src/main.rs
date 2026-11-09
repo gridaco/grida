@@ -63,6 +63,12 @@ fn command() -> Command {
                 )
                 .arg(Arg::new("session").long("session").value_name("SESSION_ID"))
                 .arg(
+                    Arg::new("questions")
+                        .long("questions")
+                        .action(ArgAction::SetTrue)
+                        .help("Allow questions and exit with an identified input-required result."),
+                )
+                .arg(
                     Arg::new("prompt")
                         .long("prompt")
                         .value_name("TEXT")
@@ -302,7 +308,7 @@ async fn run(host: &Host, args: &ArgMatches, timeout: Duration) -> Result<u8> {
         }
     }
     .map_err(|_| problem(ErrorKind::Uncertain, "run_worker_disconnected"))??;
-    let (disposition, account, code) = match result {
+    let (disposition, account, code, questions) = match result {
         RunResult::Settled(outcome) => {
             let (disposition, code) = match outcome.status {
                 OutcomeStatus::Succeeded => ("succeeded", 0),
@@ -311,11 +317,12 @@ async fn run(host: &Host, args: &ArgMatches, timeout: Duration) -> Result<u8> {
                 OutcomeStatus::Uncertain => ("uncertain", 5),
             };
             let account = outcome.account.as_ref().map(read_account).transpose()?;
-            (disposition, account, code)
+            (disposition, account, code, None)
         }
-        RunResult::Suspended => ("suspended", None, 4),
+        RunResult::Suspended => ("suspended", None, 4, None),
+        RunResult::InputRequired(pending) => ("input_required", None, 6, Some(pending.questions)),
     };
-    write_record(&json!({
+    let mut finished = json!({
         "schema_version": 1,
         "kind": "finished",
         "session_id": accepted.session,
@@ -323,8 +330,11 @@ async fn run(host: &Host, args: &ArgMatches, timeout: Duration) -> Result<u8> {
         "input_id": accepted.input,
         "disposition": disposition,
         "account": account,
-    }))
-    .await?;
+    });
+    if let Some(questions) = questions {
+        finished["questions"] = json!(questions);
+    }
+    write_record(&finished).await?;
     Ok(code)
 }
 
@@ -342,6 +352,7 @@ async fn admit_run(host: &Host, args: &ArgMatches) -> Result<grida_agent::host::
         id: change_id()?,
         session,
         parts: vec![PromptPart::Text { text: prompt }],
+        questions: args.get_flag("questions"),
     })
     .await
 }

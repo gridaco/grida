@@ -111,6 +111,8 @@ summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
 | `stop`, `pause`                          | Flat task basis. Return the committed control receipt. Stop also pauses queue admission. Pause becomes verified when the turn reports `suspended`.                        |
 | `resume`                                 | Task basis in `task`, `expectedEpoch`, `expectedJournalPosition`. Claim the verified suspension and clear its task pause. Return the claimed turn summary.                |
 | `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                               |
+| `questions`                              | `sessionId`, `turnId`. Read pending question identities, prompts, choices, and the current control/history basis.                                                         |
+| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed answer and its correlated contribution.                                            |
 
 A duplicate input compares the original prompt and returns its retained
 disposition, including supersession or withdrawal. Changes reuse the caller's
@@ -124,8 +126,16 @@ The host advances waiting work after verified settlement while admission is
 open. Observation stays independent of scheduling. After a restart, Resume
 Queue can wake retained waiting work, and Resume Task checks captured settings
 and current authority before reacquiring a suspended turn. A credential change
-blocks dispatch under an earlier captured authority. Question operations remain
-outside the advertised source-built set.
+blocks dispatch under an earlier captured authority.
+
+Clients negotiate both question operations to enable the corresponding tools
+for newly accepted input. Answers use `{ "kind": "text", "text": "..." }`,
+`{ "kind": "choice", "index": 0 }`, or `{ "kind": "skipped" }`.
+Keep the request identity and all parameters stable when retrying. Accepted
+answers retain a scheduling wake across concurrent worker completion and
+capacity changes. An explicit task pause is independent of answer receipt.
+An embedded `run --questions` returns a verified `input_required` result and
+exit code `6` when it suspends for an answer.
 
 Subagent observation has an active ACP proposal. Its initial client mutation is
 child cancellation, with direct prompt, steering, configuration, and resume

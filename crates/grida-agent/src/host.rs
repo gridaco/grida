@@ -1,7 +1,9 @@
 //! Product composition and ownership for native agent turns.
 
 mod lifecycle;
+mod questions;
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
+pub use questions::{PendingQuestion, Questions};
 
 use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
 use crate::http::{CompatibleOutputLimitField, HttpTransport, ProviderOptions, ProviderProtocol};
@@ -23,10 +25,7 @@ use agent_kit_providers::{
     Anthropic, Gemini, GeminiProfile, ModelProfile, OpenAiCompatible, OutputLimitField,
     StreamLimits,
 };
-use agent_kit_runtime::{
-    AdmissionContext, ExecutionLimits, ExecutionServices, Runtime, ToolAdmission, ToolDecision,
-    ToolGate, TurnUpdate,
-};
+use agent_kit_runtime::{ExecutionLimits, ExecutionServices, Runtime, TurnUpdate};
 use agent_kit_sessions::{
     Acceptance, ClaimOutcome, ClaimRequest, ControlReceipt, ControlRequest, CreateSession,
     InputDisposition, RecoveryRequest, SessionControl, SessionRevision, SessionStore, SessionView,
@@ -37,6 +36,7 @@ use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
+use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -73,6 +73,7 @@ struct Execution {
     config: MasterConfig,
     provider: Arc<dyn Provider>,
     authority: MasterAuthority,
+    questions: Arc<questions::QuestionAccess>,
 }
 
 #[derive(Default)]
@@ -87,13 +88,24 @@ struct Work {
 enum ReadyWork {
     Queue(SessionId),
     Stop(SessionId, TurnId),
+    Answered {
+        session: SessionId,
+        turn: TurnId,
+        position: JournalPosition,
+    },
 }
 
 impl ReadyWork {
     fn session(&self) -> &SessionId {
         match self {
-            Self::Queue(session) | Self::Stop(session, _) => session,
+            Self::Queue(session) | Self::Stop(session, _) | Self::Answered { session, .. } => {
+                session
+            }
         }
+    }
+
+    fn wakes_answer(&self, session: &SessionId, turn: &TurnId) -> bool {
+        matches!(self, Self::Answered { session: owner, turn: target, .. } if owner == session && target == turn)
     }
 }
 
@@ -133,6 +145,7 @@ pub struct PromptRequest {
     pub id: ChangeId,
     pub session: SessionId,
     pub parts: Vec<PromptPart>,
+    pub questions: bool,
 }
 
 pub struct AcceptedRun {
@@ -160,6 +173,8 @@ struct StoredPrompt {
     max_steps: Option<u32>,
     model: Option<agent_kit_core::ModelId>,
     authority: Option<CapturedAuthority>,
+    #[serde(default)]
+    questions: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -191,9 +206,11 @@ enum Launch {
     Prompt {
         id: ChangeId,
         parts: Vec<PromptPart>,
+        questions: bool,
     },
     Queued,
     Resume(ClaimRequest),
+    ResumeAnswered(JournalPosition),
     RecoverStopped(RecoveryRequest),
 }
 
@@ -215,11 +232,19 @@ struct Admitted {
     acceptance: Option<Acceptance>,
 }
 
+struct PreparedInput {
+    config: MasterConfig,
+    messages: Vec<Message>,
+    limit: Option<NonZeroU64>,
+    questions: bool,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "disposition", content = "outcome", rename_all = "snake_case")]
 pub enum RunResult {
     Settled(TurnOutcome),
     Suspended,
+    InputRequired(Questions),
 }
 
 pub struct SessionSnapshot {
@@ -297,7 +322,12 @@ impl Host {
 
     pub async fn start_prompt(&self, request: PromptRequest) -> Result<AcceptedRun> {
         self.execution()?;
-        let PromptRequest { id, session, parts } = request;
+        let PromptRequest {
+            id,
+            session,
+            parts,
+            questions,
+        } = request;
         prompt_input(&id, &parts)?;
         let turn = TurnId::new(uuid())?;
         let ticket = {
@@ -309,6 +339,7 @@ impl Host {
                 Launch::Prompt {
                     id: id.clone(),
                     parts,
+                    questions,
                 },
             )?
         };
@@ -352,19 +383,31 @@ impl Host {
         let handle = tokio::spawn(async move {
             // The worker checks the same lock used for registration before
             // any durable claim, even when its requesting client disappears.
+            let answered = match &launch {
+                Launch::ResumeAnswered(position) => Some((&worker_turn, *position)),
+                _ => None,
+            };
             let result = host.admit(&worker_session, &worker_turn, launch).await;
             let admitted = match result {
                 Ok(Some(run)) => run,
                 Ok(None) => {
-                    host.finish_work(&worker_session, false).await;
+                    host.finish_work(&worker_session, false, answered).await;
                     let _ = admission_tx.send(Ok(None));
                     host.wake_ready().await;
                     return;
                 }
                 Err(error) => {
                     let queue_waiting = error.code == "session_queue_waiting";
-                    host.finish_work(&worker_session, error.kind == ErrorKind::Uncertain)
-                        .await;
+                    let basis_changed = matches!(
+                        error.code.as_str(),
+                        "stale_session_revision" | "suspension_mismatch"
+                    );
+                    host.finish_work(
+                        &worker_session,
+                        error.kind == ErrorKind::Uncertain,
+                        answered.filter(|_| !basis_changed),
+                    )
+                    .await;
                     let _ = admission_tx.send(Err(error));
                     host.wake_ready().await;
                     if queue_waiting {
@@ -383,8 +426,16 @@ impl Host {
             )
             .await;
             let settled = matches!(&result, Ok(RunResult::Settled(_)));
-            let suspended = matches!(&result, Ok(RunResult::Suspended));
-            host.finish_work(&worker_session, result.is_err()).await;
+            let suspended = matches!(
+                &result,
+                Ok(RunResult::Suspended | RunResult::InputRequired(_))
+            );
+            host.finish_work(
+                &worker_session,
+                result.is_err(),
+                settled.then_some((&worker_turn, JournalPosition(u64::MAX))),
+            )
+            .await;
             let _ = completion_tx.send(result);
             host.wake_ready().await;
             if settled {
@@ -393,7 +444,9 @@ impl Host {
                 host.kick_stopped(worker_session, worker_turn).await;
             }
         });
-        work.ready.retain(|waiting| waiting.session() != &session);
+        work.ready.retain(|waiting| {
+            waiting.session() != &session || matches!(waiting, ReadyWork::Answered { .. })
+        });
         work.active.insert(
             session,
             Active {
@@ -427,13 +480,17 @@ impl Host {
         let view = self.store.inspect(session.clone()).await?;
         self.check_execution(&view)?;
         let (claim_request, input, acceptance, history) = match launch {
-            Launch::Prompt { id, parts } => {
+            Launch::Prompt {
+                id,
+                parts,
+                questions,
+            } => {
                 require_idle(&view)?;
                 if !view.queued.is_empty() {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
                 }
                 let history = self.provider_history(session.clone(), None).await?;
-                let input = self.capture_submission(id, parts).await?;
+                let input = self.capture_submission(id, parts, questions).await?;
                 let acceptance = self.store.submit(session.clone(), input.clone()).await?;
                 let view = self.store.inspect(session.clone()).await?;
                 if view.queued.first().map(|head| &head.input.id) != Some(&input.id) {
@@ -472,7 +529,17 @@ impl Host {
                     history,
                 )
             }
-            Launch::Resume(request) => {
+            resume @ (Launch::Resume(_) | Launch::ResumeAnswered(_)) => {
+                let request = match resume {
+                    Launch::Resume(request) => request,
+                    Launch::ResumeAnswered(_) => {
+                        let Some(request) = self.answered_claim(session, turn, &view).await? else {
+                            return Ok(None);
+                        };
+                        request
+                    }
+                    _ => unreachable!("resume launch selected"),
+                };
                 let history = self
                     .provider_history(session.clone(), Some(turn.clone()))
                     .await?;
@@ -502,9 +569,7 @@ impl Host {
         };
         let prepared = input
             .as_ref()
-            .map(|input| {
-                self.prepare_input(execution, input, &history, InputAuthority::RequireCaptured)
-            })
+            .map(|input| self.prepare_input(execution, input, InputAuthority::RequireCaptured))
             .transpose()?;
         let claimed = match claim_request {
             WorkerClaim::Select(request) => self.store.claim(request).await?,
@@ -515,7 +580,7 @@ impl Host {
             ClaimOutcome::Acquired(claim) => claim,
             ClaimOutcome::Existing(_) => return Ok(None),
         };
-        let (master, input) = match prepared {
+        let prepared = match prepared {
             Some(prepared) => prepared,
             None => {
                 let [input] = claim.inputs.as_slice() else {
@@ -524,7 +589,7 @@ impl Host {
                         "retained_input_selection_invalid",
                     ));
                 };
-                self.prepare_input(execution, input, &history, InputAuthority::CancellationOnly)
+                self.prepare_input(execution, input, InputAuthority::CancellationOnly)
                     .map_err(|_| problem(ErrorKind::Uncertain, "retained_input_unavailable"))?
             }
         };
@@ -552,10 +617,30 @@ impl Host {
             .await
             .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_pause_failed"))?;
         }
+        let mut authority = execution.authority.clone();
+        let tools = if prepared.questions {
+            let operations = opened.turn.operations();
+            let (tools, grants) = execution.questions.capture(operations.clone())?;
+            if !closing {
+                execution.questions.reconcile(&operations, &tools).await?;
+            }
+            authority.tools = grants;
+            tools
+        } else {
+            Inventory::new().snapshot(&[])?
+        };
+        let master = Master::new(
+            prepared.config,
+            execution.provider.clone(),
+            tools,
+            authority,
+        )?
+        .with_history(history)
+        .with_input_limit(prepared.limit);
         Ok(Some(Admitted {
             master,
             opened,
-            input,
+            input: prepared.messages,
             acceptance,
         }))
     }
@@ -576,7 +661,12 @@ impl Host {
         Ok(())
     }
 
-    async fn capture_submission(&self, id: ChangeId, parts: Vec<PromptPart>) -> Result<Submission> {
+    async fn capture_submission(
+        &self,
+        id: ChangeId,
+        parts: Vec<PromptPart>,
+        questions: bool,
+    ) -> Result<Submission> {
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
         Ok(Submission {
@@ -594,6 +684,7 @@ impl Host {
                         principal: execution.authority.inference.authority.principal.clone(),
                         scope: execution.authority.inference.authority.scope.clone(),
                     }),
+                    questions,
                 },
             )?,
         })
@@ -603,15 +694,14 @@ impl Host {
         &self,
         execution: &Execution,
         input: &Submission,
-        history: &[Message],
         authority: InputAuthority,
-    ) -> Result<(Master, Vec<Message>)> {
+    ) -> Result<PreparedInput> {
         let mut config = execution.config.clone();
-        let (input, limit) = match input.payload.version() {
+        let (messages, limit, questions) = match input.payload.version() {
             1 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 authority.validate(None, &execution.authority.inference.authority)?;
                 config.max_steps = 1;
-                (decode_input(input)?, None)
+                (decode_input(input)?, None, false)
             }
             2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
@@ -632,6 +722,7 @@ impl Host {
                 (
                     prompt_input(&input.id, &stored.parts)?,
                     stored.configuration.defaults.context.max_input_tokens,
+                    stored.questions,
                 )
             }
             _ => {
@@ -641,15 +732,15 @@ impl Host {
                 ));
             }
         };
-        let master = Master::new(
+        if config.max_steps == 0 || config.max_output_tokens == 0 {
+            return Err(problem(ErrorKind::InvalidInput, "invalid_master_limits"));
+        }
+        Ok(PreparedInput {
             config,
-            execution.provider.clone(),
-            Inventory::new().snapshot(&[])?,
-            execution.authority.clone(),
-        )?
-        .with_history(history.to_vec())
-        .with_input_limit(limit);
-        Ok((master, input))
+            messages,
+            limit,
+            questions,
+        })
     }
 
     async fn kick_queue(&self, session: SessionId) {
@@ -685,21 +776,56 @@ impl Host {
                 if work.closed || work.active.len() >= MAX_ACTIVE_RUNS {
                     return;
                 }
-                work.ready.pop_front()
+                let Some(index) = work
+                    .ready
+                    .iter()
+                    .position(|ready| !work.active.contains_key(ready.session()))
+                else {
+                    return;
+                };
+                if let ReadyWork::Answered {
+                    session,
+                    turn,
+                    position,
+                } = &work.ready[index]
+                {
+                    let (session, turn, position) = (session.clone(), turn.clone(), *position);
+                    // Keep the wake reserved until its worker determines the
+                    // disposition. A stale claim leaves it for the next drain.
+                    if self
+                        .register(&mut work, session, turn, Launch::ResumeAnswered(position))
+                        .is_err()
+                    {
+                        work.ready.remove(index);
+                    }
+                    continue;
+                }
+                work.ready.remove(index)
             };
             match next {
                 Some(ReadyWork::Queue(session)) => self.kick_queue(session).await,
                 Some(ReadyWork::Stop(session, turn)) => self.kick_stopped(session, turn).await,
+                Some(ReadyWork::Answered { .. }) => unreachable!("answered wake registered above"),
                 None => return,
             }
         }
     }
 
-    async fn finish_work(&self, session: &SessionId, unverified: bool) {
+    async fn finish_work(
+        &self,
+        session: &SessionId,
+        unverified: bool,
+        remove_answered: Option<(&TurnId, JournalPosition)>,
+    ) {
         {
             let mut work = self.work.lock().await;
             work.unverified |= unverified;
             work.active.remove(session);
+            if let Some((turn, through)) = remove_answered {
+                work.ready.retain(|ready| {
+                    !(ready.wakes_answer(session, turn) && matches!(ready, ReadyWork::Answered { position, .. } if *position <= through))
+                });
+            }
         }
         self.changed.notify_waiters();
     }
@@ -930,9 +1056,9 @@ impl Execution {
         let configuration = transport.selection();
         let binding = transport.binding().clone();
         let capabilities = ModelCapabilities {
-            revision: BindingId::new(format!("{}-text-v1", options.protocol.as_str()))?,
+            revision: BindingId::new(format!("{}-text-tools-v1", options.protocol.as_str()))?,
             input_modalities: [Modality::Text].into_iter().collect(),
-            json_tools: false,
+            json_tools: true,
             text_tools: false,
             max_output_tokens: None,
         };
@@ -988,16 +1114,18 @@ impl Execution {
             authority: binding.authority,
             grants: Vec::new(),
         };
+        let questions = Arc::new(questions::QuestionAccess::new()?);
         let runtime = Runtime::new(ExecutionServices {
             providers: BTreeMap::from([(binding.provider, provider.clone())]),
             tools: Inventory::new().snapshot(&[])?,
-            authority: Arc::new(InferenceAuthority {
+            authority: Arc::new(ExecutionAuthority {
                 inference: inference.clone(),
+                questions: questions.clone(),
                 transport,
             }),
-            gate: Arc::new(NoTools),
+            gate: questions.clone(),
             limits: ExecutionLimits {
-                max_operations: 8,
+                max_operations: 32,
                 max_concurrent_inferences: MAX_ACTIVE_RUNS,
                 max_concurrent_tools: 1,
                 max_output_bytes: 512 * 1024,
@@ -1020,18 +1148,23 @@ impl Execution {
                 inference,
                 tools: BTreeMap::new(),
             },
+            questions,
         })
     }
 }
 
-struct InferenceAuthority {
+struct ExecutionAuthority {
     inference: GrantSelection,
+    questions: Arc<questions::QuestionAccess>,
     transport: Arc<HttpTransport>,
 }
 
-impl AuthorityValidator for InferenceAuthority {
+impl AuthorityValidator for ExecutionAuthority {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
         Box::pin(async move {
+            if self.questions.accepts(&request.selection) {
+                return Ok(());
+            }
             if request.selection != self.inference {
                 return Err(problem(
                     ErrorKind::Unavailable,
@@ -1039,19 +1172,6 @@ impl AuthorityValidator for InferenceAuthority {
                 ));
             }
             self.transport.validate_credential().await
-        })
-    }
-}
-
-struct NoTools;
-
-impl ToolGate for NoTools {
-    fn decide(&self, _: ToolAdmission, _: AdmissionContext) -> BoxFuture<'_, Result<ToolDecision>> {
-        Box::pin(async {
-            Err(problem(
-                ErrorKind::Unsupported,
-                "tool_execution_unavailable",
-            ))
         })
     }
 }
@@ -1065,18 +1185,22 @@ async fn drive(
 ) -> Result<RunResult> {
     let agent_kit_runtime::OpenedTurn { turn, mut observer } = opened;
     let binding = observer.snapshot().state.binding().clone();
-    let run = master.run(turn, input);
-    tokio::pin!(run);
     let mut observer_open = true;
-    let outcome = loop {
-        tokio::select! {
-            outcome = &mut run => break outcome,
-            update = observer.next(), if observer_open => match update {
-                Some(update) => { let _ = updates.send(update); }
-                None => observer_open = false,
+    let outcome = {
+        let run = master.run(turn, input);
+        tokio::pin!(run);
+        loop {
+            tokio::select! {
+                outcome = &mut run => break outcome,
+                update = observer.next(), if observer_open => match update {
+                    Some(update) => { let _ = updates.send(update); }
+                    None => observer_open = false,
+                }
             }
         }
     };
+    // Turn-bound tools retain the publisher while they are offered by Master.
+    drop(master);
     // The turn controller releases its publishers on return. Forward their
     // buffered updates before publishing the terminal result to the client.
     if observer_open {
@@ -1104,6 +1228,13 @@ async fn drive(
                 ));
             }
             store.verify(CommitReceipt::Suspended(receipt)).await?;
+            let state = observer.snapshot().state;
+            if state.controls().admits_work() {
+                let pending = questions::pending(&state)?;
+                if !pending.questions.is_empty() {
+                    return Ok(RunResult::InputRequired(pending));
+                }
+            }
             Ok(RunResult::Suspended)
         }
     }

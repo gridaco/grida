@@ -1,6 +1,7 @@
 //! Versioned product operations layered over standard ACP.
 
 mod lifecycle;
+mod questions;
 
 use super::{ConnectionSessions, host_error, prompt_part, unavailable};
 use crate::host::{DurableSubmission, Host, InputSettings, PromptRequest};
@@ -51,7 +52,10 @@ pub(super) fn negotiated(meta: Option<&Meta>) -> BTreeSet<&'static str> {
 }
 
 fn capability_keys() -> impl Iterator<Item = &'static str> {
-    CAPABILITIES.into_iter().chain(lifecycle::CAPABILITIES)
+    CAPABILITIES
+        .into_iter()
+        .chain(lifecycle::CAPABILITIES)
+        .chain(questions::CAPABILITIES)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -253,6 +257,7 @@ pub(super) fn handlers(
     Agent
         .v1()
         .with_connection_builder(lifecycle::handlers(host.clone(), sessions.clone()))
+        .with_connection_builder(questions::handlers(host.clone(), sessions.clone()))
         .on_receive_request(
             async move |request: Submit, responder, _| {
                 let result = async {
@@ -267,6 +272,7 @@ pub(super) fn handlers(
                             id: request.input_id,
                             session: request.session_id,
                             parts,
+                            questions: questions::available(&submit_sessions),
                         })
                         .await
                         .map_err(host_error)?;

@@ -296,7 +296,7 @@ async fn initialized_shared_socket(url: &str) -> SharedSocket {
     socket
 }
 
-async fn terminate_shared_server(mut child: Child) {
+pub(super) async fn terminate_shared_server(mut child: Child) {
     let signal = Command::new("kill")
         .args(["-TERM", &child.id().unwrap().to_string()])
         .status()
@@ -309,7 +309,7 @@ async fn terminate_shared_server(mut child: Child) {
     );
 }
 
-async fn session_snapshot(socket: &mut SharedSocket, session: &str) -> Value {
+pub(super) async fn session_snapshot(socket: &mut SharedSocket, session: &str) -> Value {
     let response = ws_rpc(
         socket,
         1000,
@@ -323,7 +323,7 @@ async fn session_snapshot(socket: &mut SharedSocket, session: &str) -> Value {
         .clone()
 }
 
-async fn wait_for_snapshot(
+pub(super) async fn wait_for_snapshot(
     socket: &mut SharedSocket,
     session: &str,
     done: impl Fn(&Value) -> bool,
@@ -357,7 +357,7 @@ fn queue_basis(snapshot: &Value, session: &str, request: &str) -> Value {
     })
 }
 
-fn task_basis(snapshot: &Value, session: &str, request: &str) -> Value {
+pub(super) fn task_basis(snapshot: &Value, session: &str, request: &str) -> Value {
     json!({
         "sessionId":session,"requestId":request,
         "turnId":snapshot["current"]["turnId"],
@@ -366,7 +366,7 @@ fn task_basis(snapshot: &Value, session: &str, request: &str) -> Value {
     })
 }
 
-fn prompt_request(session: &str, input: &str, text: &str) -> Value {
+pub(super) fn prompt_request(session: &str, input: &str, text: &str) -> Value {
     json!({
         "sessionId":session,"inputId":input,
         "prompt":[{"type":"text","text":text}],

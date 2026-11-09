@@ -187,6 +187,7 @@ pub(super) fn handlers(
                                 .into_iter()
                                 .map(prompt_part)
                                 .collect::<Result<_>>()?,
+                            questions: questions::available(&enqueue.1),
                         })
                         .await
                         .map_err(host_error)?;
@@ -229,6 +230,7 @@ pub(super) fn handlers(
                             .into_iter()
                             .map(prompt_part)
                             .collect::<Result<_>>()?,
+                        questions: questions::available(&replace.1),
                     };
                     edit_queue(&replace.0, request.queue, edit).await
                 }

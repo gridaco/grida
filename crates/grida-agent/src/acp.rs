@@ -184,7 +184,12 @@ async fn serve_connection(
                     // distinct host-generated ID identifies each durable input.
                     let id = ChangeId::new(uuid::Uuid::new_v4().to_string()).map_err(host_error)?;
                     prompt_host
-                        .start_prompt(PromptRequest { id, session, parts })
+                        .start_prompt(PromptRequest {
+                            id,
+                            session,
+                            parts,
+                            questions: false,
+                        })
                         .await
                         .map_err(host_error)
                 }
@@ -325,6 +330,7 @@ async fn project_run(
             OutcomeStatus::Uncertain => Err(unavailable("agent_turn_uncertain")),
         },
         RunResult::Suspended => Err(unavailable("agent_turn_suspended")),
+        RunResult::InputRequired(_) => Err(unavailable("agent_turn_input_required")),
     }
 }
 

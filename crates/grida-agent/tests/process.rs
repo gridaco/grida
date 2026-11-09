@@ -21,6 +21,9 @@ use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 #[cfg(unix)]
 #[path = "process/lifecycle.rs"]
 mod lifecycle;
+#[cfg(unix)]
+#[path = "process/questions.rs"]
+mod questions;
 
 const WAIT: Duration = Duration::from_secs(15);
 const TEST_CREDENTIAL: &str = "fixture-only-bearer-token";
@@ -35,6 +38,10 @@ enum Reply {
     Finished(&'static str),
     Hold(&'static str),
     Stop(&'static str),
+    #[cfg(unix)]
+    Question(&'static str),
+    #[cfg(unix)]
+    QuestionThenHold(tokio::sync::oneshot::Receiver<()>),
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     GeminiSigned(&'static str),
     #[cfg(unix)]
@@ -149,12 +156,13 @@ async fn fixture_request(
     sent.send(serde_json::from_slice(&request).unwrap())
         .unwrap();
     #[cfg(unix)]
-    let reply = match reply {
+    let (reply, delayed_done) = match reply {
         Reply::Release(text, ready) => {
             timeout(WAIT, ready).await.unwrap().unwrap();
-            Reply::Finished(text)
+            (Reply::Finished(text), None)
         }
-        reply => reply,
+        Reply::QuestionThenHold(ready) => (Reply::Question("question"), Some(ready)),
+        reply => (reply, None),
     };
     let hold = matches!(reply, Reply::Hold(_));
     let body = fixture_body(reply, protocol);
@@ -164,6 +172,15 @@ async fn fixture_request(
     );
     let mut stream = stream.into_inner();
     stream.write_all(head.as_bytes()).await.unwrap();
+    #[cfg(unix)]
+    if let Some(ready) = delayed_done {
+        let prefix = body.strip_suffix("data: [DONE]\n\n").unwrap();
+        stream.write_all(prefix.as_bytes()).await.unwrap();
+        stream.flush().await.unwrap();
+        timeout(WAIT, ready).await.unwrap().unwrap();
+        stream.write_all(b"data: [DONE]\n\n").await.unwrap();
+        return;
+    }
     stream.write_all(body.as_bytes()).await.unwrap();
     stream.flush().await.unwrap();
     if hold {
@@ -184,13 +201,26 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         Reply::Finished(text) => (text, Some("stop")),
         Reply::Hold(text) => (text, None),
         Reply::Stop(reason) => ("", Some(reason)),
+        #[cfg(unix)]
+        Reply::Question(name) => {
+            assert_eq!(protocol, ProviderProtocol::OpenAiCompatible);
+            let arguments = json!({"question":"Which edition?", "options":["Screen", "Print"]});
+            let delta = json!({"id":"fixture-response", "choices":[{"index":0,"delta":{
+                "role":"assistant", "tool_calls":[{"index":0,"id":"edition-question","type":"function",
+                "function":{"name":name,"arguments":arguments.to_string()}}]
+            },"finish_reason":null}]});
+            let finish = json!({"id":"fixture-response","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]});
+            return format!("data: {delta}\n\ndata: {finish}\n\ndata: [DONE]\n\n");
+        }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         Reply::GeminiSigned(text) => {
             signed = true;
             (text, Some("stop"))
         }
         #[cfg(unix)]
-        Reply::Release(..) => unreachable!("fixture releases the response before encoding"),
+        Reply::Release(..) | Reply::QuestionThenHold(_) => {
+            unreachable!("fixture releases the response before encoding")
+        }
     };
     let mut output = String::new();
     let mut frame = |event: Value| {
@@ -773,6 +803,7 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
             parts: vec![PromptPart::Text {
                 text: "Continue work".into()
             }],
+            questions: false,
         }));
         // The current-thread executor cannot run the registered worker during
         // this poll. Drop the request before its first durable admission step.
@@ -1349,6 +1380,7 @@ async fn retry_reports_a_previously_accepted_unclaimed_input_without_starting_it
             parts: vec![PromptPart::Text {
                 text: "Keep this input".into(),
             }],
+            questions: false,
         })
         .await
         .unwrap();
@@ -1817,6 +1849,7 @@ async fn compatible_paths_with_different_dispatch_targets_have_distinct_session_
             parts: vec![PromptPart::Text {
                 text: "Do not dispatch elsewhere".into(),
             }],
+            questions: false,
         })
         .await;
     let Err(error) = result else {

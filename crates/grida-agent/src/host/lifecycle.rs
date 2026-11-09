@@ -7,6 +7,7 @@ pub enum QueueEdit {
         input: ChangeId,
         replacement: ChangeId,
         parts: Vec<PromptPart>,
+        questions: bool,
     },
     Withdraw {
         input: ChangeId,
@@ -30,6 +31,8 @@ pub struct InputSettings {
     pub model: Option<agent_kit_core::ModelId>,
     pub max_input_tokens: Option<u64>,
     pub max_output_tokens: Option<u64>,
+    #[serde(default)]
+    pub questions: bool,
 }
 
 pub struct InputInspection {
@@ -59,6 +62,7 @@ impl InputSettings {
                         .max_input_tokens
                         .map(|limit| limit.get()),
                     max_output_tokens: stored.max_output_tokens,
+                    questions: stored.questions,
                 })
             }
             _ => Err(problem(
@@ -118,7 +122,9 @@ impl Host {
         if view.current.is_none() && !view.admission_paused {
             self.check_ready_capacity(&request.session).await?;
         }
-        let input = self.capture_submission(request.id, request.parts).await?;
+        let input = self
+            .capture_submission(request.id, request.parts, request.questions)
+            .await?;
         let acceptance = self.store.submit(request.session, input).await?;
         self.kick_queue(acceptance.session.clone()).await;
         drop(admission);
@@ -203,6 +209,7 @@ impl Host {
                 input,
                 replacement,
                 parts,
+                questions,
             } => {
                 prompt_input(&replacement, &parts)?;
                 let replacement = if let Some(previous) = self
@@ -215,7 +222,8 @@ impl Host {
                 } else {
                     let view = self.store.inspect(session.clone()).await?;
                     self.check_execution(&view)?;
-                    self.capture_submission(replacement, parts).await?
+                    self.capture_submission(replacement, parts, questions)
+                        .await?
                 };
                 SessionControl::ReplaceQueued { input, replacement }
             }
