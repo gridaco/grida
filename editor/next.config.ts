@@ -207,6 +207,11 @@ const nextConfig: NextConfig = {
         destination: `${DOCS_URL}/:path*`,
       },
       {
+        // An empty wildcard adds a slash upstream, causing /blog to redirect to itself.
+        source: "/blog",
+        destination: `${BLOG_URL}/blog`,
+      },
+      {
         source: "/blog/:path*",
         destination: `${BLOG_URL}/blog/:path*`,
       },
