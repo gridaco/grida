@@ -2,6 +2,7 @@
 
 mod catalog;
 mod compaction;
+mod completion_checks;
 mod goals;
 mod history;
 mod image_tools;
@@ -58,6 +59,7 @@ use agent_kit_sessions::{
 };
 use agent_kit_store_sqlite::SqliteStore;
 use grida_agent_master::configuration::SettingChange;
+use grida_agent_master::hooks::CompletionChecks;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
@@ -96,6 +98,7 @@ pub struct Host {
     gg_connection: Option<Arc<GgConnection>>,
     configuration: Option<Arc<Configuration>>,
     permissions: Option<Arc<crate::permissions::PermissionProfile>>,
+    require_completion_text: bool,
     #[cfg(unix)]
     guidance_root: Option<Arc<skills::HeadlessGuidance>>,
     configuration_admission: Arc<Mutex<()>>,
@@ -252,6 +255,8 @@ struct StoredPrompt {
     guidance: Option<crate::skills::CapturedGuidance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     goal: Option<goals::GoalInput>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    completion_checks: Option<CompletionChecks>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -333,6 +338,8 @@ struct PreparedInput {
     permission_capture: Option<crate::permissions::PermissionCapture>,
     guidance: Option<Message>,
     goal: Option<goals::GoalInput>,
+    completion_checks: Option<CompletionChecks>,
+    completion_authorized: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -475,6 +482,7 @@ impl Host {
             gg_connection: None,
             configuration,
             permissions: None,
+            require_completion_text: false,
             #[cfg(unix)]
             guidance_root: None,
             configuration_admission: Arc::default(),
@@ -954,11 +962,16 @@ impl Host {
             .allow_wakeups
             .then(|| wakeups::WakeupAccess::bind(self.clone(), claim.lease.binding()))
             .transpose()?;
+        let completion = prepared
+            .completion_authorized
+            .then(|| completion_checks::CompletionAccess::bind(claim.lease.binding()))
+            .transpose()?;
         let tool_authority = permissions::ToolAuthority::bind(
             execution.authorization.clone(),
             permission_scope.clone(),
             image.clone(),
             wakeups.clone(),
+            completion.clone(),
         );
         let goal_authority = if prepared.goal.is_some() {
             let (validator, gate): (Arc<dyn AuthorityValidator>, Arc<dyn ToolGate>) =
@@ -1058,7 +1071,7 @@ impl Host {
         }
         let mut prior = history.messages;
         prior.extend(prepared.guidance);
-        let master = Master::new(
+        let mut master = Master::new(
             prepared.config,
             execution.provider.clone(),
             tools,
@@ -1066,6 +1079,13 @@ impl Host {
         )?
         .with_history(prior)
         .with_input_limit(prepared.limit);
+        if let Some(checks) = prepared.completion_checks {
+            let (inventory, grants) = match completion {
+                Some(completion) => (completion.inventory()?, completion.grants()),
+                None => (Inventory::new().snapshot(&[])?, BTreeMap::new()),
+            };
+            master = master.with_completion_checks(checks, inventory, grants);
+        }
         Ok(Some(Admitted {
             opened,
             work: TurnWork::Conversation {
@@ -1198,6 +1218,7 @@ impl Host {
                     permission_capture,
                     guidance,
                     goal: None,
+                    completion_checks: self.capture_completion_checks()?,
                 },
             )?,
         })
@@ -1221,6 +1242,7 @@ impl Host {
             permission_capture,
             guidance,
             goal,
+            completion_checks,
         ) = match input.payload.version() {
             1 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 authority.validate(None, &execution.authority.inference.authority)?;
@@ -1231,6 +1253,7 @@ impl Host {
                     false,
                     false,
                     crate::ConfigurationPermission::Disabled,
+                    None,
                     None,
                     None,
                     None,
@@ -1294,6 +1317,7 @@ impl Host {
                     },
                     guidance,
                     if cancellation_only { None } else { stored.goal },
+                    stored.completion_checks,
                 )
             }
             _ => {
@@ -1312,6 +1336,13 @@ impl Host {
         if config.max_steps == 0 || config.max_output_tokens == 0 {
             return Err(problem(ErrorKind::InvalidInput, "invalid_master_limits"));
         }
+        let completion_authorized = completion_checks.is_some() && !cancellation_only;
+        if completion_authorized && completion_checks != self.capture_completion_checks()? {
+            return Err(problem(
+                ErrorKind::Unavailable,
+                "completion_check_profile_unavailable",
+            ));
+        }
         Ok(PreparedInput {
             config,
             messages,
@@ -1323,6 +1354,8 @@ impl Host {
             permission_capture,
             guidance,
             goal,
+            completion_checks,
+            completion_authorized,
         })
     }
 

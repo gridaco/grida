@@ -162,6 +162,12 @@ fn launch(command: Command) -> Command {
     command
         .arg(state_dir())
         .arg(
+            Arg::new("require-completion-text")
+                .long("require-completion-text")
+                .action(ArgAction::SetTrue)
+                .help("Require answer text before completing newly accepted work"),
+        )
+        .arg(
             Arg::new("permission-profile")
                 .long("permission-profile")
                 .value_name("PRIVATE_JSON")
@@ -325,9 +331,14 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         (Some(supervisor), None) => Host::open_supervised(state_dir, provider, supervisor.clone())?,
         (None, _) => Host::open(state_dir, Some(provider))?,
     };
-    let host = Arc::new(match permissions {
+    let host = match permissions {
         Some(profile) => host.with_permission_profile(profile),
         None => host,
+    };
+    let host = Arc::new(if args.get_flag("require-completion-text") {
+        host.with_required_completion_text()
+    } else {
+        host
     });
     if name == "serve" {
         if let Some(supervisor) = supervisor {

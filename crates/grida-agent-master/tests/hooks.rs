@@ -4,7 +4,8 @@ use agent_kit_core::authority::{
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ToolArguments};
 use agent_kit_core::tools::{
-    Inventory, Invocation, InvocationContext, RecoveryKind, Tool, ToolDefinition, ToolOutcome,
+    Inventory, InventorySnapshot, Invocation, InvocationContext, RecoveryKind, Tool,
+    ToolDefinition, ToolOutcome,
 };
 use agent_kit_core::turn::{CommitReceipt, ControlDirective, OperationOutcome, TurnOutcome};
 use agent_kit_core::{
@@ -223,20 +224,7 @@ impl Fixture {
         self.claim(store, request, "resume").await
     }
 
-    async fn claim(&self, store: &SqliteStore, target: TurnSelection, request: &str) -> Turn {
-        let revision = store.inspect(chat()).await.unwrap().revision;
-        let ClaimOutcome::Acquired(claim) = store
-            .claim(ClaimRequest {
-                id: change(request),
-                session: chat(),
-                expected_revision: revision,
-                selection: target,
-            })
-            .await
-            .unwrap()
-        else {
-            panic!("expected a task owner");
-        };
+    fn inventory(&self) -> InventorySnapshot {
         let mut inventory = Inventory::new();
         let ids = [tool_id("fixture_action"), tool_id("fixture_hook")];
         for id in &ids {
@@ -256,9 +244,26 @@ impl Fixture {
                 }))
                 .unwrap();
         }
+        inventory.snapshot(&ids).unwrap()
+    }
+
+    async fn claim(&self, store: &SqliteStore, target: TurnSelection, request: &str) -> Turn {
+        let revision = store.inspect(chat()).await.unwrap().revision;
+        let ClaimOutcome::Acquired(claim) = store
+            .claim(ClaimRequest {
+                id: change(request),
+                session: chat(),
+                expected_revision: revision,
+                selection: target,
+            })
+            .await
+            .unwrap()
+        else {
+            panic!("expected a task owner");
+        };
         Runtime::new(ExecutionServices {
             providers: BTreeMap::new(),
-            tools: inventory.snapshot(&ids).unwrap(),
+            tools: self.inventory(),
             authority: Arc::new(FixtureAuthority),
             gate: Arc::new(FixtureAuthority),
             limits: ExecutionLimits {
@@ -385,6 +390,7 @@ async fn required_check_blocks_after_observer_failure_and_replays_only_recorded_
             &turn.operations(),
             &turn.view(),
             &proposal,
+            &fixture.inventory(),
             &grants(&checks),
         )
         .await
@@ -416,7 +422,13 @@ async fn required_check_blocks_after_observer_failure_and_replays_only_recorded_
     let mut turn = fixture.resume(&store).await;
     let basis = turn.view();
     let replay = selected
-        .review(&turn.operations(), &basis, &proposal, &BTreeMap::new())
+        .review(
+            &turn.operations(),
+            &basis,
+            &proposal,
+            &Inventory::new().snapshot(&[]).unwrap(),
+            &BTreeMap::new(),
+        )
         .await
         .unwrap();
     assert_eq!(replay, review);
@@ -460,7 +472,13 @@ async fn invalid_output_blocks_and_a_changed_revision_cannot_reuse_the_hook_iden
     let turn = fixture.open(&store, &selected).await;
     let proposal = proposal(vec![]);
     let review = selected
-        .review(&turn.operations(), &turn.view(), &proposal, &authority)
+        .review(
+            &turn.operations(),
+            &turn.view(),
+            &proposal,
+            &fixture.inventory(),
+            &authority,
+        )
         .await
         .unwrap();
     assert_eq!(review.decision, Decision::Block);
@@ -468,7 +486,13 @@ async fn invalid_output_blocks_and_a_changed_revision_cannot_reuse_the_hook_iden
     definition.revision = Fingerprint::of(&"replacement-revision").unwrap();
     let changed = CompletionChecks::new(vec![definition]).unwrap();
     let error = changed
-        .review(&turn.operations(), &turn.view(), &proposal, &authority)
+        .review(
+            &turn.operations(),
+            &turn.view(),
+            &proposal,
+            &fixture.inventory(),
+            &authority,
+        )
         .await
         .unwrap_err();
     assert_eq!(error.code, "hook_identity_changed");
@@ -492,9 +516,16 @@ async fn pause_and_stop_preserve_interrupted_hook_evidence_and_block_later_check
             let selected = selected.clone();
             let candidate = candidate.clone();
             let authority = grants(&checks);
+            let inventory = fixture.inventory();
             async move {
                 let review = selected
-                    .review(&turn.operations(), &turn.view(), &candidate, &authority)
+                    .review(
+                        &turn.operations(),
+                        &turn.view(),
+                        &candidate,
+                        &inventory,
+                        &authority,
+                    )
                     .await
                     .unwrap();
                 (turn, review)
@@ -526,6 +557,7 @@ async fn pause_and_stop_preserve_interrupted_hook_evidence_and_block_later_check
                     &turn.operations(),
                     &turn.view(),
                     &candidate,
+                    &fixture.inventory(),
                     &grants(&checks),
                 )
                 .await
@@ -539,7 +571,13 @@ async fn pause_and_stop_preserve_interrupted_hook_evidence_and_block_later_check
             outcome.evidence.push(id);
             assert!(
                 selected
-                    .review(&turn.operations(), &basis, &outcome, &grants(&checks))
+                    .review(
+                        &turn.operations(),
+                        &basis,
+                        &outcome,
+                        &fixture.inventory(),
+                        &grants(&checks)
+                    )
                     .await
                     .unwrap()
                     .checks
@@ -567,6 +605,7 @@ async fn a_bounded_handler_timeout_never_permits_required_completion_or_retries_
             &turn.operations(),
             &turn.view(),
             &proposal,
+            &fixture.inventory(),
             &grants(&checks),
         )
         .await
@@ -579,6 +618,7 @@ async fn a_bounded_handler_timeout_never_permits_required_completion_or_retries_
                 &turn.operations(),
                 &turn.view(),
                 &proposal,
+                &fixture.inventory(),
                 &grants(&checks)
             )
             .await
@@ -603,7 +643,13 @@ async fn a_completed_allow_decision_cannot_settle_over_new_input() {
     let mut outcome = proposal(vec![]);
     let basis = turn.view();
     let review = selected
-        .review(&turn.operations(), &basis, &outcome, &authority)
+        .review(
+            &turn.operations(),
+            &basis,
+            &outcome,
+            &fixture.inventory(),
+            &authority,
+        )
         .await
         .unwrap();
     assert_eq!(review.decision, Decision::Allow);

@@ -2,15 +2,17 @@
 
 use crate::{hex, read_account};
 use agent_kit_core::authority::GrantSelection;
+use agent_kit_core::history::HistoryPosition;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
-use agent_kit_core::tools::ToolOutcome;
+use agent_kit_core::tools::{InventorySnapshot, ToolOutcome};
 use agent_kit_core::turn::{OperationInput, OperationOutcome, OperationState, TurnOutcome};
 use agent_kit_core::{
-    BindingId, Error, ErrorKind, Fingerprint, OperationId, Result, ToolId, WaitId,
+    BindingId, Error, ErrorKind, Fingerprint, OperationId, Result, SessionId, ToolId, TurnId,
+    WaitId,
 };
 use agent_kit_runtime::{InvokeOutcome, OperationKey, PlannedInvocation, TurnOperations, TurnView};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 
 const MAX_CHECKS: usize = 8;
@@ -113,6 +115,7 @@ impl CompletionChecks {
         operations: &TurnOperations,
         basis: &TurnView,
         proposal: &TurnOutcome,
+        tools: &InventorySnapshot,
         grants: &BTreeMap<BindingId, GrantSelection>,
     ) -> Result<Review> {
         self.validate()?;
@@ -133,7 +136,8 @@ impl CompletionChecks {
                 review.decision = Decision::Reconsider;
                 break;
             }
-            let result = execute_check(operations, &event, check, grants.get(&check.id)).await;
+            let result =
+                execute_check(operations, &event, check, tools, grants.get(&check.id)).await;
             if !same_basis(operations, basis) {
                 if let Ok((evidence, _)) = result {
                     review.checks.push(evidence);
@@ -166,19 +170,59 @@ impl CompletionChecks {
     }
 }
 
-struct CompletionEvent {
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CheckInvocation {
+    pub check: CompletionCheck,
+    pub occurrence: CompletionEvent,
+}
+
+impl CheckInvocation {
+    pub fn read(arguments: &ToolArguments) -> Result<Self> {
+        let ToolArguments::Json(value) = arguments else {
+            return Err(invalid_event());
+        };
+        let invocation: Self =
+            serde_json::from_value(value.clone()).map_err(|_| invalid_event())?;
+        let event = &invocation.occurrence;
+        if event.event != EVENT
+            || event.version != 1
+            || event.text.len() > MAX_TEXT_BYTES
+            || event.evidence.len() > MAX_EVIDENCE
+            || event.identity
+                != occurrence_identity(
+                    &event.session,
+                    &event.turn,
+                    event.history_position,
+                    event.proposal,
+                )?
+        {
+            return Err(invalid_event());
+        }
+        Ok(invocation)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompletionEvent {
+    event: String,
+    version: u32,
+    pub session: SessionId,
+    pub turn: TurnId,
+    pub history_position: HistoryPosition,
+    pub has_text: bool,
     identity: Fingerprint,
-    data: Value,
+    selection: Fingerprint,
+    proposal: Fingerprint,
+    text: String,
+    text_truncated: bool,
+    evidence: Vec<OperationId>,
+    evidence_truncated: bool,
 }
 
 impl CompletionEvent {
     fn new(basis: &TurnView, proposal: &TurnOutcome, selection: Fingerprint) -> Result<Self> {
-        if proposal.evidence.len() > MAX_EVIDENCE {
-            return Err(Error::new(
-                ErrorKind::LimitExceeded,
-                "completion_hook_evidence_limit",
-            ));
-        }
         if proposal.evidence.iter().any(|id| {
             basis
                 .operation(id)
@@ -195,16 +239,25 @@ impl CompletionEvent {
         let account = proposal.account.as_ref().map(read_account).transpose()?;
         let text = account.as_ref().map_or("", |account| account.text.as_str());
         let end = text.floor_char_boundary(MAX_TEXT_BYTES.min(text.len()));
-        let identity =
-            Fingerprint::of(&(EVENT, &binding.session, &binding.turn, history, proposal_id))?;
         Ok(Self {
-            identity,
-            data: json!({
-                "event": EVENT, "version": 1, "session":binding.session, "turn":binding.turn,
-                "identity":identity, "selection":selection, "history_position":history,
-                "proposal":proposal_id, "text":&text[..end],
-                "text_truncated":end < text.len(), "evidence":proposal.evidence,
-            }),
+            event: EVENT.into(),
+            version: 1,
+            session: binding.session.clone(),
+            turn: binding.turn.clone(),
+            history_position: history,
+            has_text: !text.trim().is_empty(),
+            identity: occurrence_identity(&binding.session, &binding.turn, history, proposal_id)?,
+            selection,
+            proposal: proposal_id,
+            text: text[..end].into(),
+            text_truncated: end < text.len(),
+            evidence: proposal
+                .evidence
+                .iter()
+                .take(MAX_EVIDENCE)
+                .cloned()
+                .collect(),
+            evidence_truncated: proposal.evidence.len() > MAX_EVIDENCE,
         })
     }
 }
@@ -213,6 +266,7 @@ async fn execute_check(
     operations: &TurnOperations,
     event: &CompletionEvent,
     check: &CompletionCheck,
+    tools: &InventorySnapshot,
     grant: Option<&GrantSelection>,
 ) -> Result<(CheckEvidence, Option<WaitId>)> {
     // A changed revision keeps the operation key. Its different captured
@@ -222,7 +276,7 @@ async fn execute_check(
         hex(Fingerprint::of(&(event.identity, &check.id))?)
     ))?;
     let id = operations.operation_id(&key)?;
-    let arguments = ToolArguments::Json(json!({"check":check, "occurrence":&event.data}));
+    let arguments = ToolArguments::Json(json!({"check":check, "occurrence":event}));
     let mut evidence = CheckEvidence {
         check: check.id.clone(),
         revision: check.revision,
@@ -247,13 +301,14 @@ async fn execute_check(
         return Ok((evidence, None));
     }
     let result = operations
-        .invoke(
+        .invoke_with_inventory(
             key,
             PlannedInvocation {
                 tool: check.handler.clone(),
                 arguments: arguments.clone(),
                 grants: grant.clone(),
             },
+            tools.clone(),
         )
         .await;
     let view = operations.view();
@@ -281,6 +336,19 @@ async fn execute_check(
         }
     };
     Ok((evidence, deferred))
+}
+
+fn occurrence_identity(
+    session: &SessionId,
+    turn: &TurnId,
+    history: HistoryPosition,
+    proposal: Fingerprint,
+) -> Result<Fingerprint> {
+    Fingerprint::of(&(EVENT, session, turn, history, proposal))
+}
+
+fn invalid_event() -> Error {
+    Error::new(ErrorKind::InvalidInput, "invalid_completion_hook_event")
 }
 
 fn recorded_check<'a>(

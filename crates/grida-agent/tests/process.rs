@@ -34,6 +34,9 @@ mod goals;
 #[path = "process/history.rs"]
 mod history;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/hooks.rs"]
+mod hooks;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/images.rs"]
 mod images;
 #[cfg(unix)]

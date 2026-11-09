@@ -38,6 +38,9 @@ use agent_kit_sessions::{
 use agent_kit_store_sqlite::SqliteStore;
 use futures_util::stream;
 use grida_agent_master::goals::{Allowance, Blocker, Goal, Objective, Status, Usage, WorkOutcome};
+use grida_agent_master::hooks::{
+    CheckInvocation, CheckMode, CheckStatus, CompletionCheck, CompletionChecks,
+};
 use grida_agent_master::{
     Master, MasterAuthority, MasterConfig, MasterOutcome, StopReason, read_account,
 };
@@ -532,6 +535,7 @@ impl Fixture {
 #[derive(Clone, Copy)]
 enum PublicationInterruption {
     BeforeCommit,
+    BeforeSettlement,
     BeforeOutcome,
     BeforeDispatch,
     AfterRequestCheckpoint,
@@ -603,6 +607,10 @@ impl TurnJournal for InterruptPublication {
             .iter()
             .any(|action| matches!(action, JournalAction::SetCheckpoint(_)));
         let boundary_matches = match self.interruption {
+            PublicationInterruption::BeforeSettlement => change
+                .actions()
+                .iter()
+                .any(|action| matches!(action, JournalAction::Settle(_))),
             PublicationInterruption::AfterRequestCheckpoint => {
                 publishes_continuation && !publishes_history
             }
@@ -630,6 +638,7 @@ impl TurnJournal for InterruptPublication {
                     ))
                 }
                 PublicationInterruption::BeforeCommit
+                | PublicationInterruption::BeforeSettlement
                 | PublicationInterruption::BeforeOutcome
                 | PublicationInterruption::BeforeDispatch => Err(Error::new(
                     ErrorKind::Unavailable,
@@ -744,6 +753,122 @@ fn intercept_publication(lease: TurnLease, interruption: PublicationInterruption
         Arc::new(ForwardControls { lease }),
     )
     .unwrap()
+}
+
+struct ReviewedCheck {
+    definition: ToolDefinition,
+    calls: AtomicUsize,
+}
+
+impl Tool for ReviewedCheck {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+
+    fn validate(&self, args: &ToolArguments) -> Result<()> {
+        CheckInvocation::read(args).map(|_| ())
+    }
+
+    fn invoke(&self, invocation: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            let invocation = CheckInvocation::read(invocation.arguments()).unwrap();
+            assert!(invocation.occurrence.has_text);
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: Vec::new(),
+                structured: Some(serde_json::json!({"decision":"allow"})),
+                receipt: None,
+                truncated: false,
+            }
+        })
+    }
+}
+
+#[tokio::test]
+async fn settlement_recovery_reuses_the_original_candidate_and_completion_check() {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let handler = Arc::new(ReviewedCheck {
+        definition: ToolDefinition {
+            id: ToolId::new("review").unwrap(),
+            version: 1,
+            description: "Review the saved answer.".into(),
+            input: InputFormat::Json(serde_json::json!({"type":"object"})),
+            max_input_bytes: 32 * 1024,
+            max_output_bytes: 1024,
+            recovery: RecoveryKind::Unavailable,
+        },
+        calls: AtomicUsize::new(0),
+    });
+    let check = CompletionCheck {
+        id: BindingId::new("review").unwrap(),
+        revision: agent_kit_core::Fingerprint::of(handler.definition()).unwrap(),
+        handler: handler.definition().id.clone(),
+        mode: CheckMode::Required,
+    };
+    let selected = CompletionChecks::new(vec![check.clone()]).unwrap();
+    let mut inventory = Inventory::new();
+    inventory.insert(handler.clone()).unwrap();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture
+        .runtime()
+        .open(intercept_publication(
+            claim.lease,
+            PublicationInterruption::BeforeSettlement,
+        ))
+        .await
+        .unwrap();
+    let error = fixture
+        .master(4, "Answer")
+        .with_completion_checks(
+            selected.clone(),
+            inventory
+                .snapshot(std::slice::from_ref(&check.handler))
+                .unwrap(),
+            BTreeMap::from([(check.id.clone(), fixture.grants())]),
+        )
+        .run(opened.turn, input())
+        .await
+        .err()
+        .expect("settlement interruption");
+    assert_eq!(error.code, "commit_outcome_unknown");
+    assert_eq!(handler.calls.load(Ordering::SeqCst), 1);
+    assert!(
+        fixture.provider.requests.lock().unwrap()[0]
+            .tools
+            .iter()
+            .all(|offered| offered.id != check.handler)
+    );
+    drop(store);
+
+    let store = fixture.reopen().await;
+    let claim = fixture.recover(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Answer")
+        .with_completion_checks(
+            selected,
+            Inventory::new().snapshot(&[]).unwrap(),
+            BTreeMap::new(),
+        )
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected recovered settlement");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.text, "Finished");
+    assert_eq!(account.steps, 1);
+    assert_eq!(account.completion_checks.len(), 1);
+    assert_eq!(account.completion_checks[0].status, CheckStatus::Allowed);
+    let operation = account.completion_checks[0].operation.as_ref().unwrap();
+    assert!(receipt.outcome.evidence.contains(operation));
+    assert_eq!(handler.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
 }
 
 #[tokio::test]

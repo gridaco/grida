@@ -101,6 +101,11 @@ a question it still needs answered, `run` preserves the turn and emits a
 `finished` record with `input_required` and the pending `questions`. The
 process exits so an automation can hand the retained session to an ACP client.
 
+Use `--require-completion-text` on `run` or `serve` to require a nonempty
+final answer on newly accepted tasks. The host records the check and its
+decision in the completion account. Keep the same launch setting when
+resuming those tasks. Stop can still settle them when the check is unavailable.
+
 | Exit | Meaning                                              |
 | ---- | ---------------------------------------------------- |
 | 0    | Successful run, inspection, or clean stdio shutdown  |

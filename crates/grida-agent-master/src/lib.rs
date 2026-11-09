@@ -59,6 +59,8 @@ pub struct Account {
     pub inference_usage: usage::InferenceUsage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal: Option<goals::ProgressAccount>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub completion_checks: Vec<hooks::CheckEvidence>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,6 +91,13 @@ pub struct Master {
     history: Vec<Message>,
     input_limit: Option<NonZeroU64>,
     goal_verifier: Option<Box<goals::settlement::Verifier>>,
+    completion_checks: Option<CompletionChecksExecution>,
+}
+
+struct CompletionChecksExecution {
+    checks: hooks::CompletionChecks,
+    tools: InventorySnapshot,
+    grants: BTreeMap<agent_kit_core::BindingId, GrantSelection>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -135,6 +144,7 @@ impl Master {
             history: Vec::new(),
             input_limit: None,
             goal_verifier: None,
+            completion_checks: None,
         })
     }
 
@@ -147,6 +157,22 @@ impl Master {
     /// Apply the accepted task's hard limit to the complete provider input.
     pub fn with_input_limit(mut self, limit: Option<NonZeroU64>) -> Self {
         self.input_limit = limit;
+        self
+    }
+
+    /// Install the accepted completion policy and its private handler inventory.
+    /// The selected revisions are retained separately from live dispatch grants.
+    pub fn with_completion_checks(
+        mut self,
+        checks: hooks::CompletionChecks,
+        tools: InventorySnapshot,
+        grants: BTreeMap<agent_kit_core::BindingId, GrantSelection>,
+    ) -> Self {
+        self.completion_checks = Some(CompletionChecksExecution {
+            checks,
+            tools,
+            grants,
+        });
         self
     }
 
@@ -527,9 +553,12 @@ impl Master {
     }
 
     fn continuation(&self, turn: &Turn) -> Result<Continuation> {
-        let fingerprint = match self.input_limit {
-            Some(limit) => Fingerprint::of(&(&self.config, &self.history, limit))?,
-            None => Fingerprint::of(&(&self.config, &self.history))?,
+        let fingerprint = match (&self.completion_checks, self.input_limit) {
+            (Some(execution), limit) => {
+                Fingerprint::of(&(&self.config, &self.history, limit, &execution.checks))?
+            }
+            (None, Some(limit)) => Fingerprint::of(&(&self.config, &self.history, limit))?,
+            (None, None) => Fingerprint::of(&(&self.config, &self.history))?,
         };
         let view = turn.view();
         match view.state.checkpoint() {
@@ -544,7 +573,8 @@ impl Master {
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;
-                let legacy = self.input_limit.is_none()
+                let legacy = self.completion_checks.is_none()
+                    && self.input_limit.is_none()
                     && self.history.is_empty()
                     && value.configuration == Fingerprint::of(&self.config)?;
                 if value.configuration != fingerprint && !legacy {
@@ -773,6 +803,7 @@ impl Master {
                     inference_failure: inference_failure.cloned(),
                     inference_usage: usage::InferenceUsage::from_turn(&view.state)?,
                     goal: None,
+                    completion_checks: Vec::new(),
                 },
             )?),
             evidence,
@@ -789,6 +820,60 @@ impl Master {
         basis: &TurnView,
     ) -> Result<Option<MasterOutcome>> {
         let may_continue = outcome.status == OutcomeStatus::Succeeded;
+        if may_continue && let Some(execution) = &self.completion_checks {
+            let review = execution
+                .checks
+                .review(
+                    &turn.operations(),
+                    basis,
+                    &outcome,
+                    &execution.tools,
+                    &execution.grants,
+                )
+                .await?;
+            match review.decision {
+                hooks::Decision::Reconsider => return Ok(None),
+                hooks::Decision::Deferred(_) => {
+                    let view = turn.view();
+                    return self.suspend(turn, continuation, &view).await;
+                }
+                hooks::Decision::Allow | hooks::Decision::Block => {}
+            }
+            let mut account = read_account(outcome.account.as_ref().expect("master account"))?;
+            for check in &review.checks {
+                if let Some(operation) = &check.operation {
+                    if !outcome.evidence.contains(operation) {
+                        outcome.evidence.push(operation.clone());
+                    }
+                    if check.status == hooks::CheckStatus::Uncertain
+                        && !account.unresolved.contains(operation)
+                    {
+                        account.unresolved.push(operation.clone());
+                    }
+                }
+            }
+            if review.decision == hooks::Decision::Block {
+                let uncertain = review
+                    .checks
+                    .iter()
+                    .rev()
+                    .find(|check| check.status != hooks::CheckStatus::Skipped)
+                    .is_some_and(|check| check.status == hooks::CheckStatus::Uncertain);
+                outcome.status = if uncertain {
+                    OutcomeStatus::Uncertain
+                } else {
+                    OutcomeStatus::Failed
+                };
+                let kind = if uncertain {
+                    ErrorKind::Uncertain
+                } else {
+                    ErrorKind::Unavailable
+                };
+                account.failure = Some(Error::new(kind, "completion_check_blocked"));
+            }
+            account.completion_checks = review.checks;
+            outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+        }
         let goal = goals::settlement::prepare(
             &basis.state,
             outcome.status,

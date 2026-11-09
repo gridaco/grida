@@ -97,6 +97,15 @@ an answer is needed, the process verifies suspension and returns `input_required
 with the session, turn, and pending question identities. A capable service client
 can answer the retained question through the same state directory.
 
+### Require a completion check
+
+Use `--require-completion-text` on `run` or `serve` to require final answer
+text on newly accepted tasks. A blank answer fails the task and the completion
+account records the check's decision. Keep the same launch setting when
+resuming those tasks. You can still Stop a retained task when the check is
+unavailable. The check uses the recorded answer and preserves any work the
+agent already completed.
+
 ## Use your Grida login
 
 On macOS or Linux, the source-built `grida` CLI can run an explicitly selected

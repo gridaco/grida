@@ -619,8 +619,19 @@ impl TurnOperations {
         key: OperationKey,
         plan: PlannedInvocation,
     ) -> Result<InvokeOutcome> {
-        self.invoke_captured(key, plan, self.inner.services.tools.clone(), None, None)
+        self.invoke_with_inventory(key, plan, self.inner.services.tools.clone())
             .await
+    }
+
+    /// Invoke a host-selected operation with the inventory captured for this
+    /// decision. Dispatch uses the same journal, gate, and current authority.
+    pub async fn invoke_with_inventory(
+        &self,
+        key: OperationKey,
+        plan: PlannedInvocation,
+        inventory: InventorySnapshot,
+    ) -> Result<InvokeOutcome> {
+        self.invoke_captured(key, plan, inventory, None, None).await
     }
 
     pub(crate) async fn invoke_captured(
