@@ -418,3 +418,37 @@ fn encode_config(value: agent_kit_core::Result<impl Serialize>) -> Result<Value>
     serde_json::to_value(value.map_err(host_error)?)
         .map_err(|_| unavailable("configuration_projection_failed"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn configuration_negotiation_keeps_inspection_and_explicit_changes_distinct() {
+        let sessions = Mutex::new(ConnectionSessions::default());
+        assert_eq!(
+            configuration_permission(&sessions, false).unwrap(),
+            crate::ConfigurationPermission::Disabled
+        );
+        assert!(configuration_permission(&sessions, true).is_err());
+        sessions.lock().unwrap().negotiated.insert(CONFIG_INSPECT);
+        assert_eq!(
+            configuration_permission(&sessions, false).unwrap(),
+            crate::ConfigurationPermission::Inspect
+        );
+        assert!(configuration_permission(&sessions, true).is_err());
+        sessions
+            .lock()
+            .unwrap()
+            .negotiated
+            .extend([CONFIG_UPDATE, CONFIG_RELOAD]);
+        assert_eq!(
+            configuration_permission(&sessions, false).unwrap(),
+            crate::ConfigurationPermission::Inspect
+        );
+        assert_eq!(
+            configuration_permission(&sessions, true).unwrap(),
+            crate::ConfigurationPermission::Change
+        );
+    }
+}
