@@ -136,6 +136,13 @@ verifies their architecture, names and permissions in the completed package.
 Native resource packaging and chat runtime selection have separate acceptance
 checks.
 
+The main-process chat client creates or loads a session in its selected
+workspace and sends identified text input over ACP. It reads retained input
+receipts and turn snapshots separately from execution. Pause and Stop return
+control receipts. The snapshot confirms suspension or cancellation, and
+Resume targets a verified pause. Reconnecting requires loading the session
+again before submitting or controlling work.
+
 The source-built native process owner accepts workspace selections from Electron
 main. On macOS and Linux it writes a private launch profile that allows reads
 in the primary workspace and asks before reading an eligible additional root.

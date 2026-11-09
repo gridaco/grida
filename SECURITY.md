@@ -863,6 +863,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
   keep the child under ownership through EOF shutdown. Only projected error
   codes cross the process diagnostics boundary. Renderer authorization and
   cutover are separate from this process contract.
+- The [Desktop native chat client](desktop/src/main/native-agent-chat.ts)
+  fixes the workspace context at startup and accepts session handles issued
+  on that ACP connection. Controls use a host observation of the exact
+  session, turn, and revisions. A reconnect requires a new attachment before
+  the same scoped control can be retried. [Process tests](desktop/src/main/native-agent-chat.test.ts)
+  cover cross-session rejection, stale controls, and continuation after restart.
 - The [Desktop approval coordinator](desktop/src/main/native-agent-permissions.ts)
   derives a read profile from main-owned workspace selection. An approval
   answer takes a review issued by the coordinator for the exact session,
