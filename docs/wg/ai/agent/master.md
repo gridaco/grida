@@ -53,6 +53,10 @@ which eligible actions require another decision. The reviewer is a person or
 a separately configured automatic reviewer. Product presets can combine these
 selections while preserving their individual meanings.
 
+New Desktop chats default to asking the user before granting additional access.
+Previously granted scope remains subject to its existing constraints. Automatic
+review requires an explicit selection and its own eligibility policy.
+
 An automatic-review mode delegates eligible decisions within host policy. The
 master supplies review policy, reviewer selection, evidence preparation, resource
 allowance, and fallback behavior. Host-mandated denials and human decisions remain
