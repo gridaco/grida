@@ -31,10 +31,10 @@ generation, Tripo/GG rigging, and Gateway-backed native agent execution.
   paid retry. Response heads, interim responses, trailers, bodies and absolute
   lifetimes are bounded; credential-free downloads have an explicit redirect cap.
 - `agent.rs` embeds the native agent host for `agent run` and
-  `agent serve --stdio`. It acquires one organization-scoped Gateway grant
-  through the account owner and streams the exact registered chat route through
-  the native HTTP owner. The agent host owns durable conversation state and the
-  shared run and ACP lifecycle.
+  `agent serve --stdio`. The account owner acquires and renews the scoped
+  Gateway grant for the selected account and organization. The native HTTP owner
+  streams the exact registered chat route. The agent host owns durable
+  conversation state and the shared run and ACP lifecycle.
 
 The CLI invokes `grida-ai` through its typed media transport boundary and
 `grida-auth` through its account transport boundary. Those crates do not import
@@ -95,6 +95,6 @@ fetch or build the retired TypeScript CLI. Its guide describes the explicit
 native keyring setup required for the complete gate.
 Update public help and reviewed expectations together when the contract changes.
 The installed executable proof includes a disposable account login, a scoped
-Gateway agent run, and ACP continuation under a newly minted grant.
+Gateway agent run, and ACP continuation with coalesced grant renewal.
 Synthetic local proofs do not replace actual Supabase/browser or hosted-provider
 release acceptance.

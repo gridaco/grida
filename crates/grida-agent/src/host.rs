@@ -67,6 +67,7 @@ const PROVIDER_LIMITS: StreamLimits = StreamLimits {
 pub struct Host {
     store: Arc<SqliteStore>,
     execution: Option<Arc<Execution>>,
+    gg_connection: Option<Arc<GgConnection>>,
     configuration: Option<Arc<Configuration>>,
     configuration_admission: Arc<Mutex<()>>,
     controls: Arc<Semaphore>,
@@ -295,10 +296,12 @@ impl Host {
                 "invalid_output_token_limit",
             ));
         }
-        Self::open_with(
+        let mut host = Self::open_with(
             state_dir,
-            Some(|| Execution::new_gg(options, connection, transport)),
-        )
+            Some(|| Execution::new_gg(options, connection.clone(), transport)),
+        )?;
+        host.gg_connection = Some(connection);
+        Ok(host)
     }
 
     fn open_with(
@@ -321,6 +324,7 @@ impl Host {
         Ok(Self {
             store,
             execution,
+            gg_connection: None,
             configuration,
             configuration_admission: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
@@ -1022,6 +1026,9 @@ impl Host {
                     .await?;
                 }
             }
+            if let Some(gg) = &self.gg_connection {
+                gg.close();
+            }
             loop {
                 // notify_waiters wakes an existing Notified before its first poll.
                 let changed = self.changed.notified();
@@ -1041,8 +1048,13 @@ impl Host {
             }
         })
         .await;
+        let renewal = if let Some(gg) = &self.gg_connection {
+            gg.shutdown(deadline).await
+        } else {
+            Ok(())
+        };
         match result {
-            Ok(Ok(())) => Ok(()),
+            Ok(Ok(())) => renewal,
             Ok(Err(error)) if error.kind == ErrorKind::Uncertain => Err(error),
             failure => {
                 for (_, _, _, handle) in &active {
@@ -1290,7 +1302,7 @@ impl AuthorityValidator for ExecutionAuthority {
             }
             match &self.credential {
                 Credential::Http(transport) => transport.validate_credential().await,
-                Credential::Gg(connection) => connection.validate(),
+                Credential::Gg(connection) => connection.ensure_current().await,
             }
         })
     }

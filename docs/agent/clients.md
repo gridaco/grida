@@ -103,10 +103,11 @@ the project directory when opening a session. Keep the same model, account, and
 organization to continue a saved chat. Gateway requests use the selected
 organization's credits.
 
-Each invocation acquires one short-lived Gateway grant. If a service's grant
-expires, restart it to acquire a fresh grant. The client can reopen the retained
-chat after restart. Requests already accepted by Gateway may finish under their
-original grant.
+The host renews its short-lived Gateway grant before new model work needs it.
+Renewal uses the account and organization that opened the host. If that scope
+is no longer available, the task reports an authorization failure before
+sending the prompt to Gateway. Requests Gateway already accepted can finish
+under their original grant.
 
 ## Connect an ACP client
 

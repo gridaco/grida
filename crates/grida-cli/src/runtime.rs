@@ -524,7 +524,7 @@ async fn authority(
     token: &CancellationToken,
 ) -> Result<(ExecutionAuthority, Option<String>)> {
     if provider == "gg" {
-        account::with_gg(env.clone(), selector.cloned(), token.clone(), |grant| {
+        account::with_gg(env.clone(), selector.cloned(), token.clone(), |_, grant| {
             let origin = grant.api_origin().to_owned();
             Ok((
                 ExecutionAuthority::Gateway {

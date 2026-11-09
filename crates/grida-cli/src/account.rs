@@ -131,7 +131,7 @@ pub(crate) async fn with_gg<T: Send + 'static>(
     env: Environment,
     selected: Option<Selector>,
     cancel: CancellationToken,
-    accept: impl FnOnce(&GgGrant) -> grida_auth::Result<T> + Send + 'static,
+    accept: impl FnOnce(&Arc<AuthClient>, &GgGrant) -> grida_auth::Result<T> + Send + 'static,
 ) -> Result<T> {
     let check = |cancel: &CancellationToken| {
         if cancel.is_cancelled() {
@@ -145,7 +145,7 @@ pub(crate) async fn with_gg<T: Send + 'static>(
     let worker = cancel.clone();
     let result = tokio::task::spawn_blocking(move || {
         let host = Host::open(&env)?;
-        let client = open(&host, None, runtime)?;
+        let client = Arc::new(open(&host, None, runtime)?);
         check(&worker)?;
         let organization = select(&client, selected.as_ref())?;
         check(&worker)?;
@@ -154,7 +154,7 @@ pub(crate) async fn with_gg<T: Send + 'static>(
                 if worker.is_cancelled() {
                     return Err(grida_auth::Error::new("cancelled"));
                 }
-                accept(grant)
+                accept(&client, grant)
             })
             .map_err(failure)
     })

@@ -16,7 +16,7 @@ mod native;
 mod providers;
 mod wire;
 
-pub use client::{AuthClient, GgGrant, Request, Response, Transport};
+pub use client::{AuthClient, GgGrant, GgGrantScope, Request, Response, Transport};
 pub use config::Config;
 pub use credential_continuity::CredentialContinuityStore;
 pub use credential_lock::CredentialLock;

@@ -198,6 +198,8 @@ export async function proveInstalled({ binary, launcher, workdir }) {
   let routeReached;
   let releaseRoute;
   let issuedGrant = grant;
+  let grantLifetimeMs = 600_000;
+  let renewalGate;
   let chatOrganization = organization;
   let chatStatus = 200;
   const chatRequests = [];
@@ -381,12 +383,19 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         return;
       }
       if (req.url === "/api/v1/auth/gg") {
+        if (renewalGate) {
+          const renewal = renewalGate;
+          renewal.reached();
+          await renewal.released;
+          issuedGrant = renewal.token;
+          grantLifetimeMs = 600_000;
+        }
         assert.deepEqual(JSON.parse(bytes), {
           organization_id: chatOrganization.id,
         });
         respond(res, {
           token: issuedGrant,
-          expires_at: new Date(Date.now() + 600000).toISOString(),
+          expires_at: new Date(Date.now() + grantLifetimeMs).toISOString(),
           organization: chatOrganization,
         });
         return;
@@ -421,6 +430,51 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     return argv.includes("--json") ? JSON.parse(r.stdout) : r.stdout;
   }
   const checks = [];
+  function holdRenewal(token) {
+    const { promise: started, resolve: reached } = Promise.withResolvers();
+    const { promise: released, resolve: release } = Promise.withResolvers();
+    renewalGate = { token, reached, released, release };
+    return { started, release };
+  }
+  function agentService(settings) {
+    const operation = start(["agent", "serve", "--stdio", ...settings], null);
+    const lines = createInterface({ input: operation.child.stdout });
+    const output = lines[Symbol.asyncIterator]();
+    const updates = [];
+    const replies = new Map();
+    function send(id, method, params) {
+      operation.child.stdin.write(
+        JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"
+      );
+    }
+    async function receive(id) {
+      while (!replies.has(id)) {
+        const line = await output.next();
+        assert.equal(line.done, false, "agent ACP disconnected before reply");
+        const reply = JSON.parse(line.value);
+        if (reply.id !== undefined) replies.set(reply.id, reply);
+        else {
+          assert.equal(reply.method, "session/update");
+          updates.push(reply.params.update);
+        }
+      }
+      const reply = replies.get(id);
+      replies.delete(id);
+      assert.equal(reply.error, undefined);
+      return reply.result;
+    }
+    return {
+      operation,
+      updates,
+      send,
+      receive,
+      async rpc(id, method, params) {
+        send(id, method, params);
+        return receive(id);
+      },
+      close: () => lines.close(),
+    };
+  }
   async function checkAgent() {
     const settings = [
       "--provider",
@@ -446,57 +500,103 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(finished.disposition, "succeeded");
     assert.equal(chatRequests.length, 1);
 
-    issuedGrant = "synthetic.agent.renewed";
-    const service = start(["agent", "serve", "--stdio", ...settings], null);
-    const lines = createInterface({ input: service.child.stdout });
-    const output = lines[Symbol.asyncIterator]();
-    const updates = [];
-    async function rpc(id, method, params) {
-      service.child.stdin.write(
-        JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"
-      );
-      for (;;) {
-        const line = await output.next();
-        assert.equal(line.done, false, "agent ACP disconnected before reply");
-        const reply = JSON.parse(line.value);
-        if (reply.id === id) {
-          assert.equal(reply.error, undefined);
-          return reply.result;
-        }
-        assert.equal(reply.method, "session/update");
-        updates.push(reply.params.update);
-      }
-    }
+    issuedGrant = "synthetic.agent.near-expiry";
+    grantLifetimeMs = 20_000;
+    const service = agentService(settings);
     try {
-      assert.equal(
-        (await rpc(1, "initialize", { protocolVersion: 1 })).protocolVersion,
-        1
-      );
-      const sessionId = accepted.session_id;
-      await rpc(2, "session/load", { sessionId, cwd: owned, mcpServers: [] });
-      assert.equal(chatRequests.length, 1, "load is observational");
-      const result = await rpc(3, "session/prompt", {
-        sessionId,
-        prompt: [{ type: "text", text: "Use the saved context." }],
+      const initialized = await service.rpc(1, "initialize", {
+        protocolVersion: 1,
+        clientCapabilities: { _meta: { "co.grida/session/snapshot": 1 } },
       });
-      assert.equal(result.stopReason, "end_turn");
-      assert(updates.some((update) => update.content?.text === "Scoped reply"));
-      service.child.stdin.end();
-      const stopped = await service.result;
+      assert.equal(initialized.protocolVersion, 1);
+      const sessionId = accepted.session_id;
+      await service.rpc(2, "session/load", {
+        sessionId,
+        cwd: owned,
+        mcpServers: [],
+      });
+      const second = await service.rpc(3, "session/new", {
+        cwd: owned,
+        mcpServers: [],
+      });
+      assert.equal(chatRequests.length, 1, "load is observational");
+      const minted = counts.get("/api/v1/auth/gg");
+      const memberships = counts.get("/api/v1/account/organizations");
+      const renewal = holdRenewal("synthetic.agent.renewed");
+      try {
+        service.send(4, "session/prompt", {
+          sessionId,
+          prompt: [{ type: "text", text: "Use the saved context." }],
+        });
+        service.send(5, "session/prompt", {
+          sessionId: second.sessionId,
+          prompt: [{ type: "text", text: "Renew on this chat too." }],
+        });
+        await Promise.race([
+          renewal.started,
+          service.operation.result.then(() => {
+            throw new Error("Agent service exited before grant renewal.");
+          }),
+        ]);
+        let secondAccepted = false;
+        for (let id = 6; id < 26 && !secondAccepted; id++) {
+          const snapshot = await service.rpc(id, "_co.grida/session/snapshot", {
+            sessionId: second.sessionId,
+          });
+          secondAccepted = snapshot.current != null;
+        }
+        assert(
+          secondAccepted,
+          "both chats were admitted during the held renewal"
+        );
+        assert.equal(
+          chatRequests.length,
+          1,
+          "no inference uses the near-expiry grant"
+        );
+        renewal.release();
+        assert.equal((await service.receive(4)).stopReason, "end_turn");
+        assert.equal((await service.receive(5)).stopReason, "end_turn");
+        assert.equal(
+          counts.get("/api/v1/auth/gg"),
+          minted + 1,
+          "one shared mint"
+        );
+        assert.equal(
+          counts.get("/api/v1/account/organizations"),
+          memberships,
+          "renewal does not reselect the funding organization"
+        );
+      } finally {
+        renewal.release();
+        renewalGate = undefined;
+      }
+      assert(
+        service.updates.some(
+          (update) => update.content?.text === "Scoped reply"
+        )
+      );
+      service.operation.child.stdin.end();
+      const stopped = await service.operation.result;
       assert.equal(stopped.code, 0, stopped.stderr);
       assertInstalledStderr(stopped);
       assert(!stopped.stdout.includes(issuedGrant));
     } finally {
-      lines.close();
+      service.close();
     }
-    assert.equal(chatRequests.length, 2);
+    assert.equal(chatRequests.length, 3);
+    const continuation = chatRequests.find((request) =>
+      request.messages.some(
+        (message) => message.content === "Use the saved context."
+      )
+    );
     assert(
-      chatRequests[1].messages.some(
+      continuation.messages.some(
         (message) => message.content === "Remember this fixture."
       )
     );
     assert(
-      chatRequests[1].messages.some(
+      continuation.messages.some(
         (message) => message.content === "Scoped reply"
       )
     );
@@ -521,7 +621,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(changed.stdout, "");
     assert.equal(
       chatRequests.length,
-      2,
+      3,
       "different organization cannot dispatch saved session"
     );
 
@@ -544,13 +644,63 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(rejected.account.inference_failure.code, "payment_required");
     assert.equal(
       chatRequests.length,
-      3,
+      4,
       "credit refusal is never retried or moved to another provider"
     );
     assert(!JSON.stringify(rejected).includes("private-upstream-error"));
-    issuedGrant = grant;
     chatStatus = 200;
-    checks.push("installed_native_agent_scoped_chat");
+    issuedGrant = "synthetic.agent.shutdown-near-expiry";
+    grantLifetimeMs = 20_000;
+    const closing = agentService(settings);
+    try {
+      await closing.rpc(1, "initialize", { protocolVersion: 1 });
+      const sessionId = accepted.session_id;
+      await closing.rpc(2, "session/load", {
+        sessionId,
+        cwd: owned,
+        mcpServers: [],
+      });
+      const renewal = holdRenewal("synthetic.agent.shutdown-renewed");
+      try {
+        closing.send(3, "session/prompt", {
+          sessionId,
+          prompt: [{ type: "text", text: "Stop while renewal is held." }],
+        });
+        await Promise.race([
+          renewal.started,
+          closing.operation.result.then(() => {
+            throw new Error("Agent service exited before the held renewal.");
+          }),
+        ]);
+        closing.operation.child.stdin.end();
+        await Promise.race([
+          new Promise((resolve) => setTimeout(resolve, 100)),
+          closing.operation.result.then(() => {
+            throw new Error("Agent shutdown dropped a live renewal owner.");
+          }),
+        ]);
+        renewal.release();
+        const stopped = await closing.operation.result;
+        assert.equal(stopped.code, 0, stopped.stderr);
+        assertInstalledStderr(stopped);
+      } finally {
+        renewal.release();
+        renewalGate = undefined;
+      }
+    } finally {
+      closing.close();
+    }
+    assert.equal(
+      chatRequests.length,
+      4,
+      "shutdown does not dispatch after a held renewal"
+    );
+    issuedGrant = grant;
+    grantLifetimeMs = 600_000;
+    checks.push(
+      "installed_native_agent_scoped_chat",
+      "installed_native_agent_renewal"
+    );
   }
   async function cancelAt(route, argv) {
     heldRoute = route;
@@ -936,6 +1086,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       requests: Object.fromEntries(counts),
     };
   } finally {
+    renewalGate?.release();
     releaseResponse?.();
     releaseRoute?.();
     await Promise.all([...children].map((operation) => operation.stop()));

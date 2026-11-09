@@ -1368,13 +1368,17 @@ levels into one.
    Completion drops invocation authority; it neither
    persists, refreshes nor automatically re-mints a GG grant. CLI destination and
    output controls are independently registered under GRIDA-SEC-013.
-   The CLI agent obtains one scoped grant per owned run or service invocation
-   through the same synchronous handoff. Its session selection binds the
+   The CLI agent obtains its initial scoped grant through the same synchronous
+   handoff. Its session selection binds the
    registered API origin, verified account subject, organization and model.
    Only a matching live authority can prepare the fixed chat POST. The CLI
    HTTP owner checks expiry again after connection setup and before sending.
-   A later launch can select the same chat with a fresh grant for the same
-   scope. The native service's single grant expires without an automatic mint.
+   Before expiry, an owned renewal uses only the captured scope. The account
+   owner checks the registered origin and current stored subject before any
+   credential refresh or mint. The mint verifies membership in the original
+   organization. The live connection retains its binding across renewals
+   within this scope. Shutdown waits for any accepted renewal custody work
+   within its existing deadline and reports unverified cleanup on timeout.
    The shared media/provider host composition owns exactly one GG store for
    all mounted media and optional agent routes. Stopping that composition
    clears its store after the daemon drains active requests. Restarting can
@@ -1472,7 +1476,7 @@ limitation tracked in [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-
   [host authority](crates/grida-agent/src/host.rs), and
   [streaming HTTP owner](crates/grida-cli/src/http/gg_chat.rs).
   The [native process proof](scripts/cli-contracts/installed.mjs) exercises a
-  scoped run, continued ACP chat and changed-organization refusal.
+  scoped run, concurrent ACP renewal, owned shutdown and changed-organization refusal.
 
 - [Windows provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — optional BYOK discovery preserves existing GG eligibility without swallowing custody errors.
 

@@ -1,16 +1,17 @@
 // GRIDA-SEC-006 / GRIDA-SEC-015 — native account authority stays with auth.
-// GRIDA-GG: provider — one invocation-owned scoped chat grant.
+// GRIDA-GG: provider — invocation-owned chat authority with scoped renewal.
 
 use crate::error::{Error, Result};
 use crate::{AgentAction, AgentCommand, account, host, http};
 use agent_kit_core::inference::RequestControl;
-use agent_kit_core::{BoxFuture, ErrorKind};
+use agent_kit_core::{BoxFuture, Error as CoreError, ErrorKind, Result as CoreResult};
 use agent_kit_providers::{
     StreamingTransport, TransportFailure, TransportRequest, TransportResponse,
 };
-use grida_agent::gg::GgConnection;
+use grida_agent::gg::{GgConnection, GgGrantRenewal};
 use grida_agent::host::{GgOptions, Host};
 use grida_agent::process::{self, RunOptions};
+use grida_auth::{AuthClient, GgGrant, GgGrantScope};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
@@ -18,6 +19,38 @@ use tokio_util::sync::CancellationToken;
 struct GgTransport {
     connection: Arc<GgConnection>,
     http: http::Transport,
+}
+
+struct Renewal(Arc<AuthClient>);
+
+impl GgGrantRenewal for Renewal {
+    fn renew(
+        &self,
+        scope: GgGrantScope,
+        closing: CancellationToken,
+    ) -> BoxFuture<'_, CoreResult<GgGrant>> {
+        let client = Arc::clone(&self.0);
+        Box::pin(async move {
+            tokio::task::spawn_blocking(move || {
+                if closing.is_cancelled() {
+                    return Err(CoreError::new(
+                        ErrorKind::Unavailable,
+                        "gg_authority_closed",
+                    ));
+                }
+                client.renew_gg(&scope).map_err(|error| {
+                    let kind = if error.code() == "gg_scope_changed" {
+                        ErrorKind::Conflict
+                    } else {
+                        ErrorKind::Unavailable
+                    };
+                    CoreError::new(kind, error.code())
+                })
+            })
+            .await
+            .map_err(|_| CoreError::new(ErrorKind::Uncertain, "gg_renewal_cleanup_unverified"))?
+        })
+    }
 }
 
 impl StreamingTransport for GgTransport {
@@ -87,8 +120,9 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
         host::environment(),
         command.selector,
         cancel.clone(),
-        |grant| {
-            GgConnection::from_grant(grant).map_err(|_| grida_auth::Error::new("gg_handoff_failed"))
+        |client, grant| {
+            GgConnection::from_renewable_grant(grant, Arc::new(Renewal(Arc::clone(client))))
+                .map_err(|_| grida_auth::Error::new("gg_handoff_failed"))
         },
     );
     tokio::pin!(grant);
@@ -135,9 +169,7 @@ fn failure(error: agent_kit_core::Error) -> Error {
     let message = match error.code.as_str() {
         "empty_prompt" => "Provide a nonempty prompt with --prompt or stdin.",
         "prompt_too_large" => "The prompt is larger than the supported limit.",
-        "gg_token_expired" => {
-            "Restart with a current Grida login to acquire a fresh Gateway grant."
-        }
+        "gg_scope_changed" => "Use the Grida account and organization that opened this host.",
         "session_execution_configuration_changed" => {
             "Select the same provider, model, account, and organization as the saved chat."
         }

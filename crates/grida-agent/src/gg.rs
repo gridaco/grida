@@ -3,15 +3,22 @@
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::inference::ProviderBinding;
 use agent_kit_core::{
-    BindingId, Error, ErrorKind, Fingerprint, PrincipalId, ProviderId, Result, ScopeId,
+    BindingId, BoxFuture, CancellationToken, Error, ErrorKind, Fingerprint, PrincipalId,
+    ProviderId, Result, ScopeId,
 };
 use agent_kit_providers::{TransportOperation, TransportRequest};
-use grida_auth::GgGrant;
+use grida_auth::{GgGrant, GgGrantScope};
 use reqwest::Url;
 use reqwest::header::HeaderValue;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::watch;
+use tokio::time::{Instant, timeout_at};
 use uuid::Uuid;
 use zeroize::Zeroizing;
+
+const RENEWAL_MARGIN_MS: i64 = 30_000;
+const FAILED_RENEWAL_COOLDOWN: Duration = Duration::from_secs(1);
 
 /// Secret-bearing input for a trusted host HTTP adapter. It has no debug or
 /// serialization projection. The transport checks expiry again before sending.
@@ -27,10 +34,61 @@ pub struct GgChatRequest {
 /// A native GG grant projected into a fixed text-inference connection.
 pub struct GgConnection {
     target: Url,
-    header: HeaderValue,
-    expires_at_ms: i64,
     binding: ProviderBinding,
     scope: Fingerprint,
+    credential: Arc<Mutex<Credential>>,
+    renewal: Option<Arc<Renewal>>,
+}
+
+/// The account owner mints within the verified scope and completes any
+/// in-flight custody transaction before returning. Closing cancels new
+/// admission; accepted account custody follows its own bounded lifecycle.
+pub trait GgGrantRenewal: Send + Sync {
+    fn renew(
+        &self,
+        scope: GgGrantScope,
+        closing: CancellationToken,
+    ) -> BoxFuture<'_, Result<GgGrant>>;
+}
+
+struct Credential {
+    header: HeaderValue,
+    expires_at_ms: i64,
+}
+
+impl Credential {
+    fn capture(token: &str, expires_at_ms: i64) -> Result<Self> {
+        let bearer = Zeroizing::new(format!("Bearer {token}"));
+        let mut header = HeaderValue::from_str(&bearer)
+            .map_err(|_| Error::new(ErrorKind::Unavailable, "gg_grant_invalid"))?;
+        header.set_sensitive(true);
+        Ok(Self {
+            header,
+            expires_at_ms,
+        })
+    }
+
+    fn validate_at(&self, now: i64) -> Result<()> {
+        if now >= self.expires_at_ms {
+            return Err(Error::new(ErrorKind::Unavailable, "gg_token_expired"));
+        }
+        Ok(())
+    }
+}
+
+struct Renewal {
+    scope: GgGrantScope,
+    source: Arc<dyn GgGrantRenewal>,
+    closing: CancellationToken,
+    flight: Mutex<Option<Flight>>,
+}
+
+type Flight = watch::Receiver<Option<CompletedRenewal>>;
+
+#[derive(Clone)]
+struct CompletedRenewal {
+    at: Instant,
+    result: Result<()>,
 }
 
 impl GgConnection {
@@ -44,6 +102,19 @@ impl GgConnection {
             grant.token(),
         )?;
         connection.validate()?;
+        Ok(connection)
+    }
+
+    /// Keep this live binding across grant rotations within the verified
+    /// account, origin, and organization captured at startup.
+    pub fn from_renewable_grant(grant: &GgGrant, source: Arc<dyn GgGrantRenewal>) -> Result<Self> {
+        let mut connection = Self::from_grant(grant)?;
+        connection.renewal = Some(Arc::new(Renewal {
+            scope: grant.scope().clone(),
+            source,
+            closing: CancellationToken::new(),
+            flight: Mutex::new(None),
+        }));
         Ok(connection)
     }
 
@@ -80,16 +151,12 @@ impl GgConnection {
                 scope: ScopeId::new("gg-chat-completions")?,
             },
         };
-        let bearer = Zeroizing::new(format!("Bearer {token}"));
-        let mut header = HeaderValue::from_str(&bearer)
-            .map_err(|_| Error::new(ErrorKind::Unavailable, "gg_grant_invalid"))?;
-        header.set_sensitive(true);
         Ok(Self {
             target,
-            header,
-            expires_at_ms,
             binding,
             scope,
+            credential: Arc::new(Mutex::new(Credential::capture(token, expires_at_ms)?)),
+            renewal: None,
         })
     }
 
@@ -105,13 +172,14 @@ impl GgConnection {
         {
             return Err(Error::new(ErrorKind::Conflict, "gg_authority_changed"));
         }
-        let expires_at = u64::try_from(self.expires_at_ms)
+        let credential = self.authorized_credential(&self.target)?;
+        let expires_at = u64::try_from(credential.expires_at_ms)
             .ok()
             .and_then(|milliseconds| UNIX_EPOCH.checked_add(Duration::from_millis(milliseconds)))
             .ok_or_else(|| Error::new(ErrorKind::Unavailable, "gg_grant_invalid"))?;
         Ok(GgChatRequest {
             target: self.target.as_str().into(),
-            authorization: self.authorization(&self.target)?,
+            authorization: credential.header.clone(),
             body: request.body,
             max_response_bytes: request.max_response_bytes,
             expires_at,
@@ -134,20 +202,140 @@ impl GgConnection {
         self.validate_at(now_ms()?)
     }
 
-    fn authorization(&self, target: &Url) -> Result<HeaderValue> {
+    fn authorized_credential(&self, target: &Url) -> Result<MutexGuard<'_, Credential>> {
         if target != self.target() {
             return Err(Error::new(ErrorKind::Conflict, "gg_destination_changed"));
         }
-        self.validate()?;
-        Ok(self.header.clone())
+        if let Some(renewal) = &self.renewal {
+            renewal.ensure_open()?;
+        }
+        let credential = locked(&self.credential)?;
+        credential.validate_at(now_ms()?)?;
+        Ok(credential)
     }
 
     fn validate_at(&self, now_ms: i64) -> Result<()> {
-        if now_ms >= self.expires_at_ms {
-            return Err(Error::new(ErrorKind::Unavailable, "gg_token_expired"));
+        locked(&self.credential)?.validate_at(now_ms)
+    }
+
+    /// Authorize the current live binding before starting a provider attempt.
+    /// Dropping this waiter leaves the single accepted renewal owned by Host.
+    pub(crate) async fn ensure_current(&self) -> Result<()> {
+        let Some(renewal) = &self.renewal else {
+            return self.validate();
+        };
+        let flight = {
+            let mut active = locked(&renewal.flight)?;
+            renewal.ensure_open()?;
+            let expires_at_ms = locked(&self.credential)?.expires_at_ms;
+            if expires_at_ms > now_ms()?.saturating_add(RENEWAL_MARGIN_MS) {
+                return Ok(());
+            }
+            match active.as_ref() {
+                Some(flight) if flight.borrow().is_none() => flight.clone(),
+                Some(flight)
+                    if flight.borrow().as_ref().is_some_and(|completed| {
+                        completed.result.is_err()
+                            && completed.at.elapsed() < FAILED_RENEWAL_COOLDOWN
+                    }) =>
+                {
+                    flight.clone()
+                }
+                _ => {
+                    let flight = renewal.start(Arc::clone(&self.credential));
+                    *active = Some(flight.clone());
+                    flight
+                }
+            }
+        };
+        completed(flight).await?.result
+    }
+
+    pub(crate) async fn shutdown(&self, deadline: Instant) -> Result<()> {
+        let Some(renewal) = &self.renewal else {
+            return Ok(());
+        };
+        self.close();
+        let flight = locked(&renewal.flight)?.clone();
+        if let Some(flight) = flight {
+            let completion = timeout_at(deadline, completed(flight))
+                .await
+                .map_err(|_| unverified_renewal())??;
+            if let Err(error) = completion.result
+                && error.kind == ErrorKind::Uncertain
+            {
+                return Err(error);
+            }
         }
         Ok(())
     }
+
+    pub(crate) fn close(&self) {
+        if let Some(renewal) = &self.renewal {
+            renewal.closing.cancel();
+        }
+    }
+}
+
+impl Renewal {
+    fn ensure_open(&self) -> Result<()> {
+        if self.closing.is_cancelled() {
+            return Err(Error::new(ErrorKind::Unavailable, "gg_authority_closed"));
+        }
+        Ok(())
+    }
+
+    fn start(self: &Arc<Self>, credential: Arc<Mutex<Credential>>) -> Flight {
+        let renewal = Arc::clone(self);
+        let (sender, receiver) = watch::channel(None);
+        tokio::spawn(async move {
+            let result = renewal.replace_credential(credential).await;
+            // The account owner has finished its custody transaction before
+            // the host can observe this completion.
+            sender.send_replace(Some(CompletedRenewal {
+                at: Instant::now(),
+                result,
+            }));
+        });
+        receiver
+    }
+
+    async fn replace_credential(&self, credential: Arc<Mutex<Credential>>) -> Result<()> {
+        self.ensure_open()?;
+        let grant = self
+            .source
+            .renew(self.scope.clone(), self.closing.clone())
+            .await?;
+        if grant.scope() != &self.scope {
+            return Err(Error::new(ErrorKind::Conflict, "gg_scope_changed"));
+        }
+        let replacement = Credential::capture(grant.token(), grant.expires_at_ms())?;
+        if replacement.expires_at_ms <= now_ms()?.saturating_add(RENEWAL_MARGIN_MS) {
+            return Err(Error::new(
+                ErrorKind::Unavailable,
+                "gg_renewal_expiry_too_short",
+            ));
+        }
+        self.ensure_open()?;
+        *locked(&credential)? = replacement;
+        Ok(())
+    }
+}
+
+async fn completed(mut flight: Flight) -> Result<CompletedRenewal> {
+    flight
+        .wait_for(Option::is_some)
+        .await
+        .map_err(|_| unverified_renewal())
+        .map(|value| value.clone().expect("renewal completion predicate"))
+}
+
+fn locked<T>(mutex: &Mutex<T>) -> Result<MutexGuard<'_, T>> {
+    mutex.lock().map_err(|_| unverified_renewal())
+}
+
+fn unverified_renewal() -> Error {
+    Error::new(ErrorKind::Uncertain, "gg_renewal_cleanup_unverified")
 }
 
 fn invalid_origin() -> Error {
@@ -237,7 +425,11 @@ mod tests {
             connection.target().as_str(),
             "https://api.example/api/v1/ai/chat/completions"
         );
-        let header = connection.authorization(connection.target()).unwrap();
+        let header = connection
+            .authorized_credential(connection.target())
+            .unwrap()
+            .header
+            .clone();
         assert!(header.is_sensitive());
         assert_eq!(header.to_str().unwrap(), "Bearer synthetic.gg.grant");
         assert!(!format!("{header:?}").contains("synthetic.gg.grant"));
@@ -248,8 +440,9 @@ mod tests {
         ] {
             assert_eq!(
                 connection
-                    .authorization(&Url::parse(target).unwrap())
-                    .unwrap_err()
+                    .authorized_credential(&Url::parse(target).unwrap())
+                    .err()
+                    .unwrap()
                     .code,
                 "gg_destination_changed"
             );
@@ -269,7 +462,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            expired.authorization(expired.target()).unwrap_err().code,
+            expired
+                .authorized_credential(expired.target())
+                .err()
+                .unwrap()
+                .code,
             "gg_token_expired"
         );
     }

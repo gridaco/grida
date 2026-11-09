@@ -7,7 +7,7 @@ Options:
 
 Configure the client to launch this command. Stdin and stdout carry ACP.
 Use an absolute state directory. Sign in first with grida auth login.
-When the invocation's scoped grant expires, restart the service to acquire
-a fresh grant under your current account and organization.
+The service renews its scoped grant when needed for the account and organization
+that opened it.
 
 Documentation: https://grida.co/docs/cli/agent
