@@ -1103,6 +1103,7 @@ dependencies = [
  "agent-kit-core",
  "agent-kit-providers",
  "agent-kit-runtime",
+ "agent-kit-sandbox",
  "agent-kit-sessions",
  "agent-kit-store-sqlite",
  "clap",

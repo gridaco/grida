@@ -562,6 +562,18 @@ see the supervisor) is the structural boundary, and a per-session
   safety classifier that would judge intent is **deferred** — `auto` is an
   opt-in, informed-consent posture.
 
+**Native finite-command adapter.** A host can construct the adapter for one
+authorized execution scope after probing the installed native sandbox. A tool
+call supplies the program, arguments, working directory, environment values,
+and optional UTF-8 stdin. Filesystem grants, network denial, private temporary
+storage, and the termination guarantee come from the host and native sandbox.
+Preparation refusals share one tool response regardless of path existence.
+The adapter retains supervision after the runtime cancels an invocation. The
+host's cleanup barrier reports pending or unverified command identities before
+the host releases resources that depend on cleanup. Same-process reconciliation
+matches the invocation and attempt against retained evidence. A missing match
+leaves the result uncertain.
+
 **Supervised-approval answer boundary.** The approval pause/resume crosses the
 trust boundary, so the answer is server-validated. The host owns message state
 (it rebuilds the model view from the DB each turn), so the answer does NOT ride a
@@ -970,6 +982,7 @@ Today:
 - `desktop/src/main/agent-daemon-socket-host.ts` — owns the exact loopback listener, pauses accepted sockets, rejects non-loopback peers, and transfers the bounded connected capability over per-spawn Node IPC.
 - `desktop/src/main/agent-network-host.ts` and `agent-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization, per-spawn built-in/custom grant state, and the capped private dispatch seam into the command host.
 - `desktop/src/main/agent-command-host.ts` and `main/sandbox/manager.ts` — main-owned finite-command execution: canonical exact-root validation, shared-scratch/secret/media-root denies, own-scratch/workspace/private-temp grants, a fixed no-network policy, fresh per-command SRT wrapping, raw spawn only after the wrapper succeeds, and terminal cleanup before abort acknowledgement. The long-lived sidecar may persist generated media; an individual model-authored command cannot read or mutate that library.
+- The native command adapter retains the authorized scope, owns cleanup across runtime cancellation, and reconciles the original attempt. [Adapter](crates/grida-agent/src/command.rs) and [tests](crates/grida-agent/tests/commands.rs).
 - `desktop/src/main/agent-sandbox-policy.ts` — binds Desktop's strict sandbox posture: empty direct external egress, host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.
 - `desktop/src/main/agent-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; initializes the OS sandbox wrapper when supported; owns both private channels, forwards the one main-owned media-root fact, and removes direct provider hosts from the sidecar policy (Desktop deliberately withholds srt's alpha Windows backend pending a supported lifecycle).
 - `desktop/src/main/desktop-entry-window.ts` — owns the exact bridge-attached entry window and admits auxiliary native windows only while the authenticated main role is active; the Grida-account transition is additionally bound by GRIDA-SEC-005.

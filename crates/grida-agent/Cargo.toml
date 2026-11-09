@@ -11,6 +11,7 @@ agent-client-protocol = "=5.0.0"
 agent-kit-core = { path = "../agent-kit-core" }
 agent-kit-providers = { path = "../agent-kit-providers" }
 agent-kit-runtime = { path = "../agent-kit-runtime" }
+agent-kit-sandbox = { path = "../agent-kit-sandbox" }
 agent-kit-sessions = { path = "../agent-kit-sessions" }
 agent-kit-store-sqlite = { path = "../agent-kit-store-sqlite" }
 clap = { workspace = true, features = ["help", "usage", "error-context"] }
