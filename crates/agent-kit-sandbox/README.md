@@ -32,8 +32,10 @@ an operation bounds cleanup attempts and preserves uncertain effects.
 
 - macOS generates a deny-by-default Seatbelt profile for the supplied paths.
   The command and descendants inherit its confinement. Cancellation signals an
-  owned process group. A descendant that creates another session can outlive
-  the group, so this backend refuses a required all-descendant guarantee.
+  owned process group. After normal payload exit, the helper reports the exit
+  and stays alive for the owner's group signal and reap. Closing the status
+  channel releases that wait. A descendant that creates another session can
+  outlive the group, so this backend refuses a required all-descendant guarantee.
 - Linux uses bubblewrap user, mount, PID, IPC, UTS, and network namespaces.
   The trusted helper verifies mounted identities, disables inspection of
   itself, and installs seccomp before spawning the command. Namespace teardown

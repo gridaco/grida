@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+#[cfg(target_os = "macos")]
+pub const HELPER_FLAG: &str = "--agent-kit-sandbox-helper-v2";
+#[cfg(target_os = "linux")]
 pub const HELPER_FLAG: &str = "--agent-kit-sandbox-helper-v1";
 pub const MAX_FRAME_BYTES: usize = 256 * 1024;
 

@@ -61,9 +61,12 @@ pub(super) fn spawn(prepared: Prepared, cancellation: CancellationToken) -> Resu
     if prepared.valid_until <= Instant::now() || cancellation.is_cancelled() {
         return Err(refused(ErrorKind::InvalidState, "sandbox_admission_closed"));
     }
+    // Tokio can fail to register a child with the process or I/O driver
+    // after the OS has started it. No setup frame was sent, but launcher
+    // termination and cleanup are not established on this error path.
     let child = command
         .spawn()
-        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_spawn_failed"))?;
+        .map_err(|_| refused(ErrorKind::Uncertain, "sandbox_spawn_unconfirmed"))?;
     drop(status_write);
     let stop = CancellationToken::new();
     let task = tokio::spawn(supervise(
@@ -316,6 +319,8 @@ async fn supervise(
     });
     let pid = child.id().expect("spawned process has id") as i32;
     let deadline = (Instant::now() + prepared.timeout).min(prepared.valid_until);
+    let probe = matches!(prepared.launch.task, Task::Probe);
+    let mut status_bytes = Vec::new();
     let mut observation = None;
     let stopped = tokio::select! {
         biased;
@@ -323,6 +328,10 @@ async fn supervise(
         _ = stop.cancelled() => Some(StopReason::Requested),
         _ = overflow.cancelled() => Some(StopReason::OutputLimit),
         _ = tokio::time::sleep_until(deadline.into()) => Some(StopReason::Deadline),
+        // Seatbelt's helper holds the group open after the payload exits.
+        // Darwin can reject a group signal once only zombies remain.
+        _ = read_terminal_prefix(&mut status, &mut status_bytes, probe),
+            if prepared.support.backend == Backend::Seatbelt => None,
         result = wait_without_reaping(pid) => {
             observation = Some(result);
             None
@@ -333,14 +342,18 @@ async fn supervise(
         Some(Err(_)) => false,
         _ => signal_process_group(pid).is_ok(),
     };
+    let _ = status.shutdown().await;
     let reaped = tokio::time::timeout(REAP_GRACE, child.wait())
         .await
         .is_ok_and(|result| result.is_ok());
 
-    let mut status_bytes = Vec::new();
+    let remaining_status_bytes = (7 - status_bytes.len()) as u64;
     let status_read = async {
         // A malformed status stream never implies successful payload execution.
-        (&mut status).take(7).read_to_end(&mut status_bytes).await
+        (&mut status)
+            .take(remaining_status_bytes)
+            .read_to_end(&mut status_bytes)
+            .await
     };
     let status_complete = tokio::time::timeout(DRAIN_GRACE, status_read)
         .await
@@ -359,12 +372,12 @@ async fn supervise(
     }
 
     let completion = if status_complete {
-        parse_status(&status_bytes, matches!(prepared.launch.task, Task::Probe))
+        parse_status(&status_bytes, probe)
     } else {
         Completion::Uncertain
     };
     let descendants = match (completion, prepared.support.backend) {
-        (Completion::SetupFailed, _) => Descendants::NoPayload,
+        (Completion::SetupFailed, _) if reaped => Descendants::NoPayload,
         (_, Backend::Seatbelt) if process_group_signalled && reaped => {
             Descendants::ProcessGroupSignalled
         }
@@ -387,6 +400,22 @@ async fn supervise(
         descendants,
         temporary_removed,
     }
+}
+
+async fn read_terminal_prefix(
+    status: &mut tokio::net::UnixStream,
+    bytes: &mut Vec<u8>,
+    probe: bool,
+) -> io::Result<()> {
+    let terminal_size = if probe { 5 } else { 6 };
+    let mut byte = [0];
+    while bytes.len() < terminal_size && bytes.as_slice() != [wire::STATUS_SETUP_FAILED] {
+        if status.read(&mut byte).await? == 0 {
+            break;
+        }
+        bytes.push(byte[0]);
+    }
+    Ok(())
 }
 
 fn parse_status(bytes: &[u8], probe: bool) -> Completion {

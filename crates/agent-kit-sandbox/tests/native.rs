@@ -264,6 +264,10 @@ async fn native_scope_confines_files_ipc_network_and_environment() {
         "{evidence:?} stderr={:?}",
         String::from_utf8_lossy(&evidence.stderr)
     );
+    #[cfg(target_os = "macos")]
+    assert_eq!(evidence.descendants, Descendants::ProcessGroupSignalled);
+    #[cfg(target_os = "linux")]
+    assert_eq!(evidence.descendants, Descendants::NamespaceEnded);
     let support = sandbox.probe(&fixture.scope()).await.unwrap();
     assert_eq!(evidence.support, support);
     assert_eq!(evidence.stdout, b"complete");

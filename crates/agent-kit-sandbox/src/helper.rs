@@ -75,7 +75,16 @@ fn report_exit(status: &mut File, kind: u8, value: i32) -> bool {
     let mut frame = [0; 5];
     frame[0] = kind;
     frame[1..].copy_from_slice(&value.to_be_bytes());
-    status.write_all(&frame).is_ok()
+    if status.write_all(&frame).is_err() {
+        return false;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // Keep a live group leader until the owner signals the group or
+        // closes its end of the private status channel.
+        let _ = status.read_exact(&mut [0]);
+    }
+    true
 }
 
 #[allow(unsafe_code)]
@@ -145,4 +154,37 @@ fn probe(temp: &std::path::Path) -> std::io::Result<()> {
         return Err(std::io::ErrorKind::InvalidData.into());
     }
     Ok(())
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+    use std::os::fd::OwnedFd;
+    use std::os::unix::net::UnixStream;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    #[test]
+    fn terminal_helper_releases_its_wait_when_the_owner_disappears() {
+        let (mut owner, helper) = UnixStream::pair().unwrap();
+        let timeout = Duration::from_secs(1);
+        owner.set_read_timeout(Some(timeout)).unwrap();
+        let (finished, completion) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let mut status = File::from(OwnedFd::from(helper));
+            finished
+                .send(report_exit(&mut status, wire::STATUS_EXIT, 0))
+                .unwrap();
+        });
+        let mut frame = [0; 5];
+        owner.read_exact(&mut frame).unwrap();
+        assert_eq!(frame, [wire::STATUS_EXIT, 0, 0, 0, 0]);
+        assert!(matches!(
+            completion.try_recv(),
+            Err(mpsc::TryRecvError::Empty)
+        ));
+        drop(owner);
+        assert!(completion.recv_timeout(timeout).unwrap());
+        worker.join().unwrap();
+    }
 }
