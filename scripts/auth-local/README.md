@@ -146,8 +146,8 @@ editor, API, and callback origins. Google Fonts use local test CSS, and telemetr
 is disabled.
 
 The snapshot omits the main site's blog proxy rewrites. Blog content is outside
-this auth fixture, so `/blog` requests receive a local 404 instead of contacting
-the hosted blog or proxying back to the same editor route.
+this auth fixture, so `/blog` requests remain local without proxying to the hosted
+blog or back to the same editor route.
 
 Run the proof from another terminal after the editor reports ready:
 
