@@ -17,7 +17,7 @@
     "dev": "pnpm run build:linked-packages && node scripts/prepare-dev-electron-branding.mjs && electron-forge start",
     "dev:insiders": "pnpm run build:linked-packages && node scripts/prepare-dev-electron-branding.mjs --insiders && electron-forge start -- --insiders",
     "make": "pnpm run build:linked-packages && node scripts/prepare-dev-electron-branding.mjs && electron-forge make",
-    "package": "pnpm run build:linked-packages && node scripts/prepare-dev-electron-branding.mjs && electron-forge package",
+    "package": "pnpm run build:linked-packages && node scripts/prepare-dev-electron-branding.mjs && node scripts/package-with-native-agent.mjs",
     "test": "pnpm run build:linked-packages && vitest run",
     "test:watch": "pnpm run build:linked-packages && vitest",
     "typecheck": "pnpm run build:linked-packages && tsc --noEmit",

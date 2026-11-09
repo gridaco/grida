@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 — package the fixed native executables outside app.asar.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +11,14 @@ const { binaryHeader } = await import(
 
 const DIRECTORY = "native-agent";
 const MAX_BINARY_BYTES = 128 * 1024 * 1024;
+const workspace = fileURLToPath(new URL("../../", import.meta.url));
+const rustTargets = {
+  "darwin-arm64": "aarch64-apple-darwin",
+  "darwin-x64": "x86_64-apple-darwin",
+  "linux-arm64": "aarch64-unknown-linux-gnu",
+  "linux-x64": "x86_64-unknown-linux-gnu",
+  "win32-x64": "x86_64-pc-windows-msvc",
+};
 
 function executables(os, cpu) {
   assert(["darwin", "linux", "win32"].includes(os), "Unsupported agent OS");
@@ -99,6 +108,63 @@ export function stageNativeAgent(resources, artifacts, os, cpu) {
     fs.renameSync(staging, destination);
   } finally {
     fs.rmSync(staging, { recursive: true, force: true });
+  }
+}
+
+/** Build the fixed native resources for the current packaging machine. */
+export function buildNativeAgentArtifacts(artifacts, os, cpu) {
+  const names = executables(os, cpu);
+  assert(
+    os === process.platform && cpu === process.arch,
+    "Cross-target packages require GRIDA_DESKTOP_NATIVE_ARTIFACTS"
+  );
+  assert(
+    path.isAbsolute(artifacts),
+    "Native agent artifact root must be absolute"
+  );
+  const tag = `${os}-${cpu}`;
+  const target = rustTargets[tag];
+  const targetDir = path.join(workspace, "target", "desktop-agent");
+  const selection = ["-p", "grida-agent", "--bin", "grida-agent"];
+  if (os !== "win32") {
+    selection.push(
+      "-p",
+      "agent-kit-sandbox",
+      "--bin",
+      "agent-kit-sandbox-helper"
+    );
+  }
+  execFileSync(
+    "cargo",
+    [
+      "build",
+      "--locked",
+      "--release",
+      "--target",
+      target,
+      "--target-dir",
+      targetDir,
+      ...selection,
+    ],
+    {
+      cwd: workspace,
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        CARGO_PROFILE_RELEASE_STRIP: "symbols",
+        ...(os === "darwin" ? { MACOSX_DEPLOYMENT_TARGET: "11.0" } : {}),
+      },
+    }
+  );
+  const built = path.join(targetDir, target, "release");
+  const output = path.join(artifacts, tag);
+  fs.mkdirSync(output, { mode: 0o700 });
+  for (const name of names) {
+    fs.writeFileSync(
+      path.join(output, name),
+      readExecutable(path.join(built, name), os, cpu),
+      { flag: "wx", mode: 0o755 }
+    );
   }
 }
 

@@ -13,6 +13,12 @@ on:
   pull_request:
     paths:
       - "desktop/**"
+      - "crates/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - "skills/**"
+      - "scripts/cli-release/native*.mjs"
       - "packages/grida-ai-agent/**"
       - "packages/grida-ai/**"
       - "packages/grida-daemon/**"
@@ -70,6 +76,6 @@ jobs:
             --filter=@grida/home
 
       - name: Package (runs the GRIDA-DESKTOP-BUILD-GUARD oracle)
-        # `electron-forge package` produces the unsigned .app/.exe + app.asar and
-        # runs the postPackage oracle. No makers, no publish, no secrets.
-        run: pnpm exec electron-forge package
+        # The package script builds the locked native payload and Forge
+        # verifies it with the unsigned app. No makers, publish or secrets.
+        run: pnpm run package

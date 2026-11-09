@@ -116,25 +116,26 @@ adapter still wires the core.
 
 ## Distributions
 
-To include native agent executables in a package build, set
-`GRIDA_DESKTOP_NATIVE_ARTIFACTS` to an absolute build-output directory with one
-`<platform>-<arch>` subdirectory per target. Each target contains `grida-agent`
-and `agent-kit-sandbox-helper` built from the same locked workspace. The Windows
-x64 target contains `grida-agent.exe`. For a local macOS arm64 package:
+The local and unsigned CI package entrypoint builds the native agent with the
+repository's pinned Rust toolchain and locked dependencies. Install the Rust
+toolchain and native linker for your packaging machine, then run:
 
 ```sh
-cargo build --locked -p grida-agent -p agent-kit-sandbox \
-  --bin grida-agent --bin agent-kit-sandbox-helper
-artifacts=$(mktemp -d)
-mkdir "$artifacts/darwin-arm64"
-cp target/debug/{grida-agent,agent-kit-sandbox-helper} "$artifacts/darwin-arm64/"
-GRIDA_DESKTOP_NATIVE_ARTIFACTS="$artifacts" pnpm --dir desktop package --arch=arm64
+pnpm --dir desktop package
 ```
+
+The default build targets the packaging machine's OS and Node architecture.
+For a cross-target package or prebuilt inputs, set
+`GRIDA_DESKTOP_NATIVE_ARTIFACTS` to an absolute build-output directory with one
+`<platform>-<arch>` subdirectory per target. macOS and Linux x64 or arm64
+require `grida-agent` and `agent-kit-sandbox-helper`. Windows x64 requires
+`grida-agent.exe`.
 
 Forge stages the executables in `resources/native-agent` before signing and
 verifies their architecture, names and permissions in the completed package.
-Native resource packaging and chat runtime selection have separate acceptance
-checks.
+Local Linux binaries use the builder's GNU runtime. Installer and cross-machine
+ABI qualification and chat startup each have separate acceptance checks.
+The installer and publish workflows still use their existing artifact inputs.
 
 The main-process chat client creates or loads a session in its selected
 workspace and sends identified text input over ACP. It reads retained input

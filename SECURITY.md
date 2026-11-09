@@ -850,12 +850,14 @@ lazy reads, read-only mutation, and symlink escape refusal.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
-- [Native agent package staging](desktop/scripts/native-agent-package.mjs),
+- The [unsigned package entrypoint](desktop/scripts/package-with-native-agent.mjs)
+  builds from the locked workspace or takes an explicit absolute artifact root.
+  [Native agent package staging](desktop/scripts/native-agent-package.mjs),
   [Forge hooks](desktop/forge.config.ts), and the
-  [package verifier](desktop/scripts/verify-packaged-bundle.mjs) bind the optional
-  native build input to fixed architecture-checked executables in application
-  resources outside the archive. The build output directory is deployment-owned.
-  Launch-time trust and helper identity remain enforced by the native host.
+  [package verifier](desktop/scripts/verify-packaged-bundle.mjs) bind that input
+  to fixed architecture-checked executables in application resources outside
+  the archive. Build output custody stays with the packaging owner. Launch-time
+  trust and helper identity remain enforced by the native host.
 - [Native agent process owner](desktop/src/main/native-agent-process.ts) and
   [its fixtures](desktop/src/main/native-agent-process.test.ts) start the fixed
   resource executable without a shell. They select the child environment,

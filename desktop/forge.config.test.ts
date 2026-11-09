@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import config from "./forge.config";
 import {
+  buildNativeAgentArtifacts,
   stageNativeAgent,
   verifyNativeAgent,
 } from "./scripts/native-agent-package.mjs";
@@ -58,6 +59,19 @@ describe("Desktop package file filter", () => {
 });
 
 describe("Desktop native agent package", () => {
+  it("requires explicit artifacts before building for a different platform", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "grida-native-target-"));
+    try {
+      const foreign = process.platform === "linux" ? "darwin" : "linux";
+      expect(() => buildNativeAgentArtifacts(root, foreign, "x64")).toThrow(
+        "Cross-target packages require GRIDA_DESKTOP_NATIVE_ARTIFACTS"
+      );
+      expect(fs.readdirSync(root)).toEqual([]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   function stage(osName: string, cpu: string, helper = true) {
     const root = fs.mkdtempSync(
       path.join(os.tmpdir(), "grida-native-package-")
