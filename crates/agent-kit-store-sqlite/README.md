@@ -1,5 +1,10 @@
 # agent-kit-store-sqlite
 
+Conditional resume keeps pause changes and replacement ownership in one
+transaction. Read-only claim receipt lookup recognizes repeated requests
+without issuing a lease. Turn snapshots expose their history position for
+conditional contributions.
+
 SQLite implementation of durable session acceptance, claims, controls, and the
 shared execution journal. It accepts an explicit database path in an existing
 application-owned directory.

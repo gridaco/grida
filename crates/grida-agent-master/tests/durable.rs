@@ -118,6 +118,7 @@ struct ScriptProvider {
     requests: Mutex<Vec<InferenceRequest>>,
     measurement: Mutex<Option<InputMeasurement>>,
     measured_requests: Mutex<Vec<InferenceRequest>>,
+    authority: Mutex<AuthorityBinding>,
 }
 
 impl Provider for ScriptProvider {
@@ -147,7 +148,7 @@ impl Provider for ScriptProvider {
             request,
             ProviderBinding {
                 provider: provider_id(),
-                authority: authority(),
+                authority: self.authority.lock().unwrap().clone(),
             },
             capabilities,
         )
@@ -299,11 +300,11 @@ impl Tool for EchoTool {
     }
 }
 
-struct Granted;
+struct Granted(GrantSelection);
 impl AuthorityValidator for Granted {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
         Box::pin(async move {
-            if request.selection == grants() {
+            if request.selection == self.0 {
                 Ok(())
             } else {
                 Err(Error::new(ErrorKind::InvalidInput, "unexpected_grant"))
@@ -339,6 +340,7 @@ impl Fixture {
             requests: Mutex::new(vec![]),
             measurement: Mutex::new(None),
             measured_requests: Mutex::new(vec![]),
+            authority: Mutex::new(authority()),
         });
         let tool = Arc::new(EchoTool::new());
         let mut inventory = Inventory::new();
@@ -376,7 +378,7 @@ impl Fixture {
         Runtime::new(ExecutionServices {
             providers: BTreeMap::from([(provider_id(), provider)]),
             tools: self.inventory.clone(),
-            authority: Arc::new(Granted),
+            authority: Arc::new(Granted(self.grants())),
             gate,
             limits: ExecutionLimits {
                 max_operations: 64,
@@ -400,15 +402,21 @@ impl Fixture {
             self.provider.clone(),
             self.inventory.clone(),
             MasterAuthority {
-                inference: grants(),
+                inference: self.grants(),
                 tools: if matches!(self.provider.script, Script::Answer) {
                     BTreeMap::new()
                 } else {
-                    BTreeMap::from([(tool_id(), grants())])
+                    BTreeMap::from([(tool_id(), self.grants())])
                 },
             },
         )
         .unwrap()
+    }
+    fn grants(&self) -> GrantSelection {
+        GrantSelection {
+            authority: self.provider.authority.lock().unwrap().clone(),
+            grants: grants().grants,
+        }
     }
     async fn claim(&self, store: &SqliteStore) -> ClaimedTurn {
         store
@@ -464,6 +472,8 @@ impl Fixture {
 enum PublicationInterruption {
     BeforeCommit,
     BeforeOutcome,
+    BeforeDispatch,
+    AfterRequestCheckpoint,
     ControlAfterCommit(ControlDirective),
     ControlBeforeBoundary(ControlDirective),
     InputAfterCommit,
@@ -522,6 +532,13 @@ impl TurnJournal for InterruptPublication {
             .iter()
             .any(|action| matches!(action, JournalAction::SetCheckpoint(_)));
         let boundary_matches = match self.interruption {
+            PublicationInterruption::AfterRequestCheckpoint => {
+                publishes_continuation && !publishes_history
+            }
+            PublicationInterruption::BeforeDispatch => change
+                .actions()
+                .iter()
+                .any(|action| matches!(action, JournalAction::StartAttempt { .. })),
             PublicationInterruption::BeforeOutcome => change
                 .actions()
                 .iter()
@@ -534,12 +551,19 @@ impl TurnJournal for InterruptPublication {
         }
         Box::pin(async move {
             match self.interruption {
-                PublicationInterruption::BeforeCommit | PublicationInterruption::BeforeOutcome => {
+                PublicationInterruption::AfterRequestCheckpoint => {
+                    self.lease.journal().commit(change).await?;
                     Err(Error::new(
                         ErrorKind::Unavailable,
-                        "publication_interrupted",
+                        "request_checkpoint_interrupted",
                     ))
                 }
+                PublicationInterruption::BeforeCommit
+                | PublicationInterruption::BeforeOutcome
+                | PublicationInterruption::BeforeDispatch => Err(Error::new(
+                    ErrorKind::Unavailable,
+                    "publication_interrupted",
+                )),
                 PublicationInterruption::ControlBeforeBoundary(_) => {
                     let receipt = self.lease.journal().commit(change).await?;
                     self.loads_before_control.store(2, Ordering::SeqCst);
@@ -603,6 +627,15 @@ impl TurnJournal for InterruptPublication {
         })
     }
     fn lookup(&self, id: ChangeId) -> BoxFuture<'_, Result<Option<CommitReceipt>>> {
+        if matches!(
+            self.interruption,
+            PublicationInterruption::AfterRequestCheckpoint
+        ) && !self.armed.load(Ordering::SeqCst)
+        {
+            return Box::pin(async {
+                Err(Error::new(ErrorKind::Unavailable, "journal_disconnected"))
+            });
+        }
         self.lease.journal().lookup(id)
     }
 }
@@ -1060,6 +1093,55 @@ async fn dispatched_orphan_is_reported_without_another_provider_request() {
         .verify(CommitReceipt::Settled(receipt))
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn fresh_authority_replaces_only_a_request_that_never_dispatched() {
+    for interruption in [
+        PublicationInterruption::BeforeDispatch,
+        PublicationInterruption::AfterRequestCheckpoint,
+    ] {
+        let fixture = Fixture::new(Script::Answer);
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let lease = intercept_publication(claim.lease, interruption);
+        let opened = fixture.runtime().open(lease).await.unwrap();
+        assert!(
+            fixture
+                .master(1, "Be concise")
+                .run(opened.turn, input())
+                .await
+                .is_err()
+        );
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+        drop(store);
+        let store = fixture.reopen().await;
+        fixture.provider.authority.lock().unwrap().binding = BindingId::new("fresh-host").unwrap();
+        let claim = fixture.recover(&store).await;
+        let state = claim.lease.journal().load().await.unwrap();
+        assert!(state.operations().len() <= 1);
+        assert!(
+            state
+                .operations()
+                .values()
+                .all(|operation| operation.attempts.is_empty())
+        );
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let MasterOutcome::Settled(receipt) = fixture
+            .master(1, "Be concise")
+            .run(opened.turn, input())
+            .await
+            .unwrap()
+        else {
+            panic!("expected fresh request settlement")
+        };
+        assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+        let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+        assert_eq!(account.steps, 1);
+        assert!(account.unresolved.is_empty());
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+        store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+    }
 }
 
 #[tokio::test]

@@ -206,6 +206,27 @@ impl SqliteStore {
         .await
     }
 
+    /// Observe the current turn view associated with an exactly repeated claim.
+    /// This issues no lease and never starts or resumes execution.
+    pub async fn claim_receipt(&self, request: ClaimRequest) -> Result<Option<TurnView>> {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            let receipt = lookup_request::<ClaimRecord>(
+                connection,
+                &request.session,
+                "claim",
+                &request.id,
+                Fingerprint::of(&request)?,
+            )?;
+            receipt
+                .map(|receipt| {
+                    let state = load_turn(connection, &request.session, &receipt.turn)?;
+                    turn_view(inner, &state)
+                })
+                .transpose()
+        })
+        .await
+    }
+
     /// Read committed history in turn creation and record append order.
     ///
     /// A `before_turn` cut excludes that turn and all subsequent turns. The
@@ -349,7 +370,8 @@ impl SqliteStore {
                         }
                         (state, selected)
                     }
-                    TurnSelection::Resume { turn, epoch, position } => {
+                    TurnSelection::Resume { turn, epoch, position }
+                    | TurnSelection::ResumePaused { turn, epoch, position, .. } => {
                         if session.active_turn.as_ref() != Some(turn) {
                             return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
                         }
@@ -357,10 +379,19 @@ impl SqliteStore {
                         if !state.is_suspended() || state.position() != *position || state.binding().epoch != *epoch {
                             return Err(error(ErrorKind::Conflict, "suspension_mismatch"));
                         }
+                        require_released(inner, state.binding())?;
+                        if let TurnSelection::ResumePaused { control_revision, .. } = &request.selection {
+                            if state.controls().revision != *control_revision || !state.controls().paused || state.controls().cancelled {
+                                return Err(error(ErrorKind::Conflict, "pause_state_changed"));
+                            }
+                            state.apply(JournalChange::new(
+                                ChangeId::new(Fingerprint::of(&("resume-control", &request.id))?.bytes().iter().map(|byte| format!("{byte:02x}")).collect::<String>())?, state.binding().clone(), state.position(), *control_revision,
+                                vec![JournalAction::Control(ControlDirective::Resume)],
+                            )?)?;
+                        }
                         if !state.controls().admits_work() {
                             return Err(error(ErrorKind::InvalidState, "turn_admission_closed"));
                         }
-                        require_released(inner, state.binding())?;
                         rebind(&mut state)?;
                         save_turn(&transaction, &state)?;
                         let inputs = turn_inputs(&transaction, &request.session, turn)?;
@@ -904,11 +935,15 @@ fn execute<T: Send + 'static>(
 ) -> BoxFuture<'static, Result<T>> {
     Box::pin(async move {
         tokio::task::spawn_blocking(move || {
-            let mut connection = inner
-                .connection
-                .lock()
-                .map_err(|_| error(ErrorKind::Unavailable, "store_connection_poisoned"))?;
-            operation(&inner, &mut connection)
+            let result = match inner.connection.lock() {
+                Ok(mut connection) => operation(&inner, &mut connection),
+                Err(_) => Err(error(ErrorKind::Unavailable, "store_connection_poisoned")),
+            };
+            // Release transient ownership before publishing the blocking task's
+            // result. An awaited operation must not retain the database lock
+            // until the scheduler later drops its completed task.
+            drop(inner);
+            result
         })
         .await
         .map_err(|_| error(ErrorKind::Uncertain, "store_task_interrupted"))?
@@ -1242,6 +1277,7 @@ fn turn_view(inner: &Inner, state: &TurnState) -> Result<TurnView> {
     Ok(TurnView {
         binding: state.binding().clone(),
         position: state.position(),
+        history_position: state.history().position(),
         controls: state.controls().clone(),
         disposition,
         outcome: state.outcome().cloned(),

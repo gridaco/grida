@@ -88,6 +88,21 @@ struct Continuation {
     outcome: Option<TurnOutcome>,
     #[serde(default)]
     request_history: Option<HistoryPosition>,
+    #[serde(default)]
+    request_generation: u32,
+}
+
+impl Continuation {
+    fn step_key(&self) -> String {
+        if self.request_generation == 0 {
+            format!("conversation/{}", self.step)
+        } else {
+            format!(
+                "conversation/{}/replacement/{}",
+                self.step, self.request_generation
+            )
+        }
+    }
 }
 
 impl Master {
@@ -196,6 +211,13 @@ impl Master {
                     None => continue,
                 }
             }
+            if self
+                .retire_unstarted_request(&mut turn, &mut continuation)
+                .await?
+            {
+                continue;
+            }
+            let step_key = continuation.step_key();
             let request = match &continuation.request {
                 Some(request) => request.clone(),
                 None => {
@@ -217,10 +239,7 @@ impl Master {
                             outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
                             continuation.outcome = Some(outcome);
                             turn.checkpoint(
-                                OperationKey::new(format!(
-                                    "conversation/{}/input-rejected",
-                                    continuation.step
-                                ))?,
+                                OperationKey::new(format!("{step_key}/input-rejected"))?,
                                 encode(CONTINUATION_SCHEMA, &continuation)?,
                             )
                             .await?;
@@ -229,7 +248,7 @@ impl Master {
                     };
                     continuation.request = Some(request.clone());
                     turn.checkpoint(
-                        OperationKey::new(format!("conversation/{}/request", continuation.step))?,
+                        OperationKey::new(format!("{step_key}/request"))?,
                         encode(CONTINUATION_SCHEMA, &continuation)?,
                     )
                     .await?;
@@ -238,7 +257,7 @@ impl Master {
             };
             let step = turn
                 .step(StepPlan {
-                    key: OperationKey::new(format!("conversation/{}", continuation.step))?,
+                    key: OperationKey::new(step_key.clone())?,
                     request,
                     inference_grants: self.authority.inference.clone(),
                     tool_grants: self.authority.tools.clone(),
@@ -390,10 +409,11 @@ impl Master {
                     }
                 };
             continuation.request = None;
+            continuation.request_generation = 0;
             continuation.interrupted = false;
             continuation.outcome = outcome;
             turn.publish_continuation(
-                OperationKey::new(format!("conversation/{}/result", continuation.step - 1))?,
+                OperationKey::new(format!("{step_key}/result"))?,
                 step.history,
                 encode(CONTINUATION_SCHEMA, &continuation)?,
             )
@@ -443,6 +463,7 @@ impl Master {
                 interrupted: false,
                 outcome: None,
                 request_history: None,
+                request_generation: 0,
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;
@@ -458,6 +479,41 @@ impl Master {
                 Ok(value)
             }
         }
+    }
+
+    async fn retire_unstarted_request(
+        &self,
+        turn: &mut Turn,
+        continuation: &mut Continuation,
+    ) -> Result<bool> {
+        let Some(request) = &continuation.request else {
+            return Ok(false);
+        };
+        if request.binding().authority == self.authority.inference.authority {
+            return Ok(false);
+        }
+        let key = continuation.step_key();
+        if let Some(operation) = turn.operation(&OperationKey::new(key.clone())?)? {
+            if !operation.attempts.is_empty() {
+                return Ok(false);
+            }
+            if operation.outcome().is_none() {
+                turn.operations()
+                    .cancel_prepared(operation.record.id)
+                    .await?;
+            }
+        }
+        continuation.request = None;
+        continuation.request_generation = continuation
+            .request_generation
+            .checked_add(1)
+            .ok_or_else(|| Error::new(ErrorKind::LimitExceeded, "request_generation_overflow"))?;
+        turn.checkpoint(
+            OperationKey::new(format!("{key}/retired"))?,
+            encode(CONTINUATION_SCHEMA, continuation)?,
+        )
+        .await?;
+        Ok(true)
     }
 
     fn prepare(&self, turn: &Turn) -> Result<PreparedRequest> {
@@ -538,8 +594,9 @@ impl Master {
         let mut outcome = self.cancelled_outcome(turn, continuation.step).await?;
         if continuation.request.is_some() {
             let step = continuation.step;
+            let key = continuation.step_key();
             let records = turn
-                .recorded_step_history(&OperationKey::new(format!("conversation/{step}"))?)
+                .recorded_step_history(&OperationKey::new(key.clone())?)
                 .await?;
             if records.is_some() {
                 continuation.step = step
@@ -555,9 +612,10 @@ impl Master {
                 )?;
             }
             continuation.request = None;
+            continuation.request_generation = 0;
             continuation.outcome = Some(outcome.clone());
             turn.publish_continuation(
-                OperationKey::new(format!("conversation/{step}/result"))?,
+                OperationKey::new(format!("{key}/result"))?,
                 records.unwrap_or_default(),
                 encode(CONTINUATION_SCHEMA, continuation)?,
             )

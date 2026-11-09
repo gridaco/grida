@@ -19,5 +19,9 @@ position. A response can resolve its interaction and append correlated history
 in the same transaction. The consumer validates response meaning and chooses
 the contribution's role and provenance.
 
+Resuming a user-paused turn can clear that pause and acquire its next lease
+atomically. The operation requires the observed suspension, control revision,
+and released owner. Other waits and session admission controls remain effective.
+
 This crate depends on the shared core. Runtime, databases, providers, transports,
 and product policy are supplied independently.

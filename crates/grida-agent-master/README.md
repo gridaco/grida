@@ -23,6 +23,11 @@ User input arriving after a prepared request is incorporated before a successful
 turn settles. An unanswered interaction preserves the unfinished turn through
 suspension, releasing the worker until an explicit resumption.
 
+A prepared request with obsolete execution authority can be retired only when
+it has no dispatched attempt. Its replacement receives a new operation identity
+under current authority and preserves the inference-step allowance. Dispatched
+attempts retain their recorded outcomes and uncertainty.
+
 Completion accounts expose typed output-limit, refusal, and step-limit reasons
 for client adapters. Provider failure classifications remain available in the
 account, with context exhaustion separate from output-limit exhaustion.

@@ -69,6 +69,12 @@ pub enum TurnSelection {
         epoch: u64,
         position: JournalPosition,
     },
+    ResumePaused {
+        turn: TurnId,
+        epoch: u64,
+        position: JournalPosition,
+        control_revision: ControlRevision,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -162,6 +168,7 @@ pub enum TurnDisposition {
 pub struct TurnView {
     pub binding: TurnBinding,
     pub position: JournalPosition,
+    pub history_position: HistoryPosition,
     pub controls: ControlSnapshot,
     pub disposition: TurnDisposition,
     pub outcome: Option<TurnOutcome>,

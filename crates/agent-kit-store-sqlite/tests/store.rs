@@ -1556,3 +1556,102 @@ async fn an_answer_and_its_history_contribution_commit_atomically() {
     );
     assert_eq!(state.history().records(), &[answer_record]);
 }
+
+#[tokio::test]
+async fn resuming_a_paused_turn_claims_exclusively_and_keeps_its_unanswered_wait() {
+    let (_directory, store) = store().await;
+    store
+        .submit(session(), submission("input", "hello"))
+        .await
+        .unwrap();
+    let acquired = claim(&store, "claim", vec![change("input")]).await;
+    commit(
+        &acquired,
+        "pause",
+        vec![
+            JournalAction::OpenWait(WaitRecord {
+                id: WaitId::new("question").unwrap(),
+                request: payload("choose"),
+                response: ResponseContract {
+                    schema: SchemaId::new("test.text").unwrap(),
+                    version: 1,
+                },
+                answer: None,
+                withdrawn: false,
+            }),
+            JournalAction::Control(agent_kit_core::turn::ControlDirective::Pause),
+            JournalAction::Suspend,
+        ],
+    )
+    .await;
+    let view = store.inspect(session()).await.unwrap();
+    let current = view.current.unwrap();
+    let request = ClaimRequest {
+        id: change("resume"),
+        session: session(),
+        expected_revision: view.revision,
+        selection: TurnSelection::ResumePaused {
+            turn: turn(),
+            epoch: current.binding.epoch,
+            position: current.position,
+            control_revision: current.controls.revision,
+        },
+    };
+    assert!(
+        store
+            .claim_receipt(request.clone())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert_error(
+        store.claim(request.clone()).await,
+        ErrorKind::Conflict,
+        "turn_still_owned",
+    );
+    assert!(
+        store
+            .inspect(session())
+            .await
+            .unwrap()
+            .current
+            .unwrap()
+            .controls
+            .paused
+    );
+    drop(acquired);
+    let ClaimOutcome::Acquired(resumed) = store.claim(request.clone()).await.unwrap() else {
+        panic!("expected resume lease")
+    };
+    let state = resumed.lease.journal().load().await.unwrap();
+    assert_eq!(state.binding().epoch, 2);
+    assert!(!state.controls().paused);
+    assert!(
+        state
+            .waits()
+            .get(&WaitId::new("question").unwrap())
+            .unwrap()
+            .is_pending()
+    );
+    assert_eq!(
+        store
+            .claim_receipt(request.clone())
+            .await
+            .unwrap()
+            .unwrap()
+            .binding
+            .epoch,
+        2
+    );
+    assert!(matches!(
+        store.claim(request.clone()).await.unwrap(),
+        ClaimOutcome::Existing(_)
+    ));
+    let mut conflict = request;
+    conflict.expected_revision.0 += 1;
+    assert_error(
+        store.claim_receipt(conflict).await,
+        ErrorKind::Conflict,
+        "request_identity_reused",
+    );
+}
