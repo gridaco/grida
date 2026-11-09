@@ -34,6 +34,11 @@ limited to 64 MiB. An over-limit write is rejected before its transaction commit
 These bounds are storage admission limits. Retention and cleanup policy belong to
 the host.
 
+Acceptance positions remain immutable while queued work has its own ordering.
+Replacement and withdrawal preserve original payloads and dispositions.
+Their controls, queue updates, and receipts commit together. Reopening upgrades
+the earlier schema transactionally while retaining completed and queued inputs.
+
 `SqliteStore::history` reads committed records in turn creation order and
 preserves their append order within each turn. An optional exclusive turn cut
 selects the history available before that turn. Projection reads the retained

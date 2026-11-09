@@ -64,6 +64,8 @@ struct SubmitResponse {
     input_position: u64,
     disposition: SubmissionDisposition,
     turn_id: Option<TurnId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    replacement_input_id: Option<ChangeId>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -72,14 +74,24 @@ enum SubmissionDisposition {
     Queued,
     Claimed,
     Completed,
+    Superseded,
+    Withdrawn,
 }
 
 impl From<DurableSubmission> for SubmitResponse {
     fn from(submission: DurableSubmission) -> Self {
-        let (disposition, turn_id) = match submission.disposition {
-            InputDisposition::Queued => (SubmissionDisposition::Queued, None),
-            InputDisposition::Claimed { turn } => (SubmissionDisposition::Claimed, Some(turn)),
-            InputDisposition::Completed { turn } => (SubmissionDisposition::Completed, Some(turn)),
+        let (disposition, turn_id, replacement_input_id) = match submission.disposition {
+            InputDisposition::Queued => (SubmissionDisposition::Queued, None, None),
+            InputDisposition::Claimed { turn } => {
+                (SubmissionDisposition::Claimed, Some(turn), None)
+            }
+            InputDisposition::Completed { turn } => {
+                (SubmissionDisposition::Completed, Some(turn), None)
+            }
+            InputDisposition::Superseded { replacement } => {
+                (SubmissionDisposition::Superseded, None, Some(replacement))
+            }
+            InputDisposition::Withdrawn => (SubmissionDisposition::Withdrawn, None, None),
         };
         Self {
             session_id: submission.session,
@@ -87,6 +99,7 @@ impl From<DurableSubmission> for SubmitResponse {
             input_position: submission.position,
             disposition,
             turn_id,
+            replacement_input_id,
         }
     }
 }

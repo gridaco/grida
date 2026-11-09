@@ -540,6 +540,11 @@ chooses steering or new work. Reordering changes selection order while preservin
 input identity. The claimed input and any consulted driver-state revision form
 the durable basis of execution. Settings interpretation remains driver policy.
 
+Withdrawal removes an input from eligible work while preserving its recorded
+disposition. Its retention and permanent deletion follow the host's separate
+data-lifetime policy. Immutable acceptance order and editable queue order have
+different meanings.
+
 Pausing an active turn is a persistent continuation blocker. It closes new
 admission and requests an orderly suspension while retaining accepted input,
 questions, and resumable work. Resume clears that blocker. Other unmet conditions,

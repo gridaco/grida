@@ -132,6 +132,319 @@ async fn acceptance_is_idempotent_and_inspection_is_observational() {
 }
 
 #[tokio::test]
+async fn replacing_queued_input_retains_original_identity_and_queue_slot() {
+    let (_directory, store) = store().await;
+    let first = store
+        .submit(session(), submission("a", "first"))
+        .await
+        .unwrap();
+    store
+        .submit(session(), submission("b", "second"))
+        .await
+        .unwrap();
+    store
+        .submit(session(), submission("c", "third"))
+        .await
+        .unwrap();
+    let replacement = submission("replacement", "revised second");
+    let request = ControlRequest {
+        id: change("replace"),
+        session: session(),
+        expected_revision: store.inspect(session()).await.unwrap().revision,
+        action: SessionControl::ReplaceQueued {
+            input: change("b"),
+            replacement: replacement.clone(),
+        },
+    };
+    let receipt = store.control(request.clone()).await.unwrap();
+    assert_eq!(store.control(request).await.unwrap(), receipt);
+    let queued = store.inspect(session()).await.unwrap().queued;
+    assert_eq!(
+        queued
+            .iter()
+            .map(|input| input.input.id.clone())
+            .collect::<Vec<_>>(),
+        vec![change("a"), change("replacement"), change("c")]
+    );
+    assert_eq!(queued[0].position, first.position);
+    assert_eq!(queued[1].position, 3);
+    let old = store.input(session(), change("b")).await.unwrap().unwrap();
+    assert_eq!(old.input.payload, payload("second"));
+    assert_eq!(old.position, 1);
+    assert_eq!(
+        old.disposition,
+        InputDisposition::Superseded {
+            replacement: change("replacement")
+        }
+    );
+    assert_error(
+        store
+            .claim(ClaimRequest {
+                id: change("claim-superseded"),
+                session: session(),
+                expected_revision: store.inspect(session()).await.unwrap().revision,
+                selection: TurnSelection::New {
+                    turn: turn(),
+                    inputs: vec![change("b")],
+                },
+            })
+            .await,
+        ErrorKind::Conflict,
+        "input_not_queued",
+    );
+    assert_eq!(
+        store.submit(session(), replacement).await.unwrap().position,
+        3
+    );
+    assert_eq!(store.inspect(session()).await.unwrap().queued.len(), 3);
+}
+
+#[tokio::test]
+async fn queue_reorder_and_withdrawal_survive_reopen_without_changing_acceptance_positions() {
+    let (directory, store) = store().await;
+    for id in ["a", "b", "c"] {
+        store.submit(session(), submission(id, id)).await.unwrap();
+    }
+    store
+        .control(ControlRequest {
+            id: change("reorder"),
+            session: session(),
+            expected_revision: store.inspect(session()).await.unwrap().revision,
+            action: SessionControl::ReorderQueued {
+                inputs: vec![change("c"), change("a"), change("b")],
+            },
+        })
+        .await
+        .unwrap();
+    store
+        .control(ControlRequest {
+            id: change("withdraw"),
+            session: session(),
+            expected_revision: store.inspect(session()).await.unwrap().revision,
+            action: SessionControl::WithdrawQueued { input: change("a") },
+        })
+        .await
+        .unwrap();
+    drop(store);
+    let store = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    let queued = store.inspect(session()).await.unwrap().queued;
+    assert_eq!(
+        queued
+            .iter()
+            .map(|input| input.input.id.clone())
+            .collect::<Vec<_>>(),
+        vec![change("c"), change("b")]
+    );
+    assert_eq!(
+        queued
+            .iter()
+            .map(|input| input.position)
+            .collect::<Vec<_>>(),
+        vec![2, 1]
+    );
+    let withdrawn = store.input(session(), change("a")).await.unwrap().unwrap();
+    assert_eq!(withdrawn.disposition, InputDisposition::Withdrawn);
+    assert_eq!(withdrawn.input.payload, payload("a"));
+    assert_eq!(
+        store
+            .submit(session(), submission("a", "a"))
+            .await
+            .unwrap()
+            .position,
+        0
+    );
+    assert_eq!(store.inspect(session()).await.unwrap().queued.len(), 2);
+}
+
+#[tokio::test]
+async fn invalid_queue_edits_leave_the_original_state_intact() {
+    let (_directory, store) = store().await;
+    store
+        .submit(session(), submission("a", "first"))
+        .await
+        .unwrap();
+    store
+        .submit(session(), submission("b", "second"))
+        .await
+        .unwrap();
+    let before = store.inspect(session()).await.unwrap();
+    for (id, action) in [
+        (
+            "duplicate",
+            SessionControl::ReorderQueued {
+                inputs: vec![change("a"), change("a")],
+            },
+        ),
+        (
+            "missing",
+            SessionControl::ReorderQueued {
+                inputs: vec![change("a")],
+            },
+        ),
+        (
+            "foreign",
+            SessionControl::ReorderQueued {
+                inputs: vec![change("a"), change("other")],
+            },
+        ),
+        (
+            "reused",
+            SessionControl::ReplaceQueued {
+                input: change("a"),
+                replacement: submission("b", "second"),
+            },
+        ),
+    ] {
+        assert!(
+            store
+                .control(ControlRequest {
+                    id: change(id),
+                    session: session(),
+                    expected_revision: before.revision,
+                    action
+                })
+                .await
+                .is_err()
+        );
+        assert_eq!(store.inspect(session()).await.unwrap(), before);
+    }
+    let _claim = claim(&store, "claim", vec![change("a")]).await;
+    assert_error(
+        store
+            .control(ControlRequest {
+                id: change("late-edit"),
+                session: session(),
+                expected_revision: store.inspect(session()).await.unwrap().revision,
+                action: SessionControl::ReplaceQueued {
+                    input: change("a"),
+                    replacement: submission("revision", "too late"),
+                },
+            })
+            .await,
+        ErrorKind::Conflict,
+        "input_not_queued",
+    );
+    assert!(
+        store
+            .input(session(), change("revision"))
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[tokio::test]
+async fn queue_replacement_and_claim_have_one_winner() {
+    let (_directory, store) = store().await;
+    store
+        .submit(session(), submission("input", "original"))
+        .await
+        .unwrap();
+    let revision = store.inspect(session()).await.unwrap().revision;
+    let (replacement, claim) = tokio::join!(
+        store.control(ControlRequest {
+            id: change("replace"),
+            session: session(),
+            expected_revision: revision,
+            action: SessionControl::ReplaceQueued {
+                input: change("input"),
+                replacement: submission("revised", "changed"),
+            },
+        }),
+        store.claim(ClaimRequest {
+            id: change("claim"),
+            session: session(),
+            expected_revision: revision,
+            selection: TurnSelection::New {
+                turn: turn(),
+                inputs: vec![change("input")]
+            },
+        })
+    );
+    assert_ne!(replacement.is_ok(), claim.is_ok());
+    if replacement.is_ok() {
+        assert_eq!(
+            store.inspect(session()).await.unwrap().queued[0].input.id,
+            change("revised")
+        );
+        assert!(store.inspect(session()).await.unwrap().current.is_none());
+    } else {
+        let ClaimOutcome::Acquired(claim) = claim.unwrap() else {
+            panic!("expected claimed input")
+        };
+        assert_eq!(claim.inputs[0].payload, payload("original"));
+        assert!(
+            store
+                .input(session(), change("revised"))
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+}
+
+#[tokio::test]
+async fn previous_schema_upgrades_without_changing_completed_or_queued_input() {
+    let (directory, store) = store().await;
+    store
+        .submit(session(), submission("completed", "retained result input"))
+        .await
+        .unwrap();
+    store
+        .submit(session(), submission("pending", "retained pending input"))
+        .await
+        .unwrap();
+    let claim = claim(&store, "claim", vec![change("completed")]).await;
+    commit(
+        &claim,
+        "settle",
+        vec![JournalAction::Settle(TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: None,
+            evidence: vec![],
+        })],
+    )
+    .await;
+    drop(claim);
+    drop(store);
+    let path = directory.path().join("sessions.sqlite");
+    let previous = rusqlite::Connection::open(&path).unwrap();
+    previous
+        .execute_batch(
+            "DROP INDEX submission_queue_order;
+         ALTER TABLE submissions DROP COLUMN queue_order;
+         ALTER TABLE submissions DROP COLUMN replacement_id;
+         ALTER TABLE submissions DROP COLUMN withdrawn;
+         PRAGMA user_version=1;",
+        )
+        .unwrap();
+    drop(previous);
+    let upgraded = SqliteStore::open(&path).unwrap();
+    let pending = upgraded.inspect(session()).await.unwrap().queued;
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].input.payload, payload("retained pending input"));
+    assert_eq!(pending[0].position, 1);
+    let completed = upgraded
+        .input(session(), change("completed"))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        completed.disposition,
+        InputDisposition::Completed { turn: turn() }
+    );
+    assert_eq!(completed.input.payload, payload("retained result input"));
+    assert_eq!(
+        upgraded
+            .submit(session(), submission("pending", "retained pending input"))
+            .await
+            .unwrap()
+            .position,
+        1
+    );
+}
+
+#[tokio::test]
 async fn concurrent_claims_issue_one_lease_and_retries_keep_current_disposition() {
     let (_directory, store) = store().await;
     store

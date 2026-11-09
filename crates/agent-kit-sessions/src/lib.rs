@@ -45,6 +45,8 @@ pub enum InputDisposition {
     Queued,
     Claimed { turn: TurnId },
     Completed { turn: TurnId },
+    Superseded { replacement: ChangeId },
+    Withdrawn,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,6 +91,16 @@ pub struct RecoveryRequest {
 pub enum SessionControl {
     PauseAdmission,
     ResumeAdmission,
+    ReplaceQueued {
+        input: ChangeId,
+        replacement: Submission,
+    },
+    WithdrawQueued {
+        input: ChangeId,
+    },
+    ReorderQueued {
+        inputs: Vec<ChangeId>,
+    },
     Turn {
         turn: TurnId,
         expected: ControlRevision,

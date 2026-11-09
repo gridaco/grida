@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -50,9 +50,14 @@ CREATE TABLE submissions (
     turn_id TEXT,
     turn_order INTEGER,
     completed INTEGER NOT NULL DEFAULT 0,
+    queue_order INTEGER CHECK(queue_order IS NULL OR queue_order >= 0),
+    replacement_id TEXT,
+    withdrawn INTEGER NOT NULL DEFAULT 0 CHECK(withdrawn IN (0, 1)),
     PRIMARY KEY(session, id),
     UNIQUE(session, position)
 );
+CREATE UNIQUE INDEX submission_queue_order ON submissions(session,queue_order)
+WHERE queue_order IS NOT NULL;
 CREATE TABLE turns (
     ordinal INTEGER PRIMARY KEY AUTOINCREMENT,
     session TEXT NOT NULL REFERENCES sessions(id),
@@ -68,6 +73,15 @@ CREATE TABLE requests (
     receipt BLOB NOT NULL,
     PRIMARY KEY(session, kind, id)
 );
+";
+
+const UPGRADE_QUEUE: &str = "
+ALTER TABLE submissions ADD COLUMN queue_order INTEGER CHECK(queue_order IS NULL OR queue_order >= 0);
+ALTER TABLE submissions ADD COLUMN replacement_id TEXT;
+ALTER TABLE submissions ADD COLUMN withdrawn INTEGER NOT NULL DEFAULT 0 CHECK(withdrawn IN (0, 1));
+UPDATE submissions SET queue_order=position WHERE turn_id IS NULL;
+CREATE UNIQUE INDEX submission_queue_order ON submissions(session,queue_order)
+WHERE queue_order IS NOT NULL;
 ";
 
 /// One opened database authority. Clones share its connection and ownership lock.
@@ -161,6 +175,16 @@ impl SqliteStore {
                 transaction.commit().map_err(database_error)?;
             }
             SCHEMA_VERSION => {}
+            1 => {
+                let transaction = connection.transaction().map_err(database_error)?;
+                transaction
+                    .execute_batch(UPGRADE_QUEUE)
+                    .map_err(database_error)?;
+                transaction
+                    .pragma_update(None, "user_version", SCHEMA_VERSION)
+                    .map_err(database_error)?;
+                transaction.commit().map_err(commit_error)?;
+            }
             _ => return Err(error(ErrorKind::Unsupported, "store_schema_unsupported")),
         }
         Ok(Self {
@@ -302,8 +326,14 @@ impl SqliteStore {
                         let mut selected = Vec::with_capacity(inputs.len());
                         for id in inputs {
                             let input = load_input(&transaction, &request.session, id)?;
-                            if input.disposition != InputDisposition::Queued {
-                                return Err(error(ErrorKind::Conflict, "input_already_claimed"));
+                            match input.disposition {
+                                InputDisposition::Queued => {}
+                                InputDisposition::Claimed { .. } | InputDisposition::Completed { .. } => {
+                                    return Err(error(ErrorKind::Conflict, "input_already_claimed"));
+                                }
+                                InputDisposition::Superseded { .. } | InputDisposition::Withdrawn => {
+                                    return Err(error(ErrorKind::Conflict, "input_not_queued"));
+                                }
                             }
                             selected.push(input.input);
                         }
@@ -313,7 +343,7 @@ impl SqliteStore {
                         ).map_err(database_error)?;
                         for (order, id) in inputs.iter().enumerate() {
                             transaction.execute(
-                                "UPDATE submissions SET turn_id=?3,turn_order=?4 WHERE session=?1 AND id=?2",
+                                "UPDATE submissions SET turn_id=?3,turn_order=?4,queue_order=NULL WHERE session=?1 AND id=?2",
                                 params![request.session.as_str(), id.as_str(), turn.as_str(), order as i64],
                             ).map_err(database_error)?;
                         }
@@ -425,36 +455,7 @@ impl SessionStore for SqliteStore {
             {
                 return Ok(receipt);
             }
-            let (count, bytes): (i64, i64) = transaction.query_row(
-                "SELECT COUNT(*),COALESCE(SUM(length(payload)),0) FROM submissions WHERE session=?1 AND turn_id IS NULL",
-                [session_id.as_str()],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            ).map_err(database_error)?;
-            let payload = encode(&input.payload)?;
-            if count >= MAX_PENDING_INPUTS
-                || bytes.saturating_add(payload.len() as i64) > MAX_PENDING_BYTES
-            {
-                return Err(error(ErrorKind::LimitExceeded, "session_queue_full"));
-            }
-            let receipt = Acceptance {
-                session: session_id.clone(),
-                input: input.id.clone(),
-                position: session.next_input,
-            };
-            transaction.execute(
-                "INSERT INTO submissions(session,id,position,payload,fingerprint) VALUES(?1,?2,?3,?4,?5)",
-                params![
-                    session_id.as_str(),
-                    input.id.as_str(),
-                    sql_number(session.next_input)?,
-                    payload,
-                    fingerprint.bytes().as_slice(),
-                ],
-            ).map_err(database_error)?;
-            session.next_input = session
-                .next_input
-                .checked_add(1)
-                .ok_or_else(|| error(ErrorKind::LimitExceeded, "input_position_overflow"))?;
+            let receipt = insert_input(&transaction, &session_id, &mut session, &input, None)?;
             bump_revision(&mut session)?;
             save_session(&transaction, &session_id, &session)?;
             save_request(
@@ -561,6 +562,44 @@ impl SessionStore for SqliteStore {
                     session.paused = false;
                     None
                 }
+                SessionControl::ReplaceQueued { input, replacement } => {
+                    let order = queued_order(&transaction, &request.session, input)?;
+                    if find_input(&transaction, &request.session, &replacement.id)?.is_some() {
+                        return Err(error(ErrorKind::Conflict, "input_identity_reused"));
+                    }
+                    transaction.execute(
+                        "UPDATE submissions SET queue_order=NULL,replacement_id=?3 WHERE session=?1 AND id=?2",
+                        params![request.session.as_str(), input.as_str(), replacement.id.as_str()],
+                    ).map_err(database_error)?;
+                    let receipt = insert_input(
+                        &transaction,
+                        &request.session,
+                        &mut session,
+                        replacement,
+                        Some(order),
+                    )?;
+                    save_request(
+                        &transaction,
+                        &request.session,
+                        "submit",
+                        &replacement.id,
+                        Fingerprint::of(replacement)?,
+                        &receipt,
+                    )?;
+                    None
+                }
+                SessionControl::WithdrawQueued { input } => {
+                    queued_order(&transaction, &request.session, input)?;
+                    transaction.execute(
+                        "UPDATE submissions SET queue_order=NULL,withdrawn=1 WHERE session=?1 AND id=?2",
+                        params![request.session.as_str(), input.as_str()],
+                    ).map_err(database_error)?;
+                    None
+                }
+                SessionControl::ReorderQueued { inputs } => {
+                    reorder_queue(&transaction, &request.session, inputs)?;
+                    None
+                }
                 SessionControl::Turn {
                     turn,
                     expected,
@@ -632,7 +671,7 @@ impl SessionStore for SqliteStore {
         execute(Arc::clone(&self.inner), move |inner, connection| {
             let session = load_session(connection, &session_id)?;
             let mut statement = connection.prepare(
-                "SELECT id FROM submissions WHERE session=?1 AND turn_id IS NULL ORDER BY position",
+                "SELECT id FROM submissions WHERE session=?1 AND queue_order IS NOT NULL ORDER BY queue_order",
             ).map_err(database_error)?;
             let ids = statement
                 .query_map([session_id.as_str()], |row| row.get::<_, String>(0))
@@ -877,6 +916,97 @@ fn save_session(
     Ok(())
 }
 
+fn insert_input(
+    transaction: &Transaction<'_>,
+    session_id: &SessionId,
+    session: &mut SessionRecord,
+    input: &Submission,
+    order: Option<u64>,
+) -> Result<Acceptance> {
+    if find_input(transaction, session_id, &input.id)?.is_some() {
+        return Err(error(ErrorKind::Conflict, "input_identity_reused"));
+    }
+    let (count, bytes): (i64, i64) = transaction.query_row(
+        "SELECT COUNT(*),COALESCE(SUM(length(payload)),0) FROM submissions WHERE session=?1 AND queue_order IS NOT NULL",
+        [session_id.as_str()],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ).map_err(database_error)?;
+    let payload = encode(&input.payload)?;
+    if count >= MAX_PENDING_INPUTS || bytes.saturating_add(payload.len() as i64) > MAX_PENDING_BYTES
+    {
+        return Err(error(ErrorKind::LimitExceeded, "session_queue_full"));
+    }
+    let receipt = Acceptance {
+        session: session_id.clone(),
+        input: input.id.clone(),
+        position: session.next_input,
+    };
+    transaction.execute(
+        "INSERT INTO submissions(session,id,position,payload,fingerprint,queue_order) VALUES(?1,?2,?3,?4,?5,?6)",
+        params![session_id.as_str(), input.id.as_str(), sql_number(receipt.position)?,
+            payload, Fingerprint::of(input)?.bytes().as_slice(), sql_number(order.unwrap_or(receipt.position))?],
+    ).map_err(database_error)?;
+    session.next_input = session
+        .next_input
+        .checked_add(1)
+        .ok_or_else(|| error(ErrorKind::LimitExceeded, "input_position_overflow"))?;
+    Ok(receipt)
+}
+
+fn queued_order(connection: &Connection, session: &SessionId, input: &ChangeId) -> Result<u64> {
+    if load_input(connection, session, input)?.disposition != InputDisposition::Queued {
+        return Err(error(ErrorKind::Conflict, "input_not_queued"));
+    }
+    let order = connection
+        .query_row(
+            "SELECT queue_order FROM submissions WHERE session=?1 AND id=?2",
+            params![session.as_str(), input.as_str()],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(database_error)?;
+    unsigned(order)
+}
+
+fn reorder_queue(
+    transaction: &Transaction<'_>,
+    session: &SessionId,
+    inputs: &[ChangeId],
+) -> Result<()> {
+    if inputs.len() > MAX_PENDING_INPUTS as usize {
+        return Err(error(ErrorKind::LimitExceeded, "session_queue_full"));
+    }
+    let mut statement = transaction.prepare(
+        "SELECT id,queue_order FROM submissions WHERE session=?1 AND queue_order IS NOT NULL ORDER BY queue_order",
+    ).map_err(database_error)?;
+    let pending = statement
+        .query_map([session.as_str()], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
+        .map_err(database_error)?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(database_error)?;
+    let selected: BTreeSet<_> = inputs.iter().map(ChangeId::as_str).collect();
+    let expected: BTreeSet<_> = pending.iter().map(|(id, _)| id.as_str()).collect();
+    if selected.len() != inputs.len() || selected != expected {
+        return Err(error(ErrorKind::Conflict, "queue_order_mismatch"));
+    }
+    transaction
+        .execute(
+            "UPDATE submissions SET queue_order=NULL WHERE session=?1 AND queue_order IS NOT NULL",
+            [session.as_str()],
+        )
+        .map_err(database_error)?;
+    for (input, (_, order)) in inputs.iter().zip(pending) {
+        transaction
+            .execute(
+                "UPDATE submissions SET queue_order=?3 WHERE session=?1 AND id=?2",
+                params![session.as_str(), input.as_str(), order],
+            )
+            .map_err(database_error)?;
+    }
+    Ok(())
+}
+
 fn load_input(connection: &Connection, session: &SessionId, id: &ChangeId) -> Result<InputView> {
     find_input(connection, session, id)?
         .ok_or_else(|| error(ErrorKind::InvalidInput, "submission_missing"))
@@ -887,9 +1017,9 @@ fn find_input(
     session: &SessionId,
     id: &ChangeId,
 ) -> Result<Option<InputView>> {
-    let Some((position, bytes, turn, completed, fingerprint)) = connection
+    let Some((position, bytes, turn, completed, fingerprint, queue_order, replacement, withdrawn)) = connection
         .query_row(
-            "SELECT position,payload,turn_id,completed,fingerprint FROM submissions WHERE session=?1 AND id=?2",
+            "SELECT position,payload,turn_id,completed,fingerprint,queue_order,replacement_id,withdrawn FROM submissions WHERE session=?1 AND id=?2",
             params![session.as_str(), id.as_str()],
             |row| {
                 Ok((
@@ -898,6 +1028,9 @@ fn find_input(
                     row.get::<_, Option<String>>(2)?,
                     row.get::<_, bool>(3)?,
                     row.get::<_, Vec<u8>>(4)?,
+                    row.get::<_, Option<i64>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
+                    row.get::<_, bool>(7)?,
                 ))
             },
         )
@@ -905,14 +1038,25 @@ fn find_input(
         .map_err(database_error)? else {
             return Ok(None);
         };
-    let disposition = match turn {
-        None => InputDisposition::Queued,
-        Some(turn) if completed => InputDisposition::Completed {
+    let queued = queue_order.map(unsigned).transpose()?.is_some();
+    let disposition = match (turn, completed, queued, replacement, withdrawn) {
+        (None, false, true, None, false) => InputDisposition::Queued,
+        (Some(turn), true, false, None, false) => InputDisposition::Completed {
             turn: TurnId::new(turn)?,
         },
-        Some(turn) => InputDisposition::Claimed {
+        (Some(turn), false, false, None, false) => InputDisposition::Claimed {
             turn: TurnId::new(turn)?,
         },
+        (None, false, false, Some(replacement), false) => InputDisposition::Superseded {
+            replacement: ChangeId::new(replacement)?,
+        },
+        (None, false, false, None, true) => InputDisposition::Withdrawn,
+        _ => {
+            return Err(error(
+                ErrorKind::InvalidState,
+                "stored_input_disposition_invalid",
+            ));
+        }
     };
     let input = Submission {
         id: id.clone(),
