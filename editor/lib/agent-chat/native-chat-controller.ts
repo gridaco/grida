@@ -9,6 +9,10 @@ import type {
   NativeChatPage,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
+  NativeChatQueueAction,
+  NativeChatQueueChange,
+  NativeChatQueuePage,
+  NativeChatSteer,
   NativeChatReadiness,
   NativeChatTextUpdate,
   NativeChatUpdate,
@@ -34,6 +38,10 @@ export type NativeChatView = Readonly<{
   questions: readonly NativeChatQuestion[];
   questionReady: boolean;
   questionError: string | null;
+  queue: NativeChatQueuePage | null;
+  queueLoading: boolean;
+  queueDraft: Readonly<{ inputId: string; text: string }> | null;
+  steering: boolean;
   loading: boolean;
   acting: boolean;
   repairing: boolean;
@@ -53,6 +61,11 @@ type Scope = {
   observation: NativeChatObservation | null;
   approvalBasis?: string;
   questionBasis?: string;
+  queueBasis?: { revision: number; offset: number; observationId: string };
+  queueListing?: Promise<void>;
+  pendingQueueChange?: { key: string; change: NativeChatQueueChange };
+  steeringTarget?: string;
+  pendingSteering?: NativeChatSteer;
   replay: boolean;
   pending?: { text: string; inputId: string; mode: "submit" | "enqueue" };
   awaitingTurn?: string;
@@ -73,6 +86,10 @@ const EMPTY: NativeChatView = Object.freeze({
   questions: [],
   questionReady: false,
   questionError: null,
+  queue: null,
+  queueLoading: false,
+  queueDraft: null,
+  steering: false,
   loading: false,
   acting: false,
   repairing: false,
@@ -220,6 +237,10 @@ export class NativeChatController {
       questions: [],
       questionReady: false,
       questionError: null,
+      queue: null,
+      queueLoading: false,
+      queueDraft: null,
+      steering: false,
       loading: sessionId !== null,
       acting: false,
       repairing: false,
@@ -241,36 +262,68 @@ export class NativeChatController {
   }
 
   get canSubmit(): boolean {
-    const snapshot = this.view.observation?.snapshot;
     return (
       !!this.scope &&
       !this.view.loading &&
       !this.view.acting &&
-      !snapshot?.admissionPaused &&
-      (!snapshot?.current ||
-        (!snapshot.current.cancelled &&
-          !!this.bridge.enqueue &&
-          this.view.questions.length > 0))
+      (this.view.steering
+        ? this.canSteer &&
+          this.scope.steeringTarget ===
+            this.view.observation?.snapshot.current?.turnId
+        : !this.needsQueue || !!this.bridge.enqueue)
     );
+  }
+
+  get canSteer(): boolean {
+    const turn = this.view.observation?.snapshot.current;
+    return (
+      !!this.bridge.steer &&
+      !!turn &&
+      !turn.cancelled &&
+      (turn.disposition === "running" || turn.disposition === "suspended")
+    );
+  }
+
+  private get needsQueue(): boolean {
+    const snapshot = this.view.observation?.snapshot;
+    return (
+      !!snapshot &&
+      (!!snapshot.current ||
+        snapshot.admissionPaused ||
+        snapshot.queuedInputs > 0)
+    );
+  }
+
+  toggleSteering(): void {
+    const scope = this.scope;
+    if (!scope || this.view.acting) return;
+    if (this.view.steering) {
+      scope.steeringTarget = undefined;
+      scope.pendingSteering = undefined;
+      this.update({ steering: false, error: null });
+    } else if (this.canSteer) {
+      scope.steeringTarget = scope.observation?.snapshot.current?.turnId;
+      this.update({ steering: true, error: null });
+    }
   }
 
   async submit(text: string): Promise<void> {
     const scope = this.scope;
     if (!scope || !this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
+    if (this.view.steering) return this.submitSteering(scope, text);
+    const mode = this.needsQueue ? "enqueue" : "submit";
     this.update({ acting: true, error: null });
     try {
       await this.open(scope);
       const attachment = this.attachment(scope);
-      const pending =
+      const pending: NonNullable<Scope["pending"]> =
         scope.pending?.text === text
           ? scope.pending
           : {
               text,
               inputId: crypto.randomUUID(),
-              mode: this.view.observation?.snapshot.current
-                ? ("enqueue" as const)
-                : ("submit" as const),
+              mode,
             };
       scope.pending = pending;
       let accepted;
@@ -299,16 +352,167 @@ export class NativeChatController {
         await this.refresh(scope);
       }
     } catch (error) {
-      if (this.owns(scope))
+      if (
+        error instanceof Error &&
+        /session_(queue_waiting|prompt_in_progress|admission_paused|turn_requires_recovery)/.test(
+          error.message
+        )
+      )
+        scope.pending = undefined;
+      if (this.owns(scope)) {
         this.update({
           error: describe(
             error,
             "Couldn't confirm the send. Your draft is still here."
           ),
         });
+        await this.refresh(scope);
+      }
       throw error;
     } finally {
       if (this.owns(scope)) this.update({ acting: false });
+    }
+  }
+
+  private async submitSteering(scope: Scope, text: string): Promise<void> {
+    const attachment = this.attachment(scope);
+    const observation = scope.observation;
+    if (!observation || !this.bridge.steer)
+      throw new Error("native_chat_steering_unavailable");
+    const pending =
+      scope.pendingSteering?.text === text
+        ? scope.pendingSteering
+        : {
+            text,
+            observationId: observation.observationId,
+            requestId: crypto.randomUUID(),
+          };
+    scope.pendingSteering = pending;
+    this.update({ acting: true, error: null });
+    try {
+      await this.bridge.steer(attachment.attachmentId, pending);
+      scope.pendingSteering = undefined;
+      scope.steeringTarget = undefined;
+      if (this.owns(scope)) {
+        this.update({ steering: false });
+        scope.replay = true;
+        await this.refresh(scope);
+      }
+    } catch (error) {
+      if (revisionChanged(error)) scope.pendingSteering = undefined;
+      if (this.owns(scope)) {
+        this.update({
+          error:
+            "Couldn't confirm the update to this turn. Your draft is still here.",
+        });
+        await this.refresh(scope);
+      }
+      throw error;
+    } finally {
+      if (this.owns(scope)) this.update({ acting: false });
+    }
+  }
+
+  async showQueuePage(offset: number): Promise<void> {
+    const scope = this.scope;
+    if (scope) await this.refreshQueue(scope, offset);
+  }
+
+  async editQueuedText(inputId: string): Promise<void> {
+    const scope = this.scope;
+    if (
+      !scope?.attachment ||
+      !scope.queueBasis ||
+      !this.queueCurrent ||
+      !this.bridge.queuedText ||
+      this.view.acting ||
+      this.view.queueDraft
+    )
+      return;
+    this.update({ acting: true, error: null });
+    try {
+      const text = await this.bridge.queuedText(
+        scope.attachment.attachmentId,
+        scope.queueBasis.observationId,
+        inputId
+      );
+      if (this.owns(scope)) this.update({ queueDraft: { inputId, text } });
+    } catch {
+      if (this.owns(scope))
+        this.update({ error: "Couldn't open the queued message." });
+    } finally {
+      if (this.owns(scope)) this.update({ acting: false });
+    }
+  }
+
+  changeQueueDraft(text: string): void {
+    if (this.view.queueDraft && !this.view.acting)
+      this.update({ queueDraft: { ...this.view.queueDraft, text } });
+  }
+
+  closeQueueDraft(): void {
+    if (!this.view.acting) this.update({ queueDraft: null });
+  }
+
+  async saveQueueDraft(): Promise<void> {
+    const draft = this.view.queueDraft;
+    if (draft?.text.trim())
+      await this.editQueue({ action: "replace", ...draft });
+  }
+
+  get queueCurrent(): boolean {
+    const scope = this.scope;
+    return (
+      !!scope?.queueBasis &&
+      !this.view.queueLoading &&
+      scope.queueBasis.revision === scope.observation?.snapshot.sessionRevision
+    );
+  }
+
+  async editQueue(action: NativeChatQueueAction): Promise<void> {
+    const scope = this.scope;
+    if (
+      !scope?.attachment ||
+      !scope.observation ||
+      !this.bridge.editQueue ||
+      this.view.acting
+    )
+      return;
+    const observationId =
+      action.action === "resume"
+        ? scope.observation.observationId
+        : this.queueCurrent
+          ? scope.queueBasis?.observationId
+          : undefined;
+    const key = JSON.stringify(action);
+    if (!observationId && scope.pendingQueueChange?.key !== key) return;
+    const change =
+      scope.pendingQueueChange?.key === key
+        ? scope.pendingQueueChange.change
+        : {
+            ...action,
+            observationId: observationId!,
+            requestId: crypto.randomUUID(),
+          };
+    scope.pendingQueueChange = { key, change };
+    this.update({ acting: true, error: null });
+    try {
+      await this.bridge.editQueue(scope.attachment.attachmentId, change);
+      scope.pendingQueueChange = undefined;
+      if (this.owns(scope) && action.action === "replace")
+        this.update({ queueDraft: null });
+    } catch (error) {
+      if (revisionChanged(error)) scope.pendingQueueChange = undefined;
+      if (this.owns(scope))
+        this.update({
+          error:
+            "Couldn't confirm the queue change. Check the queue and try again.",
+        });
+    } finally {
+      if (this.owns(scope)) {
+        await this.refresh(scope);
+        if (this.owns(scope)) this.update({ acting: false });
+      }
     }
   }
 
@@ -513,6 +717,7 @@ export class NativeChatController {
             questionError: null,
           }),
         });
+        void this.refreshQueue(scope, this.view.queue?.offset ?? 0);
         await Promise.all([
           this.refreshApprovals(scope, attachment, next),
           this.refreshQuestions(scope, attachment, next),
@@ -590,6 +795,59 @@ export class NativeChatController {
       if (this.owns(scope))
         this.update({ approvalError: "Couldn't load the permission request." });
     }
+  }
+
+  private refreshQueue(scope: Scope, offset: number): Promise<void> {
+    const observation = scope.observation;
+    const attachment = scope.attachment;
+    if (!this.owns(scope) || !attachment || !observation || !this.bridge.queue)
+      return Promise.resolve();
+    if (!observation.snapshot.queuedInputs) {
+      scope.queueBasis = undefined;
+      if (this.view.queue) this.update({ queue: null });
+      return Promise.resolve();
+    }
+    if (scope.queueListing) return scope.queueListing;
+    const revision = observation.snapshot.sessionRevision;
+    if (
+      scope.queueBasis?.revision === revision &&
+      scope.queueBasis.offset === offset
+    ) {
+      scope.queueBasis.observationId = observation.observationId;
+      return Promise.resolve();
+    }
+    this.update({ queueLoading: true });
+    scope.queueListing = this.bridge
+      .queue(attachment.attachmentId, observation.observationId, offset)
+      .then((page) => {
+        if (
+          !this.owns(scope) ||
+          scope.observation?.snapshot.sessionRevision !== revision
+        )
+          return;
+        scope.queueBasis = {
+          revision,
+          offset: page.offset,
+          observationId: observation.observationId,
+        };
+        this.update({ queue: page });
+      })
+      .catch((error: unknown) => {
+        if (
+          this.owns(scope) &&
+          scope.observation?.snapshot.sessionRevision === revision &&
+          !revisionChanged(error)
+        )
+          this.update({ error: "Couldn't read the queued messages." });
+      })
+      .finally(() => {
+        scope.queueListing = undefined;
+        if (!this.owns(scope)) return;
+        this.update({ queueLoading: false });
+        if (scope.observation?.snapshot.sessionRevision !== revision)
+          void this.refreshQueue(scope, offset);
+      });
+    return scope.queueListing;
   }
 
   private async refreshQuestions(
@@ -823,4 +1081,13 @@ function describe(error: unknown, fallback: string): string {
     error.message.includes("native_chat_transcript_too_large")
     ? "This chat is too large to restore in the workspace pane."
     : fallback;
+}
+
+function revisionChanged(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /stale_session_revision|stale_journal_change|history_position_changed|native_chat_(observation_unavailable|queue_changed)/.test(
+      error.message
+    )
+  );
 }

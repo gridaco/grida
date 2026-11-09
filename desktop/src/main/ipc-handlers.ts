@@ -195,6 +195,24 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     nativeChat.observe(event, id)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUE,
+    (event, id: string, observation: string, offset: number) =>
+      nativeChat.queue(event, id, observation, offset)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUEUED_TEXT,
+    (event, id: string, observation: string, inputId: string) =>
+      nativeChat.queuedText(event, id, observation, inputId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_EDIT_QUEUE,
+    (event, id: string, change: unknown) =>
+      nativeChat.editQueue(event, id, change)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_STEER, (event, id: string, input: unknown) =>
+    nativeChat.steer(event, id, input)
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_APPROVALS,
     (event, id: string, observation: string) =>
       nativeChat.approvals(event, id, observation)

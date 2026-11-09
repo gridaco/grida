@@ -12,6 +12,7 @@
 "use client";
 
 import { XIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   Message,
   MessageAction,
@@ -38,17 +39,49 @@ export function QueuedMessages({
   queued: ChatMessageWithParts[];
   onCancel: (messageId: string) => void;
 }) {
-  if (queued.length === 0) return null;
+  return (
+    <QueuedMessageRows
+      queued={queued.map((message) => ({
+        id: message.id,
+        text: queuedMessageText(message),
+      }))}
+      actions={(id) => (
+        <MessageAction
+          className={revealOnHoverActions}
+          tooltip="Remove from queue"
+          onClick={() => onCancel(id)}
+        >
+          <XIcon />
+        </MessageAction>
+      )}
+    />
+  );
+}
+
+export function QueuedMessageRows({
+  queued,
+  actions,
+  plain = false,
+}: {
+  queued: readonly { id: string; text: string }[];
+  actions: (id: string, index: number) => ReactNode;
+  plain?: boolean;
+}) {
+  if (!queued.length) return null;
   return (
     <div className="shrink-0 space-y-1.5 px-3 pb-2 opacity-60">
-      {queued.map((m) => (
+      {queued.map((m, index) => (
         // Row, not column: the bubble sits at the right edge with the X to
         // its RIGHT (not stacked below). Smaller than a settled turn — it is
         // pending, not history. `from="user"` keeps the bubble framing so a
         // queued message looks like the message it will become, only dimmed.
         <Message key={m.id} from="user" className="flex-row items-center gap-1">
           <MessageContent className="relative max-h-20 overflow-hidden text-xs group-[.is-user]:px-3 group-[.is-user]:py-1.5">
-            <MessageResponse>{queuedMessageText(m)}</MessageResponse>
+            {plain ? (
+              <div className="whitespace-pre-wrap break-words">{m.text}</div>
+            ) : (
+              <MessageResponse>{m.text}</MessageResponse>
+            )}
             {/* Bottom fade so a long queued message clips seamlessly instead
                 of ending mid-line. The stop color IS the bubble bg
                 (`bg-secondary`), so the gradient is invisible over empty
@@ -57,13 +90,7 @@ export function QueuedMessages({
                 the bubble. */}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-b from-transparent to-secondary" />
           </MessageContent>
-          <MessageAction
-            className={revealOnHoverActions}
-            tooltip="Remove from queue"
-            onClick={() => onCancel(m.id)}
-          >
-            <XIcon />
-          </MessageAction>
+          {actions(m.id, index)}
         </Message>
       ))}
     </div>

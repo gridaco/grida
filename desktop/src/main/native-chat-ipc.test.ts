@@ -115,6 +115,22 @@ function setup() {
     async observe(session) {
       return snapshot(session.id);
     },
+    async queue(_session, _snapshot, offset) {
+      return { items: [], offset, previousOffset: null, nextOffset: null };
+    },
+    async queuedText() {
+      return "Fixture";
+    },
+    async editQueue(session, observed, change) {
+      return {
+        sessionId: session.id,
+        requestId: change.requestId,
+        sessionRevision: observed.sessionRevision + 1,
+      };
+    },
+    async steer(session, observed, input) {
+      return this.pause(session, observed, input.requestId);
+    },
     async approvals() {
       return [];
     },
@@ -185,6 +201,52 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("rechecks navigation after queued replacement preflight and keeps steering scoped", async () => {
+    const { ipc, first, second, chat } = setup();
+    const one = await ipc.create(first.event);
+    const two = await ipc.load(second.event, one.sessionId);
+    const basis = await ipc.observe(first.event, one.attachmentId);
+    const change = {
+      action: "replace",
+      inputId: "queued",
+      text: "draft",
+      requestId: "replace",
+      observationId: basis.observationId,
+    };
+    const beforeDispatch = Promise.withResolvers<void>();
+    let dispatched = false;
+    vi.spyOn(chat, "editQueue").mockImplementation(
+      async (session, snapshot, edit, revalidate) => {
+        await beforeDispatch.promise;
+        revalidate?.();
+        dispatched = true;
+        return {
+          sessionId: session.id,
+          requestId: edit.requestId,
+          sessionRevision: snapshot.sessionRevision,
+        };
+      }
+    );
+    await expect(
+      ipc.editQueue(first.event, one.attachmentId, {
+        ...change,
+        inputIds: ["injected"],
+      })
+    ).rejects.toThrow("native_chat_queue_change_invalid");
+    await expect(
+      ipc.steer(second.event, two.attachmentId, {
+        observationId: basis.observationId,
+        requestId: "steer",
+        text: "Correction",
+      })
+    ).rejects.toThrow("native_chat_observation_unavailable");
+    const pending = ipc.editQueue(first.event, one.attachmentId, change);
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    beforeDispatch.resolve();
+    await expect(pending).rejects.toThrow("native_chat_attachment_unavailable");
+    expect(dispatched).toBe(false);
+  });
+
   it("binds question answers to their attachment and rejects approval and malformed inputs", async () => {
     const { ipc, first, second, chat } = setup();
     const one = await ipc.create(first.event);

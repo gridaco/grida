@@ -10,6 +10,9 @@ import type {
   NativeChatPage,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
+  NativeChatQueueChange,
+  NativeChatQueuePage,
+  NativeChatQueueReceipt,
   NativeChatReadiness,
   NativeChatSnapshot,
   NativeChatUpdate,
@@ -43,6 +46,10 @@ export type ActiveNativeChat = Readonly<{
     | "enqueue"
     | "inputReceipt"
     | "observe"
+    | "queue"
+    | "queuedText"
+    | "editQueue"
+    | "steer"
     | "approvals"
     | "answerApproval"
     | "questions"
@@ -270,16 +277,94 @@ export class NativeChatIpc {
     return messages;
   }
 
+  async queue(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string,
+    offset: number
+  ): Promise<NativeChatQueuePage> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = requireObservation(attachment, observationId);
+    const page = await owner.active.chat.queue(
+      attachment.session,
+      snapshot,
+      offset
+    );
+    this.revalidate(owner, attachment);
+    return page;
+  }
+
+  async queuedText(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string,
+    inputId: string
+  ): Promise<string> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = requireObservation(attachment, observationId);
+    const text = await owner.active.chat.queuedText(
+      attachment.session,
+      snapshot,
+      inputId
+    );
+    this.revalidate(owner, attachment);
+    return text;
+  }
+
+  async editQueue(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    input: unknown
+  ): Promise<NativeChatQueueReceipt> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const change = queueChange(input);
+    const snapshot = requireObservation(attachment, change.observationId);
+    const receipt = await owner.active.chat.editQueue(
+      attachment.session,
+      snapshot,
+      change,
+      () => this.revalidate(owner, attachment)
+    );
+    this.revalidate(owner, attachment);
+    return receipt;
+  }
+
+  async steer(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    input: unknown
+  ): Promise<NativeChatControlReceipt> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const value = record(input);
+    if (
+      !value ||
+      Object.keys(value).length !== 3 ||
+      !token(value.observationId) ||
+      typeof value.requestId !== "string" ||
+      typeof value.text !== "string"
+    )
+      throw new Error("native_chat_steering_invalid");
+    const snapshot = requireObservation(attachment, value.observationId);
+    const receipt = await owner.active.chat.steer(
+      attachment.session,
+      snapshot,
+      {
+        observationId: value.observationId,
+        requestId: value.requestId,
+        text: value.text,
+      }
+    );
+    this.revalidate(owner, attachment);
+    return receipt;
+  }
+
   async approvals(
     event: IpcMainInvokeEvent,
     attachmentId: string,
     observationId: string
   ): Promise<readonly NativeChatApproval[]> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
-    const snapshot = token(observationId)
-      ? attachment.observations.get(observationId)
-      : undefined;
-    if (!snapshot) throw new Error("native_chat_observation_unavailable");
+    const snapshot = requireObservation(attachment, observationId);
     const reviews = await owner.active.chat.approvals(
       attachment.session,
       snapshot
@@ -304,10 +389,7 @@ export class NativeChatIpc {
     observationId: string
   ): Promise<readonly NativeChatQuestion[]> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
-    const snapshot = token(observationId)
-      ? attachment.observations.get(observationId)
-      : undefined;
-    if (!snapshot) throw new Error("native_chat_observation_unavailable");
+    const snapshot = requireObservation(attachment, observationId);
     const reviews = await owner.active.chat.questions(
       attachment.session,
       snapshot
@@ -706,6 +788,46 @@ function sameBasis(
 
 function token(value: unknown): value is string {
   return typeof value === "string" && TOKEN.test(value);
+}
+
+function requireObservation(
+  attachment: Attachment,
+  id: unknown
+): NativeChatSnapshot {
+  const snapshot = token(id) ? attachment.observations.get(id) : undefined;
+  if (!snapshot) throw new Error("native_chat_observation_unavailable");
+  return snapshot;
+}
+
+function queueChange(input: unknown): NativeChatQueueChange {
+  const change = record(input);
+  if (
+    change &&
+    token(change.observationId) &&
+    typeof change.requestId === "string"
+  ) {
+    const { action, observationId, requestId, inputId } = change;
+    const count = Object.keys(change).length;
+    const basis = { observationId, requestId };
+    if (action === "resume" && count === 3) return { ...basis, action };
+    if (typeof inputId === "string") {
+      if (action === "withdraw" && count === 4)
+        return { ...basis, action, inputId };
+      if (
+        action === "replace" &&
+        count === 5 &&
+        typeof change.text === "string"
+      )
+        return { ...basis, action, inputId, text: change.text };
+      if (
+        action === "move" &&
+        count === 5 &&
+        (change.direction === "up" || change.direction === "down")
+      )
+        return { ...basis, action, inputId, direction: change.direction };
+    }
+  }
+  throw new Error("native_chat_queue_change_invalid");
 }
 
 function record(value: unknown): Record<string, unknown> | null {

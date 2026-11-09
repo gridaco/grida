@@ -62,6 +62,41 @@ export type NativeChatControl = Readonly<{
   requestId: string;
 }>;
 
+export type NativeChatQueueItem = Readonly<{
+  inputId: string;
+  preview: string | null;
+}>;
+
+export type NativeChatQueuePage = Readonly<{
+  items: readonly NativeChatQueueItem[];
+  offset: number;
+  previousOffset: number | null;
+  nextOffset: number | null;
+}>;
+
+export type NativeChatQueueAction =
+  | { action: "replace"; inputId: string; text: string }
+  | { action: "withdraw"; inputId: string }
+  | { action: "move"; inputId: string; direction: "up" | "down" }
+  | { action: "resume" };
+
+export type NativeChatQueueChange = NativeChatQueueAction & {
+  observationId: string;
+  requestId: string;
+};
+
+export type NativeChatQueueReceipt = Readonly<{
+  sessionId: string;
+  requestId: string;
+  sessionRevision: number;
+}>;
+
+export type NativeChatSteer = Readonly<{
+  observationId: string;
+  requestId: string;
+  text: string;
+}>;
+
 export type NativeChatControlReceipt = Readonly<{
   sessionId: string;
   turnId: string;
@@ -142,6 +177,24 @@ export type DesktopNativeChat = {
     inputId: string
   ): Promise<NativeChatAcceptance>;
   observe(attachmentId: string): Promise<NativeChatObservation>;
+  queue?(
+    attachmentId: string,
+    observationId: string,
+    offset: number
+  ): Promise<NativeChatQueuePage>;
+  queuedText?(
+    attachmentId: string,
+    observationId: string,
+    inputId: string
+  ): Promise<string>;
+  editQueue?(
+    attachmentId: string,
+    change: NativeChatQueueChange
+  ): Promise<NativeChatQueueReceipt>;
+  steer?(
+    attachmentId: string,
+    input: NativeChatSteer
+  ): Promise<NativeChatControlReceipt>;
   approvals?(
     attachmentId: string,
     observationId: string

@@ -10,7 +10,11 @@ import type {
   NativeChatPage,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
+  NativeChatQueueChange,
+  NativeChatQueuePage,
+  NativeChatQueueReceipt,
   NativeChatSnapshot,
+  NativeChatSteer,
   NativeChatStreamUpdate,
   NativeChatTurn,
 } from "@grida/desktop-bridge";
@@ -23,6 +27,11 @@ import {
 const CAPABILITIES = {
   "co.grida/session/submit": 1,
   "co.grida/session/enqueue": 1,
+  "co.grida/session/replace": 1,
+  "co.grida/session/withdraw": 1,
+  "co.grida/session/reorder": 1,
+  "co.grida/session/resume-queue": 1,
+  "co.grida/session/steer": 1,
   "co.grida/session/input": 1,
   "co.grida/session/snapshot": 1,
   "co.grida/session/stop": 1,
@@ -56,6 +65,9 @@ const MAX_UPDATE_BYTES = 8 * 1024;
 const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 const MAX_TRANSCRIPT_MESSAGES = 1024;
 const MAX_CATALOG_SESSIONS = 32;
+const MAX_QUEUE_INPUTS = 256;
+const QUEUE_PAGE_SIZE = 8;
+const QUEUE_PREVIEW_LENGTH = 2048;
 const CATALOG_CURSOR = /^[!-~]{1,512}$/;
 const IDENTITY = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 
@@ -86,7 +98,11 @@ export type NativeQuestionReview = Readonly<
 
 // A retained basis can retry an identical control after the native child is
 // replaced. The replacement still requires a fresh attachment to that session.
-const observed = new WeakMap<NativeChatSnapshot, string>();
+type QueuePosition = Readonly<{ inputId: string; inputPosition: number }>;
+const observed = new WeakMap<
+  NativeChatSnapshot,
+  { scope: string; queue: readonly QueuePosition[] }
+>();
 type TranscriptCapture = {
   messages: Map<string, NativeChatMessage>;
   bytes: number;
@@ -242,17 +258,11 @@ export class NativeAgentChat {
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
-    if (
-      typeof text !== "string" ||
-      !text.trim() ||
-      Buffer.byteLength(text) > MAX_TEXT_BYTES
-    )
-      throw new Error("native_chat_text_invalid");
     return acceptance(
       await this.process.request(`_co.grida/session/${mode}`, {
         sessionId,
         inputId,
-        prompt: [{ type: "text", text }],
+        prompt: textPrompt(text),
       }),
       sessionId,
       inputId
@@ -289,8 +299,155 @@ export class NativeAgentChat {
       current: result.current === null ? null : turn(result.current),
       latest: result.latest === null ? null : turn(result.latest),
     });
-    observed.set(snapshot, this.scope);
+    observed.set(snapshot, {
+      scope: this.scope,
+      queue: queuePositions(result.queue, snapshot.queuedInputs),
+    });
     return snapshot;
+  }
+
+  async queue(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    offset: number
+  ): Promise<NativeChatQueuePage> {
+    const sessionId = this.requireObservation(session, snapshot);
+    if (
+      !Number.isSafeInteger(offset) ||
+      offset < 0 ||
+      offset >= MAX_QUEUE_INPUTS
+    )
+      throw new Error("native_chat_queue_offset_invalid");
+    const queue = observed.get(snapshot)!.queue;
+    const last =
+      Math.max(0, Math.floor((queue.length - 1) / QUEUE_PAGE_SIZE)) *
+      QUEUE_PAGE_SIZE;
+    const start = Math.min(offset, last);
+    const page = queue.slice(start, start + QUEUE_PAGE_SIZE);
+    const items = [];
+    for (const row of page) {
+      const input = await this.readQueueInput(sessionId, row);
+      this.requireAttached(session);
+      if (input.receipt.disposition !== "queued")
+        throw new Error("native_chat_queue_changed");
+      const text = input.text;
+      const preview =
+        text && text.length > QUEUE_PREVIEW_LENGTH
+          ? `${text.slice(0, QUEUE_PREVIEW_LENGTH)}…`
+          : text;
+      items.push({ inputId: row.inputId, preview });
+    }
+    return {
+      items,
+      offset: start,
+      previousOffset: start > 0 ? Math.max(0, start - QUEUE_PAGE_SIZE) : null,
+      nextOffset:
+        start + page.length < queue.length ? start + page.length : null,
+    };
+  }
+
+  async queuedText(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    inputId: string
+  ): Promise<string> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const row = observed
+      .get(snapshot)!
+      .queue.find((item) => item.inputId === inputId);
+    if (!row) throw new Error("native_chat_queue_input_unavailable");
+    const input = await this.readQueueInput(sessionId, row);
+    this.requireAttached(session);
+    if (input.receipt.disposition !== "queued" || input.text === null)
+      throw new Error("native_chat_queue_input_unavailable");
+    return input.text;
+  }
+
+  async editQueue(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    change: NativeChatQueueChange,
+    revalidate?: () => void
+  ): Promise<NativeChatQueueReceipt> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const requestId = identity(change.requestId);
+    const basis = {
+      sessionId,
+      requestId,
+      expectedSessionRevision: snapshot.sessionRevision,
+    };
+    let result: unknown;
+    if (change.action === "resume") {
+      if (!snapshot.admissionPaused)
+        throw new Error("native_chat_queue_not_paused");
+      result = await this.process.request(
+        "_co.grida/session/resume-queue",
+        basis
+      );
+    } else {
+      const queue = observed.get(snapshot)!.queue;
+      const index = queue.findIndex((item) => item.inputId === change.inputId);
+      if (index < 0) throw new Error("native_chat_queue_input_unavailable");
+      if (change.action === "replace") {
+        const prompt = textPrompt(change.text);
+        const input = await this.readQueueInput(sessionId, queue[index]);
+        this.requireAttached(session);
+        revalidate?.();
+        if (input.text === null)
+          throw new Error("native_chat_queue_input_unavailable");
+        const replacementInputId = `desktop-replacement-${createHash("sha256")
+          .update(JSON.stringify([sessionId, requestId]))
+          .digest("hex")}`;
+        result = await this.process.request("_co.grida/session/replace", {
+          queue: basis,
+          inputId: change.inputId,
+          replacementInputId,
+          prompt,
+        });
+      } else if (change.action === "withdraw") {
+        result = await this.process.request("_co.grida/session/withdraw", {
+          queue: basis,
+          inputId: change.inputId,
+        });
+      } else {
+        const ids = queue.map((row) => row.inputId);
+        const other = index + (change.direction === "up" ? -1 : 1);
+        if (other < 0 || other >= ids.length)
+          throw new Error("native_chat_queue_move_unavailable");
+        [ids[index], ids[other]] = [ids[other], ids[index]];
+        result = await this.process.request("_co.grida/session/reorder", {
+          queue: basis,
+          inputIds: ids,
+        });
+      }
+    }
+    const reply = object(result);
+    if (reply.sessionId !== sessionId || reply.requestId !== requestId)
+      throw invalidResponse();
+    return {
+      sessionId,
+      requestId,
+      sessionRevision: revision(reply.sessionRevision),
+    };
+  }
+
+  async steer(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    input: NativeChatSteer
+  ): Promise<NativeChatControlReceipt> {
+    const { task, current } = this.task(session, snapshot, input.requestId);
+    if (
+      current.cancelled ||
+      (current.disposition !== "running" && current.disposition !== "suspended")
+    )
+      throw new Error("native_chat_steering_unavailable");
+    const result = await this.process.request("_co.grida/session/steer", {
+      task,
+      expectedHistoryPosition: current.historyPosition,
+      prompt: textPrompt(input.text),
+    });
+    return controlReceipt(result, task);
   }
 
   async transcript(
@@ -629,11 +786,34 @@ export class NativeAgentChat {
   ): string {
     const sessionId = this.requireAttached(session);
     if (
-      observed.get(snapshot) !== this.scope ||
+      observed.get(snapshot)?.scope !== this.scope ||
       snapshot.sessionId !== sessionId
     )
       throw new Error("native_chat_turn_observation_required");
     return sessionId;
+  }
+
+  private async readQueueInput(sessionId: string, row: QueuePosition) {
+    const result = object(
+      await this.process.request("_co.grida/session/input", {
+        sessionId,
+        inputId: row.inputId,
+      })
+    );
+    const receipt = acceptance(result.receipt, sessionId, row.inputId);
+    if (
+      receipt.inputPosition !== row.inputPosition ||
+      !Array.isArray(result.prompt)
+    )
+      throw invalidResponse();
+    const part = result.prompt.length === 1 ? object(result.prompt[0]) : null;
+    const text =
+      part?.type === "text" &&
+      typeof part.text === "string" &&
+      Buffer.byteLength(part.text) <= MAX_TEXT_BYTES
+        ? part.text
+        : null;
+    return { receipt, text };
   }
 
   private attach(id: string): NativeChatSession {
@@ -746,6 +926,38 @@ function boundedText(value: unknown, bytes: number): string {
   )
     throw invalidResponse();
   return value;
+}
+
+function textPrompt(text: string) {
+  if (
+    typeof text !== "string" ||
+    !text.trim() ||
+    Buffer.byteLength(text) > MAX_TEXT_BYTES
+  )
+    throw new Error("native_chat_text_invalid");
+  return [{ type: "text", text }];
+}
+
+function queuePositions(
+  value: unknown,
+  count: number
+): readonly QueuePosition[] {
+  if (
+    !Array.isArray(value) ||
+    value.length !== count ||
+    count > MAX_QUEUE_INPUTS
+  )
+    throw invalidResponse();
+  const queue = value.map((entry: unknown) => {
+    const row = object(entry);
+    return {
+      inputId: identity(row.inputId),
+      inputPosition: revision(row.inputPosition),
+    };
+  });
+  if (new Set(queue.map((row) => row.inputId)).size !== count)
+    throw invalidResponse();
+  return queue;
 }
 
 function identity(value: unknown): string {

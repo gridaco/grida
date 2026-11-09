@@ -280,6 +280,111 @@ it("keeps ordinary turns quiet when question inspection is absent or fails", asy
   controller.disconnect();
 });
 
+it("keeps a queued edit draft across a stale revision and requires an explicit retry", async () => {
+  const { bridge, controller, running } = fixture();
+  running.add("chat-a");
+  let revision = 2;
+  const base = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const value = await base(id);
+    return {
+      observationId: `${id}-${revision}`,
+      snapshot: {
+        ...value.snapshot,
+        sessionRevision: revision,
+        queuedInputs: id === "chat-a" ? 1 : 0,
+      },
+    };
+  };
+  bridge.queue = async () => ({
+    items: [{ inputId: "queued", preview: "Original" }],
+    offset: 0,
+    previousOffset: null,
+    nextOffset: null,
+  });
+  bridge.queuedText = async () => "Original";
+  const edits = vi.fn<NonNullable<DesktopNativeChat["editQueue"]>>(
+    async (sessionId, change) => {
+      revision++;
+      if (revision === 3) throw new Error("stale_session_revision");
+      return {
+        sessionId,
+        requestId: change.requestId,
+        sessionRevision: revision,
+      };
+    }
+  );
+  bridge.editQueue = edits;
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await controller.editQueuedText("queued");
+  controller.changeQueueDraft("Revised draft");
+  await controller.saveQueueDraft();
+  expect(controller.read().queueDraft).toEqual({
+    inputId: "queued",
+    text: "Revised draft",
+  });
+  expect(edits).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  await controller.saveQueueDraft();
+  expect(edits).toHaveBeenLastCalledWith(
+    "chat-a",
+    expect.objectContaining({
+      action: "replace",
+      observationId: "chat-a-3",
+      text: "Revised draft",
+    })
+  );
+  expect(edits.mock.calls[1][1].requestId).not.toBe(
+    edits.mock.calls[0][1].requestId
+  );
+  expect(controller.read().queueDraft).toBeNull();
+  controller.disconnect();
+});
+
+it("retries steering exactly after a lost reply and never falls through to the queue", async () => {
+  const { bridge, controller, running } = fixture();
+  running.add("chat-a");
+  const enqueue = vi.fn<NonNullable<DesktopNativeChat["enqueue"]>>(
+    async (sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "queued",
+      inputPosition: 2,
+      turnId: null,
+    })
+  );
+  const steer = vi.fn<NonNullable<DesktopNativeChat["steer"]>>(
+    async (sessionId, input) => ({
+      sessionId,
+      requestId: input.requestId,
+      turnId: "turn-chat-a",
+      sessionRevision: 3,
+      journalPosition: 2,
+    })
+  );
+  steer.mockRejectedValueOnce(new Error("fixture lost reply"));
+  bridge.enqueue = enqueue;
+  bridge.steer = steer;
+  await controller.select("chat-a");
+  controller.toggleSteering();
+  await expect(controller.submit("Correction")).rejects.toThrow(
+    "fixture lost reply"
+  );
+  expect(controller.read().steering).toBe(true);
+  expect(enqueue).not.toHaveBeenCalled();
+  await controller.submit("Correction");
+  expect(steer.mock.calls[1]).toEqual(steer.mock.calls[0]);
+  expect(controller.read().steering).toBe(false);
+  await controller.submit("Next task");
+  expect(enqueue).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    expect.any(String),
+    "Next task"
+  );
+  controller.disconnect();
+});
+
 it("uses the readiness probe and preserves native mode through startup failure", async () => {
   const { bridge } = fixture();
   const availability = vi.spyOn(bridge, "available");

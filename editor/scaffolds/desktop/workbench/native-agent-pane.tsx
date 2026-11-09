@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { DesktopNativeChat } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
+import { Textarea } from "@app/ui/components/textarea";
+import { MessageAction } from "@app/ui/ai-elements/message";
+import { ArrowDownIcon, ArrowUpIcon, PencilIcon, XIcon } from "lucide-react";
 import {
   Conversation,
   ConversationContent,
@@ -16,6 +19,7 @@ import {
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentComposerInput } from "../shared/agent-composer-input";
+import { QueuedMessageRows } from "../shared/queued-messages";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
 const APPROVAL_ACTION = {
@@ -69,6 +73,11 @@ export function NativeAgentPane({
       : undefined;
   const question = turn && !turn.cancelled ? state.questions[0] : undefined;
   const queued = snapshot?.queuedInputs ?? 0;
+  const queue = state.queue;
+  const previousQueueOffset = queue?.previousOffset ?? null;
+  const nextQueueOffset = queue?.nextOffset ?? null;
+  const streamingControlsOnly = running && !bridge.enqueue;
+  const queueDisabled = !controller.queueCurrent || state.acting;
   const error = state.error ?? state.approvalError ?? state.questionError;
   const status = state.loading
     ? "Opening chat…"
@@ -211,6 +220,150 @@ export function NativeAgentPane({
           </Button>
         </div>
       )}
+      {queue && (
+        <div className="max-h-40 shrink-0 overflow-y-auto">
+          <QueuedMessageRows
+            plain
+            queued={queue.items.map((item) => ({
+              id: item.inputId,
+              text: item.preview ?? "Queued input with other content",
+            }))}
+            actions={(inputId, index) => {
+              const position = queue.offset + index;
+              return (
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <MessageAction
+                    tooltip="Edit queued message"
+                    disabled={
+                      queueDisabled ||
+                      !!state.queueDraft ||
+                      !bridge.queuedText ||
+                      !bridge.editQueue ||
+                      queue.items[index].preview === null
+                    }
+                    onClick={() => void controller.editQueuedText(inputId)}
+                  >
+                    <PencilIcon />
+                  </MessageAction>
+                  <MessageAction
+                    tooltip="Move queued message up"
+                    disabled={
+                      queueDisabled || !bridge.editQueue || position === 0
+                    }
+                    onClick={() =>
+                      void controller.editQueue({
+                        action: "move",
+                        inputId,
+                        direction: "up",
+                      })
+                    }
+                  >
+                    <ArrowUpIcon />
+                  </MessageAction>
+                  <MessageAction
+                    tooltip="Move queued message down"
+                    disabled={
+                      queueDisabled ||
+                      !bridge.editQueue ||
+                      position + 1 >= queued
+                    }
+                    onClick={() =>
+                      void controller.editQueue({
+                        action: "move",
+                        inputId,
+                        direction: "down",
+                      })
+                    }
+                  >
+                    <ArrowDownIcon />
+                  </MessageAction>
+                  <MessageAction
+                    tooltip="Remove from queue"
+                    disabled={queueDisabled || !bridge.editQueue}
+                    onClick={() =>
+                      void controller.editQueue({ action: "withdraw", inputId })
+                    }
+                  >
+                    <XIcon />
+                  </MessageAction>
+                </div>
+              );
+            }}
+          />
+          {(previousQueueOffset !== null || nextQueueOffset !== null) && (
+            <div className="flex gap-2 px-3 pb-2">
+              {previousQueueOffset !== null && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  type="button"
+                  disabled={state.queueLoading || state.acting}
+                  onClick={() =>
+                    void controller.showQueuePage(previousQueueOffset)
+                  }
+                >
+                  Previous queued messages
+                </Button>
+              )}
+              {nextQueueOffset !== null && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  type="button"
+                  disabled={state.queueLoading || state.acting}
+                  onClick={() => void controller.showQueuePage(nextQueueOffset)}
+                >
+                  Next queued messages
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {state.queueDraft && (
+        <div className="shrink-0 space-y-2 px-3 py-2">
+          <Textarea
+            aria-label="Edit queued message"
+            value={state.queueDraft.text}
+            disabled={state.acting}
+            onChange={(event) =>
+              controller.changeQueueDraft(event.currentTarget.value)
+            }
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              size="xs"
+              variant="ghost"
+              type="button"
+              disabled={state.acting}
+              onClick={() => controller.closeQueueDraft()}
+            >
+              Cancel edit
+            </Button>
+            <Button
+              size="xs"
+              type="button"
+              disabled={state.acting || !state.queueDraft.text.trim()}
+              onClick={() => void controller.saveQueueDraft()}
+            >
+              Save changes
+            </Button>
+          </div>
+        </div>
+      )}
+      {snapshot?.admissionPaused && !turn && bridge.editQueue && (
+        <div className="px-3 py-2">
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            disabled={state.acting}
+            onClick={() => void controller.editQueue({ action: "resume" })}
+          >
+            Resume queue
+          </Button>
+        </div>
+      )}
       {approval && (
         <AgentApprovalPrompt
           description="The agent is asking for additional read access."
@@ -268,35 +421,55 @@ export function NativeAgentPane({
           awaitSubmission
           canSubmit={controller.canSubmit}
           busy={!!turn}
-          isStreaming={running && !question}
+          isStreaming={streamingControlsOnly}
+          placeholder={
+            state.steering
+              ? "Add guidance to this turn…"
+              : turn || snapshot?.admissionPaused || queued
+                ? "Queue a follow-up…"
+                : undefined
+          }
           submissionScope={state.scope}
           onSubmit={(text) => controller.submit(text)}
           onStop={() => void controller.control("stop")}
           toolbarStart={
-            running ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                disabled={state.acting}
-                onClick={() => void controller.control("pause")}
-              >
-                Pause
-              </Button>
-            ) : canResume ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                disabled={state.acting}
-                onClick={() => void controller.control("resume")}
-              >
-                Resume
-              </Button>
-            ) : null
+            <>
+              {running ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={state.acting}
+                  onClick={() => void controller.control("pause")}
+                >
+                  Pause
+                </Button>
+              ) : canResume ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={state.acting}
+                  onClick={() => void controller.control("resume")}
+                >
+                  Resume
+                </Button>
+              ) : null}
+              {(controller.canSteer || state.steering) && (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant={state.steering ? "secondary" : "ghost"}
+                  disabled={state.acting}
+                  onClick={() => controller.toggleSteering()}
+                >
+                  {state.steering ? "Send a follow-up" : "Send to current turn"}
+                </Button>
+              )}
+            </>
           }
           toolbarEnd={
-            (!running || !!question) && canStop ? (
+            !streamingControlsOnly && canStop ? (
               <Button
                 type="button"
                 variant="ghost"

@@ -169,6 +169,11 @@ Answer a question in its card by selecting a choice, writing a reply, or
 skipping. The agent may continue other work while it waits. A separate message
 sent from the composer joins the queue and leaves the question open.
 
+While a turn is active, the native workspace composer queues text as a
+follow-up. You can edit, move, or remove waiting messages. Choose **Send to
+current turn** when the text should guide that turn at its next decision.
+**Stop** holds the queue. Choose **Resume queue** to let waiting messages run.
+
 Text and resource-link descriptors are accepted as prompt content. A resource
 link supplies context about a resource. File access follows a separately granted
 capability.

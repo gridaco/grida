@@ -959,6 +959,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
   An answer cannot grant access. An ordinary queued message cannot answer a
   question. The [native process fixture](desktop/src/main/native-agent-questions.test.ts)
   covers an answer during independent work, a separate queue, and stale replies.
+- Native queue edits use the attached frame's observed session revision and
+  retained input identities. Main bounds text previews and computes a move's
+  full ordering. It rechecks the frame after replacement preflight. Steering
+  uses a separate request with the observed turn, control, and history basis.
+  The [queue process fixture](desktop/src/main/native-agent-queue.test.ts)
+  verifies exact retries, stale revisions, and the queue held after Stop.
 - [Native capability host](crates/grida-agent/src/tool_host.rs) and
   [its fixtures](crates/grida-agent/tests/tool_host.rs) bind a tool lease to
   a single capability and endpoint lifetime. The dispatcher checks the

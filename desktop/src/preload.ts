@@ -402,6 +402,28 @@ const bridge: DesktopBridge = {
       ),
     observe: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
+    queue: (attachmentId, observationId, offset) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_QUEUE,
+        attachmentId,
+        observationId,
+        offset
+      ),
+    queuedText: (attachmentId, observationId, inputId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_QUEUED_TEXT,
+        attachmentId,
+        observationId,
+        inputId
+      ),
+    editQueue: (attachmentId, change) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_EDIT_QUEUE,
+        attachmentId,
+        change
+      ),
+    steer: (attachmentId, input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STEER, attachmentId, input),
     approvals: (attachmentId, observationId) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_APPROVALS,
