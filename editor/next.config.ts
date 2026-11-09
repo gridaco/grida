@@ -6,6 +6,7 @@ import createMDX from "@next/mdx";
 import { apiPolicy } from "./lib/api/policy";
 
 const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
+// Blog deployment origin, without /blog; the standalone app owns that base path.
 const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
 const USE_TELEMETRY =
   process.env.NODE_ENV === "production" &&
@@ -207,7 +208,7 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/blog/:path*",
-        destination: `${BLOG_URL}/:path*`,
+        destination: `${BLOG_URL}/blog/:path*`,
       },
       // The-Bundle
       {
