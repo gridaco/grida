@@ -31,6 +31,11 @@ same transaction that claims the input and issues ownership.
 Derived driver controls bind an opaque caller intent before computing the new
 state. An exact retry returns the original receipt even after later changes.
 
+The optional owner-defined catalog projects immutable session configuration
+into a scope fingerprint. It indexes the scope at creation and upgrades earlier
+records without reading their turns. A scoped page returns at most 32 session
+IDs in reverse creation order. Its anchor must already belong to that scope.
+
 A live lease blocks recovery of its turn. Dropping it makes interrupted execution
 eligible for an explicit recovery request. Reopening the database preserves the
 turn's operations and outcomes, and recovery advances its writer epoch. Inspection

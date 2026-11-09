@@ -53,6 +53,10 @@ mod skills;
 const WAIT: Duration = Duration::from_secs(15);
 const TEST_CREDENTIAL: &str = "fixture-only-bearer-token";
 
+#[cfg(unix)]
+#[path = "process/catalog.rs"]
+mod catalog;
+
 struct Endpoint {
     url: String,
     requests: mpsc::UnboundedReceiver<Value>,

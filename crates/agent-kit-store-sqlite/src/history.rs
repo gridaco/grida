@@ -120,7 +120,7 @@ impl SqliteStore {
         project: impl Fn(&TurnState) -> Vec<HistoryRecord> + Send + 'static,
         make_seed: impl FnOnce(RetainedHistory) -> Result<HistorySeed> + Send + 'static,
     ) -> Result<SessionCreated> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
@@ -145,7 +145,7 @@ impl SqliteStore {
             )?;
             require_basis(&history.basis, &request.expected_history)?;
             let seed = make_seed(history)?;
-            let receipt = insert_session(&transaction, &request.create)?;
+            let receipt = insert_session(&transaction, &request.create, inner.catalog)?;
             insert_view(&transaction, destination, receipt.revision, &seed, 0)?;
             save_request(
                 &transaction,

@@ -1,5 +1,6 @@
 //! SQLite persistence for session admission and the bound execution journal.
 
+pub mod catalog;
 pub mod context;
 pub mod driver;
 pub mod history;
@@ -28,7 +29,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 6;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -127,6 +128,7 @@ struct Inner {
     connection: Mutex<Connection>,
     owners: Mutex<BTreeMap<(SessionId, TurnId), Weak<()>>>,
     changed: Notify,
+    catalog: Option<catalog::ScopeProjection>,
     _lock: File,
 }
 
@@ -162,7 +164,19 @@ impl SqliteStore {
     /// The parent directory must exist. One process owns this database while
     /// any store or bound journal handle remains alive.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let path = path.as_ref();
+        Self::open_inner(path.as_ref(), None)
+    }
+
+    /// Open with a stable, owner-defined scope projection for read-only
+    /// catalog queries. The projection uses only immutable session metadata.
+    pub fn open_cataloged(
+        path: impl AsRef<Path>,
+        project: catalog::ScopeProjection,
+    ) -> Result<Self> {
+        Self::open_inner(path.as_ref(), Some(project))
+    }
+
+    fn open_inner(path: &Path, catalog: Option<catalog::ScopeProjection>) -> Result<Self> {
         if path.file_name().is_none() || !path.parent().is_some_and(Path::is_dir) {
             return Err(error(ErrorKind::InvalidInput, "store_directory_missing"));
         }
@@ -210,12 +224,15 @@ impl SqliteStore {
                     .execute_batch(CONTEXT_REPLACEMENTS)
                     .map_err(database_error)?;
                 transaction
+                    .execute_batch(catalog::SCHEMA)
+                    .map_err(database_error)?;
+                transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(database_error)?;
                 transaction.commit().map_err(database_error)?;
             }
             SCHEMA_VERSION => {}
-            1..=4 => {
+            1..=5 => {
                 let transaction = connection.transaction().map_err(database_error)?;
                 if version == 1 {
                     transaction
@@ -232,8 +249,13 @@ impl SqliteStore {
                         .execute_batch(CONTEXT_REPLACEMENTS)
                         .map_err(database_error)?;
                 }
+                if version <= 4 {
+                    transaction
+                        .execute_batch("ALTER TABLE sessions ADD COLUMN driver_state BLOB")
+                        .map_err(database_error)?;
+                }
                 transaction
-                    .execute_batch("ALTER TABLE sessions ADD COLUMN driver_state BLOB")
+                    .execute_batch(catalog::SCHEMA)
                     .map_err(database_error)?;
                 transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
@@ -242,11 +264,15 @@ impl SqliteStore {
             }
             _ => return Err(error(ErrorKind::Unsupported, "store_schema_unsupported")),
         }
+        if let Some(project) = catalog {
+            catalog::project_existing(&mut connection, project)?;
+        }
         Ok(Self {
             inner: Arc::new(Inner {
                 connection: Mutex::new(connection),
                 owners: Mutex::new(BTreeMap::new()),
                 changed: Notify::new(),
+                catalog,
                 _lock: lock,
             }),
         })
@@ -577,7 +603,7 @@ impl SqliteStore {
 
 impl SessionStore for SqliteStore {
     fn create(&self, request: CreateSession) -> BoxFuture<'_, Result<SessionCreated>> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
@@ -591,7 +617,7 @@ impl SessionStore for SqliteStore {
             )? {
                 return Ok(receipt);
             }
-            let receipt = insert_session(&transaction, &request)?;
+            let receipt = insert_session(&transaction, &request, inner.catalog)?;
             save_request(
                 &transaction,
                 &request.id,
@@ -938,6 +964,7 @@ fn execute<T: Send + 'static>(
 fn insert_session(
     transaction: &Transaction<'_>,
     request: &CreateSession,
+    catalog: Option<catalog::ScopeProjection>,
 ) -> Result<SessionCreated> {
     let inserted = transaction
         .execute(
@@ -949,6 +976,7 @@ fn insert_session(
     if inserted == 0 {
         return Err(error(ErrorKind::Conflict, "session_exists"));
     }
+    catalog::insert(transaction, request, catalog)?;
     Ok(SessionCreated {
         session: request.id.clone(),
         revision: SessionRevision(0),

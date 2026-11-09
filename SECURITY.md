@@ -899,6 +899,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery
   window. Losing the observer or falling behind cannot cancel a turn.
+- [Native session listing](crates/grida-agent/src/host/catalog.rs) uses an
+  explicit canonical workspace on the initialized ACP connection. The
+  [SQLite catalog](crates/agent-kit-store-sqlite/src/catalog.rs) queries that
+  scope before pagination. Responses expose only IDs and the selected
+  workspace. A cursor carries no global order and must anchor a session in
+  the same scope. The request does not attach, load, or resume any session.
 - [Native goal controls](crates/grida-agent/src/acp/extensions/goals.rs) require
   version negotiation and session attachment on the existing ACP perimeter.
   The [goal owner](crates/grida-agent/src/host/goals.rs) conditions each

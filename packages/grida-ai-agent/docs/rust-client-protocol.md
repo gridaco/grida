@@ -34,6 +34,13 @@ The outward ACP server remains separate from an optional ACP client that
 delegates work to an external agent. Choosing this client protocol leaves the
 Grida master in charge of native execution.
 
+The Grida profile advertises `sessionCapabilities.list` for standard v1
+`session/list` with an explicit absolute workspace `cwd`. The host canonicalizes
+that directory and reads the workspace's saved IDs in newest-created order.
+Pages contain at most 32 `SessionInfo` records with only the ID and working
+directory. Treat `nextCursor` as opaque and send it with the same workspace.
+Listing leaves attachment, execution, and history unchanged. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+
 ## Standard messages and custom UX
 
 Use standard ACP for session setup, prompts, message/thought streams, tool

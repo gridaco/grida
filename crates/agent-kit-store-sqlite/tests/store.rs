@@ -419,7 +419,8 @@ async fn previous_schema_upgrades_without_changing_completed_or_queued_input() {
     let previous = rusqlite::Connection::open(&path).unwrap();
     previous
         .execute_batch(
-            "DROP TABLE session_context_replacements;
+            "DROP TABLE session_catalog;
+         DROP TABLE session_context_replacements;
          DROP TABLE session_history_views;
          DROP INDEX session_turn_order;
          DROP INDEX submission_queue_order;
@@ -1939,7 +1940,8 @@ async fn version_two_upgrades_with_original_history_view() {
     let previous = rusqlite::Connection::open(&path).unwrap();
     previous
         .execute_batch(
-            "DROP TABLE session_context_replacements;
+            "DROP TABLE session_catalog;
+         DROP TABLE session_context_replacements;
          DROP TABLE session_history_views;
          DROP INDEX session_turn_order;
          ALTER TABLE sessions DROP COLUMN driver_state;
@@ -1957,7 +1959,7 @@ async fn version_two_upgrades_with_original_history_view() {
     let version: i64 = reopened
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 5);
+    assert_eq!(version, 6);
 }
 
 #[tokio::test]
@@ -2375,7 +2377,11 @@ async fn upgrades_context_store_without_inventing_driver_state() {
 
     let previous = rusqlite::Connection::open(&filename).unwrap();
     previous
-        .execute_batch("ALTER TABLE sessions DROP COLUMN driver_state; PRAGMA user_version=4;")
+        .execute_batch(
+            "DROP TABLE session_catalog;
+             ALTER TABLE sessions DROP COLUMN driver_state;
+             PRAGMA user_version=4;",
+        )
         .unwrap();
     drop(previous);
 

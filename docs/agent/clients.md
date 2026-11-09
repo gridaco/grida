@@ -142,6 +142,11 @@ updates, and cancel their active turn. A loaded session replays committed text
 before the load response. A prompt response follows its streamed updates and
 verified turn outcome.
 
+Use `session/list` to discover saved chats for an absolute workspace `cwd`.
+Follow `nextCursor` with the same workspace to get the next page. The list
+shows chat identities in newest-created order. Choose a chat and call
+`session/load` to open its transcript. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+
 Text and resource-link descriptors are accepted as prompt content. A resource
 link supplies context about a resource. File access follows a separately granted
 capability.

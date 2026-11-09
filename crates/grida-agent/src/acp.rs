@@ -8,12 +8,14 @@ mod websocket;
 
 pub use websocket::{ListenOptions, serve_websocket};
 
-use crate::host::{AcceptedRun, Host, PromptPart, PromptRequest, RunResult};
+use crate::host::{AcceptedRun, Host, PromptPart, PromptRequest, RunResult, SessionCatalog};
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::schema::{
     AgentCapabilities, CancelNotification, ContentBlock, Implementation, InitializeRequest,
-    InitializeResponse, LoadSessionRequest, LoadSessionResponse, NewSessionRequest,
-    NewSessionResponse, PromptCapabilities, PromptRequest as AcpPrompt, PromptResponse, StopReason,
+    InitializeResponse, ListSessionsRequest, ListSessionsResponse, LoadSessionRequest,
+    LoadSessionResponse, NewSessionRequest, NewSessionResponse, PromptCapabilities,
+    PromptRequest as AcpPrompt, PromptResponse, SessionCapabilities, SessionInfo,
+    SessionListCapabilities, StopReason,
 };
 use agent_client_protocol::{
     Agent, Channel, Error, Result, on_receive_notification, on_receive_request,
@@ -72,6 +74,7 @@ async fn serve(
 
 #[derive(Default)]
 struct ConnectionSessions {
+    initialized: bool,
     attached: BTreeSet<SessionId>,
     active: BTreeMap<SessionId, TurnId>,
     negotiated: BTreeSet<&'static str>,
@@ -113,6 +116,8 @@ async fn serve_connection(
     let load_host = host.clone();
     let load_sessions = sessions.clone();
     let load_delivery = delivery.clone();
+    let list_host = host.clone();
+    let list_sessions = sessions.clone();
     let prompt_host = host.clone();
     let prompt_sessions = sessions.clone();
     let image_intake = reviewer && host.accepts_images();
@@ -151,6 +156,7 @@ async fn serve_connection(
                 }
                 let updates = {
                     let mut sessions = initialized_sessions.lock().unwrap();
+                    sessions.initialized = true;
                     let meta = request.client_capabilities.meta.as_ref();
                     sessions.negotiated = extensions::negotiated(meta, reviewer);
                     if reviewer
@@ -171,6 +177,9 @@ async fn serve_connection(
                         .agent_capabilities(
                             AgentCapabilities::new()
                                 .load_session(true)
+                                .session_capabilities(
+                                    SessionCapabilities::new().list(SessionListCapabilities::new()),
+                                )
                                 .prompt_capabilities(PromptCapabilities::new().image(image_intake))
                                 .meta(advertised),
                         )
@@ -188,6 +197,27 @@ async fn serve_connection(
                     ))?;
                 }
                 Ok(())
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: ListSessionsRequest, responder, _| {
+                let result = async {
+                    if !list_sessions.lock().unwrap().initialized {
+                        return Err(unavailable("initialize_required"));
+                    }
+                    let cwd = request.cwd.ok_or_else(|| {
+                        Error::invalid_params().data("session_list_workspace_required")
+                    })?;
+                    let after = request.cursor.as_deref().map(catalog_anchor).transpose()?;
+                    let catalog = list_host
+                        .list_sessions(cwd, after)
+                        .await
+                        .map_err(host_error)?;
+                    catalog_response(catalog)
+                }
+                .await;
+                responder.respond_with_result(result)
             },
             on_receive_request!(),
         )
@@ -524,4 +554,35 @@ fn host_error(error: agent_kit_core::Error) -> Error {
         _ => Error::internal_error(),
     };
     wire_error.data(error.code)
+}
+
+fn catalog_anchor(cursor: &str) -> Result<SessionId> {
+    cursor
+        .strip_prefix("v1/")
+        .and_then(|id| SessionId::new(id).ok())
+        .ok_or_else(|| Error::invalid_params().data("invalid_session_cursor"))
+}
+
+fn catalog_response(mut catalog: SessionCatalog) -> Result<ListSessionsResponse> {
+    let cwd_bytes = serde_json::to_vec(&catalog.cwd)
+        .map_err(|_| unavailable("session_catalog_projection_failed"))?
+        .len();
+    // Each standard record repeats the workspace path. Leave frame room for
+    // the maximum escaped ID, keys, cursor, and the JSON-RPC envelope.
+    let page_limit = (transport::MAX_FRAME_BYTES / 2) / (cwd_bytes + 1024);
+    if page_limit == 0 {
+        return Err(Error::invalid_params().data("session_catalog_workspace_too_large"));
+    }
+    if catalog.sessions.len() > page_limit {
+        catalog.sessions.truncate(page_limit);
+        catalog.next_after = catalog.sessions.last().cloned();
+    }
+    Ok(ListSessionsResponse::new(
+        catalog
+            .sessions
+            .into_iter()
+            .map(|id| SessionInfo::new(id.as_str().to_owned(), catalog.cwd.clone()))
+            .collect(),
+    )
+    .next_cursor(catalog.next_after.map(|id| format!("v1/{}", id.as_str()))))
 }

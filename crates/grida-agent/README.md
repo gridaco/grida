@@ -107,12 +107,16 @@ configuration. Use it after the process that owns the state directory exits.
 
 ## ACP stdio
 
-The host handles `initialize`, `session/new`, `session/load`,
+The host handles `initialize`, `session/new`, `session/list`, `session/load`,
 `session/prompt`, and `session/cancel` using the stable upstream ACP v1
 SDK. Prompts accept text and resource-link descriptors. References travel as
 text context and confer no file or network access. Session loading replays
 committed text before its reply and leaves work ownership with the host.
 The prompt response follows the last delivered update and verified outcome.
+
+List supplies an absolute workspace `cwd` and returns up to 32 saved session
+identities in newest-created order. Follow `nextCursor` with the same workspace.
+Listing leaves chats detached and reads no transcripts.
 
 Clients can negotiate both `co.grida/session/questions` and
 `co.grida/session/answer-question` at version `1`. Prompts accepted through the

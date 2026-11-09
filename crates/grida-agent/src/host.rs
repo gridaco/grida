@@ -1,5 +1,6 @@
 //! Product composition and ownership for native agent turns.
 
+mod catalog;
 mod compaction;
 mod goals;
 mod history;
@@ -10,6 +11,7 @@ pub(crate) mod live;
 mod permissions;
 mod questions;
 mod skills;
+pub use catalog::SessionCatalog;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
@@ -411,7 +413,10 @@ impl Host {
         } else if !database.is_file() {
             return Err(problem(ErrorKind::Unavailable, "agent_state_unavailable"));
         }
-        let store = Arc::new(SqliteStore::open(database)?);
+        let store = Arc::new(SqliteStore::open_cataloged(
+            database,
+            catalog::configuration_scope,
+        )?);
         let configuration = execution
             .as_ref()
             .map(|_| Configuration::open(state_dir))
@@ -2060,7 +2065,10 @@ fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
 }
 
 fn session_configuration(view: &SessionView) -> Result<SessionConfiguration> {
-    let config = &view.configuration;
+    decode_session_configuration(&view.configuration)
+}
+
+fn decode_session_configuration(config: &Envelope) -> Result<SessionConfiguration> {
     if config.schema().as_str() != SESSION_SCHEMA || !matches!(config.version(), 1 | 2) {
         return Err(problem(
             ErrorKind::Unsupported,
