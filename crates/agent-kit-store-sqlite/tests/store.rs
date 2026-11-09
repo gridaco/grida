@@ -1,3 +1,5 @@
+mod support;
+
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::turn::{
@@ -5,13 +7,12 @@ use agent_kit_core::turn::{
     ResponseContract, TurnOutcome, WaitRecord,
 };
 use agent_kit_core::{
-    ChangeId, Envelope, ErrorKind, Fingerprint, MessageId, Result, SchemaId, SessionId, TurnId,
-    WaitId,
+    ErrorKind, Fingerprint, MessageId, Result, SchemaId, SessionId, TurnId, WaitId,
 };
 use agent_kit_sessions::{
     ClaimOutcome, ClaimRequest, ClaimedTurn, ControlRequest, CreateSession, DriverOutcome,
     InputDisposition, RecoveryRequest, RunDisposition, SessionControl, SessionRevision,
-    SessionStore, Sessions, Submission, TurnDisposition, TurnDriver, TurnSelection,
+    SessionStore, Sessions, TurnDisposition, TurnDriver, TurnSelection,
 };
 use agent_kit_store_sqlite::SqliteStore;
 use agent_kit_store_sqlite::history::{
@@ -19,41 +20,9 @@ use agent_kit_store_sqlite::history::{
 };
 use std::sync::Arc;
 use std::time::Duration;
+use support::*;
 use tempfile::TempDir;
 
-fn private_directory() -> TempDir {
-    let directory = tempfile::tempdir().unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
-    }
-    directory
-}
-
-fn change(value: &str) -> ChangeId {
-    ChangeId::new(value).unwrap()
-}
-fn session() -> SessionId {
-    SessionId::new("conversation").unwrap()
-}
-fn turn() -> TurnId {
-    TurnId::new("turn").unwrap()
-}
-fn payload(value: &str) -> Envelope {
-    Envelope::new(
-        SchemaId::new("test.text").unwrap(),
-        1,
-        value.as_bytes().to_vec(),
-    )
-    .unwrap()
-}
-fn submission(id: &str, text: &str) -> Submission {
-    Submission {
-        id: change(id),
-        payload: payload(text),
-    }
-}
 fn assert_error<T>(result: Result<T>, kind: ErrorKind, code: &str) {
     match result {
         Err(error) => {
@@ -76,34 +45,6 @@ async fn store() -> (TempDir, SqliteStore) {
         .unwrap();
     (directory, store)
 }
-async fn claim(store: &SqliteStore, id: &str, inputs: Vec<ChangeId>) -> ClaimedTurn {
-    let request = ClaimRequest {
-        id: change(id),
-        session: session(),
-        expected_revision: store.inspect(session()).await.unwrap().revision,
-        selection: TurnSelection::New {
-            turn: turn(),
-            inputs,
-        },
-    };
-    match store.claim(request).await.unwrap() {
-        ClaimOutcome::Acquired(claim) => claim,
-        ClaimOutcome::Existing(_) => panic!("expected a new owner"),
-    }
-}
-async fn commit(claim: &ClaimedTurn, id: &str, actions: Vec<JournalAction>) -> CommitReceipt {
-    let state = claim.lease.journal().load().await.unwrap();
-    let change = JournalChange::new(
-        change(id),
-        state.binding().clone(),
-        state.position(),
-        state.controls().revision,
-        actions,
-    )
-    .unwrap();
-    claim.lease.journal().commit(change).await.unwrap()
-}
-
 #[tokio::test]
 async fn acceptance_is_idempotent_and_inspection_is_observational() {
     let (_directory, store) = store().await;
@@ -929,76 +870,6 @@ async fn committed_suspension_survives_loss_of_the_driver_return() {
     assert_eq!(view.disposition, TurnDisposition::Suspended);
 }
 
-#[test]
-fn process_exit_retains_committed_work_and_releases_ownership() {
-    let directory = private_directory();
-    let path = directory.path().join("sessions.sqlite");
-    let status = std::process::Command::new(std::env::current_exe().unwrap())
-        .arg("--exact")
-        .arg("abrupt_writer_child")
-        .arg("--nocapture")
-        .env("AGENT_STORE_EXIT_FIXTURE", &path)
-        .status()
-        .unwrap();
-    assert_eq!(status.code(), Some(91));
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
-        let reopened = SqliteStore::open(&path).unwrap();
-        let view = reopened.inspect(session()).await.unwrap();
-        assert_eq!(
-            view.current.unwrap().disposition,
-            TurnDisposition::Interrupted
-        );
-        let ClaimOutcome::Acquired(recovered) = reopened
-            .recover(RecoveryRequest {
-                id: change("recover"),
-                session: session(),
-                turn: turn(),
-                expected_epoch: 1,
-            })
-            .await
-            .unwrap()
-        else {
-            panic!("expected recovery owner")
-        };
-        assert_eq!(
-            recovered.lease.journal().load().await.unwrap().checkpoint(),
-            Some(&payload("committed"))
-        );
-    });
-}
-
-#[test]
-fn abrupt_writer_child() {
-    let Some(path) = std::env::var_os("AGENT_STORE_EXIT_FIXTURE") else {
-        return;
-    };
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
-        let store = SqliteStore::open(path).unwrap();
-        store
-            .create(CreateSession {
-                id: session(),
-                request: change("create"),
-                configuration: payload("configuration"),
-            })
-            .await
-            .unwrap();
-        store
-            .submit(session(), submission("input", "hello"))
-            .await
-            .unwrap();
-        let acquired = claim(&store, "claim", vec![change("input")]).await;
-        commit(
-            &acquired,
-            "checkpoint",
-            vec![JournalAction::SetCheckpoint(payload("committed"))],
-        )
-        .await;
-        std::process::exit(91);
-    });
-}
-
 #[tokio::test]
 async fn malformed_stored_turn_is_rejected_before_recovery() {
     let (directory, store) = store().await;
@@ -1064,33 +935,6 @@ async fn failed_selection_preserves_queue_and_later_valid_claim() {
         store.claim(request).await.unwrap(),
         ClaimOutcome::Acquired(_)
     ));
-}
-
-#[test]
-fn database_ownership_excludes_another_process() {
-    let directory = private_directory();
-    let path = directory.path().join("sessions.sqlite");
-    let _owner = SqliteStore::open(&path).unwrap();
-    let status = std::process::Command::new(std::env::current_exe().unwrap())
-        .arg("--exact")
-        .arg("ownership_probe_child")
-        .arg("--nocapture")
-        .env("AGENT_STORE_OWNER_FIXTURE", &path)
-        .status()
-        .unwrap();
-    assert_eq!(status.code(), Some(92));
-}
-
-#[test]
-fn ownership_probe_child() {
-    let Some(path) = std::env::var_os("AGENT_STORE_OWNER_FIXTURE") else {
-        return;
-    };
-    let result = SqliteStore::open(path);
-    match result {
-        Err(error) if error.code == "store_already_owned" => std::process::exit(92),
-        _ => std::process::exit(93),
-    }
 }
 
 #[test]
