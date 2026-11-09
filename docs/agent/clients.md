@@ -326,5 +326,17 @@ Negotiate the version-1 capabilities `co.grida/goal/start`, `co.grida/goal/inspe
 The [client protocol reference](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md#persistent-goal-operations)
 lists their parameters.
 
+### Ask the agent to check later
+
+A private ACP client can enable one timed wake-up when submitting a task.
+Ask the agent what to check and how long to wait. The task suspends without
+an open model request. While the host is running, it continues the same task
+when due and when task admission allows it. Inspect the wake-up to see its
+time, reason, and whether the current host has armed it.
+
+Pause holds delivery. Stop ends the task. Cancelling just the wake-up leaves
+the suspended task available for an explicit Resume. After a host restart,
+inspect the wake-up and explicitly recover it to resume timer delivery.
+
 The [feature catalog](./features.md) describes the wider agent experience and
 the availability of its product features.

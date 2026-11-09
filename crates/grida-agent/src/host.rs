@@ -11,6 +11,7 @@ pub(crate) mod live;
 mod permissions;
 mod questions;
 mod skills;
+mod wakeups;
 pub use catalog::SessionCatalog;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
@@ -20,6 +21,7 @@ pub(crate) use images::is_retained_image;
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use permissions::{Approvals, PendingApproval};
 pub use questions::{PendingQuestion, Questions};
+pub use wakeups::{ScheduledWakeup, WakeupStatus, Wakeups};
 
 use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
 use crate::configuration_tools::ConfigurationAccess;
@@ -123,6 +125,7 @@ struct Work {
     unverified: bool,
     active: BTreeMap<SessionId, Active>,
     ready: VecDeque<ReadyWork>,
+    timers: wakeups::TimerOwners,
 }
 
 #[derive(PartialEq, Eq)]
@@ -240,6 +243,8 @@ struct StoredPrompt {
     #[serde(default)]
     questions: bool,
     #[serde(default)]
+    allow_wakeups: bool,
+    #[serde(default)]
     configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     permission_capture: Option<crate::permissions::PermissionCapture>,
@@ -279,6 +284,7 @@ enum Launch {
         id: ChangeId,
         parts: Vec<PromptPart>,
         questions: bool,
+        allow_wakeups: bool,
         configuration_permission: crate::ConfigurationPermission,
         publish_text: bool,
     },
@@ -321,6 +327,7 @@ struct PreparedInput {
     messages: Vec<Message>,
     limit: Option<NonZeroU64>,
     questions: bool,
+    allow_wakeups: bool,
     configuration_permission: crate::ConfigurationPermission,
     captured: Option<ConfigurationSnapshot>,
     permission_capture: Option<crate::permissions::PermissionCapture>,
@@ -524,13 +531,14 @@ impl Host {
     }
 
     pub async fn start_prompt(&self, request: PromptRequest) -> Result<AcceptedRun> {
-        self.launch_prompt(request, false).await
+        self.launch_prompt(request, false, false).await
     }
 
     async fn launch_prompt(
         &self,
         request: PromptRequest,
         publish_text: bool,
+        allow_wakeups: bool,
     ) -> Result<AcceptedRun> {
         self.execution()?;
         let PromptRequest {
@@ -552,6 +560,7 @@ impl Host {
                     id: id.clone(),
                     parts,
                     questions,
+                    allow_wakeups,
                     configuration_permission,
                     publish_text,
                 },
@@ -658,11 +667,9 @@ impl Host {
                             Err(error) => {
                                 // Leave queued inputs retained without automatically
                                 // admitting more work after uncertain native cleanup.
-                                host.work
-                                    .lock()
-                                    .await
-                                    .ready
-                                    .retain(|work| work.session() != &worker_session);
+                                let mut work = host.work.lock().await;
+                                work.release_timer(&worker_session, &worker_turn);
+                                work.ready.retain(|work| work.session() != &worker_session);
                                 Err(error)
                             }
                         }
@@ -673,6 +680,9 @@ impl Host {
                 TurnWork::Compaction(plan) => host.drive_compaction(admitted.opened, *plan).await,
             };
             let settled = matches!(&result, Ok(RunResult::Settled(_)));
+            if settled || result.is_err() {
+                host.release_timer(&worker_session, &worker_turn).await;
+            }
             let suspended = matches!(
                 &result,
                 Ok(RunResult::Suspended | RunResult::InputRequired(_))
@@ -760,6 +770,7 @@ impl Host {
                 id,
                 parts,
                 questions,
+                allow_wakeups,
                 configuration_permission,
                 ..
             } => {
@@ -769,7 +780,14 @@ impl Host {
                 }
                 let history = self.provider_history(session.clone(), None).await?;
                 let input = self
-                    .capture_submission(&view, id, parts, questions, configuration_permission)
+                    .capture_submission(
+                        &view,
+                        id,
+                        parts,
+                        questions,
+                        configuration_permission,
+                        allow_wakeups,
+                    )
                     .await?;
                 let acceptance = self.store.submit(session.clone(), input.clone()).await?;
                 let view = self.store.inspect(session.clone()).await?;
@@ -932,10 +950,15 @@ impl Host {
             })
             .transpose()?
             .flatten();
+        let wakeups = prepared
+            .allow_wakeups
+            .then(|| wakeups::WakeupAccess::bind(self.clone(), claim.lease.binding()))
+            .transpose()?;
         let tool_authority = permissions::ToolAuthority::bind(
             execution.authorization.clone(),
             permission_scope.clone(),
             image.clone(),
+            wakeups.clone(),
         );
         let goal_authority = if prepared.goal.is_some() {
             let (validator, gate): (Arc<dyn AuthorityValidator>, Arc<dyn ToolGate>) =
@@ -994,6 +1017,9 @@ impl Host {
                 .questions
                 .insert(operations.clone(), &mut inventory, &mut authority.tools)?;
         }
+        if let Some(wakeups) = &wakeups {
+            wakeups.insert(operations.clone(), &mut inventory, &mut authority.tools)?;
+        }
         if prepared.configuration_permission != crate::ConfigurationPermission::Disabled {
             let captured = prepared.captured.ok_or_else(|| {
                 problem(ErrorKind::InvalidState, "captured_configuration_missing")
@@ -1013,6 +1039,9 @@ impl Host {
         let tools = inventory.snapshot(&selected)?;
         if !closing && prepared.questions {
             execution.questions.reconcile(&operations, &tools).await?;
+        }
+        if !closing && let Some(wakeups) = &wakeups {
+            wakeups.reconcile(&operations, &tools).await?;
         }
         if !closing && prepared.configuration_permission != crate::ConfigurationPermission::Disabled
         {
@@ -1114,6 +1143,7 @@ impl Host {
         parts: Vec<PromptPart>,
         questions: bool,
         configuration_permission: crate::ConfigurationPermission,
+        allow_wakeups: bool,
     ) -> Result<Submission> {
         validate_prompt_parts(&parts)?;
         let execution = self.execution()?;
@@ -1163,6 +1193,7 @@ impl Host {
                         scope: execution.authority.inference.authority.scope.clone(),
                     }),
                     questions,
+                    allow_wakeups,
                     configuration_permission,
                     permission_capture,
                     guidance,
@@ -1184,6 +1215,7 @@ impl Host {
             messages,
             limit,
             questions,
+            allow_wakeups,
             configuration_permission,
             captured,
             permission_capture,
@@ -1196,6 +1228,7 @@ impl Host {
                 (
                     decode_input(input)?,
                     None,
+                    false,
                     false,
                     crate::ConfigurationPermission::Disabled,
                     None,
@@ -1251,6 +1284,7 @@ impl Host {
                     messages,
                     stored.configuration.defaults.context.max_input_tokens,
                     stored.questions,
+                    !cancellation_only && stored.allow_wakeups,
                     stored.configuration_permission,
                     Some(stored.configuration),
                     if cancellation_only {
@@ -1283,6 +1317,7 @@ impl Host {
             messages,
             limit,
             questions,
+            allow_wakeups,
             configuration_permission,
             captured,
             permission_capture,
@@ -1386,11 +1421,22 @@ impl Host {
     }
 
     pub async fn submit_prompt(&self, request: PromptRequest) -> Result<DurableSubmission> {
+        self.submit_prompt_with_wakeups(request, false).await
+    }
+
+    pub(crate) async fn submit_prompt_with_wakeups(
+        &self,
+        request: PromptRequest,
+        allow_wakeups: bool,
+    ) -> Result<DurableSubmission> {
         validate_prompt_parts(&request.parts)?;
-        if let Some(accepted) = self.existing_submission(&request).await? {
+        if let Some(accepted) = self.existing_submission(&request, allow_wakeups).await? {
             return Ok(accepted);
         }
-        match self.launch_prompt(request.clone(), true).await {
+        match self
+            .launch_prompt(request.clone(), true, allow_wakeups)
+            .await
+        {
             Ok(run) => Ok(DurableSubmission {
                 session: run.session,
                 input: run.input,
@@ -1399,13 +1445,17 @@ impl Host {
             }),
             // An acceptance may have committed before the claim or response
             // failed. Re-read its identity and leave unclaimed input queued.
-            Err(error) => self.existing_submission(&request).await?.ok_or(error),
+            Err(error) => self
+                .existing_submission(&request, allow_wakeups)
+                .await?
+                .ok_or(error),
         }
     }
 
     async fn existing_submission(
         &self,
         request: &PromptRequest,
+        allow_wakeups: bool,
     ) -> Result<Option<DurableSubmission>> {
         let Some(view) = self
             .store
@@ -1415,6 +1465,12 @@ impl Host {
             return Ok(None);
         };
         lifecycle::check_input(&view.input, &request.parts)?;
+        if InputSettings::for_input(&view.input)?.allow_wakeups != allow_wakeups {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "submission_wakeup_permission_changed",
+            ));
+        }
         Ok(Some(DurableSubmission {
             session: request.session.clone(),
             input: request.id.clone(),
@@ -1444,6 +1500,7 @@ impl Host {
                     },
                 })
                 .await?;
+            host.release_timer(&session, &turn).await;
             host.kick_stopped(session, turn).await;
             Ok(receipt)
         })
@@ -1521,7 +1578,15 @@ impl Host {
     }
 
     pub async fn cancel(&self, session: SessionId, turn: TurnId) -> Result<()> {
-        control(&self.store, session, turn, ControlDirective::Cancel).await
+        control(
+            &self.store,
+            session.clone(),
+            turn.clone(),
+            ControlDirective::Cancel,
+        )
+        .await?;
+        self.release_timer(&session, &turn).await;
+        Ok(())
     }
 
     pub async fn shutdown(&self) -> Result<()> {
@@ -1531,6 +1596,9 @@ impl Host {
                 .await
                 .map_err(|_| problem(ErrorKind::Uncertain, "host_shutdown_timeout"))?;
             work.closed = true;
+            for timer in work.timers.values() {
+                timer.cancel();
+            }
             self.controls.close();
             work.active
                 .iter()
@@ -1950,10 +2018,14 @@ async fn control(
     for _ in 0..4 {
         let session_view = store.inspect(session.clone()).await?;
         let turn_view = store.inspect_turn(session.clone(), turn.clone()).await?;
+        // A worker can still be releasing its lease after durable suspension.
+        // Host shutdown preserves the recorded pause state of that waiting task.
         if matches!(turn_view.disposition, TurnDisposition::Settled)
             || (directive == ControlDirective::Cancel && turn_view.controls.cancelled)
             || (directive == ControlDirective::Pause
-                && (turn_view.controls.paused || turn_view.controls.cancelled))
+                && (turn_view.disposition == TurnDisposition::Suspended
+                    || turn_view.controls.paused
+                    || turn_view.controls.cancelled))
         {
             return Ok(());
         }

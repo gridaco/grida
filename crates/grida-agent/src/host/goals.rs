@@ -126,6 +126,7 @@ impl Host {
                 request.parts,
                 request.questions,
                 request.configuration_permission,
+                false,
             )
             .await?;
         let mut stored: StoredPrompt = decode_input(&input)?;

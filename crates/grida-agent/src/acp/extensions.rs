@@ -7,6 +7,7 @@ mod history;
 mod lifecycle;
 mod questions;
 mod skills;
+mod wakeups;
 
 use super::{ConnectionSessions, host_error, prompt_part, prompt_parts, unavailable};
 use crate::host::{DurableSubmission, Host, InputSettings, PromptRequest};
@@ -66,6 +67,7 @@ fn capability_keys(reviewer: bool) -> impl Iterator<Item = &'static str> {
         .chain([compaction::COMPACT])
         .chain([skills::CATALOG])
         .chain(goals::CAPABILITIES)
+        .chain(wakeups::capabilities(reviewer))
 }
 
 pub(super) fn configuration_permission(
@@ -100,6 +102,8 @@ struct Submit {
     prompt: Vec<ContentBlock>,
     #[serde(default)]
     allow_configuration_changes: bool,
+    #[serde(default)]
+    allow_wakeups: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -312,22 +316,29 @@ pub(super) fn handlers(
             sessions.clone(),
             image_intake,
         ))
+        .with_connection_builder(wakeups::handlers(host.clone(), sessions.clone()))
         .on_receive_request(
             async move |request: Submit, responder, _| {
                 let result = async {
                     require(&submit_sessions, SUBMIT, Some(&request.session_id))?;
+                    if request.allow_wakeups && !wakeups::available(&submit_sessions) {
+                        return Err(unavailable("wakeup_capability_required"));
+                    }
                     let parts = prompt_parts(request.prompt, image_intake)?;
                     let accepted = submit_host
-                        .submit_prompt(PromptRequest {
-                            id: request.input_id,
-                            session: request.session_id,
-                            parts,
-                            questions: questions::available(&submit_sessions),
-                            configuration_permission: configuration_permission(
-                                &submit_sessions,
-                                request.allow_configuration_changes,
-                            )?,
-                        })
+                        .submit_prompt_with_wakeups(
+                            PromptRequest {
+                                id: request.input_id,
+                                session: request.session_id,
+                                parts,
+                                questions: questions::available(&submit_sessions),
+                                configuration_permission: configuration_permission(
+                                    &submit_sessions,
+                                    request.allow_configuration_changes,
+                                )?,
+                            },
+                            request.allow_wakeups,
+                        )
                         .await
                         .map_err(host_error)?;
                     Ok(SubmitResponse::from(accepted))

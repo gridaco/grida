@@ -29,6 +29,7 @@ pub(super) struct ToolAuthority {
     base: Arc<ExecutionAuthority>,
     permissions: Option<Arc<TurnPermissions>>,
     image: Option<Arc<image_tools::TurnImage>>,
+    wakeups: Option<Arc<wakeups::WakeupAccess>>,
 }
 
 impl ToolAuthority {
@@ -36,20 +37,29 @@ impl ToolAuthority {
         base: Arc<ExecutionAuthority>,
         permissions: Option<Arc<TurnPermissions>>,
         image: Option<Arc<image_tools::TurnImage>>,
+        wakeups: Option<Arc<wakeups::WakeupAccess>>,
     ) -> Option<Arc<Self>> {
-        if permissions.is_none() && image.is_none() {
+        if permissions.is_none() && image.is_none() && wakeups.is_none() {
             return None;
         }
         Some(Arc::new(Self {
             base,
             permissions,
             image,
+            wakeups,
         }))
     }
 }
 
 impl AuthorityValidator for ToolAuthority {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
+        if self
+            .wakeups
+            .as_ref()
+            .is_some_and(|scope| scope.accepts(&request.selection))
+        {
+            return Box::pin(async { Ok(()) });
+        }
         if let Some(image) = self
             .image
             .as_ref()
@@ -74,6 +84,13 @@ impl ToolGate for ToolAuthority {
         admission: ToolAdmission,
         context: AdmissionContext,
     ) -> BoxFuture<'_, Result<ToolDecision>> {
+        if let Some(wakeups) = self
+            .wakeups
+            .as_ref()
+            .filter(|scope| scope.accepts(&admission.grants))
+        {
+            return wakeups.decide(admission, context);
+        }
         if let Some(image) = self
             .image
             .as_ref()
@@ -179,7 +196,8 @@ impl Host {
                 wait: wait_id,
                 answer,
             };
-            host.resolve_interaction(control, action, can_wake).await
+            host.resolve_interaction(control, action, can_wake, None)
+                .await
         })
         .await
     }

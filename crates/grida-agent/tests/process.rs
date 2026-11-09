@@ -49,6 +49,9 @@ mod responses;
 #[cfg(unix)]
 #[path = "process/skills.rs"]
 mod skills;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/wakeups.rs"]
+mod wakeups;
 
 const WAIT: Duration = Duration::from_secs(15);
 const TEST_CREDENTIAL: &str = "fixture-only-bearer-token";

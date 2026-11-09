@@ -35,6 +35,8 @@ pub struct InputSettings {
     #[serde(default)]
     pub questions: bool,
     #[serde(default)]
+    pub allow_wakeups: bool,
+    #[serde(default)]
     pub configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<crate::skills::SkillDescription>,
@@ -70,6 +72,7 @@ impl InputSettings {
                         .map(|limit| limit.get()),
                     max_output_tokens: stored.max_output_tokens,
                     questions: stored.questions,
+                    allow_wakeups: stored.allow_wakeups,
                     configuration_permission: stored.configuration_permission,
                     skills: stored
                         .guidance
@@ -129,7 +132,7 @@ impl Host {
     async fn enqueue_owned(&self, request: PromptRequest) -> Result<DurableSubmission> {
         validate_prompt_parts(&request.parts)?;
         let admission = self.configuration_admission.lock().await;
-        if let Some(accepted) = self.existing_submission(&request).await? {
+        if let Some(accepted) = self.existing_submission(&request, false).await? {
             return Ok(accepted);
         }
         if self.work.lock().await.closed {
@@ -147,6 +150,7 @@ impl Host {
                 request.parts,
                 request.questions,
                 request.configuration_permission,
+                false,
             )
             .await?;
         let acceptance = self.store.submit(request.session, input).await?;
@@ -267,6 +271,7 @@ impl Host {
                         parts,
                         questions,
                         configuration_permission,
+                        false,
                     )
                     .await?
                 };

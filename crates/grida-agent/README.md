@@ -325,3 +325,9 @@ The initial work and explicitly authorized automatic follow-ups use the same
 owned scheduler. A claim and its reservation commit together. Only reserved
 turns receive the goal tools. See the
 [agent client guide](../../docs/agent/clients.md#work-toward-a-persistent-goal).
+
+An opted-in private ACP submission can schedule one wake-up for its own task.
+The native host owns the timer and uses the ordinary task scheduler to claim
+continuation. Closing the host releases its timers while preserving their
+recorded due times and delivery state. A private client explicitly recovers the
+selected wake-up after restart. Inspecting or loading a chat leaves it idle.

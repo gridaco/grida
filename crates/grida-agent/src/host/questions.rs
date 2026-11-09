@@ -208,7 +208,8 @@ impl Host {
                     answer: prepared.answer,
                 }
             };
-            host.resolve_interaction(control, action, can_wake).await
+            host.resolve_interaction(control, action, can_wake, None)
+                .await
         })
         .await
     }
@@ -218,22 +219,20 @@ impl Host {
         control: TurnControl,
         action: SessionControl,
         can_wake: bool,
+        timer: Option<&agent_kit_core::CancellationToken>,
     ) -> Result<ControlReceipt> {
         let mut work = self.work.lock().await;
         if work.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
+        if timer.is_some_and(agent_kit_core::CancellationToken::is_cancelled) {
+            return Err(problem(ErrorKind::Unavailable, "wakeup_owner_released"));
+        }
         // Reserve the existing scheduler's wake alongside the answer.
         // An owner that suspends concurrently releases the same work lock
         // before the scheduler can claim the answered turn.
-        if can_wake
-            && work.ready.len() >= MAX_READY_SESSIONS
-            && !work
-                .ready
-                .iter()
-                .any(|item| item.wakes_answer(&control.session, &control.turn))
-        {
-            return Err(problem(ErrorKind::LimitExceeded, "host_ready_queue_limit"));
+        if can_wake {
+            work.check_answer_capacity(&control.session, &control.turn)?;
         }
         let receipt = self
             .store
@@ -251,21 +250,7 @@ impl Host {
                 .ok_or_else(|| problem(ErrorKind::Uncertain, "interaction_receipt_missing"))?
                 .record()
                 .position;
-            if let Some(ReadyWork::Answered {
-                position: queued, ..
-            }) = work
-                .ready
-                .iter_mut()
-                .find(|item| item.wakes_answer(&control.session, &control.turn))
-            {
-                *queued = (*queued).max(position);
-            } else {
-                work.defer(ReadyWork::Answered {
-                    session: control.session,
-                    turn: control.turn,
-                    position,
-                });
-            }
+            work.queue_answered(control.session, control.turn, position);
         }
         drop(work);
         self.wake_ready().await;
@@ -294,8 +279,9 @@ impl Host {
                     && state.controls().admits_work()
                     && state.waits().values().all(|wait| !wait.is_pending())
                     && state.waits().values().any(|wait| {
-                        (is_question(wait) || crate::permissions::is_approval(wait))
-                            && wait.answer.is_some()
+                        ((is_question(wait) || crate::permissions::is_approval(wait))
+                            && wait.answer.is_some())
+                            || wakeups::was_delivered(wait)
                     });
                 Ok(ready.then(|| (state.binding().epoch, state.position())))
             })
@@ -313,5 +299,45 @@ impl Host {
                 position,
             },
         }))
+    }
+}
+
+impl Work {
+    pub(super) fn check_answer_capacity(&self, session: &SessionId, turn: &TurnId) -> Result<()> {
+        if self.closed {
+            return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
+        }
+        if self.ready.len() >= MAX_READY_SESSIONS
+            && !self
+                .ready
+                .iter()
+                .any(|item| item.wakes_answer(session, turn))
+        {
+            return Err(problem(ErrorKind::LimitExceeded, "host_ready_queue_limit"));
+        }
+        Ok(())
+    }
+
+    pub(super) fn queue_answered(
+        &mut self,
+        session: SessionId,
+        turn: TurnId,
+        position: JournalPosition,
+    ) {
+        if let Some(ReadyWork::Answered {
+            position: queued, ..
+        }) = self
+            .ready
+            .iter_mut()
+            .find(|item| item.wakes_answer(&session, &turn))
+        {
+            *queued = (*queued).max(position);
+        } else {
+            self.defer(ReadyWork::Answered {
+                session,
+                turn,
+                position,
+            });
+        }
     }
 }

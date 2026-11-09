@@ -232,6 +232,28 @@ capacity changes. An explicit task pause is independent of answer receipt.
 An embedded `run --questions` returns a verified `input_required` result and
 exit code `6` when it suspends for an answer.
 
+### One-shot task wake-ups
+
+Private stdio clients negotiate `co.grida/session/wakeups`,
+`co.grida/session/cancel-wakeup`, and `co.grida/session/recover-wakeup` version
+
+1. Set `allowWakeups: true` on the identified Submit to offer the schedule
+   tool for that task. The setting is retained and must agree on input retries.
+   The host accepts one wake-up for the same task with a delay up to seven days.
+
+| Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                    |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `wakeups`                                | `sessionId`, `turnId`. Inspect the retained schedule, with its wait ID, time, reason, disposition, and live `armed` flag.                |
+| `cancel-wakeup`                          | `sessionId`, `turnId`, `waitId`. Cancel that schedule and return its current disposition. A retry observes the same cancellation.        |
+| `recover-wakeup`                         | `sessionId`, `turnId`, `waitId`. Explicitly rearm the pending timer or restore a recorded due continuation through the normal scheduler. |
+
+The timer resolves the exact recorded wait when due and uses normal task
+admission and provider authority. `delivered` records the resolution, while
+task completion is reported separately. Task Pause holds delivery and Stop
+closes it. Cancelling the wake-up makes no automatic continuation. Load,
+inspection, and connection setup make no recovery request. Closing the host
+releases the live timer, and a new host reports `armed: false` until recovery.
+
 With a trusted native permission profile, an access that requires approval
 records its directory, action and scope identities, and a bounded description
 of the file operation or command. The reply uses `decision: "approve_once"`
