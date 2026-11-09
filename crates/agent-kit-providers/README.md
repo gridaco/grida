@@ -15,6 +15,7 @@ and resolves it to the approved destination.
 | Operation                     | Relative route for the corresponding API       |
 | ----------------------------- | ---------------------------------------------- |
 | `ChatCompletions`             | `chat/completions`                             |
+| `OpenAiResponses`             | `responses`                                    |
 | `AnthropicMessages`           | `messages`                                     |
 | `GeminiStreamGenerateContent` | `models/{model}:streamGenerateContent?alt=sse` |
 
@@ -43,6 +44,15 @@ Cache-related counters retain their provider-specific meanings.
   after the tool-call finish reason and JSON validation. Compatible reasoning
   deltas remain separate from answer text and are omitted from portable request
   history. The Ollama profile uses the `max_tokens` field. [Ollama compatibility](https://docs.ollama.com/api/openai-compatibility) · [Chat Completions streaming](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
+- `Responses` uses stateless SSE with top-level instructions, `store: false`,
+  and explicitly requested encrypted reasoning. It keeps completed output
+  item order and remote function call IDs for replay. Tool calls become
+  eligible after the verified terminal response. The API profile accepts an
+  explicit output-token bound. The subscription profile rejects that field,
+  so a host using it must select an effective output policy before preparing
+  the request. The adapter provides protocol fixtures for both profiles.
+  Subscription account setup and native host activation are separate.
+  [Responses migration](https://developers.openai.com/api/docs/guides/migrate-to-responses)
 - `Anthropic` requires an explicit output-token limit and lowers leading
   instructions to the system field. It emits a call after its complete
   tool-use block. Completion requires a stop reason and `message_stop`.
@@ -54,12 +64,21 @@ Cache-related counters retain their provider-specific meanings.
   with the provider ID when available. Streamed function arguments and media
   parts require a different profile. [Gemini thought signatures](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking/thought-signatures)
 
-The Gemini host persists an opaque replay binding for each endpoint and
+Gemini and Responses use an opaque replay binding for each endpoint and
 provider-account lineage. Recreating live execution authority can reuse that
 replay binding when lineage is verified. Rotate the replay binding when
-lineage cannot be established. The adapter checks the replay binding, model,
-and original assistant message content before using stored parts. It checks
-the fresh execution binding independently before starting a request.
+lineage cannot be established. The adapters check the replay binding, model,
+and original assistant message content before using stored parts. Responses
+also checks the selected endpoint profile and wire model. Replay state is
+trusted history from the host. Fingerprints detect mismatches with that history.
+The adapters check the fresh execution binding independently before dispatch.
+
+Responses streams reasoning summaries separately from answer text. It retains
+completed encrypted reasoning in the provider-state envelope for replay. When a
+stream ends without verified completion, the visible prefix and available
+usage survive without publishing a tool call from that stream. Stopping the
+local reader closes its stream. Remote execution and charges follow the
+provider's contract.
 
 Completed calls still require executor schema preflight and authority checks.
 A stream failure retains the valid prefix and available usage and request
@@ -70,7 +89,7 @@ opaque continuation state.
 
 The fixture transport covers lowering, fragmented streams, terminal and partial
 outcomes, attempt-scoped usage, redacted failures, cancellation and limits,
-and signed tool-history continuation across live authority generations.
+and opaque tool-history continuation across live authority generations.
 
 ```sh
 cargo test -p agent-kit-providers --locked

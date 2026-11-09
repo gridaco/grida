@@ -3,6 +3,7 @@
 mod anthropic;
 mod gemini;
 mod openai;
+mod responses;
 mod sse;
 mod wire;
 
@@ -13,6 +14,7 @@ use futures_core::stream::BoxStream;
 pub use anthropic::Anthropic;
 pub use gemini::{Gemini, GeminiProfile};
 pub use openai::{ModelProfile, OpenAiCompatible, OutputLimitField};
+pub use responses::{ReasoningEffort, Responses, ResponsesEndpoint, ResponsesProfile};
 
 /// The bound host selects the destination and injects credentials. The body
 /// contains conversation data and deliberately has no Debug implementation.
@@ -27,6 +29,7 @@ pub struct TransportRequest {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TransportOperation {
     ChatCompletions,
+    OpenAiResponses,
     AnthropicMessages,
     GeminiStreamGenerateContent { model: ModelId },
 }
