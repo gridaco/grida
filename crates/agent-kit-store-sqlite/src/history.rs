@@ -94,7 +94,7 @@ pub struct HistoryRevised {
     pub acceptance: Acceptance,
 }
 
-type TurnProjection = dyn Fn(&TurnState) -> Vec<HistoryRecord>;
+type TurnProjection<'a> = dyn Fn(&TurnState) -> Vec<HistoryRecord> + 'a;
 
 impl SqliteStore {
     /// The projection runs under the store lock and must be pure.
@@ -252,7 +252,7 @@ impl SqliteStore {
     }
 }
 
-fn require_basis(current: &HistoryBasis, expected: &HistoryBasis) -> Result<()> {
+pub(super) fn require_basis(current: &HistoryBasis, expected: &HistoryBasis) -> Result<()> {
     if current != expected {
         return Err(error(ErrorKind::Conflict, "history_basis_changed"));
     }
@@ -266,14 +266,7 @@ fn insert_view(
     seed: &HistorySeed,
     after: i64,
 ) -> Result<()> {
-    if seed.records.len() > MAX_HISTORY_RECORDS {
-        return Err(projection_limit());
-    }
-    let bytes = encode(seed)?;
-    if bytes.len() > MAX_HISTORY_BYTES {
-        return Err(projection_limit());
-    }
-    History::new().append(HistoryPosition::default(), &seed.records)?;
+    let bytes = seed_bytes(seed)?;
     let identity = encode(&Fingerprint::of(seed)?)?;
     transaction.execute(
         "INSERT INTO session_history_views(session,view,seed,after_ordinal,seed_identity) VALUES(?1,?2,?3,?4,?5)",
@@ -282,16 +275,28 @@ fn insert_view(
     Ok(())
 }
 
-#[derive(Default)]
-struct View {
-    id: SessionRevision,
-    seed: Option<HistorySeed>,
-    seed_identity: Option<Fingerprint>,
-    after: i64,
-    end: Option<i64>,
+pub(super) fn seed_bytes(seed: &HistorySeed) -> Result<Vec<u8>> {
+    if seed.records.len() > MAX_HISTORY_RECORDS {
+        return Err(projection_limit());
+    }
+    let bytes = encode(seed)?;
+    if bytes.len() > MAX_HISTORY_BYTES {
+        return Err(projection_limit());
+    }
+    History::new().append(HistoryPosition::default(), &seed.records)?;
+    Ok(bytes)
 }
 
-fn select_view(
+#[derive(Default)]
+pub(super) struct View {
+    pub(super) id: SessionRevision,
+    pub(super) seed: Option<HistorySeed>,
+    pub(super) seed_identity: Option<Fingerprint>,
+    pub(super) after: i64,
+    pub(super) end: Option<i64>,
+}
+
+pub(super) fn select_view(
     connection: &Connection,
     session: &SessionId,
     selection: HistorySelection,
@@ -381,9 +386,20 @@ fn read_history(
     session: &SessionId,
     session_revision: SessionRevision,
     selection: HistorySelection,
-    project: &TurnProjection,
+    project: &TurnProjection<'_>,
 ) -> Result<RetainedHistory> {
     let (view, before) = select_view(connection, session, selection)?;
+    read_view(connection, session, session_revision, view, before, project)
+}
+
+pub(super) fn read_view(
+    connection: &Connection,
+    session: &SessionId,
+    session_revision: SessionRevision,
+    view: View,
+    before: Option<i64>,
+    project: &TurnProjection<'_>,
+) -> Result<RetainedHistory> {
     let mut query = connection.prepare(
         "SELECT ordinal,id,snapshot FROM turns
          WHERE session=?1 AND ordinal>?2 AND (?3 IS NULL OR ordinal<=?3) AND (?4 IS NULL OR ordinal<?4)

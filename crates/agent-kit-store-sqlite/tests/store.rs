@@ -419,7 +419,8 @@ async fn previous_schema_upgrades_without_changing_completed_or_queued_input() {
     let previous = rusqlite::Connection::open(&path).unwrap();
     previous
         .execute_batch(
-            "DROP TABLE session_history_views;
+            "DROP TABLE session_context_replacements;
+         DROP TABLE session_history_views;
          DROP INDEX session_turn_order;
          DROP INDEX submission_queue_order;
          ALTER TABLE submissions DROP COLUMN queue_order;
@@ -1937,7 +1938,8 @@ async fn version_two_upgrades_with_original_history_view() {
     let previous = rusqlite::Connection::open(&path).unwrap();
     previous
         .execute_batch(
-            "DROP TABLE session_history_views;
+            "DROP TABLE session_context_replacements;
+         DROP TABLE session_history_views;
          DROP INDEX session_turn_order;
          PRAGMA user_version=2;",
         )
@@ -1953,7 +1955,7 @@ async fn version_two_upgrades_with_original_history_view() {
     let version: i64 = reopened
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 3);
+    assert_eq!(version, 4);
 }
 
 #[tokio::test]
@@ -2161,5 +2163,201 @@ async fn malformed_seed_creates_neither_a_session_nor_a_receipt() {
             .unwrap()
             .session,
         destination
+    );
+}
+
+#[tokio::test]
+async fn context_replacement_retains_transcript_queued_input_and_old_context() {
+    use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
+
+    let (directory, store) = store().await;
+    let original = history_message("original", "Original transcript");
+    let original_turn =
+        finish_history_turn(&store, session(), "original", vec![original.clone()]).await;
+    let source = store
+        .context_history_with(session(), None, |state| state.history().records().to_vec())
+        .await
+        .unwrap();
+    let maintenance = TurnId::new("summary-turn").unwrap();
+    let request = UnpromptedClaim {
+        session: session(),
+        turn: maintenance.clone(),
+        request: change("compact"),
+        expected_revision: source.session_revision,
+        expected_context: source.basis.clone(),
+        checkpoint: payload("captured source"),
+    };
+    let ClaimOutcome::Acquired(claim) = store.claim_unprompted(request.clone()).await.unwrap()
+    else {
+        panic!("expected unprompted owner")
+    };
+    assert!(claim.inputs.is_empty());
+    assert!(matches!(
+        store.claim_unprompted(request).await.unwrap(),
+        ClaimOutcome::Existing(_)
+    ));
+    assert_eq!(
+        claim.lease.journal().load().await.unwrap().checkpoint(),
+        Some(&payload("captured source"))
+    );
+    let queued = submission("queued-after-capture", "New input during compaction");
+    let accepted = store.submit(session(), queued.clone()).await.unwrap();
+    let outcome = TurnOutcome {
+        status: OutcomeStatus::Succeeded,
+        account: Some(payload("validated summary")),
+        evidence: vec![],
+    };
+    commit(
+        &claim,
+        "complete-summary",
+        vec![JournalAction::Settle(outcome.clone())],
+    )
+    .await;
+    drop(claim);
+    drop(store);
+    let store = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+
+    let summary = history_message("summary", "Short summary");
+    let install = ContextInstall {
+        session: session(),
+        turn: maintenance,
+        expected_context: source.basis,
+        expected_outcome: Fingerprint::of(&outcome).unwrap(),
+        replacement: HistorySeed {
+            records: vec![summary.clone()],
+            provenance: payload("covered original"),
+        },
+    };
+    let mut mismatch = install.clone();
+    mismatch.expected_outcome = Fingerprint::of(&"wrong").unwrap();
+    assert_error(
+        store.install_context(mismatch).await,
+        ErrorKind::Conflict,
+        "context_outcome_changed",
+    );
+    assert_eq!(
+        store
+            .context_history_with(session(), None, |state| state.history().records().to_vec())
+            .await
+            .unwrap()
+            .into_records(),
+        std::slice::from_ref(&original)
+    );
+    store.install_context(install.clone()).await.unwrap();
+    assert_eq!(
+        store.history(session(), None).await.unwrap(),
+        std::slice::from_ref(&original)
+    );
+    let observed = store.inspect(session()).await.unwrap();
+    assert_eq!(observed.queued[0].input, queued);
+    assert_eq!(observed.queued[0].position, accepted.position);
+    drop(store);
+
+    let store = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    let next = TurnId::new("future").unwrap();
+    let ClaimOutcome::Acquired(next_claim) = store
+        .claim(ClaimRequest {
+            id: change("claim-queued"),
+            session: session(),
+            expected_revision: observed.revision,
+            selection: TurnSelection::New {
+                turn: next.clone(),
+                inputs: vec![queued.id],
+            },
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected queued input owner")
+    };
+    assert_eq!(
+        store
+            .context_history_with(session(), Some(next), |state| state
+                .history()
+                .records()
+                .to_vec())
+            .await
+            .unwrap()
+            .into_records(),
+        [summary]
+    );
+    assert!(
+        store
+            .context_history_with(session(), Some(original_turn), |state| state
+                .history()
+                .records()
+                .to_vec())
+            .await
+            .unwrap()
+            .into_records()
+            .is_empty()
+    );
+    store.install_context(install).await.unwrap();
+    drop(next_claim);
+}
+
+#[tokio::test]
+async fn context_candidate_cannot_install_after_a_new_turn_claim() {
+    use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
+
+    let (_directory, store) = store().await;
+    let original = history_message("original", "Original transcript");
+    finish_history_turn(&store, session(), "original", vec![original.clone()]).await;
+    let source = store
+        .context_history_with(session(), None, |state| state.history().records().to_vec())
+        .await
+        .unwrap();
+    let maintenance = TurnId::new("summary-turn").unwrap();
+    let ClaimOutcome::Acquired(claim) = store
+        .claim_unprompted(UnpromptedClaim {
+            session: session(),
+            turn: maintenance.clone(),
+            request: change("compact"),
+            expected_revision: source.session_revision,
+            expected_context: source.basis.clone(),
+            checkpoint: payload("captured source"),
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected compaction owner");
+    };
+    let outcome = TurnOutcome {
+        status: OutcomeStatus::Succeeded,
+        account: Some(payload("summary candidate")),
+        evidence: vec![],
+    };
+    commit(
+        &claim,
+        "candidate",
+        vec![JournalAction::Settle(outcome.clone())],
+    )
+    .await;
+    drop(claim);
+    let later = history_message("later", "Newer input");
+    finish_history_turn(&store, session(), "later", vec![later.clone()]).await;
+    assert_error(
+        store
+            .install_context(ContextInstall {
+                session: session(),
+                turn: maintenance,
+                expected_context: source.basis,
+                expected_outcome: Fingerprint::of(&outcome).unwrap(),
+                replacement: HistorySeed {
+                    records: vec![history_message("summary", "Stale")],
+                    provenance: payload("old"),
+                },
+            })
+            .await,
+        ErrorKind::Conflict,
+        "context_install_basis_changed",
+    );
+    assert_eq!(
+        store
+            .context_history_with(session(), None, |state| state.history().records().to_vec())
+            .await
+            .unwrap()
+            .into_records(),
+        [original, later]
     );
 }

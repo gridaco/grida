@@ -116,6 +116,7 @@ summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
 | `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                |
 | `fork`                                   | `sessionId`, `requestId`, `expectedHistory`, and `anchor`. Return the independent `sessionId` for a committed prefix through that message.                                  |
 | `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `allowConfigurationChanges`. Return the installed view and accepted input. |
+| `compact`                                | `sessionId`, `requestId`, and optional `recover`. Run or inspect one retained context compaction. Return its status and available usage/failure evidence.                   |
 
 History returns `basis`, `sessionRevision`, up to 128 `messages`, `nextOffset`,
 and optional `seed` provenance. Echo the basis as `expectedHistory` on later
@@ -137,6 +138,21 @@ The revised input captures current settings and uses the same explicit
 configuration-change opt-in as a new submission. Retrying a revision returns
 its original receipt. Retained queued work after restart needs explicit Resume
 Queue.
+
+Negotiating `co.grida/session/compact` or `co.grida/session/fork` adds the
+matching command to the standard ACP available commands update after session
+setup. An exact bare `/compact` or `/fork` in `session/prompt` runs the same
+host control and returns its result under the negotiated key in `_meta`.
+Identified control requests support exact retries across reconnects.
+
+Compaction starts from an idle session with open admission and an empty queue.
+It owns a real turn that can be paused or stopped. New queued input remains
+accepted. Standard load and history anchors keep the original transcript.
+Future model input uses the latest installed summary and the subsequent
+conversation. Failed, stale, or uncertain attempts keep the previous model
+context. Resume a paused compaction through `resume`. Read an interrupted
+attempt by repeating its request ID and use `recover: true` to settle it under
+a replacement owner. Recovery does not repeat an uncertain provider dispatch.
 
 A duplicate input compares the original prompt and returns its retained
 disposition, including supersession or withdrawal. Changes reuse the caller's

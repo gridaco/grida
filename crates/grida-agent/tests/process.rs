@@ -19,6 +19,9 @@ use tokio::time::timeout;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 #[cfg(unix)]
+#[path = "process/compaction.rs"]
+mod compaction;
+#[cfg(unix)]
 #[path = "process/configuration_tools.rs"]
 mod configuration_tools;
 #[cfg(unix)]

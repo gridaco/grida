@@ -380,6 +380,13 @@ impl Host {
             message.id = MessageId::new(format!("steer/{}", message.id.as_str()))?;
         }
         self.owned_control(move |host| async move {
+            if host
+                .compaction_plan(control.session.clone(), control.turn.clone())
+                .await?
+                .is_some()
+            {
+                return Err(problem(ErrorKind::Conflict, "cannot_steer_compaction"));
+            }
             host.store
                 .control(ControlRequest {
                     id: control.request,

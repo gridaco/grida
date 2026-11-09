@@ -89,6 +89,7 @@ async fn serve_connection(
     let initialized_sessions = sessions.clone();
     let new_host = host.clone();
     let new_sessions = sessions.clone();
+    let new_delivery = delivery.clone();
     let load_host = host.clone();
     let load_sessions = sessions.clone();
     let load_delivery = delivery.clone();
@@ -119,7 +120,7 @@ async fn serve_connection(
             on_receive_request!(),
         )
         .on_receive_request(
-            async move |request: NewSessionRequest, responder, _| {
+            async move |request: NewSessionRequest, responder, connection| {
                 let result = async {
                     validate_session_setup(&request.mcp_servers, &request.additional_directories)?;
                     new_sessions.lock().unwrap().ensure_capacity(None)?;
@@ -128,6 +129,13 @@ async fn serve_connection(
                         .await
                         .map_err(host_error)?;
                     let response = NewSessionResponse::new(id.as_str().to_owned());
+                    extensions::compaction::announce(
+                        &new_sessions,
+                        &id,
+                        &connection,
+                        &new_delivery,
+                    )
+                    .await?;
                     new_sessions.lock().unwrap().attached.insert(id);
                     Ok(response)
                 }
@@ -156,6 +164,13 @@ async fn serve_connection(
                     projection
                         .replay(&connection, &load_delivery, snapshot.messages)
                         .await?;
+                    extensions::compaction::announce(
+                        &load_sessions,
+                        &id,
+                        &connection,
+                        &load_delivery,
+                    )
+                    .await?;
                     load_sessions.lock().unwrap().attached.insert(id);
                     Ok(LoadSessionResponse::new())
                 }
@@ -166,6 +181,34 @@ async fn serve_connection(
         )
         .on_receive_request(
             async move |request: AcpPrompt, responder, connection| {
+                if let Some(command) =
+                    extensions::compaction::command(&prompt_sessions, &request.prompt)
+                {
+                    let session = match session_id(&request.session_id).and_then(|session| {
+                        let sessions = prompt_sessions.lock().unwrap();
+                        sessions.ensure_attached(&session)?;
+                        if sessions.active.contains_key(&session) {
+                            return Err(unavailable("session_prompt_in_progress"));
+                        }
+                        Ok(session)
+                    }) {
+                        Ok(session) => session,
+                        Err(error) => return responder.respond_with_error(error),
+                    };
+                    let host = prompt_host.clone();
+                    let sessions = prompt_sessions.clone();
+                    return connection.spawn(async move {
+                        let result = extensions::compaction::invoke(
+                            &host,
+                            &sessions,
+                            session,
+                            command,
+                            responder.cancellation(),
+                        )
+                        .await;
+                        responder.respond_with_result(result)
+                    });
+                }
                 let start = async {
                     let session = session_id(&request.session_id)?;
                     {

@@ -62,6 +62,48 @@ pub(super) struct PriorContext {
 }
 
 impl Host {
+    pub(crate) async fn fork_latest(
+        &self,
+        session: SessionId,
+        request: ChangeId,
+    ) -> Result<SessionId> {
+        let history = self
+            .store
+            .retained_history_with(session.clone(), HistorySelection::Current, project)
+            .await?;
+        let anchor = history
+            .records
+            .iter()
+            .rev()
+            .find_map(|item| {
+                let HistoryRecord::Message(message) = &item.record;
+                visible_text(message).then(|| ConversationAnchor::Turn {
+                    turn: item.turn.clone(),
+                    message: message.id.clone(),
+                })
+            })
+            .or_else(|| {
+                history.seed.as_ref().and_then(|seed| {
+                    seed.records.iter().rev().find_map(|record| {
+                        let HistoryRecord::Message(message) = record;
+                        visible_text(message).then(|| ConversationAnchor::Inherited {
+                            message: message.id.clone(),
+                        })
+                    })
+                })
+            })
+            .ok_or_else(|| problem(ErrorKind::InvalidInput, "history_anchor_missing"))?;
+        self.fork_session(
+            session,
+            ConversationDerivation {
+                request,
+                basis: history.basis,
+                anchor,
+            },
+        )
+        .await
+    }
+
     pub(super) async fn provider_history(
         &self,
         session: SessionId,
@@ -69,24 +111,12 @@ impl Host {
     ) -> Result<PriorContext> {
         let retained = self
             .store
-            .retained_history_with(
-                session,
-                before_turn.map_or(HistorySelection::Current, HistorySelection::BeforeTurn),
-                project,
-            )
+            .context_history_with(session, before_turn, project)
             .await?;
-        let seed = decode_seed(retained.seed)?;
-        let disclosure = seed
-            .as_ref()
-            .and_then(|seed| seed.provenance().omissions().context_disclosure());
-        let mut messages = seed.map_or_else(Vec::new, ConversationSeed::into_records);
-        messages.extend(retained.records.into_iter().map(|item| item.record));
+        let (messages, omissions, _) = context_material(retained)?;
         Ok(PriorContext {
-            messages: messages
-                .into_iter()
-                .map(|HistoryRecord::Message(message)| message)
-                .collect(),
-            disclosure,
+            messages,
+            disclosure: omissions.context_disclosure(),
         })
     }
 
@@ -299,6 +329,34 @@ impl Host {
     }
 }
 
+pub(super) fn context_material(
+    retained: RetainedHistory,
+) -> Result<(Vec<Message>, SeedOmissions, bool)> {
+    let (mut records, omissions, compacted) = match retained.seed {
+        Some(seed) => {
+            if let Some(coverage) =
+                grida_agent_master::compaction::replacement_coverage(&seed.provenance)?
+            {
+                (seed.records, coverage.omissions, true)
+            } else {
+                let seed = ConversationSeed::from_parts(seed.records, &seed.provenance)?;
+                let omissions = seed.provenance().omissions();
+                (seed.into_records(), omissions, false)
+            }
+        }
+        None => (Vec::new(), SeedOmissions::default(), false),
+    };
+    records.extend(retained.records.into_iter().map(|item| item.record));
+    Ok((
+        records
+            .into_iter()
+            .map(|HistoryRecord::Message(message)| message)
+            .collect(),
+        omissions,
+        compacted,
+    ))
+}
+
 fn decode_seed(seed: Option<HistorySeed>) -> Result<Option<ConversationSeed>> {
     seed.map(|seed| ConversationSeed::from_parts(seed.records, &seed.provenance))
         .transpose()
@@ -358,4 +416,12 @@ fn history_message(
         editable,
         preview,
     })
+}
+
+fn visible_text(message: &Message) -> bool {
+    matches!(message.role, Role::User | Role::Assistant)
+        && message
+            .content
+            .iter()
+            .any(|part| matches!(part, Content::Text(text) if !text.is_empty()))
 }

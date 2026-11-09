@@ -164,6 +164,7 @@ with an underscore.
 | `co.grida/session/pause`, `resume`, `steer`       | Pause an exact turn, claim a verified suspension, or add a correction.              |
 | `co.grida/session/stop`, `resume-queue`           | Stop the current turn and pause admission, or reopen queue admission separately.    |
 | `co.grida/session/history`, `fork`, `revise`      | Read message anchors, branch a committed prefix, or revise an earlier user message. |
+| `co.grida/session/compact`                        | Summarize model context for future turns and retain the original transcript.        |
 | `co.grida/config/inspect`, `update`, `reload`     | Read, change, or activate the host's reviewed defaults.                             |
 
 Standard `session/prompt` streams its response. Durable submission and enqueue
@@ -180,6 +181,14 @@ still applies. Retained context carries portable text and provenance, with
 omissions for provider continuation and restricted source material. Clients
 receive categorized omission counts. The agent receives a notice when relevant
 context such as media or tool data was omitted.
+
+The negotiated command catalog offers `/compact` and `/fork` when the client
+enables their corresponding controls. Manual compaction requires an idle
+session, an empty queue, and open admission. New queued input is retained
+while the summary runs. The host installs a useful summary only against its
+captured context. A failed or interrupted summary leaves the prior context
+usable. Resume and explicit recovery account for the same turn without
+repeating an interrupted provider attempt.
 
 Queue advancement follows verified settlement while admission is open.
 Loading a session observes retained state. Resume Queue explicitly lets

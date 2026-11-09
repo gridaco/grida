@@ -1,8 +1,10 @@
 //! Product composition and ownership for native agent turns.
 
+mod compaction;
 mod history;
 mod lifecycle;
 mod questions;
+pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use questions::{PendingQuestion, Questions};
@@ -231,6 +233,8 @@ enum Launch {
         configuration_permission: crate::ConfigurationPermission,
     },
     Queued,
+    Compact(ChangeId),
+    RecoverCompaction(RecoveryRequest),
     Resume(ClaimRequest),
     ResumeAnswered(JournalPosition),
     RecoverStopped(RecoveryRequest),
@@ -248,10 +252,17 @@ struct LaunchTicket {
 }
 
 struct Admitted {
-    master: Master,
     opened: agent_kit_runtime::OpenedTurn,
-    input: Vec<Message>,
+    work: TurnWork,
     acceptance: Option<Acceptance>,
+}
+
+enum TurnWork {
+    Conversation {
+        master: Box<Master>,
+        input: Vec<Message>,
+    },
+    Compaction(Box<compaction::CompactionPlan>),
 }
 
 struct PreparedInput {
@@ -487,14 +498,19 @@ impl Host {
                 }
             };
             let _ = admission_tx.send(Ok(admitted.acceptance));
-            let result = drive(
-                host.store.clone(),
-                admitted.master,
-                admitted.opened,
-                admitted.input,
-                updates_tx,
-            )
-            .await;
+            let result = match admitted.work {
+                TurnWork::Conversation { master, input } => {
+                    drive(
+                        host.store.clone(),
+                        *master,
+                        admitted.opened,
+                        input,
+                        updates_tx,
+                    )
+                    .await
+                }
+                TurnWork::Compaction(plan) => host.drive_compaction(admitted.opened, *plan).await,
+            };
             let settled = matches!(&result, Ok(RunResult::Settled(_)));
             let suspended = matches!(
                 &result,
@@ -540,6 +556,23 @@ impl Host {
     ) -> Result<Option<Admitted>> {
         if self.work.lock().await.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
+        }
+        let maintenance_claim = match &launch {
+            Launch::Compact(request) => {
+                return self.admit_compaction(session, turn, request.clone()).await;
+            }
+            Launch::Resume(request) => Some(WorkerClaim::Select(request.clone())),
+            Launch::RecoverStopped(request) | Launch::RecoverCompaction(request) => {
+                Some(WorkerClaim::Recover(request.clone()))
+            }
+            _ => None,
+        };
+        if let Some(claim) = maintenance_claim
+            && let Some(plan) = self.compaction_plan(session.clone(), turn.clone()).await?
+        {
+            return self
+                .admit_retained_compaction(session, turn, claim, plan)
+                .await;
         }
         let execution = self.execution()?;
         let configuration_admission = if matches!(&launch, Launch::Prompt { .. } | Launch::Queued) {
@@ -639,6 +672,9 @@ impl Host {
                     .await?;
                 (WorkerClaim::Recover(request), None, None, history)
             }
+            Launch::Compact(_) | Launch::RecoverCompaction(_) => {
+                return Err(problem(ErrorKind::InvalidState, "compaction_plan_missing"));
+            }
         };
         let prepared = input
             .as_ref()
@@ -666,30 +702,7 @@ impl Host {
                     .map_err(|_| problem(ErrorKind::Uncertain, "retained_input_unavailable"))?
             }
         };
-        let opened = execution
-            .runtime
-            .open(claim.lease)
-            .await
-            .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_open_failed"))?;
-        let closing = {
-            let mut work = self.work.lock().await;
-            let active = work
-                .active
-                .get_mut(session)
-                .expect("registered admission worker");
-            active.admitted = true;
-            work.closed
-        };
-        if closing {
-            control(
-                &self.store,
-                session.clone(),
-                turn.clone(),
-                ControlDirective::Pause,
-            )
-            .await
-            .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_pause_failed"))?;
-        }
+        let (opened, closing) = self.open_owned_turn(session, turn, claim.lease).await?;
         let mut authority = execution.authority.clone();
         let operations = opened.turn.operations();
         let mut inventory = Inventory::new();
@@ -737,11 +750,47 @@ impl Host {
         .with_history(history.messages)
         .with_input_limit(prepared.limit);
         Ok(Some(Admitted {
-            master,
             opened,
-            input: prepared.messages,
+            work: TurnWork::Conversation {
+                master: Box::new(master),
+                input: prepared.messages,
+            },
             acceptance,
         }))
+    }
+
+    async fn open_owned_turn(
+        &self,
+        session: &SessionId,
+        turn: &TurnId,
+        lease: agent_kit_core::turn::TurnLease,
+    ) -> Result<(agent_kit_runtime::OpenedTurn, bool)> {
+        let opened = self
+            .execution()?
+            .runtime
+            .open(lease)
+            .await
+            .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_open_failed"))?;
+        let closing = {
+            let mut work = self.work.lock().await;
+            let active = work
+                .active
+                .get_mut(session)
+                .expect("registered admission worker");
+            active.admitted = true;
+            work.closed
+        };
+        if closing {
+            control(
+                &self.store,
+                session.clone(),
+                turn.clone(),
+                ControlDirective::Pause,
+            )
+            .await
+            .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_pause_failed"))?;
+        }
+        Ok((opened, closing))
     }
 
     fn check_execution(&self, view: &SessionView) -> Result<()> {

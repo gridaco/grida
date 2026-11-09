@@ -7,7 +7,7 @@ use agent_kit_store_sqlite::history::HistoryBasis;
 use grida_agent_master::conversation_seed::ConversationAnchor;
 
 const HISTORY: &str = "co.grida/session/history";
-const FORK: &str = "co.grida/session/fork";
+pub(super) const FORK: &str = "co.grida/session/fork";
 const REVISE: &str = "co.grida/session/revise";
 pub(super) const CAPABILITIES: [&str; 3] = [HISTORY, FORK, REVISE];
 

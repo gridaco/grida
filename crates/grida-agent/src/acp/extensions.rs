@@ -1,5 +1,6 @@
 //! Versioned product operations layered over standard ACP.
 
+pub(super) mod compaction;
 mod history;
 mod lifecycle;
 mod questions;
@@ -58,6 +59,7 @@ fn capability_keys() -> impl Iterator<Item = &'static str> {
         .chain(lifecycle::CAPABILITIES)
         .chain(questions::CAPABILITIES)
         .chain(history::CAPABILITIES)
+        .chain([compaction::COMPACT])
 }
 
 pub(super) fn configuration_permission(
@@ -286,6 +288,7 @@ pub(super) fn handlers(
         .with_connection_builder(lifecycle::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(questions::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(history::handlers(host.clone(), sessions.clone()))
+        .with_connection_builder(compaction::handlers(host.clone(), sessions.clone()))
         .on_receive_request(
             async move |request: Submit, responder, _| {
                 let result = async {

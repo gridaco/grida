@@ -109,24 +109,28 @@ impl SeedProvenance {
     pub fn omissions(&self) -> SeedOmissions {
         let mut counts = SeedOmissions::default();
         for omission in self.entries.iter().flat_map(|entry| &entry.omissions) {
-            match omission.kind {
-                SeedOmissionKind::Instruction => counts.instructions += 1,
-                SeedOmissionKind::Reasoning => counts.reasoning += 1,
-                SeedOmissionKind::Media => counts.media += 1,
-                SeedOmissionKind::ToolCall => counts.tool_calls += 1,
-                SeedOmissionKind::ToolResult { media, .. } => {
-                    counts.tool_results += 1;
-                    counts.tool_results_with_media += usize::from(media);
-                }
-                SeedOmissionKind::ProviderState => counts.provider_state += 1,
-                SeedOmissionKind::UnsupportedRoleContent => counts.other_content += 1,
-            }
+            counts.record(&omission.kind);
         }
         counts
     }
 }
 
 impl SeedOmissions {
+    pub(super) fn record(&mut self, kind: &SeedOmissionKind) {
+        match kind {
+            SeedOmissionKind::Instruction => self.instructions += 1,
+            SeedOmissionKind::Reasoning => self.reasoning += 1,
+            SeedOmissionKind::Media => self.media += 1,
+            SeedOmissionKind::ToolCall => self.tool_calls += 1,
+            SeedOmissionKind::ToolResult { media, .. } => {
+                self.tool_results += 1;
+                self.tool_results_with_media += usize::from(*media);
+            }
+            SeedOmissionKind::ProviderState => self.provider_state += 1,
+            SeedOmissionKind::UnsupportedRoleContent => self.other_content += 1,
+        }
+    }
+
     /// Product-authored context disclosure. It carries no source material or authority.
     pub fn context_disclosure(&self) -> Option<String> {
         let omitted: Vec<_> = [
@@ -324,9 +328,45 @@ fn lower_message(
 ) -> Result<(SeedEntry, Option<HistoryRecord>)> {
     let role = message.role;
     let editable = is_editable_user(&message);
+    let (content, omissions) = portable_parts(role, message.content);
+    let projected = if content.is_empty() {
+        None
+    } else {
+        let fingerprint = Fingerprint::of(&origin)?;
+        let digest: String = fingerprint
+            .bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        Some(Message {
+            id: MessageId::new(format!("seed/{digest}"))?,
+            role: if role == Role::Tool {
+                Role::Assistant
+            } else {
+                role
+            },
+            phase: message.phase,
+            content,
+            provenance: Provenance {
+                source: "retained_history".into(),
+                kind: ProvenanceKind::Transformed,
+                fingerprint: Some(fingerprint),
+            },
+        })
+    };
+    let entry = SeedEntry {
+        origin,
+        message: projected.as_ref().map(|message| message.id.clone()),
+        editable,
+        omissions,
+    };
+    Ok((entry, projected.map(HistoryRecord::Message)))
+}
+
+pub(super) fn portable_parts(role: Role, parts: Vec<Content>) -> (Vec<Content>, Vec<SeedOmission>) {
     let mut omissions = Vec::new();
     let mut content = Vec::new();
-    for (part, value) in message.content.into_iter().enumerate() {
+    for (part, value) in parts.into_iter().enumerate() {
         let kind = match (role, value) {
             (Role::System, _) => SeedOmissionKind::Instruction,
             (Role::User | Role::Assistant, Content::Text(text)) => {
@@ -363,38 +403,7 @@ fn lower_message(
         };
         omissions.push(SeedOmission { part, kind });
     }
-    let projected = if content.is_empty() {
-        None
-    } else {
-        let fingerprint = Fingerprint::of(&origin)?;
-        let digest: String = fingerprint
-            .bytes()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        Some(Message {
-            id: MessageId::new(format!("seed/{digest}"))?,
-            role: if role == Role::Tool {
-                Role::Assistant
-            } else {
-                role
-            },
-            phase: message.phase,
-            content,
-            provenance: Provenance {
-                source: "retained_history".into(),
-                kind: ProvenanceKind::Transformed,
-                fingerprint: Some(fingerprint),
-            },
-        })
-    };
-    let entry = SeedEntry {
-        origin,
-        message: projected.as_ref().map(|message| message.id.clone()),
-        editable,
-        omissions,
-    };
-    Ok((entry, projected.map(HistoryRecord::Message)))
+    (content, omissions)
 }
 
 fn invalid_seed() -> Error {

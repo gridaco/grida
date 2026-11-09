@@ -64,6 +64,13 @@ later evidence recorded for an older turn. Session inspection keeps reporting
 the latest retained execution. The selected history basis identifies the latest
 turn in that particular view when one exists.
 
+An unprompted claim uses the same lease and retained journal as a submitted
+turn. The initial checkpoint and exact model-context basis are committed with
+the claim. An owned successful turn can install one context replacement by
+matching its retained outcome and covered history. Model reads select the
+latest eligible replacement and newer local turns. Transcript reads and
+queued submissions retain their existing records.
+
 Caller-owned pure projections can inspect a committed turn or transform each
 turn's history within those bounded reads. They acquire no execution lease.
 External answers and history contributions are rejected after cancellation,

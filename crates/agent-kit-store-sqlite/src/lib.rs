@@ -1,5 +1,6 @@
 //! SQLite persistence for session admission and the bound execution journal.
 
+pub mod context;
 pub mod history;
 
 use agent_kit_core::history::HistoryRecord;
@@ -25,7 +26,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -100,6 +101,17 @@ CREATE TABLE session_history_views (
 CREATE UNIQUE INDEX active_history_view ON session_history_views(session)
 WHERE end_ordinal IS NULL;
 CREATE INDEX history_view_order ON session_history_views(session,after_ordinal,view);
+";
+
+const CONTEXT_REPLACEMENTS: &str = "
+CREATE TABLE session_context_replacements (
+    session TEXT NOT NULL REFERENCES sessions(id),
+    view INTEGER NOT NULL CHECK(view >= 0),
+    turn_ordinal INTEGER NOT NULL REFERENCES turns(ordinal),
+    replacement BLOB NOT NULL,
+    identity BLOB NOT NULL,
+    PRIMARY KEY(session,view,turn_ordinal)
+);
 ";
 
 /// One opened database authority. Clones share its connection and ownership lock.
@@ -191,20 +203,28 @@ impl SqliteStore {
                     .execute_batch(HISTORY_VIEWS)
                     .map_err(database_error)?;
                 transaction
+                    .execute_batch(CONTEXT_REPLACEMENTS)
+                    .map_err(database_error)?;
+                transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(database_error)?;
                 transaction.commit().map_err(database_error)?;
             }
             SCHEMA_VERSION => {}
-            1 | 2 => {
+            1..=3 => {
                 let transaction = connection.transaction().map_err(database_error)?;
                 if version == 1 {
                     transaction
                         .execute_batch(UPGRADE_QUEUE)
                         .map_err(database_error)?;
                 }
+                if version <= 2 {
+                    transaction
+                        .execute_batch(HISTORY_VIEWS)
+                        .map_err(database_error)?;
+                }
                 transaction
-                    .execute_batch(HISTORY_VIEWS)
+                    .execute_batch(CONTEXT_REPLACEMENTS)
                     .map_err(database_error)?;
                 transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
