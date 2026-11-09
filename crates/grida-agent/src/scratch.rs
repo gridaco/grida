@@ -144,6 +144,12 @@ impl ScratchScope {
     }
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(crate) fn check_private_directory(path: &Path) -> Result<()> {
+    crate::workspace::validate_absolute(path)?;
+    native::check_base(path)
+}
+
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
 fn unsupported() -> Error {
     Error::new(ErrorKind::Unsupported, "scratch_platform_unsupported")
@@ -744,7 +750,7 @@ mod native {
         Ok(())
     }
 
-    fn check_base(base: &Path) -> Result<()> {
+    pub(super) fn check_base(base: &Path) -> Result<()> {
         if base.parent().is_none() || fs::canonicalize(base).map_err(io_failure)? != base {
             return Err(invalid_storage());
         }

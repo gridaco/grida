@@ -119,6 +119,13 @@ fn launch(command: Command) -> Command {
     command
         .arg(state_dir())
         .arg(
+            Arg::new("permission-profile")
+                .long("permission-profile")
+                .value_name("PRIVATE_JSON")
+                .value_parser(value_parser!(PathBuf))
+                .help("Trusted launch profile for explicitly selected workspace roots"),
+        )
+        .arg(
             Arg::new("provider")
                 .long("provider")
                 .value_name("PROTOCOL")
@@ -229,7 +236,21 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     } else {
         None
     };
-    let host = Arc::new(Host::open(state_dir, Some(provider))?);
+    let permissions = args
+        .get_one::<PathBuf>("permission-profile")
+        .map(|path| {
+            grida_agent::launch_permissions::load_permission_profile(
+                path,
+                state_dir,
+                provider.credential_home.as_deref(),
+            )
+        })
+        .transpose()?;
+    let host = Host::open(state_dir, Some(provider))?;
+    let host = Arc::new(match permissions {
+        Some(profile) => host.with_permission_profile(profile),
+        None => host,
+    });
     if name == "serve" {
         return process::serve(host, listener, process::shutdown_signal()).await;
     }

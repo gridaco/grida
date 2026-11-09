@@ -208,59 +208,68 @@ impl Host {
                     answer: prepared.answer,
                 }
             };
-            let mut work = host.work.lock().await;
-            if work.closed {
-                return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
-            }
-            // Reserve the existing scheduler's wake alongside the answer.
-            // An owner that suspends concurrently releases the same work lock
-            // before the scheduler can claim the answered turn.
-            if can_wake
-                && work.ready.len() >= MAX_READY_SESSIONS
-                && !work
-                    .ready
-                    .iter()
-                    .any(|item| item.wakes_answer(&control.session, &control.turn))
-            {
-                return Err(problem(ErrorKind::LimitExceeded, "host_ready_queue_limit"));
-            }
-            let receipt = host
-                .store
-                .control(ControlRequest {
-                    id: control.request,
-                    session: control.session.clone(),
-                    expected_revision: control.expected_session,
-                    action,
-                })
-                .await?;
-            if can_wake {
-                let position = receipt
-                    .turn
-                    .as_ref()
-                    .ok_or_else(|| problem(ErrorKind::Uncertain, "question_receipt_missing"))?
-                    .record()
-                    .position;
-                if let Some(ReadyWork::Answered {
-                    position: queued, ..
-                }) = work
-                    .ready
-                    .iter_mut()
-                    .find(|item| item.wakes_answer(&control.session, &control.turn))
-                {
-                    *queued = (*queued).max(position);
-                } else {
-                    work.defer(ReadyWork::Answered {
-                        session: control.session,
-                        turn: control.turn,
-                        position,
-                    });
-                }
-            }
-            drop(work);
-            host.wake_ready().await;
-            Ok(receipt)
+            host.resolve_interaction(control, action, can_wake).await
         })
         .await
+    }
+
+    pub(super) async fn resolve_interaction(
+        &self,
+        control: TurnControl,
+        action: SessionControl,
+        can_wake: bool,
+    ) -> Result<ControlReceipt> {
+        let mut work = self.work.lock().await;
+        if work.closed {
+            return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
+        }
+        // Reserve the existing scheduler's wake alongside the answer.
+        // An owner that suspends concurrently releases the same work lock
+        // before the scheduler can claim the answered turn.
+        if can_wake
+            && work.ready.len() >= MAX_READY_SESSIONS
+            && !work
+                .ready
+                .iter()
+                .any(|item| item.wakes_answer(&control.session, &control.turn))
+        {
+            return Err(problem(ErrorKind::LimitExceeded, "host_ready_queue_limit"));
+        }
+        let receipt = self
+            .store
+            .control(ControlRequest {
+                id: control.request,
+                session: control.session.clone(),
+                expected_revision: control.expected_session,
+                action,
+            })
+            .await?;
+        if can_wake {
+            let position = receipt
+                .turn
+                .as_ref()
+                .ok_or_else(|| problem(ErrorKind::Uncertain, "interaction_receipt_missing"))?
+                .record()
+                .position;
+            if let Some(ReadyWork::Answered {
+                position: queued, ..
+            }) = work
+                .ready
+                .iter_mut()
+                .find(|item| item.wakes_answer(&control.session, &control.turn))
+            {
+                *queued = (*queued).max(position);
+            } else {
+                work.defer(ReadyWork::Answered {
+                    session: control.session,
+                    turn: control.turn,
+                    position,
+                });
+            }
+        }
+        drop(work);
+        self.wake_ready().await;
+        Ok(receipt)
     }
 }
 
@@ -284,10 +293,10 @@ impl Host {
                 let ready = state.is_suspended()
                     && state.controls().admits_work()
                     && state.waits().values().all(|wait| !wait.is_pending())
-                    && state
-                        .waits()
-                        .values()
-                        .any(|wait| is_question(wait) && wait.answer.is_some());
+                    && state.waits().values().any(|wait| {
+                        (is_question(wait) || crate::permissions::is_approval(wait))
+                            && wait.answer.is_some()
+                    });
                 Ok(ready.then(|| (state.binding().epoch, state.position())))
             })
             .await?;

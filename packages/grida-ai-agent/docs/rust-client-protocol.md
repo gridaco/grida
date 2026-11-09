@@ -113,6 +113,8 @@ summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
 | `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                                 |
 | `questions`                              | `sessionId`, `turnId`. Read pending question identities, prompts, choices, and the current control/history basis.                                                           |
 | `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed answer and its correlated contribution.                                              |
+| `approvals`                              | `sessionId`, `turnId`. Read pending approval requests and their wait IDs with the current control revision.                                                                 |
+| `answer-approval`                        | Flat task basis plus `waitId` and `decision`. Commit a decision for the exact recorded action. Available on private supervising stdio.                                      |
 | `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                |
 | `fork`                                   | `sessionId`, `requestId`, `expectedHistory`, and `anchor`. Return the independent `sessionId` for a committed prefix through that message.                                  |
 | `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `allowConfigurationChanges`. Return the installed view and accepted input. |
@@ -177,6 +179,14 @@ capacity changes. An explicit task pause is independent of answer receipt.
 An embedded `run --questions` returns a verified `input_required` result and
 exit code `6` when it suspends for an answer.
 
+With a trusted native permission profile, an access that requires approval
+records its directory, action and scope identities, and a bounded description
+of the file operation or command. The reply uses `decision: "approve_once"`
+or `"decline"`. The same request identity, revisions and decision replay its
+receipt. A conflicting answer fails. Continuation checks the current profile
+and resource identities before executing the approved action. One-shot `run`
+returns pending `approvals` with `input_required` and exit code `6`.
+
 Subagent observation has an active ACP proposal. Its initial client mutation is
 child cancellation, with direct prompt, steering, configuration, and resume
 restricted. Our richer reusable-child controls therefore need negotiated
@@ -220,8 +230,8 @@ It never sends both to start the same task. RPC IDs correlate connection-local
 calls. Durable input, turn, interaction, and operation IDs retain their internal
 meaning and are exposed only as specified by the extension.
 
-The planned question and permission adapters may hold an ordinary ACP
-prompt or interaction RPC while an engine worker is suspended. Connection loss disposes that RPC, while retained work
+Question and approval delivery can hold an ordinary ACP prompt or interaction
+RPC while an engine worker is suspended. Connection loss disposes that RPC, while retained work
 follows the host lifetime contract. A capable reconnecting client receives a
 fresh delivery of the same durable interaction. Human think time requires no
 live model request or occupied worker.
@@ -257,6 +267,11 @@ controls who may read a session, mutate configuration, answer an interaction, or
 use a filesystem/editor capability. Additional workspace roots express session
 context, and each actual access still needs its grant. A reconnecting observer
 does not gain execution ownership.
+
+An authenticated shared loopback client can negotiate approval inspection and
+attach to a session. The private supervising stdio channel is the approval
+writer. The working directory selects a matching native workspace profile
+supplied at launch. It carries no filesystem authority on its own.
 
 For model-facing configuration tools, negotiating `co.grida/config/inspect`
 enables inspection on newly accepted enhanced inputs. Mutation tools additionally

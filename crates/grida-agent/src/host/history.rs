@@ -298,6 +298,7 @@ impl Host {
                     host.check_ready_capacity(&session).await?;
                 }
                 host.capture_submission(
+                    &view,
                     replacement.id,
                     replacement.parts,
                     replacement.questions,

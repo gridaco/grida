@@ -3,10 +3,12 @@
 mod compaction;
 mod history;
 mod lifecycle;
+mod permissions;
 mod questions;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
+pub use permissions::{Approvals, PendingApproval};
 pub use questions::{PendingQuestion, Questions};
 
 use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
@@ -79,6 +81,7 @@ pub struct Host {
     execution: Option<Arc<Execution>>,
     gg_connection: Option<Arc<GgConnection>>,
     configuration: Option<Arc<Configuration>>,
+    permissions: Option<Arc<crate::permissions::PermissionProfile>>,
     configuration_admission: Arc<Mutex<()>>,
     controls: Arc<Semaphore>,
     work: Arc<Mutex<Work>>,
@@ -92,6 +95,7 @@ struct Execution {
     config: MasterConfig,
     provider: Arc<dyn Provider>,
     authority: MasterAuthority,
+    authorization: Arc<ExecutionAuthority>,
     questions: Arc<questions::QuestionAccess>,
     configuration_tools: Arc<ConfigurationAccess>,
 }
@@ -198,6 +202,8 @@ struct StoredPrompt {
     questions: bool,
     #[serde(default)]
     configuration_permission: crate::ConfigurationPermission,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    permission_capture: Option<crate::permissions::PermissionCapture>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -261,6 +267,7 @@ enum TurnWork {
     Conversation {
         master: Box<Master>,
         input: Vec<Message>,
+        command: Option<Arc<crate::command::CommandTool>>,
     },
     Compaction(Box<compaction::CompactionPlan>),
 }
@@ -272,6 +279,15 @@ struct PreparedInput {
     questions: bool,
     configuration_permission: crate::ConfigurationPermission,
     captured: Option<ConfigurationSnapshot>,
+    permission_capture: Option<crate::permissions::PermissionCapture>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct PendingInteractions {
+    #[serde(flatten)]
+    pub questions: Questions,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub approvals: Vec<PendingApproval>,
 }
 
 #[derive(Debug, Serialize)]
@@ -279,7 +295,7 @@ struct PreparedInput {
 pub enum RunResult {
     Settled(TurnOutcome),
     Suspended,
-    InputRequired(Questions),
+    InputRequired(PendingInteractions),
 }
 
 pub struct SessionSnapshot {
@@ -352,6 +368,7 @@ impl Host {
             execution,
             gg_connection: None,
             configuration,
+            permissions: None,
             configuration_admission: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
             work: Arc::default(),
@@ -498,16 +515,38 @@ impl Host {
                 }
             };
             let _ = admission_tx.send(Ok(admitted.acceptance));
+            let mut completion_tx = Some(completion_tx);
             let result = match admitted.work {
-                TurnWork::Conversation { master, input } => {
-                    drive(
+                TurnWork::Conversation {
+                    master,
+                    input,
+                    command,
+                } => {
+                    let result = drive(
                         host.store.clone(),
                         *master,
                         admitted.opened,
                         input,
                         updates_tx,
                     )
-                    .await
+                    .await;
+                    if let Some(command) = command {
+                        match permissions::finish_commands(command, &mut completion_tx).await {
+                            Ok(()) => result,
+                            Err(error) => {
+                                // Leave queued inputs retained without automatically
+                                // admitting more work after uncertain native cleanup.
+                                host.work
+                                    .lock()
+                                    .await
+                                    .ready
+                                    .retain(|work| work.session() != &worker_session);
+                                Err(error)
+                            }
+                        }
+                    } else {
+                        result
+                    }
                 }
                 TurnWork::Compaction(plan) => host.drive_compaction(admitted.opened, *plan).await,
             };
@@ -522,7 +561,9 @@ impl Host {
                 settled.then_some((&worker_turn, JournalPosition(u64::MAX))),
             )
             .await;
-            let _ = completion_tx.send(result);
+            if let Some(completion_tx) = completion_tx {
+                let _ = completion_tx.send(result);
+            }
             host.wake_ready().await;
             if settled {
                 host.kick_queue(worker_session).await;
@@ -595,7 +636,7 @@ impl Host {
                 }
                 let history = self.provider_history(session.clone(), None).await?;
                 let input = self
-                    .capture_submission(id, parts, questions, configuration_permission)
+                    .capture_submission(&view, id, parts, questions, configuration_permission)
                     .await?;
                 let acceptance = self.store.submit(session.clone(), input.clone()).await?;
                 let view = self.store.inspect(session.clone()).await?;
@@ -702,10 +743,39 @@ impl Host {
                     .map_err(|_| problem(ErrorKind::Uncertain, "retained_input_unavailable"))?
             }
         };
-        let (opened, closing) = self.open_owned_turn(session, turn, claim.lease).await?;
+        let permission_scope = prepared
+            .permission_capture
+            .as_ref()
+            .map(|capture| {
+                self.bind_permissions(
+                    capture,
+                    claim.lease.binding().clone(),
+                    execution.authorization.clone(),
+                )
+                .map_err(|_| problem(ErrorKind::Uncertain, "admitted_permission_unavailable"))
+            })
+            .transpose()?;
+        let runtime = permission_scope.as_ref().map(|(_, authorization)| {
+            execution
+                .runtime
+                .with_authorization(authorization.clone(), authorization.clone())
+        });
+        let (opened, closing) = self
+            .open_owned_turn_with_runtime(
+                session,
+                turn,
+                claim.lease,
+                runtime.as_ref().unwrap_or(&execution.runtime),
+            )
+            .await?;
         let mut authority = execution.authority.clone();
         let operations = opened.turn.operations();
         let mut inventory = Inventory::new();
+        let command = if let Some((permissions, _)) = permission_scope {
+            permissions.insert(&mut inventory, &mut authority.tools)?
+        } else {
+            None
+        };
         if prepared.questions {
             execution
                 .questions
@@ -754,6 +824,7 @@ impl Host {
             work: TurnWork::Conversation {
                 master: Box::new(master),
                 input: prepared.messages,
+                command,
             },
             acceptance,
         }))
@@ -765,9 +836,18 @@ impl Host {
         turn: &TurnId,
         lease: agent_kit_core::turn::TurnLease,
     ) -> Result<(agent_kit_runtime::OpenedTurn, bool)> {
-        let opened = self
-            .execution()?
-            .runtime
+        self.open_owned_turn_with_runtime(session, turn, lease, &self.execution()?.runtime)
+            .await
+    }
+
+    async fn open_owned_turn_with_runtime(
+        &self,
+        session: &SessionId,
+        turn: &TurnId,
+        lease: agent_kit_core::turn::TurnLease,
+        runtime: &Runtime,
+    ) -> Result<(agent_kit_runtime::OpenedTurn, bool)> {
+        let opened = runtime
             .open(lease)
             .await
             .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_open_failed"))?;
@@ -811,6 +891,7 @@ impl Host {
 
     async fn capture_submission(
         &self,
+        session: &SessionView,
         id: ChangeId,
         parts: Vec<PromptPart>,
         questions: bool,
@@ -818,6 +899,7 @@ impl Host {
     ) -> Result<Submission> {
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
+        let permission_capture = self.capture_permissions(session, &id)?;
         Ok(Submission {
             id,
             payload: encode(
@@ -835,6 +917,7 @@ impl Host {
                     }),
                     questions,
                     configuration_permission,
+                    permission_capture,
                 },
             )?,
         })
@@ -847,7 +930,8 @@ impl Host {
         authority: InputAuthority,
     ) -> Result<PreparedInput> {
         let mut config = execution.config.clone();
-        let (messages, limit, questions, configuration_permission, captured) =
+        let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
+        let (messages, limit, questions, configuration_permission, captured, permission_capture) =
             match input.payload.version() {
                 1 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                     authority.validate(None, &execution.authority.inference.authority)?;
@@ -857,6 +941,7 @@ impl Host {
                         None,
                         false,
                         crate::ConfigurationPermission::Disabled,
+                        None,
                         None,
                     )
                 }
@@ -873,6 +958,9 @@ impl Host {
                     {
                         return Err(problem(ErrorKind::Conflict, "retained_model_changed"));
                     }
+                    if let Some(permission) = &stored.permission_capture {
+                        config.instructions.push_str(permission.context());
+                    }
                     config.max_steps = stored.max_steps.unwrap_or(1);
                     config.max_output_tokens =
                         stored.max_output_tokens.unwrap_or(config.max_output_tokens);
@@ -882,6 +970,11 @@ impl Host {
                         stored.questions,
                         stored.configuration_permission,
                         Some(stored.configuration),
+                        if cancellation_only {
+                            None
+                        } else {
+                            stored.permission_capture
+                        },
                     )
                 }
                 _ => {
@@ -891,6 +984,12 @@ impl Host {
                     ));
                 }
             };
+        if let Some(capture) = &permission_capture {
+            self.permissions
+                .as_ref()
+                .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?
+                .validate_capture(capture)?;
+        }
         if config.max_steps == 0 || config.max_output_tokens == 0 {
             return Err(problem(ErrorKind::InvalidInput, "invalid_master_limits"));
         }
@@ -901,6 +1000,7 @@ impl Host {
             questions,
             configuration_permission,
             captured,
+            permission_capture,
         })
     }
 
@@ -1349,7 +1449,7 @@ impl Execution {
             providers: BTreeMap::from([(binding.provider, provider.clone())]),
             tools: Inventory::new().snapshot(&[])?,
             authority: authorization.clone(),
-            gate: authorization,
+            gate: authorization.clone(),
             limits: ExecutionLimits {
                 max_operations: 32,
                 max_concurrent_inferences: MAX_ACTIVE_RUNS,
@@ -1374,6 +1474,7 @@ impl Execution {
                 inference,
                 tools: BTreeMap::new(),
             },
+            authorization,
             questions,
             configuration_tools,
         })
@@ -1495,9 +1596,13 @@ async fn drive(
             store.verify(CommitReceipt::Suspended(receipt)).await?;
             let state = observer.snapshot().state;
             if state.controls().admits_work() {
-                let pending = questions::pending(&state)?;
-                if !pending.questions.is_empty() {
-                    return Ok(RunResult::InputRequired(pending));
+                let questions = questions::pending(&state)?;
+                let approvals = permissions::pending_approvals(&state)?.approvals;
+                if !questions.questions.is_empty() || !approvals.is_empty() {
+                    return Ok(RunResult::InputRequired(PendingInteractions {
+                        questions,
+                        approvals,
+                    }));
                 }
             }
             Ok(RunResult::Suspended)

@@ -91,7 +91,7 @@ process exits so an automation can hand the retained session to an ACP client.
 | 1    | Failed request, runtime failure, or delivery failure |
 | 4    | Verified suspension returned by the run              |
 | 5    | Uncertain execution or unverified host shutdown      |
-| 6    | Verified suspension for an identified question       |
+| 6    | Verified suspension for a question or approval       |
 | 130  | Stopped run or process signal                        |
 
 `inspect` reads the latest and current persisted turn state without provider
@@ -226,4 +226,52 @@ The adapters refuse symlinks, multiply linked files, special files, and
 cross-device paths. Linux requires kernel support for `openat2` and also
 refuses nested mounts. Cancellation and deadlines stop new filesystem work and
 result delivery. An in-flight native read may finish before its worker can exit.
-Host permission and tool offering are separate from library availability.
+Native `run` and `serve` can offer these tools through a permission profile
+selected with `--permission-profile PATH`. Use an absolute canonical path to
+an owner-only JSON file (mode 0600) in a private directory (mode 0700). This
+launch input is separate from `config.toml` and comes from the supervisor.
+The session working directory must match the profile's canonical primary root.
+A working directory supplied over ACP does not grant access.
+
+```json
+{
+  "version": 1,
+  "workspace": "project",
+  "revision": "permissions-v1",
+  "primary": "project",
+  "directories": [
+    {
+      "id": "project",
+      "name": "Project",
+      "path": "/absolute/path/to/project",
+      "generation": "directory-v1",
+      "read": "allow"
+    },
+    {
+      "id": "reference",
+      "name": "Reference",
+      "path": "/absolute/path/to/reference",
+      "generation": "directory-v1",
+      "read": "ask"
+    }
+  ]
+}
+```
+
+Each root's `read`, `commandRead`, and `commandReadWrite` rule accepts
+`allow`, `ask`, or `deny`, with omitted rules defaulting to `deny`. Native
+commands additionally require a trusted `command` installation with `helper`
+(a canonical `path` and a 32-byte `sha256` array), `runtimePaths`, and a
+private `temporaryParent`. Linux also requires `bubblewrap` with its own path
+and digest. Installed executables, host state, credential homes, and the launch
+profile have additional protections. This launch path supports macOS and Linux.
+
+An action within an existing grant proceeds directly. An `ask` action creates
+a retained approval for that exact command or file operation. One-shot `run`
+reports pending `approvals` in its `input_required` record. An attached ACP
+client can negotiate `co.grida/session/approvals` to read pending requests.
+Only the private supervising stdio client can negotiate
+`co.grida/session/answer-approval` and reply with `approve_once` or `decline`.
+Continuation rechecks the launch profile and native identity before dispatch.
+Unverified command cleanup surfaces uncertainty and stops automatic queue
+advancement.

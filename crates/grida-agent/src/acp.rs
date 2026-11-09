@@ -47,7 +47,7 @@ async fn serve(
     let (sdk, wire) = Channel::duplex();
     let (incoming, outgoing) = wire.into_parts();
     let result = tokio::try_join!(
-        serve_connection(host.clone(), sdk, delivery.clone()),
+        serve_connection(host.clone(), sdk, delivery.clone(), true),
         transport::read(input, outgoing, delivery.clone()),
         transport::write(output, incoming, delivery),
     );
@@ -84,6 +84,7 @@ async fn serve_connection(
     host: Arc<Host>,
     channel: Channel,
     delivery: Arc<Delivery>,
+    reviewer: bool,
 ) -> Result<()> {
     let sessions = Arc::new(Mutex::new(ConnectionSessions::default()));
     let initialized_sessions = sessions.clone();
@@ -99,17 +100,21 @@ async fn serve_connection(
     Agent
         .v1()
         .name("grida-agent")
-        .with_connection_builder(extensions::handlers(host.clone(), sessions.clone()))
+        .with_connection_builder(extensions::handlers(
+            host.clone(),
+            sessions.clone(),
+            reviewer,
+        ))
         .on_receive_request(
             async move |request: InitializeRequest, responder, _| {
                 initialized_sessions.lock().unwrap().negotiated =
-                    extensions::negotiated(request.client_capabilities.meta.as_ref());
+                    extensions::negotiated(request.client_capabilities.meta.as_ref(), reviewer);
                 responder.respond(
                     InitializeResponse::new(ProtocolVersion::V1)
                         .agent_capabilities(
                             AgentCapabilities::new()
                                 .load_session(true)
-                                .meta(extensions::advertised()),
+                                .meta(extensions::advertised(reviewer)),
                         )
                         .agent_info(Implementation::new(
                             "grida-agent",

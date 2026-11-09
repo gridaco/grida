@@ -113,9 +113,9 @@ async fn run_once(
             accepted.completion.await
         }
     }
-    .map_err(|_| problem(ErrorKind::Uncertain, "run_worker_disconnected"))??;
-    let (disposition, account, code, questions) = match result {
-        RunResult::Settled(outcome) => {
+    .map_err(|_| problem(ErrorKind::Uncertain, "run_worker_disconnected"))?;
+    let (disposition, account, code, interactions, reason) = match result {
+        Ok(RunResult::Settled(outcome)) => {
             let (disposition, code) = match outcome.status {
                 OutcomeStatus::Succeeded => ("succeeded", 0),
                 OutcomeStatus::Failed => ("failed", 1),
@@ -123,10 +123,14 @@ async fn run_once(
                 OutcomeStatus::Uncertain => ("uncertain", 5),
             };
             let account = outcome.account.as_ref().map(read_account).transpose()?;
-            (disposition, account, code, None)
+            (disposition, account, code, None, None)
         }
-        RunResult::Suspended => ("suspended", None, 4, None),
-        RunResult::InputRequired(pending) => ("input_required", None, 6, Some(pending.questions)),
+        Ok(RunResult::Suspended) => ("suspended", None, 4, None, None),
+        Ok(RunResult::InputRequired(pending)) => ("input_required", None, 6, Some(pending), None),
+        Err(error) if error.kind == ErrorKind::Uncertain => {
+            ("uncertain", None, 5, None, Some(error.code))
+        }
+        Err(error) => return Err(error),
     };
     let mut finished = json!({
         "schema_version": 1,
@@ -137,8 +141,16 @@ async fn run_once(
         "disposition": disposition,
         "account": account,
     });
-    if let Some(questions) = questions {
-        finished["questions"] = json!(questions);
+    if let Some(pending) = interactions {
+        if !pending.questions.questions.is_empty() {
+            finished["questions"] = json!(pending.questions.questions);
+        }
+        if !pending.approvals.is_empty() {
+            finished["approvals"] = json!(pending.approvals);
+        }
+    }
+    if let Some(reason) = reason {
+        finished["reason"] = json!(reason);
     }
     write_record(&finished).await?;
     Ok(code)

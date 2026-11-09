@@ -1,5 +1,6 @@
 //! Versioned product operations layered over standard ACP.
 
+pub(super) mod approvals;
 pub(super) mod compaction;
 mod history;
 mod lifecycle;
@@ -41,23 +42,24 @@ const CAPABILITIES: [&str; 6] = [
     CONFIG_RELOAD,
 ];
 
-pub(super) fn advertised() -> Meta {
-    capability_keys()
+pub(super) fn advertised(reviewer: bool) -> Meta {
+    capability_keys(reviewer)
         .map(|key| (key.into(), 1.into()))
         .collect()
 }
 
-pub(super) fn negotiated(meta: Option<&Meta>) -> BTreeSet<&'static str> {
-    capability_keys()
+pub(super) fn negotiated(meta: Option<&Meta>, reviewer: bool) -> BTreeSet<&'static str> {
+    capability_keys(reviewer)
         .filter(|key| meta.and_then(|meta| meta.get(*key)).and_then(Value::as_u64) == Some(1))
         .collect()
 }
 
-fn capability_keys() -> impl Iterator<Item = &'static str> {
+fn capability_keys(reviewer: bool) -> impl Iterator<Item = &'static str> {
     CAPABILITIES
         .into_iter()
         .chain(lifecycle::CAPABILITIES)
         .chain(questions::CAPABILITIES)
+        .chain(approvals::capabilities(reviewer))
         .chain(history::CAPABILITIES)
         .chain([compaction::COMPACT])
 }
@@ -266,6 +268,7 @@ struct ConfigReload {
 pub(super) fn handlers(
     host: Arc<Host>,
     sessions: Arc<Mutex<ConnectionSessions>>,
+    reviewer: bool,
 ) -> Builder<
     Agent,
     impl HandleDispatchFrom<Client>,
@@ -287,6 +290,11 @@ pub(super) fn handlers(
         .v1()
         .with_connection_builder(lifecycle::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(questions::handlers(host.clone(), sessions.clone()))
+        .with_connection_builder(approvals::handlers(
+            host.clone(),
+            sessions.clone(),
+            reviewer,
+        ))
         .with_connection_builder(history::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(compaction::handlers(host.clone(), sessions.clone()))
         .on_receive_request(

@@ -128,6 +128,7 @@ impl Host {
         }
         let input = self
             .capture_submission(
+                &view,
                 request.id,
                 request.parts,
                 request.questions,
@@ -232,8 +233,14 @@ impl Host {
                 } else {
                     let view = self.store.inspect(session.clone()).await?;
                     self.check_execution(&view)?;
-                    self.capture_submission(replacement, parts, questions, configuration_permission)
-                        .await?
+                    self.capture_submission(
+                        &view,
+                        replacement,
+                        parts,
+                        questions,
+                        configuration_permission,
+                    )
+                    .await?
                 };
                 SessionControl::ReplaceQueued { input, replacement }
             }

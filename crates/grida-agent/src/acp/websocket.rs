@@ -161,7 +161,11 @@ async fn serve_client(
         }
         Ok(())
     };
-    tokio::try_join!(serve_connection(host, sdk, delivery.clone()), read, write)?;
+    tokio::try_join!(
+        serve_connection(host, sdk, delivery.clone(), false),
+        read,
+        write
+    )?;
     Ok(())
 }
 
