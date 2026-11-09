@@ -114,6 +114,38 @@ export function NativeAgentPane({
           New Chat
         </Button>
       </div>
+      {(state.catalogCursor ||
+        state.nextCatalogCursor ||
+        state.catalogLoading ||
+        state.catalogError) && (
+        <div className="flex shrink-0 items-center gap-2 px-3 pb-2 text-xs text-muted-foreground">
+          <span role="status">
+            {state.catalogLoading ? "Loading saved chats…" : state.catalogError}
+          </span>
+          {(state.catalogCursor || state.catalogError) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={state.catalogLoading}
+              onClick={() => void controller.listChats()}
+            >
+              {state.catalogCursor ? "Newest chats" : "Retry list"}
+            </Button>
+          )}
+          {state.nextCatalogCursor && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={state.catalogLoading}
+              onClick={() => void controller.listChats(state.nextCatalogCursor)}
+            >
+              Older chats
+            </Button>
+          )}
+        </div>
+      )}
       <Conversation
         className="min-h-0 flex-1"
         initial="instant"

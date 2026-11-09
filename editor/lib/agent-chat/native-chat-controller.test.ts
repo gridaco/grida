@@ -38,6 +38,9 @@ function fixture() {
     async available() {
       return true;
     },
+    async list() {
+      return { sessionIds: [], nextCursor: null };
+    },
     async create() {
       return this.load("new");
     },
@@ -94,6 +97,67 @@ function fixture() {
     controller: new NativeChatController(bridge),
   };
 }
+
+it("browses saved pages without opening a chat until it is selected", async () => {
+  const { bridge } = fixture();
+  const load = vi.spyOn(bridge, "load");
+  const create = vi.spyOn(bridge, "create");
+  const list = vi
+    .spyOn(bridge, "list")
+    .mockImplementation(async (cursor) =>
+      cursor === "older"
+        ? { sessionIds: ["old"], nextCursor: null }
+        : { sessionIds: ["newest"], nextCursor: "older" }
+    );
+  const storage = {
+    getItem: () => JSON.stringify({ selected: null, sessions: ["recent"] }),
+    setItem: vi.fn<Storage["setItem"]>(),
+  };
+  const controller = new NativeChatController(bridge, storage, "fixture");
+  controller.connect(null);
+  await vi.waitFor(() => {
+    expect(controller.read().sessions).toEqual(["recent", "newest"]);
+    expect(controller.read().catalogLoading).toBe(false);
+  });
+  await controller.listChats(controller.read().nextCatalogCursor);
+  expect(list.mock.calls).toEqual([[null], ["older"]]);
+  expect(controller.read().sessions).toEqual(["recent", "old"]);
+  expect(controller.read().selected).toBeNull();
+  expect(load).not.toHaveBeenCalled();
+  expect(create).not.toHaveBeenCalled();
+
+  await controller.select("old");
+  expect(load).toHaveBeenCalledExactlyOnceWith("old");
+  await controller.listChats();
+  expect(controller.read().sessions).toEqual(["old", "recent", "newest"]);
+  expect(storage.setItem).toHaveBeenLastCalledWith(
+    "fixture",
+    JSON.stringify({ selected: "old", sessions: ["old", "recent"] })
+  );
+  controller.disconnect();
+});
+
+it("drops an obsolete page and serializes the next connection's request", async () => {
+  const { bridge, controller } = fixture();
+  const old =
+    Promise.withResolvers<Awaited<ReturnType<DesktopNativeChat["list"]>>>();
+  const list = vi
+    .spyOn(bridge, "list")
+    .mockReturnValueOnce(old.promise)
+    .mockResolvedValueOnce({ sessionIds: ["current"], nextCursor: null });
+  controller.connect(null);
+  await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+  controller.disconnect();
+  controller.connect(null);
+  expect(list).toHaveBeenCalledTimes(1);
+  old.resolve({ sessionIds: ["obsolete"], nextCursor: "obsolete-cursor" });
+  await vi.waitFor(() => {
+    expect(controller.read().sessions).toEqual(["current"]);
+    expect(controller.read().nextCatalogCursor).toBeNull();
+  });
+  expect(list).toHaveBeenCalledTimes(2);
+  controller.disconnect();
+});
 
 function text(
   id: string,

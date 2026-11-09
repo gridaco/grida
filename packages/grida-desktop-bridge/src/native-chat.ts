@@ -4,6 +4,11 @@ export type NativeChatAttachment = Readonly<{
   sessionId: string;
 }>;
 
+export type NativeChatPage = Readonly<{
+  sessionIds: readonly string[];
+  nextCursor: string | null;
+}>;
+
 export type NativeChatTurn = Readonly<{
   turnId: string;
   epoch: number;
@@ -87,6 +92,7 @@ export type NativeChatUpdate =
 /** Available only for a main-selected native chat in the current workspace. */
 export type DesktopNativeChat = {
   available(): Promise<boolean>;
+  list(cursor?: string | null): Promise<NativeChatPage>;
   create(): Promise<NativeChatAttachment>;
   load(sessionId: string): Promise<NativeChatAttachment>;
   detach(attachmentId: string): Promise<void>;

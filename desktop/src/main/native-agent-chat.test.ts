@@ -101,6 +101,69 @@ it("rejects a chat launch outside the main-selected workspace", async () => {
 });
 
 it.runIf(Boolean(packaged))(
+  "lists retained workspace pages over a fresh native connection without attaching",
+  async () => {
+    const test = fixture();
+    const otherWorkspace = path.join(test.root, "other-workspace");
+    fs.mkdirSync(otherWorkspace, { mode: 0o700 });
+    const launch: NativeAgentChatLaunch = {
+      resourcesPath: packaged!,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      provider: "openai-compatible",
+      endpoint: "http://127.0.0.1:1/v1",
+      model: "fixture",
+    };
+    let client: NativeAgentChat | undefined;
+    try {
+      client = await NativeAgentChat.start({ ...launch, cwd: otherWorkspace });
+      const other = await client.create();
+      await client.close();
+
+      client = await NativeAgentChat.start(launch);
+      const saved: string[] = [];
+      for (let index = 0; index < 34; index++)
+        saved.unshift((await client.create()).id);
+      await client.close();
+
+      client = await NativeAgentChat.start(launch);
+      const first = await client.list();
+      expect(first.sessionIds).toEqual(saved.slice(0, 32));
+      expect(first.nextCursor).toEqual(expect.any(String));
+      await expect(client.list(first.nextCursor)).resolves.toEqual({
+        sessionIds: saved.slice(32),
+        nextCursor: null,
+      });
+      await expect(
+        client.list({ cwd: otherWorkspace } as unknown as string)
+      ).rejects.toThrow("native_chat_cursor_invalid");
+      await expect(client.observe({ id: saved[0] })).rejects.toThrow(
+        "native_chat_attachment_required"
+      );
+      await expect(client.load(other.id)).rejects.toThrow(
+        "session_workspace_mismatch"
+      );
+      const selected = await client.load(saved[0]);
+      expect((await client.observe(selected)).current).toBeNull();
+
+      await client.close();
+      client = await NativeAgentChat.start({ ...launch, cwd: otherWorkspace });
+      await expect(client.list(first.nextCursor)).rejects.toThrow(
+        "invalid_session_cursor"
+      );
+      await expect(client.list()).resolves.toEqual({
+        sessionIds: [other.id],
+        nextCursor: null,
+      });
+    } finally {
+      await client?.close();
+      test.close();
+    }
+  },
+  20_000
+);
+
+it.runIf(Boolean(packaged))(
   "observes one accepted turn and pauses, resumes after restart, and stops that exact turn",
   async () => {
     const test = fixture();

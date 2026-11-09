@@ -899,6 +899,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   workspace isolation, exact control targeting, and navigation cleanup.
   Transcript reads use the same attachment and recheck scope after a bounded
   replay of committed visible text. Live updates keep their own attribution.
+  Saved-chat discovery uses the main-owned workspace and a bounded cursor.
+  Its reply contains only chat IDs and the next cursor, after the same frame
+  and workspace recheck. Discovery creates no chat attachment.
 - The [native text observer](crates/grida-agent/src/acp/live.rs) projects
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery

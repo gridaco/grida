@@ -147,6 +147,10 @@ Follow `nextCursor` with the same workspace to get the next page. The list
 shows chat identities in newest-created order. Choose a chat and call
 `session/load` to open its transcript. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
 
+When a native chat owner is active in Desktop, the workspace Chat selector
+combines recent chats with saved chats from that workspace. Use **Older chats**
+to browse further. Selecting a chat opens its transcript.
+
 Text and resource-link descriptors are accepted as prompt content. A resource
 link supplies context about a resource. File access follows a separately granted
 capability.

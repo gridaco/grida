@@ -5,6 +5,7 @@ import type {
   NativeChatAcceptance,
   NativeChatControlReceipt,
   NativeChatMessage,
+  NativeChatPage,
   NativeChatSnapshot,
   NativeChatStreamUpdate,
   NativeChatTurn,
@@ -46,6 +47,8 @@ const MAX_TEXT_BYTES = 512 * 1024;
 const MAX_UPDATE_BYTES = 8 * 1024;
 const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 const MAX_TRANSCRIPT_MESSAGES = 1024;
+const MAX_CATALOG_SESSIONS = 32;
+const CATALOG_CURSOR = /^[!-~]{1,512}$/;
 const IDENTITY = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 
 export type NativeAgentChatLaunch = Omit<
@@ -115,6 +118,38 @@ export class NativeAgentChat {
       JSON.stringify([launch.stateDirectory, cwd])
     );
     return client;
+  }
+
+  async list(cursor: string | null = null): Promise<NativeChatPage> {
+    this.requireOpen();
+    if (cursor !== null && !isCatalogCursor(cursor))
+      throw new Error("native_chat_cursor_invalid");
+    const result = object(
+      await this.process.request("session/list", {
+        cwd: this.cwd,
+        ...(cursor === null ? {} : { cursor }),
+      })
+    );
+    if (
+      !Array.isArray(result.sessions) ||
+      result.sessions.length > MAX_CATALOG_SESSIONS
+    )
+      throw invalidResponse();
+    const sessionIds = result.sessions.map((entry: unknown) => {
+      const session = object(entry);
+      if (session.cwd !== this.cwd) throw invalidResponse();
+      return identity(session.sessionId);
+    });
+    const nextCursor = result.nextCursor ?? null;
+    if (
+      new Set(sessionIds).size !== sessionIds.length ||
+      (nextCursor !== null &&
+        (!isCatalogCursor(nextCursor) ||
+          nextCursor === cursor ||
+          sessionIds.length === 0))
+    )
+      throw invalidResponse();
+    return { sessionIds, nextCursor };
   }
 
   async create(): Promise<NativeChatSession> {
@@ -545,4 +580,8 @@ function choice<T extends string>(value: unknown, choices: readonly T[]): T {
 
 function invalidResponse(): Error {
   return new Error("native_chat_invalid_protocol_value");
+}
+
+function isCatalogCursor(value: unknown): value is string {
+  return typeof value === "string" && CATALOG_CURSOR.test(value);
 }

@@ -145,6 +145,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE, (event) =>
     nativeChat.available(event)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_LIST, (event, cursor?: string | null) =>
+    nativeChat.list(event, cursor)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_CREATE, (event) => nativeChat.create(event));
   guarded(IPC_CHANNELS.NATIVE_CHAT_LOAD, (event, id: string) =>
     nativeChat.load(event, id)

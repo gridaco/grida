@@ -367,6 +367,7 @@ const bridge: DesktopBridge = {
 
   nativeChat: {
     available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
+    list: (cursor) => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
     create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
     load: (sessionId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),

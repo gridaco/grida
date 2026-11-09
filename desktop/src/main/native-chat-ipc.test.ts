@@ -82,6 +82,9 @@ function setup() {
     latest: null,
   });
   const chat: ActiveNativeChat["chat"] = {
+    async list() {
+      return { sessionIds: [], nextCursor: null };
+    },
     async create() {
       return load(`session-${sessions.size}`);
     },
@@ -149,6 +152,32 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("lists without attaching and drops replies after the admitted frame changes", async () => {
+    const { ipc, first, chat, scopes } = setup();
+    const load = vi.spyOn(chat, "load");
+    const page = { sessionIds: ["saved-chat"], nextCursor: "opaque-page" };
+    const list = vi.spyOn(chat, "list").mockResolvedValue(page);
+    await expect(ipc.list(first.event)).resolves.toEqual(page);
+    expect(load).not.toHaveBeenCalled();
+
+    const pending = Promise.withResolvers<typeof page>();
+    list.mockReturnValueOnce(pending.promise);
+    const listing = ipc.list(first.event, page.nextCursor);
+    await expect(ipc.list(first.event)).rejects.toThrow(
+      "native_chat_catalog_busy"
+    );
+    expect(list).toHaveBeenLastCalledWith(page.nextCursor);
+
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    pending.resolve(page);
+    await expect(listing).rejects.toThrow("native_chat_attachment_unavailable");
+    scopes.set(first.sender, { workspaceId: "other-workspace", chat });
+    await expect(ipc.list(first.event)).rejects.toThrow(
+      "native_chat_unavailable"
+    );
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
   it("requires a current main frame and main-owned workspace with separate sender handles", async () => {
     const { ipc, first, second } = setup();
     expect(ipc.available(first.event)).toBe(true);

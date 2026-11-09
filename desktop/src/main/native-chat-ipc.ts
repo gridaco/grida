@@ -5,6 +5,7 @@ import type {
   NativeChatAttachment,
   NativeChatControlResult,
   NativeChatObservation,
+  NativeChatPage,
   NativeChatSnapshot,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
@@ -24,6 +25,7 @@ export type ActiveNativeChat = Readonly<{
   workspaceId: string;
   chat: Pick<
     NativeAgentChat,
+    | "list"
     | "create"
     | "load"
     | "submit"
@@ -52,6 +54,7 @@ type Owner = {
   attachments: Map<string, Attachment>;
   subscriptions: Map<string, Subscription>;
   pending: number;
+  listing: boolean;
   release(): void;
 };
 
@@ -65,6 +68,22 @@ export class NativeChatIpc {
 
   available(event: IpcMainInvokeEvent): boolean {
     return this.scope(event.sender, event.senderFrame) !== null;
+  }
+
+  async list(
+    event: IpcMainInvokeEvent,
+    cursor?: string | null
+  ): Promise<NativeChatPage> {
+    const owner = this.owner(event);
+    if (owner.listing) throw new Error("native_chat_catalog_busy");
+    owner.listing = true;
+    try {
+      const page = await owner.active.chat.list(cursor);
+      this.revalidate(owner);
+      return page;
+    } finally {
+      owner.listing = false;
+    }
   }
 
   create(event: IpcMainInvokeEvent): Promise<NativeChatAttachment> {
@@ -288,6 +307,7 @@ export class NativeChatIpc {
       attachments: new Map(),
       subscriptions: new Map(),
       pending: 0,
+      listing: false,
       release: () => {
         if (this.owners.get(sender) !== owner) return;
         this.owners.delete(sender);

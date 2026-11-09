@@ -4,6 +4,7 @@ import type {
   NativeChatControl,
   NativeChatMessage,
   NativeChatObservation,
+  NativeChatPage,
   NativeChatTextUpdate,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
@@ -17,6 +18,10 @@ export type NativeChatView = Readonly<{
   scope: number;
   selected: string | null;
   sessions: readonly string[];
+  catalogCursor: string | null;
+  nextCatalogCursor: string | null;
+  catalogLoading: boolean;
+  catalogError: string | null;
   messages: readonly NativeChatMessage[];
   observation: NativeChatObservation | null;
   loading: boolean;
@@ -45,6 +50,10 @@ const EMPTY: NativeChatView = Object.freeze({
   scope: 0,
   selected: null,
   sessions: [],
+  catalogCursor: null,
+  nextCatalogCursor: null,
+  catalogLoading: false,
+  catalogError: null,
   messages: [],
   observation: null,
   loading: false,
@@ -60,6 +69,10 @@ export class NativeChatController {
   private scope?: Scope;
   private generation = 0;
   private attachments = Promise.resolve();
+  private catalogConnection?: object;
+  private catalog: NativeChatPage | null = null;
+  private listing?: Promise<NativeChatPage>;
+  private recents: readonly string[] = [];
 
   constructor(
     private readonly bridge: DesktopNativeChat,
@@ -104,14 +117,53 @@ export class NativeChatController {
 
   connect(initial: string | null): void {
     const saved = this.restore();
-    this.update({ sessions: saved.sessions });
+    this.catalogConnection = {};
+    this.catalog = null;
+    this.recents = saved.sessions;
+    this.update({
+      sessions: this.recents,
+      catalogCursor: null,
+      nextCatalogCursor: null,
+      catalogLoading: false,
+      catalogError: null,
+    });
+    void this.listChats();
     void this.select(initial ?? saved.selected);
   }
 
   disconnect(): void {
     const previous = this.scope;
     this.scope = undefined;
+    this.catalogConnection = undefined;
     this.queueRelease(previous);
+  }
+
+  async listChats(cursor: string | null = null): Promise<void> {
+    const connection = this.catalogConnection;
+    if (!connection || this.view.catalogLoading) return;
+    this.update({ catalogLoading: true, catalogError: null });
+    try {
+      // A reconnect can happen before the old page releases the frame's slot.
+      await this.listing?.catch(() => {});
+      if (this.catalogConnection !== connection) return;
+      this.listing = this.bridge.list(cursor).finally(() => {
+        this.listing = undefined;
+      });
+      const page = await this.listing;
+      if (this.catalogConnection !== connection) return;
+      this.catalog = page;
+      this.update({
+        sessions: this.sessionChoices(),
+        catalogCursor: cursor,
+        nextCatalogCursor: page.nextCursor,
+      });
+    } catch {
+      if (this.catalogConnection === connection)
+        this.update({ catalogError: "Couldn't list saved chats." });
+    } finally {
+      if (this.catalogConnection === connection)
+        this.update({ catalogLoading: false });
+    }
   }
 
   async select(sessionId: string | null): Promise<void> {
@@ -270,12 +322,13 @@ export class NativeChatController {
         : await this.bridge.create();
       scope.attachment = attachment;
       if (!this.owns(scope)) return;
+      this.recents = [
+        attachment.sessionId,
+        ...this.recents.filter((id) => id !== attachment.sessionId),
+      ].slice(0, RECENTS_LIMIT);
       this.update({
         selected: attachment.sessionId,
-        sessions: [
-          attachment.sessionId,
-          ...this.view.sessions.filter((id) => id !== attachment.sessionId),
-        ].slice(0, RECENTS_LIMIT),
+        sessions: this.sessionChoices(),
       });
       this.save();
       await this.renewSubscription(scope);
@@ -444,6 +497,10 @@ export class NativeChatController {
     for (const listener of this.listeners) listener();
   }
 
+  private sessionChoices(): readonly string[] {
+    return [...new Set([...this.recents, ...(this.catalog?.sessionIds ?? [])])];
+  }
+
   private restore(): { selected: string | null; sessions: string[] } {
     try {
       const value = JSON.parse(
@@ -476,7 +533,7 @@ export class NativeChatController {
           this.memoryKey,
           JSON.stringify({
             selected: this.view.selected,
-            sessions: this.view.sessions,
+            sessions: this.recents,
           })
         );
     } catch {

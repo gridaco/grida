@@ -48,6 +48,7 @@ export const IPC_CHANNELS = {
   ONBOARDING_WORKSPACE_DEFAULT: "grida:onboarding:workspace:default",
   ONBOARDING_WORKSPACE_CHOOSE: "grida:onboarding:workspace:choose",
   NATIVE_CHAT_AVAILABLE: "grida:native-chat:available",
+  NATIVE_CHAT_LIST: "grida:native-chat:list",
   NATIVE_CHAT_CREATE: "grida:native-chat:create",
   NATIVE_CHAT_LOAD: "grida:native-chat:load",
   NATIVE_CHAT_DETACH: "grida:native-chat:detach",
