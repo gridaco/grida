@@ -891,6 +891,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery
   window. Losing the observer or falling behind cannot cancel a turn.
+- [Native goal controls](crates/grida-agent/src/acp/extensions/goals.rs) require
+  version negotiation and session attachment on the existing ACP perimeter.
+  The [goal owner](crates/grida-agent/src/host/goals.rs) conditions each
+  automatic claim on the captured goal revision, allowance and original
+  settings. It revalidates current authority before dispatch. A generated
+  turn receives neither new access nor configuration-change permission.
 - The [Desktop approval coordinator](desktop/src/main/native-agent-permissions.ts)
   derives a read profile from main-owned workspace selection. An approval
   answer takes a review issued by the coordinator for the exact session,

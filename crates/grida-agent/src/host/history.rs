@@ -294,6 +294,7 @@ impl Host {
                 }
                 let view = host.store.inspect(session.clone()).await?;
                 host.check_execution(&view)?;
+                super::goals::require_goal_resolved_for_revision(&view)?;
                 if !view.admission_paused {
                     host.check_ready_capacity(&session).await?;
                 }

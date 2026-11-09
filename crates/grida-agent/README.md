@@ -300,10 +300,8 @@ Continuation rechecks the launch profile and native identity before dispatch.
 Unverified command cleanup surfaces uncertainty and stops automatic queue
 advancement.
 
-The embedded host can accept an explicit goal with `Host::start_goal` and read
-its state with `Host::inspect_goal`. The initial work uses the ordinary owned
-queue. Its claim and resource reservation commit together. Only the reserved
-turn sees the goal inspection and report tools. Native process clients do not
-yet have goal controls or automatic continuation. The embedded owner can
-pause, resume, revise, or clear the exact goal. Resume reuses the suspended
-turn's allowance, and control retries preserve their original receipts.
+Persistent goals are available through negotiated ACP and the embedded Host.
+The initial work and explicitly authorized automatic follow-ups use the same
+owned scheduler. A claim and its reservation commit together. Only reserved
+turns receive the goal tools. See the
+[agent client guide](../../docs/agent/clients.md#work-toward-a-persistent-goal).

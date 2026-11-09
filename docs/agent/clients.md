@@ -285,5 +285,31 @@ compaction fails or its result is uncertain, the host keeps the previous
 context. Pause and Stop apply while the summary runs. An identified request
 can inspect the retained attempt after reconnecting.
 
+### Work toward a persistent goal
+
+Start a goal in an idle chat with an empty queue. Supply an objective, its
+success criteria, and separate allowances for work turns and inference steps.
+Opt in to automatic continuation when you start the goal. The next reserved
+turn follows any prompts already in the queue. The agent waits if it needs
+input, runs out of allowance, or records no further progress.
+Without that opt-in, the goal reserves its first work turn only.
+
+Inspect the goal to see progress, allowance used and held, and any blocker.
+Pause and Resume preserve the allowance for the same suspended turn. Revising
+the objective or clearing the goal stops its current work. The prior
+turn's evidence and uncertainty remain available. A model report alone
+does not establish completion.
+Clear an active or blocked goal before replacing an earlier message in the
+same chat. A fork starts independently.
+
+After a host restart, inspect the goal and its latest turn. Use Recover to
+reconsider eligible work under the original allowance and authorization.
+Work with an interrupted dispatch remains recorded against its existing turn.
+
+Negotiate the version-1 capabilities `co.grida/goal/start`, `co.grida/goal/inspect`,
+`co.grida/goal/control`, and `co.grida/goal/recover` for these operations.
+The [client protocol reference](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md#persistent-goal-operations)
+lists their parameters.
+
 The [feature catalog](./features.md) describes the wider agent experience and
 the availability of its product features.

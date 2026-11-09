@@ -5,7 +5,7 @@ use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
 use agent_kit_core::{GrantId, ToolId};
 use agent_kit_store_sqlite::driver::{DriverControlPlan, DriverControlRequest};
 use grida_agent_master::goals::{
-    Allowance, Basis, Goal, Objective, Reservation, Status, Usage, tools,
+    Allowance, Basis, Continuation, Goal, Objective, Reservation, Status, Usage, tools,
 };
 use std::num::NonZeroU32;
 
@@ -16,6 +16,15 @@ pub(super) const INSTRUCTIONS: &str = "This work was explicitly reserved for a p
 pub struct GoalRequest {
     pub objective: Objective,
     pub allowance: Allowance,
+    #[serde(default)]
+    pub automatic: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub(super) enum GoalInput {
+    Start(GoalRequest),
+    Continue(Continuation),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,7 +46,7 @@ pub struct GoalControl {
     pub action: GoalAction,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GoalInspection {
     pub session: SessionId,
@@ -46,13 +55,14 @@ pub struct GoalInspection {
     pub goal: Option<GoalView>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GoalView {
     pub basis: Basis,
     pub objective: Objective,
     pub status: Status,
     pub paused: bool,
+    pub automatic: bool,
     pub progress: Option<String>,
     pub allowance: Allowance,
     pub spent: Usage,
@@ -76,7 +86,7 @@ impl Host {
         request: PromptRequest,
         goal: GoalRequest,
     ) -> Result<DurableSubmission> {
-        prompt_input(&request.id, &request.parts)?;
+        validate_prompt_parts(&request.parts)?;
         Goal::start(request.id.clone(), goal.objective.clone(), goal.allowance)?;
         let _admission = self.configuration_admission.lock().await;
         if let Some(accepted) = self
@@ -85,10 +95,10 @@ impl Host {
             .await?
         {
             let stored = retained_goal_prompt(&accepted.input)?;
-            if stored.goal.as_ref() != Some(&goal)
-                || stored.parts != request.parts
-                || stored.questions != request.questions
-                || stored.configuration_permission != request.configuration_permission
+            if stored.goal.as_ref() != Some(&GoalInput::Start(goal))
+                || !images::same_prompt(&stored.parts, &request.parts)
+                || (stored.configuration_permission == crate::ConfigurationPermission::Change)
+                    != (request.configuration_permission == crate::ConfigurationPermission::Change)
             {
                 return Err(problem(ErrorKind::Conflict, "input_identity_reused"));
             }
@@ -119,7 +129,7 @@ impl Host {
             )
             .await?;
         let mut stored: StoredPrompt = decode_input(&input)?;
-        stored.goal = Some(goal);
+        stored.goal = Some(GoalInput::Start(goal));
         input.payload = encode(INPUT_SCHEMA, 2, &stored)?;
         let accepted = self
             .store
@@ -137,28 +147,96 @@ impl Host {
     /// Read the committed goal without claiming a turn or scheduling work.
     pub async fn inspect_goal(&self, session: SessionId) -> Result<GoalInspection> {
         let view = self.store.inspect(session.clone()).await?;
-        let goal = view
-            .driver_state
-            .value()
-            .map(Goal::decode)
-            .transpose()?
-            .map(|goal| GoalView {
+        let goal = if let Some(value) = view.driver_state.value() {
+            let goal = Goal::decode(value)?;
+            let (_, automatic) = self.goal_origin(&session, goal.basis()).await?;
+            Some(GoalView {
                 basis: goal.basis().clone(),
                 objective: goal.objective().clone(),
                 status: goal.status(),
                 paused: goal.paused(),
+                automatic,
                 progress: goal.progress().map(str::to_owned),
                 allowance: goal.allowance(),
                 spent: goal.spent(),
                 remaining: goal.remaining(),
                 reservation: goal.reservation().cloned(),
-            });
+            })
+        } else {
+            None
+        };
         Ok(GoalInspection {
             session,
             revision: view.revision,
             state_revision: view.driver_state.revision(),
             goal,
         })
+    }
+
+    /// Reconsider an explicitly authorized goal after an owner restart.
+    /// Observation does not call this method. Interrupted work still requires
+    /// recovery or a stop instead of silently dispatching again.
+    pub async fn recover_goal_work(&self, session: SessionId) -> Result<()> {
+        self.owned_control(move |host| async move {
+            let view = host.store.inspect(session.clone()).await?;
+            host.check_execution(&view)?;
+            if view.driver_state.value().is_none() {
+                return Err(problem(ErrorKind::Unavailable, "goal_missing"));
+            }
+            host.check_ready_capacity(&session).await?;
+            host.kick_queue(session).await;
+            Ok(())
+        })
+        .await
+    }
+
+    pub(super) async fn goal_continuation(&self, view: &SessionView) -> Result<Option<Submission>> {
+        let Some(value) = view.driver_state.value() else {
+            return Ok(None);
+        };
+        let goal = Goal::decode(value)?;
+        let Some(continuation) = goal.continuation() else {
+            return Ok(None);
+        };
+        let (mut captured, automatic) =
+            self.goal_origin(&view.session, &continuation.basis).await?;
+        if !automatic {
+            return Ok(None);
+        }
+        let id = continuation.input_id(&view.session)?;
+        captured.parts.clear();
+        captured.configuration_permission = crate::ConfigurationPermission::Disabled;
+        if let Some(permission) = &captured.permission_capture {
+            let profile = self
+                .permissions
+                .as_ref()
+                .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?;
+            profile.validate_capture(permission)?;
+            captured.permission_capture = Some(profile.capture(ScopeId::new(id.as_str())?));
+        }
+        captured.goal = Some(GoalInput::Continue(continuation));
+        Ok(Some(Submission {
+            id,
+            payload: encode(INPUT_SCHEMA, 2, &captured)?,
+        }))
+    }
+
+    async fn goal_origin(
+        &self,
+        session: &SessionId,
+        basis: &Basis,
+    ) -> Result<(StoredPrompt, bool)> {
+        let original = self
+            .store
+            .input(session.clone(), basis.goal.clone())
+            .await?
+            .ok_or_else(|| problem(ErrorKind::InvalidState, "goal_origin_unavailable"))?;
+        let captured = retained_goal_prompt(&original.input)?;
+        let Some(GoalInput::Start(request)) = captured.goal.as_ref() else {
+            return Err(problem(ErrorKind::InvalidState, "goal_origin_unavailable"));
+        };
+        let automatic = request.automatic;
+        Ok((captured, automatic))
     }
 
     /// Apply a goal control through the same owned admission/control boundary.
@@ -266,19 +344,7 @@ impl Host {
         }) else {
             return;
         };
-        let Some(goal) = view
-            .driver_state
-            .value()
-            .and_then(|value| Goal::decode(value).ok())
-        else {
-            return;
-        };
-        if goal.paused()
-            || goal.status() != Status::Active
-            || goal
-                .reservation()
-                .is_none_or(|work| work.turn != current.binding.turn || &work.basis != goal.basis())
-        {
+        if require_resumable(view, &current.binding.turn).is_err() {
             return;
         }
         let session = view.session.clone();
@@ -318,18 +384,51 @@ impl Host {
     }
 }
 
+pub(super) fn require_resumable(view: &SessionView, turn: &TurnId) -> Result<()> {
+    let goal = Goal::decode(
+        view.driver_state
+            .value()
+            .ok_or_else(|| problem(ErrorKind::InvalidState, "goal_state_missing"))?,
+    )?;
+    if goal.paused()
+        || goal.status() != Status::Active
+        || goal
+            .reservation()
+            .is_none_or(|work| &work.turn != turn || &work.basis != goal.basis())
+    {
+        return Err(problem(ErrorKind::Conflict, "goal_control_required"));
+    }
+    Ok(())
+}
+
 pub(super) fn claim_update(
     view: &SessionView,
     input: &ChangeId,
     turn: &TurnId,
-    request: &GoalRequest,
+    request: &GoalInput,
     steps: u32,
 ) -> Result<DriverStateChange> {
-    // This submission was accepted at an idle empty queue. Later accepted user
-    // work remains queued behind it, so only the current ownership is checked.
     require_idle(view)?;
-    require_no_active_goal(view)?;
-    let mut goal = Goal::start(input.clone(), request.objective.clone(), request.allowance)?;
+    let mut goal = match request {
+        GoalInput::Start(request) => {
+            // Later accepted inputs remain behind the explicit goal start.
+            require_no_active_goal(view)?;
+            Goal::start(input.clone(), request.objective.clone(), request.allowance)?
+        }
+        GoalInput::Continue(continuation) => {
+            let value = view
+                .driver_state
+                .value()
+                .ok_or_else(|| problem(ErrorKind::Conflict, "goal_continuation_changed"))?;
+            let goal = Goal::decode(value)?;
+            if goal.continuation().as_ref() != Some(continuation)
+                || &continuation.input_id(&view.session)? != input
+            {
+                return Err(problem(ErrorKind::Conflict, "goal_continuation_changed"));
+            }
+            goal
+        }
+    };
     let steps = NonZeroU32::new(steps)
         .ok_or_else(|| problem(ErrorKind::InvalidInput, "invalid_master_limits"))?;
     goal.reserve(&goal.basis().clone(), turn.clone(), steps)?;
@@ -354,6 +453,19 @@ fn require_no_active_goal(view: &SessionView) -> Result<()> {
             || !matches!(goal.status(), Status::Complete | Status::Cleared)
         {
             return Err(problem(ErrorKind::Conflict, "session_goal_exists"));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn require_goal_resolved_for_revision(view: &SessionView) -> Result<()> {
+    if let Some(value) = view.driver_state.value() {
+        let goal = Goal::decode(value)?;
+        if matches!(goal.status(), Status::Active | Status::Blocked(_)) {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "history_revision_requires_goal_resolution",
+            ));
         }
     }
     Ok(())

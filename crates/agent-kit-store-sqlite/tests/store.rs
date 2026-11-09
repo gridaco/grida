@@ -2571,6 +2571,104 @@ async fn reserved_claim_retries_without_allocating_again_and_leaves_stale_work_q
 }
 
 #[tokio::test]
+async fn idle_accept_and_claim_is_atomic_and_replays_after_reopen() {
+    use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
+
+    let (directory, store) = store().await;
+    let session = session();
+    let input = submission("generated", "generated work");
+    let user = submission("user", "user work");
+    let stale = store.inspect(session.clone()).await.unwrap();
+    store.submit(session.clone(), user.clone()).await.unwrap();
+    let waiting = store.inspect(session.clone()).await.unwrap();
+    let mut request = ClaimRequest {
+        id: change("generated-claim"),
+        session: session.clone(),
+        expected_revision: stale.revision,
+        selection: TurnSelection::New {
+            turn: turn(),
+            inputs: vec![input.id.clone()],
+        },
+    };
+    let change = DriverStateChange {
+        expected: DriverStateRevision(0),
+        value: Some(payload("reserved")),
+    };
+    assert_error(
+        store
+            .submit_and_claim(request.clone(), input.clone(), change.clone())
+            .await,
+        ErrorKind::Conflict,
+        "stale_session_revision",
+    );
+    request.expected_revision = waiting.revision;
+    assert_error(
+        store
+            .submit_and_claim(request.clone(), input.clone(), change.clone())
+            .await,
+        ErrorKind::Conflict,
+        "session_queue_waiting",
+    );
+    assert_eq!(store.inspect(session.clone()).await.unwrap(), waiting);
+    assert!(
+        store
+            .input(session.clone(), input.id.clone())
+            .await
+            .unwrap()
+            .is_none()
+    );
+
+    store
+        .control(ControlRequest {
+            id: agent_kit_core::ChangeId::new("withdraw-user").unwrap(),
+            session: session.clone(),
+            expected_revision: waiting.revision,
+            action: SessionControl::WithdrawQueued { input: user.id },
+        })
+        .await
+        .unwrap();
+    request.expected_revision = store.inspect(session.clone()).await.unwrap().revision;
+    let ClaimOutcome::Acquired(claimed) = store
+        .submit_and_claim(request.clone(), input.clone(), change.clone())
+        .await
+        .unwrap()
+    else {
+        panic!("expected generated work lease");
+    };
+    assert_eq!(claimed.inputs, std::slice::from_ref(&input));
+    drop(claimed);
+    drop(store);
+    let reopened = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    let after = reopened.inspect(session.clone()).await.unwrap();
+    assert_eq!(after.driver_state.value(), Some(&payload("reserved")));
+    assert_eq!(after.driver_state.revision(), DriverStateRevision(1));
+    assert!(after.queued.is_empty());
+    assert!(matches!(
+        reopened
+            .submit_and_claim(request.clone(), input.clone(), change.clone())
+            .await
+            .unwrap(),
+        ClaimOutcome::Existing(_)
+    ));
+    assert_error(
+        reopened
+            .submit_and_claim(request, submission("generated", "different work"), change)
+            .await,
+        ErrorKind::Conflict,
+        "request_identity_reused",
+    );
+    assert_eq!(
+        reopened
+            .input(session, input.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .disposition,
+        InputDisposition::Claimed { turn: turn() }
+    );
+}
+
+#[tokio::test]
 async fn a_derived_control_replays_original_intent_without_recomputing_new_state() {
     use agent_kit_core::driver_state::DriverStateRevision;
     use agent_kit_core::turn::ControlDirective;

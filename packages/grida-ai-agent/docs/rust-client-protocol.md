@@ -252,6 +252,28 @@ public MCP adapter exposes a separately enabled authenticated loopback endpoint
 for independent callers. These bindings share product operations, while their
 wire protocols and connection lifetimes remain distinct.
 
+### Persistent goal operations
+
+Negotiate each `co.grida/goal/` capability at version `1`. The methods apply
+to an attached session. Start accepts the same ACP prompt parts as Submit
+and captures settings for the original request. Generated work retains the
+original authority and selected settings and carries no new user message.
+
+| Method suffix after `_co.grida/goal/` | Parameters and result                                                                                                                                                                                                                                                               |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `start`                               | `sessionId`, `inputId`, ACP `prompt`, and `goal`. Supply `objective` with `description` and `criteria`, and `allowance` with positive `work_turns` and `inference_steps`. Set `automatic` to `true` inside `goal` to authorize later work. Returns the retained submission receipt. |
+| `inspect`                             | `sessionId`. Returns `revision`, `stateRevision` and the bounded goal state, including its `basis`, status, allowance and held reservation. This does not claim work.                                                                                                               |
+| `control`                             | `sessionId`, `requestId`, `expectedSessionRevision`, `expectedStateRevision`, `basis` and `change`. Actions are `pause`, `resume`, `clear` and `revise` with a replacement `objective`. Returns the original session and state revisions and any affected turn's journal position.  |
+| `recover`                             | `sessionId`. Reconsiders eligible work after a host restart. An interrupted dispatch remains bound to its original turn.                                                                                                                                                            |
+
+Start requires idle work and an empty queue. Automatic follow-ups wait behind
+queued user prompts. Their acceptance, exact claim, and resource reservation
+commit together. Repeating the same start or control preserves its receipt.
+Pause and Resume can reacquire the same suspended turn. Revising or clearing
+an active goal cancels its reserved turn without discarding its uncertainty.
+Clear an active or blocked goal before replacing an earlier message in the
+same chat. A separate fork carries no goal authorization.
+
 ## Preserve lifecycle meaning
 
 In v1, `session/prompt` completes with the turn's stop reason. It cannot return

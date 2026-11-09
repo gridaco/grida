@@ -59,6 +59,7 @@ use std::collections::{BTreeMap, VecDeque};
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tokio::sync::{Mutex, Notify, Semaphore, broadcast, oneshot};
 use tokio::task::AbortHandle;
@@ -95,6 +96,7 @@ pub struct Host {
     configuration_admission: Arc<Mutex<()>>,
     controls: Arc<Semaphore>,
     work: Arc<Mutex<Work>>,
+    workers: Arc<AtomicUsize>,
     changed: Arc<Notify>,
     live_text: broadcast::Sender<live::LiveText>,
 }
@@ -163,6 +165,18 @@ struct Active {
     handle: AbortHandle,
 }
 
+struct WorkerLifetime {
+    workers: Arc<AtomicUsize>,
+    changed: Arc<Notify>,
+}
+
+impl Drop for WorkerLifetime {
+    fn drop(&mut self) {
+        self.workers.fetch_sub(1, Ordering::Release);
+        self.changed.notify_waiters();
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PromptPart {
@@ -229,7 +243,7 @@ struct StoredPrompt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     guidance: Option<crate::skills::CapturedGuidance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    goal: Option<GoalRequest>,
+    goal: Option<goals::GoalInput>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -308,7 +322,7 @@ struct PreparedInput {
     captured: Option<ConfigurationSnapshot>,
     permission_capture: Option<crate::permissions::PermissionCapture>,
     guidance: Option<Message>,
-    goal: Option<GoalRequest>,
+    goal: Option<goals::GoalInput>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -414,6 +428,7 @@ impl Host {
             configuration_admission: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
             work: Arc::default(),
+            workers: Arc::default(),
             changed: Arc::default(),
             live_text: broadcast::channel(UPDATE_CAPACITY).0,
         })
@@ -534,7 +549,7 @@ impl Host {
         let host = self.clone();
         let worker_session = session.clone();
         let worker_turn = turn.clone();
-        let handle = tokio::spawn(async move {
+        let task = async move {
             // The worker checks the same lock used for registration before
             // any durable claim, even when its requesting client disappears.
             let answered = match &launch {
@@ -632,6 +647,16 @@ impl Host {
             } else if suspended {
                 host.kick_stopped(worker_session, worker_turn).await;
             }
+        };
+        self.workers.fetch_add(1, Ordering::Relaxed);
+        let lifetime = WorkerLifetime {
+            workers: self.workers.clone(),
+            changed: self.changed.clone(),
+        };
+        let handle = tokio::spawn(async move {
+            // Release the worker's Host clone before acknowledging shutdown.
+            let _lifetime = lifetime;
+            task.await;
         });
         work.ready.retain(|waiting| {
             waiting.session() != &session || matches!(waiting, ReadyWork::Answered { .. })
@@ -721,23 +746,23 @@ impl Host {
             }
             Launch::Queued => {
                 require_idle(&view)?;
-                let next = view
-                    .queued
-                    .first()
-                    .ok_or_else(|| problem(ErrorKind::Unavailable, "session_queue_empty"))?;
+                let next = match view.queued.first() {
+                    Some(next) => next.input.clone(),
+                    None => {
+                        let Some(next) = self.goal_continuation(&view).await? else {
+                            return Ok(None);
+                        };
+                        next
+                    }
+                };
                 let history = self.provider_history(session.clone(), None).await?;
                 let claim = new_claim(
                     session.clone(),
                     turn.clone(),
                     view.revision,
-                    next.input.id.clone(),
+                    next.id.clone(),
                 )?;
-                (
-                    WorkerClaim::Select(claim),
-                    Some(next.input.clone()),
-                    None,
-                    history,
-                )
+                (WorkerClaim::Select(claim), Some(next), None, history)
             }
             resume @ (Launch::Resume(_) | Launch::ResumeAnswered(_)) => {
                 let request = match resume {
@@ -786,6 +811,11 @@ impl Host {
             .transpose()?;
         let claimed = match claim_request {
             WorkerClaim::Select(request) => {
+                if !matches!(&request.selection, TurnSelection::New { .. })
+                    && prepared.as_ref().is_some_and(|input| input.goal.is_some())
+                {
+                    goals::require_resumable(&view, turn)?;
+                }
                 let change = match (input.as_ref(), prepared.as_ref(), &request.selection) {
                     (Some(input), Some(prepared), TurnSelection::New { .. }) => prepared
                         .goal
@@ -802,9 +832,18 @@ impl Host {
                         .transpose()?,
                     _ => None,
                 };
-                match change {
-                    Some(change) => self.store.claim_with_driver_state(request, change).await?,
-                    None => self.store.claim(request).await?,
+                match (change, input.as_ref(), prepared.as_ref()) {
+                    (Some(change), Some(input), Some(prepared))
+                        if matches!(prepared.goal, Some(goals::GoalInput::Continue(_))) =>
+                    {
+                        self.store
+                            .submit_and_claim(request, input.clone(), change)
+                            .await?
+                    }
+                    (Some(change), _, _) => {
+                        self.store.claim_with_driver_state(request, change).await?
+                    }
+                    (None, _, _) => self.store.claim(request).await?,
                 }
             }
             WorkerClaim::Recover(request) => self.store.recover(request).await?,
@@ -1135,8 +1174,19 @@ impl Host {
                 config.max_steps = stored.max_steps.unwrap_or(1);
                 config.max_output_tokens =
                     stored.max_output_tokens.unwrap_or(config.max_output_tokens);
+                let messages = if matches!(&stored.goal, Some(goals::GoalInput::Continue(_))) {
+                    if !stored.parts.is_empty() {
+                        return Err(problem(
+                            ErrorKind::InvalidState,
+                            "invalid_goal_continuation",
+                        ));
+                    }
+                    Vec::new()
+                } else {
+                    prompt_input(&input.id, &stored.parts)?
+                };
                 (
-                    prompt_input(&input.id, &stored.parts)?,
+                    messages,
                     stored.configuration.defaults.context.max_input_tokens,
                     stored.questions,
                     stored.configuration_permission,
@@ -1193,17 +1243,17 @@ impl Host {
             self.kick_resumed_goal(&view).await;
             return;
         }
-        if view.queued.is_empty() {
+        if view.queued.is_empty() && self.goal_continuation(&view).await.ok().flatten().is_none() {
             return;
         }
         let Ok(turn) = TurnId::new(uuid()) else {
             return;
         };
         let mut work = self.work.lock().await;
-        if work.closed || work.active.contains_key(&session) {
+        if work.closed {
             return;
         }
-        if work.active.len() >= MAX_ACTIVE_RUNS {
+        if work.active.contains_key(&session) || work.active.len() >= MAX_ACTIVE_RUNS {
             work.defer(ReadyWork::Queue(session));
             return;
         }
@@ -1453,6 +1503,7 @@ impl Host {
                 {
                     let work = self.work.lock().await;
                     if work.active.is_empty()
+                        && self.workers.load(Ordering::Acquire) == 0
                         && self.controls.available_permits() == MAX_OWNED_CONTROLS
                     {
                         return if work.unverified {

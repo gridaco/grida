@@ -2,6 +2,7 @@
 
 pub(super) mod approvals;
 pub(super) mod compaction;
+mod goals;
 mod history;
 mod lifecycle;
 mod questions;
@@ -64,6 +65,7 @@ fn capability_keys(reviewer: bool) -> impl Iterator<Item = &'static str> {
         .chain(history::CAPABILITIES)
         .chain([compaction::COMPACT])
         .chain([skills::CATALOG])
+        .chain(goals::CAPABILITIES)
 }
 
 pub(super) fn configuration_permission(
@@ -305,6 +307,11 @@ pub(super) fn handlers(
         .with_connection_builder(history::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(compaction::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(skills::handlers(host.clone(), sessions.clone()))
+        .with_connection_builder(goals::handlers(
+            host.clone(),
+            sessions.clone(),
+            image_intake,
+        ))
         .on_receive_request(
             async move |request: Submit, responder, _| {
                 let result = async {

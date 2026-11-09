@@ -367,7 +367,22 @@ impl SqliteStore {
                 "driver_state_claim_requires_new_turn",
             ));
         }
-        self.acquire(request, Some(change)).await
+        self.acquire(request, Some(change), None).await
+    }
+
+    /// Accept and claim a new submission against an idle, empty queue, with
+    /// the driver state update in the same transaction as both receipts.
+    pub async fn submit_and_claim(
+        &self,
+        request: ClaimRequest,
+        input: Submission,
+        change: DriverStateChange,
+    ) -> Result<ClaimOutcome> {
+        if !matches!(&request.selection, TurnSelection::New { inputs, .. } if inputs == std::slice::from_ref(&input.id))
+        {
+            return Err(error(ErrorKind::InvalidInput, "claim_submission_mismatch"));
+        }
+        self.acquire(request, Some(change), Some(input)).await
     }
 
     fn accept(
@@ -410,6 +425,7 @@ impl SqliteStore {
         &self,
         request: ClaimRequest,
         state_change: Option<DriverStateChange>,
+        submission: Option<Submission>,
     ) -> BoxFuture<'_, Result<ClaimOutcome>> {
         let inner = Arc::clone(&self.inner);
         Box::pin(async move {
@@ -417,9 +433,10 @@ impl SqliteStore {
                 let transaction = connection
                     .transaction_with_behavior(TransactionBehavior::Immediate)
                     .map_err(database_error)?;
-                let fingerprint = match &state_change {
-                    Some(change) => Fingerprint::of(&(&request, change))?,
-                    None => Fingerprint::of(&request)?,
+                let fingerprint = match (&state_change, &submission) {
+                    (change, Some(input)) => Fingerprint::of(&(&request, change, input))?,
+                    (Some(change), None) => Fingerprint::of(&(&request, change))?,
+                    (None, None) => Fingerprint::of(&request)?,
                 };
                 if let Some(receipt) = lookup_request::<ClaimRecord>(
                     &transaction,
@@ -458,6 +475,21 @@ impl SqliteStore {
                         }
                         if let Some(change) = state_change {
                             session.driver_state.apply(change)?;
+                        }
+                        if let Some(input) = submission {
+                            let waiting: bool = transaction.query_row(
+                                "SELECT EXISTS(SELECT 1 FROM submissions WHERE session=?1 AND queue_order IS NOT NULL)",
+                                [request.session.as_str()],
+                                |row| row.get(0),
+                            ).map_err(database_error)?;
+                            if waiting {
+                                return Err(error(ErrorKind::Conflict, "session_queue_waiting"));
+                            }
+                            let receipt = insert_input(&transaction, &request.session, &mut session, &input, None)?;
+                            save_request(
+                                &transaction, &request.session, "submit", &input.id,
+                                Fingerprint::of(&input)?, &receipt,
+                            )?;
                         }
                         let state = TurnState::with_driver_state(TurnBinding {
                             session: request.session.clone(),
@@ -582,7 +614,7 @@ impl SessionStore for SqliteStore {
     }
 
     fn claim(&self, request: ClaimRequest) -> BoxFuture<'_, Result<ClaimOutcome>> {
-        self.acquire(request, None)
+        self.acquire(request, None, None)
     }
 
     fn recover(&self, request: RecoveryRequest) -> BoxFuture<'_, Result<ClaimOutcome>> {
