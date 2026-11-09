@@ -872,6 +872,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
   memory-only Chromium session, and starts one POST without following
   redirects. Upload and pull are bounded. Cancelling the exchange or closing
   the child aborts the request. This mode has no native direct-network fallback.
+- [Configured native provider selection](desktop/src/main/native-provider-selection.ts)
+  resolves a registered model through the authenticated settings owner and
+  binds its anonymous request to the approved chat endpoint. A configured key
+  requires a separate custody composition. [Main's grant owner](desktop/src/main/agent-network-authority.ts)
+  rotates the captured grant when the approved base changes, including a path
+  change on the same origin. Retained launch profiles cannot use the new grant.
 - The [Desktop native chat client](desktop/src/main/native-agent-chat.ts)
   fixes the workspace context at startup and accepts session handles issued
   on that ACP connection. Controls use a host observation of the exact

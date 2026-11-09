@@ -14,7 +14,7 @@ export class AgentNetworkAuthority {
   private readonly builtIns: AgentNetworkPolicy.Grant[];
   private readonly customByEndpoint = new Map<
     string,
-    AgentNetworkPolicy.Grant
+    { baseUrl: string; grant: AgentNetworkPolicy.Grant }
   >();
   private revisionValue = 1;
 
@@ -27,16 +27,25 @@ export class AgentNetworkAuthority {
   }
 
   grants(): AgentNetworkPolicy.Grant[] {
-    return [...this.builtIns, ...this.customByEndpoint.values()].map(
-      (grant) => ({ ...grant, origins: [...grant.origins] })
+    const custom = [...this.customByEndpoint.values()].map(
+      ({ grant }) => grant
     );
+    return [...this.builtIns, ...custom].map((grant) => ({
+      ...grant,
+      origins: [...grant.origins],
+    }));
   }
 
   isCustomGrant(grantId: string): boolean {
-    for (const grant of this.customByEndpoint.values()) {
+    for (const { grant } of this.customByEndpoint.values()) {
       if (grant.id === grantId) return true;
     }
     return false;
+  }
+
+  approvedEndpointGrant(endpointId: string, baseUrl: string): string | null {
+    const current = this.customByEndpoint.get(endpointId);
+    return current?.baseUrl === new URL(baseUrl).href ? current.grant.id : null;
   }
 
   approveCustomEndpoint(endpointId: string, baseUrl: string): void {
@@ -44,12 +53,16 @@ export class AgentNetworkAuthority {
       throw new Error("custom endpoint id is invalid");
     }
     const origin = AgentNetworkPolicy.canonicalOrigin(baseUrl);
+    const canonicalBase = new URL(baseUrl).href;
     const current = this.customByEndpoint.get(endpointId);
-    if (current?.origins[0] === origin) return;
+    if (current?.baseUrl === canonicalBase) return;
     this.customByEndpoint.set(endpointId, {
-      id: `provider:custom:${crypto.randomUUID()}`,
-      lane: "provider",
-      origins: [origin],
+      baseUrl: canonicalBase,
+      grant: {
+        id: `provider:custom:${crypto.randomUUID()}`,
+        lane: "provider",
+        origins: [origin],
+      },
     });
     this.revisionValue += 1;
   }

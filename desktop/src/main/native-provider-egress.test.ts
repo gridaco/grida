@@ -8,6 +8,7 @@ import {
   NativeProviderEgress,
   type NativeProviderNetwork,
 } from "./native-provider-egress";
+import { NativeProviderSelection } from "./native-provider-selection";
 
 const endpoint = "http://127.0.0.1:1/v1";
 const target = endpoint + "/chat/completions";
@@ -190,13 +191,25 @@ it.skipIf(!resourcesPath)(
     const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
     let agent: NativeAgentProcess | undefined;
     try {
+      const selection = await NativeProviderSelection.configuredEndpoint(
+        "fixture_endpoint",
+        undefined,
+        {
+          list: async () => [
+            {
+              id: "fixture_endpoint",
+              base_url: endpoint,
+              models: [{ id: "fixture" }],
+            },
+          ],
+          hasKey: async () => false,
+          network: async () => ({ prepare }),
+        }
+      );
       agent = await NativeAgentProcess.start({
+        ...selection,
         resourcesPath: resourcesPath!,
         stateDirectory: path.join(root, "state"),
-        provider: "openai-compatible",
-        endpoint,
-        model: "fixture",
-        providerNetwork: { prepare },
         onSessionUpdate: (update) => updates.push(update),
       });
       const { sessionId } = (await agent.request("session/new", {

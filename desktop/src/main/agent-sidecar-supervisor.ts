@@ -64,6 +64,7 @@ import { AgentDaemonSocketHost } from "./agent-daemon-socket-host";
 import { DesktopAgentSandboxPolicy } from "./agent-sandbox-policy";
 import { AgentCommandHost, sweepAgentCommandTemps } from "./agent-command-host";
 import { DesktopMediaRoot } from "./media-root";
+import type { NativeProviderNetwork } from "./native-provider-egress";
 
 export type AgentSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -223,6 +224,18 @@ export class AgentSidecarSupervisor {
     const revision = this.networkAuthority.revision;
     this.networkAuthority.revokeCustomEndpoint(id);
     if (this.networkAuthority.revision !== revision) await this.publishGrants();
+  }
+
+  async nativeEndpointNetwork(
+    id: string,
+    baseUrl: string
+  ): Promise<NativeProviderNetwork> {
+    const grantId = this.networkAuthority.approvedEndpointGrant(id, baseUrl);
+    if (!grantId) throw new Error("native_provider_endpoint_not_approved");
+    return await AgentNetworkHost.nativeProviderNetwork(
+      this.networkAuthority,
+      grantId
+    );
   }
 
   async withTemporaryProviderEndpoint<T>(
@@ -745,6 +758,10 @@ export function sealLegacyChatForColdStart() {
 
 export function getAgentSidecarInfo(): AgentSidecarInfo | null {
   return supervisor.getInfo();
+}
+
+export function nativeAgentEndpointNetwork(id: string, baseUrl: string) {
+  return supervisor.nativeEndpointNetwork(id, baseUrl);
 }
 
 export function stopAgentSidecar() {

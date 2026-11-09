@@ -34,8 +34,10 @@
 
 import {
   getAgentSidecarInfo,
+  nativeAgentEndpointNetwork,
   type AgentSidecarInfo,
 } from "./agent-sidecar-supervisor";
+import { NativeProviderSelection } from "./native-provider-selection";
 import { EDITOR_BASE_URL } from "../env";
 import { AgentTransport } from "@grida/agent/transport";
 import type { Workspace } from "@grida/daemon";
@@ -100,6 +102,18 @@ export namespace agentSidecarClient {
     EndpointProviderConfig[]
   > {
     return await client().providers.list_endpoints();
+  }
+
+  export function nativeConfiguredEndpoint(
+    providerId: string,
+    modelId?: string
+  ) {
+    const transport = client();
+    return NativeProviderSelection.configuredEndpoint(providerId, modelId, {
+      list: transport.providers.list_endpoints,
+      hasKey: transport.secrets.has,
+      network: nativeAgentEndpointNetwork,
+    });
   }
 
   export async function setProviderEndpoint(
