@@ -1,0 +1,309 @@
+// GRIDA-SEC-004 / GRIDA-SEC-014 — cold-start ownership and private chat cutoff.
+import { createHash } from "node:crypto";
+import { constants, type Stats } from "node:fs";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { sealLegacyChatForColdStart } from "./agent-sidecar-supervisor";
+import { LegacyChatArchive } from "./legacy-chat-archive";
+import {
+  NativeAgentChat,
+  type NativeAgentChatLaunch,
+} from "./native-agent-chat";
+
+const STATE_DIRECTORY = "native-chat";
+const CHECKPOINT = "cutover.json";
+const PENDING = ".cutover.pending";
+const CHECKPOINT_BYTES = 4096;
+const DIGEST = /^[a-f0-9]{64}$/;
+
+type Checkpoint = Readonly<{
+  version: 1;
+  source: string;
+  archiveId: string | null;
+  nativeReady: boolean;
+}>;
+
+type Ready = Readonly<{
+  chat: NativeAgentChat;
+  stateDirectory: string;
+  archive: Awaited<ReturnType<LegacyChatArchive["snapshotQuiesced"]>>;
+}>;
+
+export class NativeAgentCutover {
+  private static starting = false;
+
+  static async start(
+    launch: Omit<NativeAgentChatLaunch, "stateDirectory">
+  ): Promise<Ready> {
+    if (process.platform !== "darwin" && process.platform !== "linux")
+      throw new Error("native_chat_cutover_platform_unsupported");
+    if (this.starting) throw new Error("native_chat_cutover_in_progress");
+    this.starting = true;
+    try {
+      return await this.startSealed(launch);
+    } finally {
+      this.starting = false;
+    }
+  }
+
+  private static async startSealed(
+    launch: Omit<NativeAgentChatLaunch, "stateDirectory">
+  ): Promise<Ready> {
+    const source = await sealLegacyChatForColdStart();
+    const desktop = await fs.realpath(source.desktopUserDataPath);
+    checkDirectory(await fs.lstat(desktop), false);
+    const stateDirectory = path.join(desktop, STATE_DIRECTORY);
+    const separate = await Promise.all(
+      [
+        source.userDataPath,
+        source.scratchBase,
+        source.providerHome,
+        source.mediaRoot,
+        launch.credentialHome,
+      ]
+        .filter((root): root is string => root !== undefined)
+        .map(intendedLocation)
+    );
+    if (separate.some((root) => overlaps(root, stateDirectory)))
+      throw new Error("native_chat_cutover_state_overlap");
+
+    // The single-instance owner sealed the actual Desktop supervisor before
+    // its legacy launch. Leftover managed worker state is a reason to stop.
+    await requireDrainedCommands(source.scratchBase);
+    const sourceKey = createHash("sha256")
+      .update(JSON.stringify([source.userDataPath, source.scratchBase]))
+      .digest("hex");
+    const archive = new LegacyChatArchive(source);
+    const previous = await readCheckpoint(stateDirectory);
+    if (previous && previous.source !== sourceKey)
+      throw new Error("native_chat_cutover_source_changed");
+    let cutoff = previous?.archiveId
+      ? await archive.verify(previous.archiveId)
+      : null;
+    if (!previous?.nativeReady) {
+      // An interrupted first startup has not exposed any native chat. Capture
+      // the latest sealed legacy cutoff and independently verify publication.
+      const captured = await archive.snapshotQuiesced();
+      cutoff = captured ? await archive.verify(captured.id) : null;
+      await ensureState(stateDirectory);
+      if (!previous && !(await emptyDirectory(stateDirectory)))
+        throw new Error("native_chat_cutover_unowned_state");
+      await writeCheckpoint(stateDirectory, {
+        version: 1,
+        source: sourceKey,
+        archiveId: cutoff?.id ?? null,
+        nativeReady: false,
+      });
+    }
+
+    const chat = await NativeAgentChat.start({ ...launch, stateDirectory });
+    if (!previous?.nativeReady) {
+      try {
+        await writeCheckpoint(stateDirectory, {
+          version: 1,
+          source: sourceKey,
+          archiveId: cutoff?.id ?? null,
+          nativeReady: true,
+        });
+      } catch (error) {
+        await chat.close();
+        throw error;
+      }
+    }
+    return { chat, stateDirectory, archive: cutoff };
+  }
+}
+
+async function requireDrainedCommands(scratchBase: string): Promise<void> {
+  const scratch = await statIfPresent(scratchBase);
+  if (!scratch) return;
+  checkDirectory(scratch, true);
+  const commands = path.join(await fs.realpath(scratchBase), "commands");
+  const metadata = await statIfPresent(commands);
+  if (!metadata) return;
+  checkDirectory(metadata, true);
+  if (!(await emptyDirectory(commands)))
+    throw new Error("legacy_chat_command_drain_unverified");
+}
+
+async function readCheckpoint(directory: string): Promise<Checkpoint | null> {
+  const state = await statIfPresent(directory);
+  if (!state) return null;
+  checkDirectory(state, true);
+  if ((await fs.realpath(directory)) !== directory) throw unsafeState();
+  const pending = path.join(directory, PENDING);
+  const staged = await statIfPresent(pending);
+  if (staged) {
+    checkCheckpointFile(staged);
+    await fs.unlink(pending);
+  }
+  const filename = path.join(directory, CHECKPOINT);
+  const before = await statIfPresent(filename);
+  if (!before) {
+    if (!(await emptyDirectory(directory)))
+      throw new Error("native_chat_cutover_unowned_state");
+    return null;
+  }
+  checkCheckpointFile(before);
+  const file = await fs.open(
+    filename,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
+  );
+  try {
+    const opened = await file.stat();
+    checkCheckpointFile(opened);
+    if (
+      opened.dev !== before.dev ||
+      opened.ino !== before.ino ||
+      opened.size !== before.size
+    )
+      throw unsafeState();
+    const bytes = Buffer.alloc(CHECKPOINT_BYTES + 1);
+    const { bytesRead } = await file.read(bytes, 0, bytes.length, 0);
+    if (bytesRead !== opened.size) throw unsafeState();
+    return parseCheckpoint(bytes.subarray(0, bytesRead));
+  } finally {
+    await file.close();
+  }
+}
+
+function parseCheckpoint(bytes: Uint8Array): Checkpoint {
+  let value: Partial<Checkpoint> | null;
+  try {
+    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    throw unsafeState();
+  }
+  if (
+    !value ||
+    value.version !== 1 ||
+    typeof value.source !== "string" ||
+    !DIGEST.test(value.source) ||
+    (value.archiveId !== null &&
+      (typeof value.archiveId !== "string" || !DIGEST.test(value.archiveId))) ||
+    typeof value.nativeReady !== "boolean"
+  )
+    throw unsafeState();
+  return {
+    version: 1,
+    source: value.source,
+    archiveId: value.archiveId,
+    nativeReady: value.nativeReady,
+  };
+}
+
+async function ensureState(directory: string): Promise<void> {
+  try {
+    await fs.mkdir(directory, { mode: 0o700 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
+  checkDirectory(await fs.lstat(directory), true);
+  if ((await fs.realpath(directory)) !== directory) throw unsafeState();
+  // Make the directory entry durable before publishing a marker inside it.
+  await syncDirectory(path.dirname(directory));
+}
+
+async function writeCheckpoint(
+  directory: string,
+  record: Checkpoint
+): Promise<void> {
+  const staging = path.join(directory, PENDING);
+  const file = await fs.open(staging, "wx", 0o600);
+  try {
+    await file.writeFile(JSON.stringify(record));
+    await file.sync();
+  } finally {
+    await file.close();
+  }
+  await fs.rename(staging, path.join(directory, CHECKPOINT));
+  await syncDirectory(directory);
+}
+
+async function syncDirectory(directory: string): Promise<void> {
+  const file = await fs.open(
+    directory,
+    constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW
+  );
+  try {
+    await file.sync();
+  } finally {
+    await file.close();
+  }
+}
+
+async function intendedLocation(value: string): Promise<string> {
+  if (!path.isAbsolute(value)) throw unsafeState();
+  let current = path.resolve(value);
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      return path.join(await fs.realpath(current), ...tail);
+    } catch (error) {
+      const parent = path.dirname(current);
+      if (
+        (error as NodeJS.ErrnoException).code !== "ENOENT" ||
+        parent === current
+      )
+        throw unsafeState();
+      tail.unshift(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
+function overlaps(left: string, right: string): boolean {
+  return within(left, right) || within(right, left);
+}
+
+function within(parent: string, child: string): boolean {
+  const relative = path.relative(parent, child);
+  return (
+    relative !== ".." &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
+async function emptyDirectory(directory: string): Promise<boolean> {
+  const entries = await fs.opendir(directory);
+  try {
+    return (await entries.read()) === null;
+  } finally {
+    await entries.close();
+  }
+}
+
+async function statIfPresent(filename: string): Promise<Stats | undefined> {
+  try {
+    return await fs.lstat(filename);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
+
+function checkDirectory(stat: Stats, privateDirectory: boolean): void {
+  if (
+    !stat.isDirectory() ||
+    stat.uid !== process.geteuid?.() ||
+    (privateDirectory
+      ? (stat.mode & 0o7777) !== 0o700
+      : (stat.mode & 0o022) !== 0)
+  )
+    throw unsafeState();
+}
+
+function checkCheckpointFile(stat: Stats): void {
+  if (
+    !stat.isFile() ||
+    stat.uid !== process.geteuid?.() ||
+    stat.nlink !== 1 ||
+    (stat.mode & 0o7777) !== 0o600 ||
+    stat.size > CHECKPOINT_BYTES
+  )
+    throw unsafeState();
+}
+
+function unsafeState(): Error {
+  return new Error("native_chat_cutover_state_unsafe");
+}

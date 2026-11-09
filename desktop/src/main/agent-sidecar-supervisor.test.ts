@@ -13,6 +13,7 @@ vi.mock("electron", () => ({
       name === "documents" ? "/Users/test/Documents" : "/Users/test"
     ),
     getAppPath: vi.fn<() => string>(() => "/app/desktop"),
+    hasSingleInstanceLock: vi.fn<() => boolean>(() => true),
   },
 }));
 vi.mock("../env", () => ({ EDITOR_BASE_URL: "https://grida.co" }));
@@ -88,6 +89,49 @@ describe("AgentSidecarSupervisor recovery", () => {
     expect(command).not.toContain("--scratch-base=");
     expect(command).not.toContain("--skills-root=");
     supervisor.stop();
+  });
+
+  it("seals the exact legacy roots only for the primary app before selecting media-only startup", async () => {
+    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/cold-legacy");
+    const supervisor = new AgentSidecarSupervisor();
+    vi.mocked(app.hasSingleInstanceLock).mockReturnValueOnce(false);
+    await expect(supervisor.sealLegacyChatForColdStart()).rejects.toThrow(
+      "legacy_chat_cold_start_required"
+    );
+    const source = await supervisor.sealLegacyChatForColdStart();
+    const { defaultScratchBase } = await import("@grida/agent/sandbox");
+    expect(source).toEqual(
+      expect.objectContaining({
+        userDataPath: "/synthetic/cold-legacy",
+        scratchBase: defaultScratchBase(
+          "/synthetic/cold-legacy",
+          app.getPath("temp")
+        ),
+        desktopUserDataPath: app.getPath("userData"),
+      })
+    );
+    expect(await supervisor.sealLegacyChatForColdStart()).toBe(source);
+    vi.mocked(wrap).mockRejectedValueOnce(new Error("stop before spawn"));
+    await expect(supervisor.start()).rejects.toThrow("stop before spawn");
+    const argv = vi.mocked(wrap).mock.calls.at(-1)?.[0];
+    expect(argv).toContain("--agent=disabled");
+    expect(argv).not.toContain("--scratch-base=");
+    expect(argv).not.toContain("--skills-root=");
+  });
+
+  it("cannot use cold-start evidence after legacy startup was attempted", async () => {
+    const supervisor = new AgentSidecarSupervisor();
+    vi.spyOn(
+      supervisor as unknown as { initSandbox(): Promise<void> },
+      "initSandbox"
+    ).mockRejectedValueOnce(new Error("legacy startup attempted"));
+    await expect(supervisor.start()).rejects.toThrow(
+      "legacy startup attempted"
+    );
+    supervisor.stop();
+    await expect(supervisor.sealLegacyChatForColdStart()).rejects.toThrow(
+      "legacy_chat_cold_start_required"
+    );
   });
 
   it("shares the canonical Grida home and isolates an explicit agent data override", async () => {

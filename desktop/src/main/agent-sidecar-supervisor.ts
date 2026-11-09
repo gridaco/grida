@@ -76,8 +76,18 @@ const STARTUP_TIMEOUT_MS = 15_000; // bumped from 8s — srt init adds proxy sta
 const BACKOFF_INITIAL_MS = 250;
 const BACKOFF_MAX_MS = 10_000;
 
+type LegacyChatSource = Readonly<{
+  userDataPath: string;
+  scratchBase: string;
+  desktopUserDataPath: string;
+  providerHome: string;
+  mediaRoot: string;
+}>;
+
 export class AgentSidecarSupervisor {
-  private readonly agentEnabled: boolean;
+  private agentEnabled: boolean;
+  private legacyLaunchStarted = false;
+  private coldStartSource?: Promise<LegacyChatSource>;
   private child: ChildProcess | null = null;
   private activeGeneration = 0;
   private nextGeneration = 0;
@@ -146,6 +156,7 @@ export class AgentSidecarSupervisor {
   }
 
   async start(): Promise<AgentSidecarInfo> {
+    if (this.agentEnabled) this.legacyLaunchStarted = true;
     if (this.info) return this.info;
     if (this.restartTimer) {
       clearTimeout(this.restartTimer);
@@ -155,6 +166,33 @@ export class AgentSidecarSupervisor {
       await this.initSandbox();
     }
     return await this.spawn();
+  }
+
+  /** Select the media-only composition before the old writer can be started. */
+  async sealLegacyChatForColdStart(): Promise<LegacyChatSource> {
+    if (
+      !app.hasSingleInstanceLock() ||
+      this.legacyLaunchStarted ||
+      this.isShuttingDown
+    ) {
+      throw new Error("legacy_chat_cold_start_required");
+    }
+    this.agentEnabled = false;
+    if (!this.coldStartSource) {
+      const temp = app.getPath("temp");
+      const desktopUserDataPath = app.getPath("userData");
+      this.coldStartSource = import("@grida/agent/sandbox").then(
+        ({ defaultScratchBase }) =>
+          Object.freeze({
+            userDataPath: this.user_data_path,
+            scratchBase: defaultScratchBase(this.user_data_path, temp),
+            desktopUserDataPath,
+            providerHome: this.provider_home,
+            mediaRoot: this.media_root,
+          })
+      );
+    }
+    return this.coldStartSource;
   }
 
   getInfo(): AgentSidecarInfo | null {
@@ -699,6 +737,10 @@ const supervisor = new AgentSidecarSupervisor({
 
 export function startAgentSidecar(): Promise<AgentSidecarInfo> {
   return supervisor.start();
+}
+
+export function sealLegacyChatForColdStart() {
+  return supervisor.sealLegacyChatForColdStart();
 }
 
 export function getAgentSidecarInfo(): AgentSidecarInfo | null {

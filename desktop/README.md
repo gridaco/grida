@@ -143,6 +143,17 @@ control receipts. The snapshot confirms suspension or cancellation, and
 Resume targets a verified pause. Reconnecting requires loading the session
 again before submitting or controlling work.
 
+The cold-start coordinator requires the primary Desktop instance to select
+media-only sidecar startup before launching any legacy chat writer. It verifies
+a private archive of the old chat database and its managed scratch, then opens
+a separate `native-chat` store under the Desktop profile. Interrupted startup
+can retry after checking the archive. Native startup failures surface as errors,
+and the media-only service remains separately startable. The coordinator has
+macOS and Linux storage support. Windows cutover requires separate ACL-aware
+verification. Stable and Insiders can share the old store under separate app
+locks, so activation also needs shared-source writer custody across editions.
+The standard Desktop startup still uses its existing composition.
+
 The source-built native process owner accepts workspace selections from Electron
 main. On macOS and Linux it writes a private launch profile that allows reads
 in the primary workspace and asks before reading an eligible additional root.
