@@ -387,6 +387,13 @@ const bridge: DesktopBridge = {
         inputId,
         text
       ),
+    enqueue: (attachmentId, inputId, text) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,
+        attachmentId,
+        inputId,
+        text
+      ),
     inputReceipt: (attachmentId, inputId) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
@@ -407,6 +414,19 @@ const bridge: DesktopBridge = {
         attachmentId,
         reviewId,
         decision
+      ),
+    questions: (attachmentId, observationId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_QUESTIONS,
+        attachmentId,
+        observationId
+      ),
+    answerQuestion: (attachmentId, reviewId, answer) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ANSWER_QUESTION,
+        attachmentId,
+        reviewId,
+        answer
       ),
     transcript: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, attachmentId),

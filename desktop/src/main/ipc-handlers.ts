@@ -182,6 +182,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       nativeChat.submit(event, id, input, text)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,
+    (event, id: string, input: string, text: string) =>
+      nativeChat.enqueue(event, id, input, text)
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
     (event, id: string, input: string) =>
       nativeChat.inputReceipt(event, id, input)
@@ -198,6 +203,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_ANSWER_APPROVAL,
     (event, id: string, review: string, decision: unknown) =>
       nativeChat.answerApproval(event, id, review, decision)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_QUESTIONS,
+    (event, id: string, observation: string) =>
+      nativeChat.questions(event, id, observation)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ANSWER_QUESTION,
+    (event, id: string, review: string, answer: unknown) =>
+      nativeChat.answerQuestion(event, id, review, answer)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, (event, id: string) =>
     nativeChat.transcript(event, id)

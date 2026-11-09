@@ -80,6 +80,19 @@ export type NativeChatApproval = Readonly<{
 
 export type NativeChatApprovalDecision = "approve_once" | "decline";
 
+export type NativeChatQuestion = Readonly<{
+  questionId: string;
+  reviewId: string;
+  style: "answer_dependent" | "nonblocking";
+  question: string;
+  options: readonly string[];
+}>;
+
+export type NativeChatQuestionAnswer =
+  | { kind: "choice"; index: number }
+  | { kind: "text"; text: string }
+  | { kind: "skipped" };
+
 export type NativeChatControlResult =
   | { action: "pause" | "stop"; receipt: NativeChatControlReceipt }
   | { action: "resume"; turn: NativeChatTurn };
@@ -119,6 +132,11 @@ export type DesktopNativeChat = {
     inputId: string,
     text: string
   ): Promise<NativeChatAcceptance>;
+  enqueue?(
+    attachmentId: string,
+    inputId: string,
+    text: string
+  ): Promise<NativeChatAcceptance>;
   inputReceipt(
     attachmentId: string,
     inputId: string
@@ -132,6 +150,15 @@ export type DesktopNativeChat = {
     attachmentId: string,
     reviewId: string,
     decision: NativeChatApprovalDecision
+  ): Promise<NativeChatControlReceipt>;
+  questions?(
+    attachmentId: string,
+    observationId: string
+  ): Promise<readonly NativeChatQuestion[]>;
+  answerQuestion?(
+    attachmentId: string,
+    reviewId: string,
+    answer: NativeChatQuestionAnswer
   ): Promise<NativeChatControlReceipt>;
   transcript(attachmentId: string): Promise<readonly NativeChatMessage[]>;
   control(

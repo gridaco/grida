@@ -947,6 +947,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
   The workspace pane receives a bounded display target and an attachment-local
   review token. Its reply supplies only the token and a decision. Main retains
   the action and revision basis, and navigation invalidates its tokens.
+- Native chat question tokens are issued separately from approval tokens.
+  Main retains the exact wait and session, control, and history revisions.
+  An answer cannot grant access. An ordinary queued message cannot answer a
+  question. The [native process fixture](desktop/src/main/native-agent-questions.test.ts)
+  covers an answer during independent work, a separate queue, and stale replies.
 - [Native capability host](crates/grida-agent/src/tool_host.rs) and
   [its fixtures](crates/grida-agent/tests/tool_host.rs) bind a tool lease to
   a single capability and endpoint lifetime. The dispatcher checks the

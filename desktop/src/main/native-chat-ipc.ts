@@ -8,18 +8,24 @@ import type {
   NativeChatControlResult,
   NativeChatObservation,
   NativeChatPage,
+  NativeChatQuestion,
+  NativeChatQuestionAnswer,
   NativeChatReadiness,
   NativeChatSnapshot,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
 import { IPC_CHANNELS } from "../bridge/contract";
 import { ipc_sender } from "./ipc-sender";
-import type { NativeAgentChat, NativeChatSession } from "./native-agent-chat";
+import type {
+  NativeAgentChat,
+  NativeChatSession,
+  NativeQuestionReview,
+} from "./native-agent-chat";
 import type { NativeApprovalReview } from "./native-agent-permissions";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
-const MAX_APPROVALS = 16;
+const MAX_REVIEWS = 16;
 const MAX_SUBSCRIPTIONS = 8;
 const MAX_UPDATE_BYTES = 8 * 1024;
 const MAX_DELIVERY_BYTES = 1024 * 1024;
@@ -34,10 +40,13 @@ export type ActiveNativeChat = Readonly<{
     | "create"
     | "load"
     | "submit"
+    | "enqueue"
     | "inputReceipt"
     | "observe"
     | "approvals"
     | "answerApproval"
+    | "questions"
+    | "answerQuestion"
     | "transcript"
     | "pause"
     | "stop"
@@ -51,6 +60,7 @@ type Attachment = {
   session: NativeChatSession;
   observations: Map<string, NativeChatSnapshot>;
   approvals: Map<string, NativeApprovalReview>;
+  questions: Map<string, NativeQuestionReview>;
 };
 
 type Subscription = { attachment: Attachment; stop(): void };
@@ -205,6 +215,22 @@ export class NativeChatIpc {
     return result;
   }
 
+  async enqueue(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    inputId: string,
+    text: string
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const result = await owner.active.chat.enqueue(
+      attachment.session,
+      inputId,
+      text
+    );
+    this.revalidate(owner, attachment);
+    return result;
+  }
+
   async inputReceipt(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -259,16 +285,8 @@ export class NativeChatIpc {
       snapshot
     );
     this.revalidate(owner, attachment);
-    return reviews.slice(0, MAX_APPROVALS).map((review) => {
-      const existing = [...attachment.approvals].find(([, value]) =>
-        sameReview(value, review)
-      );
-      const reviewId = existing?.[0] ?? randomUUID();
-      attachment.approvals.delete(reviewId);
-      const oldest = attachment.approvals.keys().next().value;
-      if (oldest && attachment.approvals.size >= MAX_APPROVALS)
-        attachment.approvals.delete(oldest);
-      attachment.approvals.set(reviewId, review);
+    return reviews.slice(0, MAX_REVIEWS).map((review) => {
+      const reviewId = retainReview(attachment.approvals, review, sameApproval);
       const { tool, root, relativePath, query } = review;
       return {
         reviewId,
@@ -278,6 +296,51 @@ export class NativeChatIpc {
         ...(query === undefined ? {} : { query }),
       };
     });
+  }
+
+  async questions(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string
+  ): Promise<readonly NativeChatQuestion[]> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = token(observationId)
+      ? attachment.observations.get(observationId)
+      : undefined;
+    if (!snapshot) throw new Error("native_chat_observation_unavailable");
+    const reviews = await owner.active.chat.questions(
+      attachment.session,
+      snapshot
+    );
+    this.revalidate(owner, attachment);
+    return reviews.slice(0, MAX_REVIEWS).map((review) => ({
+      questionId: JSON.stringify([review.task.turnId, review.waitId]),
+      reviewId: retainReview(attachment.questions, review, sameQuestion),
+      style: review.style,
+      question: review.question,
+      options: review.options,
+    }));
+  }
+
+  async answerQuestion(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    reviewId: string,
+    input: unknown
+  ): Promise<NativeChatControlReceipt> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const review = token(reviewId)
+      ? attachment.questions.get(reviewId)
+      : undefined;
+    if (!review) throw new Error("native_chat_question_unavailable");
+    const answer = questionAnswer(input, review.options.length);
+    const receipt = await owner.active.chat.answerQuestion(
+      attachment.session,
+      review,
+      answer
+    );
+    this.revalidate(owner, attachment);
+    return receipt;
   }
 
   async answerApproval(
@@ -422,6 +485,7 @@ export class NativeChatIpc {
         session,
         observations: new Map(),
         approvals: new Map(),
+        questions: new Map(),
       };
       owner.attachments.set(attachment.id, attachment);
       return { attachmentId: attachment.id, sessionId: session.id };
@@ -553,7 +617,21 @@ function sameActive(
   return left.chat === right?.chat && left.workspaceId === right.workspaceId;
 }
 
-function sameReview(
+function retainReview<T>(
+  reviews: Map<string, T>,
+  review: T,
+  same: (left: T, right: T) => boolean
+): string {
+  const existing = [...reviews].find(([, value]) => same(value, review));
+  const id = existing?.[0] ?? randomUUID();
+  reviews.delete(id);
+  const oldest = reviews.keys().next().value;
+  if (oldest && reviews.size >= MAX_REVIEWS) reviews.delete(oldest);
+  reviews.set(id, review);
+  return id;
+}
+
+function sameApproval(
   left: NativeApprovalReview,
   right: NativeApprovalReview
 ): boolean {
@@ -569,6 +647,48 @@ function sameReview(
     left.relativePath === right.relativePath &&
     left.query === right.query
   );
+}
+
+function sameQuestion(
+  left: NativeQuestionReview,
+  right: NativeQuestionReview
+): boolean {
+  return (
+    left.task.requestId === right.task.requestId &&
+    left.style === right.style &&
+    left.question === right.question &&
+    left.options.length === right.options.length &&
+    left.options.every((option, index) => option === right.options[index])
+  );
+}
+
+function questionAnswer(
+  input: unknown,
+  options: number
+): NativeChatQuestionAnswer {
+  const answer = record(input);
+  if (answer) {
+    const fields = Object.keys(answer).length;
+    if (answer.kind === "skipped" && fields === 1) return { kind: "skipped" };
+    if (
+      fields === 2 &&
+      answer.kind === "choice" &&
+      typeof answer.index === "number" &&
+      Number.isSafeInteger(answer.index) &&
+      answer.index >= 0 &&
+      answer.index < options
+    )
+      return { kind: "choice", index: answer.index };
+    if (
+      fields === 2 &&
+      answer.kind === "text" &&
+      typeof answer.text === "string" &&
+      answer.text.trim() &&
+      Buffer.byteLength(answer.text) <= 4096
+    )
+      return { kind: "text", text: answer.text };
+  }
+  throw new Error("native_chat_question_answer_invalid");
 }
 
 function sameBasis(

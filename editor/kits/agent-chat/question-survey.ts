@@ -34,6 +34,11 @@ export type QuestionSpec = {
 /** The `question` tool's result shape (mirrors the package `outputSchema`). */
 export type QuestionAnswerOutput = { answers: string[][]; skipped?: boolean };
 
+type SingleAnswer =
+  | { kind: "choice"; index: number }
+  | { kind: "text"; text: string }
+  | { kind: "skipped" };
+
 export class QuestionSurvey {
   private constructor(
     readonly questions: readonly QuestionSpec[],
@@ -197,6 +202,18 @@ export class QuestionSurvey {
     if (answers.every((a) => a.length === 0))
       return { answers: [], skipped: true };
     return { answers };
+  }
+
+  singleAnswer(): SingleAnswer | null {
+    const question = this.questions[0];
+    if (this.count !== 1 || question.multi_select) return null;
+    if (this.isSkipped(0)) return { kind: "skipped" };
+    const text = this.writeInFor(0).trim();
+    if (text) return { kind: "text", text };
+    const index = question.options?.findIndex(
+      (option) => option.label === this.pickedFor(0)[0]
+    );
+    return index !== undefined && index >= 0 ? { kind: "choice", index } : null;
   }
 
   // ── internals ───────────────────────────────────────────────────────────

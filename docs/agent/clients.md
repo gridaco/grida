@@ -156,6 +156,10 @@ for review when its folder is eligible for additional access. The pane shows
 the requested action and target. **Allow once** authorizes that action.
 **Decline** leaves the additional access denied.
 
+Answer a question in its card by selecting a choice, writing a reply, or
+skipping. The agent may continue other work while it waits. A separate message
+sent from the composer joins the queue and leaves the question open.
+
 Text and resource-link descriptors are accepted as prompt content. A resource
 link supplies context about a resource. File access follows a separately granted
 capability.

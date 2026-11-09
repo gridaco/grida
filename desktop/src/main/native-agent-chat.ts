@@ -1,4 +1,5 @@
 // GRIDA-SEC-004 — attached native chat controls owned by Electron main.
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type {
@@ -7,6 +8,8 @@ import type {
   NativeChatControlReceipt,
   NativeChatMessage,
   NativeChatPage,
+  NativeChatQuestion,
+  NativeChatQuestionAnswer,
   NativeChatSnapshot,
   NativeChatStreamUpdate,
   NativeChatTurn,
@@ -19,12 +22,15 @@ import {
 
 const CAPABILITIES = {
   "co.grida/session/submit": 1,
+  "co.grida/session/enqueue": 1,
   "co.grida/session/input": 1,
   "co.grida/session/snapshot": 1,
   "co.grida/session/stop": 1,
   "co.grida/session/pause": 1,
   "co.grida/session/resume": 1,
   "co.grida/session/updates": 1,
+  "co.grida/session/questions": 1,
+  "co.grida/session/answer-question": 1,
 } as const;
 const TURN_DISPOSITIONS = [
   "running",
@@ -70,6 +76,14 @@ type TaskBasis = Readonly<{
   expectedControlRevision: number;
 }>;
 
+export type NativeQuestionReview = Readonly<
+  Pick<NativeChatQuestion, "style" | "question" | "options"> & {
+    task: TaskBasis;
+    waitId: string;
+    expectedHistoryPosition: number;
+  }
+>;
+
 // A retained basis can retry an identical control after the native child is
 // replaced. The replacement still requires a fresh attachment to that session.
 const observed = new WeakMap<NativeChatSnapshot, string>();
@@ -85,6 +99,7 @@ export class NativeAgentChat {
   private readonly loading = new Map<string, Promise<NativeChatSession>>();
   private readonly transcripts = new Map<string, TranscriptCapture>();
   private readonly unverifiedTranscripts = new Set<string>();
+  private readonly questionReviews = new WeakSet<NativeQuestionReview>();
   private readonly listeners = new Map<
     string,
     Set<(update: NativeChatStreamUpdate) => void>
@@ -203,7 +218,24 @@ export class NativeAgentChat {
     return requested;
   }
 
-  async submit(
+  submit(
+    session: NativeChatSession,
+    inputId: string,
+    text: string
+  ): Promise<NativeChatAcceptance> {
+    return this.send("submit", session, inputId, text);
+  }
+
+  enqueue(
+    session: NativeChatSession,
+    inputId: string,
+    text: string
+  ): Promise<NativeChatAcceptance> {
+    return this.send("enqueue", session, inputId, text);
+  }
+
+  private async send(
+    mode: "submit" | "enqueue",
     session: NativeChatSession,
     inputId: string,
     text: string
@@ -217,7 +249,7 @@ export class NativeAgentChat {
     )
       throw new Error("native_chat_text_invalid");
     return acceptance(
-      await this.process.request("_co.grida/session/submit", {
+      await this.process.request(`_co.grida/session/${mode}`, {
         sessionId,
         inputId,
         prompt: [{ type: "text", text }],
@@ -339,6 +371,96 @@ export class NativeAgentChat {
     if (!permissions || review.sessionId !== sessionId)
       throw new Error("native_chat_approval_unavailable");
     return permissions.answer(review, decision);
+  }
+
+  async questions(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot
+  ): Promise<readonly NativeQuestionReview[]> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const current = snapshot.current;
+    if (!current || current.cancelled) return [];
+    const result = object(
+      await this.process.request("_co.grida/session/questions", {
+        sessionId,
+        turnId: current.turnId,
+      })
+    );
+    this.requireAttached(session);
+    if (
+      result.sessionId !== sessionId ||
+      result.turnId !== current.turnId ||
+      result.controlRevision !== current.controlRevision ||
+      result.historyPosition !== current.historyPosition
+    )
+      throw new Error("native_chat_question_changed");
+    if (!Array.isArray(result.questions)) throw invalidResponse();
+    const reviews = result.questions.map((value: unknown) => {
+      const entry = object(value);
+      const waitId = identity(entry.waitId);
+      const style = choice(entry.style, [
+        "answer_dependent",
+        "nonblocking",
+      ] as const);
+      const question = boundedText(entry.question, 2048);
+      if (!Array.isArray(entry.options) || entry.options.length > 6)
+        throw invalidResponse();
+      const options = entry.options.map((option: unknown) =>
+        boundedText(option, 256)
+      );
+      if (
+        new Set(options.map((option) => option.trim())).size !== options.length
+      )
+        throw invalidResponse();
+      const expectedHistoryPosition = current.historyPosition;
+      const requestId = `desktop-question-${createHash("sha256")
+        .update(
+          JSON.stringify([
+            sessionId,
+            current.turnId,
+            waitId,
+            snapshot.sessionRevision,
+            current.controlRevision,
+            expectedHistoryPosition,
+          ])
+        )
+        .digest("hex")}`;
+      const { task } = this.task(session, snapshot, requestId);
+      return Object.freeze({
+        task: Object.freeze(task),
+        waitId,
+        expectedHistoryPosition,
+        style,
+        question,
+        options: Object.freeze(options),
+      });
+    });
+    if (new Set(reviews.map(({ waitId }) => waitId)).size !== reviews.length)
+      throw invalidResponse();
+    for (const review of reviews) this.questionReviews.add(review);
+    return reviews;
+  }
+
+  async answerQuestion(
+    session: NativeChatSession,
+    review: NativeQuestionReview,
+    answer: NativeChatQuestionAnswer
+  ): Promise<NativeChatControlReceipt> {
+    if (
+      review.task.sessionId !== this.requireAttached(session) ||
+      !this.questionReviews.has(review)
+    )
+      throw new Error("native_chat_question_unavailable");
+    const result = await this.process.request(
+      "_co.grida/session/answer-question",
+      {
+        ...review.task,
+        waitId: review.waitId,
+        expectedHistoryPosition: review.expectedHistoryPosition,
+        answer,
+      }
+    );
+    return controlReceipt(result, review.task);
   }
 
   pause(
@@ -474,22 +596,11 @@ export class NativeAgentChat {
     requestId: string
   ): Promise<NativeChatControlReceipt> {
     const { task } = this.task(session, snapshot, requestId);
-    const result = object(
-      await this.process.request(`_co.grida/session/${action}`, task)
+    const result = await this.process.request(
+      `_co.grida/session/${action}`,
+      task
     );
-    if (
-      result.sessionId !== task.sessionId ||
-      result.turnId !== task.turnId ||
-      result.requestId !== requestId
-    )
-      throw invalidResponse();
-    return Object.freeze({
-      sessionId: task.sessionId,
-      turnId: task.turnId,
-      requestId,
-      sessionRevision: revision(result.sessionRevision),
-      journalPosition: revision(result.journalPosition),
-    });
+    return controlReceipt(result, task);
   }
 
   private task(
@@ -604,6 +715,37 @@ function turn(value: unknown): NativeChatTurn {
     status:
       result.status === null ? null : choice(result.status, TURN_STATUSES),
   });
+}
+
+function controlReceipt(
+  value: unknown,
+  task: TaskBasis
+): NativeChatControlReceipt {
+  const result = object(value);
+  const { sessionId, turnId, requestId } = task;
+  if (
+    result.sessionId !== sessionId ||
+    result.turnId !== turnId ||
+    result.requestId !== requestId
+  )
+    throw invalidResponse();
+  return Object.freeze({
+    sessionId,
+    turnId,
+    requestId,
+    sessionRevision: revision(result.sessionRevision),
+    journalPosition: revision(result.journalPosition),
+  });
+}
+
+function boundedText(value: unknown, bytes: number): string {
+  if (
+    typeof value !== "string" ||
+    !value.trim() ||
+    Buffer.byteLength(value) > bytes
+  )
+    throw invalidResponse();
+  return value;
 }
 
 function identity(value: unknown): string {

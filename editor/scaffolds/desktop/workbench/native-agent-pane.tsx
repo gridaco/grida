@@ -8,7 +8,11 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@app/ui/ai-elements/conversation";
-import { ChatMessageView, PendingTurnIndicator } from "@/kits/agent-chat";
+import {
+  ChatMessageView,
+  PendingTurnIndicator,
+  QuestionPrompt,
+} from "@/kits/agent-chat";
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentComposerInput } from "../shared/agent-composer-input";
@@ -63,9 +67,9 @@ export function NativeAgentPane({
     turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
       ? state.approvals[0]
       : undefined;
-  const error = state.error ?? state.approvalError;
-  const canSubmit =
-    !state.loading && !state.acting && !turn && !snapshot?.admissionPaused;
+  const question = turn && !turn.cancelled ? state.questions[0] : undefined;
+  const queued = snapshot?.queuedInputs ?? 0;
+  const error = state.error ?? state.approvalError ?? state.questionError;
   const status = state.loading
     ? "Opening chat…"
     : state.repairing
@@ -182,6 +186,13 @@ export function NativeAgentPane({
       {status && (
         <div role="status" className="px-3 pt-2 text-xs text-muted-foreground">
           {status}
+          {turn && queued > 0 && (
+            <>
+              {" "}
+              ·{" "}
+              {queued === 1 ? "1 message queued" : `${queued} messages queued`}
+            </>
+          )}
         </div>
       )}
       {error && (
@@ -226,6 +237,28 @@ export function NativeAgentPane({
           }
         />
       )}
+      {question && (
+        <div className="shrink-0 px-3 py-2">
+          <QuestionPrompt
+            key={question.questionId}
+            input={{
+              questions: [
+                {
+                  question: question.question,
+                  options: question.options.map((label) => ({ label })),
+                },
+              ],
+            }}
+            onSubmit={async (survey) => {
+              const answer = survey.singleAnswer();
+              return answer
+                ? controller.answerQuestion(question.questionId, answer)
+                : false;
+            }}
+            disabled={!state.questionReady || state.acting}
+          />
+        </div>
+      )}
       <div className="shrink-0 p-3">
         <AgentComposerInput
           key={state.scope}
@@ -233,9 +266,9 @@ export function NativeAgentPane({
           attach={false}
           operableFiles={false}
           awaitSubmission
-          canSubmit={canSubmit}
+          canSubmit={controller.canSubmit}
           busy={!!turn}
-          isStreaming={running}
+          isStreaming={running && !question}
           submissionScope={state.scope}
           onSubmit={(text) => controller.submit(text)}
           onStop={() => void controller.control("stop")}
@@ -263,7 +296,7 @@ export function NativeAgentPane({
             ) : null
           }
           toolbarEnd={
-            !running && canStop ? (
+            (!running || !!question) && canStop ? (
               <Button
                 type="button"
                 variant="ghost"

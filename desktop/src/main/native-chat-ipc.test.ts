@@ -100,6 +100,15 @@ function setup() {
         disposition: "claimed",
       };
     },
+    async enqueue(session, inputId) {
+      return {
+        sessionId: session.id,
+        inputId,
+        inputPosition: 2,
+        turnId: null,
+        disposition: "queued",
+      };
+    },
     async inputReceipt(session, inputId) {
       return this.submit(session, inputId, "Fixture");
     },
@@ -116,6 +125,18 @@ function setup() {
         requestId: "native-review",
         sessionRevision: review.sessionRevision + 1,
         journalPosition: review.controlRevision + 1,
+      };
+    },
+    async questions() {
+      return [];
+    },
+    async answerQuestion(session, review) {
+      return {
+        sessionId: session.id,
+        turnId: review.task.turnId,
+        requestId: review.task.requestId,
+        sessionRevision: review.task.expectedSessionRevision + 1,
+        journalPosition: review.expectedHistoryPosition + 1,
       };
     },
     async transcript() {
@@ -164,6 +185,89 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("binds question answers to their attachment and rejects approval and malformed inputs", async () => {
+    const { ipc, first, second, chat } = setup();
+    const one = await ipc.create(first.event);
+    const two = await ipc.load(second.event, one.sessionId);
+    const observation = await ipc.observe(first.event, one.attachmentId);
+    const review = {
+      task: {
+        sessionId: one.sessionId,
+        turnId: "turn",
+        requestId: "question-request",
+        expectedSessionRevision: observation.snapshot.sessionRevision,
+        expectedControlRevision: observation.snapshot.current!.controlRevision,
+      },
+      expectedHistoryPosition: observation.snapshot.current!.historyPosition,
+      waitId: "wait",
+      style: "nonblocking",
+      question: "Which edition?",
+      options: ["Digital", "Print"],
+    } as const;
+    vi.spyOn(chat, "questions").mockResolvedValue([review]);
+    const answer = vi.spyOn(chat, "answerQuestion");
+    const [shown] = await ipc.questions(
+      first.event,
+      one.attachmentId,
+      observation.observationId
+    );
+    expect(shown).toEqual({
+      questionId: expect.any(String),
+      reviewId: expect.any(String),
+      style: "nonblocking",
+      question: "Which edition?",
+      options: ["Digital", "Print"],
+    });
+    await expect(
+      ipc.answerApproval(
+        first.event,
+        one.attachmentId,
+        shown.reviewId,
+        "approve_once"
+      )
+    ).rejects.toThrow("native_chat_approval_unavailable");
+    await expect(
+      ipc.answerQuestion(second.event, two.attachmentId, shown.reviewId, {
+        kind: "choice",
+        index: 1,
+      })
+    ).rejects.toThrow("native_chat_question_unavailable");
+    await expect(
+      ipc.answerQuestion(first.event, one.attachmentId, shown.reviewId, {
+        kind: "choice",
+        index: 2,
+      })
+    ).rejects.toThrow("native_chat_question_answer_invalid");
+    await expect(
+      ipc.answerQuestion(first.event, one.attachmentId, shown.reviewId, {
+        kind: "text",
+        text: "Print",
+        waitId: "injected",
+      })
+    ).rejects.toThrow("native_chat_question_answer_invalid");
+    const selected = { kind: "choice", index: 1 } as const;
+    await ipc.answerQuestion(
+      first.event,
+      one.attachmentId,
+      shown.reviewId,
+      selected
+    );
+    expect(answer).toHaveBeenCalledExactlyOnceWith(
+      { id: one.sessionId },
+      review,
+      selected
+    );
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    await expect(
+      ipc.answerQuestion(
+        first.event,
+        one.attachmentId,
+        shown.reviewId,
+        selected
+      )
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+  });
+
   it("issues stable exact approval tokens only to their observing attachment", async () => {
     const { ipc, first, second, chat } = setup();
     const one = await ipc.create(first.event);

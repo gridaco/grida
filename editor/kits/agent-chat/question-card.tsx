@@ -19,7 +19,7 @@
 
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { getToolName } from "ai";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
@@ -128,24 +128,31 @@ export function QuestionCard({
   onAnswer: AnswerQuestionHandler;
   disabled?: boolean;
 }) {
+  const toolCallId = toolCallIdOf(entry);
+  return (
+    <QuestionPrompt
+      key={toolCallId}
+      input={inputOf(entry)}
+      disabled={disabled}
+      onSubmit={(survey) => onAnswer(toolCallId, survey.buildOutput())}
+    />
+  );
+}
+
+export function QuestionPrompt({
+  input,
+  onSubmit,
+  disabled,
+}: {
+  input: unknown;
+  onSubmit: (survey: QuestionSurvey) => void | Promise<boolean>;
+  disabled?: boolean;
+}) {
   // Stable prefix for `aria-labelledby` ids tying each write-in to its question
   // text (the form gives screen readers no other accessible name).
   const labelId = useId();
-  const [survey, setSurvey] = useState(() =>
-    QuestionSurvey.from(inputOf(entry))
-  );
+  const [survey, setSurvey] = useState(() => QuestionSurvey.from(input));
   const [submitted, setSubmitted] = useState(false);
-
-  // Reset when the pending tool call changes — a surface may reuse this instance
-  // for a NEW question without unmounting (two questions back-to-back in one
-  // turn). React's guarded "adjust state during render" pattern.
-  const toolCallId = toolCallIdOf(entry);
-  const seenToolCallId = useRef(toolCallId);
-  if (seenToolCallId.current !== toolCallId) {
-    seenToolCallId.current = toolCallId;
-    setSurvey(QuestionSurvey.from(inputOf(entry)));
-    setSubmitted(false);
-  }
 
   if (survey.count === 0) return null;
 
@@ -161,7 +168,14 @@ export function QuestionCard({
   const finalize = (s: QuestionSurvey) => {
     if (busy) return;
     setSubmitted(true);
-    onAnswer(toolCallId, s.buildOutput());
+    const pending = onSubmit(s);
+    if (pending)
+      void pending.then(
+        (accepted) => {
+          if (!accepted) setSubmitted(false);
+        },
+        () => setSubmitted(false)
+      );
   };
   // Skip is PER QUESTION: skip the current one (its answer becomes empty) and
   // advance, or finalize if it's the last/only question.

@@ -177,6 +177,109 @@ it("drops a late review from the previous chat", async () => {
   controller.disconnect();
 });
 
+it("queues separately and uses the new review token for the same question", async () => {
+  const { bridge, controller, waiting } = fixture();
+  waiting.add("chat-a");
+  let queued = 0;
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const prior = await observe(id);
+    return {
+      observationId: `${prior.observationId}-${queued}`,
+      snapshot: { ...prior.snapshot, queuedInputs: queued },
+    };
+  };
+  const question = {
+    questionId: "question",
+    style: "answer_dependent",
+    question: "Which edition?",
+    options: ["Screen", "Print"],
+  } as const;
+  bridge.questions = async () =>
+    waiting.size ? [{ ...question, reviewId: `review-${queued}` }] : [];
+  const enqueue = vi.fn<NonNullable<DesktopNativeChat["enqueue"]>>(
+    async (sessionId, inputId) => {
+      queued++;
+      return {
+        sessionId,
+        inputId,
+        disposition: "queued",
+        inputPosition: 2,
+        turnId: null,
+      };
+    }
+  );
+  const answer = vi.fn<NonNullable<DesktopNativeChat["answerQuestion"]>>(
+    async () => {
+      waiting.clear();
+      return {
+        sessionId: "chat-a",
+        turnId: "turn-chat-a",
+        requestId: "answer",
+        sessionRevision: 3,
+        journalPosition: 2,
+      };
+    }
+  );
+  bridge.enqueue = enqueue;
+  bridge.answerQuestion = answer;
+  await controller.select("chat-a");
+  expect(controller.read().questions[0]?.reviewId).toBe("review-0");
+  await controller.submit("Check the page numbers.");
+  expect(enqueue).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    expect.any(String),
+    "Check the page numbers."
+  );
+  expect(controller.read().questions[0]).toEqual({
+    ...question,
+    reviewId: "review-1",
+  });
+  expect(
+    await controller.answerQuestion(question.questionId, {
+      kind: "choice",
+      index: 1,
+    })
+  ).toBe(true);
+  expect(answer).toHaveBeenCalledExactlyOnceWith("chat-a", "review-1", {
+    kind: "choice",
+    index: 1,
+  });
+  await controller.select("chat-b");
+  expect(
+    await controller.answerQuestion(question.questionId, { kind: "skipped" })
+  ).toBe(false);
+  expect(answer).toHaveBeenCalledTimes(1);
+  controller.disconnect();
+});
+
+it("keeps ordinary turns quiet when question inspection is absent or fails", async () => {
+  const { bridge, controller, running } = fixture();
+  running.add("chat-a");
+  const questions = vi.fn<NonNullable<DesktopNativeChat["questions"]>>(
+    async () => {
+      throw new Error("fixture question method unavailable");
+    }
+  );
+  bridge.questions = questions;
+  await controller.select("chat-a");
+  expect(questions).not.toHaveBeenCalled();
+  expect(controller.read().questionError).toBeNull();
+
+  bridge.answerQuestion = async () => {
+    throw new Error("unexpected answer");
+  };
+  await controller.repair();
+  expect(questions).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    "observation-chat-a"
+  );
+  expect(controller.read().questions).toEqual([]);
+  expect(controller.read().questionError).toBeNull();
+  expect(controller.read().error).toBeNull();
+  controller.disconnect();
+});
+
 it("uses the readiness probe and preserves native mode through startup failure", async () => {
   const { bridge } = fixture();
   const availability = vi.spyOn(bridge, "available");

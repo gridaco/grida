@@ -7,6 +7,8 @@ import type {
   NativeChatMessage,
   NativeChatObservation,
   NativeChatPage,
+  NativeChatQuestion,
+  NativeChatQuestionAnswer,
   NativeChatReadiness,
   NativeChatTextUpdate,
   NativeChatUpdate,
@@ -29,6 +31,9 @@ export type NativeChatView = Readonly<{
   observation: NativeChatObservation | null;
   approvals: readonly NativeChatApproval[];
   approvalError: string | null;
+  questions: readonly NativeChatQuestion[];
+  questionReady: boolean;
+  questionError: string | null;
   loading: boolean;
   acting: boolean;
   repairing: boolean;
@@ -47,8 +52,9 @@ type Scope = {
   gaps: Set<string>;
   observation: NativeChatObservation | null;
   approvalBasis?: string;
+  questionBasis?: string;
   replay: boolean;
-  pending?: { text: string; inputId: string };
+  pending?: { text: string; inputId: string; mode: "submit" | "enqueue" };
   awaitingTurn?: string;
 };
 
@@ -64,6 +70,9 @@ const EMPTY: NativeChatView = Object.freeze({
   observation: null,
   approvals: [],
   approvalError: null,
+  questions: [],
+  questionReady: false,
+  questionError: null,
   loading: false,
   acting: false,
   repairing: false,
@@ -208,6 +217,9 @@ export class NativeChatController {
       observation: null,
       approvals: [],
       approvalError: null,
+      questions: [],
+      questionReady: false,
+      questionError: null,
       loading: sessionId !== null,
       acting: false,
       repairing: false,
@@ -228,16 +240,23 @@ export class NativeChatController {
     }
   }
 
+  get canSubmit(): boolean {
+    const snapshot = this.view.observation?.snapshot;
+    return (
+      !!this.scope &&
+      !this.view.loading &&
+      !this.view.acting &&
+      !snapshot?.admissionPaused &&
+      (!snapshot?.current ||
+        (!snapshot.current.cancelled &&
+          !!this.bridge.enqueue &&
+          this.view.questions.length > 0))
+    );
+  }
+
   async submit(text: string): Promise<void> {
     const scope = this.scope;
-    if (
-      !scope ||
-      this.view.loading ||
-      this.view.acting ||
-      this.view.observation?.snapshot.current ||
-      this.view.observation?.snapshot.admissionPaused ||
-      !text.trim()
-    )
+    if (!scope || !this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
     this.update({ acting: true, error: null });
     try {
@@ -246,11 +265,20 @@ export class NativeChatController {
       const pending =
         scope.pending?.text === text
           ? scope.pending
-          : { text, inputId: crypto.randomUUID() };
+          : {
+              text,
+              inputId: crypto.randomUUID(),
+              mode: this.view.observation?.snapshot.current
+                ? ("enqueue" as const)
+                : ("submit" as const),
+            };
       scope.pending = pending;
       let accepted;
       try {
-        accepted = await this.bridge.submit(
+        const send = this.bridge[pending.mode];
+        if (!send) throw new Error("native_chat_enqueue_unavailable");
+        accepted = await send.call(
+          this.bridge,
           attachment.attachmentId,
           pending.inputId,
           pending.text
@@ -364,6 +392,56 @@ export class NativeChatController {
     }
   }
 
+  async answerQuestion(
+    questionId: string,
+    answer: NativeChatQuestionAnswer
+  ): Promise<boolean> {
+    const scope = this.scope;
+    const question = this.view.questions.find(
+      (entry) => entry.questionId === questionId
+    );
+    if (
+      !scope?.attachment ||
+      !this.bridge.answerQuestion ||
+      !question ||
+      !this.view.questionReady ||
+      this.view.acting
+    )
+      return false;
+    if (answer.kind === "text" && utf8.encode(answer.text).length > 4096) {
+      this.update({ error: "The answer exceeds the 4 KiB limit." });
+      return false;
+    }
+    this.update({ acting: true, error: null });
+    try {
+      await this.bridge.answerQuestion(
+        scope.attachment.attachmentId,
+        question.reviewId,
+        answer
+      );
+      if (this.owns(scope))
+        this.update({
+          questions: this.view.questions.filter(
+            (entry) => entry.questionId !== questionId
+          ),
+          questionReady: false,
+        });
+      return true;
+    } catch {
+      if (this.owns(scope))
+        this.update({
+          error:
+            "Couldn't confirm the answer. Check the question and try again.",
+        });
+      return false;
+    } finally {
+      if (this.owns(scope)) {
+        await this.refresh(scope);
+        if (this.owns(scope)) this.update({ acting: false });
+      }
+    }
+  }
+
   private open(scope: Scope): Promise<void> {
     if (scope.attachment) return Promise.resolve();
     if (scope.opening) return scope.opening;
@@ -412,6 +490,9 @@ export class NativeChatController {
       .observe(attachment.attachmentId)
       .then(async (next) => {
         if (!this.owns(scope)) return;
+        const turnChanged =
+          scope.observation?.snapshot.current?.turnId !==
+          next.snapshot.current?.turnId;
         const replay =
           scope.replay ||
           lifecycleBasis(scope.observation) !== lifecycleBasis(next) ||
@@ -424,8 +505,18 @@ export class NativeChatController {
             next.snapshot.latest?.turnId === scope.awaitingTurn)
         )
           scope.awaitingTurn = undefined;
-        this.update({ observation: next });
-        await this.refreshApprovals(scope, attachment, next);
+        this.update({
+          observation: next,
+          ...(turnChanged && {
+            questions: [],
+            questionReady: false,
+            questionError: null,
+          }),
+        });
+        await Promise.all([
+          this.refreshApprovals(scope, attachment, next),
+          this.refreshQuestions(scope, attachment, next),
+        ]);
         if (!this.owns(scope)) return;
         if (!replay) return;
         scope.replay = false;
@@ -459,6 +550,8 @@ export class NativeChatController {
           observable &&
           this.owns(scope) &&
           (scope.observation?.snapshot.current ||
+            (scope.observation?.snapshot.queuedInputs &&
+              !scope.observation.snapshot.admissionPaused) ||
             scope.replay ||
             scope.awaitingTurn)
         ) {
@@ -496,6 +589,50 @@ export class NativeChatController {
     } catch {
       if (this.owns(scope))
         this.update({ approvalError: "Couldn't load the permission request." });
+    }
+  }
+
+  private async refreshQuestions(
+    scope: Scope,
+    attachment: NativeChatAttachment,
+    observation: NativeChatObservation
+  ): Promise<void> {
+    if (!this.bridge.questions || !this.bridge.answerQuestion) return;
+    const turn = observation.snapshot.current;
+    if (!turn || turn.cancelled) {
+      scope.questionBasis = undefined;
+      if (
+        this.view.questions.length ||
+        this.view.questionReady ||
+        this.view.questionError
+      )
+        this.update({
+          questions: [],
+          questionReady: false,
+          questionError: null,
+        });
+      return;
+    }
+    if (scope.questionBasis === observation.observationId) return;
+    if (this.view.questionReady) this.update({ questionReady: false });
+    try {
+      const questions = await this.bridge.questions(
+        attachment.attachmentId,
+        observation.observationId
+      );
+      if (!this.owns(scope)) return;
+      scope.questionBasis = observation.observationId;
+      this.update({ questions, questionReady: true, questionError: null });
+    } catch (error) {
+      if (
+        this.owns(scope) &&
+        this.view.questions.length > 0 &&
+        !(
+          error instanceof Error &&
+          error.message.includes("native_chat_question_changed")
+        )
+      )
+        this.update({ questionError: "Couldn't load the pending question." });
     }
   }
 

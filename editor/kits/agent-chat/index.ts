@@ -7,6 +7,7 @@ export {
 export type { ChatMessage, ChatMessageActions, ToolCallEntry } from "./message";
 export {
   QuestionCard,
+  QuestionPrompt,
   AnsweredQuestionSummary,
   findPendingQuestion,
 } from "./question-card";
