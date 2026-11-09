@@ -2,7 +2,7 @@
  * `bindEditor(editor)` — the `AgentFs.LiveBinding` that ties a single
  * virtual canvas path to a live `SvgEditor`.
  *
- * Mirrors `editor/app/(canvas)/svg/_ai/binding-svg.ts` (the web `/svg`
+ * Mirrors `editor/app/(canvas)/svg/_storage/binding-svg.ts` (the web `/svg`
  * route's binding) shape-for-shape:
  *
  *   serialize → pretty-printed SVG (stable for the model's
@@ -31,7 +31,7 @@ import type { SvgEditor } from "@grida/svg-editor";
 // boundary. Kept in the canvas-web folder because pretty-printing is
 // SVG-specific and the original lives there; moving it to a shared
 // package is a follow-up if a third caller appears.
-import { formatSvg } from "@/app/(canvas)/svg/_ai/format-svg";
+import { formatSvg } from "@/app/(canvas)/svg/_storage/format-svg";
 
 /** The single virtual path the active editor is mounted at. */
 export const CANVAS_PATH = "/canvas.svg" as const;

@@ -3,7 +3,7 @@ import { AgentFs } from "@grida/agent/fs";
 import { OpfsBackend } from "@grida/agent/fs/backends/opfs";
 import { dotcanvas } from "dotcanvas";
 import type { SvgEditor } from "@grida/svg-editor";
-import { svgEditorBinding } from "../_ai/binding-svg";
+import { svgEditorBinding } from "./binding-svg";
 import { bundleFs, ManifestHidingBackend } from "./bundle-fs";
 import { svgToDataUri } from "./thumbnails";
 

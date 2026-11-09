@@ -322,8 +322,8 @@ next thing to ship.
   ([README](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/fs/README.md))
 - `packages/grida-ai-agent/src/todos/` — planning fundamentals
 - `packages/grida-ai-agent/src/tool-search/` — _not yet created; see proposal above_
-- `editor/grida-canvas-hosted/ai/tools/` — canvas tools; see
-  [`tools-canvas.md`](./tools-canvas.md) for the catalog.
+- Document-specific tools belong to their editor implementations. See
+  [`tools-canvas.md`](./tools-canvas.md) for the canvas capability catalog.
 
 ## Adding a new fundamental tool
 

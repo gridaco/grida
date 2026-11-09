@@ -80,12 +80,12 @@ Their presence does not make every operation a tool available to the native agen
 
 Desktop and headless execution are the supported agent surfaces. The desktop
 client can use web-rendered UI while its agent executes through the native host.
-Hosted browser assistants are being retired under the desktop-first scope.
+Hosted browser assistants are unavailable under the desktop-first scope.
 
 | Retired surface      | What it provided                                                     | Disposition                                                                                    |
 | -------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Web SVG assistant    | Hosted chat and tool execution for the browser SVG editor.           | Remove hosted execution and assistant entrypoints. Retain independent SVG editing and storage. |
-| Web canvas assistant | Hosted chat and design-tool execution for the browser canvas editor. | Remove hosted execution and assistant entrypoints. Retain independent canvas editing.          |
+| Web SVG assistant    | Hosted chat and tool execution for the browser SVG editor.           | Hosted execution, chat panel and assistant controls removed. SVG editing and storage retained. |
+| Web canvas assistant | Hosted chat and design-tool execution for the browser canvas editor. | Hosted execution and the Agent tab removed. Canvas editing and inspector retained.             |
 
 ## Checking coverage
 

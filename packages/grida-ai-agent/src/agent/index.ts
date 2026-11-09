@@ -158,9 +158,7 @@ export type CreateAgentOptions = {
 };
 
 /**
- * Build the Grida agent. Used by:
- *   - `editor/app/(api)/private/ai/design/chat/route.ts` (web SVG).
- *   - Local AgentHost processes (BYOK model access).
+ * Build the Grida agent for local AgentHost processes.
  */
 export function createAgent(opts: CreateAgentOptions) {
   return buildAgent(opts);

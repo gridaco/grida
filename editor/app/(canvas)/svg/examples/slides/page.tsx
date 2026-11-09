@@ -1,6 +1,6 @@
 "use client";
 
-// Slides canvas demo. Multi-doc state + persistence + AI agent come from
+// Slides canvas demo. Multi-doc state and persistence come from
 // the shared `SvgRouteShell`. This file owns only the slide-specific
 // presentation surface (keynote camera preset + Presentation overlay)
 // and template-aware add operations.
@@ -22,7 +22,6 @@ import { useOpacityDigitsHotkeys } from "../../_components/use-opacity-digits";
 import { TITLE_SLIDE_SVG, type SlideTemplate } from "./_components/templates";
 import { EMPTY_SLIDE_SVG } from "./_components/types";
 import { SvgRouteShell, useSvgDocStore } from "../../_storage";
-import { useSvgAgentHydrated } from "../../_ai/provider";
 
 // v3: persistence moved from the `_meta/index.json` sidecar to a `.canvas`
 // bundle (.canvas.json + <id>.svg) via dotcanvas. Old data is dropped.
@@ -56,7 +55,11 @@ function SlidesBody() {
 
   const activeDoc = docs.find((d) => d.id === activeId);
   const activeIndex = docs.findIndex((d) => d.id === activeId);
-  const hydrated = useSvgAgentHydrated();
+  const hydrated = useSyncExternalStore(
+    store.subscribe,
+    store.isHydrated,
+    store.isHydrated
+  );
 
   // Host-owned digit → opacity shortcut (1–9 / 0 / 0 0) + toast. Suppressed
   // while presenting, where digits are not an authoring gesture.
