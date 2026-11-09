@@ -21,6 +21,10 @@ tags:
 
 # Foundations
 
+> **Earlier design reference**
+>
+> The fixed stream format, tool profile, and directory-rooted assumptions below belong to the earlier design. [Components](./components.md) now defines the agnostic execution contract, and [Master](./master.md) defines product policy for the proposed rebuild.
+
 Bedrock — the assumptions the rest of the guide rests on. An
 implementor MAY swap any of these, but each swap pulls a
 cross-cutting change. Read [`index`](./index.md) first for the
@@ -79,13 +83,12 @@ collected in [`ai-sdk`](./ai-sdk/index.md).
 
 ### Outward wire vs internal stream
 
-The AI SDK chunk shape is the **internal** stream — the language the
-core, the recorder, the canonical inspection format, and the resume
-layer all speak. When the host delivers the stream to an external
-client (an editor, an IDE, another agent host), the **outward** wire
-is [ACP](./acp.md). A thin adapter translates AI-SDK-v6 chunks to
-ACP `session/update` notifications without introducing buffering or
-its own state. See [ACP integration](./acp.md) for the mapping.
+The earlier implementation uses AI SDK chunks internally. The fresh design
+defines its semantic vocabulary in [Components](./components.md) and projects
+it through an [ACP client adapter](./acp.md). That adapter owns protocol
+correlation, capabilities, and bounded delivery. Durable execution facts stay
+with their component owners. The client wire places no SDK-shape requirement
+on internal history or execution.
 
 ## Directory-rooted execution
 

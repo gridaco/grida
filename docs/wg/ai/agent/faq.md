@@ -11,6 +11,11 @@ tags:
 
 # FAQ
 
+> **Earlier design reference.** For the rebuilt product, the
+> [feature catalog](../../../agent/features.md) owns feature status and minimum
+> promises, and [Experience](./experience.md) defines detailed behavior. Answers
+> below retain earlier design assumptions where those sources differ.
+
 This page is a question-and-answer index over the Agent System guide.
 It exists for two reasons:
 
@@ -42,6 +47,20 @@ the FAQ records the settled answer and points to it.
 -->
 
 ### Agents and patterns
+
+#### Can an ACP client still have a custom interface?
+
+Yes. The client controls streaming presentation, tool cards, plans, previews,
+and layout. Standard ACP carries the common content. Negotiated extensions
+supply richer controls and optional view data. A generic client supports the
+shared subset. See [ACP integration](./acp.md#custom-presentation).
+
+#### Does the rebuild support hooks?
+
+Yes, as a proposed feature. Hooks can contribute context, check a pending tool
+action, and request verification before completion. The current implementation
+has internal event callbacks only. Hook execution retains the task's permissions,
+limits, and controls. See [Hooks](./hooks.md).
 
 #### How do I design a "plan mode"?
 
@@ -279,42 +298,22 @@ See:
 `data-compaction` type,
 [`session / rewinding past a compaction`](./session.md#rewinding-past-a-compaction).
 
-#### How should errors be designed — what auto-retries, what hard-fails, and is a hard-failed session dead forever?
+#### How should errors, retries, and unattended approvals behave?
 
-Four buckets, organized by who recovers and how:
+Components retain correlated failures, cancellation, uncertainty, and completed
+outcomes. The master chooses retry limits, fallback models, context recovery,
+and user-visible explanations. An executor states whether an interrupted action
+can be queried, safely repeated, or must remain uncertain.
 
-| Bucket             | Examples                                                                                                    | Recovery                           | Surfaces as                                       |
-| ------------------ | ----------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------- |
-| Tool errors        | schema validation, watchdog `deny`, capability refusal, sandbox refusal, in-tool failure, aborted-by-parent | **Model decides next turn**        | `{ type: "error", error_text }` envelope          |
-| Transient provider | rate limit, provider 5xx, network blip                                                                      | **Loop auto-retries with backoff** | `SessionStatus.state = "retrying"` with `attempt` |
-| Spec-limit (hard)  | compaction overflow after fallbacks; model swap to too-small context; fork on busy                          | **User takes action**              | `SessionStatus.state = "error"`                   |
-| Loop abort         | user cancel; parent abort cascade                                                                           | Not an error — a signal            | Partial result / `"aborted by parent"` tool error |
+The host authorization adapter handles approval policy. An unattended run may
+suspend for input, return an input-required result, or use an explicitly allowed
+reviewer. Its behavior is configured by the product. Missing approval grants no
+permission to execute.
 
-Normative rules from the RFC:
-
-- Tools MUST NOT throw. Schema validation, watchdog deny, capability
-  refusal, sandbox refusal, runtime failure — all use the uniform
-  envelope.
-- The model is the retry policy for tool errors; the loop is the
-  retry policy for transient provider errors.
-- Spec-limit failures attempt recovery (pruned tool-outputs →
-  chunked summarize → drop-middle) before hard-failing.
-- Headless hosts MUST treat `ask` as `deny`.
-
-**A hard-failed session is not dead.** `SessionStatus` has no
-terminal state. `error` clears on the next submission attempt — the
-state machine transitions to `busy` for that run and follows the
-normal lifecycle. Recovery for the underlying cause is user-driven
-(prune, fork, switch model).
-
-See:
-[`session / session status`](./session.md#session-status) for the
-state machine and the `error` → `idle` transition,
-[`session / failure modes`](./session.md#failure-modes) for
-compaction recovery,
-[`session / compaction interacts with model switch`](./session.md#compaction-interacts-with-model-switch),
-[`tools / tool result envelope`](./tools.md#tool-result-envelope),
-[`tools / the watchdog`](./tools.md#the-watchdog).
+A failed turn retains its recorded result. A later submission can start new
+work when the underlying capability is available. The [master](./master.md#failures-retries-and-fallback)
+owns that recovery decision, while the [tool contract](./tools.md#tool-result-envelope)
+preserves the facts it uses.
 
 #### Can the main agent re-prompt a finished subagent? Can parent and subagent have a multi-turn conversation?
 

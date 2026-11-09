@@ -400,10 +400,11 @@ Editor context arrives in user messages as parts of type
 }
 ```
 
-The `payload` is **opaque to the loop** — its shape is the host's
-business, the way it is for [`mention`](#mentions) targets. The model
-sees the part; tools the host or the agent's manifest wires up can
-act on it. The runtime does not validate payloads beyond presence.
+The `payload` has a host-defined schema and remains opaque to the generic
+loop. The host adapter validates its shape and preserves its source and sample
+time. Document references and any version data follow the owning capability's
+schema. Tools validate their own inputs and execution authority. Document content
+inside the payload retains its original trust classification.
 
 A single user message MAY include multiple `editor-context` parts —
 one selection plus the list of open files plus a recent-action
@@ -448,8 +449,8 @@ entity into the compositor.
   range, prefer [file-ref with range](#file-ref-with-range).
 - **vs `mention`** — a `mention` is a user-driven suggestion; the
   model is not forced to act on it. `editor-context` is a host-driven
-  description; the model can treat it as authoritative ("this is what
-  the user is currently doing").
+  description of observed UI state at the recorded time. That observation
+  does not promote embedded document content into trusted instructions.
 - **vs Memory** ([`ux / memory`](./ux.md#memory)) — Memory is
   **durable** across turns and sessions. Editor context is
   **ephemeral** — a snapshot at the moment of the user's message.

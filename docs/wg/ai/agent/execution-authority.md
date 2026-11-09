@@ -13,19 +13,17 @@ This document decides where an agent host applies confinement. The boundary is
 the authority behind an operation, not the process that happens to contain its
 implementation.
 
-The decision is:
+Every raw agent-controlled runtime receives its own confined authority.
+Mediated or cooperatively configured connections use the user's effective host
+network, within the principal's destination grant. An incompatible opaque
+client remains unavailable.
 
-> **Keep a host-containment boundary around the trusted agent host, but do not
-> make an agent egress allowlist the host's network configuration. Give every
-> raw agent-controlled runtime its own confined authority. Route mediated or
-> cooperatively configured connections through the user's effective host
-> network, and fail closed when an opaque client cannot consume it safely.**
-
-This is a two-boundary model. Host containment is defense in depth for trusted
-code that implements structured capabilities. Execution confinement contains
-raw commands, external agents, and extension runtimes whose behavior is not
-fully described by a host-owned operation. Neither boundary grants the model a
-generic ambient network capability.
+The model distinguishes two boundaries. Host containment is a separately
+declared deployment guarantee for trusted code that implements structured
+capabilities. Execution confinement contains raw commands, external agents,
+and extension runtimes whose behavior is not fully described by a host-owned
+operation. A host may require both. A reusable raw-execution adapter can serve
+hosts with different containment policies.
 
 ## Etiology
 
@@ -78,9 +76,9 @@ how completely the host-defined operation bounds its effects.
 
 | Operation                                                                                      | Principal               | Enforcement                                                             | Network posture                                                               |
 | ---------------------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| The host fixes the operation and origin                                                        | Host service            | Host implementation + host containment                                  | Authorized origin through the host network route                              |
-| The user approves an exact provider origin and the model can select only a registered model    | Host service            | User-originated grant + host containment                                | Approved origin through the host network route                                |
-| The model invokes a host-designed file or data operation                                       | Structured capability   | Schema and semantic checks + watchdog + host containment                | None unless the capability explicitly owns a fixed or granted destination     |
+| The host fixes the operation and origin                                                        | Host service            | Host implementation + selected host-containment profile                 | Authorized origin through the host network route                              |
+| The user approves an exact provider origin and the model can select only a registered model    | Host service            | User-originated grant + selected host-containment profile               | Approved origin through the host network route                                |
+| The model invokes a host-designed file or data operation                                       | Structured capability   | Schema and semantic checks + watchdog + selected host profile           | None unless the capability explicitly owns a fixed or granted destination     |
 | The model chooses a command, executable, script, unrestricted URL client, or equivalent target | Raw agent execution     | One execution-confinement domain                                        | Denied by default; explicit destinations only through a compatible host route |
 | The user enables an extension runtime                                                          | Extension principal     | One extension-confinement domain + separate lifecycle and egress grants | The extension's grant only; managed route or explicit unmanaged posture       |
 | An external agent owns its own loop and can choose tools or subprocesses                       | Agent runtime principal | One execution-confinement domain for the entire process tree            | Explicit runtime destinations only; withheld when route/trust is incompatible |
@@ -101,8 +99,9 @@ An implementation MUST provide separate logical authority paths for host
 services, structured capabilities, extension runtimes, and raw agent execution.
 Sharing an operating-system process does not erase those contracts, but it
 **does** merge memory, file-descriptor, credential, and kernel authority. The
-host-containment ceiling therefore covers the union of authority held in that
-process, while structured checks provide narrower operation scopes.
+effective process authority therefore includes the union held in that process,
+while structured checks provide narrower operation scopes. A selected
+host-containment profile bounds that union at the OS boundary.
 
 Credential-rich or independently distrusted principals MUST be compartmented
 when the union would violate either principal's contract. Logical labels inside
@@ -149,19 +148,28 @@ Every model-invocable in-process operation MUST be a structured capability. It
 MUST validate its schema and semantic scope before performing an effect, and
 the watchdog MUST evaluate the invocation where policy requires it.
 
-The trusted agent host MUST retain a coarse host-containment envelope. Reads
-deny user credential and configuration locations that no in-process host
-service requires. Writes are limited to the union of active workspaces,
-host-owned state, and scratch roots. The boundary MUST NOT expose a
-model-selectable raw process launcher. Fixed host helpers MAY exist, but their
-executable, arguments, and authority are host-owned rather than model-selected.
+The host MUST declare the filesystem, credential, process, and network authority
+its trusted services retain. A deployment MAY require a coarse OS containment
+envelope around those services. When required, its availability is checked
+independently of the raw-execution backend, and deployment fails if that envelope
+cannot be established. The selected profile bounds readable locations, writable
+workspaces, host state, and scratch according to that host's contract.
 
-This envelope is deliberately not a per-tool claim. Host-owned credentials and
-session data required by a service remain reachable to any code compromised
+Model-selected raw execution MUST pass through the separately scoped launcher.
+Fixed trusted helpers MAY exist, with their executable, arguments, and authority
+chosen by the host.
+
+When selected, this envelope is deliberately not a per-tool claim. Host-owned
+credentials and session data required by a service remain reachable to any code compromised
 inside the same process, and one process that serves several workspaces holds
 their union. When a capability must remain unable to reach that union despite a
 validation defect, the host MUST move it into a narrower compartment or give it
 capability-safe handles instead of ambient paths.
+
+Workspace-controlled code remains raw execution when a trusted watcher, build
+service, language server, or plugin loads it later. The host MUST apply compatible
+confinement to that execution or withhold that automatic path. Confining only the
+original editing command cannot establish containment of later workspace code.
 
 ### A4 — Raw execution is capability-scoped and fail-closed
 
@@ -285,10 +293,10 @@ routing and credential custody remain independent contracts.
 
 When the host cannot enforce an execution authority set on the current
 platform, it MUST withhold the affected raw execution or extension capability.
-When host containment is unavailable, it MUST also withhold model-invocable
-local filesystem and process capabilities, or place the entire local-agent
-surface in the explicit unsandboxed posture below. It MUST NOT label ambient
-execution as sandboxed.
+When the deployment requires host containment and it is unavailable, the host
+MUST withhold the capabilities covered by that requirement. Structured local
+capabilities otherwise follow their declared host profile. Ambient raw execution
+MUST NOT be labeled sandboxed.
 
 An explicit human-operated development escape hatch MAY provide ambient raw
 execution, but it is a distinct, visibly unsandboxed posture and is never the
@@ -307,7 +315,7 @@ trusted agent host              execution supervisor
   ├─ host services ─────────► host route ◄──────── destination filter
   └─ structured capabilities                         │
          │                                           ├─ raw command
-         └─ host containment                         ├─ external agent
+         └─ selected host containment                ├─ external agent
                                                      └─ extension runtime
 ```
 
@@ -427,8 +435,9 @@ An implementation conforms only if it can demonstrate all of these:
    different roots or destination grants cannot use each other's authority.
 10. **Unsupported enforcement fails closed.** Raw shell and external-agent
     runtimes are absent when the host cannot enforce their authority sets.
-    Model-invocable local file capabilities are also absent when host containment
-    is unavailable, unless the user entered the explicit unsandboxed posture.
+    Capabilities requiring a host-containment profile are absent when that
+    profile is unavailable. Other structured capabilities retain their own
+    declared requirements.
 
 ## Rejected alternatives
 
@@ -439,12 +448,15 @@ destination set keeps the wrong authority boundary. Host services, extensions,
 commands, and parallel agents still share mutable authority. A single static
 upstream proxy also cannot represent per-destination PAC decisions in general.
 
-### Remove the host sandbox and confine only shell commands
+### Leave raw principals outside execution confinement
 
-This restores some networking but discards filesystem defense in depth for
-structured capabilities. It also leaves long-lived external agents and
-extensions unconfined. Host containment and execution confinement are both
-required.
+Confining finite shell commands alone leaves long-lived external agents,
+extension runtimes, and later workspace-code execution outside the boundary.
+Every raw principal needs its declared confinement. Trusted host services retain
+structured checks and credential custody, with a separately chosen hardening
+profile. A deployment that requires a whole-host envelope must establish it.
+The native host can select another profile while meeting these same authority
+and isolation requirements.
 
 ### Add every configured destination to one global allowlist
 
@@ -473,8 +485,8 @@ routing while keeping agent authority confined.
 
 ## Consequences
 
-- The trusted agent host keeps filesystem and process defense in depth without
-  using an agent allowlist as its network configuration.
+- The trusted host declares its retained authority and any required containment
+  envelope independently of raw-execution grants and network routing.
 - Host services and approved provider endpoints use the effective host route.
 - Structured tools stay narrow and do not expose raw OS handles.
 - Raw commands, external agents, and extension runtimes receive attributable
@@ -488,8 +500,8 @@ routing while keeping agent authority confined.
 
 - [Runtime environments](./environments.md) — how the authority model lands in
   web, cloud, and computer hosts.
-- [Sandbox Runtime (`srt`)](./srt.md) — one reference implementation of
-  confinement primitives.
+- [Existing sandbox backend](./srt.md) — evaluated confinement capabilities,
+  limitations, and requirements for its replacement.
 - [Tools](./tools.md) — structured capability checks and the watchdog.
 - [MCP and Connectors](./mcp.md) — extension trust and per-tool permission
   policy.

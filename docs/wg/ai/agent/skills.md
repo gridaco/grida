@@ -21,6 +21,11 @@ tags:
 
 # Skills and Project Instructions
 
+> The discovery and caching rules below describe the earlier design. For the
+> proposed rebuild, [Master](./master.md#context-and-tool-design) owns discovery,
+> precedence, refresh, and missing-source policy. [Components](./components.md#history-and-context)
+> preserves the identity and provenance of the material each decision used.
+
 Two distinct layers of knowledge an agent reaches for at session
 start:
 

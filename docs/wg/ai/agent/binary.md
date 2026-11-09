@@ -47,7 +47,7 @@ chooses.
 > bitmap is the overlap: handled here as a native-multimodal attachment,
 > reached there by path on demand. For the entry-point handling (the `file-attachment` part,
 > the descriptor fallback, the storage threshold), see
-> [`compositor / attachments`](./compositor.md#attachments-the-long-tail).
+> [`compositor / attachments`](./compositor.md#attachments--the-long-tail).
 > For the broader skill discovery and loading flow, see
 > [`skills`](./skills.md).
 
@@ -200,7 +200,7 @@ flags which formats _typically_ benefit from shell.
 
 ## Scratch space for extraction
 
-> The scratch concept — per-session, ephemeral, host-owned, distinct from the
+> The scratch concept — per-session, retention-bounded, host-owned, distinct from the
 > workspace — is specified in [`scratch`](./scratch.md). This section is its
 > **archive-extraction application**: the location and contract notes below are
 > that page's bindings seen from the extraction use case.
@@ -214,8 +214,9 @@ the host's filesystem MUST provide:
 
 - A **writable, agent-scoped directory** that is inside the
   sandbox's `fs.write` allow-list.
-- A **lifecycle** the agent can rely on: contents live at least for
-  the current session, and the host owns cleanup.
+- A **lifecycle** the agent can rely on: contents remain available while active
+  extraction or retained consumers depend on them, or have an explicit recovery
+  path. The host owns cleanup and declares the retention bounds.
 - **Sandbox-aware**: the directory is bounded by whatever sandbox
   primitive the environment uses
   ([`environments`](./environments.md), [`srt`](./srt.md)). Writes
@@ -224,7 +225,7 @@ the host's filesystem MUST provide:
 Two reasonable locations, each with trade-offs (the
 [`scratch` bindings](./scratch.md#bindings) seen from the extraction case —
 note neither is workspace-resident: that would violate scratch's
-[S2 / S5](./scratch.md#the-scratch-contract)):
+[scratch contract](./scratch.md#the-scratch-contract)):
 
 | Location                 | Where                                        | Pros                                                          | Cons                                                                               |
 | ------------------------ | -------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -301,7 +302,7 @@ A conforming implementation SHOULD:
 
 ## See also
 
-- [Compositor / attachments](./compositor.md#attachments-the-long-tail) —
+- [Compositor / attachments](./compositor.md#attachments--the-long-tail) —
   the entry-point handling for any attachment, including the
   storage threshold.
 - [Compositor / templating](./compositor.md#templating-user-view-vs-model-view) —

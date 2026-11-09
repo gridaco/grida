@@ -312,12 +312,11 @@ must not grow into it by accretion:
   complexity exactly when they can veto or rewrite (pre-tool-use
   gates); none of the jobs this page serves needs that.
 
-A hooks system, if built, is its own proposal — and it would likely
-_consume_ this channel (or the seam beneath it) rather than replace
-it: notification-grade events are the observe-only subset of any
-hook vocabulary. Keeping the two separate means the small surface
-ships and stays auditable while the large one is designed on its own
-merits.
+The proposed [hooks system](./hooks.md) owns executable handlers and blocking
+decision points. It uses explicit lifecycle boundaries and retained invocation
+results. This volatile observer channel alone cannot supply those guarantees.
+Notification consumers continue to use the channel without gaining authority
+to alter work.
 
 ## Invariants
 

@@ -23,6 +23,10 @@ tags:
 
 # Turn Queue
 
+> **Earlier design reference**
+>
+> The queue-drain policy below belongs to the earlier design. The proposed [user experience](./experience.md#pause-resume-and-stop-deliberately) pauses automatic queue advancement after Stop until the user resumes it. [Master](./master.md) owns that product policy, and [Components](./components.md) owns serialized admission and settlement.
+
 A session runs **one turn at a time**. Many things want to start a
 turn: a human typing in the compositor, a cron expression matching, a
 webhook landing, an API call, an agent self-schedule, an MCP push.

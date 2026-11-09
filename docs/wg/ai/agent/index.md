@@ -1,244 +1,124 @@
 ---
 title: Agent System (WG)
-description: A guide for implementing an LLM-driven agent system. Implementation-agnostic, normative, and meant to play the same role for agent runtimes that LSP plays for language tooling or that ACP plays for editor ↔ agent integration. Names the invariants every implementor MUST honor and the policies each implementor picks.
-keywords:
-  [
-    agent,
-    agent-system,
-    ai-sdk,
-    sqlite,
-    sessions,
-    tools,
-    skills,
-    subagents,
-    compaction,
-    mcp,
-    sandbox,
-    streaming,
-    rewind,
-    forking,
-    spec,
-    guide,
-    acp,
-  ]
+description: A fresh agent design defined through user expectations, the product master, and agnostic execution components.
+keywords: [agent, agent system, product, harness, components, durability]
 format: md
-tags:
-  - internal
-  - wg
-  - agent-system
+sidebar_position: 0
+tags: [internal, wg, ai, architecture]
 ---
 
 # Agent System (WG)
 
-This is a guide for implementing an LLM-driven agent system —
-implementation-agnostic, normative, and meant to play the same role
-for agent runtimes that the
-[Agent Client Protocol](./acp.md) plays for editor ↔ agent
-integration, or that the Language Server Protocol plays for language
-tooling.
+This working group defines an agent system through reusable mechanisms,
+product decisions, and expected behavior. The three proposals below establish
+the contract for a fresh implementation.
 
-It answers one question: _what is an agent system that hosts a code
-agent, a design agent, or any other task-agnostic agent without
-rewriting the core?_
+Start with the compact [Agent Features](../../../agent/features.md) catalog for
+the product's features, delivery status, and scope. The documents below provide
+the detailed behavior and engineering contracts behind that catalog.
 
-The shape is host-agnostic: it holds for a local daemon, a cloud
-sandbox runtime, a CLI, an IDE plugin, a hosted multi-tenant
-service. UX (window, panel, picker) is out of scope except where a
-UX requirement reaches back into the protocol.
+| Product review order               | Defines                                                                                                       | Reader                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [User experience](./experience.md) | What a person can expect, including Agent effort presets, control over ongoing work, and a final turn summary | Anyone deciding whether the product behaves usefully |
+| [Master](./master.md)              | The product harness that selects context, tools, models, agent effort, verification, and completion           | Product designers and agent engineers                |
+| [Components](./components.md)      | Messages, inference, tools, history, context, runtime, and durable sessions                                   | Engineers implementing reusable mechanisms           |
 
-## Conventions
+Engineering starts with Components. Establish their responsibilities,
+dependency direction, and invariants before shaping the master around them.
+Then use distinct masters and the experience scenarios to test whether those
+contracts are sufficient. Product review starts with User experience so that
+the resulting behavior remains the measure of success.
 
-The keywords **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**,
-**MAY** are used as in
-[RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
+These are design proposals. Their requirements describe the product to build.
+Release availability belongs in the documentation for each shipped product.
+The proposals are language- and stack-agnostic. Implementations choose their
+language, storage engine, provider adapters, and client protocols while
+satisfying the stated contracts.
 
-| Identifier shape                  | Convention used in this guide                                                                                        |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Field, column, and function names | `snake_case`                                                                                                         |
-| Path variables                    | `kebab-case` (e.g. `{user-data}`, `{workspace}`)                                                                     |
-| Type names                        | `PascalCase` (e.g. `SessionStatus`, `ChatSessionRow`)                                                                |
-| ACP wire identifiers              | Carried verbatim from upstream (`camelCase`); translated at the seam. See [ACP / naming seam](./acp.md#naming-seam). |
+The concrete Rust design includes a
+[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox-proposal.md)
+with the srt replacement, launch contract, platform boundaries, and source study.
+
+The native delivery includes a headless agent executable. Its service and
+unattended entrypoints run the same master and components used by Desktop.
+Desktop, automation, and test clients exercise one execution contract. The
+[executable design](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-core-proposal.md#native-executable-and-headless-host)
+defines process boundaries, interaction policy, and machine-readable outcomes.
+The [ACP integration contract](./acp.md) defines the shared client vocabulary
+and how custom presentation and durable controls extend it.
+The [hooks contract](./hooks.md) defines configurable lifecycle automation and
+its boundaries against observers, permissions, and completion.
+
+## Design ownership
+
+The feature catalog owns feature identity, minimum promises, delivery status,
+and scope. Experience owns their detailed behavior and acceptance scenarios.
+Master owns how product decisions fulfill those promises. Components owns
+independently usable mechanisms and execution correctness. A change to a promise
+must be reflected in the responsible master behavior and in any component
+contract it requires.
+
+The master is deliberately thin in infrastructure and expressive in policy.
+It can create a different kind of agent by selecting a different strategy and
+composition of components. Components retain their meaning across products.
+Task quality, useful initiative, context relevance, and appropriate completion
+are evaluated at the master and experience layers.
+
+Codex and Zed are peer implementation references for this study. Their code
+supplies examples of execution mechanisms, integration constraints, and product
+choices. Each proposed invariant still needs its own rationale and conformance
+case. [Codex source](https://github.com/openai/codex),
+[Zed source](https://github.com/zed-industries/zed).
 
 ## Vocabulary
 
-- **Agent** — a config object: a system prompt + a tool list + a
-  resolved model. Agent-as-data, not agent-as-class.
-- **Session** — one conversation. Carries messages, parts, token
-  rollups, and a parent pointer for forks. Persistent; survives the
-  client process.
-- **Turn** — one round-trip from a user message through assistant
-  output (text, reasoning, tool calls, tool outputs) to a finished
-  state. The unit a user can rewind to.
-- **Tool** — a self-describing capability the agent can invoke. The
-  set of fundamental tools is locked across agents; MCP tools and
-  skills extend it without changing the contract.
-- **Runtime** — the per-run capability surface handed to the agent
-  (fs, net, shell, stream). Backed by a sandbox the agent does not
-  see.
-- **Host** — the process that loads the agent system. Desktop app,
-  CLI, server, cloud sandbox. The host decides UI; the system
-  decides protocol.
-- **Environment** — where the host (and therefore the agent) runs:
-  web, cloud sandbox, or computer. See
-  [`environments`](./environments.md).
+The [components proposal](./components.md) owns the execution vocabulary.
+Across these documents, a **session** contains an ongoing conversation and its
+work, a **turn** addresses accepted input, and an **effect** is an operation
+that can change or interact with the outside world. The **master** is the
+product's decision-making harness. The **host** supplies execution capabilities
+and grants their authority. A **client** presents the experience and submits
+user intent.
 
-## What this is
-
-A **normative guide**:
-
-- Names the invariants every implementor MUST honor for an agent
-  to be portable.
-- Names the policies each implementor picks for their product
-  shape.
-- Specifies the wire-level shapes (session schema, chunk vocabulary,
-  result envelope) that two conforming implementations agree on.
-
-## What this is not
-
-- A model-provider router. Provider selection (Anthropic, OpenAI,
-  cloud gateways, BYOK) is a sibling concern. The guide only
-  requires that whichever provider is picked feeds the same
-  AI-SDK-v6 chunk shape.
-- A UI framework. Window / tab / sidebar / picker decisions belong
-  to the host. The guide touches UX only where UX requirements
-  bend the protocol (compositor format, sidecar forking, queued
-  sends).
-- A billing engine. Usage rollups land on the session row so a
-  billing layer can read them; pricing is not the agent system's
-  job.
-- A multi-agent orchestration graph. Agents call subagents through
-  the locked `task` tool; there are no chains, no DAGs, no shared
-  cross-run state.
-
-## Pages
-
-The guide is organized as a set of pages. Read [Foundations](./foundations.md)
-first; the rest can be read in any order.
-
-| Page                                                                                     | Covers                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [Foundations](./foundations.md)                                                          | Bedrock: AI SDK v6 chunk shape, directory-rooted execution, the locked tool set summary, watchdog placement, web search, cross-cutting invariants.                                                                                                                                                                                                                                                                                   |
-| [AI SDK (reference substrate)](./ai-sdk/index.md)                                        | Implementor's annex to AI SDK's own docs. The token-usage cache normalization rule, where the SDK's tool-loop helper fits, what the RFC adds on top of the substrate.                                                                                                                                                                                                                                                                |
-| [Runtime Environments](./environments.md)                                                | Web / cloud sandbox / computer. Which capabilities each environment exposes; how the locked tool set degrades; sandbox primitives.                                                                                                                                                                                                                                                                                                   |
-| [Execution Authority](./execution-authority.md)                                          | The two-boundary model: coarse host containment for structured capabilities, host-native routing for authorized services, and one attributable confinement domain per raw command, external agent, or extension runtime.                                                                                                                                                                                                             |
-| [Sandbox Runtime (srt)](./srt.md)                                                        | srt as the reference implementation of the `computer` environment's sandbox primitive. Capability surface, platform support, what the protocol does and does not lock to.                                                                                                                                                                                                                                                            |
-| [Session Lifecycle](./session.md)                                                        | Context tracking, rewinding, forking, compaction (auto + manual + failure), per-turn model switch, streaming, interruption, session status, permission scopes.                                                                                                                                                                                                                                                                       |
-| [Persistency](./persistency.md)                                                          | Storage engine, the three-table schema, save policy, ID strategy, JSON discipline, event-log opt-in, schema evolution.                                                                                                                                                                                                                                                                                                               |
-| [Turn Queue](./queue.md)                                                                 | The single point where competing demands to start a turn on one session are serialized. Turn-ingestion model, `queued_at`, the run-state machine and its drain, drain discipline (serial vs coalescing), stop-with-a-queue semantics, queued-message operations (cancel / edit / reorder), the single-flight / FIFO / no-preemption invariants, drop rules, restart behavior, and the core-vs-surface boundary.                      |
-| [Turn Authority](./turn-authority.md)                                                    | The host states what happened; the client renders it. Why a client must not infer which queued message became a turn, the fired-message identity and started/finished/aborted transitions the turn-lifecycle wire must carry, clients-as-pure-renderers, and the migration off a state-only status channel.                                                                                                                          |
-| [Lifecycle Events](./events.md)                                                          | The multi-subscriber session-lifecycle event channel: `turn-started` / `turn-finished` / `approval-requested` vocabulary, volatility and ordering semantics, the host-wide projected stream, the notification consumer policy (focus gating, click-to-attend, the anti-drift guards on the when-to-notify table), the obligation a foreign backend adapter (e.g. ACP) takes on, and the boundary against a user-facing hooks system. |
-| [Tools](./tools.md)                                                                      | The locked fundamental set, the tool contract, capability requirements, result envelope, truncation, watchdog at the tool boundary, ACP `kind` mapping.                                                                                                                                                                                                                                                                              |
-| [Tool Design](./tool-design.md)                                                          | The design discipline behind the contract: a tool is a surface for a consumer that cannot be renegotiated with or migrated, so it must refuse the wrong shape. The retraction asymmetry, the five lenses (awareness, honesty, context economy, permission/security, ergonomics), clear-failure as contract, and the tool-vs-connector-vs-skill design reasoning.                                                                     |
-| [Cost Optimization](./cost-optimization.md)                                              | Doctrine and case study: the agent-loop cost model (the transcript is re-billed every step; four input price tiers), the ledger of measured leaks (missing prompt caching, tool-result echo, unbounded replay, window/threshold/tier decided separately, rewrite bias, unaudited baseline), observability obligations, and the quality-first ordering — quality-neutral fixes before quality-tradeoff ones.                          |
-| [MCP and Connectors](./mcp.md)                                                           | User-plugged MCP servers, lazy materialization, `tool_search` for bulk discovery, OAuth, dynamic refresh, the untrusted-by-default trust policy.                                                                                                                                                                                                                                                                                     |
-| [Skills and Project Instructions](./skills.md)                                           | Two layers of knowledge: skills (lazy, advertise-then-load) and project instructions (eager, unconditional). Discovery sources, manifests, decision matrix.                                                                                                                                                                                                                                                                          |
-| [Binary file handling](./binary.md)                                                      | Glossary / reference. Three resolution paths (provider-native multimodal, skill-per-format, shell-based conversion), the format matrix (pdf / zip / pptx / psd / fig / …), the scratch-space pattern for archive extraction.                                                                                                                                                                                                         |
-| [Visual perception](./vision.md)                                                         | The read/view modality split: why seeing a source as pixels is a separate tool from reading it as text. The perception-tool contract, the input matrix (bitmaps now, rendered svg / text later), result-to-image lowering that reproduces from the persisted record, and the retention policy that evicts only re-viewable perceptions so pixels don't re-fill context every turn.                                                   |
-| [Scratch](./scratch.md)                                                                  | The per-session, system-managed, ephemeral filesystem area where the agent does working I/O and where produced files land by default — distinct from the durable workspace. The scratch contract (host-owned and per-session; ephemeral with durability only by promotion; the default output sink; reachable without per-operation approval yet inside sandbox containment; not the workspace), lifecycle, and bindings.            |
-| [Subagents](./subagents.md)                                                              | The `task` tool, agent modes, blocking vs background, recursion, permission inheritance, inspectability, awareness, specialized subagents, opinionated patterns.                                                                                                                                                                                                                                                                     |
-| [Plan Mode](./mode-plan.md)                                                              | Plan mode as a host-owned operating regime: the plan/build pair, the four-invariant transition contract (mode is injected context not model state; the agent proposes but never effects a switch; transitions are human-gated re-injections; the plan is a reviewed artifact), entry/exit symmetry, who may initiate a transition, and the read-only harness with its single carve-out.                                              |
-| [Triggers](./triggers.md)                                                                | Non-human-originated turns. Schedule / external webhook / programmatic API / agent self-schedule / MCP-pushed event sources. Trigger envelope on `metadata_json.trigger`, queue semantics, interactive-vs-hosted execution, lifecycle bounds, auth and trust.                                                                                                                                                                        |
-| [Compositor](./compositor.md)                                                            | User intent representation. The multipart user-message shape, file refs vs attachments, inline commands, mentions, editor context (host-emitted selection / open / cursor / recent-action), attachment handling, and the user-view-vs-model-view lowering rules.                                                                                                                                                                     |
-| [UX Patterns](./ux.md)                                                                   | What rides on top of the compositor: queued sends, the unresolved contract for superseding an open human interaction, sidecar chat as ephemeral fork, and memory as a built-on-top layer.                                                                                                                                                                                                                                            |
-| [Debugging](./debugging.md)                                                              | The canonical inspection format, export paths, what an inspection tool MUST expose, replay semantics, the DX checklist.                                                                                                                                                                                                                                                                                                              |
-| [Local Daemon](./daemon.md)                                                              | The agent server as a long-lived, discoverable local process. Discovery contract (registration record, persistent credential, atomic publish, single-daemon convergence), the authenticated probe and protocol gate, connect-or-spawn, the browser exception, production shape, browser-engine conformance harness.                                                                                                                  |
-| [ACP Integration](./acp.md)                                                              | The [Agent Client Protocol](https://agentclientprotocol.com/) as the default outward wire. Method mapping, capability matrix, where the protocol and the guide diverge.                                                                                                                                                                                                                                                              |
-| [ACP Provider Class](./acp-provider.md)                                                  | Decision/RFD: whether to host an agent-provider class — Grida as ACP consumer driving an external Claude/Codex on the user's own subscription. The forever-cost ledger, the narrow delta over BYOK, and a reversible path. Umbrella over the provider profiles below.                                                                                                                                                                |
-| [ACP Provider: Codex](./acp-provider-codex.md)                                           | Provider profile for consuming Codex from an external ACP-consuming agent system. What Codex provides, how to adapt its thread/event surface, and where tool and image-generation control ends.                                                                                                                                                                                                                                      |
-| [ChatGPT Subscription Native Provider Specification](./chatgpt-subscription-provider.md) | Golden specification for using an eligible ChatGPT account as native Grida model capacity. Grida owns the loop, tools, and sessions; the provider is never ACP. Defines the experimental public-native-client posture, external stable-release gate, subscription-first onboarding, intentional-switch/sticky-provider rules, credential custody, closed compatibility catalog, and the image-input/media-generation boundary.       |
-| [FAQ](./faq.md)                                                                          | Question-and-answer index over the guide. Doubles as an entry point and as a conformance test — if a Q cannot be answered from the RFC, the RFC owes a clarification.                                                                                                                                                                                                                                                                |
+An agent combines a master with its selected components and capabilities.
+Prompts, tools, and model settings are part of that composition. Its strategy
+can include planning, review, retrieval, and delegation as required by the
+product contract.
 
 ## Cross-cutting invariants
 
-The following hold across every implementor:
+Execution requirements are specified in [Components](./components.md), including
+single ownership of session state, durable acceptance, captured decisions,
+correlated results, cancellation, and recovery. Host authorization bounds every
+operation. Explicit denials remain effective through composition and delegation.
+The [Master](./master.md) chooses work within those bounds.
 
-| Layer                 | Invariant                                                             | Policy                                                                  |
-| --------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Loop                  | One universal LLM loop drives any agent                               | Native vs AI SDK runtime path; cancel semantics                         |
-| Scheduling            | One turn per session; queued by `queued_at`, FIFO, no preemption      | Status transport; throttle / dedup caps; whether triggers are supported |
-| Agent                 | Agent-as-data: `{ manifest, tools, system_prompt }`                   | Where the manifest lives; how it is compiled                            |
-| Tools                 | Locked fundamental set; self-describing parameters                    | Which tools beyond the lock; how MCP is surfaced                        |
-| Session               | Three-table shape: `chat_sessions` / `chat_messages` / `chat_parts`   | DB engine (SQLite default; alternatives); event-log opt-in              |
-| Streaming             | AI SDK v6 chunk shape internally                                      | Transport (SSE / IPC / WS); resume semantics                            |
-| Outward protocol      | ACP-conformant when an external client speaks ACP                     | Whether to ship an ACP adapter; which capabilities to advertise         |
-| Compaction            | Auto-fire on overflow; user-fire on demand; failure modes named       | Threshold tuning; which model summarizes; tail-budget                   |
-| Cost                  | Quality-neutral leaks closed first: caching, envelopes, truncation    | Provider caching regime; window / premium-tier defaults                 |
-| Skills                | Discovered once; names + descriptions injected; body loaded lazily    | Where to look; remote-skill fetch policy                                |
-| Subagents             | Same loop, gated by intersected permissions; deny rules unconditional | Recursion limit; whether parent inspects child                          |
-| Sandbox               | Capability surface, not free spawn                                    | OS-level enforcement (seatbelt / landlock / VM); per-call sub-policies  |
-| Persistence           | Save on every chunk by default                                        | Storage engine; write-buffer trade-off                                  |
-| Model switch per turn | Allowed; carries to the next turn                                     | What to do if new model has smaller context (force compaction vs error) |
+The product's [acceptance scenarios](./experience.md#judge-the-experience-by-outcomes)
+connect these requirements to observable behavior. Performance comparisons must
+state the task, success criteria, available capabilities, and resource allowance.
 
-## Abstract
+## Earlier design studies
 
-### What matters most
+The following pages retain detailed studies and contracts from the earlier
+agent design. They are useful source material when refining a component or
+product behavior. The three proposals above govern the rebuild where their
+requirements differ. Each older page's implementation or feature-status claims
+remain scoped to the design it describes.
 
-The single decision that compounds across every other one is whether
-the system treats an agent as **data** or as **code**. An
-agent-as-data system publishes a config (`{ manifest, tools,
-system_prompt, model? }`) and runs one universal loop over it. An
-agent-as-code system publishes a function per agent.
+In particular, the earlier fixed tool profile, universal loop, internal stream
+format, storage schema, and default queue-drain behavior are earlier design
+choices. Their concrete representations do not constrain the fresh design.
+The product's new Stop behavior pauses automatic queue advancement until the
+user resumes it.
 
-This guide picks agent-as-data because:
+| Topic                         | Existing studies                                                                                                                                                                                                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Foundations and environment   | [Foundations](./foundations.md), [Environments](./environments.md), [Execution authority](./execution-authority.md), [Existing sandbox backend](./srt.md)                                                                                                         |
+| Durable work and control      | [Session lifecycle](./session.md), [Persistency](./persistency.md), [Turn queue](./queue.md), [Turn authority](./turn-authority.md), [Lifecycle events](./events.md)                                                                                              |
+| Capability and context design | [Tools](./tools.md), [Tool design](./tool-design.md), [Skills and project instructions](./skills.md), [MCP and connectors](./mcp.md), [Visual perception](./vision.md), [Binary files](./binary.md), [Scratch](./scratch.md), [Workspaces](./workspace.md)        |
+| Product behavior              | [Compositor](./compositor.md), [UX patterns](./ux.md), [Plan mode](./mode-plan.md), [Subagents](./subagents.md), [Triggers](./triggers.md), [Cost optimization](./cost-optimization.md)                                                                           |
+| Inspection and hosting        | [Debugging](./debugging.md), [Local daemon](./daemon.md), [FAQ](./faq.md)                                                                                                                                                                                         |
+| Protocol and provider studies | [ACP integration](./acp.md), [ACP provider class](./acp-provider.md), [Codex provider profile](./acp-provider-codex.md), [Subscription provider](./chatgpt-subscription-provider.md), [AI SDK](./ai-sdk/index.md), [Vision lowering](./ai-sdk/vision-lowering.md) |
 
-- Specialization is cheap. A "title" agent, a "summary" agent, a
-  "compaction" agent are all the same loop with different config.
-- The system is inspectable. Diff two agent configs to see what
-  changed.
-- The runtime is auditable in one place — one stream loop to read,
-  one abort path, one permission gate.
-
-Everything else in the guide follows from that choice.
-
-### Properties that follow
-
-- **Dynamic, task-agnostic workflow.** A code agent and a design
-  agent differ only by manifest. Adding a new agent type does not
-  rewrite the loop, the session schema, the streaming layer, or
-  the tool contract — it adds a config.
-- **Parallel workflow.** A subagent is the same agent loop on a
-  child session. The parent's loop continues while children run;
-  results return as tool outputs. Parallelism is a function call,
-  not a new framework. See [`subagents`](./subagents.md).
-- **Safety and harness.** The agent never touches the OS directly.
-  Every shell call, every file read, every network fetch goes
-  through a capability the runtime declared. The runtime sits on
-  top of a sandbox the host owns. See
-  [`environments`](./environments.md).
-- **Watchdog.** A pre-execute hook on every tool call can refuse
-  with a reason that goes back to the model. Policy is host
-  configuration. See [`tools / watchdog`](./tools.md#the-watchdog).
-- **Web search.** Locked tool by frequency, special case by
-  implementation (cannot be done in-house). The tool abstracts over
-  which provider the host wires up. See
-  [`tools / web search`](./tools.md#web-search).
-
-### Stress tests
-
-The guide is task-agnostic, but it pays to test it against the
-agents it targets:
-
-- A **code agent** — long-running, file-heavy, shell-heavy,
-  occasional web search. Exercises `fs.*`, `shell.run` with
-  sub-policies, rewind-to-edit, hour-long session compaction.
-- A **design agent** — file-light, model-call-heavy, tool-arg-heavy
-  (vector diffs as tool calls). Exercises tool-output streaming,
-  fast rewind, per-turn model swaps between cheap and premium tiers.
-- A **research / write agent** — web-heavy, low write traffic.
-  Exercises web search, subagent fan-out for parallel reading,
-  queued sends.
-- A **scripted job agent** — runs unattended on a queue.
-  Exercises the watchdog, the canonical inspection format,
-  permission policies with no human in the loop.
-
-A change that breaks any of these four is a wrong move.
-
-## See also
-
-- [Agent Client Protocol](https://agentclientprotocol.com/) — the
-  upstream protocol the [ACP integration](./acp.md) page maps onto.
-- [AI SDK v6](https://sdk.vercel.ai/) — the chunk-shape substrate
-  the guide pins.
-- [Grida bindings](../grida/index.md) — the sibling layer that binds
-  this RFC to Grida's actual surfaces (canvas, image tools, fundamentals
-  as shipped).
+[Grida bindings](../grida/index.md) describe the existing product's concrete
+integration. They remain a separate reference for that implementation.

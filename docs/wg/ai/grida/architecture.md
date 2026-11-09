@@ -40,14 +40,14 @@ daemon knows no tenant. A contributor adding a non-AI host capability (a file
 server, a viewer backend) targets `@grida/daemon` and never touches an AI
 package.
 
-**Source-of-truth rule.** Every agent feature lands in the core
-(`@grida/agent`) and is reachable from the **`grida-agent` CLI** first; Desktop
-and the editor UI are thin wrappers over the same composed daemon +
-`AgentTransport` surface. A capability that exists in a host but not the CLI is
-a bug — it means behavior leaked out of the core into a shell. The CLI is also
-what keeps the core testable without Electron: the lifecycle ops (`run`,
-`compact`, `rewind`, `fork`) are exercised end to end over HTTP in
-`packages/grida-ai-agent/src/cli.test.ts`.
+**Shared contracts and host capabilities.** Agent lifecycle behavior belongs in
+the shared agent package and is exercised through the headless executable.
+Editor-specific capabilities can execute in the owning editor process. Controlled
+headless adapters prove their protocol and lifecycle contracts, while real editor
+document behavior and rendering require Desktop checks. The proposed
+[Rust/Electron tool-host contract](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/tool-host-contract.md)
+separates those responsibilities for the rebuild. The remaining package and HTTP
+shapes on this page describe the current TypeScript deployment.
 
 Sibling docs:
 

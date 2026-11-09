@@ -1,6 +1,6 @@
 ---
-title: Sandbox Runtime (srt) — reference confinement primitive
-description: srt is the reference macOS and Linux confinement primitive for the computer environment, with explicit limits around host routing and concurrent authority domains.
+title: Existing sandbox backend — srt
+description: Evaluation of the existing srt backend and the confinement guarantees a replacement must preserve, including host routing and independent authority domains.
 keywords:
   [
     agent-system,
@@ -20,33 +20,30 @@ tags:
   - agent-system
 ---
 
-# Sandbox Runtime (`srt`) — reference confinement primitive
+# Existing sandbox backend — srt
+
+The proposed Rust rebuild replaces srt with a native confinement adapter.
+This page records the existing backend's capabilities and limitations as evidence
+for that replacement. The current TypeScript host still uses srt. The
+[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox-proposal.md)
+now selects the initial platform mechanisms, launch contract, and support limits.
 
 For the `computer` environment
-([`environments / computer`](./environments.md#computer)), the runtime MUST
-retain host containment for structured capabilities and MUST wrap every **raw
-agent-controlled process tree** in an attributable OS-level sandbox. Those are
-distinct authority domains; [Execution authority](./execution-authority.md)
-owns the distinction.
+([`environments / computer`](./environments.md#computer)), every raw
+agent-controlled process tree requires an attributable OS-level sandbox.
+The existing host also selects outer containment for its trusted service.
+These have independent profiles and availability. [Execution authority](./execution-authority.md)
+owns the distinction and the deployment-level choice of host containment.
 
-The guide does not lock to any single primitive — `Seatbelt`, `Landlock`,
-`bubblewrap`, `AppContainer`, and others all qualify when wired correctly.
-
-This guide uses
+The existing implementation uses
 [`anthropic-experimental/sandbox-runtime`](https://github.com/anthropic-experimental/sandbox-runtime)
-(`srt`) as its concrete macOS and Linux reference; the audited release also has
-an alpha Windows backend whose lifecycle is assessed separately below. It
+(`srt`). The audited release has macOS and Linux backends plus an alpha Windows
+backend whose lifecycle is assessed separately below. It
 supplies filesystem deny-then-allow, network allow-only, and a mandatory deny
-set for common escape paths. It does **not** by itself satisfy the host-route or
-concurrent-authority contracts in
-[Execution authority](./execution-authority.md). This page names it explicitly,
-the same way [`foundations`](./foundations.md) names AI SDK v6 (the chunk shape)
-and SQLite (the persistence shape).
-
-Naming srt here is a recommendation, not a requirement. An implementor MAY
-substitute any equivalent that delivers the same capability surface;
-conformance with [`environments`](./environments.md) and
-[Execution authority](./execution-authority.md) is what matters.
+set for common escape paths. Its host-route and concurrent-authority limitations
+are described below. The replacement is evaluated against the contracts in
+[Environments](./environments.md), [Execution authority](./execution-authority.md),
+and [Components](./components.md#integration-capabilities-and-bounds).
 
 ## What srt provides
 
@@ -83,8 +80,8 @@ descriptor-transfer proof rather than an inference from the macOS profile.
 The Windows backend in the audited 0.0.65 release is not drop-in parity with
 the macOS/Linux wrapper. A host must own its helper provisioning, argv-based
 spawn, packaging, lifecycle, and regression suite before claiming support.
-Until then it SHOULD gate sandbox-requiring features off or substitute another
-AppContainer + Job-objects-based primitive.
+These requirements concern the existing backend. The rebuild's native Windows
+support boundary is defined in the native sandbox proposal.
 
 ## How it sits in the guide's stack
 
@@ -174,25 +171,35 @@ domain, add an attributable network mediator, or substitute an enforcer with
 instance-scoped state. Version bumps must re-audit this limitation rather than
 assuming a custom per-call policy supplies network identity.
 
-## Why this guide names it
+## Replacement requirements
 
-Three reasons, matching the AI-SDK-v6 and SQLite picks:
+The replacement preserves the authority model while supplying its own native
+enforcement. The model distinguishes declarations, admission decisions, and
+the OS boundary that enforces them.
 
-- **It is a concrete, integrated baseline.** Its macOS and Linux backends make
-  the required filesystem, network, and Unix-socket restrictions testable
-  rather than leaving the guide at an abstract policy shape.
-- **The capability shape is a useful baseline.** srt's `allow_read` /
-  `allow_write` / `allowed_domains` / `allow_unix_sockets` covers the core
-  declaration vocabulary in
-  [`tools`](./tools.md#capability-requirements). Authority attribution and host
-  routing remain host responsibilities.
-- **Its mandatory deny set is good.** Implementors who roll their own routinely
-  forget shell startup files, version-control hooks, or IDE configuration. srt
-  does the bookkeeping.
+| Concern               | Required owner and evidence                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Host containment      | The host independently selects and establishes any outer confinement profile required by its deployment.                                          |
+| Raw execution         | The native adapter binds an immutable grant to one attributable process tree, including inherited filesystem, network, socket, and handle access. |
+| Concurrent principals | Each execution keeps independent authority. Shared mutable network policy cannot widen another execution's grant.                                 |
+| Sensitive paths       | Host policy defines mandatory protected paths and the backend proves the effective restrictions on each supported platform.                       |
+| Routing and trust     | The host supplies destination authorization, routing, proxy behavior, and transport trust independently of the confinement backend.               |
+| Lifecycle             | The executor reports cancellation, worker termination, descendant revocation, and cleanup according to the evidence it has.                       |
+| Platform availability | The adapter reports which requested profiles it can enforce, and admission rejects unsupported profiles.                                          |
+
+Process-group cancellation alone cannot prove that a deliberately detached
+descendant has terminated. It can remain confined while still modifying resources
+inside its grant. Releasing conflicting resource ownership requires verified
+termination or revocation of the relevant access. Until then, the replacement
+retains an unresolved disposition. This distinction belongs to the durable
+execution contract as well as the native backend.
+
+Platform primitives, helper processes, packaging, and revocation techniques
+require implementation evidence. The component contract does not select them.
 
 ## What this guide does not specify
 
-- **Bundling.** How a host ships srt, or its substitute, with its installer —
+- **Bundling.** How a host ships the selected backend with its installer —
   single binary, system dependency, container layer — is host territory.
 - **Violation surfacing.** macOS reports violations via the system log store;
   Linux requires `strace` or equivalent. How a host surfaces these to the user
@@ -202,8 +209,8 @@ Three reasons, matching the AI-SDK-v6 and SQLite picks:
   or by a supervisor. The conformance requirement is that the launcher is
   host-owned, one authority domain cannot mutate another, and a raw spawn
   primitive is never exposed to the model.
-- **Version pinning.** Pinning a specific srt release and auditing changelogs
-  before bumping is RECOMMENDED but not normative.
+- **Version pinning.** The host owns dependency pinning and review of changes
+  to the selected enforcement implementation.
 
 ## See also
 

@@ -24,6 +24,10 @@ tags:
 
 # Persistency
 
+> **Earlier design reference**
+>
+> The tables and save-on-chunk policy below belong to the earlier design. [Components](./components.md#storage-and-recovery) defines the persistence and recovery requirements for the proposed rebuild independently of storage representation.
+
 A session is **the unit of state**. This page specifies the storage
 contract: what a session looks like on disk, when it's written, what
 identifiers it uses, and what an implementor MUST preserve so two

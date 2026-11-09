@@ -32,7 +32,7 @@ sees only the capabilities the chosen environment exposes.
 | ----------------- | -------------------------------------------------- | --------------------------------------------- | --------------------- |
 | **Web**           | Inside a browser tab — the user's open page        | Browser's same-origin policy + CORS           | Transient (tab close) |
 | **Cloud sandbox** | Ephemeral container or micro-VM in a managed cloud | Container / VM isolation + outbound allowlist | Per-job lifetime      |
-| **Computer**      | The user's own machine (desktop host, IDE, CLI)    | OS-level (seatbelt / landlock / AppContainer) | Local-first, durable  |
+| **Computer**      | The user's own machine (desktop host, IDE, CLI)    | OS-enforced raw execution                     | Local-first, durable  |
 
 Each environment is described below.
 
@@ -161,46 +161,39 @@ process, an IDE plugin, a CLI invocation, or any local process.
 
 | Capability    | Available?                                                                                  |
 | ------------- | ------------------------------------------------------------------------------------------- |
-| `fs.read`     | **Yes**, scoped by the effective host-issued grant and host containment.                    |
+| `fs.read`     | **Yes**, scoped by the effective host-issued grant and the selected host profile.           |
 | `fs.write`    | **Yes**, same scoping.                                                                      |
 | `shell.run`   | **Yes**, through one execution-confinement authority.                                       |
 | `net.fetch`   | **Yes**, only as a structured capability or within an explicit execution destination grant. |
 | `secrets.has` | **Yes** via the OS keychain or a local secrets file.                                        |
 | `stream.send` | **Yes**.                                                                                    |
 
-**Locked tool availability.** The complete locked profile is available only
-where the host can enforce its authority. On an unsupported host, local
-filesystem, shell, external-runtime, and extension capabilities are withheld
-unless the user enters an explicit unsandboxed posture.
+**Tool availability.** Each capability is available only where the host can
+enforce its declared profile. An unavailable raw-execution backend withholds
+shell, external-runtime, and extension execution that requires it. Structured
+file operations and inference have their own requirements. If the deployment
+also requires whole-host containment, that requirement is checked separately.
 
-**Sandbox.** The OS provides two distinct boundaries: host containment for
-structured in-process capabilities, and execution confinement for raw commands,
-external agents, and extension runtimes. Any permitted connection uses a
-compatible host network route without turning that route into agent authority;
-an incompatible opaque client fails closed. See
-[Execution authority](./execution-authority.md). Recommended primitives:
+**Sandbox.** Raw commands, external agents, and extension runtimes require
+execution confinement. A deployment can add host containment for trusted
+in-process services. Any permitted connection uses a compatible host network
+route within its destination grant. An incompatible opaque client fails closed.
+See [Execution authority](./execution-authority.md).
 
-| OS      | Sandbox primitive                                          |
-| ------- | ---------------------------------------------------------- |
-| macOS   | Seatbelt (`sandbox_init`, `sandbox-exec`).                 |
-| Linux   | Landlock + namespace isolation (or bubblewrap / firejail). |
-| Windows | AppContainer + Job objects.                                |
-
-The guide names
-[`anthropic-experimental/sandbox-runtime`](https://github.com/anthropic-experimental/sandbox-runtime)
-("srt") as the reference macOS/Linux confinement primitive. It does not, by
-itself, provide host-native routing or independent concurrent network
-authorities. See
-[Sandbox Runtime (`srt`)](./srt.md) for what srt provides, what the
-protocol locks and does not lock to, and how to substitute equivalent
-primitives.
+The proposed rebuild uses a native confinement adapter whose platform backends
+must satisfy these authority boundaries. The host supplies routing and transport
+trust, and concurrent executions retain independent grants. The
+[existing srt backend study](./srt.md) records capabilities and limitations relevant
+to replacing that dependency. The concrete platform choices and initial support
+boundary live in the
+[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox-proposal.md).
 
 For `shell.run`, the host creates a confined process tree from the effective
 grant: the host/user ceiling ∩ declared requirements ∩ parent-delegable
 authority. The watchdog may narrow that result; it cannot mint authority
 ([`foundations / watchdog`](./foundations.md#watchdog)). The trusted agent host
-keeps filesystem and process defense in depth, but its provider calls do not run
-through a raw execution's destination set.
+uses its own authority and selected containment profile. Its provider calls use
+the host-service destination grant and transport.
 
 **Defense in depth.** Three layers:
 
@@ -231,8 +224,8 @@ filesystem-resident database
   loopback / Unix socket / named pipe); do not expose the agent host to
   the network.
 - Keep host services, structured capabilities, extensions, and raw execution on
-  separate authority paths. Retain host containment for in-process file tools,
-  and apply execution confinement to every raw process tree the agent controls,
+  separate authority paths. Enforce the selected host-containment profile and
+  apply execution confinement to every raw process tree the agent controls,
   including external agents that own their own tool loop.
 - Resolve an already-authorized destination through the effective host network
   route. Merely removing a network sandbox does not provide system proxy, PAC,

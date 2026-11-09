@@ -22,6 +22,10 @@ tags:
 
 # Subagents
 
+> **Earlier design reference**
+>
+> The shared-loop specialization described below belongs to the earlier design. The proposed [subagent experience](./experience.md#work-with-subagents) defines named, reusable child conversations. [Master](./master.md#delegation-and-verification) owns their assignments and control policy, and [Components](./components.md#owned-child-sessions) defines child-session identity, authority, and per-turn settlement.
+
 A **subagent** is a child agent run, spawned by a parent via the
 locked `task` tool. The child runs the same loop, against the same
 runtime, against a child session. The parent's `task` call returns

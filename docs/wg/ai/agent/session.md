@@ -25,6 +25,10 @@ tags:
 
 # Session Lifecycle
 
+> **Earlier design reference**
+>
+> The prompt ordering, compaction choices, and session representation below belong to the earlier design. For the proposed rebuild, [Components](./components.md) owns execution and history semantics, and [Master](./master.md) owns context and continuation policy.
+
 A session is the unit of state. Everything an agent does — read,
 write, call a tool, switch model, fork, restart — lands here. This
 page covers the **lifecycle** (what happens between session-open and
@@ -102,7 +106,7 @@ The SDK's `inputTokens` field already **includes** the cache-read
 and cache-write counts. The recorder MUST subtract them out before
 persisting `prompt_tokens`, or the cache columns get double-counted
 in the session rollup. See
-[`ai-sdk / token usage`](./ai-sdk/index.md#token-usage-the-cache-normalization-rule)
+[`ai-sdk / token usage`](./ai-sdk/index.md#token-usage--the-cache-normalization-rule)
 for the exact formula and the per-component mapping.
 
 ### Cost

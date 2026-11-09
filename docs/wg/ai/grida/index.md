@@ -20,6 +20,11 @@ this layer binds those shapes to Grida's actual surfaces — the
 canvas, the image-generation provider seam, and the host-level
 fundamentals as Grida ships them.
 
+The proposed [Rust/Electron tool-host contract](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/tool-host-contract.md)
+defines shared Grida capabilities exposed directly and through MCP, including
+live editor ownership and headless execution. The pages below also retain
+current implementation evidence and earlier domain-tool proposals.
+
 ## Pages
 
 | Page                                                                  | Covers                                                                                                                                                                                                                     |

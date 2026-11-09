@@ -360,15 +360,38 @@ This is a spike, and the class **forks every host feature** (each one needs an
 agent-provider branch alongside the model-provider one). Whether it earns that
 permanent cost is an open decision — see
 [acp-provider.md](../../docs/wg/ai/agent/acp-provider.md). User-outcome
-("jobs to be done") coverage is the spec: deterministic tests drive a fake ACP
-agent (`testing/fake-acp-agent.ts`, `agent-provider/jtbd.test.ts`); the gated
-`agent-provider/run.live.test.ts` proves the real bridge.
+("jobs to be done") tests exercise selected bridge contracts with a fake ACP
+agent (`testing/fake-acp-agent.ts`, `agent-provider/jtbd.test.ts`). The gated
+`agent-provider/run.live.test.ts` exercises real-provider streaming and recall.
+The [feature catalog](../../docs/agent/features.md) owns current availability,
+intended outcomes, and caveats. The tests supply evidence within their exercised
+scope.
 
 ## Package Docs
 
-Package docs are host-agnostic and describe the contracts exported by
-`@grida/agent`:
+Package docs cover the current host contracts and the proposed Rust core.
 
+The [Agent Features catalog](https://github.com/gridaco/grida/blob/main/docs/agent/features.md)
+records current implementation coverage alongside the rebuilt product's feature
+promises and scope.
+
+- [Rust core proposal](./docs/rust-core-proposal.md) — proposed crate layout,
+  dependency graph, and public contracts for the fresh agent implementation.
+- [Native executable and headless host](./docs/rust-core-proposal.md#native-executable-and-headless-host)
+  — the shared engine/server binary, unattended runs, and process-level testing
+  required before Desktop integration.
+- [Rust core pressure test](./docs/rust-core-pressure-test.md) — minimal-master
+  and durable-session walkthroughs, Grida feature checks, and proposed commitments.
+- [Tool-host contract](./docs/tool-host-contract.md) — concrete Rust/Electron
+  ownership, shared native/MCP capabilities, endpoint identity, domain-owned results, and invocation recovery.
+- [Configuration proposal](./docs/rust-config-proposal.md) — reviewed settings,
+  conversational inspection and changes, and the minimal host-owned TOML surface.
+- [Client protocol proposal](./docs/rust-client-protocol.md) — ACP-first clients,
+  custom presentation, negotiated durable controls, and compatibility checks.
+- [Lifecycle hooks](./docs/rust-core-proposal.md#configured-lifecycle-hooks) —
+  configured checks and context contributions through existing execution contracts.
+- [Native sandbox proposal](./docs/rust-sandbox-proposal.md) — concrete srt
+  replacement, minimal launch contract, and native platform boundaries.
 - [DaemonServer](../grida-daemon/docs/daemon-server.md) — lifecycle,
   ownership, and what hosts must provide (`@grida/daemon`).
 - [HTTP access](../grida-daemon/docs/http-access.md) — Basic Auth, CORS, and

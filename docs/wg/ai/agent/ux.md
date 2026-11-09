@@ -20,6 +20,10 @@ tags:
 
 # UX Patterns
 
+> **Earlier design reference**
+>
+> The interaction policies below belong to the earlier design. [User experience](./experience.md) owns the proposed rebuild's behavior, including Stop pausing automatic queue advancement until explicit resumption.
+
 The agent system core does not own UI. It does own the **interaction
 patterns** that change the protocol — when a turn fires, how a side
 question is forked, where durable memory lives, what is inspectable.

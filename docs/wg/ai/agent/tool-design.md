@@ -53,9 +53,9 @@ differs from an ordinary API's in two ways that shape the discipline:
   a model or hand it your release notes. It takes the surface literally,
   fills every argument you expose, and forms habits on what it sees.
 - **Changing the surface is costly — most costly where the model is most
-  fluent.** A name the model was trained on, it calls well; rename it and
-  quality drops, which is why the
-  [locked fundamental set](./tools.md#locked-fundamental-tools) is locked.
+  fluent.** Familiar names and schemas can influence tool use. The master
+  chooses a [product tool profile](./tools.md#locked-fundamental-tools) and
+  evaluates its behavior with the selected models.
   For a tool the model never trained on, the cost is narrower — keeping
   live and resumed sessions consistent with the calls already in their
   transcripts — but it points the same way: a shape is easier to grow
@@ -197,9 +197,9 @@ depends as much on good failures as on good successes.
   different recoveries. Collapsing them into one opaque error throws that
   signal away.
 
-This is the same envelope every tool returns (see
-[Tools / result envelope](./tools.md#tool-result-envelope)); the design
-obligation is to populate it with something _actionable_.
+The [result contract](./tools.md#tool-result-envelope) preserves outcome meaning
+across adapters. The concrete tool and its model-facing projection supply
+actionable detail.
 
 ## Tool, connector, or skill
 
