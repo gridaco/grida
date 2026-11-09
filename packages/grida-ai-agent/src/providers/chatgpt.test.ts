@@ -367,6 +367,62 @@ describe("ChatGptProvider", () => {
     });
   });
 
+  it.each([
+    ["a different account before refresh", "account-b", false],
+    ["a fresh login for the same account", "account-123", false],
+    ["a different account during refresh", "account-b", true],
+  ])(
+    "keeps the original prompt from reaching %s",
+    async (_label, account, duringRefresh) => {
+      await auth.set(CHATGPT_PROVIDER_ID, {
+        type: "oauth",
+        access: "access-one",
+        refresh: "refresh-one",
+        expires: Math.floor(Date.now() / 1000) + 3600,
+        account_id: "account-123",
+        metadata: { credential_id: "first-fixture-connection" },
+      });
+      const replacement: OAuthEntry = {
+        type: "oauth",
+        access: "replacement-access",
+        refresh: "replacement-refresh",
+        expires: Math.floor(Date.now() / 1000) + 3600,
+        account_id: account,
+        metadata: { credential_id: "second-fixture-connection" },
+      };
+      const calls: string[] = [];
+      const request = vi.fn<typeof fetch>(async (input) => {
+        const url = input instanceof Request ? input.url : input.toString();
+        calls.push(url);
+        if (url === TOKEN_URL) {
+          await auth.set(CHATGPT_PROVIDER_ID, replacement);
+          return Response.json({
+            access_token: "rotated-access",
+            refresh_token: "rotated-refresh",
+            expires_in: 3600,
+            account_id: "account-123",
+          });
+        }
+        if (!duringRefresh) await auth.set(CHATGPT_PROVIDER_ID, replacement);
+        return calls.length === 1
+          ? new Response("private-upstream-error", { status: 401 })
+          : completedResponse("gpt-5.6-terra");
+      });
+      const { factory } = runtime(request);
+
+      await expect(
+        generateText({
+          model: factory("pro", "openai/gpt-5.6-terra"),
+          prompt: "Captured by the original connection",
+        })
+      ).rejects.toThrow(/chatgpt_credential_changed/);
+      expect(calls).toEqual(
+        duringRefresh ? [RESPONSES_URL, TOKEN_URL] : [RESPONSES_URL]
+      );
+      expect(await auth.get(CHATGPT_PROVIDER_ID)).toEqual(replacement);
+    }
+  );
+
   it("removes the exact credential when the inference retry is also unauthorized", async () => {
     const request = vi.fn<typeof fetch>(async (input) => {
       const url = input instanceof Request ? input.url : input.toString();

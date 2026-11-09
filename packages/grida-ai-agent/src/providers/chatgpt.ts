@@ -184,9 +184,8 @@ export namespace ChatGptProvider {
       );
       if (response.status === 401) {
         await discardBody(response);
-        credential = await runtime.credentials.refreshAfterUnauthorized(
-          credential.access_token
-        );
+        credential =
+          await runtime.credentials.refreshAfterUnauthorized(credential);
         response = await requestWithCredential(
           providerHttp,
           input,
@@ -196,9 +195,7 @@ export namespace ChatGptProvider {
         );
         if (response.status === 401) {
           await discardBody(response);
-          await runtime.credentials.invalidateAfterUnauthorized(
-            credential.access_token
-          );
+          await runtime.credentials.invalidateAfterUnauthorized(credential);
           throw new ChatGptCredentialError("chatgpt_reauthentication_required");
         }
       }

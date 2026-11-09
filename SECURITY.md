@@ -1740,9 +1740,12 @@ trusted merely because it is “local.”
    endpoint and ChatGPT Responses endpoint to the authenticated provider lane;
    neither is a provider-asset/download grant. The model adapter rejects any
    other URL, injects bearer/account/product headers only at request time,
-   forces stateless Responses posture, performs at most one refresh/replay
-   after `401`, consumes every non-success body, and maps it to a bounded
-   code-led error before the AI SDK or agent stream can observe it.
+   forces stateless Responses posture, and permits at most one refresh/replay
+   after `401` within the captured account and connection. Reconnecting the
+   same account creates a new connection. Legacy records without a connection
+   ID can refresh only their exact captured record. The adapter consumes every
+   non-success body and maps it to a bounded code-led error before the AI SDK
+   or agent stream can observe it.
 6. **Session/provider identity is sticky.** A new provider-unqualified
    compatible conversation may prefer a ready ChatGPT connection. Once
    persisted, the provider/model pair is reused for continuations and queued

@@ -334,30 +334,82 @@ describe("ChatGptCredentialManager", () => {
     }
   });
 
-  it("re-reads persisted credentials and does not overwrite a newer access token on reactive refresh", async () => {
+  it("reuses an access token already rotated within the same connection", async () => {
     const original: OAuthEntry = {
       type: "oauth",
       access: "rejected-access",
       refresh: "old-refresh",
       expires: NOW / 1000 + 3600,
       account_id: "account-123",
+      metadata: { credential_id: "fixture-connection" },
     };
     await auth.set(CHATGPT_PROVIDER_ID, original);
     const request = vi.fn<typeof fetch>();
     const manager = makeManager(request);
+    const rejected = await manager.getAccessCredentials();
     await auth.set(CHATGPT_PROVIDER_ID, {
       ...original,
       access: "already-rotated",
       refresh: "already-rotated-refresh",
     });
 
-    await expect(
-      manager.refreshAfterUnauthorized("rejected-access")
-    ).resolves.toEqual({
+    await expect(manager.refreshAfterUnauthorized(rejected)).resolves.toEqual({
       access_token: "already-rotated",
       account_id: "account-123",
     });
     expect(request).not.toHaveBeenCalled();
+  });
+
+  it("does not infer connection continuity from a changed legacy record", async () => {
+    const original: OAuthEntry = {
+      type: "oauth",
+      access: "original-access",
+      refresh: "original-refresh",
+      expires: NOW / 1000 + 3600,
+      account_id: "account-123",
+    };
+    await auth.set(CHATGPT_PROVIDER_ID, original);
+    const request = vi.fn<typeof fetch>();
+    const manager = makeManager(request);
+    const rejected = await manager.getAccessCredentials();
+    const replacement = { ...original, refresh: "replacement-refresh" };
+    await auth.set(CHATGPT_PROVIDER_ID, replacement);
+
+    await expect(
+      manager.refreshAfterUnauthorized(rejected)
+    ).rejects.toMatchObject({
+      code: "chatgpt_credential_changed",
+    });
+    expect(request).not.toHaveBeenCalled();
+    expect(await auth.get(CHATGPT_PROVIDER_ID)).toEqual(replacement);
+  });
+
+  it("does not install a different account from a token refresh", async () => {
+    const original: OAuthEntry = {
+      type: "oauth",
+      access: "original-access",
+      refresh: "original-refresh",
+      expires: NOW / 1000 + 3600,
+      account_id: "account-a",
+      metadata: { credential_id: "fixture-connection" },
+    };
+    await auth.set(CHATGPT_PROVIDER_ID, original);
+    const manager = makeManager(async () =>
+      tokenResponse({
+        access_token: "account-b-access",
+        refresh_token: "account-b-refresh",
+        expires_in: 3600,
+        account_id: "account-b",
+      })
+    );
+    const rejected = await manager.getAccessCredentials();
+
+    await expect(
+      manager.refreshAfterUnauthorized(rejected)
+    ).rejects.toMatchObject({
+      code: "chatgpt_credential_changed",
+    });
+    expect(await auth.get(CHATGPT_PROVIDER_ID)).toEqual(original);
   });
 
   it("does not resurrect a credential when sign-out wins an in-flight refresh", async () => {
@@ -537,7 +589,7 @@ describe("ChatGptCredentialManager", () => {
     });
   });
 
-  it("does not let a late account refresh overwrite a newer OAuth completion", async () => {
+  it("rejects an old refresh after a newer OAuth completion wins", async () => {
     await auth.set(CHATGPT_PROVIDER_ID, {
       type: "oauth",
       access: "account-a-access",
@@ -587,8 +639,11 @@ describe("ChatGptCredentialManager", () => {
       account: { id: "account-b" },
     });
     releaseRefresh();
+    await expect(refresh).rejects.toMatchObject({
+      code: "chatgpt_credential_changed",
+    });
 
-    await expect(refresh).resolves.toEqual({
+    await expect(manager.getAccessCredentials()).resolves.toEqual({
       access_token: "account-b-access",
       account_id: "account-b",
     });
@@ -678,23 +733,24 @@ describe("ChatGptCredentialManager", () => {
     };
     const newer: OAuthEntry = {
       type: "oauth",
-      access: "newer-access",
+      access: "rejected-access",
       refresh: "newer-refresh",
       expires: NOW / 1000 + 7200,
       account_id: "account-b",
     };
     await auth.set(CHATGPT_PROVIDER_ID, rejected);
     const manager = makeManager(vi.fn<typeof fetch>());
+    const selection = await manager.getAccessCredentials();
 
-    await expect(
-      manager.invalidateAfterUnauthorized("rejected-access")
-    ).resolves.toBe(true);
+    await expect(manager.invalidateAfterUnauthorized(selection)).resolves.toBe(
+      true
+    );
     expect(await auth.get(CHATGPT_PROVIDER_ID)).toBeUndefined();
 
     await auth.set(CHATGPT_PROVIDER_ID, newer);
-    await expect(
-      manager.invalidateAfterUnauthorized("rejected-access")
-    ).resolves.toBe(false);
+    await expect(manager.invalidateAfterUnauthorized(selection)).resolves.toBe(
+      false
+    );
     expect(await auth.get(CHATGPT_PROVIDER_ID)).toEqual(newer);
   });
 

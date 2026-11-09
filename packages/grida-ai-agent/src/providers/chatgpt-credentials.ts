@@ -9,6 +9,7 @@
  */
 
 import crypto from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import type { AuthStore, OAuthEntry } from "@grida/daemon/server";
 import type {
   ChatGptAuthStart,
@@ -49,14 +50,15 @@ export type ChatGptOAuthConfig = Readonly<{
   attempt_ttl_ms?: number;
 }>;
 
-export type ChatGptAccessCredentials = {
+export type ChatGptAccessCredentials = Readonly<{
   access_token: string;
   account_id: string;
-};
+}>;
 
 export type ChatGptCredentialErrorCode =
   | "chatgpt_not_signed_in"
   | "chatgpt_account_missing"
+  | "chatgpt_credential_changed"
   | "chatgpt_oauth_attempt_invalid"
   | "chatgpt_oauth_exchange_failed"
   | "chatgpt_token_refresh_failed"
@@ -123,7 +125,14 @@ export class ChatGptCredentialManager {
   private readonly attemptTtlMs: number;
   private pending: PendingAttempt | null = null;
   private readonly completing = new Map<string, CompletingAttempt>();
-  private refreshInFlight: Promise<ChatGptAccessCredentials> | null = null;
+  private readonly selections = new WeakMap<
+    ChatGptAccessCredentials,
+    OAuthEntry
+  >();
+  private refreshInFlight: {
+    entry: OAuthEntry;
+    task: Promise<ChatGptAccessCredentials>;
+  } | null = null;
   private generation = 0;
 
   constructor(
@@ -301,20 +310,23 @@ export class ChatGptCredentialManager {
   async getAccessCredentials(): Promise<ChatGptAccessCredentials> {
     const entry = await this.requireEntry();
     if (isFresh(entry, this.now(), this.refreshSkewMs)) {
-      return accessCredentials(entry);
+      return this.capture(entry);
     }
-    return this.refresh(false);
+    return this.refresh(entry, false);
   }
 
   /**
-   * Reactive recovery after one inference 401. If another request already
-   * rotated the access token, use that fresh record; otherwise force exactly
-   * one singleflight refresh.
+   * Reactive recovery after one inference 401. Reuse a rotated token only
+   * within the connection that authorized the original request.
    */
   async refreshAfterUnauthorized(
-    rejectedAccessToken: string
+    rejected: ChatGptAccessCredentials
   ): Promise<ChatGptAccessCredentials> {
-    return this.refresh(true, rejectedAccessToken);
+    const expected = this.selections.get(rejected);
+    if (!expected) {
+      throw new ChatGptCredentialError("chatgpt_credential_changed");
+    }
+    return this.refresh(expected, true);
   }
 
   /**
@@ -323,13 +335,12 @@ export class ChatGptCredentialManager {
    * entry, so a late 401 for account A cannot sign out account B.
    */
   async invalidateAfterUnauthorized(
-    rejectedAccessToken: string
+    rejected: ChatGptAccessCredentials
   ): Promise<boolean> {
-    const entry = await this.readEntry();
-    if (!entry || !timingSafeTextEqual(entry.access, rejectedAccessToken)) {
-      return false;
-    }
-    return this.auth.removeIfUnchanged(CHATGPT_PROVIDER_ID, entry);
+    const expected = this.selections.get(rejected);
+    return expected
+      ? this.auth.removeIfUnchanged(CHATGPT_PROVIDER_ID, expected)
+      : false;
   }
 
   supportsAccount(): Promise<boolean> {
@@ -362,38 +373,56 @@ export class ChatGptCredentialManager {
     return this.pending !== null || this.completing.size > 0;
   }
 
+  private capture(entry: OAuthEntry): ChatGptAccessCredentials {
+    if (!entry.account_id) {
+      throw new ChatGptCredentialError("chatgpt_account_missing");
+    }
+    const selection = Object.freeze({
+      access_token: entry.access,
+      account_id: entry.account_id,
+    });
+    this.selections.set(selection, entry);
+    return selection;
+  }
+
   private async refresh(
-    force: boolean,
-    rejectedAccessToken?: string
+    expected: OAuthEntry,
+    force: boolean
   ): Promise<ChatGptAccessCredentials> {
-    if (this.refreshInFlight) return await this.refreshInFlight;
-    const task = this.refreshOnce(force, rejectedAccessToken);
-    this.refreshInFlight = task;
+    const current = this.refreshInFlight;
+    if (current) {
+      requireSameConnection(expected, current.entry);
+      return current.task;
+    }
+    const work = { entry: expected, task: this.refreshOnce(expected, force) };
+    this.refreshInFlight = work;
     try {
-      return await task;
+      return await work.task;
     } finally {
-      if (this.refreshInFlight === task) this.refreshInFlight = null;
+      this.refreshInFlight = null;
     }
   }
 
   private async refreshOnce(
-    force: boolean,
-    rejectedAccessToken?: string
+    expected: OAuthEntry,
+    force: boolean
   ): Promise<ChatGptAccessCredentials> {
     // Re-read after entering the singleflight. A concurrent request may have
     // persisted a rotated token before this caller acquired the slot.
+    const generation = this.generation;
     const entry = await this.requireEntry();
-    if (
-      rejectedAccessToken !== undefined &&
-      entry.access !== rejectedAccessToken
-    ) {
-      return accessCredentials(entry);
+    if (generation !== this.generation) {
+      throw new ChatGptCredentialError("chatgpt_not_signed_in");
     }
-    if (!force && isFresh(entry, this.now(), this.refreshSkewMs)) {
-      return accessCredentials(entry);
+    requireSameConnection(expected, entry);
+    if (
+      force
+        ? entry.access !== expected.access
+        : isFresh(entry, this.now(), this.refreshSkewMs)
+    ) {
+      return this.capture(entry);
     }
 
-    const generation = this.generation;
     const form = new URLSearchParams({
       grant_type: "refresh_token",
       client_id: this.config.client_id,
@@ -432,6 +461,9 @@ export class ChatGptCredentialManager {
       undefined,
       "chatgpt_token_refresh_failed"
     );
+    if (entry.account_id && entry.account_id !== next.account_id) {
+      throw new ChatGptCredentialError("chatgpt_credential_changed");
+    }
     // Load-bearing ordering for rotating refresh tokens: durable mutation
     // completes before callers can spend the corresponding access token. The
     // compare-and-replace also prevents a slow refresh for account A from
@@ -442,13 +474,18 @@ export class ChatGptCredentialManager {
       next
     );
     if (!replaced) {
-      return accessCredentials(await this.requireEntry());
+      const current = await this.requireEntry();
+      if (generation !== this.generation) {
+        throw new ChatGptCredentialError("chatgpt_not_signed_in");
+      }
+      requireSameConnection(entry, current);
+      return this.capture(current);
     }
     if (generation !== this.generation) {
       await this.auth.removeIfUnchanged(CHATGPT_PROVIDER_ID, next);
       throw new ChatGptCredentialError("chatgpt_not_signed_in");
     }
-    return accessCredentials(next);
+    return this.capture(next);
   }
 
   private requestToken(
@@ -765,11 +802,24 @@ function isFresh(entry: OAuthEntry, now: number, skewMs: number): boolean {
   return entry.expires * 1000 > now + skewMs;
 }
 
-function accessCredentials(entry: OAuthEntry): ChatGptAccessCredentials {
-  if (!entry.account_id) {
-    throw new ChatGptCredentialError("chatgpt_account_missing");
+function requireSameConnection(
+  expected: OAuthEntry,
+  current: OAuthEntry
+): void {
+  const expectedId = expected.metadata?.credential_id;
+  const currentId = current.metadata?.credential_id;
+  // Records from before connection IDs can refresh their captured entry.
+  // They cannot prove that a different stored record belongs to that sign-in.
+  const sameConnection =
+    typeof expectedId === "string" &&
+    expectedId &&
+    typeof currentId === "string" &&
+    currentId
+      ? timingSafeTextEqual(expectedId, currentId)
+      : isDeepStrictEqual(expected, current);
+  if (expected.account_id !== current.account_id || !sameConnection) {
+    throw new ChatGptCredentialError("chatgpt_credential_changed");
   }
-  return { access_token: entry.access, account_id: entry.account_id };
 }
 
 function statusFrom(
@@ -820,6 +870,8 @@ function credentialErrorDescription(code: ChatGptCredentialErrorCode): string {
       return "no ChatGPT subscription credential is available";
     case "chatgpt_account_missing":
       return "the credential has no ChatGPT account identity";
+    case "chatgpt_credential_changed":
+      return "the ChatGPT connection changed while preparing this request";
     case "chatgpt_oauth_attempt_invalid":
       return "the sign-in attempt is missing, expired, cancelled, or mismatched";
     case "chatgpt_oauth_exchange_failed":
