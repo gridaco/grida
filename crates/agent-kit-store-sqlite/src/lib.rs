@@ -3,7 +3,7 @@
 pub mod context;
 pub mod history;
 
-use agent_kit_core::driver_state::DriverStateSnapshot;
+use agent_kit_core::driver_state::{DriverStateChange, DriverStateSnapshot};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlReader, ControlRevision, ControlSnapshot,
@@ -342,14 +342,84 @@ impl SqliteStore {
             .into_records())
     }
 
-    fn acquire(&self, request: ClaimRequest) -> BoxFuture<'_, Result<ClaimOutcome>> {
+    /// Accept an ordinary submission only at the observed session revision.
+    /// A previously accepted identical input retains its receipt across revisions.
+    pub async fn submit_at_revision(
+        &self,
+        session: SessionId,
+        input: Submission,
+        expected: SessionRevision,
+    ) -> Result<Acceptance> {
+        self.accept(session, input, Some(expected)).await
+    }
+
+    /// Claim new work and conditionally change the session driver's state in the
+    /// same transaction. Repeat both arguments to resolve a lost acknowledgment.
+    pub async fn claim_with_driver_state(
+        &self,
+        request: ClaimRequest,
+        change: DriverStateChange,
+    ) -> Result<ClaimOutcome> {
+        if !matches!(request.selection, TurnSelection::New { .. }) {
+            return Err(error(
+                ErrorKind::InvalidInput,
+                "driver_state_claim_requires_new_turn",
+            ));
+        }
+        self.acquire(request, Some(change)).await
+    }
+
+    fn accept(
+        &self,
+        session_id: SessionId,
+        input: Submission,
+        expected: Option<SessionRevision>,
+    ) -> BoxFuture<'_, Result<Acceptance>> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(database_error)?;
+            let mut session = load_session(&transaction, &session_id)?;
+            let fingerprint = Fingerprint::of(&input)?;
+            if let Some(receipt) =
+                lookup_request(&transaction, &session_id, "submit", &input.id, fingerprint)?
+            {
+                return Ok(receipt);
+            }
+            if let Some(expected) = expected {
+                require_revision(&session, expected)?;
+            }
+            let receipt = insert_input(&transaction, &session_id, &mut session, &input, None)?;
+            bump_revision(&mut session)?;
+            save_session(&transaction, &session_id, &session)?;
+            save_request(
+                &transaction,
+                &session_id,
+                "submit",
+                &input.id,
+                fingerprint,
+                &receipt,
+            )?;
+            transaction.commit().map_err(commit_error)?;
+            Ok(receipt)
+        })
+    }
+
+    fn acquire(
+        &self,
+        request: ClaimRequest,
+        state_change: Option<DriverStateChange>,
+    ) -> BoxFuture<'_, Result<ClaimOutcome>> {
         let inner = Arc::clone(&self.inner);
         Box::pin(async move {
             let prepared = execute(Arc::clone(&inner), move |inner, connection| {
                 let transaction = connection
                     .transaction_with_behavior(TransactionBehavior::Immediate)
                     .map_err(database_error)?;
-                let fingerprint = Fingerprint::of(&request)?;
+                let fingerprint = match &state_change {
+                    Some(change) => Fingerprint::of(&(&request, change))?,
+                    None => Fingerprint::of(&request)?,
+                };
                 if let Some(receipt) = lookup_request::<ClaimRecord>(
                     &transaction,
                     &request.session,
@@ -384,6 +454,9 @@ impl SqliteStore {
                         ).map_err(database_error)?;
                         if exists {
                             return Err(error(ErrorKind::Conflict, "turn_exists"));
+                        }
+                        if let Some(change) = state_change {
+                            session.driver_state.apply(change)?;
                         }
                         let state = TurnState::with_driver_state(TurnBinding {
                             session: request.session.clone(),
@@ -504,35 +577,11 @@ impl SessionStore for SqliteStore {
         session_id: SessionId,
         input: Submission,
     ) -> BoxFuture<'_, Result<Acceptance>> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
-            let transaction = connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(database_error)?;
-            let mut session = load_session(&transaction, &session_id)?;
-            let fingerprint = Fingerprint::of(&input)?;
-            if let Some(receipt) =
-                lookup_request(&transaction, &session_id, "submit", &input.id, fingerprint)?
-            {
-                return Ok(receipt);
-            }
-            let receipt = insert_input(&transaction, &session_id, &mut session, &input, None)?;
-            bump_revision(&mut session)?;
-            save_session(&transaction, &session_id, &session)?;
-            save_request(
-                &transaction,
-                &session_id,
-                "submit",
-                &input.id,
-                fingerprint,
-                &receipt,
-            )?;
-            transaction.commit().map_err(commit_error)?;
-            Ok(receipt)
-        })
+        self.accept(session_id, input, None)
     }
 
     fn claim(&self, request: ClaimRequest) -> BoxFuture<'_, Result<ClaimOutcome>> {
-        self.acquire(request)
+        self.acquire(request, None)
     }
 
     fn recover(&self, request: RecoveryRequest) -> BoxFuture<'_, Result<ClaimOutcome>> {

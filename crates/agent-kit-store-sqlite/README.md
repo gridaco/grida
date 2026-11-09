@@ -25,6 +25,9 @@ into each claimed turn. State changes share the transaction with an exact
 active-turn control or a turn journal commit. The committed revision appears
 in the receipt. The adapter preserves the driver's bytes without interpreting
 its policy. Earlier databases upgrade with empty driver state.
+Conditional submission keeps ordinary input identity while fencing admission
+at the observed session revision. A new claim can reserve driver state in the
+same transaction that claims the input and issues ownership.
 
 A live lease blocks recovery of its turn. Dropping it makes interrupted execution
 eligible for an explicit recovery request. Reopening the database preserves the

@@ -2440,3 +2440,132 @@ async fn rejects_an_oversized_state_change_without_publishing_its_control() {
             .paused
     );
 }
+
+#[tokio::test]
+async fn conditional_submission_rejects_a_changed_session_and_replays_accepted_identity() {
+    let (_directory, store) = store().await;
+    let session = session();
+    let before = store.inspect(session.clone()).await.unwrap();
+    let generated = submission("driver-generated", "continue owned work");
+    store
+        .submit(session.clone(), submission("user", "new user input"))
+        .await
+        .unwrap();
+    assert_error(
+        store
+            .submit_at_revision(session.clone(), generated.clone(), before.revision)
+            .await,
+        ErrorKind::Conflict,
+        "stale_session_revision",
+    );
+    assert!(
+        store
+            .input(session.clone(), generated.id.clone())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let current = store.inspect(session.clone()).await.unwrap();
+    let accepted = store
+        .submit_at_revision(session.clone(), generated.clone(), current.revision)
+        .await
+        .unwrap();
+    assert_eq!(
+        store
+            .submit_at_revision(session.clone(), generated, before.revision)
+            .await
+            .unwrap(),
+        accepted
+    );
+    assert_eq!(
+        store.inspect(session).await.unwrap().queued[0].input.id,
+        change("user")
+    );
+}
+
+#[tokio::test]
+async fn reserved_claim_retries_without_allocating_again_and_leaves_stale_work_queued() {
+    use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
+
+    let (_directory, store) = store().await;
+    let session = session();
+    let initial = store.inspect(session.clone()).await.unwrap();
+    store
+        .control(ControlRequest {
+            id: change("set-driver-state"),
+            session: session.clone(),
+            expected_revision: initial.revision,
+            action: SessionControl::DriverState {
+                change: DriverStateChange {
+                    expected: DriverStateRevision(0),
+                    value: Some(payload("available")),
+                },
+                turn: None,
+            },
+        })
+        .await
+        .unwrap();
+    let input = submission("driver-work", "accepted work");
+    store.submit(session.clone(), input.clone()).await.unwrap();
+    let expected = store.inspect(session.clone()).await.unwrap();
+    let request = ClaimRequest {
+        id: change("reserved-claim"),
+        session: session.clone(),
+        expected_revision: expected.revision,
+        selection: TurnSelection::New {
+            turn: turn(),
+            inputs: vec![input.id.clone()],
+        },
+    };
+    let wrong = DriverStateChange {
+        expected: DriverStateRevision(0),
+        value: Some(payload("reserved")),
+    };
+    assert_error(
+        store.claim_with_driver_state(request.clone(), wrong).await,
+        ErrorKind::Conflict,
+        "driver_state_revision_changed",
+    );
+    assert_eq!(store.inspect(session.clone()).await.unwrap(), expected);
+    let reserved = DriverStateChange {
+        expected: DriverStateRevision(1),
+        value: Some(payload("reserved")),
+    };
+    let ClaimOutcome::Acquired(lease) = store
+        .claim_with_driver_state(request.clone(), reserved.clone())
+        .await
+        .unwrap()
+    else {
+        panic!("expected owned claim");
+    };
+    assert!(matches!(
+        store
+            .claim_with_driver_state(request.clone(), reserved.clone())
+            .await
+            .unwrap(),
+        ClaimOutcome::Existing(_)
+    ));
+    let conflicting = DriverStateChange {
+        value: Some(payload("replacement")),
+        ..reserved
+    };
+    assert_error(
+        store.claim_with_driver_state(request, conflicting).await,
+        ErrorKind::Conflict,
+        "request_identity_reused",
+    );
+    let current = store.inspect(session.clone()).await.unwrap();
+    let state = lease.lease.journal().load().await.unwrap();
+    assert_eq!(state.driver_state(), &current.driver_state);
+    assert_eq!(current.driver_state.revision(), DriverStateRevision(2));
+    assert_eq!(current.driver_state.value(), Some(&payload("reserved")));
+    assert_eq!(
+        store
+            .input(session, input.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .disposition,
+        InputDisposition::Claimed { turn: turn() }
+    );
+}
