@@ -32,6 +32,8 @@ struct Enqueue {
     session_id: SessionId,
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
+    #[serde(default)]
+    allow_configuration_changes: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -66,6 +68,8 @@ struct Replace {
     input_id: ChangeId,
     replacement_input_id: ChangeId,
     prompt: Vec<ContentBlock>,
+    #[serde(default)]
+    allow_configuration_changes: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -188,6 +192,10 @@ pub(super) fn handlers(
                                 .map(prompt_part)
                                 .collect::<Result<_>>()?,
                             questions: questions::available(&enqueue.1),
+                            configuration_permission: configuration_permission(
+                                &enqueue.1,
+                                request.allow_configuration_changes,
+                            )?,
                         })
                         .await
                         .map_err(host_error)?;
@@ -231,6 +239,10 @@ pub(super) fn handlers(
                             .map(prompt_part)
                             .collect::<Result<_>>()?,
                         questions: questions::available(&replace.1),
+                        configuration_permission: configuration_permission(
+                            &replace.1,
+                            request.allow_configuration_changes,
+                        )?,
                     };
                     edit_queue(&replace.0, request.queue, edit).await
                 }

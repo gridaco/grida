@@ -72,3 +72,19 @@ inspection reveals the current revision and values.
 
 When editing manually, stop the host or reload deliberately after the edit.
 External editors operate independently of the managed writer lock.
+
+## Changes requested through the agent
+
+A capable native client can expose `config_inspect` to the agent. Its result
+includes the supported field description, current file and active defaults,
+and the defaults captured for the current task.
+
+`config_update` and `config_reload` require an explicit permission on the accepted
+input. A client supplies `allowConfigurationChanges: true` when submitting,
+enqueueing or replacing that input, after enabling all three configuration
+capabilities. This permits changes to the reviewed default for future tasks.
+Existing tasks retain their captured settings.
+
+Successful changes report the snapshot produced by the write. After an
+interrupted response, recovery can report that the requested setting is present.
+A differing state remains uncertain and needs inspection before another change.

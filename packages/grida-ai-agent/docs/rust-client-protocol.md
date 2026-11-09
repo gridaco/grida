@@ -218,6 +218,14 @@ use a filesystem/editor capability. Additional workspace roots express session
 context, and each actual access still needs its grant. A reconnecting observer
 does not gain execution ownership.
 
+For model-facing configuration tools, negotiating `co.grida/config/inspect`
+enables inspection on newly accepted enhanced inputs. Mutation tools additionally
+require all three configuration capabilities and an explicit
+`allowConfigurationChanges: true` in `submit`, `enqueue` or `replace`. The flag
+defaults to false and is retained with the accepted input. A request for changes
+without those capabilities fails before acceptance. Queue inspection reports
+the captured `configurationPermission` as `disabled`, `inspect` or `change`.
+
 ## Acceptance before claiming compatibility
 
 - Drive ordinary sessions with a standard-only ACP client, including streaming,

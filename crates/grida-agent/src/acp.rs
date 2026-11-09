@@ -189,6 +189,7 @@ async fn serve_connection(
                             session,
                             parts,
                             questions: false,
+                            configuration_permission: crate::ConfigurationPermission::Disabled,
                         })
                         .await
                         .map_err(host_error)

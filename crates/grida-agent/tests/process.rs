@@ -19,6 +19,9 @@ use tokio::time::timeout;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 #[cfg(unix)]
+#[path = "process/configuration_tools.rs"]
+mod configuration_tools;
+#[cfg(unix)]
 #[path = "process/lifecycle.rs"]
 mod lifecycle;
 #[cfg(unix)]
@@ -43,6 +46,8 @@ enum Reply {
     Stop(&'static str),
     #[cfg(unix)]
     Question(&'static str),
+    #[cfg(unix)]
+    Tool(&'static str, &'static str),
     #[cfg(unix)]
     QuestionThenHold(tokio::sync::oneshot::Receiver<()>),
     #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -231,15 +236,15 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         Reply::Stop(reason) => ("", Some(reason)),
         Reply::InputCount(_) => unreachable!("count responses use the JSON endpoint"),
         #[cfg(unix)]
+        Reply::Tool(name, arguments) => {
+            assert_eq!(protocol, ProviderProtocol::OpenAiCompatible);
+            return fixture_tool_body(name, arguments);
+        }
+        #[cfg(unix)]
         Reply::Question(name) => {
             assert_eq!(protocol, ProviderProtocol::OpenAiCompatible);
             let arguments = json!({"question":"Which edition?", "options":["Screen", "Print"]});
-            let delta = json!({"id":"fixture-response", "choices":[{"index":0,"delta":{
-                "role":"assistant", "tool_calls":[{"index":0,"id":"edition-question","type":"function",
-                "function":{"name":name,"arguments":arguments.to_string()}}]
-            },"finish_reason":null}]});
-            let finish = json!({"id":"fixture-response","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]});
-            return format!("data: {delta}\n\ndata: {finish}\n\ndata: [DONE]\n\n");
+            return fixture_tool_body(name, &arguments.to_string());
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         Reply::GeminiSigned(text) => {
@@ -332,6 +337,16 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         }
     }
     output
+}
+
+#[cfg(unix)]
+fn fixture_tool_body(name: &str, arguments: &str) -> String {
+    let delta = json!({"id":"fixture-response", "choices":[{"index":0,"delta":{
+        "role":"assistant", "tool_calls":[{"index":0,"id":"fixture-call","type":"function",
+        "function":{"name":name,"arguments":arguments}}]
+    },"finish_reason":null}]});
+    let finish = json!({"id":"fixture-response","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]});
+    format!("data: {delta}\n\ndata: {finish}\n\ndata: [DONE]\n\n")
 }
 
 fn executable() -> Command {
@@ -864,6 +879,7 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
                 text: "Continue work".into()
             }],
             questions: false,
+            configuration_permission: grida_agent::ConfigurationPermission::Disabled,
         }));
         // The current-thread executor cannot run the registered worker during
         // this poll. Drop the request before its first durable admission step.
@@ -1441,6 +1457,7 @@ async fn retry_reports_a_previously_accepted_unclaimed_input_without_starting_it
                 text: "Keep this input".into(),
             }],
             questions: false,
+            configuration_permission: grida_agent::ConfigurationPermission::Disabled,
         })
         .await
         .unwrap();
@@ -1910,6 +1927,7 @@ async fn compatible_paths_with_different_dispatch_targets_have_distinct_session_
                 text: "Do not dispatch elsewhere".into(),
             }],
             questions: false,
+            configuration_permission: grida_agent::ConfigurationPermission::Disabled,
         })
         .await;
     let Err(error) = result else {

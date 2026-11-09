@@ -6,13 +6,16 @@ pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use questions::{PendingQuestion, Questions};
 
 use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
+use crate::configuration_tools::ConfigurationAccess;
 use crate::gg::GgConnection;
 use crate::http::{CompatibleOutputLimitField, HttpTransport, ProviderOptions, ProviderProtocol};
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
 };
 use agent_kit_core::history::{HistoryPosition, HistoryRecord};
-use agent_kit_core::inference::{Modality, ModelCapabilities, Provider, ProviderBinding};
+use agent_kit_core::inference::{
+    Modality, ModelCapabilities, Provider, ProviderBinding, RequestControl,
+};
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::Inventory;
 use agent_kit_core::turn::{
@@ -26,7 +29,10 @@ use agent_kit_providers::{
     Anthropic, Gemini, GeminiProfile, ModelProfile, OpenAiCompatible, OutputLimitField, Responses,
     ResponsesEndpoint, ResponsesProfile, StreamLimits, StreamingTransport,
 };
-use agent_kit_runtime::{ExecutionLimits, ExecutionServices, Runtime, TurnUpdate};
+use agent_kit_runtime::{
+    AdmissionContext, ExecutionLimits, ExecutionServices, Runtime, ToolAdmission, ToolDecision,
+    ToolGate, TurnUpdate,
+};
 use agent_kit_sessions::{
     Acceptance, ClaimOutcome, ClaimRequest, ControlReceipt, ControlRequest, CreateSession,
     InputDisposition, RecoveryRequest, SessionControl, SessionRevision, SessionStore, SessionView,
@@ -83,6 +89,7 @@ struct Execution {
     provider: Arc<dyn Provider>,
     authority: MasterAuthority,
     questions: Arc<questions::QuestionAccess>,
+    configuration_tools: Arc<ConfigurationAccess>,
 }
 
 #[derive(Default)]
@@ -155,6 +162,7 @@ pub struct PromptRequest {
     pub session: SessionId,
     pub parts: Vec<PromptPart>,
     pub questions: bool,
+    pub configuration_permission: crate::ConfigurationPermission,
 }
 
 pub struct AcceptedRun {
@@ -184,6 +192,8 @@ struct StoredPrompt {
     authority: Option<CapturedAuthority>,
     #[serde(default)]
     questions: bool,
+    #[serde(default)]
+    configuration_permission: crate::ConfigurationPermission,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -216,6 +226,7 @@ enum Launch {
         id: ChangeId,
         parts: Vec<PromptPart>,
         questions: bool,
+        configuration_permission: crate::ConfigurationPermission,
     },
     Queued,
     Resume(ClaimRequest),
@@ -246,6 +257,8 @@ struct PreparedInput {
     messages: Vec<Message>,
     limit: Option<NonZeroU64>,
     questions: bool,
+    configuration_permission: crate::ConfigurationPermission,
+    captured: Option<ConfigurationSnapshot>,
 }
 
 #[derive(Debug, Serialize)]
@@ -374,6 +387,7 @@ impl Host {
             session,
             parts,
             questions,
+            configuration_permission,
         } = request;
         prompt_input(&id, &parts)?;
         let turn = TurnId::new(uuid())?;
@@ -387,6 +401,7 @@ impl Host {
                     id: id.clone(),
                     parts,
                     questions,
+                    configuration_permission,
                 },
             )?
         };
@@ -531,13 +546,16 @@ impl Host {
                 id,
                 parts,
                 questions,
+                configuration_permission,
             } => {
                 require_idle(&view)?;
                 if !view.queued.is_empty() {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
                 }
                 let history = self.provider_history(session.clone(), None).await?;
-                let input = self.capture_submission(id, parts, questions).await?;
+                let input = self
+                    .capture_submission(id, parts, questions, configuration_permission)
+                    .await?;
                 let acceptance = self.store.submit(session.clone(), input.clone()).await?;
                 let view = self.store.inspect(session.clone()).await?;
                 if view.queued.first().map(|head| &head.input.id) != Some(&input.id) {
@@ -665,17 +683,37 @@ impl Host {
             .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_pause_failed"))?;
         }
         let mut authority = execution.authority.clone();
-        let tools = if prepared.questions {
-            let operations = opened.turn.operations();
-            let (tools, grants) = execution.questions.capture(operations.clone())?;
-            if !closing {
-                execution.questions.reconcile(&operations, &tools).await?;
-            }
-            authority.tools = grants;
-            tools
-        } else {
-            Inventory::new().snapshot(&[])?
-        };
+        let operations = opened.turn.operations();
+        let mut inventory = Inventory::new();
+        if prepared.questions {
+            execution
+                .questions
+                .insert(operations.clone(), &mut inventory, &mut authority.tools)?;
+        }
+        if prepared.configuration_permission != crate::ConfigurationPermission::Disabled {
+            let captured = prepared.captured.ok_or_else(|| {
+                problem(ErrorKind::InvalidState, "captured_configuration_missing")
+            })?;
+            execution.configuration_tools.insert(
+                self.clone(),
+                captured,
+                prepared.configuration_permission,
+                &mut inventory,
+                &mut authority.tools,
+            )?;
+        }
+        let selected = authority.tools.keys().cloned().collect::<Vec<_>>();
+        let tools = inventory.snapshot(&selected)?;
+        if !closing && prepared.questions {
+            execution.questions.reconcile(&operations, &tools).await?;
+        }
+        if !closing && prepared.configuration_permission != crate::ConfigurationPermission::Disabled
+        {
+            execution
+                .configuration_tools
+                .reconcile(&operations, &tools)
+                .await?;
+        }
         let master = Master::new(
             prepared.config,
             execution.provider.clone(),
@@ -713,6 +751,7 @@ impl Host {
         id: ChangeId,
         parts: Vec<PromptPart>,
         questions: bool,
+        configuration_permission: crate::ConfigurationPermission,
     ) -> Result<Submission> {
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
@@ -732,6 +771,7 @@ impl Host {
                         scope: execution.authority.inference.authority.scope.clone(),
                     }),
                     questions,
+                    configuration_permission,
                 },
             )?,
         })
@@ -744,41 +784,50 @@ impl Host {
         authority: InputAuthority,
     ) -> Result<PreparedInput> {
         let mut config = execution.config.clone();
-        let (messages, limit, questions) = match input.payload.version() {
-            1 if input.payload.schema().as_str() == INPUT_SCHEMA => {
-                authority.validate(None, &execution.authority.inference.authority)?;
-                config.max_steps = 1;
-                (decode_input(input)?, None, false)
-            }
-            2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
-                let stored: StoredPrompt = decode_input(input)?;
-                authority.validate(
-                    stored.authority.as_ref(),
-                    &execution.authority.inference.authority,
-                )?;
-                if stored
-                    .model
-                    .as_ref()
-                    .is_some_and(|model| *model != config.model)
-                {
-                    return Err(problem(ErrorKind::Conflict, "retained_model_changed"));
+        let (messages, limit, questions, configuration_permission, captured) =
+            match input.payload.version() {
+                1 if input.payload.schema().as_str() == INPUT_SCHEMA => {
+                    authority.validate(None, &execution.authority.inference.authority)?;
+                    config.max_steps = 1;
+                    (
+                        decode_input(input)?,
+                        None,
+                        false,
+                        crate::ConfigurationPermission::Disabled,
+                        None,
+                    )
                 }
-                config.max_steps = stored.max_steps.unwrap_or(1);
-                config.max_output_tokens =
-                    stored.max_output_tokens.unwrap_or(config.max_output_tokens);
-                (
-                    prompt_input(&input.id, &stored.parts)?,
-                    stored.configuration.defaults.context.max_input_tokens,
-                    stored.questions,
-                )
-            }
-            _ => {
-                return Err(problem(
-                    ErrorKind::Unsupported,
-                    "unsupported_submission_schema",
-                ));
-            }
-        };
+                2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
+                    let stored: StoredPrompt = decode_input(input)?;
+                    authority.validate(
+                        stored.authority.as_ref(),
+                        &execution.authority.inference.authority,
+                    )?;
+                    if stored
+                        .model
+                        .as_ref()
+                        .is_some_and(|model| *model != config.model)
+                    {
+                        return Err(problem(ErrorKind::Conflict, "retained_model_changed"));
+                    }
+                    config.max_steps = stored.max_steps.unwrap_or(1);
+                    config.max_output_tokens =
+                        stored.max_output_tokens.unwrap_or(config.max_output_tokens);
+                    (
+                        prompt_input(&input.id, &stored.parts)?,
+                        stored.configuration.defaults.context.max_input_tokens,
+                        stored.questions,
+                        stored.configuration_permission,
+                        Some(stored.configuration),
+                    )
+                }
+                _ => {
+                    return Err(problem(
+                        ErrorKind::Unsupported,
+                        "unsupported_submission_schema",
+                    ));
+                }
+            };
         if config.max_steps == 0 || config.max_output_tokens == 0 {
             return Err(problem(ErrorKind::InvalidInput, "invalid_master_limits"));
         }
@@ -787,6 +836,8 @@ impl Host {
             messages,
             limit,
             questions,
+            configuration_permission,
+            captured,
         })
     }
 
@@ -951,11 +1002,23 @@ impl Host {
         expected: Option<Fingerprint>,
         change: SettingChange,
     ) -> Result<ConfigurationSnapshot> {
+        self.configuration_update_controlled(expected, change, None)
+            .await
+    }
+
+    pub(crate) async fn configuration_update_controlled(
+        &self,
+        expected: Option<Fingerprint>,
+        change: SettingChange,
+        control: Option<RequestControl>,
+    ) -> Result<ConfigurationSnapshot> {
         self.owned_control(move |host| async move {
             let admission = host.configuration_admission.clone().lock_owned().await;
             host.with_configuration(move |configuration| {
                 let _admission = admission;
-                configuration.update(expected, change)
+                configuration.update_guarded(expected, change, || {
+                    control.as_ref().map_or(Ok(()), check_configuration_control)
+                })
             })
             .await
         })
@@ -966,11 +1029,21 @@ impl Host {
         &self,
         expected: Option<Fingerprint>,
     ) -> Result<ConfigurationSnapshot> {
+        self.configuration_reload_controlled(expected, None).await
+    }
+
+    pub(crate) async fn configuration_reload_controlled(
+        &self,
+        expected: Option<Fingerprint>,
+        control: Option<RequestControl>,
+    ) -> Result<ConfigurationSnapshot> {
         self.owned_control(move |host| async move {
             let admission = host.configuration_admission.clone().lock_owned().await;
             host.with_configuration(move |configuration| {
                 let _admission = admission;
-                configuration.reload(expected)
+                configuration.reload_guarded(expected, || {
+                    control.as_ref().map_or(Ok(()), check_configuration_control)
+                })
             })
             .await
         })
@@ -1229,15 +1302,18 @@ impl Execution {
             grants: Vec::new(),
         };
         let questions = Arc::new(questions::QuestionAccess::new()?);
+        let configuration_tools = Arc::new(ConfigurationAccess::new()?);
+        let authorization = Arc::new(ExecutionAuthority {
+            inference: inference.clone(),
+            questions: questions.clone(),
+            configuration_tools: configuration_tools.clone(),
+            credential,
+        });
         let runtime = Runtime::new(ExecutionServices {
             providers: BTreeMap::from([(binding.provider, provider.clone())]),
             tools: Inventory::new().snapshot(&[])?,
-            authority: Arc::new(ExecutionAuthority {
-                inference: inference.clone(),
-                questions: questions.clone(),
-                credential,
-            }),
-            gate: questions.clone(),
+            authority: authorization.clone(),
+            gate: authorization,
             limits: ExecutionLimits {
                 max_operations: 32,
                 max_concurrent_inferences: MAX_ACTIVE_RUNS,
@@ -1263,6 +1339,7 @@ impl Execution {
                 tools: BTreeMap::new(),
             },
             questions,
+            configuration_tools,
         })
     }
 }
@@ -1285,13 +1362,16 @@ enum Credential {
 struct ExecutionAuthority {
     inference: GrantSelection,
     questions: Arc<questions::QuestionAccess>,
+    configuration_tools: Arc<ConfigurationAccess>,
     credential: Credential,
 }
 
 impl AuthorityValidator for ExecutionAuthority {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
         Box::pin(async move {
-            if self.questions.accepts(&request.selection) {
+            if self.questions.accepts(&request.selection)
+                || self.configuration_tools.accepts(&request.selection)
+            {
                 return Ok(());
             }
             if request.selection != self.inference {
@@ -1305,6 +1385,23 @@ impl AuthorityValidator for ExecutionAuthority {
                 Credential::Gg(connection) => connection.ensure_current().await,
             }
         })
+    }
+}
+
+impl ToolGate for ExecutionAuthority {
+    fn decide(
+        &self,
+        admission: ToolAdmission,
+        context: AdmissionContext,
+    ) -> BoxFuture<'_, Result<ToolDecision>> {
+        if self.configuration_tools.accepts(&admission.grants)
+            && self
+                .configuration_tools
+                .permits(&admission.invocation, &admission.grants)
+        {
+            return Box::pin(async { Ok(ToolDecision::Permit) });
+        }
+        self.questions.decide(admission, context)
     }
 }
 
@@ -1560,4 +1657,17 @@ fn uuid() -> String {
 
 fn problem(kind: ErrorKind, code: &'static str) -> Error {
     Error::new(kind, code)
+}
+
+pub(crate) fn check_configuration_control(control: &RequestControl) -> Result<()> {
+    if control.cancellation.is_cancelled() {
+        return Err(problem(ErrorKind::Unavailable, "configuration_cancelled"));
+    }
+    if control
+        .deadline
+        .is_some_and(|deadline| deadline <= std::time::Instant::now())
+    {
+        return Err(problem(ErrorKind::Unavailable, "configuration_deadline"));
+    }
+    Ok(())
 }

@@ -6,9 +6,9 @@ change a supported default, or restore its inherited value. TOML is the editable
 backing format. Conversational changes use the same validated host operations as
 other clients.
 
-The native host implements the file and client operations below. Conversational
-tool exposure remains part of the product integration. Existing model and mode
-selectors retain their separate settings contracts.
+The native host implements the file, client operations and model-facing tools
+below. Existing model and mode selectors retain their separate settings
+contracts.
 
 ## Initial scope
 
@@ -132,6 +132,20 @@ The agent's tools are ordinary capability-scoped invocations recorded by Runtime
 The master changes persistent settings in response to an explicit user request.
 The configuration capability restricts writable fields and scope, and conveys
 no authority to alter unrelated files or execution limits.
+
+Native clients can offer inspection by negotiating `co.grida/config/inspect`.
+Offering the mutation tools also requires the update and reload capabilities,
+plus an explicit `allowConfigurationChanges: true` on that accepted submit,
+enqueue or replacement request. The host retains this permission with the
+input. A reconnect preserves the accepted permission. An ordinary prompt or a
+model-generated tool argument cannot upgrade it. Read and change grants have
+separate identities and are checked against the selected operation.
+
+Managed tool changes return the exact snapshot produced by that write. Recovery
+inspects the requested postcondition and labels a matching state as observed
+after recovery. A differing or invalid state remains uncertain. Recovery performs
+no new write. Cancellation is checked at the final publication boundary, and a
+begun publication remains owned through its result.
 
 Use standard ACP session configuration for advertised selectors whose scope and
 semantics match. Its current select/negotiated-boolean options do not express

@@ -3,6 +3,7 @@
 pub mod acp;
 pub mod command;
 pub mod configuration;
+mod configuration_tools;
 mod custody;
 pub mod file_tools;
 pub mod gg;
@@ -13,3 +14,5 @@ pub mod scratch;
 pub mod workspace;
 
 pub use http::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol};
+
+pub use configuration_tools::ConfigurationPermission;

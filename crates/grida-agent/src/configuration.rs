@@ -88,6 +88,14 @@ impl Configuration {
 
     /// Activate an explicit manual edit after validating its exact revision.
     pub fn reload(&self, expected: Option<Fingerprint>) -> Result<ConfigurationSnapshot> {
+        self.reload_guarded(expected, || Ok(()))
+    }
+
+    pub(crate) fn reload_guarded(
+        &self,
+        expected: Option<Fingerprint>,
+        admission: impl Fn() -> Result<()>,
+    ) -> Result<ConfigurationSnapshot> {
         let mut active = self
             .active
             .lock()
@@ -95,6 +103,7 @@ impl Configuration {
         self.validate_directory()?;
         let source = read_source(&self.directory)?;
         check_revision(source.revision, expected)?;
+        admission()?;
         *active = snapshot(&source)?;
         Ok(active.clone())
     }
@@ -105,6 +114,15 @@ impl Configuration {
         &self,
         expected: Option<Fingerprint>,
         change: SettingChange,
+    ) -> Result<ConfigurationSnapshot> {
+        self.update_guarded(expected, change, || Ok(()))
+    }
+
+    pub(crate) fn update_guarded(
+        &self,
+        expected: Option<Fingerprint>,
+        change: SettingChange,
+        admission: impl Fn() -> Result<()>,
     ) -> Result<ConfigurationSnapshot> {
         let mut active = self
             .active
@@ -124,6 +142,7 @@ impl Configuration {
             SettingChange::ResetContextMaxInputTokens => None,
         };
         if source.defaults.context.max_input_tokens == requested {
+            admission()?;
             *active = snapshot(&source)?;
             return Ok(active.clone());
         }
@@ -145,10 +164,14 @@ impl Configuration {
         let bytes = source.document.to_string().into_bytes();
         let defaults = parse(Some(&bytes))?;
         self.validate_directory()?;
-        // Detect manual edits that happened during validation before replacing.
-        let current = read_bytes(&self.directory.join("config.toml"))?;
-        check_revision(revision(current.as_deref())?, expected)?;
-        write_atomic(&self.directory, &bytes)?;
+        write_atomic(&self.directory, &bytes, || {
+            admission()?;
+            self.validate_directory()?;
+            // Detect manual edits through staging before replacing the file.
+            let current = read_bytes(&self.directory.join("config.toml"))?;
+            check_revision(revision(current.as_deref())?, expected)?;
+            admission()
+        })?;
         source.revision = revision(Some(&bytes))?;
         source.defaults = defaults;
         *active = snapshot(&source)?;
@@ -359,7 +382,7 @@ impl Drop for WriterGuard<'_> {
     }
 }
 
-fn write_atomic(directory: &Path, bytes: &[u8]) -> Result<()> {
+fn write_atomic(directory: &Path, bytes: &[u8], admission: impl Fn() -> Result<()>) -> Result<()> {
     if bytes.len() as u64 > MAX_FILE_BYTES {
         return Err(Error::new(
             ErrorKind::LimitExceeded,
@@ -375,6 +398,7 @@ fn write_atomic(directory: &Path, bytes: &[u8]) -> Result<()> {
     file.as_file()
         .sync_all()
         .map_err(|_| unavailable("config_write_failed"))?;
+    admission()?;
     file.persist(directory.join("config.toml"))
         .map_err(|_| unavailable("config_write_failed"))?;
     #[cfg(unix)]

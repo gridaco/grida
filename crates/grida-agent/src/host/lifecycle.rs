@@ -8,6 +8,7 @@ pub enum QueueEdit {
         replacement: ChangeId,
         parts: Vec<PromptPart>,
         questions: bool,
+        configuration_permission: crate::ConfigurationPermission,
     },
     Withdraw {
         input: ChangeId,
@@ -33,6 +34,8 @@ pub struct InputSettings {
     pub max_output_tokens: Option<u64>,
     #[serde(default)]
     pub questions: bool,
+    #[serde(default)]
+    pub configuration_permission: crate::ConfigurationPermission,
 }
 
 pub struct InputInspection {
@@ -63,6 +66,7 @@ impl InputSettings {
                         .map(|limit| limit.get()),
                     max_output_tokens: stored.max_output_tokens,
                     questions: stored.questions,
+                    configuration_permission: stored.configuration_permission,
                 })
             }
             _ => Err(problem(
@@ -123,7 +127,12 @@ impl Host {
             self.check_ready_capacity(&request.session).await?;
         }
         let input = self
-            .capture_submission(request.id, request.parts, request.questions)
+            .capture_submission(
+                request.id,
+                request.parts,
+                request.questions,
+                request.configuration_permission,
+            )
             .await?;
         let acceptance = self.store.submit(request.session, input).await?;
         self.kick_queue(acceptance.session.clone()).await;
@@ -210,6 +219,7 @@ impl Host {
                 replacement,
                 parts,
                 questions,
+                configuration_permission,
             } => {
                 prompt_input(&replacement, &parts)?;
                 let replacement = if let Some(previous) = self
@@ -222,7 +232,7 @@ impl Host {
                 } else {
                     let view = self.store.inspect(session.clone()).await?;
                     self.check_execution(&view)?;
-                    self.capture_submission(replacement, parts, questions)
+                    self.capture_submission(replacement, parts, questions, configuration_permission)
                         .await?
                 };
                 SessionControl::ReplaceQueued { input, replacement }

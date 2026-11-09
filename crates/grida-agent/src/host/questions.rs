@@ -33,19 +33,18 @@ impl QuestionAccess {
         selection == &self.selection
     }
 
-    pub(super) fn capture(
+    pub(super) fn insert(
         &self,
         operations: TurnOperations,
-    ) -> Result<(InventorySnapshot, BTreeMap<ToolId, GrantSelection>)> {
-        let mut inventory = Inventory::new();
-        let mut grants = BTreeMap::new();
+        inventory: &mut Inventory,
+        grants: &mut BTreeMap<ToolId, GrantSelection>,
+    ) -> Result<()> {
         for style in [QuestionStyle::AnswerDependent, QuestionStyle::Nonblocking] {
             let tool = QuestionTool::new(operations.clone(), style)?;
             grants.insert(tool.definition().id.clone(), self.selection.clone());
             inventory.insert(Arc::new(tool))?;
         }
-        let selected: Vec<_> = grants.keys().cloned().collect();
-        Ok((inventory.snapshot(&selected)?, grants))
+        Ok(())
     }
 
     pub(super) async fn reconcile(

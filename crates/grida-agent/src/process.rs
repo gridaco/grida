@@ -163,6 +163,7 @@ async fn admit_run(host: &Host, options: RunOptions) -> Result<AcceptedRun> {
         session,
         parts: vec![PromptPart::Text { text: prompt }],
         questions: options.questions,
+        configuration_permission: crate::ConfigurationPermission::Disabled,
     })
     .await
 }

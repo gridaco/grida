@@ -58,6 +58,29 @@ fn capability_keys() -> impl Iterator<Item = &'static str> {
         .chain(questions::CAPABILITIES)
 }
 
+pub(super) fn configuration_permission(
+    sessions: &Mutex<ConnectionSessions>,
+    allow_changes: bool,
+) -> Result<crate::ConfigurationPermission> {
+    let sessions = sessions.lock().unwrap();
+    let can_inspect = sessions.negotiated.contains(CONFIG_INSPECT);
+    let can_change = [CONFIG_INSPECT, CONFIG_UPDATE, CONFIG_RELOAD]
+        .iter()
+        .all(|key| sessions.negotiated.contains(key));
+    if allow_changes {
+        return if can_change {
+            Ok(crate::ConfigurationPermission::Change)
+        } else {
+            Err(unavailable("configuration_capability_required"))
+        };
+    }
+    Ok(if can_inspect {
+        crate::ConfigurationPermission::Inspect
+    } else {
+        crate::ConfigurationPermission::Disabled
+    })
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/session/submit", response = SubmitResponse)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -65,6 +88,8 @@ struct Submit {
     session_id: SessionId,
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
+    #[serde(default)]
+    allow_configuration_changes: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -273,6 +298,10 @@ pub(super) fn handlers(
                             session: request.session_id,
                             parts,
                             questions: questions::available(&submit_sessions),
+                            configuration_permission: configuration_permission(
+                                &submit_sessions,
+                                request.allow_configuration_changes,
+                            )?,
                         })
                         .await
                         .map_err(host_error)?;
