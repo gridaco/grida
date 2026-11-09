@@ -28,8 +28,10 @@ max_input_tokens = 64000
 The input limit covers instructions, conversation history, media representation,
 tool declarations, and provider framing. The provider must establish an exact
 count or conservative bound for its complete prepared request. Unsupported
-counting or an excessive request produces a recorded failure before model
-dispatch. An estimate cannot certify this hard limit.
+counting or an excessive request produces a recorded failure before generation.
+Remote counting sends the prepared input to the selected provider under the
+same authority and deadline as generation. An estimate cannot certify this
+hard limit.
 
 The limit remains subject to actual model capacity and host constraints. A larger
 value does not enlarge the model's context window. Remove `max_input_tokens` to

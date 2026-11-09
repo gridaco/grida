@@ -122,7 +122,7 @@ fn launch(command: Command) -> Command {
             Arg::new("provider")
                 .long("provider")
                 .value_name("PROTOCOL")
-                .value_parser(["openai-compatible", "anthropic", "gemini"])
+                .value_parser(["openai-compatible", "responses", "anthropic", "gemini"])
                 .default_value("openai-compatible"),
         )
         .arg(

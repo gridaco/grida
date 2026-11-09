@@ -690,6 +690,14 @@ for its declared tokenizer/version. Remote counting uses an admitted provider
 operation, while summarization uses Inference. Both supply results as data.
 Retrieval runs through Tools.
 
+Provider counting has its own precision contract. Responses exposes an exact
+input-count endpoint that includes request framing, instructions and tools.
+Claude describes its count as an estimate. Remote counting uses the selected
+authority and can transmit prepared content before generation. Its result
+stays bound to that exact request, with cancellation and a shared deadline.
+[Responses token counting](https://developers.openai.com/api/docs/guides/token-counting),
+[Claude token counting](https://platform.claude.com/docs/en/build-with-claude/token-counting).
+
 The captured snapshot also preserves instruction and skill content identities,
 scope, trust, and source versions. Recovery uses the recorded request material.
 A policy-selected refresh applies to a subsequent prepared decision and records

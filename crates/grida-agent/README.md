@@ -28,11 +28,12 @@ Select a provider protocol, base URL, and model. HTTPS is accepted for remote
 providers. HTTP is limited to numeric loopback addresses or `localhost`,
 which resolves to loopback without DNS.
 
-| `--provider`                  | Base URL example                                   | Request                                                           |
-| ----------------------------- | -------------------------------------------------- | ----------------------------------------------------------------- |
-| `openai-compatible` (default) | `https://api.openai.com/v1`                        | Chat Completions with bearer authentication                       |
-| `anthropic`                   | `https://api.anthropic.com/v1`                     | Messages with API-key and version headers                         |
-| `gemini`                      | `https://generativelanguage.googleapis.com/v1beta` | Stream GenerateContent with the selected model and API-key header |
+| `--provider`                  | Base URL example                                   | Request                                                                   |
+| ----------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------- |
+| `openai-compatible` (default) | `https://api.openai.com/v1`                        | Chat Completions with bearer authentication                               |
+| `responses`                   | `https://api.openai.com/v1`                        | Stateless Responses with bearer authentication and encrypted continuation |
+| `anthropic`                   | `https://api.anthropic.com/v1`                     | Messages with API-key and version headers                                 |
+| `gemini`                      | `https://generativelanguage.googleapis.com/v1beta` | Stream GenerateContent with the selected model and API-key header         |
 
 Use `--credential-env NAME` to select a key from the host environment.
 Anonymous endpoints work when no credential source is selected.
@@ -56,11 +57,17 @@ compatible endpoints that read `max_tokens`, including Ollama, pass
 `--compatible-output-limit-field max-tokens`. The default sends
 `max_completion_tokens`.
 
-Gemini retains signed model history across restarts when its protected
-credential proof still matches. A changed credential invalidates replay of
+Responses and Gemini retain opaque model history across restarts when their
+protected credential proof still matches. A changed credential invalidates replay of
 that opaque history. The replay identity is separate from the live dispatch
-grant. Authenticated Gemini continuity uses the private storage supported on
-macOS and Linux.
+grant. Authenticated continuity uses private storage on macOS and Linux.
+Other platforms can use an explicit environment credential within the current
+process. That process-local binding cannot authorize opaque replay after restart.
+
+The Responses API adapter can count complete input before generation when an
+input-token cap is configured. Counting sends the captured input to the same
+provider under the same credential and deadline. Unsupported counting and
+over-limit input return a persisted failure before generation.
 
 `run` reads one UTF-8 prompt from stdin or `--prompt`, with a 512 KiB
 input bound. `--session SESSION_ID` continues a settled session in its
@@ -173,7 +180,7 @@ A changed provider credential blocks dispatch for that retained task.
 The host reads `config.toml` from its private state directory and retains an
 immutable defaults snapshot with each accepted input. A setting change applies
 to later inputs. The current compatible adapter rejects an explicit input-token
-cap before dispatch when it cannot establish a hard bound.
+cap before generation when it cannot establish a hard bound.
 
 ## Filesystem services
 

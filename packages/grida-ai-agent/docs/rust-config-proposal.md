@@ -6,9 +6,9 @@ change a supported default, or restore its inherited value. TOML is the editable
 backing format. Conversational changes use the same validated host operations as
 other clients.
 
-This is a design proposal. The field below is a candidate for review before
-implementation. Existing model and mode selectors remain evidence of separate
-settings, without defining the new file's schema.
+The native host implements the file and client operations below. Conversational
+tool exposure remains part of the product integration. Existing model and mode
+selectors retain their separate settings contracts.
 
 ## Initial scope
 
@@ -30,12 +30,12 @@ to master and avoids a second settings path inside the agent loop.
 
 ## Field review
 
-| Field                              | Proposed meaning                                                                                           | Default and bounds                                                                                                                                                                                                                            | Status                         |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `schema_version`                   | Version of this file's schema.                                                                             | Required version `1` when the file exists.                                                                                                                                                                                                    | Format metadata.               |
-| `context.max_input_tokens`         | Upper limit on the complete assembled model input, including instructions, history, and tool declarations. | Omitted means automatic product/model budgeting. Explicit values are positive integers representable by TOML's signed 64-bit integer. Effective input is also capped by provider capacity after output/headroom reservations and host limits. | First reviewed behavior field. |
-| Automatic-compaction threshold     | When the master should summarize or replace context.                                                       | Requires a separate definition of measured scope and interaction with the input budget.                                                                                                                                                       | Review later.                  |
-| Provider context-window correction | Replace stale or missing model-capacity metadata for a specific provider/model binding.                    | Needs provenance, known-maximum handling, and explicit treatment of unverified capacity.                                                                                                                                                      | Review separately.             |
+| Field                              | Proposed meaning                                                                                           | Default and bounds                                                                                                                                                                                                                                                                       | Status                         |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `schema_version`                   | Version of this file's schema.                                                                             | Required version `1` when the file exists.                                                                                                                                                                                                                                               | Format metadata.               |
+| `context.max_input_tokens`         | Upper limit on the complete assembled model input, including instructions, history, and tool declarations. | Omitted means automatic product/model budgeting. Explicit values are integers from `1` through `9007199254740991`, preserving exact values across native and JavaScript clients. Effective input is also capped by provider capacity after output/headroom reservations and host limits. | First reviewed behavior field. |
+| Automatic-compaction threshold     | When the master should summarize or replace context.                                                       | Requires a separate definition of measured scope and interaction with the input budget.                                                                                                                                                                                                  | Review later.                  |
+| Provider context-window correction | Replace stale or missing model-capacity metadata for a specific provider/model binding.                    | Needs provenance, known-maximum handling, and explicit treatment of unverified capacity.                                                                                                                                                                                                 | Review separately.             |
 
 The first behavior field controls how much input the agent tries to use. Raising
 it can increase cost and admit more context, subject to available model capacity.

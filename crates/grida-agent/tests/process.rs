@@ -24,6 +24,8 @@ mod lifecycle;
 #[cfg(unix)]
 #[path = "process/questions.rs"]
 mod questions;
+#[path = "process/responses.rs"]
+mod responses;
 
 const WAIT: Duration = Duration::from_secs(15);
 const TEST_CREDENTIAL: &str = "fixture-only-bearer-token";
@@ -36,6 +38,7 @@ struct Endpoint {
 
 enum Reply {
     Finished(&'static str),
+    InputCount(u64),
     Hold(&'static str),
     Stop(&'static str),
     #[cfg(unix)]
@@ -44,6 +47,8 @@ enum Reply {
     QuestionThenHold(tokio::sync::oneshot::Receiver<()>),
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     GeminiSigned(&'static str),
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    ResponsesSigned(&'static str),
     #[cfg(unix)]
     Release(&'static str, tokio::sync::oneshot::Receiver<()>),
 }
@@ -111,6 +116,10 @@ async fn fixture_request(
     stream.read_line(&mut line).await.unwrap();
     let path = match protocol {
         ProviderProtocol::OpenAiCompatible => "/v1/chat/completions",
+        ProviderProtocol::Responses if matches!(&reply, Reply::InputCount(_)) => {
+            "/v1/responses/input_tokens"
+        }
+        ProviderProtocol::Responses => "/v1/responses",
         ProviderProtocol::Anthropic => "/v1/messages",
         ProviderProtocol::Gemini => "/v1beta/models/fixture-model:streamGenerateContent?alt=sse",
     };
@@ -118,6 +127,7 @@ async fn fixture_request(
     let mut length = None;
     let mut authorization = None;
     let mut anthropic_version = None;
+    let mut accept = None;
     loop {
         line.clear();
         assert_ne!(stream.read_line(&mut line).await.unwrap(), 0);
@@ -138,11 +148,14 @@ async fn fixture_request(
         if key.eq_ignore_ascii_case("anthropic-version") {
             anthropic_version = Some(value.trim().to_owned());
         }
+        if key.eq_ignore_ascii_case("accept") {
+            accept = Some(value.trim().to_owned());
+        }
     }
     assert_eq!(
         authorization,
         credential.map(|value| match protocol {
-            ProviderProtocol::OpenAiCompatible =>
+            ProviderProtocol::OpenAiCompatible | ProviderProtocol::Responses =>
                 ("authorization".into(), format!("Bearer {value}")),
             ProviderProtocol::Anthropic => ("x-api-key".into(), value.into()),
             ProviderProtocol::Gemini => ("x-goog-api-key".into(), value.into()),
@@ -155,6 +168,21 @@ async fn fixture_request(
     stream.read_exact(&mut request).await.unwrap();
     sent.send(serde_json::from_slice(&request).unwrap())
         .unwrap();
+    if let Reply::InputCount(tokens) = reply {
+        assert_eq!(protocol, ProviderProtocol::Responses);
+        assert_eq!(accept.as_deref(), Some("application/json"));
+        let body = json!({"object":"response.input_tokens","input_tokens":tokens}).to_string();
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream
+            .get_mut()
+            .write_all(response.as_bytes())
+            .await
+            .unwrap();
+        return;
+    }
     #[cfg(unix)]
     let (reply, delayed_done) = match reply {
         Reply::Release(text, ready) => {
@@ -201,6 +229,7 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         Reply::Finished(text) => (text, Some("stop")),
         Reply::Hold(text) => (text, None),
         Reply::Stop(reason) => ("", Some(reason)),
+        Reply::InputCount(_) => unreachable!("count responses use the JSON endpoint"),
         #[cfg(unix)]
         Reply::Question(name) => {
             assert_eq!(protocol, ProviderProtocol::OpenAiCompatible);
@@ -217,6 +246,12 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
             signed = true;
             (text, Some("stop"))
         }
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        Reply::ResponsesSigned(text) => {
+            assert_eq!(protocol, ProviderProtocol::Responses);
+            signed = true;
+            (text, Some("stop"))
+        }
         #[cfg(unix)]
         Reply::Release(..) | Reply::QuestionThenHold(_) => {
             unreachable!("fixture releases the response before encoding")
@@ -228,6 +263,31 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         write!(output, "data: {event}\n\n").unwrap();
     };
     match protocol {
+        ProviderProtocol::Responses => {
+            assert_eq!(finish, Some("stop"));
+            let mut index = 0;
+            if signed {
+                frame(
+                    json!({"type":"response.output_item.done", "output_index":index, "item":{
+                        "type":"reasoning", "id":"reasoning-fixture", "summary":[],
+                        "encrypted_content":"retained-private-reasoning"
+                    }}),
+                );
+                index += 1;
+            }
+            frame(
+                json!({"type":"response.output_text.delta", "item_id":"message-fixture", "delta":text}),
+            );
+            frame(
+                json!({"type":"response.output_item.done", "output_index":index, "item":{
+                    "type":"message", "id":"message-fixture", "role":"assistant", "status":"completed",
+                    "content":[{"type":"output_text", "text":text, "annotations":[]}]
+                }}),
+            );
+            frame(json!({"type":"response.completed", "response":{
+                "status":"completed", "usage":{"input_tokens":5,"output_tokens":3}
+            }}));
+        }
         ProviderProtocol::OpenAiCompatible => {
             frame(json!({
                 "id": "fixture-response",

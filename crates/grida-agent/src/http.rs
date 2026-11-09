@@ -1,4 +1,4 @@
-//! Host-owned HTTP dispatch for explicitly selected provider endpoints.
+//! GRIDA-SEC-014 — host-owned dispatch for explicitly selected provider endpoints.
 
 use crate::custody::{CapturedCredential, CredentialFormat, CredentialSource};
 
@@ -27,6 +27,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub enum ProviderProtocol {
     #[default]
     OpenAiCompatible,
+    Responses,
     Anthropic,
     Gemini,
 }
@@ -35,6 +36,7 @@ impl ProviderProtocol {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::OpenAiCompatible => "openai-compatible",
+            Self::Responses => "responses",
             Self::Anthropic => "anthropic",
             Self::Gemini => "gemini",
         }
@@ -51,6 +53,7 @@ impl std::str::FromStr for ProviderProtocol {
     fn from_str(value: &str) -> Result<Self> {
         match value {
             "openai-compatible" => Ok(Self::OpenAiCompatible),
+            "responses" => Ok(Self::Responses),
             "anthropic" => Ok(Self::Anthropic),
             "gemini" => Ok(Self::Gemini),
             _ => Err(invalid("unknown_provider_protocol")),
@@ -157,7 +160,11 @@ impl HttpTransport {
                 scope: ScopeId::new(format!("provider/{scope}"))?,
             },
         };
-        let replay_binding = (options.protocol == ProviderProtocol::Gemini).then_some(continuity);
+        let replay_binding = matches!(
+            options.protocol,
+            ProviderProtocol::Gemini | ProviderProtocol::Responses
+        )
+        .then_some(continuity);
         let mut client = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())
@@ -214,6 +221,26 @@ impl HttpTransport {
         }
         Ok(())
     }
+
+    fn request_target(
+        &self,
+        operation: &TransportOperation,
+    ) -> std::result::Result<Url, TransportFailure> {
+        if operation == &self.operation {
+            return Ok(self.target.clone());
+        }
+        if self.protocol == ProviderProtocol::Responses
+            && operation == &TransportOperation::OpenAiResponsesInputTokens
+        {
+            let mut target = self.target.clone();
+            target
+                .path_segments_mut()
+                .map_err(|_| TransportFailure::Unavailable)?
+                .push("input_tokens");
+            return Ok(target);
+        }
+        Err(TransportFailure::Unavailable)
+    }
 }
 
 impl StreamingTransport for HttpTransport {
@@ -223,9 +250,10 @@ impl StreamingTransport for HttpTransport {
         control: RequestControl,
     ) -> BoxFuture<'_, std::result::Result<TransportResponse, TransportFailure>> {
         Box::pin(async move {
-            if request.binding != self.binding || request.operation != self.operation {
+            if request.binding != self.binding {
                 return Err(TransportFailure::Unavailable);
             }
+            let target = self.request_target(&request.operation)?;
             if control.cancellation.is_cancelled()
                 || control
                     .deadline
@@ -235,16 +263,24 @@ impl StreamingTransport for HttpTransport {
             }
             let mut outbound = self
                 .client
-                .post(self.target.clone())
+                .post(target)
                 .header(CONTENT_TYPE, "application/json")
-                .header(ACCEPT, "text/event-stream")
+                .header(
+                    ACCEPT,
+                    match request.operation {
+                        TransportOperation::OpenAiResponsesInputTokens => "application/json",
+                        _ => "text/event-stream",
+                    },
+                )
                 .body(request.body);
             if self.protocol == ProviderProtocol::Anthropic {
                 outbound = outbound.header("anthropic-version", "2023-06-01");
             }
             if let Some(credential) = &self.credential {
                 let (name, format) = match self.protocol {
-                    ProviderProtocol::OpenAiCompatible => (AUTHORIZATION, CredentialFormat::Bearer),
+                    ProviderProtocol::OpenAiCompatible | ProviderProtocol::Responses => {
+                        (AUTHORIZATION, CredentialFormat::Bearer)
+                    }
                     ProviderProtocol::Anthropic => (
                         HeaderName::from_static("x-api-key"),
                         CredentialFormat::ApiKey,
@@ -281,7 +317,9 @@ impl StreamingTransport for HttpTransport {
                 .headers()
                 .get(match self.protocol {
                     ProviderProtocol::Anthropic => "request-id",
-                    ProviderProtocol::OpenAiCompatible | ProviderProtocol::Gemini => "x-request-id",
+                    ProviderProtocol::OpenAiCompatible
+                    | ProviderProtocol::Responses
+                    | ProviderProtocol::Gemini => "x-request-id",
                 })
                 .and_then(|value| value.to_str().ok())
                 .filter(|value| {
@@ -375,7 +413,11 @@ fn stored_provider(protocol: ProviderProtocol, base: &Url) -> Option<&'static st
     }
     let path = base.path().strip_suffix('/').unwrap_or(base.path());
     match (protocol, base.host_str()?, path) {
-        (ProviderProtocol::OpenAiCompatible, "api.openai.com", "/v1") => Some("openai"),
+        (
+            ProviderProtocol::OpenAiCompatible | ProviderProtocol::Responses,
+            "api.openai.com",
+            "/v1",
+        ) => Some("openai"),
         (ProviderProtocol::OpenAiCompatible, "openrouter.ai", "/api/v1") => Some("openrouter"),
         (ProviderProtocol::OpenAiCompatible, "ai-gateway.vercel.sh", "/v1") => Some("vercel"),
         (ProviderProtocol::Anthropic, "api.anthropic.com", "/v1") => Some("anthropic"),
@@ -425,6 +467,10 @@ fn provider_route(
             segments.extend(["chat", "completions"]);
             TransportOperation::ChatCompletions
         }
+        ProviderProtocol::Responses => {
+            segments.push("responses");
+            TransportOperation::OpenAiResponses
+        }
         ProviderProtocol::Anthropic => {
             segments.push("messages");
             TransportOperation::AnthropicMessages
@@ -461,4 +507,74 @@ fn invalid(code: &'static str) -> Error {
 
 fn problem(code: &'static str) -> Error {
     Error::new(ErrorKind::Unavailable, code)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn options(protocol: ProviderProtocol) -> ProviderOptions {
+        ProviderOptions {
+            endpoint: "http://127.0.0.1:1/v1".into(),
+            model: ModelId::new("fixture-model").unwrap(),
+            credential_env: None,
+            max_output_tokens: 128,
+            protocol,
+            credential_home: None,
+            compatible_output_limit_field: None,
+        }
+    }
+
+    #[test]
+    fn responses_can_count_only_under_the_same_fixed_api_route() {
+        let state = tempfile::tempdir().unwrap();
+        let transport =
+            HttpTransport::new(state.path(), &options(ProviderProtocol::Responses)).unwrap();
+        assert_eq!(
+            transport
+                .request_target(&TransportOperation::OpenAiResponses)
+                .unwrap()
+                .as_str(),
+            "http://127.0.0.1:1/v1/responses"
+        );
+        assert_eq!(
+            transport
+                .request_target(&TransportOperation::OpenAiResponsesInputTokens)
+                .unwrap()
+                .as_str(),
+            "http://127.0.0.1:1/v1/responses/input_tokens"
+        );
+        assert_eq!(
+            transport.request_target(&TransportOperation::ChatCompletions),
+            Err(TransportFailure::Unavailable)
+        );
+        let compatible =
+            HttpTransport::new(state.path(), &options(ProviderProtocol::OpenAiCompatible)).unwrap();
+        assert_eq!(
+            compatible.request_target(&TransportOperation::OpenAiResponsesInputTokens),
+            Err(TransportFailure::Unavailable)
+        );
+    }
+
+    #[test]
+    fn responses_stored_credentials_require_the_reviewed_vendor_destination() {
+        assert_eq!(
+            stored_provider(
+                ProviderProtocol::Responses,
+                &Url::parse("https://api.openai.com/v1").unwrap()
+            ),
+            Some("openai")
+        );
+        for address in [
+            "https://api.openai.com/elsewhere",
+            "https://api.openai.com:444/v1",
+            "https://other.example/v1",
+            "http://127.0.0.1/v1",
+        ] {
+            assert_eq!(
+                stored_provider(ProviderProtocol::Responses, &Url::parse(address).unwrap()),
+                None
+            );
+        }
+    }
 }

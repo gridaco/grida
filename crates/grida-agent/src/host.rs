@@ -23,8 +23,8 @@ use agent_kit_core::{
     PrincipalId, Result, SchemaId, ScopeId, SessionId, TurnId,
 };
 use agent_kit_providers::{
-    Anthropic, Gemini, GeminiProfile, ModelProfile, OpenAiCompatible, OutputLimitField,
-    StreamLimits, StreamingTransport,
+    Anthropic, Gemini, GeminiProfile, ModelProfile, OpenAiCompatible, OutputLimitField, Responses,
+    ResponsesEndpoint, ResponsesProfile, StreamLimits, StreamingTransport,
 };
 use agent_kit_runtime::{ExecutionLimits, ExecutionServices, Runtime, TurnUpdate};
 use agent_kit_sessions::{
@@ -1121,6 +1121,23 @@ impl Execution {
             ProviderProtocol::Anthropic => Arc::new(Anthropic::new(
                 binding.clone(),
                 BTreeMap::from([(options.model.clone(), capabilities)]),
+                transport.clone(),
+                PROVIDER_LIMITS,
+            )?),
+            ProviderProtocol::Responses => Arc::new(Responses::new(
+                binding.clone(),
+                transport.replay_binding().cloned().ok_or_else(|| {
+                    problem(ErrorKind::InvalidState, "provider_replay_binding_missing")
+                })?,
+                ResponsesEndpoint::Api,
+                BTreeMap::from([(
+                    options.model.clone(),
+                    ResponsesProfile {
+                        capabilities,
+                        wire_model: options.model.clone(),
+                        reasoning_effort: None,
+                    },
+                )]),
                 transport.clone(),
                 PROVIDER_LIMITS,
             )?),

@@ -2879,6 +2879,15 @@ durable or discard unrelated OAuth records.
    observed values. The host establishes account identity and execution
    authorization separately.
 
+9. **Native provider requests keep their selected destination.** The HTTP adapter
+   injects a freshly validated credential only for its captured provider binding
+   and finite operation. Responses generation and input counting share that
+   binding and the same configured API base. Counting adds only the fixed
+   `responses/input_tokens` route. It grants no arbitrary URL access or access
+   to a different provider's operation. Stored OpenAI keys require the reviewed
+   vendor base URL, while custom destinations require an explicit environment
+   credential. Requests disable redirects and automatic retries.
+
 **Limits and verification.** This is plaintext user-level custody, not encryption,
 secure erasure, provider revocation, protection from same-user code, or backup
 protection. A supported filesystem, OS, runtime and dependencies are trusted.
@@ -2915,6 +2924,7 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [crates/grida-auth/src/credential_lock.rs](crates/grida-auth/src/credential_lock.rs),
   [credential continuity store](crates/grida-auth/src/credential_continuity.rs),
   [native agent custody](crates/grida-agent/src/custody.rs),
+  [native provider HTTP dispatch](crates/grida-agent/src/http.rs),
   [native agent custody tests](crates/grida-agent/tests/custody.rs),
   [native workspace protection](crates/grida-agent/src/workspace.rs),
   [private retained inputs](crates/grida-agent/src/scratch.rs),
