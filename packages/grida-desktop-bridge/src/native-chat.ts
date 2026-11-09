@@ -70,6 +70,16 @@ export type NativeChatControlReceipt = Readonly<{
   journalPosition: number;
 }>;
 
+export type NativeChatApproval = Readonly<{
+  reviewId: string;
+  tool: "read_file" | "list_files" | "search_text";
+  root: string;
+  relativePath: string;
+  query?: string;
+}>;
+
+export type NativeChatApprovalDecision = "approve_once" | "decline";
+
 export type NativeChatControlResult =
   | { action: "pause" | "stop"; receipt: NativeChatControlReceipt }
   | { action: "resume"; turn: NativeChatTurn };
@@ -114,6 +124,15 @@ export type DesktopNativeChat = {
     inputId: string
   ): Promise<NativeChatAcceptance>;
   observe(attachmentId: string): Promise<NativeChatObservation>;
+  approvals?(
+    attachmentId: string,
+    observationId: string
+  ): Promise<readonly NativeChatApproval[]>;
+  answerApproval?(
+    attachmentId: string,
+    reviewId: string,
+    decision: NativeChatApprovalDecision
+  ): Promise<NativeChatControlReceipt>;
   transcript(attachmentId: string): Promise<readonly NativeChatMessage[]>;
   control(
     attachmentId: string,

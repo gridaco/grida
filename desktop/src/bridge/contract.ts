@@ -56,6 +56,8 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_SUBMIT: "grida:native-chat:submit",
   NATIVE_CHAT_INPUT_RECEIPT: "grida:native-chat:input-receipt",
   NATIVE_CHAT_OBSERVE: "grida:native-chat:observe",
+  NATIVE_CHAT_APPROVALS: "grida:native-chat:approvals",
+  NATIVE_CHAT_ANSWER_APPROVAL: "grida:native-chat:answer-approval",
   NATIVE_CHAT_TRANSCRIPT: "grida:native-chat:transcript",
   NATIVE_CHAT_CONTROL: "grida:native-chat:control",
   NATIVE_CHAT_SUBSCRIBE: "grida:native-chat:subscribe",

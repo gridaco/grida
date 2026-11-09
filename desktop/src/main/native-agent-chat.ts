@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type {
   NativeChatAcceptance,
+  NativeChatApprovalDecision,
   NativeChatControlReceipt,
   NativeChatMessage,
   NativeChatPage,
@@ -10,6 +11,7 @@ import type {
   NativeChatStreamUpdate,
   NativeChatTurn,
 } from "@grida/desktop-bridge";
+import type { NativeApprovalReview } from "./native-agent-permissions";
 import {
   NativeAgentProcess,
   type NativeAgentLaunch,
@@ -300,6 +302,45 @@ export class NativeAgentChat {
     return capture.result;
   }
 
+  async approvals(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot
+  ): Promise<readonly NativeApprovalReview[]> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const current = snapshot.current;
+    const permissions = this.process.permissions;
+    if (
+      !permissions ||
+      current?.disposition !== "suspended" ||
+      current.paused ||
+      current.cancelled
+    )
+      return [];
+    const reviews = await permissions.list(sessionId, current.turnId);
+    this.requireAttached(session);
+    if (
+      reviews.some(
+        (review) =>
+          review.sessionRevision !== snapshot.sessionRevision ||
+          review.controlRevision !== current.controlRevision
+      )
+    )
+      throw new Error("native_chat_approval_changed");
+    return reviews;
+  }
+
+  async answerApproval(
+    session: NativeChatSession,
+    review: NativeApprovalReview,
+    decision: NativeChatApprovalDecision
+  ): Promise<NativeChatControlReceipt> {
+    const sessionId = this.requireAttached(session);
+    const permissions = this.process.permissions;
+    if (!permissions || review.sessionId !== sessionId)
+      throw new Error("native_chat_approval_unavailable");
+    return permissions.answer(review, decision);
+  }
+
   pause(
     session: NativeChatSession,
     snapshot: NativeChatSnapshot,
@@ -456,14 +497,9 @@ export class NativeAgentChat {
     snapshot: NativeChatSnapshot,
     requestId: string
   ): { task: TaskBasis; current: NativeChatTurn } {
-    const sessionId = this.requireAttached(session);
-    if (
-      observed.get(snapshot) !== this.scope ||
-      snapshot.sessionId !== sessionId ||
-      !snapshot.current
-    )
-      throw new Error("native_chat_turn_observation_required");
+    const sessionId = this.requireObservation(session, snapshot);
     const current = snapshot.current;
+    if (!current) throw new Error("native_chat_turn_observation_required");
     return {
       current,
       task: {
@@ -474,6 +510,19 @@ export class NativeAgentChat {
         expectedControlRevision: current.controlRevision,
       },
     };
+  }
+
+  private requireObservation(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot
+  ): string {
+    const sessionId = this.requireAttached(session);
+    if (
+      observed.get(snapshot) !== this.scope ||
+      snapshot.sessionId !== sessionId
+    )
+      throw new Error("native_chat_turn_observation_required");
+    return sessionId;
   }
 
   private attach(id: string): NativeChatSession {

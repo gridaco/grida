@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import type { IpcMainInvokeEvent, WebContents, WebFrameMain } from "electron";
 import type {
   NativeChatAttachment,
+  NativeChatApproval,
+  NativeChatControlReceipt,
   NativeChatControlResult,
   NativeChatObservation,
   NativeChatPage,
@@ -13,9 +15,11 @@ import type {
 import { IPC_CHANNELS } from "../bridge/contract";
 import { ipc_sender } from "./ipc-sender";
 import type { NativeAgentChat, NativeChatSession } from "./native-agent-chat";
+import type { NativeApprovalReview } from "./native-agent-permissions";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
+const MAX_APPROVALS = 16;
 const MAX_SUBSCRIPTIONS = 8;
 const MAX_UPDATE_BYTES = 8 * 1024;
 const MAX_DELIVERY_BYTES = 1024 * 1024;
@@ -32,6 +36,8 @@ export type ActiveNativeChat = Readonly<{
     | "submit"
     | "inputReceipt"
     | "observe"
+    | "approvals"
+    | "answerApproval"
     | "transcript"
     | "pause"
     | "stop"
@@ -44,6 +50,7 @@ type Attachment = {
   id: string;
   session: NativeChatSession;
   observations: Map<string, NativeChatSnapshot>;
+  approvals: Map<string, NativeApprovalReview>;
 };
 
 type Subscription = { attachment: Attachment; stop(): void };
@@ -72,7 +79,10 @@ export class NativeChatIpc {
 
   constructor(
     private readonly editorOrigin: string,
-    private readonly resolve: (sender: WebContents) => ActiveNativeChat | null,
+    private readonly resolve: (
+      sender: WebContents,
+      workspaceId: string
+    ) => ActiveNativeChat | null,
     private readonly startup?: {
       admits(sender: WebContents): boolean;
       ensure(workspaceId: string): Promise<void>;
@@ -96,7 +106,7 @@ export class NativeChatIpc {
       throw new Error("native_chat_start_invalid");
     const workspaceId = this.workspaceId(sender, frame);
     if (!frame || !workspaceId) throw new Error("native_chat_scope_changed");
-    if (this.resolve(sender)?.workspaceId === workspaceId)
+    if (this.resolve(sender, workspaceId)?.workspaceId === workspaceId)
       return "native-ready";
     const startup = this.startup;
     if (!startup) return "legacy";
@@ -133,7 +143,7 @@ export class NativeChatIpc {
             return "native-unavailable";
           }
           requireCurrent();
-          return this.resolve(sender)?.workspaceId === workspaceId
+          return this.resolve(sender, workspaceId)?.workspaceId === workspaceId
             ? "native-ready"
             : "native-unavailable";
         })
@@ -232,6 +242,64 @@ export class NativeChatIpc {
     const messages = await owner.active.chat.transcript(attachment.session);
     this.revalidate(owner, attachment);
     return messages;
+  }
+
+  async approvals(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string
+  ): Promise<readonly NativeChatApproval[]> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = token(observationId)
+      ? attachment.observations.get(observationId)
+      : undefined;
+    if (!snapshot) throw new Error("native_chat_observation_unavailable");
+    const reviews = await owner.active.chat.approvals(
+      attachment.session,
+      snapshot
+    );
+    this.revalidate(owner, attachment);
+    return reviews.slice(0, MAX_APPROVALS).map((review) => {
+      const existing = [...attachment.approvals].find(([, value]) =>
+        sameReview(value, review)
+      );
+      const reviewId = existing?.[0] ?? randomUUID();
+      attachment.approvals.delete(reviewId);
+      const oldest = attachment.approvals.keys().next().value;
+      if (oldest && attachment.approvals.size >= MAX_APPROVALS)
+        attachment.approvals.delete(oldest);
+      attachment.approvals.set(reviewId, review);
+      const { tool, root, relativePath, query } = review;
+      return {
+        reviewId,
+        tool,
+        root,
+        relativePath,
+        ...(query === undefined ? {} : { query }),
+      };
+    });
+  }
+
+  async answerApproval(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    reviewId: string,
+    decision: unknown
+  ): Promise<NativeChatControlReceipt> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    if (decision !== "approve_once" && decision !== "decline")
+      throw new Error("native_chat_approval_decision_invalid");
+    const review = token(reviewId)
+      ? attachment.approvals.get(reviewId)
+      : undefined;
+    if (!review) throw new Error("native_chat_approval_unavailable");
+    const receipt = await owner.active.chat.answerApproval(
+      attachment.session,
+      review,
+      decision
+    );
+    this.revalidate(owner, attachment);
+    return receipt;
   }
 
   async control(
@@ -353,6 +421,7 @@ export class NativeChatIpc {
         id: randomUUID(),
         session,
         observations: new Map(),
+        approvals: new Map(),
       };
       owner.attachments.set(attachment.id, attachment);
       return { attachmentId: attachment.id, sessionId: session.id };
@@ -431,7 +500,7 @@ export class NativeChatIpc {
   ): ActiveNativeChat | null {
     const id = this.workspaceId(sender, frame);
     if (!id) return null;
-    const active = this.resolve(sender);
+    const active = this.resolve(sender, id);
     return active?.workspaceId === id ? active : null;
   }
 
@@ -482,6 +551,24 @@ function sameActive(
   right: ActiveNativeChat | null
 ): boolean {
   return left.chat === right?.chat && left.workspaceId === right.workspaceId;
+}
+
+function sameReview(
+  left: NativeApprovalReview,
+  right: NativeApprovalReview
+): boolean {
+  return (
+    left.sessionId === right.sessionId &&
+    left.turnId === right.turnId &&
+    left.waitId === right.waitId &&
+    left.sessionRevision === right.sessionRevision &&
+    left.controlRevision === right.controlRevision &&
+    left.directory === right.directory &&
+    left.root === right.root &&
+    left.tool === right.tool &&
+    left.relativePath === right.relativePath &&
+    left.query === right.query
+  );
 }
 
 function sameBasis(

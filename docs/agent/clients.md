@@ -151,6 +151,11 @@ When a native chat owner is active in Desktop, the workspace Chat selector
 combines recent chats with saved chats from that workspace. Use **Older chats**
 to browse further. Selecting a chat opens its transcript.
 
+With the native **Ask me** profile, a read outside the current grants pauses
+for review when its folder is eligible for additional access. The pane shows
+the requested action and target. **Allow once** authorizes that action.
+**Decline** leaves the additional access denied.
+
 Text and resource-link descriptors are accepted as prompt content. A resource
 link supplies context about a resource. File access follows a separately granted
 capability.

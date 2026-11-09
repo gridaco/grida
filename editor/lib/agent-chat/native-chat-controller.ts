@@ -1,5 +1,7 @@
 import type {
   DesktopNativeChat,
+  NativeChatApproval,
+  NativeChatApprovalDecision,
   NativeChatAttachment,
   NativeChatControl,
   NativeChatMessage,
@@ -25,6 +27,8 @@ export type NativeChatView = Readonly<{
   catalogError: string | null;
   messages: readonly NativeChatMessage[];
   observation: NativeChatObservation | null;
+  approvals: readonly NativeChatApproval[];
+  approvalError: string | null;
   loading: boolean;
   acting: boolean;
   repairing: boolean;
@@ -42,6 +46,7 @@ type Scope = {
   live: Map<string, NativeChatMessage & { turnId: string; bytes: number }>;
   gaps: Set<string>;
   observation: NativeChatObservation | null;
+  approvalBasis?: string;
   replay: boolean;
   pending?: { text: string; inputId: string };
   awaitingTurn?: string;
@@ -57,6 +62,8 @@ const EMPTY: NativeChatView = Object.freeze({
   catalogError: null,
   messages: [],
   observation: null,
+  approvals: [],
+  approvalError: null,
   loading: false,
   acting: false,
   repairing: false,
@@ -199,6 +206,8 @@ export class NativeChatController {
       selected: sessionId,
       messages: [],
       observation: null,
+      approvals: [],
+      approvalError: null,
       loading: sessionId !== null,
       acting: false,
       repairing: false,
@@ -321,6 +330,40 @@ export class NativeChatController {
     }
   }
 
+  async answerApproval(
+    reviewId: string,
+    decision: NativeChatApprovalDecision
+  ): Promise<void> {
+    const scope = this.scope;
+    if (
+      !scope?.attachment ||
+      !this.bridge.answerApproval ||
+      this.view.acting ||
+      !this.view.approvals.some((review) => review.reviewId === reviewId)
+    )
+      return;
+    this.update({ acting: true, error: null });
+    try {
+      await this.bridge.answerApproval(
+        scope.attachment.attachmentId,
+        reviewId,
+        decision
+      );
+      if (this.owns(scope)) this.update({ approvals: [] });
+    } catch {
+      if (this.owns(scope))
+        this.update({
+          error:
+            "Couldn't confirm the permission decision. Check the pending request.",
+        });
+    } finally {
+      if (this.owns(scope)) {
+        await this.refresh(scope);
+        if (this.owns(scope)) this.update({ acting: false });
+      }
+    }
+  }
+
   private open(scope: Scope): Promise<void> {
     if (scope.attachment) return Promise.resolve();
     if (scope.opening) return scope.opening;
@@ -382,6 +425,8 @@ export class NativeChatController {
         )
           scope.awaitingTurn = undefined;
         this.update({ observation: next });
+        await this.refreshApprovals(scope, attachment, next);
+        if (!this.owns(scope)) return;
         if (!replay) return;
         scope.replay = false;
         const messages = await this.bridge.transcript(attachment.attachmentId);
@@ -423,6 +468,35 @@ export class NativeChatController {
         }
       });
     return scope.refreshing;
+  }
+
+  private async refreshApprovals(
+    scope: Scope,
+    attachment: NativeChatAttachment,
+    observation: NativeChatObservation
+  ): Promise<void> {
+    if (!this.bridge.approvals || !this.bridge.answerApproval) return;
+    const turn = observation.snapshot.current;
+    if (turn?.disposition !== "suspended" || turn.paused || turn.cancelled) {
+      scope.approvalBasis = undefined;
+      if (this.view.approvals.length || this.view.approvalError)
+        this.update({ approvals: [], approvalError: null });
+      return;
+    }
+    if (scope.approvalBasis === observation.observationId) return;
+    if (this.view.approvals.length) this.update({ approvals: [] });
+    try {
+      const approvals = await this.bridge.approvals(
+        attachment.attachmentId,
+        observation.observationId
+      );
+      if (!this.owns(scope)) return;
+      scope.approvalBasis = observation.observationId;
+      this.update({ approvals, approvalError: null });
+    } catch {
+      if (this.owns(scope))
+        this.update({ approvalError: "Couldn't load the permission request." });
+    }
   }
 
   private receive(scope: Scope, update: NativeChatUpdate): void {

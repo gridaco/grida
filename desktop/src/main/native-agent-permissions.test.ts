@@ -1,8 +1,9 @@
-import { once } from "node:events";
+import { EventEmitter, once } from "node:events";
 import fs from "node:fs";
 import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
+import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { describe, expect, it, vi } from "vitest";
 import {
   NativeAgentPermissions,
@@ -13,6 +14,8 @@ import {
   NativeAgentProcess,
   type NativeAgentLaunch,
 } from "./native-agent-process";
+import { NativeAgentChat } from "./native-agent-chat";
+import { NativeChatIpc } from "./native-chat-ipc";
 
 const supported = process.platform === "darwin" || process.platform === "linux";
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
@@ -278,6 +281,108 @@ it.runIf(Boolean(packaged) && supported)(
     } finally {
       try {
         await agent?.close();
+      } finally {
+        await provider.close();
+        test.close();
+      }
+    }
+  },
+  15000
+);
+
+it.runIf(Boolean(packaged) && supported)(
+  "reviews an additional-root read through the guarded Desktop bridge and replays only the exact decision",
+  async () => {
+    const test = workspaceFixture();
+    const provider = await fixtureProvider();
+    const origin = "https://editor.fixture.invalid";
+    const frame = {
+      url: `${origin}/desktop/workspace?id=${test.workspace.id}`,
+    };
+    const sender = Object.assign(new EventEmitter(), {
+      mainFrame: frame,
+      isDestroyed: () => false,
+      isLoadingMainFrame: () => false,
+    }) as unknown as WebContents;
+    const event = {
+      sender,
+      senderFrame: frame,
+    } as unknown as IpcMainInvokeEvent;
+    fs.writeFileSync(
+      path.join(test.additional.path, "note.txt"),
+      "reviewed bridge fixture content"
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        resourcesPath: packaged!,
+        cwd: test.workspace.primary.path,
+        stateDirectory: test.stateDirectory,
+        provider: "openai-compatible",
+        endpoint: provider.endpoint,
+        model: "fixture",
+        workspace: test.workspace,
+      });
+      const active = { workspaceId: test.workspace.id, chat };
+      const ipc = new NativeChatIpc(origin, (candidate) =>
+        candidate === sender ? active : null
+      );
+      const { attachmentId } = await ipc.create(event);
+      await ipc.submit(
+        event,
+        attachmentId,
+        "fixture-input",
+        "Read the reference"
+      );
+      const review = await vi.waitFor(
+        async () => {
+          const observed = await ipc.observe(event, attachmentId);
+          const approvals = await ipc.approvals(
+            event,
+            attachmentId,
+            observed.observationId
+          );
+          expect(approvals).toHaveLength(1);
+          return approvals[0];
+        },
+        { timeout: 5000 }
+      );
+      expect(review).toEqual({
+        reviewId: expect.any(String),
+        tool: "read_file",
+        relativePath: "note.txt",
+        root: test.additional.path,
+      });
+      expect(provider.received).toHaveLength(1);
+      expect(provider.received[0]).not.toContain(
+        "reviewed bridge fixture content"
+      );
+      const receipt = await ipc.answerApproval(
+        event,
+        attachmentId,
+        review.reviewId,
+        "approve_once"
+      );
+      await vi.waitFor(async () => {
+        const observed = await ipc.observe(event, attachmentId);
+        expect(observed.snapshot.latest?.status).toBe("succeeded");
+      });
+      expect(provider.received).toHaveLength(2);
+      expect(provider.received[1]).toContain("reviewed bridge fixture content");
+      await expect(
+        ipc.answerApproval(event, attachmentId, review.reviewId, "approve_once")
+      ).resolves.toEqual(receipt);
+      await expect(
+        ipc.answerApproval(event, attachmentId, review.reviewId, "decline")
+      ).rejects.toThrow("request_identity_reused");
+      sender.emit("did-start-navigation", { isMainFrame: true });
+      await expect(
+        ipc.answerApproval(event, attachmentId, review.reviewId, "approve_once")
+      ).rejects.toThrow("native_chat_attachment_unavailable");
+      expect(provider.received).toHaveLength(2);
+    } finally {
+      try {
+        await chat?.close();
       } finally {
         await provider.close();
         test.close();

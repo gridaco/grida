@@ -88,7 +88,10 @@ const mediaHost = new DesktopMediaHost({
 
 type RegisterIpcHandlersOptions = {
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
-  resolve_native_chat?: (window: BrowserWindow) => ActiveNativeChat | null;
+  resolve_native_chat?: (
+    window: BrowserWindow,
+    workspaceId: string
+  ) => ActiveNativeChat | null;
   /** Present when this main process has selected native chat mode. */
   ensure_native_chat?: (workspaceId: string) => Promise<void>;
   on_onboarding_complete?: (input: {
@@ -109,9 +112,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   };
   const nativeChat = new NativeChatIpc(
     EDITOR_ORIGIN,
-    (sender) => {
+    (sender, workspaceId) => {
       const window = admittedWindow(sender);
-      return window ? (options.resolve_native_chat?.(window) ?? null) : null;
+      return window
+        ? (options.resolve_native_chat?.(window, workspaceId) ?? null)
+        : null;
     },
     options.ensure_native_chat && {
       admits: (sender) => admittedWindow(sender) !== null,
@@ -183,6 +188,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, (event, id: string) =>
     nativeChat.observe(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_APPROVALS,
+    (event, id: string, observation: string) =>
+      nativeChat.approvals(event, id, observation)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ANSWER_APPROVAL,
+    (event, id: string, review: string, decision: unknown) =>
+      nativeChat.answerApproval(event, id, review, decision)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, (event, id: string) =>
     nativeChat.transcript(event, id)

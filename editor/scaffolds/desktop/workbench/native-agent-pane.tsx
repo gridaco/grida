@@ -10,9 +10,15 @@ import {
 } from "@app/ui/ai-elements/conversation";
 import { ChatMessageView, PendingTurnIndicator } from "@/kits/agent-chat";
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
+import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentComposerInput } from "../shared/agent-composer-input";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
+const APPROVAL_ACTION = {
+  read_file: "Read file",
+  list_files: "List folder",
+  search_text: "Search files",
+} as const;
 const selectionMemory = {
   getItem: (key: string) => window.localStorage.getItem(key),
   setItem: (key: string, value: string) =>
@@ -53,6 +59,11 @@ export function NativeAgentPane({
   const canResume =
     turn?.disposition === "suspended" && turn.paused && !turn.cancelled;
   const canStop = !!turn && !turn.cancelled;
+  const approval =
+    turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
+      ? state.approvals[0]
+      : undefined;
+  const error = state.error ?? state.approvalError;
   const canSubmit =
     !state.loading && !state.acting && !turn && !snapshot?.admissionPaused;
   const status = state.loading
@@ -173,12 +184,12 @@ export function NativeAgentPane({
           {status}
         </div>
       )}
-      {state.error && (
+      {error && (
         <div
           role="alert"
           className="flex items-center gap-2 px-3 pt-2 text-xs text-destructive"
         >
-          <span className="flex-1">{state.error}</span>
+          <span className="flex-1">{error}</span>
           <Button
             type="button"
             variant="ghost"
@@ -188,6 +199,32 @@ export function NativeAgentPane({
             Refresh
           </Button>
         </div>
+      )}
+      {approval && (
+        <AgentApprovalPrompt
+          description="The agent is asking for additional read access."
+          detail={
+            <div className="mt-1 max-h-24 overflow-y-auto break-all font-mono text-xs text-foreground/80">
+              <div>
+                {APPROVAL_ACTION[approval.tool]}{" "}
+                {reviewText(approval.relativePath || ".")}
+              </div>
+              <div>Folder {reviewText(approval.root)}</div>
+              {approval.query !== undefined && (
+                <div>Search {reviewText(approval.query)}</div>
+              )}
+            </div>
+          }
+          acceptLabel="Allow once"
+          declineLabel="Decline"
+          disabled={state.acting}
+          onDecision={(allowed) =>
+            controller.answerApproval(
+              approval.reviewId,
+              allowed ? "approve_once" : "decline"
+            )
+          }
+        />
       )}
       <div className="shrink-0 p-3">
         <AgentComposerInput
@@ -241,5 +278,12 @@ export function NativeAgentPane({
         />
       </div>
     </div>
+  );
+}
+
+function reviewText(value: string): string {
+  return JSON.stringify(value).replace(
+    /[\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
   );
 }

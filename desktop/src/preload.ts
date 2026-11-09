@@ -395,6 +395,19 @@ const bridge: DesktopBridge = {
       ),
     observe: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
+    approvals: (attachmentId, observationId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_APPROVALS,
+        attachmentId,
+        observationId
+      ),
+    answerApproval: (attachmentId, reviewId, decision) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ANSWER_APPROVAL,
+        attachmentId,
+        reviewId,
+        decision
+      ),
     transcript: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, attachmentId),
     control: (attachmentId, control) =>

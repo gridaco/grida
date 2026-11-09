@@ -106,6 +106,18 @@ function setup() {
     async observe(session) {
       return snapshot(session.id);
     },
+    async approvals() {
+      return [];
+    },
+    async answerApproval(session, review) {
+      return {
+        sessionId: session.id,
+        turnId: review.turnId,
+        requestId: "native-review",
+        sessionRevision: review.sessionRevision + 1,
+        journalPosition: review.controlRevision + 1,
+      };
+    },
     async transcript() {
       return [];
     },
@@ -152,6 +164,88 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("issues stable exact approval tokens only to their observing attachment", async () => {
+    const { ipc, first, second, chat } = setup();
+    const one = await ipc.create(first.event);
+    const two = await ipc.load(second.event, one.sessionId);
+    const basis = await ipc.observe(first.event, one.attachmentId);
+    const review = {
+      sessionId: one.sessionId,
+      turnId: "turn",
+      waitId: "wait",
+      sessionRevision: basis.snapshot.sessionRevision,
+      controlRevision: basis.snapshot.current!.controlRevision,
+      directory: "additional",
+      root: "/fixture/chosen",
+      tool: "read_file",
+      relativePath: "note.txt",
+    } as const;
+    const list = vi.spyOn(chat, "approvals").mockResolvedValue([review]);
+    const answer = vi.spyOn(chat, "answerApproval");
+    await expect(
+      ipc.approvals(second.event, two.attachmentId, basis.observationId)
+    ).rejects.toThrow("native_chat_observation_unavailable");
+    const [shown] = await ipc.approvals(
+      first.event,
+      one.attachmentId,
+      basis.observationId
+    );
+    expect(list).toHaveBeenCalledWith({ id: one.sessionId }, basis.snapshot);
+    expect(shown).toEqual({
+      reviewId: expect.any(String),
+      tool: "read_file",
+      root: "/fixture/chosen",
+      relativePath: "note.txt",
+    });
+    await expect(
+      ipc.approvals(first.event, one.attachmentId, basis.observationId)
+    ).resolves.toEqual([shown]);
+    await expect(
+      ipc.answerApproval(
+        second.event,
+        two.attachmentId,
+        shown.reviewId,
+        "approve_once"
+      )
+    ).rejects.toThrow("native_chat_approval_unavailable");
+    await expect(
+      ipc.answerApproval(first.event, one.attachmentId, shown.reviewId, {
+        decision: "approve_once",
+        root: "/injected",
+      })
+    ).rejects.toThrow("native_chat_approval_decision_invalid");
+    const receipt = await ipc.answerApproval(
+      first.event,
+      one.attachmentId,
+      shown.reviewId,
+      "approve_once"
+    );
+    await expect(
+      ipc.answerApproval(
+        first.event,
+        one.attachmentId,
+        shown.reviewId,
+        "approve_once"
+      )
+    ).resolves.toEqual(receipt);
+    expect(answer).toHaveBeenLastCalledWith(
+      { id: one.sessionId },
+      review,
+      "approve_once"
+    );
+
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    await expect(
+      ipc.answerApproval(
+        first.event,
+        one.attachmentId,
+        shown.reviewId,
+        "approve_once"
+      )
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    expect(answer).toHaveBeenCalledTimes(2);
+  });
+
   it("starts only the admitted route's workspace and shares the pending start", async () => {
     const { first, second, scopes, chat, ipc: legacy } = setup();
     scopes.delete(first.sender);

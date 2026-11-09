@@ -9,6 +9,8 @@ const APPROVALS = "co.grida/session/approvals";
 const ANSWER = "co.grida/session/answer-approval";
 const ID = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 const READ_TOOLS = ["read_file", "list_files", "search_text"] as const;
+const MAX_PATH_BYTES = 4096;
+const MAX_QUERY_BYTES = 128;
 type ReadTool = (typeof READ_TOOLS)[number];
 
 type Directory = Readonly<{ id: string; name: string; path: string }>;
@@ -262,13 +264,17 @@ function readReview(
     request.turn !== turnId ||
     !identity(request.directory) ||
     typeof request.root !== "string" ||
+    Buffer.byteLength(request.root) > MAX_PATH_BYTES ||
     askRoots.get(request.directory) !== request.root ||
     effect?.kind !== "read" ||
     !readTool(effect.tool) ||
     typeof effect.relative_path !== "string" ||
+    Buffer.byteLength(effect.relative_path) > MAX_PATH_BYTES ||
     path.isAbsolute(effect.relative_path) ||
     effect.relative_path.split("/").includes("..") ||
-    (effect.query !== undefined && typeof effect.query !== "string")
+    (effect.query !== undefined &&
+      (typeof effect.query !== "string" ||
+        Buffer.byteLength(effect.query) > MAX_QUERY_BYTES))
   )
     throw invalidApproval();
   const review = Object.freeze({

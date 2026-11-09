@@ -11,6 +11,7 @@ function fixture() {
   const updates = new Map<string, (update: NativeChatUpdate) => void>();
   const transcripts = new Map<string, readonly NativeChatMessage[]>();
   const running = new Set<string>();
+  const waiting = new Set<string>();
   const observed = (id: string): NativeChatObservation => ({
     observationId: `observation-${id}`,
     snapshot: {
@@ -18,19 +19,20 @@ function fixture() {
       sessionRevision: 2,
       queuedInputs: 0,
       admissionPaused: false,
-      current: running.has(id)
-        ? {
-            turnId: `turn-${id}`,
-            epoch: 1,
-            journalPosition: 1,
-            historyPosition: 1,
-            controlRevision: 1,
-            paused: false,
-            cancelled: false,
-            disposition: "running",
-            status: null,
-          }
-        : null,
+      current:
+        running.has(id) || waiting.has(id)
+          ? {
+              turnId: `turn-${id}`,
+              epoch: 1,
+              journalPosition: 1,
+              historyPosition: 1,
+              controlRevision: 1,
+              paused: false,
+              cancelled: false,
+              disposition: waiting.has(id) ? "suspended" : "running",
+              status: null,
+            }
+          : null,
       latest: null,
     },
   });
@@ -94,9 +96,86 @@ function fixture() {
     updates,
     transcripts,
     running,
+    waiting,
     controller: new NativeChatController(bridge),
   };
 }
+
+it("reviews the exact pending request and removes authority on chat switch", async () => {
+  const { bridge, controller, waiting } = fixture();
+  waiting.add("chat-a");
+  const review = {
+    reviewId: "review-a",
+    tool: "read_file",
+    root: "/chosen",
+    relativePath: "note.txt",
+  } as const;
+  const approvals = vi.fn<NonNullable<DesktopNativeChat["approvals"]>>(
+    async () => [review]
+  );
+  const answer = vi.fn<NonNullable<DesktopNativeChat["answerApproval"]>>(
+    async () => {
+      waiting.delete("chat-a");
+      return {
+        sessionId: "chat-a",
+        turnId: "turn-chat-a",
+        requestId: "decision",
+        sessionRevision: 3,
+        journalPosition: 2,
+      };
+    }
+  );
+  bridge.approvals = approvals;
+  bridge.answerApproval = answer;
+  await controller.select("chat-a");
+  expect(controller.read().approvals).toEqual([review]);
+  expect(approvals).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    "observation-chat-a"
+  );
+  await controller.answerApproval("review-a", "approve_once");
+  expect(answer).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    "review-a",
+    "approve_once"
+  );
+  expect(controller.read().approvals).toEqual([]);
+  await controller.select("chat-b");
+  await controller.answerApproval("review-a", "decline");
+  expect(answer).toHaveBeenCalledTimes(1);
+  controller.disconnect();
+});
+
+it("drops a late review from the previous chat", async () => {
+  const { bridge, controller, waiting } = fixture();
+  waiting.add("chat-a");
+  const pending =
+    Promise.withResolvers<
+      Awaited<ReturnType<NonNullable<DesktopNativeChat["approvals"]>>>
+    >();
+  const approvals = vi.fn<NonNullable<DesktopNativeChat["approvals"]>>(
+    () => pending.promise
+  );
+  bridge.approvals = approvals;
+  bridge.answerApproval = async () => {
+    throw new Error("unexpected review");
+  };
+  const old = controller.select("chat-a");
+  await vi.waitFor(() => expect(approvals).toHaveBeenCalledTimes(1));
+  await controller.select("chat-b");
+  pending.resolve([
+    {
+      reviewId: "old",
+      tool: "read_file",
+      root: "/chosen",
+      relativePath: "note.txt",
+    },
+  ]);
+  await old;
+  expect(controller.read().selected).toBe("chat-b");
+  expect(controller.read().approvals).toEqual([]);
+  controller.disconnect();
+});
 
 it("uses the readiness probe and preserves native mode through startup failure", async () => {
   const { bridge } = fixture();
