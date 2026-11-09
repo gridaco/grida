@@ -155,6 +155,14 @@ verification. Stable and Insiders can share the old store under separate app
 locks, so activation also needs shared-source writer custody across editions.
 The standard Desktop startup still uses its existing composition.
 
+For a disposable native chat run, launch a development or Insiders build
+with `--native-chat` and `--user-data-dir` set to a precreated owner-only
+browser directory. Set `GRIDA_AGENT_USER_DATA` to a separate sibling directory
+under the same owner-only root in the system temporary directory. Chat uses a
+separate native store for each registered workspace. The retained sidecar owns
+files, endpoint settings and media. This profile requires an empty legacy chat
+source and uses the account's Gateway connection.
+
 The source-built native process owner accepts workspace selections from Electron
 main. On macOS and Linux it writes a private launch profile that allows reads
 in the primary workspace and asks before reading an eligible additional root.

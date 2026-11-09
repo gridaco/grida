@@ -38,6 +38,8 @@ import { startup_window } from "./main/startup-window-policy";
 import { DesktopAccountSession } from "./main/account-session";
 import { DesktopEntryWindow } from "./main/desktop-entry-window";
 import { DesktopPreferences } from "./main/desktop-preferences";
+import { NativeDesktopAgent } from "./main/native-desktop-agent";
+import { NativeDesktopProfile } from "./main/native-desktop-profile";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -110,6 +112,9 @@ registerWorkspaceMediaScheme();
 // main. Auxiliary document/settings/workspace windows are admitted and
 // registered through this controller only after it reaches `main`.
 let entryWindow: DesktopEntryWindow | null = null;
+let nativeDesktopAgent: NativeDesktopAgent | undefined;
+let nativeQuitDrain: Promise<void> | undefined;
+let nativeQuitReady = false;
 const windowAdmission = {
   can_open: () => entryWindow?.isMain ?? false,
   register: (window: BrowserWindow) => {
@@ -547,9 +552,9 @@ app.on("ready", async () => {
     return;
   }
 
-  // Primary-only: auto-update checks should never run in a secondary that is
-  // about to quit.
-  updateElectronApp({ notifyUser: true });
+  // Keep a disposable profile on the build it was launched to exercise.
+  const nativeProfile = NativeDesktopProfile.selected();
+  if (!nativeProfile) updateElectronApp({ notifyUser: true });
 
   if (USE_DEV_INSIDERS_BRANDING && process.platform === "darwin") {
     app.dock?.setIcon(create_runtime_app_icon());
@@ -563,6 +568,22 @@ app.on("ready", async () => {
     fetch: async (url, init) =>
       (await session.defaultSession.fetch(url, init)) as Response,
   });
+  if (nativeProfile) {
+    try {
+      await NativeDesktopProfile.configure(app);
+      nativeDesktopAgent = await NativeDesktopAgent.prepareFresh(
+        accountSession,
+        process.resourcesPath
+      );
+    } catch {
+      dialog.showErrorBox(
+        "Native chat could not start",
+        "Use a fresh Desktop profile with a separate Grida agent data directory."
+      );
+      app.quit();
+      return;
+    }
+  }
   let desktopPreferences: DesktopPreferences;
   try {
     desktopPreferences = await DesktopPreferences.open({
@@ -594,7 +615,10 @@ app.on("ready", async () => {
       await authenticatedEntryReady;
     },
     clear_hosted_session: async () => {
-      await agentSidecarClient.clearGridaGatewaySession();
+      await Promise.all([
+        agentSidecarClient.clearGridaGatewaySession(),
+        nativeDesktopAgent?.clearAccount(),
+      ]);
     },
     on_role_change: (role) => {
       refresh_recent_menu();
@@ -607,8 +631,14 @@ app.on("ready", async () => {
 
   // Native-OS IPC handlers are needed before any window opens —
   // otherwise the renderer's first bridge call races the registration.
+  const native = nativeDesktopAgent;
   registerIpcHandlers({
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
+    ...(native && {
+      resolve_native_chat: (_window, workspaceId) =>
+        native.current(workspaceId),
+      ensure_native_chat: (workspaceId) => native.ensure(workspaceId),
+    }),
     on_onboarding_complete: async ({ window, workspace_id: workspaceId }) => {
       try {
         await entryWindow?.completeOnboarding(window, workspaceId);
@@ -659,7 +689,7 @@ app.on("ready", async () => {
       // Desktop notifications on turn-finish / pending-approval (RFC
       // `events.md` §the first consumer). Main-owned so a turn with no
       // renderer attached (queue drain, closed window) still notifies.
-      startAgentNotifications(windowAdmission);
+      if (!nativeDesktopAgent) startAgentNotifications(windowAdmission);
       // Now that the sidecar is up, serve `grida-workspace://` media requests
       // by proxying to its streamed `/workspaces/file` route (#924).
       handleWorkspaceMediaProtocol();
@@ -775,4 +805,18 @@ app.on("before-quit", () => {
   stopAgentSidecar();
   disposeAllTerminals();
   void disposeAllWorkspaceWatches();
+});
+
+app.on("will-quit", (event) => {
+  if (!nativeDesktopAgent || nativeQuitReady) return;
+  event.preventDefault();
+  nativeQuitDrain ??= nativeDesktopAgent
+    .close()
+    .catch(() => {
+      console.error("[grida] native workspace shutdown could not be verified");
+    })
+    .finally(() => {
+      nativeQuitReady = true;
+      app.quit();
+    });
 });

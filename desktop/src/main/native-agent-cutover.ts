@@ -40,18 +40,31 @@ export class NativeAgentCutover {
   private constructor(
     private readonly stateDirectory: string,
     private readonly checkpoint: Checkpoint,
-    readonly archive: Ready["archive"]
+    readonly archive: Ready["archive"],
+    readonly protectedPaths: readonly string[]
   ) {}
 
   /** Verify the shared legacy cutoff before starting any workspace engine. */
-  static async prepare(credentialHome?: string): Promise<NativeAgentCutover> {
+  static prepare(credentialHome?: string): Promise<NativeAgentCutover> {
+    return this.claim(false, credentialHome);
+  }
+
+  /** Admit an isolated native profile without claiming an existing-data cutoff. */
+  static prepareFresh(): Promise<NativeAgentCutover> {
+    return this.claim(true);
+  }
+
+  private static async claim(
+    fresh: boolean,
+    credentialHome?: string
+  ): Promise<NativeAgentCutover> {
     if (process.platform !== "darwin" && process.platform !== "linux")
       throw new Error("native_chat_cutover_platform_unsupported");
     if (this.preparing) throw new Error("native_chat_cutover_in_progress");
     if (this.prepared) throw new Error("native_chat_cutover_already_prepared");
     this.preparing = true;
     try {
-      const prepared = await this.prepareSealed(credentialHome);
+      const prepared = await this.prepareSealed(fresh, credentialHome);
       this.prepared = true;
       return prepared;
     } finally {
@@ -60,6 +73,7 @@ export class NativeAgentCutover {
   }
 
   private static async prepareSealed(
+    fresh: boolean,
     credentialHome: string | undefined
   ): Promise<NativeAgentCutover> {
     const source = await sealLegacyChatForColdStart();
@@ -82,7 +96,9 @@ export class NativeAgentCutover {
 
     // The single-instance owner sealed the actual Desktop supervisor before
     // its legacy launch. Leftover managed worker state is a reason to stop.
-    await requireDrainedCommands(source.scratchBase);
+    if (fresh)
+      await requireFreshSource(source.userDataPath, source.scratchBase);
+    else await requireDrainedCommands(source.scratchBase);
     const sourceKey = createHash("sha256")
       .update(JSON.stringify([source.userDataPath, source.scratchBase]))
       .digest("hex");
@@ -90,6 +106,8 @@ export class NativeAgentCutover {
     const previous = await readCheckpoint(stateDirectory);
     if (previous && previous.source !== sourceKey)
       throw new Error("native_chat_cutover_source_changed");
+    if (fresh && previous?.archiveId)
+      throw new Error("native_chat_requires_fresh_profile");
     let cutoff = previous?.archiveId
       ? await archive.verify(previous.archiveId)
       : null;
@@ -97,7 +115,7 @@ export class NativeAgentCutover {
     if (!checkpoint?.nativeReady) {
       // An interrupted first startup has not exposed any native chat. Capture
       // the latest sealed legacy cutoff and independently verify publication.
-      const captured = await archive.snapshotQuiesced();
+      const captured = fresh ? null : await archive.snapshotQuiesced();
       cutoff = captured ? await archive.verify(captured.id) : null;
       await ensureState(stateDirectory);
       if (!previous && !(await emptyDirectory(stateDirectory)))
@@ -110,7 +128,12 @@ export class NativeAgentCutover {
       };
       await writeCheckpoint(stateDirectory, checkpoint);
     }
-    return new NativeAgentCutover(stateDirectory, checkpoint, cutoff);
+    return new NativeAgentCutover(
+      stateDirectory,
+      checkpoint,
+      cutoff,
+      Object.freeze([desktop, ...separate])
+    );
   }
 
   async startWorkspace(workspaceId: string, launch: Launch): Promise<Ready> {
@@ -159,6 +182,25 @@ export class NativeAgentCutover {
     });
     await this.publication;
   }
+}
+
+async function requireFreshSource(userDataPath: string, scratchBase: string) {
+  for (const name of [
+    "sessions.db",
+    "sessions.db-wal",
+    "sessions.db-shm",
+    "sessions.db-journal",
+    "chat-archive",
+  ]) {
+    if (await statIfPresent(path.join(userDataPath, name)))
+      throw new Error("native_chat_requires_fresh_profile");
+  }
+  const scratch = await statIfPresent(scratchBase);
+  if (
+    scratch &&
+    (!scratch.isDirectory() || !(await emptyDirectory(scratchBase)))
+  )
+    throw new Error("native_chat_requires_fresh_profile");
 }
 
 async function requireDrainedCommands(scratchBase: string): Promise<void> {

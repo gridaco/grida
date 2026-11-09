@@ -904,6 +904,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
   A disconnected child stops serving attachments. The workspace can be reopened
   after the process owner observes exit. Reopening does not replay interrupted
   provider work, and the old provider connection is released before launch.
+- [Native Desktop composition](desktop/src/main/native-desktop-agent.ts) looks
+  up the selected workspace in the retained sidecar registry before launch.
+  It binds the main-owned Gateway connection and scoped read profile, withdraws
+  workspace ownership on account sign-out, and drains it on app quit. The
+  [development profile](desktop/src/main/native-desktop-profile.ts) requires
+  separate canonical browser and agent directories under an owner-only
+  temporary root. Existing legacy chat data or scratch refuses that launch.
 - [Native chat IPC](desktop/src/main/native-chat-ipc.ts) is available only to
   the current top-level workspace frame under the existing authenticated
   window guard. Its attachments and observed control revisions are issued in

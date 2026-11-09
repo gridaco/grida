@@ -1,6 +1,7 @@
 /** GRIDA-SEC-004 — one main-process-owned path fact for durable media. */
 import os from "node:os";
 import path from "node:path";
+import { NativeDesktopProfile } from "./native-desktop-profile";
 
 export namespace DesktopMediaRoot {
   export type ResolveInput = Readonly<{
@@ -58,12 +59,14 @@ export namespace DesktopMediaRoot {
    * One process-wide path fact shared by the sidecar sandbox grant and native
    * media host. The build-time channel flag keeps Stable and Insiders isolated.
    */
-  export const current = resolve({
-    platform: process.platform,
-    home: os.homedir(),
-    environment: process.env,
-    insiders: typeof INSIDERS !== "undefined" && INSIDERS === 1,
-  });
+  export const current =
+    NativeDesktopProfile.mediaRoot() ??
+    resolve({
+      platform: process.platform,
+      home: os.homedir(),
+      environment: process.env,
+      insiders: typeof INSIDERS !== "undefined" && INSIDERS === 1,
+    });
 
   function productDirectory(
     platform: NodeJS.Platform,

@@ -104,6 +104,17 @@ function writeLegacy(database: string, scratchBase: string): void {
 }
 
 describe.skipIf(!supported)("Native Desktop cold start", () => {
+  it("refuses existing legacy history when native chat is selected for a fresh profile", async () => {
+    const test = await fixture();
+    writeLegacy(test.database, test.scratchBase);
+    await expect(test.NativeAgentCutover.prepareFresh()).rejects.toThrow(
+      "native_chat_requires_fresh_profile"
+    );
+    expect(fs.existsSync(test.database)).toBe(true);
+    expect(fs.existsSync(test.archiveRoot)).toBe(false);
+    expect(fs.existsSync(test.nativeState)).toBe(false);
+  });
+
   it("preserves a verified archive when the native executable is unavailable and resumes interrupted publication", async () => {
     const test = await fixture();
     writeLegacy(test.database, test.scratchBase);
