@@ -37,6 +37,12 @@ definite nonexecution result. Inference grants and each tool's grants are suppli
 separately. Missing tool authority never falls back to provider authority.
 Completed results remain readable independently of current execution grants.
 
+Each local owner captures its admission control revision. Pause and Cancel
+interrupt older owners even when a control reader sees only the latest snapshot
+after Resume. An attempt commit checks that same admission on retry. A known
+control interruption is retained in the inference result. Dispatched tool work
+can still have an uncertain result.
+
 Journal acknowledgment loss triggers readback using the same change identity.
 If the committed disposition cannot be established, admission freezes. A
 successor must reconcile that state before new dependent work.
@@ -62,6 +68,10 @@ results. The master installs it together with its next checkpoint using
 `publish_continuation`. Replaying a completed step reconstructs the candidate
 without requiring a live provider or the old tool inventory. Deferred tool work
 returns its wait identity and leaves transcript installation to continuation.
+`recorded_step_history` projects completed exchanges from the journal without
+starting provider or tool work. It keeps the original call identity and omits
+unpaired declarations. A master can publish this history when stopping a step
+whose outcomes were recorded before its transcript was installed.
 
 Suspension and settlement validate the master's exact control and history basis.
 A concurrent change rejects that decision. Terminal commits never silently

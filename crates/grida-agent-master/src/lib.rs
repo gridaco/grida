@@ -1,8 +1,12 @@
 //! Bounded conversational policy composed over the reusable execution runtime.
 
+pub mod configuration;
+
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::history::HistoryRecord;
-use agent_kit_core::inference::{InferenceRequest, InferenceStatus, PreparedRequest, Provider};
+use agent_kit_core::inference::{
+    FailureKind, InferenceRequest, InferenceStatus, PreparedRequest, Provider,
+};
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::InventorySnapshot;
 use agent_kit_core::turn::{SettlementReceipt, SuspensionReceipt, TurnOutcome};
@@ -11,7 +15,7 @@ use agent_kit_core::{
 };
 use agent_kit_runtime::{
     CompletionDraft, FinishOutcome, InvokeOutcome, OperationKey, StepPlan, SuspendOutcome,
-    SuspensionDraft, Turn,
+    SuspensionDraft, Turn, TurnView,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -33,6 +37,16 @@ pub struct Account {
     pub text: String,
     pub steps: u32,
     pub unresolved: Vec<OperationId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stop_reason: Option<StopReason>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StopReason {
+    StepLimit,
+    OutputLimit,
+    Refused,
 }
 
 #[derive(Clone, Debug)]
@@ -90,8 +104,8 @@ impl Master {
     }
 
     pub async fn run(&self, mut turn: Turn, input: Vec<Message>) -> Result<MasterOutcome> {
-        self.accept_input(&mut turn, input).await?;
         let mut continuation = self.continuation(&turn)?;
+        self.accept_input(&mut turn, input).await?;
         let view = turn.view();
         let orphaned: Vec<_> = view
             .state
@@ -106,21 +120,30 @@ impl Master {
         loop {
             let view = turn.view();
             if view.state.controls().cancelled {
-                let outcome = self.cancelled_outcome(&turn, continuation.step).await?;
-                match self.finish(&mut turn, &mut continuation, outcome).await? {
+                let outcome = self
+                    .cancelled_continuation(&mut turn, &mut continuation)
+                    .await?;
+                let basis = turn.view();
+                match self
+                    .finish(&mut turn, &mut continuation, outcome, &basis)
+                    .await?
+                {
                     Some(outcome) => return Ok(outcome),
                     None => continue,
                 }
             }
             if view.state.controls().paused {
                 continuation.interrupted = true;
-                match self.suspend(&mut turn, &continuation).await? {
+                match self.suspend(&mut turn, &continuation, &view).await? {
                     Some(outcome) => return Ok(outcome),
                     None => continue,
                 }
             }
             if let Some(outcome) = continuation.outcome.clone() {
-                match self.finish(&mut turn, &mut continuation, outcome).await? {
+                match self
+                    .finish(&mut turn, &mut continuation, outcome, &view)
+                    .await?
+                {
                     Some(outcome) => return Ok(outcome),
                     None => continue,
                 }
@@ -131,8 +154,12 @@ impl Master {
                     OutcomeStatus::Failed,
                     continuation.step,
                     "The configured step limit was reached.",
+                    Some(StopReason::StepLimit),
                 )?;
-                match self.finish(&mut turn, &mut continuation, outcome).await? {
+                match self
+                    .finish(&mut turn, &mut continuation, outcome, &view)
+                    .await?
+                {
                     Some(outcome) => return Ok(outcome),
                     None => continue,
                 }
@@ -163,16 +190,22 @@ impl Master {
                 Ok(step) => step,
                 Err(error) => {
                     let current = turn.view();
-                    if current.state.controls().paused {
+                    if current.state.controls().paused && !current.state.controls().cancelled {
                         continuation.interrupted = true;
-                        match self.suspend(&mut turn, &continuation).await? {
+                        match self.suspend(&mut turn, &continuation, &current).await? {
                             Some(outcome) => return Ok(outcome),
                             None => continue,
                         }
                     }
                     if current.state.controls().cancelled {
-                        let outcome = self.cancelled_outcome(&turn, continuation.step).await?;
-                        match self.finish(&mut turn, &mut continuation, outcome).await? {
+                        let outcome = self
+                            .cancelled_continuation(&mut turn, &mut continuation)
+                            .await?;
+                        let basis = turn.view();
+                        match self
+                            .finish(&mut turn, &mut continuation, outcome, &basis)
+                            .await?
+                        {
                             Some(outcome) => return Ok(outcome),
                             None => continue,
                         }
@@ -185,15 +218,29 @@ impl Master {
                 .iter()
                 .any(|tool| matches!(tool.outcome, InvokeOutcome::Deferred(_)))
             {
-                match self.suspend(&mut turn, &continuation).await? {
+                let current = turn.view();
+                if current.state.controls().cancelled {
+                    let outcome = self
+                        .cancelled_continuation(&mut turn, &mut continuation)
+                        .await?;
+                    let basis = turn.view();
+                    match self
+                        .finish(&mut turn, &mut continuation, outcome, &basis)
+                        .await?
+                    {
+                        Some(outcome) => return Ok(outcome),
+                        None => continue,
+                    }
+                }
+                match self.suspend(&mut turn, &continuation, &current).await? {
                     Some(outcome) => return Ok(outcome),
                     None => continue,
                 }
             }
             let current = turn.view();
-            if current.state.controls().paused {
+            if current.state.controls().paused && !current.state.controls().cancelled {
                 continuation.interrupted = true;
-                match self.suspend(&mut turn, &continuation).await? {
+                match self.suspend(&mut turn, &continuation, &current).await? {
                     Some(outcome) => return Ok(outcome),
                     None => continue,
                 }
@@ -203,6 +250,9 @@ impl Master {
                 matches!(&tool.outcome,
                 InvokeOutcome::Complete(outcome) if outcome.status == OutcomeStatus::Uncertain)
             });
+            let interrupted_by_pause = step.inference.failure.as_ref().is_some_and(|failure| {
+                failure.kind == FailureKind::Cancelled && failure.code == "turn_paused"
+            });
             let outcome = if current.state.controls().cancelled {
                 Some(self.cancelled_outcome(&turn, continuation.step).await?)
             } else if uncertain {
@@ -211,7 +261,10 @@ impl Master {
                     OutcomeStatus::Uncertain,
                     continuation.step,
                     "An operation has an unconfirmed outcome.",
+                    None,
                 )?)
+            } else if interrupted_by_pause {
+                None
             } else {
                 match step.inference.status {
                     InferenceStatus::Completed if step.tools.is_empty() => {
@@ -221,6 +274,7 @@ impl Master {
                             OutcomeStatus::Succeeded,
                             continuation.step,
                             &text,
+                            None,
                         )?)
                     }
                     InferenceStatus::Completed => None,
@@ -230,24 +284,28 @@ impl Master {
                         OutcomeStatus::Uncertain,
                         continuation.step,
                         "The model response was interrupted.",
+                        None,
                     )?),
                     InferenceStatus::Limited => Some(self.account(
                         &turn,
                         OutcomeStatus::Failed,
                         continuation.step,
                         "The model reached its output limit.",
+                        Some(StopReason::OutputLimit),
                     )?),
                     InferenceStatus::Refused => Some(self.account(
                         &turn,
                         OutcomeStatus::Failed,
                         continuation.step,
                         "The model declined the request.",
+                        Some(StopReason::Refused),
                     )?),
                     InferenceStatus::Failed => Some(self.account(
                         &turn,
                         OutcomeStatus::Failed,
                         continuation.step,
                         "The model request failed.",
+                        None,
                     )?),
                 }
             };
@@ -349,8 +407,12 @@ impl Master {
         let view = turn.view();
         let operations = turn.operations();
         for (id, operation) in view.state.operations() {
-            if operation.outcome().is_none() && !operation.is_running() {
-                operations.cancel_prepared(id.clone()).await?;
+            if operation.outcome().is_none() {
+                if operation.is_running() && !view.active.contains(id) {
+                    operations.record_interruption(id.clone()).await?;
+                } else if !operation.is_running() {
+                    operations.cancel_prepared(id.clone()).await?;
+                }
             }
         }
         for (id, wait) in view.state.waits() {
@@ -358,7 +420,48 @@ impl Master {
                 operations.withdraw_input(id.clone()).await?;
             }
         }
-        self.account(turn, OutcomeStatus::Cancelled, steps, "Work was stopped.")
+        self.account(
+            turn,
+            OutcomeStatus::Cancelled,
+            steps,
+            "Work was stopped.",
+            None,
+        )
+    }
+
+    async fn cancelled_continuation(
+        &self,
+        turn: &mut Turn,
+        continuation: &mut Continuation,
+    ) -> Result<TurnOutcome> {
+        let mut outcome = self.cancelled_outcome(turn, continuation.step).await?;
+        if continuation.request.is_some() {
+            let step = continuation.step;
+            let records = turn
+                .recorded_step_history(&OperationKey::new(format!("conversation/{step}"))?)
+                .await?;
+            if records.is_some() {
+                continuation.step = step
+                    .checked_add(1)
+                    .ok_or_else(|| Error::new(ErrorKind::LimitExceeded, "step_counter_overflow"))?;
+                outcome = self.account(
+                    turn,
+                    OutcomeStatus::Cancelled,
+                    continuation.step,
+                    "Work was stopped.",
+                    None,
+                )?;
+            }
+            continuation.request = None;
+            continuation.outcome = Some(outcome.clone());
+            turn.publish_continuation(
+                OperationKey::new(format!("conversation/{step}/result"))?,
+                records.unwrap_or_default(),
+                encode(CONTINUATION_SCHEMA, continuation)?,
+            )
+            .await?;
+        }
+        Ok(outcome)
     }
 
     fn account(
@@ -367,6 +470,7 @@ impl Master {
         status: OutcomeStatus,
         steps: u32,
         text: &str,
+        stop_reason: Option<StopReason>,
     ) -> Result<TurnOutcome> {
         let view = turn.view();
         let evidence = view.state.operations().keys().cloned().collect();
@@ -386,30 +490,33 @@ impl Master {
                     text: text.into(),
                     steps,
                     unresolved,
+                    stop_reason,
                 },
             )?),
             evidence,
         })
     }
 
+    // A newer view can contain steering or a control that invalidates this
+    // policy decision. The runtime validates the caller's captured basis.
     async fn finish(
         &self,
         turn: &mut Turn,
         continuation: &mut Continuation,
         outcome: TurnOutcome,
+        basis: &TurnView,
     ) -> Result<Option<MasterOutcome>> {
-        let view = turn.view();
         match turn
             .try_finish(CompletionDraft {
-                expected_control: view.state.controls().revision,
-                expected_history: view.state.history().position(),
+                expected_control: basis.state.controls().revision,
+                expected_history: basis.state.history().position(),
                 outcome,
             })
             .await?
         {
             FinishOutcome::Settled(receipt) => Ok(Some(MasterOutcome::Settled(*receipt))),
             FinishOutcome::Continue(error) if error.kind == ErrorKind::Conflict => {
-                if turn.view().state.history().position() != view.state.history().position() {
+                if turn.view().state.history().position() != basis.state.history().position() {
                     continuation.outcome = None;
                     continuation.request = None;
                 }
@@ -423,12 +530,12 @@ impl Master {
         &self,
         turn: &mut Turn,
         continuation: &Continuation,
+        basis: &TurnView,
     ) -> Result<Option<MasterOutcome>> {
-        let view = turn.view();
         match turn
             .try_suspend(SuspensionDraft {
-                expected_control: view.state.controls().revision,
-                expected_history: view.state.history().position(),
+                expected_control: basis.state.controls().revision,
+                expected_history: basis.state.history().position(),
                 checkpoint: Some(encode(CONTINUATION_SCHEMA, continuation)?),
             })
             .await?

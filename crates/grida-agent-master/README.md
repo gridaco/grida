@@ -13,3 +13,12 @@ The host can supply preceding conversation history as an immutable projection.
 It is included in model context without copying it into each turn's records.
 The continuation identity includes this projection so recovery cannot silently
 replace the context on which the turn was based.
+
+Pause-origin interruptions remain distinguishable after a rapid resumption.
+Stopping accounts for unfinished operations and publishes recorded effects into
+the conversation before settlement. Completion and suspension validate the
+control and history positions on which the master made its decision.
+
+Completion accounts expose typed output-limit, refusal, and step-limit reasons
+for client adapters. Reviewed default-setting definitions live here, while the
+native host owns their persistence and user operations.

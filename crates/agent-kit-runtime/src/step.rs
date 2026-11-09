@@ -2,6 +2,7 @@ use crate::execution::fingerprint_name;
 use crate::*;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role, ToolResult};
+use agent_kit_core::turn::{OperationInput, OperationOutcome};
 use agent_kit_core::{MessageId, ToolCallId};
 use futures_util::stream::{FuturesUnordered, StreamExt};
 use std::pin::Pin;
@@ -79,13 +80,80 @@ impl Turn {
         {
             vec![]
         } else {
-            candidate_history(&origin, &inference, &tools)?
+            candidate_history(&origin, inference.messages.iter().cloned(), &tools)?
         };
         Ok(StepOutcome {
             inference,
             tools,
             history,
         })
+    }
+
+    /// Project a step's recorded response and paired tool outcomes without
+    /// admitting work. Only tool exchanges backed by a journaled result are
+    /// included. The caller decides whether to publish the projection.
+    pub async fn recorded_step_history(
+        &self,
+        key: &OperationKey,
+    ) -> Result<Option<Vec<HistoryRecord>>> {
+        let origin = self.operations().operation_id(key)?;
+        let state = self.inner.refresh().await?;
+        let Some(OperationOutcome::Inference(inference)) = state
+            .operations()
+            .get(&origin)
+            .and_then(OperationState::outcome)
+        else {
+            return Ok(None);
+        };
+        let results: BTreeMap<_, _> = state
+            .operations()
+            .values()
+            .filter_map(|operation| {
+                let record = &operation.record;
+                if record.origin.as_ref() != Some(&origin) {
+                    return None;
+                }
+                let call = record.source_call.as_ref()?;
+                let OperationInput::Tool(invocation) = &record.input else {
+                    return None;
+                };
+                let Some(OperationOutcome::Tool(outcome)) = operation.outcome() else {
+                    return None;
+                };
+                Some((call, (invocation, outcome)))
+            })
+            .collect();
+        let mut tools = BTreeMap::new();
+        let mut messages = Vec::new();
+        for mut message in inference.messages.iter().cloned() {
+            message.content.retain(|content| match content {
+                Content::ToolCall(call) => {
+                    let Some((invocation, outcome)) = results.get(&call.id) else {
+                        return false;
+                    };
+                    if invocation.definition().id != call.tool
+                        || invocation.arguments() != &call.arguments
+                    {
+                        return false;
+                    }
+                    tools.insert(
+                        call.id.clone(),
+                        StepToolOutcome {
+                            call: call.clone(),
+                            outcome: InvokeOutcome::Complete((*outcome).clone()),
+                        },
+                    );
+                    true
+                }
+                Content::ToolResult(_) => false,
+                _ => true,
+            });
+            if !message.content.is_empty() {
+                messages.push(message);
+            }
+        }
+        let tools: Vec<_> = tools.into_values().collect();
+        Ok(Some(candidate_history(&origin, messages, &tools)?))
     }
 
     fn inner_capacity(&self) -> usize {
@@ -159,15 +227,10 @@ fn queue_call(
 
 fn candidate_history(
     origin: &OperationId,
-    inference: &InferenceOutcome,
+    messages: impl IntoIterator<Item = Message>,
     tools: &[StepToolOutcome],
 ) -> Result<Vec<HistoryRecord>> {
-    let mut records: Vec<_> = inference
-        .messages
-        .iter()
-        .cloned()
-        .map(HistoryRecord::Message)
-        .collect();
+    let mut records: Vec<_> = messages.into_iter().map(HistoryRecord::Message).collect();
     for tool in tools {
         let InvokeOutcome::Complete(outcome) = &tool.outcome else {
             continue;

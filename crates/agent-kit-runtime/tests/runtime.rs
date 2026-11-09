@@ -16,8 +16,8 @@ use agent_kit_core::tools::{
 };
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlReader, ControlRevision, ControlSnapshot,
-    EphemeralControl, EphemeralJournal, JournalChange, ResponseContract, TurnBinding, TurnJournal,
-    TurnLease, TurnOutcome, TurnState, WaitRecord, bind_lease,
+    EphemeralControl, EphemeralJournal, JournalAction, JournalChange, ResponseContract,
+    TurnBinding, TurnJournal, TurnLease, TurnOutcome, TurnState, WaitRecord, bind_lease,
 };
 use agent_kit_core::{
     BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, GrantId, MessageId, ModelId,
@@ -578,6 +578,168 @@ async fn early_tool_effect_survives_inference_stream_failure_and_replay() {
 }
 
 #[tokio::test]
+async fn coalesced_pause_interrupts_older_inference_but_not_work_started_after_resume() {
+    let (provider, _sender) = ScriptedProvider::streaming();
+    let tool = CounterTool::new(None);
+    let runtime = runtime(
+        provider.clone(),
+        &tool,
+        Arc::new(Allow),
+        Authority::allowed(),
+    );
+    let ephemeral = EphemeralJournal::create(binding()).unwrap();
+    let turn = runtime.open(ephemeral.lease).await.unwrap().turn;
+    let operations = turn.operations();
+    let inference = {
+        let operations = operations.clone();
+        let request = request(&provider, &inventory(&tool));
+        tokio::spawn(async move {
+            operations
+                .infer(OperationKey::new("older").unwrap(), request, grants())
+                .await
+        })
+    };
+    wait_for_count(&provider.starts, 1).await;
+    // The in-memory journal applies both controls before this task yields to
+    // the monitor, which can then only read the latest, resumed snapshot.
+    ephemeral
+        .control
+        .change(
+            ChangeId::new("pause").unwrap(),
+            ControlRevision(0),
+            ControlDirective::Pause,
+        )
+        .await
+        .unwrap();
+    ephemeral
+        .control
+        .change(
+            ChangeId::new("resume").unwrap(),
+            ControlRevision(1),
+            ControlDirective::Resume,
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        operations
+            .invoke(OperationKey::new("newer").unwrap(), invocation(1))
+            .await
+            .unwrap(),
+        InvokeOutcome::Complete(ToolOutcome {
+            status: OutcomeStatus::Succeeded,
+            ..
+        })
+    ));
+    let outcome = tokio::time::timeout(Duration::from_secs(1), inference)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert_eq!(outcome.status, InferenceStatus::Interrupted);
+    let failure = outcome.failure.unwrap();
+    assert_eq!(
+        failure.kind,
+        agent_kit_core::inference::FailureKind::Cancelled
+    );
+    assert_eq!(failure.code, "turn_paused");
+    assert!(!turn.view().state.controls().paused);
+    assert_eq!(tool.calls.load(Ordering::SeqCst), 1);
+}
+
+#[derive(Default)]
+struct AskForSecondCall(AtomicUsize);
+impl ToolGate for AskForSecondCall {
+    fn decide(
+        &self,
+        admission: ToolAdmission,
+        context: AdmissionContext,
+    ) -> BoxFuture<'_, Result<ToolDecision>> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        if matches!(admission.invocation.arguments(), ToolArguments::Json(value) if value["value"] == 2)
+        {
+            Ask.decide(admission, context)
+        } else {
+            Box::pin(async { Ok(ToolDecision::Permit) })
+        }
+    }
+}
+
+#[tokio::test]
+async fn stopped_step_projects_only_recorded_pairs_without_dispatch_or_gate_work() {
+    let (provider, sender) = ScriptedProvider::streaming();
+    let tool = CounterTool::new(None);
+    let authority = Authority::allowed();
+    let gate = Arc::new(AskForSecondCall::default());
+    let runtime = runtime(provider.clone(), &tool, gate.clone(), authority.clone());
+    let ephemeral = EphemeralJournal::create(binding()).unwrap();
+    let mut turn = runtime.open(ephemeral.lease).await.unwrap().turn;
+    let call = |id, value| ToolCall {
+        id: ToolCallId::new(id).unwrap(),
+        tool: tool.definition.id.clone(),
+        arguments: invocation(value).arguments,
+    };
+    let completed = call("completed", 1);
+    sender
+        .send(ProviderEvent::Finished(inference_outcome(vec![
+            Content::Text("Work in progress".into()),
+            Content::ToolCall(completed.clone()),
+            Content::ToolCall(call("deferred", 2)),
+        ])))
+        .unwrap();
+    let key = OperationKey::new("step").unwrap();
+    let outcome = turn
+        .step(StepPlan {
+            key: key.clone(),
+            request: request(&provider, &inventory(&tool)),
+            inference_grants: grants(),
+            tool_grants: tool_grants(),
+            tools: inventory(&tool),
+        })
+        .await
+        .unwrap();
+    assert!(outcome.history.is_empty());
+    assert!(
+        outcome
+            .tools
+            .iter()
+            .any(|tool| matches!(tool.outcome, InvokeOutcome::Deferred(_)))
+    );
+    let revision = turn.view().state.controls().revision;
+    ephemeral
+        .control
+        .change(
+            ChangeId::new("stop").unwrap(),
+            revision,
+            ControlDirective::Cancel,
+        )
+        .await
+        .unwrap();
+    let requests = authority.requests.lock().unwrap().len();
+    let history = turn.recorded_step_history(&key).await.unwrap().unwrap();
+    let messages: Vec<_> = history
+        .into_iter()
+        .map(|HistoryRecord::Message(message)| message)
+        .collect();
+    agent_kit_core::history::validate_exchanges(&messages, false).unwrap();
+    assert_eq!(messages.len(), 2);
+    assert_eq!(
+        messages[0].content,
+        vec![
+            Content::Text("Work in progress".into()),
+            Content::ToolCall(completed.clone())
+        ]
+    );
+    assert!(
+        matches!(&messages[1].content[..], [Content::ToolResult(result)] if result.call == completed.id && result.status == OutcomeStatus::Succeeded)
+    );
+    assert_eq!(provider.starts.load(Ordering::SeqCst), 1);
+    assert_eq!(tool.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(gate.0.load(Ordering::SeqCst), 2);
+    assert_eq!(authority.requests.lock().unwrap().len(), requests);
+    assert_eq!(turn.view().state.history().position(), HistoryPosition(0));
+}
+
+#[tokio::test]
 async fn observer_drop_does_not_stop_work_but_controller_drop_closes_handles() {
     let provider = ScriptedProvider::complete();
     let tool = CounterTool::new(None);
@@ -756,8 +918,14 @@ struct FaultJournal {
     fault_at: usize,
     unresolved: bool,
     failed: AtomicBool,
-    race_control: Option<Arc<EphemeralControl>>,
+    race_control: Option<(RacePoint, Arc<EphemeralControl>)>,
     raced: AtomicBool,
+}
+
+#[derive(Clone, Copy)]
+enum RacePoint {
+    Boundary,
+    Start,
 }
 
 impl TurnJournal for FaultJournal {
@@ -770,13 +938,13 @@ impl TurnJournal for FaultJournal {
     fn commit(&self, change: JournalChange) -> BoxFuture<'_, Result<CommitReceipt>> {
         Box::pin(async move {
             let count = self.commits.fetch_add(1, Ordering::SeqCst) + 1;
-            if change.actions().iter().any(|action| {
-                matches!(
-                    action,
-                    agent_kit_core::turn::JournalAction::Settle(_)
-                        | agent_kit_core::turn::JournalAction::Suspend
-                )
-            }) && let Some(control) = &self.race_control
+            if let Some((point, control)) = &self.race_control
+                && change.actions().iter().any(|action| match point {
+                    RacePoint::Boundary => {
+                        matches!(action, JournalAction::Settle(_) | JournalAction::Suspend)
+                    }
+                    RacePoint::Start => matches!(action, JournalAction::StartAttempt { .. }),
+                })
                 && !self.raced.swap(true, Ordering::SeqCst)
             {
                 let state = self.lease.journal().load().await?;
@@ -787,6 +955,16 @@ impl TurnJournal for FaultJournal {
                         ControlDirective::Pause,
                     )
                     .await?;
+                if matches!(point, RacePoint::Start) {
+                    let state = self.lease.journal().load().await?;
+                    control
+                        .change(
+                            ChangeId::new("race-resume").unwrap(),
+                            state.controls().revision,
+                            ControlDirective::Resume,
+                        )
+                        .await?;
+                }
             }
             if count == self.fault_at && self.unresolved {
                 self.failed.store(true, Ordering::SeqCst);
@@ -824,7 +1002,7 @@ impl ControlReader for FaultJournal {
 fn fault_lease(
     fault_at: usize,
     unresolved: bool,
-    race: bool,
+    race: Option<RacePoint>,
 ) -> (TurnLease, Arc<EphemeralControl>) {
     let ephemeral = EphemeralJournal::create(binding()).unwrap();
     let control = Arc::new(ephemeral.control);
@@ -834,7 +1012,7 @@ fn fault_lease(
         fault_at,
         unresolved,
         failed: AtomicBool::new(false),
-        race_control: race.then(|| control.clone()),
+        race_control: race.map(|point| (point, control.clone())),
         raced: AtomicBool::new(false),
     });
     struct Journal(Arc<FaultJournal>);
@@ -859,11 +1037,52 @@ fn fault_lease(
 }
 
 #[tokio::test]
+async fn start_attempt_does_not_rebase_across_a_coalesced_pause_and_resume() {
+    let provider = ScriptedProvider::complete();
+    let tool = CounterTool::new(None);
+    let runtime = runtime(
+        provider.clone(),
+        &tool,
+        Arc::new(Allow),
+        Authority::allowed(),
+    );
+    let (lease, _) = fault_lease(0, false, Some(RacePoint::Start));
+    let turn = runtime.open(lease).await.unwrap().turn;
+    let operations = turn.operations();
+    let key = OperationKey::new("older").unwrap();
+    let outcome = operations
+        .infer(key.clone(), request(&provider, &inventory(&tool)), grants())
+        .await
+        .unwrap();
+    assert_eq!(outcome.status, InferenceStatus::Failed);
+    assert_eq!(outcome.failure.unwrap().code, "turn_paused");
+    let view = turn.view();
+    assert!(
+        view.state.operations()[&operations.operation_id(&key).unwrap()]
+            .attempts
+            .is_empty()
+    );
+    assert!(view.state.controls().admits_work());
+    assert_eq!(provider.starts.load(Ordering::SeqCst), 0);
+
+    let fresh = operations
+        .infer(
+            OperationKey::new("newer").unwrap(),
+            request(&provider, &inventory(&tool)),
+            grants(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(fresh.status, InferenceStatus::Completed);
+    assert_eq!(provider.starts.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
 async fn lost_outcome_ack_is_read_back_without_repeating_the_tool() {
     let provider = ScriptedProvider::complete();
     let tool = CounterTool::new(None);
     let runtime = runtime(provider, &tool, Arc::new(Allow), Authority::allowed());
-    let (lease, _) = fault_lease(3, false, false);
+    let (lease, _) = fault_lease(3, false, None);
     let turn = runtime.open(lease).await.unwrap().turn;
     let operations = turn.operations();
     let result = operations
@@ -885,7 +1104,7 @@ async fn unknown_prepare_commit_freezes_admission_before_any_effect() {
     let provider = ScriptedProvider::complete();
     let tool = CounterTool::new(None);
     let runtime = runtime(provider, &tool, Arc::new(Allow), Authority::allowed());
-    let (lease, _) = fault_lease(1, true, false);
+    let (lease, _) = fault_lease(1, true, None);
     let turn = runtime.open(lease).await.unwrap().turn;
     let operations = turn.operations();
     assert_eq!(
@@ -1107,7 +1326,7 @@ async fn terminal_commits_do_not_rebase_after_a_racing_control_change() {
             Arc::new(Allow),
             Authority::allowed(),
         );
-        let (lease, control) = fault_lease(0, false, true);
+        let (lease, control) = fault_lease(0, false, Some(RacePoint::Boundary));
         let mut turn = runtime.open(lease).await.unwrap().turn;
         if suspend {
             assert!(matches!(

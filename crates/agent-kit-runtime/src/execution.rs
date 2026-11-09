@@ -5,8 +5,8 @@ use agent_kit_core::inference::{FailureKind, InferenceControl, InferenceFailure,
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind};
 use agent_kit_core::tools::{InvocationContext, InvocationRecovery};
 use agent_kit_core::turn::{
-    CommitReceipt, JournalAction, JournalChange, OperationInput, OperationOutcome, OperationRecord,
-    TurnLease, WaitRecord,
+    CommitReceipt, ControlSnapshot, InterruptionReason, JournalAction, JournalChange,
+    OperationInput, OperationOutcome, OperationRecord, TurnLease, WaitRecord,
 };
 use agent_kit_core::{AttemptId, CancellationToken, ChangeId, Fingerprint, MessageId};
 use std::sync::Mutex;
@@ -172,7 +172,10 @@ impl Turn {
             .commit_with_basis(
                 id,
                 vec![JournalAction::Settle(draft.outcome)],
-                Some((draft.expected_control, draft.expected_history)),
+                Some(CommitBasis::Completion(
+                    draft.expected_control,
+                    draft.expected_history,
+                )),
             )
             .await
         {
@@ -225,7 +228,10 @@ impl Turn {
             .commit_with_basis(
                 id,
                 actions,
-                Some((draft.expected_control, draft.expected_history)),
+                Some(CommitBasis::Completion(
+                    draft.expected_control,
+                    draft.expected_history,
+                )),
             )
             .await
         {
@@ -381,8 +387,8 @@ impl TurnOperations {
         };
         let deadline = Instant::now() + self.inner.services.limits.operation_timeout;
         let permit = tokio::select! {
-            _ = owner.cancellation.cancelled() => {
-                return self.reject_inference(&id, "cancelled", FailureKind::Cancelled).await;
+            _ = owner.admission.cancellation.cancelled() => {
+                return self.reject_inference(&id, owner.admission.cancellation_code(), FailureKind::Cancelled).await;
             }
             permit = Arc::clone(&self.inner.inference_permits).acquire_owned() => {
                 permit.map_err(|_| Error::new(ErrorKind::Unavailable, "inference_capacity_closed"))?
@@ -393,15 +399,20 @@ impl TurnOperations {
         };
         if let Err(error) = self
             .inner
-            .authorize(&record, &owner.cancellation, deadline)
+            .authorize(&record, &owner.admission, deadline)
             .await
         {
             drop(permit);
+            if let Some(code) = owner.admission.interruption_code() {
+                return self
+                    .reject_inference(&id, code, FailureKind::Cancelled)
+                    .await;
+            }
             return self
                 .reject_inference(&id, &error.code, FailureKind::Configuration)
                 .await;
         }
-        let attempt = match self.inner.start_attempt(&id).await {
+        let attempt = match self.inner.start_attempt(&owner).await {
             Ok(attempt) => attempt,
             Err(error) if error.kind == ErrorKind::InvalidState => {
                 return self
@@ -410,9 +421,16 @@ impl TurnOperations {
             }
             Err(error) => return Err(error),
         };
+        if let Err(error) = owner.admission.ensure_pending() {
+            let outcome = inference_failure(&error.code, FailureKind::Cancelled);
+            self.inner
+                .complete(&id, &attempt, OperationOutcome::Inference(outcome.clone()))
+                .await?;
+            return Ok(outcome);
+        }
         let control = InferenceControl {
             attempt: attempt.clone(),
-            cancellation: owner.cancellation.clone(),
+            cancellation: owner.admission.cancellation.clone(),
             deadline: Some(deadline),
             max_output_bytes: self.inner.services.limits.max_output_bytes,
         };
@@ -432,7 +450,7 @@ impl TurnOperations {
             let update = tokio::select! {
                 value = run.next() => value,
                 _ = tokio::time::sleep_until(deadline.into()) => {
-                    owner.cancellation.cancel();
+                    owner.admission.cancellation.cancel();
                     run.next().await
                 }
             };
@@ -440,7 +458,7 @@ impl TurnOperations {
             if let InferenceUpdate::ToolCall(call) = &update {
                 if let Some(previous) = calls.get(&call.id) {
                     if previous != call {
-                        owner.cancellation.cancel();
+                        owner.admission.cancellation.cancel();
                         return Err(Error::new(ErrorKind::Conflict, "tool_call_identity_reused"));
                     }
                 } else {
@@ -458,6 +476,13 @@ impl TurnOperations {
             });
         }
         let mut outcome = run.finish().await;
+        if let Some(failure) = &mut outcome.failure
+            && outcome.status == InferenceStatus::Interrupted
+            && failure.kind == FailureKind::Cancelled
+            && let Some(code) = owner.admission.interruption_code()
+        {
+            failure.code = code.into();
+        }
         retain_calls(&id, &mut outcome, calls.into_values().collect())?;
         drop(permit);
         self.inner
@@ -534,6 +559,9 @@ impl TurnOperations {
             }
             Claim::Owner(owner) => owner,
         };
+        if let Err(error) = owner.admission.ensure_pending() {
+            return self.reject_tool(&id, &error.code).await;
+        }
         let admission = ToolAdmission {
             operation: id.clone(),
             invocation: prepared.invocation().clone(),
@@ -547,8 +575,9 @@ impl TurnOperations {
             },
         );
         let decision = tokio::select! {
+            biased;
+            _ = owner.admission.cancellation.cancelled() => Err(Error::new(ErrorKind::InvalidState, owner.admission.cancellation_code())),
             result = gate => result,
-            _ = owner.cancellation.cancelled() => Err(Error::new(ErrorKind::InvalidState, "cancelled")),
             _ = tokio::time::sleep_until(deadline.into()) => Err(Error::new(ErrorKind::LimitExceeded, "deadline")),
         };
         match decision {
@@ -573,19 +602,19 @@ impl TurnOperations {
             }
         }
         let permit = tokio::select! {
-            _ = owner.cancellation.cancelled() => return self.reject_tool(&id, "cancelled").await,
+            _ = owner.admission.cancellation.cancelled() => return self.reject_tool(&id, owner.admission.cancellation_code()).await,
             result = Arc::clone(&self.inner.tool_permits).acquire_owned() => result.map_err(|_| Error::new(ErrorKind::Unavailable, "tool_capacity_closed"))?,
             _ = tokio::time::sleep_until(deadline.into()) => return self.reject_tool(&id, "deadline").await,
         };
         if let Err(error) = self
             .inner
-            .authorize(&record, &owner.cancellation, deadline)
+            .authorize(&record, &owner.admission, deadline)
             .await
         {
             drop(permit);
             return self.reject_tool(&id, &error.code).await;
         }
-        let attempt = match self.inner.start_attempt(&id).await {
+        let attempt = match self.inner.start_attempt(&owner).await {
             Ok(attempt) => attempt,
             Err(error) if error.kind == ErrorKind::InvalidState => {
                 return self.reject_tool(&id, &error.code).await;
@@ -594,15 +623,20 @@ impl TurnOperations {
         };
         let context = InvocationContext {
             attempt: attempt.clone(),
-            cancellation: owner.cancellation.clone(),
+            cancellation: owner.admission.cancellation.clone(),
             deadline: Some(deadline),
             max_output_bytes: self.inner.services.limits.max_output_bytes,
         };
-        let future = prepared.invoke(context);
-        let outcome = tokio::select! {
-            outcome = future => outcome,
-            _ = owner.cancellation.cancelled() => ToolOutcome::uncertain(),
-            _ = tokio::time::sleep_until(deadline.into()) => ToolOutcome::uncertain(),
+        let outcome = if let Err(error) = owner.admission.ensure_pending() {
+            let mut outcome = ToolOutcome::failed(&error.code);
+            outcome.status = OutcomeStatus::Cancelled;
+            outcome
+        } else {
+            tokio::select! {
+                outcome = prepared.invoke(context) => outcome,
+                _ = owner.admission.cancellation.cancelled() => ToolOutcome::uncertain(),
+                _ = tokio::time::sleep_until(deadline.into()) => ToolOutcome::uncertain(),
+            }
         };
         drop(permit);
         self.inner
@@ -844,19 +878,17 @@ impl TurnOperations {
                 )
                 .await?;
         }
-        if !state.controls().admits_work() {
-            return Err(Error::new(ErrorKind::InvalidState, "admission_closed"));
-        }
-        let owner = self.inner.owner(id.clone());
+        let controls = self.inner.view.borrow().state.controls().clone();
+        let owner = self.inner.owner(id.clone(), &controls)?;
         drop(_serial);
         let deadline = Instant::now() + self.inner.services.limits.operation_timeout;
         let permit = tokio::select! {
             result = Arc::clone(&self.inner.tool_permits).acquire_owned() => result.map_err(|_| Error::new(ErrorKind::Unavailable, "tool_capacity_closed"))?,
-            _ = owner.cancellation.cancelled() => return Err(Error::new(ErrorKind::InvalidState, "cancelled")),
+            _ = owner.admission.cancellation.cancelled() => return Err(Error::new(ErrorKind::InvalidState, "cancelled")),
             _ = tokio::time::sleep_until(deadline.into()) => return Err(Error::new(ErrorKind::LimitExceeded, "deadline")),
         };
         self.inner
-            .authorize(&operation.record, &owner.cancellation, deadline)
+            .authorize(&operation.record, &owner.admission, deadline)
             .await?;
         let prepared = self.inner.services.tools.restore(invocation.clone())?;
         let receipts: Vec<_> = operation
@@ -888,14 +920,14 @@ impl TurnOperations {
             recovery,
             InvocationContext {
                 attempt: attempt.clone(),
-                cancellation: owner.cancellation.clone(),
+                cancellation: owner.admission.cancellation.clone(),
                 deadline: Some(deadline),
                 max_output_bytes: self.inner.services.limits.max_output_bytes,
             },
         );
         let outcome = tokio::select! {
             outcome = future => outcome,
-            _ = owner.cancellation.cancelled() => uncertain,
+            _ = owner.admission.cancellation.cancelled() => uncertain,
             _ = tokio::time::sleep_until(deadline.into()) => uncertain,
         };
         drop(permit);
@@ -984,19 +1016,71 @@ pub(crate) struct Inner {
 }
 
 struct Active {
-    cancellation: CancellationToken,
+    admission: Arc<Admission>,
     finished: watch::Sender<bool>,
 }
 
 struct Owner {
     inner: Arc<Inner>,
     id: OperationId,
+    admission: Arc<Admission>,
+}
+
+struct Admission {
+    control: ControlRevision,
     cancellation: CancellationToken,
+    interruption: Mutex<Option<InterruptionReason>>,
+}
+
+impl Admission {
+    fn observe(&self, controls: &ControlSnapshot) {
+        let Some(interruption) = &controls.interruption else {
+            return;
+        };
+        if self.control < interruption.revision {
+            let mut reason = self.interruption.lock().expect("interruption lock");
+            if !self.cancellation.is_cancelled() {
+                *reason = Some(interruption.reason);
+                self.cancellation.cancel();
+            }
+        }
+    }
+
+    fn interruption_code(&self) -> Option<&'static str> {
+        match *self.interruption.lock().expect("interruption lock") {
+            Some(InterruptionReason::Pause) => Some("turn_paused"),
+            Some(InterruptionReason::Cancel) => Some("turn_cancelled"),
+            None => None,
+        }
+    }
+
+    fn cancellation_code(&self) -> &'static str {
+        self.interruption_code().unwrap_or("cancelled")
+    }
+
+    fn ensure_pending(&self) -> Result<()> {
+        if self.cancellation.is_cancelled() {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                self.cancellation_code(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn check(&self, controls: &ControlSnapshot) -> Result<()> {
+        self.observe(controls);
+        self.ensure_pending()?;
+        if !controls.admits_work() {
+            return Err(Error::new(ErrorKind::InvalidState, "admission_closed"));
+        }
+        Ok(())
+    }
 }
 
 impl Drop for Owner {
     fn drop(&mut self) {
-        self.cancellation.cancel();
+        self.admission.cancellation.cancel();
         if let Some(active) = self
             .inner
             .active
@@ -1018,6 +1102,11 @@ impl Drop for Owner {
 enum Claim {
     Owner(Owner),
     Completed(OperationOutcome),
+}
+
+enum CommitBasis<'a> {
+    Completion(ControlRevision, HistoryPosition),
+    Admission(&'a Admission),
 }
 
 impl Inner {
@@ -1056,7 +1145,13 @@ impl Inner {
 
     fn cancel_active(&self) {
         for active in self.active.lock().expect("active lock").values() {
-            active.cancellation.cancel();
+            active.admission.cancellation.cancel();
+        }
+    }
+
+    fn observe_controls(&self, controls: &ControlSnapshot) {
+        for active in self.active.lock().expect("active lock").values() {
+            active.admission.observe(controls);
         }
     }
 
@@ -1079,7 +1174,7 @@ impl Inner {
             .send(TurnUpdate::Snapshot(Box::new(self.view.borrow().clone())));
     }
 
-    async fn refresh(&self) -> Result<TurnState> {
+    pub(crate) async fn refresh(&self) -> Result<TurnState> {
         let lease = self.lease()?;
         let state = lease
             .journal()
@@ -1094,6 +1189,7 @@ impl Inner {
                 view.state = state.clone();
             }
         });
+        self.observe_controls(state.controls());
         self.publish_current();
         Ok(state)
     }
@@ -1108,7 +1204,7 @@ impl Inner {
                     let Ok(controls) = next else { self.freeze("control_unavailable"); break };
                     if controls.binding != self.binding { self.freeze("writer_superseded"); break }
                     revision = controls.revision;
-                    if !controls.admits_work() { self.cancel_active(); }
+                    self.observe_controls(&controls);
                     if self.refresh().await.is_err() { self.freeze("journal_unavailable"); break }
                 }
             }
@@ -1132,22 +1228,30 @@ impl Inner {
         None
     }
 
-    fn owner(self: &Arc<Self>, id: OperationId) -> Owner {
-        let cancellation = self.cancellation.child_token();
+    fn owner(self: &Arc<Self>, id: OperationId, controls: &ControlSnapshot) -> Result<Owner> {
+        if !controls.admits_work() {
+            return Err(Error::new(ErrorKind::InvalidState, "admission_closed"));
+        }
+        let admission = Arc::new(Admission {
+            control: controls.revision,
+            cancellation: self.cancellation.child_token(),
+            interruption: Mutex::new(None),
+        });
         let (finished, _) = watch::channel(false);
         self.active.lock().expect("active lock").insert(
             id.clone(),
             Active {
-                cancellation: cancellation.clone(),
+                admission: Arc::clone(&admission),
                 finished,
             },
         );
+        admission.observe(self.view.borrow().state.controls());
         self.publish_current();
-        Owner {
+        Ok(Owner {
             inner: Arc::clone(self),
             id,
-            cancellation,
-        }
+            admission,
+        })
     }
 
     async fn claim(self: &Arc<Self>, record: OperationRecord) -> Result<Claim> {
@@ -1181,7 +1285,7 @@ impl Inner {
                         "operation_requires_recovery",
                     ));
                 }
-                return Ok(Claim::Owner(self.owner(record.id)));
+                return self.owner(record.id, state.controls()).map(Claim::Owner);
             }
             if state.operations().len() >= self.services.limits.max_operations {
                 return Err(Error::new(ErrorKind::LimitExceeded, "operation_limit"));
@@ -1191,7 +1295,8 @@ impl Inner {
                 vec![JournalAction::prepare(record.clone())],
             )
             .await?;
-            return Ok(Claim::Owner(self.owner(record.id)));
+            let controls = self.view.borrow().state.controls().clone();
+            return self.owner(record.id, &controls).map(Claim::Owner);
         }
     }
 
@@ -1212,7 +1317,7 @@ impl Inner {
         &self,
         id: ChangeId,
         actions: Vec<JournalAction>,
-        basis: Option<(ControlRevision, HistoryPosition)>,
+        basis: Option<CommitBasis<'_>>,
     ) -> Result<CommitReceipt> {
         let fingerprint = Fingerprint::of(&actions)?;
         let lease = self.lease()?;
@@ -1230,10 +1335,15 @@ impl Inner {
                 return Ok(receipt);
             }
             let state = self.refresh().await?;
-            if let Some((control, history)) = basis
-                && (state.controls().revision != control || state.history().position() != history)
-            {
-                return Err(Error::new(ErrorKind::Conflict, "stale_completion_basis"));
+            match &basis {
+                Some(CommitBasis::Completion(control, history))
+                    if state.controls().revision != *control
+                        || state.history().position() != *history =>
+                {
+                    return Err(Error::new(ErrorKind::Conflict, "stale_completion_basis"));
+                }
+                Some(CommitBasis::Admission(admission)) => admission.check(state.controls())?,
+                _ => {}
             }
             let change = JournalChange::new(
                 id.clone(),
@@ -1255,7 +1365,12 @@ impl Inner {
                     }
                     return Ok(receipt);
                 }
-                Err(error) if error.kind == ErrorKind::Conflict && basis.is_none() => continue,
+                Err(error)
+                    if error.kind == ErrorKind::Conflict
+                        && !matches!(basis, Some(CommitBasis::Completion(..))) =>
+                {
+                    continue;
+                }
                 Err(error) if error.kind == ErrorKind::Conflict => {
                     self.refresh().await?;
                     return Err(error);
@@ -1284,35 +1399,41 @@ impl Inner {
     async fn authorize(
         &self,
         record: &OperationRecord,
-        cancellation: &CancellationToken,
+        admission: &Admission,
         deadline: Instant,
     ) -> Result<()> {
         self.ensure_open()?;
+        admission.ensure_pending()?;
         let result = tokio::select! {
+            biased;
+            _ = admission.cancellation.cancelled() => Err(Error::new(ErrorKind::InvalidState, admission.cancellation_code())),
             result = self.services.authority.validate(AuthorityRequest {
                 operation: record.id.clone(), action: record.input.fingerprint(), selection: record.grants.clone(),
             }) => result,
-            _ = cancellation.cancelled() => Err(Error::new(ErrorKind::InvalidState, "cancelled")),
             _ = tokio::time::sleep_until(deadline.into()) => Err(Error::new(ErrorKind::LimitExceeded, "deadline")),
         };
         result?;
         let lease = self.lease()?;
         let controls = lease.controls().read().await?;
-        if controls.binding != self.binding || !controls.admits_work() {
-            return Err(Error::new(ErrorKind::InvalidState, "admission_closed"));
+        if controls.binding != self.binding {
+            return Err(self.freeze("writer_superseded"));
         }
+        admission.check(&controls)?;
         self.ensure_open()
     }
 
-    async fn start_attempt(&self, id: &OperationId) -> Result<AttemptId> {
+    async fn start_attempt(&self, owner: &Owner) -> Result<AttemptId> {
+        let _serial = self.serial.lock().await;
         self.ensure_open()?;
+        let id = &owner.id;
         let attempt = AttemptId::new(fingerprint_name("attempt", &(id, 0_u64))?)?;
-        self.apply(
+        self.commit_with_basis(
             phase_id(id, "start", &attempt)?,
             vec![JournalAction::StartAttempt {
                 operation: id.clone(),
                 attempt: attempt.clone(),
             }],
+            Some(CommitBasis::Admission(&owner.admission)),
         )
         .await?;
         Ok(attempt)

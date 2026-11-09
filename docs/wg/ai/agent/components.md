@@ -541,6 +541,16 @@ such as an unanswered required question, still govern continuation. A stop actio
 can instead cancel and settle the turn, with subsequent work based on its recorded
 partial outcome. The product gives these distinct controls clear meanings.
 
+Admission-closing controls retain their identity and cause after a later Resume.
+An observer receiving only the newest state can still distinguish interrupted
+work from work admitted after resumption. Resumption does not undo completed
+effects or turn an uncertain outcome into a confirmed cancellation.
+
+Recorded outcomes can be projected into conversation history without invoking
+their executors. This preserves completed effects when execution stops between
+recording a result and publishing the next conversation state. The projection
+retains paired call/result identities and excludes incomplete exchanges.
+
 Deriving an independent conversation captures a committed source position and
 leaves the source's execution and interactions intact. Copied questions and
 approvals are historical content. The new conversation registers any interactions
@@ -874,6 +884,8 @@ strategies. Those consumers must be able to differ through the supported contrac
 | Run that turn with persistent Sessions.                             | Input acceptance and pre-effect barriers survive the declared failure model.                                  |
 | Change presentation metadata while preparing a step.                | Relevant control and history checks remain independent of that metadata.                                      |
 | Stop races with queued admission.                                   | One ordered control transition determines which work was admitted.                                            |
+| Pause and Resume arrive before an observer sees either update.      | Earlier work retains its interruption cause. Later admitted work is unaffected by the old pause.              |
+| Stop follows a recorded tool result before transcript publication.  | Later context includes the recorded effect without repeating its executor.                                    |
 | A question is posted while independent work remains.                | Registration returns immediately, and the correlated answer can inform a subsequent decision.                 |
 | A waiting execution suspends and its worker exits.                  | The pending question and continuation survive without a live inference request or waiter.                     |
 | An answer arrives while suspension is committing.                   | It reaches the current owner or makes the suspended turn eligible for one resumption.                         |

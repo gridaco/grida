@@ -563,6 +563,10 @@ advancement. Resume clears the user pause. Other conditions, including missing
 answers and unresolved effects, still govern whether work can proceed. The
 remaining allowance and operation identities survive suspension.
 
+A rapid Pause followed by Resume still preserves why an in-flight response was
+interrupted. The master uses that recorded cause when choosing continuation.
+Uncertain tool effects keep their reconciliation requirement after resumption.
+
 The proposed product's Stop action cancels active work and pauses automatic
 queue advancement. Queued requests remain visible for editing, removal, or
 explicit resumption. The pause and cancellation request are committed together
@@ -575,6 +579,10 @@ Stop ends the current turn with its recorded partial outcome. Continuing that
 task is a new turn. A paused turn remains unfinished and resumes under its
 existing identity. The product distinguishes resuming the task from resuming
 automatic queue advancement.
+
+Before settling a stopped turn, the master publishes already recorded effects
+into the conversation context. A later turn can account for those effects even
+when stopping interrupted the earlier transcript publication.
 
 After failure, the master selects recovery using the operation's recorded
 classification. Safe resumption and retries consume the remaining allowance.

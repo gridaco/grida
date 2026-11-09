@@ -35,7 +35,9 @@ use agent_kit_sessions::{
 };
 use agent_kit_store_sqlite::SqliteStore;
 use futures_util::stream;
-use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome, read_account};
+use grida_agent_master::{
+    Master, MasterAuthority, MasterConfig, MasterOutcome, StopReason, read_account,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -103,6 +105,7 @@ fn input() -> Vec<Message> {
 enum Script {
     Answer,
     ToolThenAnswer,
+    ToolAndDeferred,
     Tools,
 }
 
@@ -139,36 +142,52 @@ impl Provider for ScriptProvider {
             .lock()
             .unwrap()
             .push(request.request().clone());
-        let tools = matches!(self.script, Script::Tools)
+        let tools = matches!(self.script, Script::Tools | Script::ToolAndDeferred)
             || matches!(self.script, Script::ToolThenAnswer) && index == 0;
-        let (content, update) = if tools {
+        let mut content = if tools {
             let call = ToolCall {
                 id: ToolCallId::new(format!("call-{index}"))?,
                 tool: tool_id(),
                 arguments: ToolArguments::Json(serde_json::json!({ "value": "echoed" })),
             };
-            (
-                Content::ToolCall(call.clone()),
-                Some(ProviderEvent::Update(InferenceUpdate::ToolCall(call))),
-            )
+            vec![Content::ToolCall(call)]
         } else {
-            (Content::Text("Finished".into()), None)
+            vec![Content::Text("Finished".into())]
         };
+        if matches!(self.script, Script::ToolAndDeferred) {
+            content.push(Content::ToolCall(ToolCall {
+                id: ToolCallId::new(format!("deferred-{index}"))?,
+                tool: tool_id(),
+                arguments: ToolArguments::Json(serde_json::json!({ "value": "ask" })),
+            }));
+        }
+        let mut events: Vec<_> = content
+            .iter()
+            .filter_map(|part| match part {
+                Content::ToolCall(call) => Some(ProviderEvent::Update(InferenceUpdate::ToolCall(
+                    call.clone(),
+                ))),
+                _ => None,
+            })
+            .collect();
         let outcome = InferenceOutcome {
             status: InferenceStatus::Completed,
-            messages: vec![message(
-                &format!("answer-{index}"),
-                Role::Assistant,
+            messages: vec![Message {
+                id: MessageId::new(format!("answer-{index}"))?,
+                role: Role::Assistant,
+                phase: None,
                 content,
-            )],
+                provenance: Provenance {
+                    source: "fixture".into(),
+                    kind: ProvenanceKind::Supplied,
+                    fingerprint: None,
+                },
+            }],
             usage: vec![],
             failure: None,
             receipt: None,
         };
-        let events = update
-            .into_iter()
-            .chain(std::iter::once(ProviderEvent::Finished(outcome)))
-            .collect::<Vec<_>>();
+        events.push(ProviderEvent::Finished(outcome));
         Ok(InferenceRun::from_stream(control, move |_| {
             Box::pin(stream::iter(events))
         }))
@@ -645,6 +664,74 @@ async fn committed_tool_results_are_reused_and_reach_the_next_model_request() {
 }
 
 #[tokio::test]
+async fn stopping_a_recovered_turn_publishes_tool_result_recorded_before_interruption() {
+    let fixture = Fixture::new(Script::ToolThenAnswer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture
+        .runtime()
+        .open(interrupted(claim.lease))
+        .await
+        .unwrap();
+    assert!(
+        fixture
+            .master(4, "Use tools")
+            .run(opened.turn, input())
+            .await
+            .is_err()
+    );
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(store.history(session_id(), None).await.unwrap().len(), 1);
+    drop(store);
+
+    let reopened = fixture.reopen().await;
+    let claim = fixture.recover(&reopened).await;
+    let view = reopened.inspect(session_id()).await.unwrap();
+    reopened
+        .control(ControlRequest {
+            id: change_id("stop"),
+            session: session_id(),
+            expected_revision: view.revision,
+            action: SessionControl::Turn {
+                turn: turn_id(),
+                expected: view.current.unwrap().controls.revision,
+                directive: ControlDirective::Cancel,
+            },
+        })
+        .await
+        .unwrap();
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Use tools")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected stopped settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
+    reopened
+        .verify(CommitReceipt::Settled(receipt))
+        .await
+        .unwrap();
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
+    let history = reopened.history(session_id(), None).await.unwrap();
+    let messages: Vec<_> = history
+        .into_iter()
+        .map(|HistoryRecord::Message(message)| message)
+        .collect();
+    agent_kit_core::history::validate_exchanges(&messages, false).unwrap();
+    assert_eq!(messages.len(), 3);
+    assert!(
+        matches!(&messages[1].content[..], [Content::ToolCall(call)] if call.id.as_str() == "call-0")
+    );
+    assert!(
+        matches!(&messages[2].content[..], [Content::ToolResult(result)] if result.call.as_str() == "call-0" && result.status == OutcomeStatus::Succeeded && result.content == vec![ResultContent::Text("echoed".into())])
+    );
+}
+
+#[tokio::test]
 async fn changed_master_configuration_cannot_resume_a_retained_decision() {
     let fixture = Fixture::new(Script::Answer);
     let store = fixture.store();
@@ -663,14 +750,24 @@ async fn changed_master_configuration_cannot_resume_a_retained_decision() {
     );
     drop(store);
     let reopened = fixture.reopen().await;
+    let history = reopened.history(session_id(), None).await.unwrap();
     let claim = fixture.recover(&reopened).await;
     let opened = fixture.runtime().open(claim.lease).await.unwrap();
-    let result = fixture.master(4, "Changed").run(opened.turn, input()).await;
+    let additional_input = vec![message(
+        "extra",
+        Role::User,
+        Content::Text("Keep working".into()),
+    )];
+    let result = fixture
+        .master(4, "Changed")
+        .run(opened.turn, additional_input)
+        .await;
     let Err(error) = result else {
         panic!("changed configuration must be rejected")
     };
     assert_eq!(error.code, "master_configuration_changed");
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(reopened.history(session_id(), None).await.unwrap(), history);
     assert_eq!(
         reopened
             .inspect_turn(session_id(), turn_id())
@@ -699,9 +796,23 @@ async fn step_limit_bounds_repeated_tool_calls_and_records_a_failed_account() {
     let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
     assert_eq!(account.steps, 2);
     assert!(account.text.contains("step limit"));
+    assert_eq!(account.stop_reason, Some(StopReason::StepLimit));
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
     assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 2);
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[test]
+fn accounts_saved_without_a_stop_reason_remain_readable() {
+    let envelope = Envelope::new(
+        SchemaId::new("grida.agent.account").unwrap(),
+        1,
+        br#"{"text":"Finished","steps":1,"unresolved":[]}"#.to_vec(),
+    )
+    .unwrap();
+    let account = read_account(&envelope).unwrap();
+    assert_eq!(account.text, "Finished");
+    assert_eq!(account.stop_reason, None);
 }
 
 #[tokio::test]
@@ -904,14 +1015,22 @@ async fn stopped_recovered_orphan_keeps_uncertainty_without_redispatch() {
         .unwrap();
 }
 
-struct DeferForInput;
+#[derive(Default)]
+struct DeferForInput {
+    calls: AtomicUsize,
+}
 impl ToolGate for DeferForInput {
     fn decide(
         &self,
-        _: ToolAdmission,
+        admission: ToolAdmission,
         context: AdmissionContext,
     ) -> BoxFuture<'_, Result<ToolDecision>> {
         Box::pin(async move {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if matches!(admission.invocation.arguments(), ToolArguments::Json(value) if value["value"] == "echoed")
+            {
+                return Ok(ToolDecision::Permit);
+            }
             let wait = WaitId::new("permission")?;
             context
                 .operations
@@ -932,12 +1051,13 @@ impl ToolGate for DeferForInput {
 }
 
 #[tokio::test]
-async fn stopping_a_deferred_turn_withdraws_input_and_cancels_prepared_tools() {
-    let fixture = Fixture::new(Script::ToolThenAnswer);
+async fn stopping_a_deferred_turn_keeps_completed_results_and_withdraws_input() {
+    let fixture = Fixture::new(Script::ToolAndDeferred);
+    let gate = Arc::new(DeferForInput::default());
     let store = fixture.store();
     let claim = fixture.claim(&store).await;
     let opened = fixture
-        .runtime_with_gate(Arc::new(DeferForInput))
+        .runtime_with_gate(gate.clone())
         .open(claim.lease)
         .await
         .unwrap();
@@ -953,7 +1073,8 @@ async fn stopping_a_deferred_turn_withdraws_input_and_cancels_prepared_tools() {
         .verify(CommitReceipt::Suspended(receipt))
         .await
         .unwrap();
-    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(gate.calls.load(Ordering::SeqCst), 2);
     let view = store.inspect(session_id()).await.unwrap();
     store
         .control(ControlRequest {
@@ -969,7 +1090,7 @@ async fn stopping_a_deferred_turn_withdraws_input_and_cancels_prepared_tools() {
         .unwrap();
     let claim = fixture.recover(&store).await;
     let opened = fixture
-        .runtime_with_gate(Arc::new(DeferForInput))
+        .runtime_with_gate(gate.clone())
         .open(claim.lease)
         .await
         .unwrap();
@@ -989,7 +1110,31 @@ async fn stopping_a_deferred_turn_withdraws_input_and_cancels_prepared_tools() {
             .is_empty()
     );
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(gate.calls.load(Ordering::SeqCst), 2);
+    let messages: Vec<_> = store
+        .history(session_id(), None)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|HistoryRecord::Message(message)| message)
+        .collect();
+    agent_kit_core::history::validate_exchanges(&messages, false).unwrap();
+    let results: Vec<_> = messages
+        .iter()
+        .flat_map(|message| &message.content)
+        .filter_map(|part| match part {
+            Content::ToolResult(result) => Some((result.call.as_str(), result.status)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        results,
+        [
+            ("call-0", OutcomeStatus::Succeeded),
+            ("deferred-0", OutcomeStatus::Cancelled)
+        ]
+    );
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
     assert!(store.inspect(session_id()).await.unwrap().current.is_none());
 }
