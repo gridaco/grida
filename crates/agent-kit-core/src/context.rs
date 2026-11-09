@@ -1,14 +1,8 @@
 use crate::history::{ConversationView, HistoryPosition, validate_exchanges};
+pub use crate::inference::InputMeasurement as ContextMeasurement;
 use crate::inference::MeasurementKind;
 use crate::messages::Message;
 use crate::{Error, ErrorKind, Result};
-use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ContextMeasurement {
-    pub tokens: u64,
-    pub kind: MeasurementKind,
-}
 
 pub trait ContextMeasure {
     fn measure(&self, content: &[Message]) -> Result<ContextMeasurement>;

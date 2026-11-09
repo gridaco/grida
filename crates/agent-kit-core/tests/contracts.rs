@@ -17,7 +17,7 @@ use agent_kit_core::tools::{
 };
 use agent_kit_core::turn::*;
 use agent_kit_core::*;
-use futures_util::stream;
+use futures_util::{StreamExt, stream};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicUsize, Ordering},
@@ -1534,4 +1534,164 @@ async fn prepared_tool_preserves_the_attempt_identity_for_its_executor() {
         })
         .await;
     assert_eq!(tool.observed.lock().unwrap().as_ref(), Some(&attempt));
+}
+
+#[tokio::test]
+async fn provider_receipt_survives_cancellation_without_a_progress_event() {
+    let parent = CancellationToken::new();
+    let receipt = envelope("request-id");
+    let evidence = receipt.clone();
+    let mut run = InferenceRun::from_stream(inference_control(parent.clone()), |_| {
+        Box::pin(stream::iter([
+            ProviderEvent::Receipt(evidence),
+            ProviderEvent::Update(InferenceUpdate::TextDelta {
+                message: MessageId::new("answer").unwrap(),
+                text: "partial".into(),
+            }),
+        ]))
+    });
+    assert!(matches!(
+        run.next().await,
+        Some(InferenceUpdate::TextDelta { .. })
+    ));
+    parent.cancel();
+    let result = run.finish().await;
+    assert_eq!(result.status, InferenceStatus::Interrupted);
+    assert_eq!(result.receipt, Some(receipt));
+}
+
+#[test]
+fn resumption_preserves_the_interruption_revision() {
+    let mut state = TurnState::new(binding()).unwrap();
+    state
+        .apply(change(
+            &state,
+            "pause",
+            vec![JournalAction::Control(ControlDirective::Pause)],
+        ))
+        .unwrap();
+    let pause = ControlInterruption {
+        revision: state.controls().revision,
+        reason: InterruptionReason::Pause,
+    };
+    state
+        .apply(change(
+            &state,
+            "resume",
+            vec![JournalAction::Control(ControlDirective::Resume)],
+        ))
+        .unwrap();
+    assert!(state.controls().admits_work());
+    assert_eq!(state.controls().interruption, Some(pause));
+    assert!(state.controls().revision > pause.revision);
+    let restored: TurnState = serde_json::from_slice(&serde_json::to_vec(&state).unwrap()).unwrap();
+    assert_eq!(restored.controls().interruption, Some(pause));
+}
+
+#[test]
+fn cancellation_records_a_new_interruption_and_cannot_be_resumed() {
+    let mut state = TurnState::new(binding()).unwrap();
+    state
+        .apply(change(
+            &state,
+            "pause",
+            vec![JournalAction::Control(ControlDirective::Pause)],
+        ))
+        .unwrap();
+    let pause = state.controls().interruption.unwrap();
+    state
+        .apply(change(
+            &state,
+            "cancel",
+            vec![JournalAction::Control(ControlDirective::Cancel)],
+        ))
+        .unwrap();
+    let cancel = state.controls().interruption.unwrap();
+    assert_eq!(cancel.reason, InterruptionReason::Cancel);
+    assert!(cancel.revision > pause.revision);
+    assert!(
+        state
+            .apply(change(
+                &state,
+                "resume",
+                vec![JournalAction::Control(ControlDirective::Resume)]
+            ))
+            .is_err()
+    );
+    assert_eq!(state.controls().interruption, Some(cancel));
+}
+
+#[test]
+fn stored_interruption_revision_cannot_exceed_its_control_revision() {
+    let mut state = TurnState::new(binding()).unwrap();
+    state
+        .apply(change(
+            &state,
+            "pause",
+            vec![JournalAction::Control(ControlDirective::Pause)],
+        ))
+        .unwrap();
+    let mut value = serde_json::to_value(&state).unwrap();
+    value["controls"]["interruption"]["revision"] = 999.into();
+    assert!(serde_json::from_value::<TurnState>(value).is_err());
+}
+
+#[test]
+fn older_control_snapshots_without_interruption_remain_readable() {
+    let mut state = TurnState::new(binding()).unwrap();
+    state
+        .apply(change(
+            &state,
+            "pause",
+            vec![JournalAction::Control(ControlDirective::Pause)],
+        ))
+        .unwrap();
+    let mut value = serde_json::to_value(&state).unwrap();
+    value["controls"]
+        .as_object_mut()
+        .unwrap()
+        .remove("interruption");
+    let restored: TurnState = serde_json::from_value(value).unwrap();
+    assert!(restored.controls().paused);
+    assert_eq!(restored.controls().interruption, None);
+}
+
+#[tokio::test]
+async fn duplicate_provider_receipts_interrupt_and_retain_the_first_evidence() {
+    let receipt = envelope("first-evidence");
+    let original = receipt.clone();
+    let run = InferenceRun::from_stream(inference_control(CancellationToken::new()), |_| {
+        Box::pin(
+            stream::iter([
+                ProviderEvent::Receipt(receipt),
+                ProviderEvent::Receipt(envelope("another-evidence")),
+            ])
+            .chain(stream::pending()),
+        )
+    });
+    let result = tokio::time::timeout(std::time::Duration::from_secs(1), run.finish())
+        .await
+        .unwrap();
+    assert_eq!(result.status, InferenceStatus::Interrupted);
+    assert_eq!(result.failure.unwrap().code, "duplicate_provider_receipt");
+    assert_eq!(result.receipt, Some(original));
+}
+
+#[tokio::test]
+async fn provider_receipt_is_rejected_when_its_evidence_exceeds_the_output_bound() {
+    let run = InferenceRun::from_stream(
+        InferenceControl {
+            max_output_bytes: 8,
+            ..inference_control(CancellationToken::new())
+        },
+        |_| {
+            Box::pin(stream::iter([ProviderEvent::Receipt(envelope(
+                "too large",
+            ))]))
+        },
+    );
+    let result = run.finish().await;
+    assert_eq!(result.status, InferenceStatus::Limited);
+    assert_eq!(result.failure.unwrap().code, "receipt_byte_limit");
+    assert!(result.receipt.is_none());
 }

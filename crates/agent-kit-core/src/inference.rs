@@ -182,6 +182,14 @@ impl<'de> Deserialize<'de> for PreparedRequest {
 pub trait Provider: Send + Sync {
     fn capabilities(&self, model: &ModelId) -> Result<ModelCapabilities>;
     fn prepare(&self, request: InferenceRequest) -> Result<PreparedRequest>;
+    /// Measure the complete prepared input, including tool declarations and
+    /// provider framing, using local information and without dispatch.
+    fn measure_input(&self, _request: &PreparedRequest) -> Result<InputMeasurement> {
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "input_measurement_unavailable",
+        ))
+    }
     /// Failure here guarantees that dispatch has not begun.
     fn start(&self, request: PreparedRequest, control: InferenceControl) -> Result<InferenceRun>;
 }
@@ -208,6 +216,8 @@ pub enum InferenceUpdate {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum ProviderEvent {
+    /// Provider evidence retained by the run without a public progress update.
+    Receipt(Envelope),
     Update(InferenceUpdate),
     Finished(InferenceOutcome),
 }
@@ -272,6 +282,12 @@ pub enum MeasurementKind {
     Estimate,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InputMeasurement {
+    pub tokens: u64,
+    pub kind: MeasurementKind,
+}
+
 /// Owns one provider stream and a child cancellation scope.
 pub struct InferenceRun {
     stream: BoxStream<'static, ProviderEvent>,
@@ -281,6 +297,8 @@ pub struct InferenceRun {
     terminal: Option<InferenceOutcome>,
     partial: Vec<Message>,
     usage: Vec<UsageObservation>,
+    receipt: Option<Envelope>,
+    receipt_bytes: usize,
 }
 
 impl InferenceRun {
@@ -304,70 +322,113 @@ impl InferenceRun {
             terminal: None,
             partial: vec![],
             usage: vec![],
+            receipt: None,
+            receipt_bytes: 0,
         }
     }
 
     pub async fn next(&mut self) -> Option<InferenceUpdate> {
-        if self.terminal.is_some() {
-            return None;
-        }
-        let event = {
-            let cancelled = self.cancellation.cancelled().fuse();
-            let next = self.stream.next().fuse();
-            futures_util::pin_mut!(cancelled, next);
-            futures_util::select_biased! { _ = cancelled => None, value = next => value }
-        };
-        match event {
-            Some(ProviderEvent::Update(update)) => {
-                let size = serde_json::to_vec(&update).map_or(usize::MAX, |bytes| bytes.len());
-                if size > self.maximum.saturating_sub(self.received) {
+        while self.terminal.is_none() {
+            let event = {
+                let cancelled = self.cancellation.cancelled().fuse();
+                let next = self.stream.next().fuse();
+                futures_util::pin_mut!(cancelled, next);
+                futures_util::select_biased! { _ = cancelled => None, value = next => value }
+            };
+            match event {
+                Some(ProviderEvent::Receipt(receipt)) => {
+                    if self.receipt.is_some() {
+                        self.interrupt(
+                            FailureKind::Protocol,
+                            InferenceStatus::Interrupted,
+                            "duplicate_provider_receipt",
+                        );
+                        continue;
+                    }
+                    let remaining = self.maximum.saturating_sub(self.received);
+                    let size = if receipt.bytes().len() > remaining {
+                        usize::MAX
+                    } else {
+                        serde_json::to_vec(&receipt).map_or(usize::MAX, |bytes| bytes.len())
+                    };
+                    if size > remaining {
+                        self.interrupt(
+                            FailureKind::OutputLimit,
+                            InferenceStatus::Limited,
+                            "receipt_byte_limit",
+                        );
+                        continue;
+                    }
+                    self.received += size;
+                    self.receipt_bytes = size;
+                    self.receipt = Some(receipt);
+                }
+                Some(ProviderEvent::Update(update)) => {
+                    let size = serde_json::to_vec(&update).map_or(usize::MAX, |bytes| bytes.len());
+                    if size > self.maximum.saturating_sub(self.received) {
+                        self.interrupt(
+                            FailureKind::OutputLimit,
+                            InferenceStatus::Limited,
+                            "output_limit",
+                        );
+                        continue;
+                    }
+                    self.received += size;
+                    self.capture(&update);
+                    return Some(update);
+                }
+                Some(ProviderEvent::Finished(mut outcome)) => {
+                    if let Some(receipt) = self.receipt.take() {
+                        if outcome
+                            .receipt
+                            .as_ref()
+                            .is_some_and(|terminal| terminal != &receipt)
+                        {
+                            self.receipt = Some(receipt);
+                            self.interrupt(
+                                FailureKind::Protocol,
+                                InferenceStatus::Interrupted,
+                                "provider_receipt_changed",
+                            );
+                            continue;
+                        }
+                        outcome.receipt = Some(receipt);
+                    }
+                    let size = serde_json::to_vec(&outcome.messages)
+                        .map_or(usize::MAX, |bytes| bytes.len());
+                    if size > self.maximum.saturating_sub(self.receipt_bytes) {
+                        outcome.messages = std::mem::take(&mut self.partial);
+                        outcome.status = InferenceStatus::Limited;
+                        outcome.failure.get_or_insert(InferenceFailure {
+                            kind: FailureKind::OutputLimit,
+                            code: "output_limit".into(),
+                            retry_after_ms: None,
+                        });
+                    }
+                    if outcome.usage.is_empty() {
+                        outcome.usage = std::mem::take(&mut self.usage);
+                    }
+                    self.terminal = Some(outcome);
+                }
+                None => {
+                    let cancelled = self.cancellation.is_cancelled();
                     self.interrupt(
-                        FailureKind::OutputLimit,
-                        InferenceStatus::Limited,
-                        "output_limit",
+                        if cancelled {
+                            FailureKind::Cancelled
+                        } else {
+                            FailureKind::Protocol
+                        },
+                        InferenceStatus::Interrupted,
+                        if cancelled {
+                            "cancelled"
+                        } else {
+                            "missing_terminal_evidence"
+                        },
                     );
-                    return None;
                 }
-                self.received += size;
-                self.capture(&update);
-                Some(update)
-            }
-            Some(ProviderEvent::Finished(mut outcome)) => {
-                let size =
-                    serde_json::to_vec(&outcome.messages).map_or(usize::MAX, |bytes| bytes.len());
-                if size > self.maximum {
-                    outcome.messages = std::mem::take(&mut self.partial);
-                    outcome.status = InferenceStatus::Limited;
-                    outcome.failure.get_or_insert(InferenceFailure {
-                        kind: FailureKind::OutputLimit,
-                        code: "output_limit".into(),
-                        retry_after_ms: None,
-                    });
-                }
-                if outcome.usage.is_empty() {
-                    outcome.usage = std::mem::take(&mut self.usage);
-                }
-                self.terminal = Some(outcome);
-                None
-            }
-            None => {
-                let cancelled = self.cancellation.is_cancelled();
-                self.interrupt(
-                    if cancelled {
-                        FailureKind::Cancelled
-                    } else {
-                        FailureKind::Protocol
-                    },
-                    InferenceStatus::Interrupted,
-                    if cancelled {
-                        "cancelled"
-                    } else {
-                        "missing_terminal_evidence"
-                    },
-                );
-                None
             }
         }
+        None
     }
 
     pub async fn finish(mut self) -> InferenceOutcome {
@@ -388,7 +449,7 @@ impl InferenceRun {
                 code: code.into(),
                 retry_after_ms: None,
             }),
-            receipt: None,
+            receipt: self.receipt.take(),
         });
     }
 

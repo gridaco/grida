@@ -31,6 +31,22 @@ pub struct ControlSnapshot {
     pub revision: ControlRevision,
     pub paused: bool,
     pub cancelled: bool,
+    #[serde(default)]
+    pub interruption: Option<ControlInterruption>,
+}
+
+/// The latest admission-closing control, retained even after resumption.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ControlInterruption {
+    pub revision: ControlRevision,
+    pub reason: InterruptionReason,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InterruptionReason {
+    Pause,
+    Cancel,
 }
 
 impl ControlSnapshot {
@@ -375,6 +391,7 @@ impl TurnState {
                 revision: ControlRevision(0),
                 paused: false,
                 cancelled: false,
+                interruption: None,
             },
             binding,
             position: JournalPosition(0),
@@ -421,6 +438,16 @@ impl TurnState {
     pub fn validate(&self) -> Result<()> {
         if self.binding.epoch == 0 || self.controls.binding != self.binding {
             return Err(Error::new(ErrorKind::InvalidState, "invalid_turn_binding"));
+        }
+        if self.controls.interruption.is_some_and(|interruption| {
+            interruption.revision.0 == 0
+                || interruption.revision > self.controls.revision
+                || (interruption.reason == InterruptionReason::Cancel) != self.controls.cancelled
+        }) {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                "invalid_control_interruption",
+            ));
         }
         self.history.validate()?;
         let mut attempts = std::collections::BTreeSet::new();
@@ -890,17 +917,30 @@ impl TurnState {
                 self.checkpoint = Some(checkpoint);
             }
             JournalAction::Control(directive) => {
-                match directive {
-                    ControlDirective::Pause => self.controls.paused = true,
-                    ControlDirective::Resume if !self.controls.cancelled => {
-                        self.controls.paused = false
+                let interruption = match directive {
+                    ControlDirective::Pause if !self.controls.cancelled => {
+                        self.controls.paused = true;
+                        Some(InterruptionReason::Pause)
                     }
-                    ControlDirective::Resume => {
+                    ControlDirective::Resume if !self.controls.cancelled => {
+                        self.controls.paused = false;
+                        None
+                    }
+                    ControlDirective::Pause | ControlDirective::Resume => {
                         return Err(Error::new(ErrorKind::InvalidState, "turn_cancelled"));
                     }
-                    ControlDirective::Cancel => self.controls.cancelled = true,
-                }
+                    ControlDirective::Cancel => {
+                        self.controls.cancelled = true;
+                        Some(InterruptionReason::Cancel)
+                    }
+                };
                 self.bump_control()?;
+                if let Some(reason) = interruption {
+                    self.controls.interruption = Some(ControlInterruption {
+                        revision: self.controls.revision,
+                        reason,
+                    });
+                }
             }
             JournalAction::Suspend => {
                 if self.operations.values().any(OperationState::is_running) {

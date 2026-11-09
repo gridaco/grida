@@ -33,7 +33,9 @@ a child cancellation scope and passes that same control to its stream factory.
 Direct callers supply an attempt identity. Runtime supplies its admitted attempt
 identity so adapters can correlate usage, call identifiers, and receipts.
 An adapter must apply its supplied transport deadline. A missing terminal event
-produces an interrupted result with the available partial content.
+produces an interrupted result with the available partial content. One bounded
+provider receipt may arrive before the terminal event and is retained with an
+interrupted or limited result.
 
 An `InventorySnapshot` captures executable definitions. Its `prepare` and
 `restore` methods check the argument representation and call the executor's
@@ -69,7 +71,9 @@ Recovery establishes prior ownership release before rebinding to a new epoch.
 
 `EphemeralJournal` supplies the same contract in memory. Its separate control
 handle records pause, resume, cancellation, and correlated answers. Releasing a
-waiter does not remove its recorded interaction.
+waiter does not remove its recorded interaction. The latest interruption revision
+survives Resume so a coalesced control notification still identifies the scopes
+that must stop.
 
 ## Context measurement
 
@@ -78,6 +82,9 @@ measurement. Trimming that leaves an invalid tool exchange fails explicitly.
 Estimated counts cannot satisfy a requested hard ceiling. Separately measured
 non-message overhead does not establish an exact combined encoding bound.
 Provider preparation owns validation of the final provider representation.
+`Provider::measure_input` optionally measures the complete prepared input from
+local information. The caller checks its reported measurement kind against its
+requested limit.
 
 ## Verification
 
