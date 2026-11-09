@@ -183,6 +183,7 @@ Each suffix in a grouped row uses the displayed prefix and is negotiated separat
 | `co.grida/session/stop`, `resume-queue`           | Stop a turn and pause queue advancement, then reopen queue admission when ready.     |
 | `co.grida/session/questions`, `answer-question`   | Inspect pending questions and submit a correlated choice, free-text answer, or skip. |
 | `co.grida/session/history`, `fork`, `revise`      | Browse retained message anchors, branch a chat, or replace an earlier text message.  |
+| `co.grida/session/compact`                        | Summarize earlier model context and keep the original transcript available.          |
 | `co.grida/config/inspect`, `update`, `reload`     | Inspect, change, or reload the host defaults.                                        |
 
 Use ordinary `session/prompt` for a streamed reply. Use durable submission or
@@ -221,6 +222,19 @@ host saves the previous view and accepts the replacement with fresh input
 settings and permissions. A paused queue still needs Resume Queue. Use the
 document or file owner's editing controls to undo changes made during earlier
 work. The history operations retain evidence of those earlier effects.
+
+### Compact model context
+
+An ACP client that negotiates compaction can send `/compact` as the entire
+prompt or call the identified compaction operation. Start from an idle chat
+with an open, empty queue. The summary uses the selected model. New prompts
+can enter the queue while it runs.
+
+After a successful compaction, future model requests use the summary and
+subsequent conversation. The original transcript remains available. If
+compaction fails or its result is uncertain, the host keeps the previous
+context. Pause and Stop apply while the summary runs. An identified request
+can inspect the retained attempt after reconnecting.
 
 The [feature catalog](./features.md) describes the wider agent experience and
 the availability of its product features.
