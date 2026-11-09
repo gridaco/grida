@@ -100,6 +100,16 @@ A queue basis contains `sessionId`, `requestId`, and
 summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
 `journalPosition`, and turn `epoch` for conditional operations.
 
+Private stdio clients can negotiate `co.grida/session/updates` version 1.
+Already attached sessions then receive standard `session/update` assistant
+chunks for identified submissions, queued work, and resumed turns. The
+notification's `_meta["co.grida/session/updates"]` contains `turnId`,
+`offsetBytes` (UTF-8), and `replace`. A replacement starts with the
+recorded message text at offset zero. Apply it to the identified message
+before appending later chunks. A `resyncRequired` notice has no text and
+asks the client to reload committed history. Observation owns neither work
+admission nor cancellation.
+
 | Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                       |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `submit`, `enqueue`                      | `sessionId`, `inputId`, ACP `prompt`. Submit selects idle work. Enqueue accepts waiting work. Both return `inputPosition`, `disposition`, and the `turnId` once selected.   |

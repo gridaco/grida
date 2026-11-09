@@ -39,6 +39,8 @@ mod images;
 #[cfg(unix)]
 #[path = "process/lifecycle.rs"]
 mod lifecycle;
+#[path = "process/live.rs"]
+mod live;
 #[cfg(unix)]
 #[path = "process/questions.rs"]
 mod questions;

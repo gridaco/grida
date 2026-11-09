@@ -878,6 +878,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   session, turn, and revisions. A reconnect requires a new attachment before
   the same scoped control can be retried. [Process tests](desktop/src/main/native-agent-chat.test.ts)
   cover cross-session rejection, stale controls, and continuation after restart.
+- The [native text observer](crates/grida-agent/src/acp/live.rs) projects
+  assistant text from owned turns on negotiated private stdio. It checks
+  attachment before serialization and uses the existing bounded ACP delivery
+  window. Losing the observer or falling behind cannot cancel a turn.
 - The [Desktop approval coordinator](desktop/src/main/native-agent-permissions.ts)
   derives a read profile from main-owned workspace selection. An approval
   answer takes a review issued by the coordinator for the exact session,

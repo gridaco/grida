@@ -5,6 +5,7 @@ mod goals;
 mod history;
 mod images;
 mod lifecycle;
+pub(crate) mod live;
 mod permissions;
 mod questions;
 mod skills;
@@ -95,6 +96,7 @@ pub struct Host {
     controls: Arc<Semaphore>,
     work: Arc<Mutex<Work>>,
     changed: Arc<Notify>,
+    live_text: broadcast::Sender<live::LiveText>,
 }
 
 struct Execution {
@@ -261,6 +263,7 @@ enum Launch {
         parts: Vec<PromptPart>,
         questions: bool,
         configuration_permission: crate::ConfigurationPermission,
+        publish_text: bool,
     },
     Queued,
     Compact(ChangeId),
@@ -412,7 +415,12 @@ impl Host {
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
             work: Arc::default(),
             changed: Arc::default(),
+            live_text: broadcast::channel(UPDATE_CAPACITY).0,
         })
+    }
+
+    pub(crate) fn observe_text(&self) -> broadcast::Receiver<live::LiveText> {
+        self.live_text.subscribe()
     }
 
     pub async fn new_session(&self, cwd: PathBuf) -> Result<SessionId> {
@@ -456,6 +464,14 @@ impl Host {
     }
 
     pub async fn start_prompt(&self, request: PromptRequest) -> Result<AcceptedRun> {
+        self.launch_prompt(request, false).await
+    }
+
+    async fn launch_prompt(
+        &self,
+        request: PromptRequest,
+        publish_text: bool,
+    ) -> Result<AcceptedRun> {
         self.execution()?;
         let PromptRequest {
             id,
@@ -477,6 +493,7 @@ impl Host {
                     parts,
                     questions,
                     configuration_permission,
+                    publish_text,
                 },
             )?
         };
@@ -524,6 +541,11 @@ impl Host {
                 Launch::ResumeAnswered(position) => Some((&worker_turn, *position)),
                 _ => None,
             };
+            let live = match &launch {
+                Launch::Prompt { publish_text, .. } => *publish_text,
+                _ => true,
+            }
+            .then(|| host.live_text.clone());
             let result = host.admit(&worker_session, &worker_turn, launch).await;
             let admitted = match result {
                 Ok(Some(run)) => run,
@@ -567,6 +589,7 @@ impl Host {
                         admitted.opened,
                         input,
                         updates_tx,
+                        live,
                     )
                     .await;
                     if let Some(command) = command {
@@ -668,6 +691,7 @@ impl Host {
                 parts,
                 questions,
                 configuration_permission,
+                ..
             } => {
                 require_idle(&view)?;
                 if !view.queued.is_empty() {
@@ -1254,7 +1278,7 @@ impl Host {
         if let Some(accepted) = self.existing_submission(&request).await? {
             return Ok(accepted);
         }
-        match self.start_prompt(request.clone()).await {
+        match self.launch_prompt(request.clone(), true).await {
             Ok(run) => Ok(DurableSubmission {
                 session: run.session,
                 input: run.input,
@@ -1735,9 +1759,17 @@ async fn drive(
     opened: agent_kit_runtime::OpenedTurn,
     input: Vec<Message>,
     updates: broadcast::Sender<TurnUpdate>,
+    live: Option<broadcast::Sender<live::LiveText>>,
 ) -> Result<RunResult> {
     let agent_kit_runtime::OpenedTurn { turn, mut observer } = opened;
     let binding = observer.snapshot().state.binding().clone();
+    let mut live = live.map(|sender| live::Publisher::new(sender, binding.clone()));
+    let mut publish = |update| {
+        if let Some(live) = &mut live {
+            live.update(&update);
+        }
+        let _ = updates.send(update);
+    };
     let mut observer_open = true;
     let outcome = {
         let run = master.run(turn, input);
@@ -1746,7 +1778,7 @@ async fn drive(
             tokio::select! {
                 outcome = &mut run => break outcome,
                 update = observer.next(), if observer_open => match update {
-                    Some(update) => { let _ = updates.send(update); }
+                    Some(update) => publish(update),
                     None => observer_open = false,
                 }
             }
@@ -1758,7 +1790,7 @@ async fn drive(
     // buffered updates before publishing the terminal result to the client.
     if observer_open {
         while let Some(update) = observer.next().await {
-            let _ = updates.send(update);
+            publish(update);
         }
     }
     match outcome? {

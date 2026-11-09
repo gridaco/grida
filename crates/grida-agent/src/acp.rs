@@ -1,6 +1,7 @@
 //! Stable ACP v1 over a supervised, bounded stdio connection.
 
 mod extensions;
+mod live;
 mod projection;
 mod transport;
 mod websocket;
@@ -74,6 +75,7 @@ struct ConnectionSessions {
     attached: BTreeSet<SessionId>,
     active: BTreeMap<SessionId, TurnId>,
     negotiated: BTreeSet<&'static str>,
+    live_started: bool,
 }
 
 impl ConnectionSessions {
@@ -103,6 +105,8 @@ async fn serve_connection(
 ) -> Result<()> {
     let sessions = Arc::new(Mutex::new(ConnectionSessions::default()));
     let initialized_sessions = sessions.clone();
+    let initialized_host = host.clone();
+    let initialized_delivery = delivery.clone();
     let new_host = host.clone();
     let new_sessions = sessions.clone();
     let new_delivery = delivery.clone();
@@ -124,6 +128,9 @@ async fn serve_connection(
         .on_receive_request(
             async move |request: InitializeRequest, responder, connection| {
                 let mut advertised = extensions::advertised(reviewer);
+                if reviewer {
+                    advertised.insert(live::CAPABILITY.into(), 1.into());
+                }
                 if let Some(provider) = &provider {
                     let capability = crate::supervised_provider::CAPABILITY;
                     if request
@@ -137,13 +144,28 @@ async fn serve_connection(
                         return responder
                             .respond_with_error(unavailable("provider_supervisor_required"));
                     }
-                    if let Err(error) = provider.attach(connection) {
+                    if let Err(error) = provider.attach(connection.clone()) {
                         return responder.respond_with_error(host_error(error));
                     }
                     advertised.insert(capability.into(), 1.into());
                 }
-                initialized_sessions.lock().unwrap().negotiated =
-                    extensions::negotiated(request.client_capabilities.meta.as_ref(), reviewer);
+                let updates = {
+                    let mut sessions = initialized_sessions.lock().unwrap();
+                    let meta = request.client_capabilities.meta.as_ref();
+                    sessions.negotiated = extensions::negotiated(meta, reviewer);
+                    if reviewer
+                        && !sessions.live_started
+                        && meta
+                            .and_then(|meta| meta.get(live::CAPABILITY))
+                            .and_then(serde_json::Value::as_u64)
+                            == Some(1)
+                    {
+                        sessions.live_started = true;
+                        Some(initialized_host.observe_text())
+                    } else {
+                        None
+                    }
+                };
                 responder.respond(
                     InitializeResponse::new(ProtocolVersion::V1)
                         .agent_capabilities(
@@ -156,7 +178,16 @@ async fn serve_connection(
                             "grida-agent",
                             env!("CARGO_PKG_VERSION"),
                         )),
-                )
+                )?;
+                if let Some(updates) = updates {
+                    connection.spawn(live::forward(
+                        connection.clone(),
+                        initialized_delivery.clone(),
+                        initialized_sessions.clone(),
+                        updates,
+                    ))?;
+                }
+                Ok(())
             },
             on_receive_request!(),
         )
