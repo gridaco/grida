@@ -1,0 +1,471 @@
+use super::*;
+use crate::wire::HELPER_FLAG;
+use std::os::fd::AsRawFd;
+use std::os::unix::net::UnixStream;
+use std::process::Stdio;
+use std::sync::Mutex;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::process::{Child, Command};
+use tokio::task::JoinHandle;
+
+const DRAIN_GRACE: Duration = Duration::from_millis(500);
+const REAP_GRACE: Duration = Duration::from_secs(2);
+
+pub(crate) struct Running {
+    stop: CancellationToken,
+    task: JoinHandle<ProcessEvidence>,
+}
+
+impl Running {
+    pub(crate) fn request_stop(&self) {
+        self.stop.cancel();
+    }
+
+    pub(crate) async fn finish(mut self) -> Result<ProcessEvidence> {
+        (&mut self.task)
+            .await
+            .map_err(|_| refused(ErrorKind::Uncertain, "sandbox_supervisor_lost"))
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.stop.cancel();
+    }
+}
+
+pub(super) fn spawn(prepared: Prepared, cancellation: CancellationToken) -> Result<Running> {
+    tokio::runtime::Handle::try_current()
+        .map_err(|_| refused(ErrorKind::InvalidState, "sandbox_async_runtime_required"))?;
+    let payload = serde_json::to_vec(&prepared.launch)
+        .map_err(|_| refused(ErrorKind::InvalidInput, "sandbox_setup_encoding"))?;
+    if payload.len() > wire::MAX_FRAME_BYTES {
+        return Err(refused(ErrorKind::LimitExceeded, "sandbox_setup_limit"));
+    }
+    let (status_read, status_write) = UnixStream::pair()
+        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_status_channel_unavailable"))?;
+    status_read
+        .set_nonblocking(true)
+        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_status_channel_unavailable"))?;
+    let status_read = tokio::net::UnixStream::from_std(status_read)
+        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_status_channel_unavailable"))?;
+    let mut command = command(&prepared, status_write.as_raw_fd());
+    command
+        .env_clear()
+        .current_dir("/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    configure_spawn(&mut command, status_write.as_raw_fd())?;
+    if prepared.valid_until <= Instant::now() || cancellation.is_cancelled() {
+        return Err(refused(ErrorKind::InvalidState, "sandbox_admission_closed"));
+    }
+    let child = command
+        .spawn()
+        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_spawn_failed"))?;
+    drop(status_write);
+    let stop = CancellationToken::new();
+    let task = tokio::spawn(supervise(
+        child,
+        status_read,
+        prepared,
+        payload,
+        cancellation,
+        stop.clone(),
+    ));
+    Ok(Running { stop, task })
+}
+
+#[cfg(target_os = "macos")]
+fn command(prepared: &Prepared, status: i32) -> Command {
+    let mut command = Command::new("/usr/bin/sandbox-exec");
+    let mut profile = String::from(
+        "(version 1)\n(deny default)\n(allow process-fork)\n\
+         (allow signal (target same-sandbox))\n(allow process-info* (target same-sandbox))\n\
+         (allow file-read* file-test-existence (literal \"/\"))\n\
+         (allow file-read* file-write-data (literal \"/dev/null\"))\n\
+         (allow sysctl-read (sysctl-name \"hw.pagesize\") (sysctl-name \"hw.pagesize_compat\"))\n",
+    );
+    let mut locations: Vec<_> = prepared
+        .locations
+        .iter()
+        .map(|location| (&location.bound, location.access))
+        .collect();
+    locations.push((&prepared.helper.bound, Access::Runtime));
+    for (index, (bound, access)) in locations.iter().enumerate() {
+        use std::fmt::Write as _;
+        let name = format!("L{index}");
+        let matcher = if bound.directory {
+            "subpath"
+        } else {
+            "literal"
+        };
+        let filter = format!("({matcher} (param \"{name}\"))");
+        let _ = writeln!(profile, "(allow file-read* file-test-existence {filter})");
+        let _ = writeln!(
+            profile,
+            "(allow file-read-metadata file-test-existence (path-ancestors (param \"{name}\")))"
+        );
+        if *access == Access::Write {
+            let _ = writeln!(profile, "(allow file-write* {filter})");
+        }
+        // Any approved content can be interpreted. Exec/map is limited to
+        // the same visible roots, including the explicitly selected binary.
+        let _ = writeln!(profile, "(allow process-exec file-map-executable {filter})");
+        command
+            .arg("-D")
+            .arg(format!("{name}={}", bound.path().display()));
+    }
+    command
+        .arg("-p")
+        .arg(profile)
+        .arg(prepared.helper.bound.path())
+        .arg(HELPER_FLAG)
+        .arg(status.to_string());
+    command
+}
+
+#[cfg(target_os = "linux")]
+fn command(prepared: &Prepared, status: i32) -> Command {
+    const HELPER: &str = "/run/agent-kit-sandbox/helper";
+    let mut command = Command::new(prepared.bubblewrap.bound.path());
+    command.args([
+        "--unshare-user",
+        "--disable-userns",
+        "--unshare-pid",
+        "--unshare-ipc",
+        "--unshare-net",
+        "--unshare-uts",
+        "--cap-drop",
+        "ALL",
+        "--die-with-parent",
+        "--as-pid-1",
+        "--clearenv",
+        "--proc",
+        "/proc",
+        "--dev",
+        "/dev",
+    ]);
+    let mut mounts = BTreeMap::new();
+    for location in &prepared.locations {
+        for destination in [location.bound.path(), location.destination.as_path()] {
+            let write = location.access == Access::Write;
+            mounts
+                .entry(destination)
+                .and_modify(|entry: &mut (&Path, bool)| entry.1 |= write)
+                .or_insert((location.bound.path(), write));
+        }
+    }
+    let mut mounts: Vec<_> = mounts.into_iter().collect();
+    mounts.sort_by_key(|(destination, _)| destination.components().count());
+    for (destination, (source, write)) in mounts {
+        command
+            .arg(if write { "--bind" } else { "--ro-bind" })
+            .arg(source)
+            .arg(destination);
+    }
+    command
+        .arg("--ro-bind")
+        .arg(prepared.helper.bound.path())
+        .arg(HELPER)
+        .args(["--", HELPER, HELPER_FLAG])
+        .arg(status.to_string());
+    command
+}
+
+#[allow(unsafe_code)]
+fn configure_spawn(command: &mut Command, preserve: i32) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    let high_descriptor = fs::read_dir("/dev/fd")
+        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_descriptor_scan_failed"))?
+        .filter_map(|entry| {
+            entry
+                .ok()?
+                .file_name()
+                .to_string_lossy()
+                .parse::<i32>()
+                .ok()
+        })
+        .max()
+        .unwrap_or(preserve)
+        .max(preserve);
+    // The child is between fork and exec here. Only async-signal-safe
+    // system calls run, and the standard library's exec error pipe remains
+    // open until exec because all other descriptors become close-on-exec.
+    unsafe {
+        command.pre_exec(move || {
+            if libc::setsid() < 0 {
+                return Err(io::Error::last_os_error());
+            }
+            #[cfg(target_os = "linux")]
+            if libc::syscall(
+                libc::SYS_close_range,
+                3_u32,
+                u32::MAX,
+                libc::CLOSE_RANGE_CLOEXEC,
+            ) != 0
+            {
+                return Err(io::Error::last_os_error());
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let mut limit: libc::rlimit = std::mem::zeroed();
+                if libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) != 0
+                    || limit.rlim_cur > 1_048_576
+                {
+                    return Err(io::Error::from_raw_os_error(libc::EINVAL));
+                }
+                let last = (limit.rlim_cur as i32).max(high_descriptor);
+                for fd in 3..=last {
+                    if libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) < 0 {
+                        let error = io::Error::last_os_error();
+                        if error.raw_os_error() != Some(libc::EBADF) {
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+            if libc::fcntl(preserve, libc::F_SETFD, 0) < 0 {
+                return Err(io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    Ok(())
+}
+
+#[derive(Default)]
+struct Output {
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+    truncated: bool,
+}
+
+async fn capture_output(
+    mut input: impl AsyncRead + Unpin,
+    capture: Arc<Mutex<Output>>,
+    stderr: bool,
+    max: usize,
+    overflow: CancellationToken,
+) {
+    let mut bytes = [0; 8192];
+    loop {
+        match input.read(&mut bytes).await {
+            Ok(0) => return,
+            Ok(count) => {
+                let mut output = capture.lock().expect("output lock");
+                let remaining = max - output.stdout.len() - output.stderr.len();
+                let take = count.min(remaining);
+                let target = if stderr {
+                    &mut output.stderr
+                } else {
+                    &mut output.stdout
+                };
+                target.extend_from_slice(&bytes[..take]);
+                if take < count {
+                    output.truncated = true;
+                    overflow.cancel();
+                    return;
+                }
+            }
+            Err(_) => {
+                capture.lock().expect("output lock").truncated = true;
+                return;
+            }
+        }
+    }
+}
+
+async fn supervise(
+    mut child: Child,
+    mut status: tokio::net::UnixStream,
+    prepared: Prepared,
+    payload: Vec<u8>,
+    cancellation: CancellationToken,
+    stop: CancellationToken,
+) -> ProcessEvidence {
+    let capture = Arc::new(Mutex::new(Output::default()));
+    let overflow = CancellationToken::new();
+    let stdout = child.stdout.take().expect("stdout piped");
+    let stderr = child.stderr.take().expect("stderr piped");
+    let mut output_tasks = [
+        tokio::spawn(capture_output(
+            stdout,
+            capture.clone(),
+            false,
+            prepared.max_output_bytes,
+            overflow.clone(),
+        )),
+        tokio::spawn(capture_output(
+            stderr,
+            capture.clone(),
+            true,
+            prepared.max_output_bytes,
+            overflow.clone(),
+        )),
+    ];
+    let mut input = child.stdin.take().expect("stdin piped");
+    let input_task = tokio::spawn(async move {
+        input
+            .write_all(&(payload.len() as u32).to_be_bytes())
+            .await?;
+        input.write_all(&payload).await?;
+        input.write_all(&prepared.stdin).await?;
+        input.shutdown().await
+    });
+    let pid = child.id().expect("spawned process has id") as i32;
+    let deadline = (Instant::now() + prepared.timeout).min(prepared.valid_until);
+    let mut observation = None;
+    let stopped = tokio::select! {
+        biased;
+        _ = cancellation.cancelled() => Some(StopReason::Requested),
+        _ = stop.cancelled() => Some(StopReason::Requested),
+        _ = overflow.cancelled() => Some(StopReason::OutputLimit),
+        _ = tokio::time::sleep_until(deadline.into()) => Some(StopReason::Deadline),
+        result = wait_without_reaping(pid) => {
+            observation = Some(result);
+            None
+        },
+    };
+    input_task.abort();
+    let process_group_signalled = match observation {
+        Some(Err(_)) => false,
+        _ => signal_process_group(pid).is_ok(),
+    };
+    let reaped = tokio::time::timeout(REAP_GRACE, child.wait())
+        .await
+        .is_ok_and(|result| result.is_ok());
+
+    let mut status_bytes = Vec::new();
+    let status_read = async {
+        // A malformed status stream never implies successful payload execution.
+        (&mut status).take(7).read_to_end(&mut status_bytes).await
+    };
+    let status_complete = tokio::time::timeout(DRAIN_GRACE, status_read)
+        .await
+        .is_ok_and(|result| result.is_ok());
+    let outputs_complete = tokio::time::timeout(DRAIN_GRACE, async {
+        for task in &mut output_tasks {
+            let _ = task.await;
+        }
+    })
+    .await
+    .is_ok();
+    if !outputs_complete {
+        for task in &output_tasks {
+            task.abort();
+        }
+    }
+
+    let completion = if status_complete {
+        parse_status(&status_bytes, matches!(prepared.launch.task, Task::Probe))
+    } else {
+        Completion::Uncertain
+    };
+    let descendants = match (completion, prepared.support.backend) {
+        (Completion::SetupFailed, _) => Descendants::NoPayload,
+        (_, Backend::Seatbelt) if process_group_signalled && reaped => {
+            Descendants::ProcessGroupSignalled
+        }
+        (Completion::Exited(_) | Completion::Signaled(_), Backend::Bubblewrap)
+            if reaped && stopped.is_none() =>
+        {
+            Descendants::NamespaceEnded
+        }
+        _ => Descendants::Unverified,
+    };
+    let temporary_removed = prepared.temporary.close().is_ok();
+    let mut output = capture.lock().expect("output lock");
+    ProcessEvidence {
+        support: prepared.support,
+        completion,
+        stopped: stopped.or_else(|| overflow.is_cancelled().then_some(StopReason::OutputLimit)),
+        stdout: std::mem::take(&mut output.stdout),
+        stderr: std::mem::take(&mut output.stderr),
+        output_truncated: output.truncated || !outputs_complete,
+        descendants,
+        temporary_removed,
+    }
+}
+
+fn parse_status(bytes: &[u8], probe: bool) -> Completion {
+    if bytes == [wire::STATUS_SETUP_FAILED] {
+        return Completion::SetupFailed;
+    }
+    let bytes = if probe {
+        bytes
+    } else if let Some(payload) = bytes.strip_prefix(&[wire::STATUS_READY]) {
+        payload
+    } else {
+        return Completion::Uncertain;
+    };
+    match bytes {
+        [wire::STATUS_EXIT, a, b, c, d] => Completion::Exited(i32::from_be_bytes([*a, *b, *c, *d])),
+        [wire::STATUS_SIGNAL, a, b, c, d] => {
+            Completion::Signaled(i32::from_be_bytes([*a, *b, *c, *d]))
+        }
+        _ => Completion::Uncertain,
+    }
+}
+
+async fn wait_without_reaping(pid: i32) -> io::Result<()> {
+    // Keep the root PID reserved until we signal its private process group.
+    // Reaping first would allow PID/PGID reuse to target an unrelated process.
+    loop {
+        match observed_exit(pid) {
+            Ok(true) => return Ok(()),
+            Ok(false) => {}
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error),
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+#[allow(unsafe_code)]
+fn observed_exit(pid: i32) -> io::Result<bool> {
+    let mut info = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
+    let result = unsafe {
+        libc::waitid(
+            libc::P_PID,
+            pid as libc::id_t,
+            &mut info,
+            libc::WEXITED | libc::WNOWAIT | libc::WNOHANG,
+        )
+    };
+    if result == 0 {
+        Ok(unsafe { info.si_pid() } == pid)
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
+
+#[allow(unsafe_code)]
+fn signal_process_group(pid: i32) -> io::Result<()> {
+    if unsafe { libc::kill(-pid, libc::SIGKILL) } == 0 {
+        return Ok(());
+    }
+    let error = io::Error::last_os_error();
+    if error.raw_os_error() == Some(libc::ESRCH) {
+        Ok(())
+    } else {
+        Err(error)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_payload_exit_requires_the_helpers_start_evidence() {
+        assert_eq!(parse_status(b"E\0\0\0\0", false), Completion::Uncertain);
+        assert_eq!(parse_status(b"S\0\0\0\x09", false), Completion::Uncertain);
+        assert_eq!(parse_status(b"R", false), Completion::Uncertain);
+        assert_eq!(parse_status(b"RF", false), Completion::Uncertain);
+        assert_eq!(parse_status(b"F", false), Completion::SetupFailed);
+        assert_eq!(parse_status(b"RE\0\0\0\0", false), Completion::Exited(0));
+        assert_eq!(parse_status(b"E\0\0\0\0", true), Completion::Exited(0));
+    }
+}
