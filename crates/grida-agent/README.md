@@ -69,3 +69,50 @@ inspect retained state.
 Process tests launch the built executable with a loopback streaming provider.
 Run them with `cargo test -p grida-agent --locked` in an environment that
 permits a local listener.
+
+## Shared local service
+
+```sh
+target/debug/grida-agent serve --listen ws://127.0.0.1:8765/acp \
+  --server-token-env GRIDA_AGENT_SERVER_TOKEN --state-dir "$GRIDA_AGENT_STATE" \
+  --endpoint "$GRIDA_AGENT_ENDPOINT" --model "$GRIDA_AGENT_MODEL" \
+  --credential-env OPENAI_API_KEY
+```
+
+Use a separate randomly generated 32-byte bearer token encoded as 64
+hexadecimal characters. Native clients send it in the upgrade request's
+`Authorization: Bearer …` header. The listener requires a numeric loopback
+address, the exact local authority and `/acp` path, and an absent `Origin`
+header. The bearer grants access to this host's state directory. Session
+attachment still checks the selected workspace.
+
+The binding carries one ACP JSON-RPC object per WebSocket text message and
+bounds message size, outstanding requests, clients, and delivery time.
+Losing one client detaches its observers. The service retains ownership of
+accepted work until settlement or service shutdown.
+
+### Negotiated operations
+
+During `initialize`, a client puts value `1` under each supported
+`clientCapabilities._meta` key. The agent advertises the same version in
+`agentCapabilities._meta`. Each custom method prefixes its capability key
+with an underscore.
+
+| Capability                  | Behavior                                                                                                                                                                                                                                      |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `co.grida/session/submit`   | Submit `sessionId`, caller-owned `inputId`, and ACP `prompt` to an attached idle session. Receive the committed input position and its queued, claimed, or completed disposition. Retry with the same input to read its retained disposition. |
+| `co.grida/session/snapshot` | Read an attached session's revisions, queue count, and current or latest turn summary. Load the session for transcript replay.                                                                                                                |
+| `co.grida/session/stop`     | Submit `sessionId`, `turnId`, caller-owned `requestId`, `expectedSessionRevision`, and `expectedControlRevision`. The committed operation cancels that turn and pauses session admission. The exact retry returns its receipt.                |
+| `co.grida/config/inspect`   | Read the supported context setting, file revision, diagnostics, and active defaults.                                                                                                                                                          |
+| `co.grida/config/update`    | Supply `expectedRevision` and one typed set or reset operation for `context.max_input_tokens`.                                                                                                                                                |
+| `co.grida/config/reload`    | Validate and activate the file at `expectedRevision`.                                                                                                                                                                                         |
+
+Standard `session/prompt` is the streaming path. The durable submit path
+returns acceptance independently of completion. Each input uses one path.
+An existing queued input remains queued on retry. Verified resume and queue
+advancement have separate lifecycle contracts.
+
+The host reads `config.toml` from its private state directory and retains an
+immutable defaults snapshot with each accepted input. A setting change applies
+to later inputs. The current compatible adapter rejects an explicit input-token
+cap before dispatch when it cannot establish a hard bound.

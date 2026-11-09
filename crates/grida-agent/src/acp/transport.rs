@@ -10,11 +10,11 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::Semaphore;
 
-const MAX_FRAME_BYTES: usize = 1 << 20;
+pub(super) const MAX_FRAME_BYTES: usize = 1 << 20;
 const MAX_QUEUED_INBOUND: usize = 32;
 const MAX_OUTSTANDING_REQUESTS: usize = 16;
 const MAX_QUEUED_UPDATES: usize = 8;
-const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+pub(super) const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(super) struct Delivery {
     requests: AtomicUsize,
@@ -38,7 +38,7 @@ impl Delivery {
             .map_err(|_| wire_error("too_many_outstanding_requests"))
     }
 
-    fn delivered(&self, frame: &TransportFrame) {
+    pub(super) fn delivered(&self, frame: &TransportFrame) {
         match frame {
             TransportFrame::Single(RawJsonRpcMessage::Response(_)) => {
                 let _ = self
@@ -54,6 +54,40 @@ impl Delivery {
             }
             _ => {}
         }
+    }
+
+    pub(super) fn receive(
+        &self,
+        line: &str,
+        incoming: &UnboundedSender<TransportFrame>,
+    ) -> Result<bool> {
+        if line.len() >= MAX_FRAME_BYTES {
+            return Err(wire_error("acp_input_frame_too_large"));
+        }
+        let frame = match TransportFrame::parse_json(line) {
+            // The SDK parser includes the raw line in parse-error data. Keep the
+            // diagnostic small and leave supplied payloads out of responses.
+            TransportFrame::Malformed { raw, error } => {
+                let error = if error.code == Error::parse_error().code {
+                    Error::parse_error()
+                } else {
+                    error
+                };
+                TransportFrame::Malformed { raw, error }
+            }
+            valid => valid,
+        };
+        if matches!(
+            frame,
+            TransportFrame::Single(RawJsonRpcMessage::Request(_))
+                | TransportFrame::Malformed { .. }
+        ) {
+            self.reserve_request()?;
+        }
+        if incoming.len() >= MAX_QUEUED_INBOUND {
+            return Err(wire_error("acp_input_queue_full"));
+        }
+        Ok(incoming.unbounded_send(frame).is_ok())
     }
 
     pub(super) async fn send(
@@ -94,30 +128,7 @@ pub(super) async fn read(
         }
         let line = std::str::from_utf8(&bytes[..count - 1])
             .map_err(|_| wire_error("invalid_stdio_frame_utf8"))?;
-        let frame = match TransportFrame::parse_json(line) {
-            // The SDK parser includes the raw line in parse-error data. Keep the
-            // diagnostic small and leave supplied payloads out of responses.
-            TransportFrame::Malformed { raw, error } => {
-                let error = if error.code == Error::parse_error().code {
-                    Error::parse_error()
-                } else {
-                    error
-                };
-                TransportFrame::Malformed { raw, error }
-            }
-            valid => valid,
-        };
-        if matches!(
-            frame,
-            TransportFrame::Single(RawJsonRpcMessage::Request(_))
-                | TransportFrame::Malformed { .. }
-        ) {
-            delivery.reserve_request()?;
-        }
-        if incoming.len() >= MAX_QUEUED_INBOUND {
-            return Err(wire_error("stdio_input_queue_full"));
-        }
-        if incoming.unbounded_send(frame).is_err() {
+        if !delivery.receive(line, &incoming)? {
             return Ok(());
         }
     }
@@ -146,6 +157,6 @@ pub(super) async fn write(
     Ok(())
 }
 
-fn wire_error(code: &'static str) -> Error {
+pub(super) fn wire_error(code: &'static str) -> Error {
     Error::new(-32603, code)
 }

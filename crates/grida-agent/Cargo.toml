@@ -21,12 +21,15 @@ libc = "0.2"
 reqwest = { version = "=0.13.5", default-features = false, features = ["rustls", "stream"] }
 serde = { version = "1", features = ["derive"] }
 serde_json.workspace = true
+subtle = "2"
 tempfile = "3"
 toml_edit = "=0.25.15"
-tokio = { version = "1", features = ["io-std", "io-util", "macros", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "1", features = ["io-std", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
+socket2 = "0.6"
 tokio = { version = "1", features = ["net", "process"] }
 tokio-util = { version = "0.7", features = ["compat"] }
 

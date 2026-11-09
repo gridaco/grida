@@ -152,6 +152,12 @@ conversion, or rejection. Native compaction can be an explicit request or an
 operation embedded in a response, with replacement state and coverage reported
 through the adapter's contract.
 
+Continuation validity and execution authority have separate identities and
+lifetimes. A stable continuation binding can survive a host restart when the
+provider and account context remain valid. Each new execution still receives
+current authorization. Changing the account or losing proof of continuity
+requires rebuilding, conversion, or rejection of the retained provider state.
+
 Inference knows the supplied request. It selects neither the product's model
 nor its fallback strategy. It reports transport and protocol failures with enough
 information for the caller to decide whether another attempt is safe. Automatic

@@ -1,6 +1,6 @@
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
-use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
+use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
 use grida_agent::host::{Host, PromptPart, PromptRequest, RunResult, change_id};
 use grida_agent::{ProviderOptions, acp};
 use grida_agent_master::read_account;
@@ -78,11 +78,23 @@ fn command() -> Command {
         ))
         .subcommand(launch(
             Command::new("serve")
-                .about("Serve stable Agent Client Protocol on stdin and stdout")
+                .about("Serve stable Agent Client Protocol")
+                .arg(Arg::new("stdio").long("stdio").action(ArgAction::SetTrue))
                 .arg(
-                    Arg::new("stdio")
-                        .long("stdio")
-                        .action(ArgAction::SetTrue)
+                    Arg::new("listen")
+                        .long("listen")
+                        .value_name("LOOPBACK_WS_URL")
+                        .requires("server-token-env"),
+                )
+                .arg(
+                    Arg::new("server-token-env")
+                        .long("server-token-env")
+                        .value_name("ENVIRONMENT_VARIABLE")
+                        .requires("listen"),
+                )
+                .group(
+                    ArgGroup::new("transport")
+                        .args(["stdio", "listen"])
                         .required(true),
                 ),
         ))
@@ -160,7 +172,33 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             .get_one::<u64>("max-output-tokens")
             .expect("output default"),
     };
+    let listener = if name == "serve" {
+        args.get_one::<String>("listen")
+            .map(|address| {
+                let token_env = args
+                    .get_one::<String>("server-token-env")
+                    .expect("required by listen");
+                if provider.credential_env.as_deref() == Some(token_env.as_str()) {
+                    return Err(problem(
+                        ErrorKind::InvalidInput,
+                        "server_token_requires_separate_environment",
+                    ));
+                }
+                acp::ListenOptions::from_environment(address, token_env)
+            })
+            .transpose()?
+    } else {
+        None
+    };
     let host = Arc::new(Host::open(state_dir, Some(provider))?);
+    if let Some(listener) = listener {
+        let result = tokio::select! {
+            result = acp::serve_websocket(host.clone(), listener) => result.map(|()| 0),
+            result = shutdown_signal() => result.map(|()| 130),
+        };
+        host.shutdown().await?;
+        return result;
+    }
     if name == "serve" {
         tokio::select! {
             result = acp::serve_stdio(host.clone()) => match result {

@@ -749,3 +749,587 @@ async fn signal_stops_an_accepted_run_and_writes_its_verified_final_disposition(
         "cancelled"
     );
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn slow_stdio_output_is_bounded_and_preserves_owned_work() {
+    use std::os::fd::OwnedFd;
+    use std::os::unix::net::UnixStream;
+
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let text = std::str::from_utf8(&[b'x'; 64 * 1024]).unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Hold(text)]).await;
+    let (reader, writer) = UnixStream::pair().unwrap();
+    socket2::SockRef::from(&writer)
+        .set_send_buffer_size(4096)
+        .unwrap();
+    reader.set_nonblocking(true).unwrap();
+    let mut stdout = BufReader::new(tokio::net::UnixStream::from_std(reader).unwrap());
+    let mut command = executable();
+    command.args(["serve", "--stdio"]);
+    configured(&mut command, &state, &endpoint.url);
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::from(OwnedFd::from(writer)))
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let initialize =
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1}});
+    let new = json!({
+        "jsonrpc":"2.0","id":2,"method":"session/new",
+        "params":{"cwd":workspace.path(),"mcpServers":[]},
+    });
+    let mut line = String::new();
+    for request in [initialize, new] {
+        timeout(WAIT, stdin.write_all(format!("{request}\n").as_bytes()))
+            .await
+            .unwrap()
+            .unwrap();
+        line.clear();
+        timeout(WAIT, stdout.read_line(&mut line))
+            .await
+            .unwrap()
+            .unwrap();
+    }
+    let response: Value = serde_json::from_str(&line).unwrap();
+    let session = response["result"]["sessionId"].as_str().unwrap();
+    let prompt = json!({
+        "jsonrpc":"2.0","id":3,"method":"session/prompt",
+        "params":{"sessionId":session,"prompt":[{"type":"text","text":"Work"}]},
+    });
+    timeout(WAIT, stdin.write_all(format!("{prompt}\n").as_bytes()))
+        .await
+        .unwrap()
+        .unwrap();
+    endpoint.request().await;
+    // Keep stdin connected and deliberately stop draining stdout.
+    let output = finish_child(child).await;
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("stdio_write_timeout"));
+    endpoint.done().await;
+    let inspected = timeout(
+        WAIT,
+        executable()
+            .arg("inspect")
+            .arg("--state-dir")
+            .arg(&state)
+            .arg(session)
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        inspected.status.success(),
+        "{}",
+        String::from_utf8_lossy(&inspected.stderr)
+    );
+    assert_eq!(
+        records(&inspected.stdout)[0]["current"]["disposition"],
+        "suspended"
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn authenticated_websocket_detach_retry_snapshot_and_stop_are_independent() {
+    use tokio_tungstenite::tungstenite::{Error as WebSocketError, http::StatusCode};
+
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Hold("Working.")]).await;
+    let (mut child, url) = shared_server(&state, &endpoint.url).await;
+    for (token, origin, authority, status) in [
+        (None, None, None, StatusCode::UNAUTHORIZED),
+        (Some("wrong"), None, None, StatusCode::UNAUTHORIZED),
+        (
+            Some(SERVER_TOKEN),
+            Some("https://invalid.example"),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Some(SERVER_TOKEN),
+            None,
+            Some("invalid.example"),
+            StatusCode::FORBIDDEN,
+        ),
+    ] {
+        let result = connect_shared(&url, token, origin, authority).await;
+        assert!(
+            matches!(result, Err(WebSocketError::Http(ref response)) if response.status() == status)
+        );
+    }
+
+    let mut first = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    let initialized = ws_rpc(&mut first, 1, "initialize", extension_initialize()).await;
+    assert_eq!(
+        initialized["result"]["agentCapabilities"]["_meta"]["co.grida/session/submit"],
+        1
+    );
+    let created = ws_rpc(
+        &mut first,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let submit = json!({
+        "sessionId":session,
+        "inputId":"user-input-a",
+        "prompt":[{"type":"text","text":"Work"}],
+    });
+    let accepted = ws_rpc(&mut first, 3, "_co.grida/session/submit", submit.clone()).await;
+    let turn = accepted["result"]["turnId"].as_str().unwrap();
+    assert_eq!(accepted["result"]["disposition"], "claimed");
+    endpoint.request().await;
+    let retry = ws_rpc(&mut first, 4, "_co.grida/session/submit", submit.clone()).await;
+    assert_eq!(retry["result"], accepted["result"]);
+    let changed = ws_rpc(
+        &mut first,
+        5,
+        "_co.grida/session/submit",
+        json!({"sessionId":session,"inputId":"user-input-a","prompt":[{"type":"text","text":"Changed"}]}),
+    )
+    .await;
+    assert_eq!(changed["error"]["data"], "submission_input_changed");
+    let busy = ws_rpc(
+        &mut first,
+        6,
+        "_co.grida/session/submit",
+        json!({"sessionId":session,"inputId":"other","prompt":[{"type":"text","text":"Another"}]}),
+    )
+    .await;
+    assert_eq!(busy["error"]["data"], "session_prompt_in_progress");
+    drop(first);
+
+    let mut second = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    ws_rpc(&mut second, 1, "initialize", extension_initialize()).await;
+    let observation = json!({"sessionId":session});
+    let denied = ws_rpc(
+        &mut second,
+        2,
+        "_co.grida/session/snapshot",
+        observation.clone(),
+    )
+    .await;
+    assert_eq!(denied["error"]["data"], "session_setup_required");
+    let loaded = ws_rpc(
+        &mut second,
+        3,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    let running = ws_rpc(
+        &mut second,
+        4,
+        "_co.grida/session/snapshot",
+        observation.clone(),
+    )
+    .await;
+    assert_eq!(running["result"]["current"]["disposition"], "running");
+    assert_eq!(running["result"]["current"]["paused"], false);
+    assert_eq!(running["result"]["current"]["turnId"], turn);
+    assert_eq!(running["result"]["queuedInputs"], 0);
+    let configured = ws_rpc(
+        &mut second,
+        5,
+        "_co.grida/config/update",
+        json!({"expectedRevision":null,"change":{"operation":"set_context_max_input_tokens","value":1024}}),
+    )
+    .await;
+    assert_eq!(
+        configured["result"]["defaults"]["context"]["max_input_tokens"],
+        1024
+    );
+    let retry = ws_rpc(&mut second, 6, "_co.grida/session/submit", submit.clone()).await;
+    assert_eq!(retry["result"], accepted["result"]);
+    let stop = json!({
+        "sessionId":session,
+        "turnId":turn,
+        "requestId":"stop-a",
+        "expectedSessionRevision":running["result"]["sessionRevision"],
+        "expectedControlRevision":running["result"]["current"]["controlRevision"],
+    });
+    let stopped = ws_rpc(&mut second, 7, "_co.grida/session/stop", stop.clone()).await;
+    assert_eq!(stopped["result"]["requestId"], "stop-a");
+    endpoint.done().await;
+    let settled = timeout(WAIT, async {
+        let mut id = 8;
+        loop {
+            let snapshot = ws_rpc(
+                &mut second,
+                id,
+                "_co.grida/session/snapshot",
+                observation.clone(),
+            )
+            .await;
+            if snapshot["result"]["current"].is_null() {
+                break snapshot;
+            }
+            id += 1;
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(settled["result"]["latest"]["status"], "cancelled");
+    assert_eq!(settled["result"]["admissionPaused"], true);
+    let replayed_stop = ws_rpc(&mut second, 100, "_co.grida/session/stop", stop).await;
+    assert_eq!(replayed_stop["result"], stopped["result"]);
+    let retried_after_stop = ws_rpc(&mut second, 101, "_co.grida/session/submit", submit).await;
+    assert_eq!(retried_after_stop["result"]["disposition"], "completed");
+    assert_eq!(retried_after_stop["result"]["turnId"], turn);
+    let paused = ws_rpc(
+        &mut second,
+        102,
+        "_co.grida/session/submit",
+        json!({"sessionId":session,"inputId":"after-stop","prompt":[{"type":"text","text":"Paused"}]}),
+    )
+    .await;
+    assert_eq!(paused["error"]["data"], "session_admission_paused");
+    let new_session = ws_rpc(
+        &mut second,
+        103,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let next = ws_rpc(
+        &mut second,
+        104,
+        "session/prompt",
+        json!({"sessionId":new_session["result"]["sessionId"],"prompt":[{"type":"text","text":"Use the new default"}]}),
+    )
+    .await;
+    assert_eq!(
+        next["error"]["data"], "input_measurement_unavailable",
+        "{next}"
+    );
+    drop(second);
+
+    let mut plain = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    ws_rpc(&mut plain, 1, "initialize", json!({"protocolVersion":1})).await;
+    let not_negotiated = ws_rpc(&mut plain, 2, "_co.grida/config/inspect", json!({})).await;
+    assert_eq!(not_negotiated["error"]["code"], -32601);
+    drop(plain);
+    let status = Command::new("kill")
+        .args(["-TERM", &child.id().unwrap().to_string()])
+        .status()
+        .await
+        .unwrap();
+    assert!(status.success());
+    assert_eq!(
+        timeout(WAIT, child.wait()).await.unwrap().unwrap().code(),
+        Some(130)
+    );
+}
+
+#[cfg(unix)]
+const SERVER_TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+#[cfg(unix)]
+type SharedSocket = tokio_tungstenite::WebSocketStream<TcpStream>;
+
+#[cfg(unix)]
+async fn shared_server(state: &Path, endpoint: &str) -> (Child, String) {
+    let mut command = executable();
+    command
+        .args([
+            "serve",
+            "--listen",
+            "ws://127.0.0.1:0/acp",
+            "--server-token-env",
+            "GRIDA_AGENT_FIXTURE_SERVER_TOKEN",
+        ])
+        .env("GRIDA_AGENT_FIXTURE_SERVER_TOKEN", SERVER_TOKEN);
+    configured(&mut command, state, endpoint);
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stderr = BufReader::new(child.stderr.take().unwrap());
+    let mut line = String::new();
+    timeout(WAIT, stderr.read_line(&mut line))
+        .await
+        .unwrap()
+        .unwrap();
+    let url = line
+        .trim()
+        .strip_prefix("grida-agent: ACP listening on ")
+        .unwrap_or_else(|| panic!("unexpected startup output: {line}"));
+    child.stderr = Some(stderr.into_inner());
+    (child, url.into())
+}
+
+#[cfg(unix)]
+async fn connect_shared(
+    url: &str,
+    token: Option<&str>,
+    origin: Option<&str>,
+    authority: Option<&str>,
+) -> Result<SharedSocket, tokio_tungstenite::tungstenite::Error> {
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+    use tokio_tungstenite::tungstenite::http::header;
+
+    let mut request = url.into_client_request().unwrap();
+    let socket_address = request.uri().authority().unwrap().to_string();
+    if let Some(token) = token {
+        request.headers_mut().insert(
+            header::AUTHORIZATION,
+            format!("Bearer {token}").parse().unwrap(),
+        );
+    }
+    if let Some(origin) = origin {
+        request
+            .headers_mut()
+            .insert(header::ORIGIN, origin.parse().unwrap());
+    }
+    if let Some(authority) = authority {
+        request
+            .headers_mut()
+            .insert(header::HOST, authority.parse().unwrap());
+    }
+    timeout(WAIT, async {
+        let stream = TcpStream::connect(socket_address).await.unwrap();
+        tokio_tungstenite::client_async(request, stream)
+            .await
+            .map(|(socket, _)| socket)
+    })
+    .await
+    .unwrap()
+}
+
+#[cfg(unix)]
+async fn ws_rpc(socket: &mut SharedSocket, id: u64, method: &str, params: Value) -> Value {
+    use futures_util::{SinkExt, StreamExt};
+    use tokio_tungstenite::tungstenite::Message;
+
+    timeout(WAIT, async {
+        let request = json!({"jsonrpc":"2.0","id":id,"method":method,"params":params});
+        socket
+            .send(Message::Text(request.to_string().into()))
+            .await
+            .unwrap();
+        loop {
+            let frame = socket.next().await.unwrap().unwrap();
+            if let Message::Text(line) = frame {
+                let reply: Value = serde_json::from_str(line.as_str()).unwrap();
+                if reply["id"] == id {
+                    return reply;
+                }
+            }
+        }
+    })
+    .await
+    .unwrap()
+}
+
+#[cfg(unix)]
+fn extension_initialize() -> Value {
+    json!({
+        "protocolVersion":1,
+        "clientCapabilities":{"_meta":{
+            "co.grida/session/submit":1,
+            "co.grida/session/snapshot":1,
+            "co.grida/session/stop":1,
+            "co.grida/config/inspect":1,
+            "co.grida/config/update":1,
+            "co.grida/config/reload":1
+        }}
+    })
+}
+
+#[tokio::test]
+async fn retry_reports_a_previously_accepted_unclaimed_input_without_starting_it() {
+    use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
+    use agent_kit_core::{ChangeId, Envelope, MessageId, ModelId, SchemaId};
+    use agent_kit_sessions::{InputDisposition, SessionStore, Submission};
+    use agent_kit_store_sqlite::SqliteStore;
+    use grida_agent::ProviderOptions;
+    use grida_agent::host::{Host, PromptPart, PromptRequest};
+
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let options = || ProviderOptions {
+        endpoint: "http://127.0.0.1:1/v1".into(),
+        model: ModelId::new("fixture-model").unwrap(),
+        credential_env: None,
+        max_output_tokens: 1024,
+    };
+    let host = Host::open(&state, Some(options())).unwrap();
+    let session = host.new_session(workspace.path().into()).await.unwrap();
+    drop(host);
+    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let id = ChangeId::new("accepted-before-interruption").unwrap();
+    let recorded = vec![Message {
+        id: MessageId::new("input/accepted-before-interruption").unwrap(),
+        role: Role::User,
+        phase: None,
+        content: vec![Content::Text("Keep this input".into())],
+        provenance: Provenance {
+            source: "native-client".into(),
+            kind: ProvenanceKind::Supplied,
+            fingerprint: None,
+        },
+    }];
+    let accepted = store
+        .submit(
+            session.clone(),
+            Submission {
+                id: id.clone(),
+                payload: Envelope::new(
+                    SchemaId::new("grida.agent.native.input").unwrap(),
+                    1,
+                    serde_json::to_vec(&recorded).unwrap(),
+                )
+                .unwrap(),
+            },
+        )
+        .await
+        .unwrap();
+    drop(store);
+
+    let host = Host::open(&state, Some(options())).unwrap();
+    let receipt = host
+        .submit_prompt(PromptRequest {
+            id,
+            session: session.clone(),
+            parts: vec![PromptPart::Text {
+                text: "Keep this input".into(),
+            }],
+        })
+        .await
+        .unwrap();
+    assert_eq!(receipt.position, accepted.position);
+    assert_eq!(receipt.disposition, InputDisposition::Queued);
+    let snapshot = host.inspect(session).await.unwrap();
+    assert!(snapshot.current.is_none());
+    assert_eq!(snapshot.queued.len(), 1);
+    host.shutdown().await.unwrap();
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn abrupt_host_exit_retains_interrupted_turn_and_blocks_replacement() {
+    use std::os::unix::process::ExitStatusExt;
+
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Hold("Started."),
+        Reply::Finished("Unexpected replacement."),
+    ])
+    .await;
+    let mut child = spawn_serve(&state, &endpoint.url);
+    let mut stdin = child.stdin.take().unwrap();
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+    let session = timeout(WAIT, async {
+        let setup = [
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1}}),
+            json!({
+                "jsonrpc":"2.0","id":2,"method":"session/new",
+                "params":{"cwd":workspace.path(),"mcpServers":[]},
+            }),
+        ];
+        let mut line = String::new();
+        for request in setup {
+            stdin
+                .write_all(format!("{request}\n").as_bytes())
+                .await
+                .unwrap();
+            line.clear();
+            assert_ne!(stdout.read_line(&mut line).await.unwrap(), 0);
+        }
+        let created: Value = serde_json::from_str(&line).unwrap();
+        let session = created["result"]["sessionId"].as_str().unwrap().to_owned();
+        let prompt = json!({
+            "jsonrpc":"2.0","id":3,"method":"session/prompt",
+            "params":{"sessionId":session,"prompt":[{"type":"text","text":"Hold"}]},
+        });
+        stdin
+            .write_all(format!("{prompt}\n").as_bytes())
+            .await
+            .unwrap();
+        loop {
+            line.clear();
+            assert_ne!(stdout.read_line(&mut line).await.unwrap(), 0);
+            let update: Value = serde_json::from_str(&line).unwrap();
+            if update["params"]["update"]["sessionUpdate"] == "agent_message_chunk" {
+                assert_eq!(update["params"]["update"]["content"]["text"], "Started.");
+                break;
+            }
+            assert_ne!(update["id"], 3, "{update}");
+        }
+        session
+    })
+    .await
+    .unwrap();
+    assert_eq!(endpoint.request().await["messages"][1]["content"], "Hold");
+
+    // Leave the supervising pipes open to force abrupt loss rather than the
+    // orderly EOF path that asks the host to suspend its work.
+    child.start_kill().unwrap();
+    let output = finish_child(child).await;
+    assert_eq!(output.status.signal(), Some(9));
+
+    let inspect = || {
+        let mut command = executable();
+        command
+            .arg("inspect")
+            .arg("--state-dir")
+            .arg(&state)
+            .arg(&session);
+        command
+    };
+    let interrupted = timeout(WAIT, inspect().output()).await.unwrap().unwrap();
+    assert!(
+        interrupted.status.success(),
+        "{}",
+        String::from_utf8_lossy(&interrupted.stderr)
+    );
+    let original = records(&interrupted.stdout);
+    let current = &original[0]["current"];
+    assert_eq!(current["disposition"], "interrupted");
+    assert!(current["outcome"].is_null());
+
+    let mut replacement = executable();
+    replacement.arg("run");
+    configured(&mut replacement, &state, &endpoint.url);
+    replacement
+        .arg("--cwd")
+        .arg(workspace.path())
+        .arg("--session")
+        .arg(&session)
+        .args(["--prompt", "Do not start a replacement"]);
+    let refused = timeout(WAIT, replacement.output()).await.unwrap().unwrap();
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(refused.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&refused.stderr).contains("session_turn_requires_recovery"));
+    let retained = timeout(WAIT, inspect().output()).await.unwrap().unwrap();
+    assert_eq!(records(&retained.stdout)[0]["current"], *current);
+    assert!(matches!(
+        endpoint.requests.try_recv(),
+        Err(mpsc::error::TryRecvError::Empty)
+    ));
+    endpoint.task.abort();
+    let _ = endpoint.task.await;
+}

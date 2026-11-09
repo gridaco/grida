@@ -1,7 +1,11 @@
 //! Stable ACP v1 over a supervised, bounded stdio connection.
 
+mod extensions;
 mod projection;
 mod transport;
+mod websocket;
+
+pub use websocket::{ListenOptions, serve_websocket};
 
 use crate::host::{AcceptedRun, Host, PromptPart, PromptRequest, RunResult};
 use agent_client_protocol::schema::ProtocolVersion;
@@ -55,6 +59,7 @@ async fn serve(
 struct ConnectionSessions {
     attached: BTreeSet<SessionId>,
     active: BTreeMap<SessionId, TurnId>,
+    negotiated: BTreeSet<&'static str>,
 }
 
 impl ConnectionSessions {
@@ -81,6 +86,7 @@ async fn serve_connection(
     delivery: Arc<Delivery>,
 ) -> Result<()> {
     let sessions = Arc::new(Mutex::new(ConnectionSessions::default()));
+    let initialized_sessions = sessions.clone();
     let new_host = host.clone();
     let new_sessions = sessions.clone();
     let load_host = host.clone();
@@ -92,11 +98,18 @@ async fn serve_connection(
     Agent
         .v1()
         .name("grida-agent")
+        .with_connection_builder(extensions::handlers(host.clone(), sessions.clone()))
         .on_receive_request(
-            async |_: InitializeRequest, responder, _| {
+            async move |request: InitializeRequest, responder, _| {
+                initialized_sessions.lock().unwrap().negotiated =
+                    extensions::negotiated(request.client_capabilities.meta.as_ref());
                 responder.respond(
                     InitializeResponse::new(ProtocolVersion::V1)
-                        .agent_capabilities(AgentCapabilities::new().load_session(true))
+                        .agent_capabilities(
+                            AgentCapabilities::new()
+                                .load_session(true)
+                                .meta(extensions::advertised()),
+                        )
                         .agent_info(Implementation::new(
                             "grida-agent",
                             env!("CARGO_PKG_VERSION"),
@@ -295,8 +308,17 @@ async fn project_run(
                         Ok(PromptResponse::new(StopReason::Refusal))
                     }
                     None => Err(account
-                        .and_then(|account| account.failure)
-                        .map(host_error)
+                        .and_then(|account| {
+                            account.failure.map(host_error).or_else(|| {
+                                account.inference_failure.map(|failure| {
+                                    Error::internal_error().data(serde_json::json!({
+                                        "kind": failure.kind,
+                                        "code": failure.code,
+                                        "retryAfterMs": failure.retry_after_ms,
+                                    }))
+                                })
+                            })
+                        })
                         .unwrap_or_else(|| unavailable("agent_turn_failed"))),
                 }
             }

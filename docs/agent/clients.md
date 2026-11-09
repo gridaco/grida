@@ -9,7 +9,7 @@ format: md
 # Connect an agent client
 
 The native Grida Agent host runs tasks from scripts and serves Agent Client
-Protocol (ACP) clients. Both entrypoints use the same conversation master and
+Protocol (ACP) clients. Its entrypoints use the same conversation master and
 durable session store. The native executable is available from source.
 
 ## Build the host
@@ -102,6 +102,60 @@ Stdio carries newline-delimited protocol frames with a 1 MiB frame limit and at
 most 16 unanswered requests per connection. Closing the supervising pipe starts
 bounded shutdown and requests suspension of owned work. A later host process can
 inspect the retained state.
+
+## Share a local host
+
+A shared host lets independent native clients connect to the same running
+service. Create a separate random server token and provide it through the named
+environment variable.
+
+```sh
+export GRIDA_AGENT_SERVER_TOKEN="$(openssl rand -hex 32)"
+
+target/debug/grida-agent serve \
+  --listen ws://127.0.0.1:8765/acp \
+  --server-token-env GRIDA_AGENT_SERVER_TOKEN \
+  --state-dir /absolute/path/to/agent-state \
+  --endpoint https://api.openai.com/v1 \
+  --model MODEL_ID \
+  --credential-env OPENAI_API_KEY
+```
+
+Connect with a WebSocket client that sends the server token in its
+`Authorization: Bearer …` upgrade header. The token grants access to this host's
+state directory. The listener accepts numeric loopback addresses, the exact
+local authority and `/acp` path, and native connections with an absent `Origin`
+header.
+
+Each WebSocket text message carries one ACP JSON-RPC object. Closing a client
+connection detaches its observers while the host continues its accepted work.
+Stopping the service requests suspension of the work it owns.
+
+## Use durable client operations
+
+A capable client can opt in to individual version-1 operations through
+`clientCapabilities._meta` during initialization. The host advertises the same
+keys in `agentCapabilities._meta`. A custom method adds `_` before its capability
+key, such as `_co.grida/session/snapshot`.
+
+| Capability key              | Operation                                                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `co.grida/session/submit`   | Submit an input with a client-chosen identity. Repeating the same input returns its retained position and disposition. |
+| `co.grida/session/snapshot` | Read revisions, queue count, and the current or latest turn summary.                                                   |
+| `co.grida/session/stop`     | Cancel an exact turn and pause admission, using the observed revisions and a client-chosen request identity.           |
+| `co.grida/config/inspect`   | Read the supported setting, file revision, diagnostics, and active defaults.                                           |
+| `co.grida/config/update`    | Set or reset the context-input limit using the expected file revision.                                                 |
+| `co.grida/config/reload`    | Validate and activate a manually edited configuration file.                                                            |
+
+Use either ordinary `session/prompt` or durable submission for a given input.
+Ordinary prompts stream their response. Durable submission acknowledges retained
+input independently of completion. An already queued input keeps its position
+when retried.
+
+Configuration changes apply to later accepted inputs. Existing inputs retain
+their captured defaults. An explicit hard context-input cap requires supported
+counting for the complete request. If counting is unavailable, the turn reports
+that failure before sending a model request.
 
 The [feature catalog](./features.md) describes the wider agent experience and
 the availability of its product features.

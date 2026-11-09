@@ -1,12 +1,13 @@
 //! Product composition and ownership for native agent turns.
 
+use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
 use crate::http::{HttpTransport, ProviderOptions};
 use agent_kit_core::authority::{AuthorityRequest, AuthorityValidator, GrantSelection};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{Modality, ModelCapabilities, Provider};
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::Inventory;
-use agent_kit_core::turn::{CommitReceipt, ControlDirective, TurnOutcome};
+use agent_kit_core::turn::{CommitReceipt, ControlDirective, ControlRevision, TurnOutcome};
 use agent_kit_core::{
     BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, MessageId, Result,
     SchemaId, SessionId, TurnId,
@@ -17,10 +18,12 @@ use agent_kit_runtime::{
     ToolGate, TurnUpdate,
 };
 use agent_kit_sessions::{
-    ClaimOutcome, ClaimRequest, CreateSession, SessionControl, SessionStore, SessionView,
-    Submission, TurnDisposition, TurnSelection,
+    Acceptance, ClaimOutcome, ClaimRequest, ControlReceipt, ControlRequest, CreateSession,
+    InputDisposition, SessionControl, SessionRevision, SessionStore, SessionView, Submission,
+    TurnDisposition, TurnSelection,
 };
 use agent_kit_store_sqlite::SqliteStore;
+use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -43,6 +46,8 @@ const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
 pub struct Host {
     store: Arc<SqliteStore>,
     execution: Option<Arc<Execution>>,
+    configuration: Option<Arc<Configuration>>,
+    configuration_admission: Arc<Mutex<()>>,
     work: Arc<Mutex<Work>>,
     changed: Arc<Notify>,
 }
@@ -68,8 +73,8 @@ struct Active {
     handle: AbortHandle,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PromptPart {
     Text {
         text: String,
@@ -81,6 +86,7 @@ pub enum PromptPart {
     },
 }
 
+#[derive(Clone)]
 pub struct PromptRequest {
     pub id: ChangeId,
     pub session: SessionId,
@@ -91,8 +97,23 @@ pub struct AcceptedRun {
     pub session: SessionId,
     pub turn: TurnId,
     pub input: ChangeId,
+    pub position: u64,
     pub updates: broadcast::Receiver<TurnUpdate>,
     pub completion: oneshot::Receiver<Result<RunResult>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct DurableSubmission {
+    pub session: SessionId,
+    pub input: ChangeId,
+    pub position: u64,
+    pub disposition: InputDisposition,
+}
+
+#[derive(Serialize, Deserialize)]
+struct StoredPrompt {
+    parts: Vec<PromptPart>,
+    configuration: ConfigurationSnapshot,
 }
 
 #[derive(Debug, Serialize)]
@@ -121,10 +142,17 @@ impl Host {
             return Err(problem(ErrorKind::Unavailable, "agent_state_unavailable"));
         }
         let store = Arc::new(SqliteStore::open(database)?);
+        let configuration = provider
+            .as_ref()
+            .map(|_| Configuration::open(state_dir))
+            .transpose()?
+            .map(Arc::new);
         let execution = provider.map(Execution::new).transpose()?.map(Arc::new);
         Ok(Self {
             store,
             execution,
+            configuration,
+            configuration_admission: Arc::default(),
             work: Arc::default(),
             changed: Arc::default(),
         })
@@ -144,7 +172,7 @@ impl Host {
             .create(CreateSession {
                 id: session.clone(),
                 request: change_id()?,
-                configuration: encode(SESSION_SCHEMA, &configuration)?,
+                configuration: encode(SESSION_SCHEMA, 1, &configuration)?,
             })
             .await?;
         Ok(session)
@@ -167,7 +195,7 @@ impl Host {
     pub async fn start_prompt(&self, request: PromptRequest) -> Result<AcceptedRun> {
         self.execution()?;
         let PromptRequest { id, session, parts } = request;
-        let input = prompt_input(&id, parts)?;
+        let input = prompt_input(&id, &parts)?;
         let turn = TurnId::new(uuid())?;
         let (admission_tx, admission) = oneshot::channel();
         let (updates_tx, updates) = broadcast::channel(UPDATE_CAPACITY);
@@ -191,9 +219,9 @@ impl Host {
                 // The first admission check acquires the same lock that records
                 // this worker. No durable submission precedes host ownership.
                 let prepared = host
-                    .admit(&worker_session, &worker_turn, worker_input, &input)
+                    .admit(&worker_session, &worker_turn, worker_input, parts)
                     .await;
-                let (master, opened) = match prepared {
+                let (master, opened, acceptance) = match prepared {
                     Ok(run) => run,
                     Err(error) => {
                         host.finish_work(&worker_session, error.kind == ErrorKind::Uncertain)
@@ -202,7 +230,7 @@ impl Host {
                         return;
                     }
                 };
-                let _ = admission_tx.send(Ok(()));
+                let _ = admission_tx.send(Ok(acceptance));
                 let result = drive(host.store.clone(), master, opened, input, updates_tx).await;
                 host.finish_work(&worker_session, result.is_err()).await;
                 let _ = completion_tx.send(result);
@@ -218,13 +246,14 @@ impl Host {
         }
         // Dropping the requesting client only detaches this receiver. The
         // registered worker keeps ownership through claim and settlement.
-        admission
+        let acceptance = admission
             .await
             .map_err(|_| problem(ErrorKind::Uncertain, "admission_worker_interrupted"))??;
         Ok(AcceptedRun {
             session,
             turn,
             input: id,
+            position: acceptance.position,
             updates,
             completion,
         })
@@ -235,8 +264,8 @@ impl Host {
         session: &SessionId,
         turn: &TurnId,
         id: ChangeId,
-        input: &[Message],
-    ) -> Result<(Master, agent_kit_runtime::OpenedTurn)> {
+        parts: Vec<PromptPart>,
+    ) -> Result<(Master, agent_kit_runtime::OpenedTurn, Acceptance)> {
         if self.work.lock().await.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
@@ -248,6 +277,9 @@ impl Host {
                 "session_execution_configuration_changed",
             ));
         }
+        if view.admission_paused {
+            return Err(problem(ErrorKind::InvalidState, "session_admission_paused"));
+        }
         if view.current.is_some() {
             return Err(problem(
                 ErrorKind::InvalidState,
@@ -255,22 +287,36 @@ impl Host {
             ));
         }
         let history = self.history(session.clone(), None).await?;
+        // Serialize settings activation with the commit that captures them.
+        let configuration_admission = self.configuration_admission.lock().await;
+        let configuration = self.with_configuration(Configuration::snapshot).await?;
+        let input_limit = configuration.defaults.context.max_input_tokens;
         let master = Master::new(
             execution.config.clone(),
             execution.provider.clone(),
             Inventory::new().snapshot(&[])?,
             execution.authority.clone(),
         )?
-        .with_history(history);
-        self.store
+        .with_history(history)
+        .with_input_limit(input_limit);
+        let acceptance = self
+            .store
             .submit(
                 session.clone(),
                 Submission {
                     id: id.clone(),
-                    payload: encode(INPUT_SCHEMA, input)?,
+                    payload: encode(
+                        INPUT_SCHEMA,
+                        2,
+                        &StoredPrompt {
+                            parts,
+                            configuration,
+                        },
+                    )?,
                 },
             )
             .await?;
+        drop(configuration_admission);
         let view = self.store.inspect(session.clone()).await?;
         let claim = self
             .store
@@ -313,7 +359,7 @@ impl Host {
             .await
             .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_pause_failed"))?;
         }
-        Ok((master, opened))
+        Ok((master, opened, acceptance))
     }
 
     async fn finish_work(&self, session: &SessionId, unverified: bool) {
@@ -323,6 +369,135 @@ impl Host {
             work.active.remove(session);
         }
         self.changed.notify_waiters();
+    }
+
+    pub async fn submit_prompt(&self, request: PromptRequest) -> Result<DurableSubmission> {
+        prompt_input(&request.id, &request.parts)?;
+        if let Some(accepted) = self.existing_submission(&request).await? {
+            return Ok(accepted);
+        }
+        match self.start_prompt(request.clone()).await {
+            Ok(run) => Ok(DurableSubmission {
+                session: run.session,
+                input: run.input,
+                position: run.position,
+                disposition: InputDisposition::Claimed { turn: run.turn },
+            }),
+            // An acceptance may have committed before the claim or response
+            // failed. Re-read its identity and leave unclaimed input queued.
+            Err(error) => self.existing_submission(&request).await?.ok_or(error),
+        }
+    }
+
+    async fn existing_submission(
+        &self,
+        request: &PromptRequest,
+    ) -> Result<Option<DurableSubmission>> {
+        let Some(view) = self
+            .store
+            .input(request.session.clone(), request.id.clone())
+            .await?
+        else {
+            return Ok(None);
+        };
+        let stored = &view.input.payload;
+        if stored.schema().as_str() != INPUT_SCHEMA {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "unsupported_submission_schema",
+            ));
+        }
+        let same_input = match stored.version() {
+            1 => {
+                let previous: Vec<Message> = serde_json::from_slice(stored.bytes())
+                    .map_err(|_| problem(ErrorKind::InvalidState, "invalid_submission"))?;
+                let current = prompt_input(&request.id, &request.parts)?;
+                previous.len() == 1 && previous[0].content == current[0].content
+            }
+            2 => {
+                let previous: StoredPrompt = serde_json::from_slice(stored.bytes())
+                    .map_err(|_| problem(ErrorKind::InvalidState, "invalid_submission"))?;
+                previous.parts == request.parts
+            }
+            _ => {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "unsupported_submission_schema",
+                ));
+            }
+        };
+        if !same_input {
+            return Err(problem(ErrorKind::Conflict, "submission_input_changed"));
+        }
+        Ok(Some(DurableSubmission {
+            session: request.session.clone(),
+            input: request.id.clone(),
+            position: view.position,
+            disposition: view.disposition,
+        }))
+    }
+
+    pub async fn stop(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+        request: ChangeId,
+        expected_session: SessionRevision,
+        expected_control: ControlRevision,
+    ) -> Result<ControlReceipt> {
+        self.store
+            .control(ControlRequest {
+                id: request,
+                session,
+                expected_revision: expected_session,
+                action: SessionControl::PauseAndCancel {
+                    turn,
+                    expected: expected_control,
+                },
+            })
+            .await
+    }
+
+    pub async fn configuration_inspect(&self) -> Result<ConfigurationInspection> {
+        self.with_configuration(Configuration::inspect).await
+    }
+
+    pub async fn configuration_update(
+        &self,
+        expected: Option<Fingerprint>,
+        change: SettingChange,
+    ) -> Result<ConfigurationSnapshot> {
+        let admission = self.configuration_admission.clone().lock_owned().await;
+        self.with_configuration(move |configuration| {
+            let _admission = admission;
+            configuration.update(expected, change)
+        })
+        .await
+    }
+
+    pub async fn configuration_reload(
+        &self,
+        expected: Option<Fingerprint>,
+    ) -> Result<ConfigurationSnapshot> {
+        let admission = self.configuration_admission.clone().lock_owned().await;
+        self.with_configuration(move |configuration| {
+            let _admission = admission;
+            configuration.reload(expected)
+        })
+        .await
+    }
+
+    async fn with_configuration<T: Send + 'static>(
+        &self,
+        operation: impl FnOnce(&Configuration) -> Result<T> + Send + 'static,
+    ) -> Result<T> {
+        let configuration = self
+            .configuration
+            .clone()
+            .ok_or_else(|| problem(ErrorKind::Unavailable, "configuration_unavailable"))?;
+        tokio::task::spawn_blocking(move || operation(&configuration))
+            .await
+            .map_err(|_| problem(ErrorKind::Uncertain, "configuration_worker_interrupted"))?
     }
 
     pub async fn cancel(&self, session: SessionId, turn: TurnId) -> Result<()> {
@@ -426,7 +601,7 @@ impl Execution {
                 input_modalities: [Modality::Text].into_iter().collect(),
                 json_tools: false,
                 text_tools: false,
-                max_output_tokens: Some(options.max_output_tokens),
+                max_output_tokens: None,
             },
             output_limit: OutputLimitField::CompletionTokens,
             include_usage: true,
@@ -611,28 +786,35 @@ async fn control(
     Err(problem(ErrorKind::Conflict, "control_revision_changed"))
 }
 
-fn prompt_input(id: &ChangeId, parts: Vec<PromptPart>) -> Result<Vec<Message>> {
+fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
     if parts.is_empty() || parts.len() > MAX_PROMPT_PARTS {
         return Err(problem(ErrorKind::InvalidInput, "invalid_prompt_parts"));
     }
-    let bytes = serde_json::to_vec(&parts)
+    let bytes = serde_json::to_vec(parts)
         .map_err(|_| problem(ErrorKind::InvalidInput, "prompt_encoding_failed"))?;
     if bytes.len() > MAX_PROMPT_BYTES {
         return Err(problem(ErrorKind::LimitExceeded, "prompt_too_large"));
     }
     let content = parts
-        .into_iter()
+        .iter()
         .map(|part| match part {
-            PromptPart::Text { text } => Content::Text(text),
+            PromptPart::Text { text } => Content::Text(text.clone()),
             reference @ PromptPart::ResourceLink { .. } => {
                 // A reference is context supplied by the user. It is neither
                 // imported nor granted filesystem or network authority here.
-                Content::Text(serde_json::to_string(&reference).expect("serializable reference"))
+                Content::Text(serde_json::to_string(reference).expect("serializable reference"))
             }
         })
         .collect();
     Ok(vec![Message {
-        id: MessageId::new(format!("input/{}", id.as_str()))?,
+        id: MessageId::new(format!(
+            "input/{:x}",
+            uuid::Uuid::from_bytes(
+                Fingerprint::of(id)?.bytes()[..16]
+                    .try_into()
+                    .expect("fingerprint prefix"),
+            )
+        ))?,
         role: Role::User,
         phase: None,
         content,
@@ -688,10 +870,10 @@ fn prepare_state_dir(path: &Path) -> Result<()> {
         .map_err(|_| problem(ErrorKind::Unavailable, "state_directory_unavailable"))
 }
 
-fn encode(schema: &str, value: &(impl Serialize + ?Sized)) -> Result<Envelope> {
+fn encode(schema: &str, version: u32, value: &(impl Serialize + ?Sized)) -> Result<Envelope> {
     Envelope::new(
         SchemaId::new(schema)?,
-        1,
+        version,
         serde_json::to_vec(value)
             .map_err(|_| problem(ErrorKind::InvalidInput, "host_record_encoding_failed"))?,
     )

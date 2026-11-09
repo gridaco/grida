@@ -4,7 +4,7 @@ use agent_kit_core::{Error, ErrorKind, Fingerprint, Result};
 use grida_agent_master::configuration::{
     CONTEXT_MAX_INPUT_TOKENS, FieldDefinition, SettingChange, UserDefaults,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs::{File, Metadata, OpenOptions};
 use std::io::{Read, Write};
 use std::num::NonZeroU64;
@@ -14,7 +14,7 @@ use toml_edit::{DocumentMut, Item, Table, value};
 
 const MAX_FILE_BYTES: u64 = 64 * 1024;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfigurationSnapshot {
     pub identity: Fingerprint,
     pub source_revision: Option<Fingerprint>,
