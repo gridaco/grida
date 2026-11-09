@@ -1411,7 +1411,9 @@ levels into one.
    `org_id` through `requireOrganizationId` → `assertOrgMember`). The
    route accepts no org header — no new org-id trust input. CSRF is
    bounded by SameSite=Lax auth cookies + same-origin-only readability
-   (no CORS on `/desktop/*`). Native `/api/v1/auth/gg` instead uses GRIDA-SEC-010's
+   (no CORS on `/desktop/*`). Its Desktop main projection adds the verified
+   account subject only for the browserless native intent under GRIDA-SEC-005.
+   Native `/api/v1/auth/gg` instead uses GRIDA-SEC-010's
    live OAuth verification and an explicit positive safe-integer organization ID.
    Its fixed membership query retains that exact bearer and filters the verified
    user and organization in the same statement. Unknown/invisible membership is
@@ -1438,13 +1440,21 @@ levels into one.
    Supabase client from the bearer value (`createClientFromBearer` is
    the _other_ pattern, for first-party Supabase tokens on
    `/private/*` routes — grep-able invariant).
-6. **Custody doctrine (client half)** — the daemon holds the token in
+6. **Custody doctrine (client half)** — the Desktop media daemon holds the token in
    memory only: never `auth.json`, never disk, never a refresh token.
    The webview session remains the only durable credential
    (GRIDA-SEC-005); the renderer re-mints and re-pushes. Provider requests use
    the GRIDA-SEC-004 host transport: Electron main necessarily observes the
    scoped bearer header and request body in transit, but does not retain,
    persist, return, or log them and never receives the durable webview session.
+   The [native chat connection](desktop/src/main/native-gateway-connection.ts)
+   instead retains its own scoped grant in main memory. It obtains the grant
+   from the [account owner](desktop/src/main/account-session.ts) through the
+   fixed cookie-authenticated mint. Sign-out and a detected subject change
+   invalidate its authority. Refresh retains the same origin, subject, and
+   organization. The connector adds the bearer only to the fixed chat route
+   through the dedicated provider session. The child receives no bearer or
+   account cookie through that connection.
    Independent native hosts keep their own account custody under GRIDA-SEC-010.
    The fixed exchange delivers a frozen GG grant only to a construction-time
    trusted synchronous memory sink; its public result contains only org/expiry

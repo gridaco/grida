@@ -16,7 +16,8 @@ type Reply =
       requestId: string | null;
       retryAfterMs: number | null;
     };
-type Dispatch = (body: Buffer, signal: AbortSignal) => Promise<Response>;
+// A null result is a refusal before a provider request started.
+type Dispatch = (body: Buffer, signal: AbortSignal) => Promise<Response | null>;
 
 /** Trusted main-process network authority. Preparation must verify the live
  * grant without dispatching a request. The returned closure is used once. */
@@ -151,6 +152,10 @@ export class NativeProviderEgress {
     exchange.uploaded.length = 0;
     try {
       const response = await dispatch(body, exchange.controller.signal);
+      if (!response) {
+        this.end(id, exchange);
+        return { status: "unavailable" };
+      }
       if (this.exchanges.get(id) !== exchange) {
         await response.body?.cancel().catch(() => {});
         return { status: "interrupted" };

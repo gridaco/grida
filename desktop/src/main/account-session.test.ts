@@ -1,6 +1,9 @@
 // GRIDA-SEC-005 — fixed-route account projection and confirmed sign-out pins.
-import { describe, expect, it } from "vitest";
-import { DesktopAccountSession } from "./account-session";
+import { describe, expect, it, vi } from "vitest";
+import {
+  DesktopAccountSession,
+  type DesktopGatewayGrant,
+} from "./account-session";
 
 const signedInPayload = {
   user: {
@@ -179,6 +182,100 @@ describe("DesktopAccountSession construction", () => {
   });
 });
 
+describe("DesktopAccountSession.withGatewayGrant", () => {
+  const grant = () => ({
+    token: "synthetic.gateway.fixture",
+    expires_at: new Date(Date.now() + 14 * 60_000).toISOString(),
+    organization: { id: 7, name: "Fixture" },
+    account_subject: "account-7",
+  });
+
+  it("requests only the same-origin grant and projects an exact organization to its owner", async () => {
+    const requests: RequestRecord[] = [];
+    const value = grant();
+    const session = createSession(requests, async () => Response.json(value));
+    const accept = vi.fn<(grant: DesktopGatewayGrant) => void>();
+    await expect(session.withGatewayGrant(7, accept)).resolves.toBeUndefined();
+    expect(requests).toEqual([
+      {
+        url: "https://grida.co/desktop/auth/token",
+        init: expect.objectContaining({
+          method: "POST",
+          body: '{"org_id":7}',
+          credentials: "include",
+          cache: "no-store",
+          redirect: "manual",
+        }),
+      },
+    ]);
+    expect(
+      new Headers(requests[0].init.headers).get(
+        "sec-grida-desktop-account-session"
+      )
+    ).toBe("mint-ai");
+    expect(accept).toHaveBeenCalledExactlyOnceWith({
+      token: value.token,
+      expiresAt: Date.parse(value.expires_at),
+      subject: "account-7",
+      organizationId: 7,
+      isCurrent: expect.any(Function),
+    });
+  });
+
+  it("invalidates a retained grant when account revalidation observes a different subject", async () => {
+    const session = createSession([], async (url) =>
+      Response.json(
+        url.endsWith("/me") ? { user: { id: "another-account" } } : grant()
+      )
+    );
+    const accept = vi.fn<(grant: DesktopGatewayGrant) => void>();
+    await session.withGatewayGrant(undefined, accept);
+    const accepted = accept.mock.calls[0][0];
+    expect(accepted.isCurrent()).toBe(true);
+    await expect(session.status()).resolves.toBe("signed-in");
+    expect(accepted.isCurrent()).toBe(false);
+  });
+
+  it.each([
+    () => Response.json({ ...grant(), organization: { id: 9 } }),
+    () => Response.json({ ...grant(), account_subject: undefined }),
+    () => Response.json({ ...grant(), expires_at: new Date(0).toISOString() }),
+    () => Response.json({ ...grant(), oversized: "x".repeat(25 * 1024) }),
+    () => followedResponse(Response.json(grant())),
+  ])(
+    "refuses unbound, expired, oversized, or redirected responses %#",
+    async (response) => {
+      const session = createSession([], async () => response());
+      const accept = vi.fn<(grant: DesktopGatewayGrant) => void>();
+      await expect(session.withGatewayGrant(7, accept)).rejects.toThrow(
+        "gateway_grant_unavailable"
+      );
+      expect(accept).not.toHaveBeenCalled();
+    }
+  );
+
+  it("discards a mint that overlaps native sign-out", async () => {
+    const mint = Promise.withResolvers<Response>();
+    const signOut = Promise.withResolvers<Response>();
+    const requests: RequestRecord[] = [];
+    const session = createSession(requests, async () =>
+      requests.length === 1 ? mint.promise : signOut.promise
+    );
+    const accept = vi.fn<(grant: DesktopGatewayGrant) => void>();
+    const before = session.withGatewayGrant(undefined, accept);
+    const signingOut = session.signOut();
+    await expect(session.withGatewayGrant(undefined, accept)).rejects.toThrow(
+      "gateway_grant_unavailable"
+    );
+    signOut.resolve(new Response(null, { status: 204 }));
+    await signingOut;
+    mint.resolve(Response.json(grant()));
+    await expect(before).rejects.toThrow("gateway_grant_unavailable");
+    expect(accept).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(2);
+  });
+});
+
 type RequestRecord = {
   url: string;
   init: RequestInit;
@@ -186,14 +283,14 @@ type RequestRecord = {
 
 function createSession(
   requests: RequestRecord[],
-  fetch: () => Promise<Response>,
+  fetch: (url: string, init: RequestInit) => Promise<Response>,
   editorBaseUrl = "https://grida.co/some/configured/base"
 ): DesktopAccountSession {
   return new DesktopAccountSession({
     base_url: editorBaseUrl,
     fetch: async (url, init) => {
       requests.push({ url, init });
-      return await fetch();
+      return await fetch(url, init);
     },
   });
 }

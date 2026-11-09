@@ -30,8 +30,23 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 const NO_STORE = { "cache-control": "no-store" } as const;
+const NATIVE_ACCOUNT_SESSION_HEADER = "sec-grida-desktop-account-session";
 
 export async function POST(request: Request) {
+  const native = request.headers.has(NATIVE_ACCOUNT_SESSION_HEADER);
+  if (
+    native &&
+    (request.headers.get(NATIVE_ACCOUNT_SESSION_HEADER) !== "mint-ai" ||
+      request.headers.has("origin") ||
+      request.headers.get("sec-fetch-site") !== "none" ||
+      request.headers.get("sec-fetch-mode") !== "no-cors" ||
+      request.headers.get("sec-fetch-dest") !== "empty")
+  ) {
+    return NextResponse.json(
+      { error: { code: "native_account_session_required" } },
+      { status: 403, headers: NO_STORE }
+    );
+  }
   try {
     // Inside the try so a throw from createClient / getUser / the Upstash
     // limiter still yields the JSON no-store envelope, not Next's default 500.
@@ -51,7 +66,10 @@ export async function POST(request: Request) {
       organization: (userId) =>
         resolveMintOrganization(request, userId, client),
     });
-    return NextResponse.json(grant, { headers: NO_STORE });
+    return NextResponse.json(
+      native ? { ...grant, account_subject: user.id } : grant,
+      { headers: NO_STORE }
+    );
   } catch (err) {
     return errorResponse(err);
   }

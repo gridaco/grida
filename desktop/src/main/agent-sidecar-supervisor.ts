@@ -65,6 +65,9 @@ import { DesktopAgentSandboxPolicy } from "./agent-sandbox-policy";
 import { AgentCommandHost, sweepAgentCommandTemps } from "./agent-command-host";
 import { DesktopMediaRoot } from "./media-root";
 import type { NativeProviderNetwork } from "./native-provider-egress";
+import type { DesktopAccountSession } from "./account-session";
+import { NativeGatewayConnection } from "./native-gateway-connection";
+import { AgentNetworkPolicy } from "../agent-network-policy";
 
 export type AgentSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -236,6 +239,24 @@ export class AgentSidecarSupervisor {
       this.networkAuthority,
       grantId
     );
+  }
+
+  async nativeGatewayConnection(
+    account: DesktopAccountSession,
+    organizationId?: number,
+    signal?: AbortSignal
+  ): Promise<NativeGatewayConnection> {
+    const network = await AgentNetworkHost.nativeProviderNetwork(
+      this.networkAuthority,
+      AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+    );
+    return await NativeGatewayConnection.open({
+      origin: new URL(EDITOR_BASE_URL).origin,
+      account,
+      network,
+      organizationId,
+      signal,
+    });
   }
 
   async withTemporaryProviderEndpoint<T>(
@@ -762,6 +783,14 @@ export function getAgentSidecarInfo(): AgentSidecarInfo | null {
 
 export function nativeAgentEndpointNetwork(id: string, baseUrl: string) {
   return supervisor.nativeEndpointNetwork(id, baseUrl);
+}
+
+export function nativeAgentGatewayConnection(
+  account: DesktopAccountSession,
+  organizationId?: number,
+  signal?: AbortSignal
+) {
+  return supervisor.nativeGatewayConnection(account, organizationId, signal);
 }
 
 export function stopAgentSidecar() {

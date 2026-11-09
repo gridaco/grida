@@ -107,6 +107,37 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("POST /desktop/auth/token", () => {
+  it("includes the verified account subject for a native account request", async () => {
+    const req = request();
+    req.headers.set("sec-grida-desktop-account-session", "mint-ai");
+    req.headers.set("sec-fetch-site", "none");
+    req.headers.set("sec-fetch-mode", "no-cors");
+    req.headers.set("sec-fetch-dest", "empty");
+    const response = await POST(req);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({
+      token: "jwt-abc",
+      expires_at: EXPIRES.toISOString(),
+      organization: { id: 7, name: "acme" },
+      account_subject: "user-1",
+    });
+  });
+
+  it("refuses native intent with browser fetch metadata before reading the account", async () => {
+    const req = request();
+    req.headers.set("sec-grida-desktop-account-session", "mint-ai");
+    req.headers.set("origin", "https://grida.test");
+    req.headers.set("sec-fetch-site", "same-origin");
+    req.headers.set("sec-fetch-mode", "cors");
+    req.headers.set("sec-fetch-dest", "empty");
+    const response = await POST(req);
+    expect(response.status).toBe(403);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(getUser).not.toHaveBeenCalled();
+    expect(mint).not.toHaveBeenCalled();
+  });
+
   it("401 when signed out; minting never runs", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
     const res = await POST(request());
