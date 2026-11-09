@@ -12,6 +12,8 @@ mod http;
 pub mod permissions;
 pub mod process;
 pub mod scratch;
+pub mod surface_tools;
+pub mod tool_host;
 pub mod workspace;
 
 pub use http::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol};

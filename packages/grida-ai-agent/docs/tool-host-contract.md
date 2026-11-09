@@ -42,6 +42,13 @@ These are roles within existing packages. The Rust host can start with
 bridge. Share the boundary schema across languages and check it with contract
 fixtures. Internal document objects stay with their owning implementation.
 
+The [native capability host](../../../crates/grida-agent/src/tool_host.rs)
+issues a lease for one capability at one registered endpoint. The native
+adapter and direct callers use the same invocation method. The first
+executor implements the non-interactive `surface_open` result. Its
+`requested: false` result reports that no presentation was requested.
+Production editor registration and MCP transport remain to be connected.
+
 ## Catalog and capability requirements
 
 A capability definition has a stable ID, definition revision, description,
@@ -102,7 +109,9 @@ authenticated request context. A native adapter correlates the call with its
 agent invocation. An MCP caller needs no Grida agent session or turn.
 
 Call IDs correlate requests and replies. Deduplication and effect recovery
-depend on capabilities supplied by the executor. Results retain the capability's structured output, bounded
+depend on capabilities supplied by the executor. The native dispatcher
+retains a versioned receipt with the original call binding and whether it
+verified a reply. Results retain the capability's structured output, bounded
 readable content, and any artifacts. Domain errors pass through with their
 meaning intact. A request to present an artifact and observed display remain
 separate evidence.

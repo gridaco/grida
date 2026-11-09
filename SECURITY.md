@@ -859,6 +859,14 @@ lazy reads, read-only mutation, and symlink escape refusal.
   keep the child under ownership through EOF shutdown. Only projected error
   codes cross the process diagnostics boundary. Renderer authorization and
   cutover are separate from this process contract.
+- [Native capability host](crates/grida-agent/src/tool_host.rs) and
+  [its fixtures](crates/grida-agent/tests/tool_host.rs) bind a tool lease to
+  a single capability and endpoint lifetime. The dispatcher checks the
+  definition revision, validates arguments before dispatch and correlates the
+  result with the original call. Closing the endpoint revokes its grants.
+  A missing or mismatched reply retains the original call binding and an
+  uncertain outcome. The executor still owns authorization at its boundary,
+  including Electron sender validation when it routes to an editor.
 
 - Portable Rust provider contracts: [crates/grida-ai/src/catalogue.rs](crates/grida-ai/src/catalogue.rs),
   [crates/grida-ai/src/discovery.rs](crates/grida-ai/src/discovery.rs),
