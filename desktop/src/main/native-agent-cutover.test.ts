@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultScratchBase } from "@grida/agent/sandbox";
 import type { NativeAgentChatLaunch } from "./native-agent-chat";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
+import { LegacyChatSourceLease } from "./legacy-chat-source-lease";
 
 const electron = vi.hoisted(() => ({ temp: "", userData: "", media: "" }));
 vi.mock("electron", () => ({
@@ -28,6 +29,7 @@ vi.mock("./media-root", () => ({
 const nativeResources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const supported = process.platform === "darwin" || process.platform === "linux";
 const roots: string[] = [];
+const fixtureAdmission = { verifyWriterAdmission: async () => true };
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -67,10 +69,11 @@ async function fixture() {
   const prepare = async (credentialHome?: string) => {
     vi.resetModules();
     const { NativeAgentCutover } = await import("./native-agent-cutover");
-    return NativeAgentCutover.prepare(credentialHome);
+    return NativeAgentCutover.prepare({ ...fixtureAdmission, credentialHome });
   };
   return {
     NativeAgentCutover,
+    prepare,
     start: async (options = launch) =>
       (await prepare(options.credentialHome)).startWorkspace("work", options),
     child,
@@ -118,14 +121,14 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
   it("preserves a verified archive when the native executable is unavailable and resumes interrupted publication", async () => {
     const test = await fixture();
     writeLegacy(test.database, test.scratchBase);
-    const first = test.NativeAgentCutover.prepare();
-    await expect(test.NativeAgentCutover.prepare()).rejects.toThrow(
-      "native_chat_cutover_in_progress"
-    );
+    const first = test.NativeAgentCutover.prepare(fixtureAdmission);
+    await expect(
+      test.NativeAgentCutover.prepare(fixtureAdmission)
+    ).rejects.toThrow("native_chat_cutover_in_progress");
     const prepared = await first;
-    await expect(test.NativeAgentCutover.prepare()).rejects.toThrow(
-      "native_chat_cutover_already_prepared"
-    );
+    await expect(
+      test.NativeAgentCutover.prepare(fixtureAdmission)
+    ).rejects.toThrow("native_chat_cutover_already_prepared");
     expect(fs.readdirSync(test.nativeState)).toEqual(["cutover.json"]);
     await expect(prepared.startWorkspace("work", test.launch)).rejects.toThrow(
       "native_agent_installation_unavailable"
@@ -211,39 +214,41 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     expect(fs.existsSync(test.archiveRoot)).toBe(false);
   });
 
-  it("captures later legacy commits when the first native startup never became ready", async () => {
+  it("requires writer admission and the exact drained claim before publishing a cutoff", async () => {
     const test = await fixture();
     writeLegacy(test.database, test.scratchBase);
-    await expect(test.start()).rejects.toThrow(
-      "native_agent_installation_unavailable"
-    );
-    const first = JSON.parse(fs.readFileSync(test.checkpoint, "utf8"));
-    const writer = new DatabaseSync(test.database);
-    try {
-      writer.exec("INSERT INTO chat_sessions VALUES ('ses_later')");
-    } finally {
-      writer.close();
-    }
-    await expect(test.start()).rejects.toThrow(
-      "native_agent_installation_unavailable"
-    );
-    const second = JSON.parse(fs.readFileSync(test.checkpoint, "utf8"));
-    expect(second.nativeReady).toBe(false);
-    expect(second.archiveId).not.toBe(first.archiveId);
-    expect(fs.readdirSync(test.archiveRoot).sort()).toEqual(
-      [first.archiveId, second.archiveId].sort()
-    );
-    const db = new DatabaseSync(
-      path.join(test.archiveRoot, second.archiveId, "sessions.db"),
-      { readOnly: true }
-    );
-    try {
-      expect(
-        db.prepare("SELECT COUNT(*) AS count FROM chat_sessions").get()
-      ).toEqual({ count: 2 });
-    } finally {
-      db.close();
-    }
+    await expect(
+      test.NativeAgentCutover.prepare({
+        verifyWriterAdmission: async () => false,
+      })
+    ).rejects.toThrow("writer_admission_unverified");
+    expect(fs.existsSync(test.nativeState)).toBe(false);
+    expect(fs.existsSync(test.archiveRoot)).toBe(false);
+    const lease = new LegacyChatSourceLease({
+      userDataPath: test.legacy,
+      scratchBase: test.scratchBase,
+    });
+    const writer = await lease.claimWriter();
+    await expect(test.prepare()).rejects.toThrow("dirty");
+    expect(fs.existsSync(test.archiveRoot)).toBe(false);
+    await writer.completeDrain(async (claimId) => claimId === writer.claimId);
+    const prepared = await test.prepare();
+    expect(prepared.archive?.sessionCount).toBe(1);
+    await expect(lease.claimWriter()).rejects.toThrow("retired");
+  });
+
+  it("reuses the retired archive when startup stopped before publishing its Desktop receipt", async () => {
+    const test = await fixture();
+    writeLegacy(test.database, test.scratchBase);
+    const first = await test.prepare();
+    const receipt = fs.readFileSync(test.checkpoint, "utf8");
+    // Simulate interruption after shared retirement but before this profile's
+    // first receipt was durable. There is still no native workspace state.
+    fs.unlinkSync(test.checkpoint);
+    const second = await test.prepare();
+    expect(second.archive).toEqual(first.archive);
+    expect(fs.readFileSync(test.checkpoint, "utf8")).toBe(receipt);
+    expect(fs.readdirSync(test.archiveRoot)).toEqual([first.archive?.id]);
   });
 
   it.runIf(Boolean(nativeResources))(
@@ -300,7 +305,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     async () => {
       const test = await fixture();
       writeLegacy(test.database, test.scratchBase);
-      const prepared = await test.NativeAgentCutover.prepare();
+      const prepared = await test.NativeAgentCutover.prepare(fixtureAdmission);
       const one = { ...test.launch, resourcesPath: nativeResources! };
       const two = { ...one, cwd: test.child("other-workspace") };
       const results = await Promise.allSettled([
@@ -339,7 +344,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     "shares workspace startup across windows and drains all retained ownership",
     async () => {
       const test = await fixture();
-      const prepared = await test.NativeAgentCutover.prepare();
+      const prepared = await test.NativeAgentCutover.prepare(fixtureAdmission);
       const workspace = { id: "work", root: test.launch.cwd };
       const release = vi.fn<() => void>();
       const launch = { ...test.launch, resourcesPath: nativeResources! };
@@ -399,7 +404,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     "reopens a disconnected workspace without redispatching interrupted work",
     async () => {
       const test = await fixture();
-      const prepared = await test.NativeAgentCutover.prepare();
+      const prepared = await test.NativeAgentCutover.prepare(fixtureAdmission);
       const workspace = { id: "work", root: test.launch.cwd };
       const resourcesPath = test.child("crash-resources");
       const executableDir = path.join(resourcesPath, "native-agent");

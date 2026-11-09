@@ -6,6 +6,10 @@ import path from "node:path";
 import { sealLegacyChatForColdStart } from "./agent-sidecar-supervisor";
 import { LegacyChatArchive } from "./legacy-chat-archive";
 import {
+  LegacyChatSourceLease,
+  type LegacyChatWriterAdmission,
+} from "./legacy-chat-source-lease";
+import {
   NativeAgentChat,
   type NativeAgentChatLaunch,
 } from "./native-agent-chat";
@@ -31,6 +35,10 @@ type Ready = Readonly<{
 }>;
 
 type Launch = Omit<NativeAgentChatLaunch, "stateDirectory">;
+type ExistingCutoff = Readonly<{
+  verifyWriterAdmission: LegacyChatWriterAdmission;
+  credentialHome?: string;
+}>;
 
 export class NativeAgentCutover {
   private static preparing = false;
@@ -45,18 +53,17 @@ export class NativeAgentCutover {
   ) {}
 
   /** Verify the shared legacy cutoff before starting any workspace engine. */
-  static prepare(credentialHome?: string): Promise<NativeAgentCutover> {
-    return this.claim(false, credentialHome);
+  static prepare(existing: ExistingCutoff): Promise<NativeAgentCutover> {
+    return this.claim(existing);
   }
 
   /** Admit an isolated native profile without claiming an existing-data cutoff. */
   static prepareFresh(): Promise<NativeAgentCutover> {
-    return this.claim(true);
+    return this.claim();
   }
 
   private static async claim(
-    fresh: boolean,
-    credentialHome?: string
+    existing?: ExistingCutoff
   ): Promise<NativeAgentCutover> {
     if (process.platform !== "darwin" && process.platform !== "linux")
       throw new Error("native_chat_cutover_platform_unsupported");
@@ -64,7 +71,7 @@ export class NativeAgentCutover {
     if (this.prepared) throw new Error("native_chat_cutover_already_prepared");
     this.preparing = true;
     try {
-      const prepared = await this.prepareSealed(fresh, credentialHome);
+      const prepared = await this.prepareSealed(existing);
       this.prepared = true;
       return prepared;
     } finally {
@@ -73,8 +80,7 @@ export class NativeAgentCutover {
   }
 
   private static async prepareSealed(
-    fresh: boolean,
-    credentialHome: string | undefined
+    existing: ExistingCutoff | undefined
   ): Promise<NativeAgentCutover> {
     const source = await sealLegacyChatForColdStart();
     const desktop = await fs.realpath(source.desktopUserDataPath);
@@ -86,7 +92,7 @@ export class NativeAgentCutover {
         source.scratchBase,
         source.providerHome,
         source.mediaRoot,
-        credentialHome,
+        existing?.credentialHome,
       ]
         .filter((root): root is string => root !== undefined)
         .map(intendedLocation)
@@ -94,29 +100,21 @@ export class NativeAgentCutover {
     if (separate.some((root) => overlaps(root, stateDirectory)))
       throw new Error("native_chat_cutover_state_overlap");
 
-    // The single-instance owner sealed the actual Desktop supervisor before
-    // its legacy launch. Leftover managed worker state is a reason to stop.
-    if (fresh)
+    if (!existing)
       await requireFreshSource(source.userDataPath, source.scratchBase);
-    else await requireDrainedCommands(source.scratchBase);
     const sourceKey = createHash("sha256")
       .update(JSON.stringify([source.userDataPath, source.scratchBase]))
       .digest("hex");
-    const archive = new LegacyChatArchive(source);
     const previous = await readCheckpoint(stateDirectory);
     if (previous && previous.source !== sourceKey)
       throw new Error("native_chat_cutover_source_changed");
-    if (fresh && previous?.archiveId)
+    if (!existing && previous?.archiveId)
       throw new Error("native_chat_requires_fresh_profile");
-    let cutoff = previous?.archiveId
-      ? await archive.verify(previous.archiveId)
+    const cutoff = existing
+      ? await retireLegacy(source, sourceKey, previous, existing)
       : null;
     let checkpoint = previous;
-    if (!checkpoint?.nativeReady) {
-      // An interrupted first startup has not exposed any native chat. Capture
-      // the latest sealed legacy cutoff and independently verify publication.
-      const captured = fresh ? null : await archive.snapshotQuiesced();
-      cutoff = captured ? await archive.verify(captured.id) : null;
+    if (!checkpoint) {
       await ensureState(stateDirectory);
       if (!previous && !(await emptyDirectory(stateDirectory)))
         throw new Error("native_chat_cutover_unowned_state");
@@ -184,6 +182,35 @@ export class NativeAgentCutover {
   }
 }
 
+async function retireLegacy(
+  source: Awaited<ReturnType<typeof sealLegacyChatForColdStart>>,
+  sourceKey: string,
+  previous: Checkpoint | null,
+  existing: ExistingCutoff
+): Promise<Ready["archive"]> {
+  const archive = new LegacyChatArchive(source);
+  let cutoff: Ready["archive"] = null;
+  await new LegacyChatSourceLease(source).retire({
+    requestId: `desktop-native-chat-${sourceKey}`,
+    verifyWriterAdmission: existing.verifyWriterAdmission,
+    verifyArchive: async (retained) => {
+      if (previous && (!retained || retained.archiveId !== previous.archiveId))
+        throw new Error("native_chat_cutover_archive_changed");
+      if (retained) {
+        cutoff = retained.archiveId
+          ? await archive.verify(retained.archiveId)
+          : null;
+      } else {
+        await requireDrainedCommands(source.scratchBase);
+        const captured = await archive.snapshotQuiesced();
+        cutoff = captured ? await archive.verify(captured.id) : null;
+      }
+      return cutoff?.id ?? null;
+    },
+  });
+  return cutoff;
+}
+
 async function requireFreshSource(userDataPath: string, scratchBase: string) {
   for (const name of [
     "sessions.db",
@@ -191,6 +218,7 @@ async function requireFreshSource(userDataPath: string, scratchBase: string) {
     "sessions.db-shm",
     "sessions.db-journal",
     "chat-archive",
+    "legacy-chat-ownership",
   ]) {
     if (await statIfPresent(path.join(userDataPath, name)))
       throw new Error("native_chat_requires_fresh_profile");

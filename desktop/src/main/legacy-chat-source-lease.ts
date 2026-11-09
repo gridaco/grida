@@ -20,6 +20,10 @@ const execute = promisify(execFile);
 
 type Source = Readonly<{ userDataPath: string; scratchBase: string }>;
 type Identity = Readonly<{ sourceId: string; scratchId: string }>;
+/** Trusted deployment evidence that every supported writer obeys this gate. */
+export type LegacyChatWriterAdmission = (
+  identity: Identity
+) => Promise<boolean>;
 type State =
   | { kind: "clean"; claimId: string | null }
   | { kind: "active"; claimId: string }
@@ -37,8 +41,7 @@ export type LegacyChatWriter = Readonly<{
 
 type Retirement = Readonly<{
   requestId: string;
-  /** Trusted deployment evidence that every supported writer obeys this gate. */
-  verifyWriterAdmission(identity: Identity): Promise<boolean>;
+  verifyWriterAdmission: LegacyChatWriterAdmission;
   /** Verify the prior archive or capture and verify a new one. Null proves absence. */
   verifyArchive(retained: LegacyChatRetirement | null): Promise<string | null>;
 }>;
