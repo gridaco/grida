@@ -20,6 +20,10 @@ const REPORT: &str = "goal_report";
 const REPORT_SCHEMA: &str = "grida.agent.goal.report";
 const MAX_REPORT_BYTES: usize = 16 * 1024;
 
+pub(super) fn is_goal_tool(id: &ToolId) -> bool {
+    matches!(id.as_str(), INSPECT | REPORT)
+}
+
 /// The host still assigns grants and installs the tools in the selected turn.
 pub fn for_work(goal: &Goal, turn: &TurnId) -> Result<[Arc<dyn Tool>; 2]> {
     if goal.paused()
@@ -120,7 +124,7 @@ impl GoalTool {
             ),
             Kind::Report => (
                 REPORT,
-                "Record a progress, blocked, or completion proposal for this goal. Call once when this work turn has collected its evidence. Completion needs verified evidence for every numbered success criterion. The proposal does not change the goal.",
+                "Record a progress, blocked, or completion proposal for this goal. Call once when this work turn has collected its evidence. For completion cite a tool call ID from this turn for each numbered success criterion. The proposal does not change the goal.",
                 report_schema(),
             ),
         };
@@ -255,9 +259,9 @@ fn report_schema() -> Value {
             {"type":"object", "required":["kind","summary","evidence"], "additionalProperties":false,
                 "properties":{"kind":{"const":"completion"},"summary":summary,
                     "evidence":{"type":"array","minItems":1,"maxItems":MAX_CRITERIA,
-                        "items":{"type":"object","required":["criterion","operation"],"additionalProperties":false,
+                        "items":{"type":"object","required":["criterion","call"],"additionalProperties":false,
                             "properties":{"criterion":{"type":"integer","minimum":1,"maximum":MAX_CRITERIA},
-                                "operation":{"type":"string","minLength":1}}}}}}
+                                "call":{"type":"string","minLength":1}}}}}}
         ]}
     }})
 }

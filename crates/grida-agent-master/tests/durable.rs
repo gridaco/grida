@@ -37,7 +37,7 @@ use agent_kit_sessions::{
 };
 use agent_kit_store_sqlite::SqliteStore;
 use futures_util::stream;
-use grida_agent_master::goals::{Allowance, Goal, Objective, Status, WorkOutcome};
+use grida_agent_master::goals::{Allowance, Blocker, Goal, Objective, Status, Usage, WorkOutcome};
 use grida_agent_master::{
     Master, MasterAuthority, MasterConfig, MasterOutcome, StopReason, read_account,
 };
@@ -113,6 +113,7 @@ enum Script {
     ToolThenAnswer,
     ToolAndDeferred,
     Tools,
+    GoalReport { call: &'static str },
 }
 
 struct ScriptProvider {
@@ -197,6 +198,26 @@ impl Provider for ScriptProvider {
         } else {
             vec![Content::Text("Finished".into())]
         };
+        if let Script::GoalReport { call } = self.script {
+            content = if index == 0 {
+                vec![Content::ToolCall(ToolCall {
+                    id: ToolCallId::new("goal-check")?,
+                    tool: tool_id(),
+                    arguments: ToolArguments::Json(serde_json::json!({"value":"opened"})),
+                })]
+            } else if index == 1 {
+                vec![Content::ToolCall(ToolCall {
+                    id: ToolCallId::new("goal-report")?,
+                    tool: ToolId::new("goal_report")?,
+                    arguments: ToolArguments::Json(serde_json::json!({"report": {
+                        "kind":"completion", "summary":"The export was verified",
+                        "evidence":[{"criterion":1,"call":call}]
+                    }})),
+                })]
+            } else {
+                content
+            };
+        }
         if matches!(self.script, Script::ToolAndDeferred) {
             content.push(Content::ToolCall(ToolCall {
                 id: ToolCallId::new(format!("deferred-{index}"))?,
@@ -437,10 +458,16 @@ impl Fixture {
             self.inventory.clone(),
             MasterAuthority {
                 inference: self.grants(),
-                tools: if matches!(self.provider.script, Script::Answer) {
-                    BTreeMap::new()
-                } else {
-                    BTreeMap::from([(tool_id(), self.grants())])
+                tools: match self.provider.script {
+                    Script::Answer => BTreeMap::new(),
+                    Script::GoalReport { .. } => self
+                        .inventory
+                        .offers()
+                        .unwrap()
+                        .into_iter()
+                        .map(|offer| (offer.id, self.grants()))
+                        .collect(),
+                    _ => BTreeMap::from([(tool_id(), self.grants())]),
                 },
             },
         )
@@ -2418,4 +2445,202 @@ async fn goal_controls_and_terminal_account_share_exact_durable_state() {
         observed.driver_state.value()
     );
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+}
+
+fn goal_for_work(steps: u32) -> Goal {
+    let mut goal = Goal::start(
+        change_id("goal"),
+        Objective {
+            description: "Verify the handoff".into(),
+            criteria: vec!["The exported file opens".into()],
+        },
+        Allowance {
+            work_turns: NonZeroU32::new(3).unwrap(),
+            inference_steps: NonZeroU32::new(steps).unwrap(),
+        },
+    )
+    .unwrap();
+    goal.reserve(
+        &goal.basis().clone(),
+        turn_id(),
+        NonZeroU32::new(steps).unwrap(),
+    )
+    .unwrap();
+    goal
+}
+
+async fn claim_goal_work(store: &SqliteStore, goal: &Goal) -> ClaimedTurn {
+    let session = session_id();
+    let created = store
+        .create(CreateSession {
+            id: session.clone(),
+            request: change_id("create-goal-session"),
+            configuration: envelope("configuration"),
+        })
+        .await
+        .unwrap();
+    store
+        .control(ControlRequest {
+            id: change_id("accept-goal"),
+            session: session.clone(),
+            expected_revision: created.revision,
+            action: SessionControl::DriverState {
+                change: DriverStateChange {
+                    expected: DriverStateRevision(0),
+                    value: Some(goal.encode().unwrap()),
+                },
+                turn: None,
+            },
+        })
+        .await
+        .unwrap();
+    let input = change_id("goal-input");
+    store
+        .submit(
+            session.clone(),
+            Submission {
+                id: input.clone(),
+                payload: envelope("continue goal"),
+            },
+        )
+        .await
+        .unwrap();
+    let ClaimOutcome::Acquired(claim) = store
+        .claim(ClaimRequest {
+            id: change_id("claim-goal"),
+            session: session.clone(),
+            expected_revision: store.inspect(session).await.unwrap().revision,
+            selection: TurnSelection::New {
+                turn: turn_id(),
+                inputs: vec![input],
+            },
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected goal work ownership");
+    };
+    claim
+}
+
+#[tokio::test]
+async fn goal_completion_requires_an_independently_verified_current_tool_call() {
+    use grida_agent_master::goals::tools;
+
+    for (call, verify, expected) in [
+        ("goal-check", true, Status::Complete),
+        (
+            "goal-check",
+            false,
+            Status::Blocked(Blocker::UnverifiedCompletion),
+        ),
+        (
+            "goal-report",
+            true,
+            Status::Blocked(Blocker::UnverifiedCompletion),
+        ),
+        (
+            "another-turn-call",
+            true,
+            Status::Blocked(Blocker::UnverifiedCompletion),
+        ),
+    ] {
+        let mut fixture = Fixture::new(Script::GoalReport { call });
+        let store = fixture.store();
+        let goal = goal_for_work(4);
+        let mut inventory = Inventory::new();
+        inventory.insert(fixture.tool.clone()).unwrap();
+        let mut selected = vec![tool_id()];
+        for tool in tools::for_work(&goal, &turn_id()).unwrap() {
+            selected.push(tool.definition().id.clone());
+            inventory.insert(tool).unwrap();
+        }
+        fixture.inventory = inventory.snapshot(&selected).unwrap();
+        let claimed = claim_goal_work(&store, &goal).await;
+        let runtime = fixture.runtime();
+        let opened = runtime.open(claimed.lease).await.unwrap();
+        let mut master = fixture.master(8, "Verify the export");
+        if verify {
+            master = master.with_goal_verifier(|criterion, operation| {
+                matches!(&operation.record.input, agent_kit_core::turn::OperationInput::Tool(invocation)
+                    if invocation.definition().id == tool_id())
+                    && matches!(operation.outcome(), Some(agent_kit_core::turn::OperationOutcome::Tool(outcome))
+                        if outcome.content == vec![ResultContent::Text("opened".into())])
+                    && criterion == "The exported file opens"
+            });
+        }
+        let MasterOutcome::Settled(receipt) = master.run(opened.turn, input()).await.unwrap()
+        else {
+            panic!("expected goal work to settle");
+        };
+        assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+        let account = read_account(receipt.outcome.account.as_ref().unwrap())
+            .unwrap()
+            .goal
+            .unwrap();
+        assert_eq!(account.status, expected);
+        assert_eq!(
+            account.spent,
+            Usage {
+                work_turns: 1,
+                inference_steps: 3,
+            }
+        );
+        assert_eq!(
+            account.verified.len(),
+            usize::from(expected == Status::Complete)
+        );
+        assert!(account.held.is_none());
+        assert_eq!(
+            receipt.record.driver_state_revision,
+            Some(DriverStateRevision(2))
+        );
+        if let Some(verified) = account.verified.first() {
+            assert!(receipt.outcome.evidence.contains(&verified.operation));
+        }
+        let current = store.inspect(session_id()).await.unwrap();
+        assert_eq!(
+            Goal::decode(current.driver_state.value().unwrap())
+                .unwrap()
+                .status(),
+            expected
+        );
+        store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn goal_work_clamps_steps_and_retains_uncertainty() {
+    for uncertain in [false, true] {
+        let fixture = Fixture::new(Script::Tools);
+        fixture.tool.uncertain.store(uncertain, Ordering::SeqCst);
+        let store = fixture.store();
+        let goal = goal_for_work(1);
+        let claimed = claim_goal_work(&store, &goal).await;
+        let runtime = fixture.runtime();
+        let opened = runtime.open(claimed.lease).await.unwrap();
+        let MasterOutcome::Settled(receipt) = fixture
+            .master(8, "Verify the export")
+            .run(opened.turn, input())
+            .await
+            .unwrap()
+        else {
+            panic!("expected goal work to settle");
+        };
+        let account = read_account(receipt.outcome.account.as_ref().unwrap())
+            .unwrap()
+            .goal
+            .unwrap();
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(account.remaining.inference_steps, 0);
+        if uncertain {
+            assert_eq!(account.status, Status::Blocked(Blocker::UncertainWork));
+            assert_eq!(account.held.unwrap().uncertain_steps, Some(1));
+            assert_eq!(account.spent, Usage::default());
+        } else {
+            assert_eq!(account.status, Status::Exhausted);
+            assert!(account.held.is_none());
+            assert_eq!(account.spent.inference_steps, 1);
+        }
+    }
 }

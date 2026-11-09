@@ -55,6 +55,8 @@ pub struct Account {
     pub inference_failure: Option<InferenceFailure>,
     #[serde(default)]
     pub inference_usage: usage::InferenceUsage,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal: Option<goals::ProgressAccount>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -84,6 +86,7 @@ pub struct Master {
     authority: MasterAuthority,
     history: Vec<Message>,
     input_limit: Option<NonZeroU64>,
+    goal_verifier: Option<Box<goals::settlement::Verifier>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -129,6 +132,7 @@ impl Master {
             authority,
             history: Vec::new(),
             input_limit: None,
+            goal_verifier: None,
         })
     }
 
@@ -144,7 +148,19 @@ impl Master {
         self
     }
 
+    /// Accept evidence through a product verifier of recorded tool outcomes.
+    /// The verifier must check the criterion against the outcome independently
+    /// of the model's proposal and must not perform I/O or create effects.
+    pub fn with_goal_verifier(
+        mut self,
+        verifier: impl Fn(&str, &OperationState) -> bool + Send + Sync + 'static,
+    ) -> Self {
+        self.goal_verifier = Some(Box::new(verifier));
+        self
+    }
+
     pub async fn run(&self, mut turn: Turn, input: Vec<Message>) -> Result<MasterOutcome> {
+        let max_steps = goals::settlement::step_limit(&turn.view().state, self.config.max_steps)?;
         let mut continuation = self.continuation(&turn)?;
         self.accept_input(&mut turn, input).await?;
         let view = turn.view();
@@ -201,7 +217,7 @@ impl Master {
                     None => continue,
                 }
             }
-            if continuation.step >= self.config.max_steps {
+            if continuation.step >= max_steps {
                 let outcome = self.account(
                     &turn,
                     OutcomeStatus::Failed,
@@ -754,6 +770,7 @@ impl Master {
                     }),
                     inference_failure: inference_failure.cloned(),
                     inference_usage: usage::InferenceUsage::from_turn(&view.state)?,
+                    goal: None,
                 },
             )?),
             evidence,
@@ -766,18 +783,34 @@ impl Master {
         &self,
         turn: &mut Turn,
         continuation: &mut Continuation,
-        outcome: TurnOutcome,
+        mut outcome: TurnOutcome,
         basis: &TurnView,
     ) -> Result<Option<MasterOutcome>> {
         let may_continue = outcome.status == OutcomeStatus::Succeeded;
-        match turn
-            .try_finish(CompletionDraft {
-                expected_control: basis.state.controls().revision,
-                expected_history: basis.state.history().position(),
-                outcome,
-            })
-            .await?
-        {
+        let goal = goals::settlement::prepare(
+            &basis.state,
+            outcome.status,
+            self.goal_verifier.as_deref(),
+        )?;
+        let state_change = match goal {
+            Some((change, goal)) => {
+                let mut account = read_account(outcome.account.as_ref().expect("master account"))?;
+                account.goal = Some(goal);
+                outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+                Some(change)
+            }
+            None => None,
+        };
+        let draft = CompletionDraft {
+            expected_control: basis.state.controls().revision,
+            expected_history: basis.state.history().position(),
+            outcome,
+        };
+        let finished = match state_change {
+            Some(change) => turn.try_finish_with_driver_state(draft, change).await?,
+            None => turn.try_finish(draft).await?,
+        };
+        match finished {
             FinishOutcome::Settled(receipt) => Ok(Some(MasterOutcome::Settled(*receipt))),
             FinishOutcome::Continue(error) if error.kind == ErrorKind::Conflict => {
                 if may_continue && has_new_input(turn, continuation)? {

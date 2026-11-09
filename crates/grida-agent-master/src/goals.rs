@@ -1,8 +1,11 @@
 //! Persistent goal policy. The session owner commits these transitions.
 
+pub(crate) mod settlement;
 pub mod tools;
 
-use agent_kit_core::{ChangeId, Envelope, Error, ErrorKind, OperationId, Result, SchemaId, TurnId};
+use agent_kit_core::{
+    ChangeId, Envelope, Error, ErrorKind, OperationId, Result, SchemaId, ToolCallId, TurnId,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::num::NonZeroU32;
@@ -74,7 +77,7 @@ pub struct Reservation {
 pub struct CriterionEvidence {
     /// The criterion's one-based position in the objective.
     pub criterion: u8,
-    pub operation: OperationId,
+    pub call: ToolCallId,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -112,6 +115,25 @@ pub enum WorkOutcome<'a> {
         /// Independently verified links between these criteria and operations.
         verified_evidence: &'a BTreeSet<CriterionEvidence>,
     },
+}
+
+/// The goal's state at a settled work boundary, retained with the turn account.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgressAccount {
+    pub basis: Basis,
+    pub status: Status,
+    pub paused: bool,
+    pub progress: Option<String>,
+    pub spent: Usage,
+    pub remaining: Usage,
+    pub held: Option<Reservation>,
+    pub verified: Vec<VerifiedCriterion>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifiedCriterion {
+    pub criterion: u8,
+    pub operation: OperationId,
 }
 
 /// Product state persisted in a versioned envelope. Only validated transitions

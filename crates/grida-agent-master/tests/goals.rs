@@ -1,4 +1,4 @@
-use agent_kit_core::{ChangeId, Envelope, ErrorKind, OperationId, SchemaId, TurnId};
+use agent_kit_core::{ChangeId, Envelope, ErrorKind, OperationId, SchemaId, ToolCallId, TurnId};
 use grida_agent_master::goals::{
     Allowance, Blocker, CriterionEvidence, Goal, Objective, Report, Status, Usage, WorkOutcome,
 };
@@ -32,11 +32,11 @@ fn verified_checks() -> BTreeSet<CriterionEvidence> {
     [
         CriterionEvidence {
             criterion: 1,
-            operation: OperationId::new("test-result").unwrap(),
+            call: ToolCallId::new("test-result").unwrap(),
         },
         CriterionEvidence {
             criterion: 2,
-            operation: OperationId::new("opened-export").unwrap(),
+            call: ToolCallId::new("opened-export").unwrap(),
         },
     ]
     .into_iter()
@@ -500,7 +500,7 @@ fn goal_report_refuses_objective_mutation_and_incomplete_criteria() {
     );
     let incomplete = ToolArguments::Json(json!({
         "report":{"kind":"completion","summary":"Done","evidence":[
-            {"criterion":1,"operation":"only-one-check"}
+            {"criterion":1,"call":"only-one-check"}
         ]}
     }));
     assert_eq!(

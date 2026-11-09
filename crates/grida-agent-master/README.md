@@ -69,4 +69,7 @@ reconciled. A changed goal can account for older work while rejecting its
 progress or completion proposal. Completion requires a verified evidence link
 for every criterion. `goal_inspect` reads the state captured for reserved work.
 `goal_report` records a proposal bound to the exact goal revision, turn, and
-operation. The host still supplies tool grants and automatic continuation.
+operation. The master limits the reserved turn, accounts for recorded attempts,
+and commits the result with the goal update. A completion claim cites recorded
+tool calls. An explicit verifier must establish their relevance to each
+criterion. The host still supplies tool grants and automatic continuation.
