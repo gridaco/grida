@@ -1,5 +1,6 @@
 //! Durable submissions and exclusive turn ownership around an injected driver.
 
+use agent_kit_core::history::{HistoryPosition, HistoryRecord};
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlRevision, ControlSnapshot, JournalPosition,
     SettlementReceipt, SuspensionReceipt, TurnBinding, TurnLease, TurnOutcome,
@@ -86,7 +87,7 @@ pub struct RecoveryRequest {
     pub expected_epoch: u64,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SessionControl {
     PauseAdmission,
@@ -101,6 +102,12 @@ pub enum SessionControl {
     ReorderQueued {
         inputs: Vec<ChangeId>,
     },
+    AppendHistory {
+        turn: TurnId,
+        expected: ControlRevision,
+        expected_history: HistoryPosition,
+        records: Vec<HistoryRecord>,
+    },
     Turn {
         turn: TurnId,
         expected: ControlRevision,
@@ -112,13 +119,21 @@ pub enum SessionControl {
         wait: WaitId,
         answer: Envelope,
     },
+    ResolveAndAppend {
+        turn: TurnId,
+        expected: ControlRevision,
+        expected_history: HistoryPosition,
+        wait: WaitId,
+        answer: Envelope,
+        records: Vec<HistoryRecord>,
+    },
     PauseAndCancel {
         turn: TurnId,
         expected: ControlRevision,
     },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ControlRequest {
     pub id: ChangeId,
     pub session: SessionId,

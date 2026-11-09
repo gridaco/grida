@@ -14,5 +14,10 @@ and assigns a fresh immutable identity to the revised content. Withdrawal keeps
 the input's recorded disposition. Reordering supplies the complete current queue
 order. Claim and edit cannot both win the same session revision.
 
+History contributions use an explicit turn, control revision and history
+position. A response can resolve its interaction and append correlated history
+in the same transaction. The consumer validates response meaning and chooses
+the contribution's role and provenance.
+
 This crate depends on the shared core. Runtime, databases, providers, transports,
 and product policy are supplied independently.

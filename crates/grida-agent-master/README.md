@@ -19,6 +19,10 @@ Stopping accounts for unfinished operations and publishes recorded effects into
 the conversation before settlement. Completion and suspension validate the
 control and history positions on which the master made its decision.
 
+User input arriving after a prepared request is incorporated before a successful
+turn settles. An unanswered interaction preserves the unfinished turn through
+suspension, releasing the worker until an explicit resumption.
+
 Completion accounts expose typed output-limit, refusal, and step-limit reasons
 for client adapters. Provider failure classifications remain available in the
 account, with context exhaustion separate from output-limit exhaustion.

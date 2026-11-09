@@ -466,6 +466,8 @@ enum PublicationInterruption {
     BeforeOutcome,
     ControlAfterCommit(ControlDirective),
     ControlBeforeBoundary(ControlDirective),
+    InputAfterCommit,
+    QuestionAfterCommit,
 }
 
 /// Injects a boundary event after provider/tool outcomes are durable.
@@ -554,6 +556,47 @@ impl TurnJournal for InterruptPublication {
                         vec![JournalAction::Control(directive)],
                     )?;
                     self.lease.journal().commit(control).await?;
+                    Ok(receipt)
+                }
+                PublicationInterruption::InputAfterCommit => {
+                    let receipt = self.lease.journal().commit(change).await?;
+                    let state = self.lease.journal().load().await?;
+                    let contribution = JournalChange::new(
+                        change_id("incoming-steering"),
+                        state.binding().clone(),
+                        state.position(),
+                        state.controls().revision,
+                        vec![JournalAction::AppendHistory(vec![HistoryRecord::Message(
+                            message(
+                                "steering",
+                                Role::User,
+                                Content::Text("Use the revised direction".into()),
+                            ),
+                        )])],
+                    )?;
+                    self.lease.journal().commit(contribution).await?;
+                    Ok(receipt)
+                }
+                PublicationInterruption::QuestionAfterCommit => {
+                    let receipt = self.lease.journal().commit(change).await?;
+                    let state = self.lease.journal().load().await?;
+                    let question = JournalChange::new(
+                        change_id("registered-question"),
+                        state.binding().clone(),
+                        state.position(),
+                        state.controls().revision,
+                        vec![JournalAction::OpenWait(WaitRecord {
+                            id: WaitId::new("question")?,
+                            request: envelope("Choose the direction"),
+                            response: ResponseContract {
+                                schema: SchemaId::new("test.text")?,
+                                version: 1,
+                            },
+                            answer: None,
+                            withdrawn: false,
+                        })],
+                    )?;
+                    self.lease.journal().commit(question).await?;
                     Ok(receipt)
                 }
             }
@@ -1317,6 +1360,115 @@ async fn previous_turns_supply_model_context_without_copying_transcript_records(
     assert_eq!(requests[1].messages[0].role, Role::System);
     assert_eq!(&requests[1].messages[1..3], preceding.as_slice());
     assert_eq!(requests[1].messages[3..], [follow_up]);
+}
+
+#[tokio::test]
+async fn steering_after_result_publication_is_incorporated_before_settlement() {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let lease = intercept_publication(claim.lease, PublicationInterruption::InputAfterCommit);
+    let opened = fixture.runtime().open(lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Be concise")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected settlement after incorporating steering")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+    let requests = fixture.provider.requests.lock().unwrap();
+    assert_eq!(requests.len(), 2);
+    assert!(
+        !requests[0]
+            .messages
+            .iter()
+            .any(|message| message.id.as_str() == "steering")
+    );
+    assert!(
+        requests[1]
+            .messages
+            .iter()
+            .any(|message| message.id.as_str() == "steering")
+    );
+}
+
+#[tokio::test]
+async fn unanswered_question_suspends_and_its_answer_becomes_new_input_on_resume() {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let lease = intercept_publication(claim.lease, PublicationInterruption::QuestionAfterCommit);
+    let opened = fixture.runtime().open(lease).await.unwrap();
+    let outcome = tokio::time::timeout(
+        Duration::from_secs(2),
+        fixture.master(4, "Be concise").run(opened.turn, input()),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(matches!(outcome, MasterOutcome::Suspended(_)));
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    let session = store.inspect(session_id()).await.unwrap();
+    let turn = session.current.unwrap();
+    store
+        .control(ControlRequest {
+            id: change_id("answer"),
+            session: session_id(),
+            expected_revision: session.revision,
+            action: SessionControl::ResolveAndAppend {
+                turn: turn_id(),
+                expected: turn.controls.revision,
+                expected_history: agent_kit_core::history::HistoryPosition(2),
+                wait: WaitId::new("question").unwrap(),
+                answer: envelope("Use the new direction"),
+                records: vec![HistoryRecord::Message(message(
+                    "answer-to-question",
+                    Role::User,
+                    Content::Text("Use the new direction".into()),
+                ))],
+            },
+        })
+        .await
+        .unwrap();
+    let view = store.inspect(session_id()).await.unwrap();
+    let current = view.current.unwrap();
+    let ClaimOutcome::Acquired(claim) = store
+        .claim(ClaimRequest {
+            id: change_id("resume"),
+            session: session_id(),
+            expected_revision: view.revision,
+            selection: TurnSelection::Resume {
+                turn: turn_id(),
+                epoch: current.binding.epoch,
+                position: current.position,
+            },
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected resumed owner")
+    };
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Be concise")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected answered settlement")
+    };
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+    let requests = fixture.provider.requests.lock().unwrap();
+    assert!(
+        requests[1]
+            .messages
+            .iter()
+            .any(|message| message.id.as_str() == "answer-to-question")
+    );
 }
 
 #[tokio::test]

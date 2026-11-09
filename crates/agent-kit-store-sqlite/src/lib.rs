@@ -600,11 +600,30 @@ impl SessionStore for SqliteStore {
                     reorder_queue(&transaction, &request.session, inputs)?;
                     None
                 }
+                SessionControl::AppendHistory {
+                    turn,
+                    expected,
+                    expected_history,
+                    records,
+                } => {
+                    let state = load_turn(&transaction, &request.session, turn)?;
+                    if state.history().position() != *expected_history {
+                        return Err(error(ErrorKind::Conflict, "history_position_changed"));
+                    }
+                    if records.is_empty() {
+                        return Err(error(ErrorKind::InvalidInput, "empty_history_contribution"));
+                    }
+                    Some((
+                        turn,
+                        *expected,
+                        vec![JournalAction::AppendHistory(records.clone())],
+                    ))
+                }
                 SessionControl::Turn {
                     turn,
                     expected,
                     directive,
-                } => Some((turn, *expected, JournalAction::Control(*directive))),
+                } => Some((turn, *expected, vec![JournalAction::Control(*directive)])),
                 SessionControl::Resolve {
                     turn,
                     expected,
@@ -613,21 +632,48 @@ impl SessionStore for SqliteStore {
                 } => Some((
                     turn,
                     *expected,
-                    JournalAction::ResolveWait {
+                    vec![JournalAction::ResolveWait {
                         wait: wait.clone(),
                         answer: answer.clone(),
-                    },
+                    }],
                 )),
+                SessionControl::ResolveAndAppend {
+                    turn,
+                    expected,
+                    expected_history,
+                    wait,
+                    answer,
+                    records,
+                } => {
+                    let state = load_turn(&transaction, &request.session, turn)?;
+                    if state.history().position() != *expected_history {
+                        return Err(error(ErrorKind::Conflict, "history_position_changed"));
+                    }
+                    if records.is_empty() {
+                        return Err(error(ErrorKind::InvalidInput, "empty_history_contribution"));
+                    }
+                    Some((
+                        turn,
+                        *expected,
+                        vec![
+                            JournalAction::ResolveWait {
+                                wait: wait.clone(),
+                                answer: answer.clone(),
+                            },
+                            JournalAction::AppendHistory(records.clone()),
+                        ],
+                    ))
+                }
                 SessionControl::PauseAndCancel { turn, expected } => {
                     session.paused = true;
                     Some((
                         turn,
                         *expected,
-                        JournalAction::Control(ControlDirective::Cancel),
+                        vec![JournalAction::Control(ControlDirective::Cancel)],
                     ))
                 }
             };
-            let turn_receipt = if let Some((turn, expected, action)) = action {
+            let turn_receipt = if let Some((turn, expected, actions)) = action {
                 if session.active_turn.as_ref() != Some(turn) {
                     return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
                 }
@@ -637,7 +683,7 @@ impl SessionStore for SqliteStore {
                     state.binding().clone(),
                     state.position(),
                     expected,
-                    vec![action],
+                    actions,
                 )?;
                 let receipt = state.apply(change)?;
                 save_turn(&transaction, &state)?;

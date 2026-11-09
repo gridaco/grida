@@ -132,6 +132,69 @@ async fn acceptance_is_idempotent_and_inspection_is_observational() {
 }
 
 #[tokio::test]
+async fn history_contribution_is_conditional_idempotent_and_retained() {
+    let (directory, store) = store().await;
+    store
+        .submit(session(), submission("request", "hello"))
+        .await
+        .unwrap();
+    let claim = claim(&store, "claim", vec![change("request")]).await;
+    let state = claim.lease.journal().load().await.unwrap();
+    let records = vec![HistoryRecord::Message(Message {
+        id: MessageId::new("steering").unwrap(),
+        role: Role::User,
+        phase: None,
+        content: vec![Content::Text("Use the revised direction".into())],
+        provenance: Provenance {
+            source: "client".into(),
+            kind: ProvenanceKind::Supplied,
+            fingerprint: None,
+        },
+    })];
+    let request = ControlRequest {
+        id: change("steer"),
+        session: session(),
+        expected_revision: store.inspect(session()).await.unwrap().revision,
+        action: SessionControl::AppendHistory {
+            turn: turn(),
+            expected: state.controls().revision,
+            expected_history: state.history().position(),
+            records: records.clone(),
+        },
+    };
+    let receipt = store.control(request.clone()).await.unwrap();
+    assert_eq!(store.control(request.clone()).await.unwrap(), receipt);
+    assert_eq!(
+        claim
+            .lease
+            .journal()
+            .load()
+            .await
+            .unwrap()
+            .history()
+            .records(),
+        records
+    );
+    let mut stale = request.clone();
+    stale.id = change("stale-steering");
+    stale.expected_revision = receipt.revision;
+    assert_error(
+        store.control(stale).await,
+        ErrorKind::Conflict,
+        "history_position_changed",
+    );
+    assert_eq!(
+        store.inspect(session()).await.unwrap().revision,
+        receipt.revision
+    );
+    drop(claim);
+    drop(store);
+    let reopened = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    assert_eq!(reopened.control(request).await.unwrap(), receipt);
+    assert_eq!(reopened.history(session(), None).await.unwrap(), records);
+}
+
+#[tokio::test]
 async fn replacing_queued_input_retains_original_identity_and_queue_slot() {
     let (_directory, store) = store().await;
     let first = store
@@ -1421,4 +1484,75 @@ async fn oversized_history_is_refused_without_returning_a_partial_projection() {
             .unwrap()
             .is_empty()
     );
+}
+
+#[tokio::test]
+async fn an_answer_and_its_history_contribution_commit_atomically() {
+    let (_directory, store) = store().await;
+    store
+        .submit(session(), submission("input", "hello"))
+        .await
+        .unwrap();
+    let claim = claim(&store, "claim", vec![change("input")]).await;
+    let wait = WaitId::new("question").unwrap();
+    commit(
+        &claim,
+        "question",
+        vec![JournalAction::OpenWait(WaitRecord {
+            id: wait.clone(),
+            request: payload("choose"),
+            response: ResponseContract {
+                schema: SchemaId::new("test.text").unwrap(),
+                version: 1,
+            },
+            answer: None,
+            withdrawn: false,
+        })],
+    )
+    .await;
+    let state = claim.lease.journal().load().await.unwrap();
+    let answer_record = HistoryRecord::Message(Message {
+        id: MessageId::new("answer").unwrap(),
+        role: Role::User,
+        phase: None,
+        content: vec![Content::Text("selected".into())],
+        provenance: Provenance {
+            source: "client".into(),
+            kind: ProvenanceKind::Supplied,
+            fingerprint: None,
+        },
+    });
+    let mut request = ControlRequest {
+        id: change("answer"),
+        session: session(),
+        expected_revision: store.inspect(session()).await.unwrap().revision,
+        action: SessionControl::ResolveAndAppend {
+            turn: turn(),
+            expected: state.controls().revision,
+            expected_history: state.history().position(),
+            wait: wait.clone(),
+            answer: payload("selected"),
+            records: vec![answer_record.clone(), answer_record.clone()],
+        },
+    };
+    assert_error(
+        store.control(request.clone()).await,
+        ErrorKind::Conflict,
+        "duplicate_message",
+    );
+    let unchanged = claim.lease.journal().load().await.unwrap();
+    assert_eq!(unchanged.position(), state.position());
+    assert!(unchanged.waits().get(&wait).unwrap().is_pending());
+    let SessionControl::ResolveAndAppend { records, .. } = &mut request.action else {
+        unreachable!()
+    };
+    records.pop();
+    let receipt = store.control(request.clone()).await.unwrap();
+    assert_eq!(store.control(request).await.unwrap(), receipt);
+    let state = claim.lease.journal().load().await.unwrap();
+    assert_eq!(
+        state.waits().get(&wait).unwrap().answer,
+        Some(payload("selected"))
+    );
+    assert_eq!(state.history().records(), &[answer_record]);
 }

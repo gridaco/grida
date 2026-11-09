@@ -4,7 +4,7 @@ pub mod configuration;
 pub mod usage;
 
 use agent_kit_core::authority::GrantSelection;
-use agent_kit_core::history::HistoryRecord;
+use agent_kit_core::history::{HistoryPosition, HistoryRecord};
 use agent_kit_core::inference::{
     FailureKind, InferenceFailure, InferenceRequest, InferenceStatus, MeasurementKind,
     PreparedRequest, Provider,
@@ -86,6 +86,8 @@ struct Continuation {
     request: Option<PreparedRequest>,
     interrupted: bool,
     outcome: Option<TurnOutcome>,
+    #[serde(default)]
+    request_history: Option<HistoryPosition>,
 }
 
 impl Master {
@@ -157,6 +159,18 @@ impl Master {
                 }
             }
             if let Some(outcome) = continuation.outcome.clone() {
+                if outcome.status == OutcomeStatus::Succeeded
+                    && has_new_input(&view, continuation.request_history)
+                {
+                    continuation.outcome = None;
+                    continue;
+                }
+                if view.state.waits().values().any(|wait| wait.is_pending()) {
+                    match self.suspend(&mut turn, &continuation, &view).await? {
+                        Some(outcome) => return Ok(outcome),
+                        None => continue,
+                    }
+                }
                 match self
                     .finish(&mut turn, &mut continuation, outcome, &view)
                     .await?
@@ -185,6 +199,7 @@ impl Master {
             let request = match &continuation.request {
                 Some(request) => request.clone(),
                 None => {
+                    continuation.request_history = Some(turn.view().state.history().position());
                     let request = match self.prepare(&turn) {
                         Ok(request) => request,
                         Err(error) => {
@@ -427,6 +442,7 @@ impl Master {
                 request: None,
                 interrupted: false,
                 outcome: None,
+                request_history: None,
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;
@@ -635,6 +651,21 @@ impl Master {
             SuspendOutcome::Continue(error) => Err(error),
         }
     }
+}
+
+fn has_new_input(view: &TurnView, after: Option<HistoryPosition>) -> bool {
+    let Some(after) = after else {
+        return false;
+    };
+    view.state
+        .history()
+        .records()
+        .iter()
+        .enumerate()
+        .any(|(index, record)| {
+            let HistoryRecord::Message(message) = record;
+            index as u64 >= after.0 && message.role == Role::User
+        })
 }
 
 pub fn read_account(envelope: &Envelope) -> Result<Account> {
