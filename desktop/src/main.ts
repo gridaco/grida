@@ -570,10 +570,11 @@ app.on("ready", async () => {
   });
   if (nativeProfile) {
     try {
-      await NativeDesktopProfile.configure(app);
+      const provider = await NativeDesktopProfile.configure(app);
       nativeDesktopAgent = await NativeDesktopAgent.prepareFresh(
         accountSession,
-        process.resourcesPath
+        process.resourcesPath,
+        { provider, openExternal: (url) => shell.openExternal(url) }
       );
     } catch {
       dialog.showErrorBox(
@@ -638,6 +639,7 @@ app.on("ready", async () => {
       resolve_native_chat: (_window, workspaceId) =>
         native.current(workspaceId),
       ensure_native_chat: (workspaceId) => native.ensure(workspaceId),
+      native_chatgpt_oauth: native.chatgptOAuth,
     }),
     on_onboarding_complete: async ({ window, workspace_id: workspaceId }) => {
       try {

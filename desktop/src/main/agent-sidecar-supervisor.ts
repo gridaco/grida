@@ -313,6 +313,22 @@ export class AgentSidecarSupervisor {
     };
   }
 
+  // GRIDA-SEC-008 — the sealed Desktop source is the sole OAuth home.
+  async nativeSubscriptionSettings() {
+    if (!this.coldStartSource || this.agentEnabled || this.isShuttingDown)
+      throw new Error("native_chatgpt_source_unavailable");
+    const [source, network] = await Promise.all([
+      this.coldStartSource,
+      AgentNetworkHost.nativeProviderNetwork(
+        this.networkAuthority,
+        AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+      ),
+    ]);
+    if (this.isShuttingDown)
+      throw new Error("native_chatgpt_source_unavailable");
+    return { userDataPath: source.userDataPath, network };
+  }
+
   async nativeGatewayConnection(
     account: DesktopAccountSession,
     organizationId?: number,
@@ -862,6 +878,10 @@ export function nativeAgentEndpointNetwork(id: string, baseUrl: string) {
 
 export function nativeAgentByokSettings() {
   return supervisor.nativeByokSettings();
+}
+
+export function nativeAgentSubscriptionSettings() {
+  return supervisor.nativeSubscriptionSettings();
 }
 
 export function nativeAgentGatewayConnection(

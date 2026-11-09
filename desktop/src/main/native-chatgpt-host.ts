@@ -31,8 +31,17 @@ export class NativeChatGptHost {
     return this.owner.ceremonyRequest(route, init);
   }
 
+  drain(): Promise<void> {
+    return this.owner.drain();
+  }
+
+  close(): Promise<void> {
+    return this.owner.close();
+  }
+
   async launch(
-    modelId: string
+    modelId: string,
+    lifetime?: AbortSignal
   ): Promise<
     Pick<
       NativeAgentLaunch,
@@ -54,8 +63,13 @@ export class NativeChatGptHost {
           target === connection.target &&
           headers.get("content-type") === "application/json" &&
           headers.get("accept") === "text/event-stream" &&
-          [...headers.keys()].length === 2
-            ? connection.request
+          [...headers.keys()].length === 2 &&
+          !lifetime?.aborted
+            ? (body, signal) =>
+                connection.request(
+                  body,
+                  lifetime ? AbortSignal.any([signal, lifetime]) : signal
+                )
             : null,
       },
     };

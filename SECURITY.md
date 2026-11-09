@@ -1851,12 +1851,11 @@ session scratch. Reading a `SKILL.md` whose realpath escapes its layer root.
 **What it protects.** Grida Desktop can use an eligible ChatGPT subscription
 as a native text-model provider. Grida still owns the agent loop, prompts,
 tools, approvals, sessions, and persistence; this path does not launch Codex,
-Codex app-server, or an ACP agent. The boundary is the rule that **the
-world-invokable localhost OAuth callback can complete only the exact
-main/sidecar attempt that opened it, ChatGPT credentials never cross into the
-renderer, provider traffic can reach only its fixed auth/inference
-destinations, and a stored conversation never changes provider merely because
-ambient provider readiness changed.**
+Codex app-server, or an ACP agent. The localhost OAuth callback completes
+only the exact attempt opened by Main and the credential owner. Credentials
+stay on the trusted side of the renderer bridge. Provider traffic uses fixed
+auth and inference destinations. Stored conversations keep their provider
+selection when ambient readiness changes.
 
 **Vulnerable scenario (prevented).** A webpage or local process races a forged
 request into the fixed callback port and consumes the legitimate user's
@@ -1879,7 +1878,7 @@ trusted merely because it is “local.”
 
 1. **Two-owner OAuth ceremony.** Electron main binds the callback before
    browser navigation, on only the approved ports (`1455`, then `1457`) and
-   both available loopback families. The sidecar independently generates the
+   both available loopback families. The credential owner generates the
    one-use attempt id, random state, and PKCE S256 verifier/challenge for that
    exact redirect URI. Main accepts only bounded `GET` requests for the exact
    `/auth/callback` path and `localhost:<bound-port>` Host, constant-time
@@ -1894,9 +1893,11 @@ trusted merely because it is “local.”
    Reserved parameters must occur exactly once; credentials, fragments, an
    alternate approved port, unknown query keys, and lookalike origins fail
    closed.
-3. **Secret custody and race-safe persistence.** The sidecar alone owns code
-   exchange, access/refresh lifecycle, account metadata, and request-time
-   credential injection. OAuth remains in daemon `AuthStore`
+3. **Secret custody and race-safe persistence.** The selected credential owner
+   performs code exchange, refresh, account lookup, and request-time injection.
+   Standard Desktop uses the sidecar. The disposable native subscription
+   profile uses one Main-owned instance after the legacy source is sealed.
+   OAuth remains in daemon `AuthStore`
    (`auth.json`, `0600`, atomic replacement). Updated macOS/Linux writers share
    a cross-process lock with API-key retirement under GRIDA-SEC-014, rereading
    before mutation and preserving unrelated records. BYOK moves to the separate
@@ -1939,6 +1940,11 @@ trusted merely because it is “local.”
    Its stdio transport grants only the exact generation route and sends no
    credentials. The in-process Desktop owner serves the same OAuth ceremony
    and injects the selected token and account headers at the provider edge.
+   The opt-in profile fixes the reviewed default model. Signing out withdraws
+   workspace admission and waits for the native children and custody work
+   before replacement. Grida account sign-out releases the workspace without
+   deleting the separate subscription. App shutdown joins exact OAuth attempt
+   cancellation and outstanding custody within a bounded wait.
 6. **Session/provider identity is sticky.** A new provider-unqualified
    compatible conversation may prefer a ready ChatGPT connection. Once
    persisted, the provider/model pair is reused for continuations and queued
@@ -2000,6 +2006,10 @@ platform credential store is a separate hardening step.
   bind one private launch to an exact OAuth connection and the fixed Responses
   route. [Process fixtures](desktop/src/main/native-provider-egress.test.ts)
   exercise the ceremony and scoped continuation with synthetic responses.
+- [Disposable Desktop composition](desktop/src/main/native-desktop-agent.ts)
+  and [its process fixture](desktop/src/main/native-desktop-agent.test.ts)
+  connect the guarded ceremony to the selected provider owner and verify
+  withdrawal and drain at sign-out and shutdown.
 - `packages/grida-ai-agent/src/protocol/{chatgpt,provider-ids,endpoints}.ts`,
   `providers/{chatgpt-credentials,chatgpt,index}.ts`,
   `http/routes/chatgpt-auth.ts`, `server.ts`, `runtime/{index,run-input}.ts`,

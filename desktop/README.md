@@ -161,7 +161,14 @@ browser directory. Set `GRIDA_AGENT_USER_DATA` to a separate sibling directory
 under the same owner-only root in the system temporary directory. Chat uses a
 separate native store for each registered workspace. The retained sidecar owns
 files, endpoint settings and media. This profile requires an empty legacy chat
-source and uses the account's Gateway connection.
+source and defaults to the Grida account's Gateway connection.
+
+Add `--native-chat-provider=chatgpt` to explicitly select the experimental
+ChatGPT subscription profile for that disposable run. Use the existing Desktop
+ChatGPT sign-in with an eligible account. The launch uses its reviewed default
+model and keeps that subscription separate from the Grida account and Gateway.
+Signing out of ChatGPT stops its native workspace work before a replacement can
+start. The experimental availability limits also apply to this profile.
 
 The source-built native process owner accepts workspace selections from Electron
 main. On macOS and Linux it writes a private launch profile that allows reads

@@ -32,6 +32,8 @@ vi.mock("./sandbox/manager", () => ({
 
 import { AgentSidecarSupervisor } from "./agent-sidecar-supervisor";
 import { app } from "electron";
+import { AgentNetworkHost } from "./agent-network-host";
+import { AgentNetworkPolicy } from "../agent-network-policy";
 import { ensureInitialized, wrap } from "./sandbox/manager";
 
 describe("AgentSidecarSupervisor recovery", () => {
@@ -138,6 +140,28 @@ describe("AgentSidecarSupervisor recovery", () => {
     expect(command).not.toContain("--scratch-base=");
     expect(command).not.toContain("--skills-root=");
     supervisor.stop();
+  });
+
+  it("binds native subscription settings only to the sealed source", async () => {
+    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/subscription-source");
+    const supervisor = new AgentSidecarSupervisor();
+    const network = { prepare: () => null };
+    const egress = vi
+      .spyOn(AgentNetworkHost, "nativeProviderNetwork")
+      .mockResolvedValue(network);
+    await expect(supervisor.nativeSubscriptionSettings()).rejects.toThrow(
+      "native_chatgpt_source_unavailable"
+    );
+    expect(egress).not.toHaveBeenCalled();
+    await supervisor.sealLegacyChatForColdStart();
+    await expect(supervisor.nativeSubscriptionSettings()).resolves.toEqual({
+      userDataPath: "/synthetic/subscription-source",
+      network,
+    });
+    expect(egress).toHaveBeenCalledExactlyOnceWith(
+      expect.anything(),
+      AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+    );
   });
 
   it("seals the exact legacy roots only for the primary app before selecting media-only startup", async () => {

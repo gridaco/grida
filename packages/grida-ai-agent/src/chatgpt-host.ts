@@ -33,6 +33,8 @@ export class ChatGptSubscriptionHost {
   private readonly ceremony = new Hono();
   private readonly runtime: ChatGptProviderRuntime;
   private readonly http: ProviderHttp;
+  private readonly inFlight = new Set<Promise<unknown>>();
+  private closed = false;
 
   constructor({ userDataPath, configuration, post }: HostOptions) {
     if (
@@ -80,6 +82,7 @@ export class ChatGptSubscriptionHost {
 
   /** Invoke existing ceremony handlers in-process without opening an HTTP listener. */
   async ceremonyRequest(route: string, init?: RequestInit): Promise<Response> {
+    if (this.closed) return new Response(null, { status: 503 });
     if (!CEREMONY_ROUTES.has(route)) return new Response(null, { status: 404 });
     if (
       init?.method !== "POST" ||
@@ -87,10 +90,39 @@ export class ChatGptSubscriptionHost {
       Buffer.byteLength(init.body) > MAX_CEREMONY_BYTES
     )
       return new Response(null, { status: 400 });
-    return await this.ceremony.request(route, init);
+    return await this.track(
+      Promise.resolve(this.ceremony.request(route, init))
+    );
   }
 
-  capture(modelId: string) {
-    return ChatGptProvider.captureNative(this.runtime, modelId, this.http);
+  async capture(modelId: string) {
+    if (this.closed) throw new Error("chatgpt_host_closed");
+    const connection = await ChatGptProvider.captureNative(
+      this.runtime,
+      modelId,
+      this.http
+    );
+    return Object.freeze({
+      ...connection,
+      request: (body: Uint8Array, signal: AbortSignal) =>
+        this.closed
+          ? Promise.resolve(null)
+          : this.track(connection.request(body, signal)),
+    });
+  }
+
+  /** The supervisor closes its work admission before joining owned custody. */
+  async drain(): Promise<void> {
+    await Promise.allSettled(this.inFlight);
+  }
+
+  close(): Promise<void> {
+    this.closed = true;
+    return this.drain();
+  }
+
+  private track<T>(task: Promise<T>): Promise<T> {
+    this.inFlight.add(task);
+    return task.finally(() => this.inFlight.delete(task));
   }
 }

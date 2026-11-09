@@ -4,6 +4,8 @@ import path from "node:path";
 import type { App } from "electron";
 
 export namespace NativeDesktopProfile {
+  export type Provider = "gateway" | "chatgpt";
+
   export function selected(): boolean {
     return (
       process.argv.includes("--native-chat") &&
@@ -24,7 +26,7 @@ export namespace NativeDesktopProfile {
     app: Pick<App, "getPath" | "setPath"> & {
       commandLine: Pick<App["commandLine"], "getSwitchValue">;
     }
-  ): Promise<void> {
+  ): Promise<Provider> {
     const agentData = process.env.GRIDA_AGENT_USER_DATA;
     const browserData = app.commandLine.getSwitchValue("user-data-dir");
     if (
@@ -35,6 +37,20 @@ export namespace NativeDesktopProfile {
       browserData !== app.getPath("userData")
     )
       throw invalidProfile();
+    const choices = process.argv.filter(
+      (arg) =>
+        arg === "--native-chat-provider" ||
+        arg.startsWith("--native-chat-provider=")
+    );
+    if (
+      choices.length > 1 ||
+      (choices[0] !== undefined &&
+        choices[0] !== "--native-chat-provider=gateway" &&
+        choices[0] !== "--native-chat-provider=chatgpt")
+    )
+      throw invalidProfile();
+    const provider =
+      choices[0] === "--native-chat-provider=chatgpt" ? "chatgpt" : "gateway";
     const root = path.dirname(agentData);
     const systemTemp = await fs.realpath(app.getPath("temp"));
     const relative = path.relative(systemTemp, root);
@@ -73,6 +89,7 @@ export namespace NativeDesktopProfile {
     }
     app.setPath("temp", temp);
     app.setPath("documents", projects);
+    return provider;
   }
 
   async function checkDirectory(directory: string) {

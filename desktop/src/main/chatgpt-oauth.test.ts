@@ -126,6 +126,38 @@ describe("ChatGptOAuthCoordinator", () => {
     ]);
   });
 
+  it("joins the exact pending OAuth cancellation when the owner closes", async () => {
+    const browserOpened = deferred<void>();
+    const cancel = deferred<void>();
+    openExternal.mockImplementation(async () => browserOpened.resolve());
+    const coordinator = createCoordinator({ cancel_gate: cancel.promise });
+    const connecting = coordinator.connect();
+    await browserOpened.promise;
+    const closed = coordinator.close();
+    expect(coordinator.close()).toBe(closed);
+    const complete = vi.fn<() => void>();
+    void closed.then(complete, complete);
+    try {
+      await expect(coordinator.connect()).rejects.toThrow(
+        "ChatGPT sign-in host is closed"
+      );
+      expect(callback.attempt.cancel).toHaveBeenCalled();
+      expect(
+        requests.filter(({ path }) => path === "/auth/chatgpt/cancel")
+      ).toEqual([
+        {
+          path: "/auth/chatgpt/cancel",
+          body: { attempt_id: "attempt_0123456789abcdef" },
+        },
+      ]);
+      expect(complete).not.toHaveBeenCalled();
+    } finally {
+      cancel.resolve();
+      await closed;
+    }
+    await expect(connecting).resolves.toEqual({ outcome: "cancelled" });
+  });
+
   it("does not classify an unrelated failure from cancellation text", async () => {
     openExternal.mockRejectedValueOnce(
       new Error("ChatGPT sign-in was cancelled")
@@ -175,7 +207,11 @@ describe("ChatGptOAuthCoordinator", () => {
   });
 
   function createCoordinator(
-    options: { authorization_url?: string; cancel_status?: number } = {}
+    options: {
+      authorization_url?: string;
+      cancel_status?: number;
+      cancel_gate?: Promise<void>;
+    } = {}
   ): ChatGptOAuthCoordinator {
     return new ChatGptOAuthCoordinator({
       callback,
@@ -200,6 +236,7 @@ describe("ChatGptOAuthCoordinator", () => {
               access_token: "access-token-must-not-cross",
             });
           case "/auth/chatgpt/cancel":
+            await options.cancel_gate;
             if (options.cancel_status) {
               return Response.json(
                 { code: "temporarily_unavailable" },

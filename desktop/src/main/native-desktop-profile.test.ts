@@ -27,12 +27,23 @@ it.skipIf(process.platform === "win32")(
       vi.stubEnv("GRIDA_AGENT_USER_DATA", agent);
       process.argv = [...argv, "--native-chat"];
       await fs.mkdir(browser, { mode: 0o700 });
-      await NativeDesktopProfile.configure(app);
+      await expect(NativeDesktopProfile.configure(app)).resolves.toBe(
+        "gateway"
+      );
       expect(NativeDesktopProfile.mediaRoot()).toBe(path.join(root, "media"));
       expect(setPath.mock.calls).toEqual([
         ["temp", path.join(root, "temp")],
         ["documents", path.join(root, "projects")],
       ]);
+      process.argv.push("--native-chat-provider=chatgpt");
+      await expect(NativeDesktopProfile.configure(app)).resolves.toBe(
+        "chatgpt"
+      );
+      process.argv.push("--native-chat-provider=gateway");
+      await expect(NativeDesktopProfile.configure(app)).rejects.toThrow(
+        "native_desktop_profile_invalid"
+      );
+      process.argv.pop();
       await fs.rmdir(agent);
       await fs.symlink(browser, agent);
       await expect(NativeDesktopProfile.configure(app)).rejects.toThrow(

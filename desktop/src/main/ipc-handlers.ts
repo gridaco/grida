@@ -52,7 +52,10 @@ import {
   unsubscribeWorkspaceChanges,
 } from "./workspace-watcher-host";
 import { trashWorkspaceEntry } from "./workspace-files";
-import { createChatGptOAuthCoordinator } from "./chatgpt-oauth";
+import {
+  createChatGptOAuthCoordinator,
+  type ChatGptOAuthCoordinator,
+} from "./chatgpt-oauth";
 import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
 import { ipc_sender } from "./ipc-sender";
 import { DesktopMediaHost } from "./media-host";
@@ -71,7 +74,7 @@ const EDITOR_ORIGIN = (() => {
 
 const providerEndpointMutations =
   new AgentProviderEndpointMutation.Coordinator();
-const chatgptOAuth = createChatGptOAuthCoordinator({
+const legacyChatgptOAuth = createChatGptOAuthCoordinator({
   sidecar_fetch: (path, init) => agentSidecarClient.fetch(path, init),
   open_external: async (url) => {
     await shell.openExternal(url);
@@ -94,6 +97,10 @@ type RegisterIpcHandlersOptions = {
   ) => ActiveNativeChat | null;
   /** Present when this main process has selected native chat mode. */
   ensure_native_chat?: (workspaceId: string) => Promise<void>;
+  native_chatgpt_oauth?: Pick<
+    ChatGptOAuthCoordinator,
+    "connect" | "cancel" | "status" | "signOut"
+  >;
   on_onboarding_complete?: (input: {
     window: BrowserWindow;
     workspace_id?: string;
@@ -266,6 +273,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     return await agentSidecarClient.openWorkspace(result.filePaths[0]);
   });
 
+  const chatgptOAuth = options.native_chatgpt_oauth ?? legacyChatgptOAuth;
   guarded(IPC_CHANNELS.CHATGPT_CONNECT, () => chatgptOAuth.connect());
   guarded(IPC_CHANNELS.CHATGPT_CANCEL, async () => {
     await chatgptOAuth.cancel();
@@ -594,7 +602,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
 
 /** Close any active native-provider callback before Electron exits. */
 export function closeChatGptOAuth(): void {
-  chatgptOAuth.close();
+  void legacyChatgptOAuth.close().catch(() => {});
 }
 
 async function confirmProviderOrigin(

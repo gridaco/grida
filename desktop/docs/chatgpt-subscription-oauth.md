@@ -1,8 +1,10 @@
 # ChatGPT subscription OAuth binding
 
 This document binds the native ChatGPT model-provider contract to Grida
-Desktop. It is not ACP and it does not start Codex app-server: AgentSidecar
-continues to own Grida's model loop, sessions, tools, and approvals.
+Desktop. Grida owns the model loop, sessions, tools, and approvals. Standard
+Desktop runs them in AgentSidecar. The disposable native profile runs them
+in Grida's Rust executable and uses private ACP stdio for Desktop control.
+ChatGPT supplies model inference in either composition.
 
 The implementation is experimental because OpenAI client registration and
 the stable legal/support contract are external release gates. Desktop keeps
@@ -11,7 +13,7 @@ registration can replace the current public native-client identity without
 changing provider, callback, or renderer code.
 
 > **GRIDA-SEC-008 — ChatGPT subscription OAuth credential boundary.** The
-> callback, guarded bridge, sidecar credential manager, and exact provider
+> callback, guarded bridge, credential manager, and exact provider
 > destinations are one active local security boundary. “Active” does not mean
 > OpenAI has approved or supports the experimental integration.
 
@@ -56,9 +58,8 @@ subdomains are refused.
    redirect, code, or provider parameters.
 2. Electron main binds the configured callback port on both `127.0.0.1` and
    `::1` when available. It emits the registered `http://localhost` URI.
-3. Main POSTs that URI to the authenticated sidecar-private
-   `/auth/chatgpt/start` route.
-4. AgentSidecar generates state plus PKCE verifier/challenge, retains the
+3. Main sends that URI to the selected owner's `/auth/chatgpt/start` handler.
+4. The owner generates state plus PKCE verifier/challenge, retains the
    verifier in one launch-scoped attempt, and returns the authorization URL.
 5. Main reconstructs and validates the fixed authorization authority,
    pathname, client id, redirect URI, response type, state, and S256 challenge
@@ -67,19 +68,19 @@ subdomains are refused.
    It compares state in constant time. An invalid state does not consume the
    listener; a valid callback is atomically claimed, closing both listeners to
    replays.
-7. Main forwards the code, state, and attempt id directly to the sidecar's
-   `/auth/chatgpt/complete` route. The callback's abort signal is attached to
+7. Main forwards the code, state, and attempt id directly to the owner's
+   `/auth/chatgpt/complete` handler. The callback's abort signal is attached to
    that request.
-8. The sidecar exchanges the code through the host-routed provider transport
+8. The owner exchanges the code through the host-routed provider transport
    and durably stores the refreshable credential.
 9. Only after completion returns a ready, secret-free account status does the
    callback render its success page and the IPC invocation resolve.
 
-The callback and sidecar attempt share a ten-minute lifetime so normal browser
+The callback and credential attempt share a ten-minute lifetime so normal browser
 login and MFA remain possible. Every timeout, cancellation, completion error,
 main shutdown, and successful terminal response closes the listeners.
 
-The profile sends state and PKCE S256, but no OIDC nonce. The sidecar does not
+The profile sends state and PKCE S256, but no OIDC nonce. The credential owner does not
 independently verify JWT signature, JWKS, issuer, or audience. It parses
 bounded account/display claims only from the response returned by the exact
 TLS-authenticated token endpoint. Trust therefore comes from the pinned token
@@ -117,15 +118,25 @@ the token response is stored must leave the account signed out. Sign-out
 invalidates pending exchange/refresh generations before removing the durable
 record, so a late network completion cannot resurrect it.
 
-Application shutdown closes the callback before stopping AgentSidecar.
+Application shutdown closes the callback and cancels its exact attempt. The
+native subscription profile also drains its workspace processes and accepted
+credential work within a bounded wait. Subscription sign-out withdraws those
+workspaces before another can open. Grida account sign-out preserves the
+separate subscription record.
 
 ## Storage and process boundary
 
-The refreshable record lives in AgentSidecar's daemon-owned `AuthStore`, in the
-owner-only `auth.json` file. The renderer cannot read it. Electron main sees
-the authorization code while completing the native ceremony and transiently
-sees credential-bearing provider request headers in the existing native
-network service, but it never persists or logs either.
+The selected credential owner uses the daemon's `AuthStore` and its owner-only
+`auth.json` file. Standard Desktop runs the owner in AgentSidecar. The
+disposable native profile uses one in-process owner in Electron main, with
+the same storage and ceremony handlers. The renderer and Rust executable
+receive no OAuth tokens. The native model request passes through the private
+provider broker, which injects credentials on the exact route.
+
+The disposable profile defaults to Gateway. Select ChatGPT explicitly with
+`--native-chat-provider=chatgpt` alongside `--native-chat` on a supported
+development or Insiders profile. The experimental account and service
+availability constraints also apply to this launch.
 
 The implementation never reads `~/.codex/auth.json` or another application's
 credential store.

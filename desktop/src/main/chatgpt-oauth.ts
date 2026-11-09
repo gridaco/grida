@@ -41,6 +41,7 @@ export class ChatGptOAuthCoordinator {
   private connectInFlight: Promise<ChatGptConnectResult> | null = null;
   private cancellationEpoch = 0;
   private closed = false;
+  private closing: Promise<void> | undefined;
 
   constructor(private readonly deps: ChatGptOAuthCoordinatorDeps) {}
 
@@ -77,16 +78,22 @@ export class ChatGptOAuthCoordinator {
     return await this.status();
   }
 
-  close(): void {
-    if (this.closed) return;
+  close(): Promise<void> {
+    if (this.closing) return this.closing;
     this.closed = true;
     const active = this.active;
-    if (active) {
-      active.cancelled = true;
-      active.attempt.cancel();
-      void this.cancelSidecarAttempt(active).catch(() => undefined);
-    }
+    const cancel = this.cancel();
+    const connecting = this.connectInFlight;
     this.deps.callback.close();
+    return (this.closing = Promise.allSettled([cancel, connecting]).then(
+      ([cancelled]) => {
+        if (
+          cancelled.status === "rejected" ||
+          (active?.attempt_id && !active.cancel_sent)
+        )
+          throw new Error("chatgpt_oauth_shutdown_unverified");
+      }
+    ));
   }
 
   private async runConnect(): Promise<ChatGptConnectResult> {
