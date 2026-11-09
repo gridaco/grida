@@ -1,16 +1,23 @@
 //! Product composition and ownership for native agent turns.
 
+mod lifecycle;
+pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
+
 use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
-use crate::http::{HttpTransport, ProviderOptions, ProviderProtocol};
-use agent_kit_core::authority::{AuthorityRequest, AuthorityValidator, GrantSelection};
-use agent_kit_core::history::HistoryRecord;
+use crate::http::{CompatibleOutputLimitField, HttpTransport, ProviderOptions, ProviderProtocol};
+use agent_kit_core::authority::{
+    AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
+};
+use agent_kit_core::history::{HistoryPosition, HistoryRecord};
 use agent_kit_core::inference::{Modality, ModelCapabilities, Provider};
 use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::Inventory;
-use agent_kit_core::turn::{CommitReceipt, ControlDirective, ControlRevision, TurnOutcome};
+use agent_kit_core::turn::{
+    CommitReceipt, ControlDirective, ControlRevision, JournalPosition, TurnOutcome,
+};
 use agent_kit_core::{
-    BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, MessageId, Result,
-    SchemaId, SessionId, TurnId,
+    BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, MessageId,
+    PrincipalId, Result, SchemaId, ScopeId, SessionId, TurnId,
 };
 use agent_kit_providers::{
     Anthropic, Gemini, GeminiProfile, ModelProfile, OpenAiCompatible, OutputLimitField,
@@ -22,18 +29,18 @@ use agent_kit_runtime::{
 };
 use agent_kit_sessions::{
     Acceptance, ClaimOutcome, ClaimRequest, ControlReceipt, ControlRequest, CreateSession,
-    InputDisposition, SessionControl, SessionRevision, SessionStore, SessionView, Submission,
-    TurnDisposition, TurnSelection,
+    InputDisposition, RecoveryRequest, SessionControl, SessionRevision, SessionStore, SessionView,
+    Submission, TurnDisposition, TurnSelection, TurnView,
 };
 use agent_kit_store_sqlite::SqliteStore;
 use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{Mutex, Notify, broadcast, oneshot};
+use tokio::sync::{Mutex, Notify, Semaphore, broadcast, oneshot};
 use tokio::task::AbortHandle;
 
 const SESSION_SCHEMA: &str = "grida.agent.native.session";
@@ -41,6 +48,9 @@ const INPUT_SCHEMA: &str = "grida.agent.native.input";
 const MAX_PROMPT_BYTES: usize = 512 * 1024;
 const MAX_PROMPT_PARTS: usize = 64;
 const MAX_ACTIVE_RUNS: usize = 8;
+const MAX_OWNED_CONTROLS: usize = 32;
+const MAX_READY_SESSIONS: usize = 128;
+const MAX_TURN_STEPS: u32 = 8;
 const UPDATE_CAPACITY: usize = 128;
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(8);
 const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
@@ -51,6 +61,7 @@ pub struct Host {
     execution: Option<Arc<Execution>>,
     configuration: Option<Arc<Configuration>>,
     configuration_admission: Arc<Mutex<()>>,
+    controls: Arc<Semaphore>,
     work: Arc<Mutex<Work>>,
     changed: Arc<Notify>,
 }
@@ -69,6 +80,33 @@ struct Work {
     closed: bool,
     unverified: bool,
     active: BTreeMap<SessionId, Active>,
+    ready: VecDeque<ReadyWork>,
+}
+
+#[derive(PartialEq, Eq)]
+enum ReadyWork {
+    Queue(SessionId),
+    Stop(SessionId, TurnId),
+}
+
+impl ReadyWork {
+    fn session(&self) -> &SessionId {
+        match self {
+            Self::Queue(session) | Self::Stop(session, _) => session,
+        }
+    }
+}
+
+impl Work {
+    fn defer(&mut self, ready: ReadyWork) {
+        if self.ready.len() < MAX_READY_SESSIONS && !self.ready.contains(&ready) {
+            if matches!(ready, ReadyWork::Stop(..)) {
+                self.ready.push_front(ready);
+            } else {
+                self.ready.push_back(ready);
+            }
+        }
+    }
 }
 
 struct Active {
@@ -119,6 +157,62 @@ struct StoredPrompt {
     parts: Vec<PromptPart>,
     configuration: ConfigurationSnapshot,
     max_output_tokens: Option<u64>,
+    max_steps: Option<u32>,
+    model: Option<agent_kit_core::ModelId>,
+    authority: Option<CapturedAuthority>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct CapturedAuthority {
+    principal: PrincipalId,
+    scope: ScopeId,
+}
+
+enum InputAuthority {
+    RequireCaptured,
+    CancellationOnly,
+}
+
+impl InputAuthority {
+    fn validate(self, captured: Option<&CapturedAuthority>, live: &AuthorityBinding) -> Result<()> {
+        if matches!(self, Self::CancellationOnly) {
+            return Ok(());
+        }
+        let captured = captured
+            .ok_or_else(|| problem(ErrorKind::Unavailable, "retained_authority_unavailable"))?;
+        if captured.principal != live.principal || captured.scope != live.scope {
+            return Err(problem(ErrorKind::Conflict, "retained_authority_changed"));
+        }
+        Ok(())
+    }
+}
+
+enum Launch {
+    Prompt {
+        id: ChangeId,
+        parts: Vec<PromptPart>,
+    },
+    Queued,
+    Resume(ClaimRequest),
+    RecoverStopped(RecoveryRequest),
+}
+
+enum WorkerClaim {
+    Select(ClaimRequest),
+    Recover(RecoveryRequest),
+}
+
+struct LaunchTicket {
+    admission: oneshot::Receiver<Result<Option<Acceptance>>>,
+    updates: broadcast::Receiver<TurnUpdate>,
+    completion: oneshot::Receiver<Result<RunResult>>,
+}
+
+struct Admitted {
+    master: Master,
+    opened: agent_kit_runtime::OpenedTurn,
+    input: Vec<Message>,
+    acceptance: Option<Acceptance>,
 }
 
 #[derive(Debug, Serialize)]
@@ -161,6 +255,7 @@ impl Host {
             execution,
             configuration,
             configuration_admission: Arc::default(),
+            controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
             work: Arc::default(),
             changed: Arc::default(),
         })
@@ -203,65 +298,112 @@ impl Host {
     pub async fn start_prompt(&self, request: PromptRequest) -> Result<AcceptedRun> {
         self.execution()?;
         let PromptRequest { id, session, parts } = request;
-        let input = prompt_input(&id, &parts)?;
+        prompt_input(&id, &parts)?;
         let turn = TurnId::new(uuid())?;
-        let (admission_tx, admission) = oneshot::channel();
-        let (updates_tx, updates) = broadcast::channel(UPDATE_CAPACITY);
-        let (completion_tx, completion) = oneshot::channel();
-        {
+        let ticket = {
             let mut work = self.work.lock().await;
-            if work.closed {
-                return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
-            }
-            if work.active.len() >= MAX_ACTIVE_RUNS {
-                return Err(problem(ErrorKind::LimitExceeded, "active_run_limit"));
-            }
-            if work.active.contains_key(&session) {
-                return Err(problem(ErrorKind::Conflict, "session_prompt_in_progress"));
-            }
-            let host = self.clone();
-            let worker_session = session.clone();
-            let worker_turn = turn.clone();
-            let worker_input = id.clone();
-            let handle = tokio::spawn(async move {
-                // The first admission check acquires the same lock that records
-                // this worker. No durable submission precedes host ownership.
-                let prepared = host
-                    .admit(&worker_session, &worker_turn, worker_input, parts)
-                    .await;
-                let (master, opened, acceptance) = match prepared {
-                    Ok(run) => run,
-                    Err(error) => {
-                        host.finish_work(&worker_session, error.kind == ErrorKind::Uncertain)
-                            .await;
-                        let _ = admission_tx.send(Err(error));
-                        return;
-                    }
-                };
-                let _ = admission_tx.send(Ok(acceptance));
-                let result = drive(host.store.clone(), master, opened, input, updates_tx).await;
-                host.finish_work(&worker_session, result.is_err()).await;
-                let _ = completion_tx.send(result);
-            });
-            work.active.insert(
+            self.register(
+                &mut work,
                 session.clone(),
-                Active {
-                    turn: turn.clone(),
-                    admitted: false,
-                    handle: handle.abort_handle(),
+                turn.clone(),
+                Launch::Prompt {
+                    id: id.clone(),
+                    parts,
                 },
-            );
-        }
-        // Dropping the requesting client only detaches this receiver. The
-        // registered worker keeps ownership through claim and settlement.
-        let acceptance = admission
+            )?
+        };
+        let acceptance = ticket
+            .admission
             .await
-            .map_err(|_| problem(ErrorKind::Uncertain, "admission_worker_interrupted"))??;
+            .map_err(|_| problem(ErrorKind::Uncertain, "admission_worker_interrupted"))??
+            .ok_or_else(|| problem(ErrorKind::Uncertain, "prompt_acceptance_missing"))?;
         Ok(AcceptedRun {
             session,
             turn,
             input: id,
             position: acceptance.position,
+            updates: ticket.updates,
+            completion: ticket.completion,
+        })
+    }
+
+    fn register(
+        &self,
+        work: &mut Work,
+        session: SessionId,
+        turn: TurnId,
+        launch: Launch,
+    ) -> Result<LaunchTicket> {
+        if work.closed {
+            return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
+        }
+        if work.active.len() >= MAX_ACTIVE_RUNS {
+            return Err(problem(ErrorKind::LimitExceeded, "active_run_limit"));
+        }
+        if work.active.contains_key(&session) {
+            return Err(problem(ErrorKind::Conflict, "session_prompt_in_progress"));
+        }
+        let (admission_tx, admission) = oneshot::channel();
+        let (updates_tx, updates) = broadcast::channel(UPDATE_CAPACITY);
+        let (completion_tx, completion) = oneshot::channel();
+        let host = self.clone();
+        let worker_session = session.clone();
+        let worker_turn = turn.clone();
+        let handle = tokio::spawn(async move {
+            // The worker checks the same lock used for registration before
+            // any durable claim, even when its requesting client disappears.
+            let result = host.admit(&worker_session, &worker_turn, launch).await;
+            let admitted = match result {
+                Ok(Some(run)) => run,
+                Ok(None) => {
+                    host.finish_work(&worker_session, false).await;
+                    let _ = admission_tx.send(Ok(None));
+                    host.wake_ready().await;
+                    return;
+                }
+                Err(error) => {
+                    let queue_waiting = error.code == "session_queue_waiting";
+                    host.finish_work(&worker_session, error.kind == ErrorKind::Uncertain)
+                        .await;
+                    let _ = admission_tx.send(Err(error));
+                    host.wake_ready().await;
+                    if queue_waiting {
+                        host.kick_queue(worker_session).await;
+                    }
+                    return;
+                }
+            };
+            let _ = admission_tx.send(Ok(admitted.acceptance));
+            let result = drive(
+                host.store.clone(),
+                admitted.master,
+                admitted.opened,
+                admitted.input,
+                updates_tx,
+            )
+            .await;
+            let settled = matches!(&result, Ok(RunResult::Settled(_)));
+            let suspended = matches!(&result, Ok(RunResult::Suspended));
+            host.finish_work(&worker_session, result.is_err()).await;
+            let _ = completion_tx.send(result);
+            host.wake_ready().await;
+            if settled {
+                host.kick_queue(worker_session).await;
+            } else if suspended {
+                host.kick_stopped(worker_session, worker_turn).await;
+            }
+        });
+        work.ready.retain(|waiting| waiting.session() != &session);
+        work.active.insert(
+            session,
+            Active {
+                turn,
+                admitted: false,
+                handle: handle.abort_handle(),
+            },
+        );
+        Ok(LaunchTicket {
+            admission,
             updates,
             completion,
         })
@@ -271,81 +413,120 @@ impl Host {
         &self,
         session: &SessionId,
         turn: &TurnId,
-        id: ChangeId,
-        parts: Vec<PromptPart>,
-    ) -> Result<(Master, agent_kit_runtime::OpenedTurn, Acceptance)> {
+        launch: Launch,
+    ) -> Result<Option<Admitted>> {
         if self.work.lock().await.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
         let execution = self.execution()?;
-        let view = self.store.inspect(session.clone()).await?;
-        let expected_configuration = if view.configuration.version() == 1 {
-            execution.legacy_configuration
+        let configuration_admission = if matches!(&launch, Launch::Prompt { .. } | Launch::Queued) {
+            Some(self.configuration_admission.lock().await)
         } else {
-            execution.configuration
+            None
         };
-        if session_configuration(&view)?.execution != expected_configuration {
-            return Err(problem(
-                ErrorKind::Conflict,
-                "session_execution_configuration_changed",
-            ));
-        }
-        if view.admission_paused {
-            return Err(problem(ErrorKind::InvalidState, "session_admission_paused"));
-        }
-        if view.current.is_some() {
-            return Err(problem(
-                ErrorKind::InvalidState,
-                "session_turn_requires_recovery",
-            ));
-        }
-        let history = self.history(session.clone(), None).await?;
-        // Serialize settings activation with the commit that captures them.
-        let configuration_admission = self.configuration_admission.lock().await;
-        let configuration = self.with_configuration(Configuration::snapshot).await?;
-        let input_limit = configuration.defaults.context.max_input_tokens;
-        let master = Master::new(
-            execution.config.clone(),
-            execution.provider.clone(),
-            Inventory::new().snapshot(&[])?,
-            execution.authority.clone(),
-        )?
-        .with_history(history)
-        .with_input_limit(input_limit);
-        let acceptance = self
-            .store
-            .submit(
-                session.clone(),
-                Submission {
-                    id: id.clone(),
-                    payload: encode(
-                        INPUT_SCHEMA,
-                        2,
-                        &StoredPrompt {
-                            parts,
-                            configuration,
-                            max_output_tokens: Some(execution.config.max_output_tokens),
-                        },
-                    )?,
-                },
-            )
-            .await?;
-        drop(configuration_admission);
         let view = self.store.inspect(session.clone()).await?;
-        let claim = self
-            .store
-            .claim(ClaimRequest {
-                id: change_id()?,
-                session: session.clone(),
-                expected_revision: view.revision,
-                selection: TurnSelection::New {
-                    turn: turn.clone(),
-                    inputs: vec![id],
-                },
+        self.check_execution(&view)?;
+        let (claim_request, input, acceptance, history) = match launch {
+            Launch::Prompt { id, parts } => {
+                require_idle(&view)?;
+                if !view.queued.is_empty() {
+                    return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
+                }
+                let history = self.provider_history(session.clone(), None).await?;
+                let input = self.capture_submission(id, parts).await?;
+                let acceptance = self.store.submit(session.clone(), input.clone()).await?;
+                let view = self.store.inspect(session.clone()).await?;
+                if view.queued.first().map(|head| &head.input.id) != Some(&input.id) {
+                    return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
+                }
+                let claim = new_claim(
+                    session.clone(),
+                    turn.clone(),
+                    view.revision,
+                    input.id.clone(),
+                )?;
+                (
+                    WorkerClaim::Select(claim),
+                    Some(input),
+                    Some(acceptance),
+                    history,
+                )
+            }
+            Launch::Queued => {
+                require_idle(&view)?;
+                let next = view
+                    .queued
+                    .first()
+                    .ok_or_else(|| problem(ErrorKind::Unavailable, "session_queue_empty"))?;
+                let history = self.provider_history(session.clone(), None).await?;
+                let claim = new_claim(
+                    session.clone(),
+                    turn.clone(),
+                    view.revision,
+                    next.input.id.clone(),
+                )?;
+                (
+                    WorkerClaim::Select(claim),
+                    Some(next.input.clone()),
+                    None,
+                    history,
+                )
+            }
+            Launch::Resume(request) => {
+                let history = self
+                    .provider_history(session.clone(), Some(turn.clone()))
+                    .await?;
+                let inputs = self
+                    .store
+                    .turn_submissions(session.clone(), turn.clone())
+                    .await?;
+                let [input] = inputs.as_slice() else {
+                    return Err(problem(
+                        ErrorKind::InvalidState,
+                        "retained_input_selection_invalid",
+                    ));
+                };
+                (
+                    WorkerClaim::Select(request),
+                    Some(input.clone()),
+                    None,
+                    history,
+                )
+            }
+            Launch::RecoverStopped(request) => {
+                let history = self
+                    .provider_history(session.clone(), Some(turn.clone()))
+                    .await?;
+                (WorkerClaim::Recover(request), None, None, history)
+            }
+        };
+        let prepared = input
+            .as_ref()
+            .map(|input| {
+                self.prepare_input(execution, input, &history, InputAuthority::RequireCaptured)
             })
-            .await?;
-        let ClaimOutcome::Acquired(claim) = claim else {
-            return Err(problem(ErrorKind::Conflict, "session_turn_already_claimed"));
+            .transpose()?;
+        let claimed = match claim_request {
+            WorkerClaim::Select(request) => self.store.claim(request).await?,
+            WorkerClaim::Recover(request) => self.store.recover(request).await?,
+        };
+        drop(configuration_admission);
+        let claim = match claimed {
+            ClaimOutcome::Acquired(claim) => claim,
+            ClaimOutcome::Existing(_) => return Ok(None),
+        };
+        let (master, input) = match prepared {
+            Some(prepared) => prepared,
+            None => {
+                let [input] = claim.inputs.as_slice() else {
+                    return Err(problem(
+                        ErrorKind::Uncertain,
+                        "retained_input_selection_invalid",
+                    ));
+                };
+                self.prepare_input(execution, input, &history, InputAuthority::CancellationOnly)
+                    .map_err(|_| problem(ErrorKind::Uncertain, "retained_input_unavailable"))?
+            }
         };
         let opened = execution
             .runtime
@@ -362,8 +543,6 @@ impl Host {
             work.closed
         };
         if closing {
-            // A concurrent shutdown may have observed this worker before its
-            // lease existed. Apply the pause before entering the master.
             control(
                 &self.store,
                 session.clone(),
@@ -373,7 +552,147 @@ impl Host {
             .await
             .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_pause_failed"))?;
         }
-        Ok((master, opened, acceptance))
+        Ok(Some(Admitted {
+            master,
+            opened,
+            input,
+            acceptance,
+        }))
+    }
+
+    fn check_execution(&self, view: &SessionView) -> Result<()> {
+        let execution = self.execution()?;
+        let expected = if view.configuration.version() == 1 {
+            execution.legacy_configuration
+        } else {
+            execution.configuration
+        };
+        if session_configuration(view)?.execution != expected {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "session_execution_configuration_changed",
+            ));
+        }
+        Ok(())
+    }
+
+    async fn capture_submission(&self, id: ChangeId, parts: Vec<PromptPart>) -> Result<Submission> {
+        let execution = self.execution()?;
+        let configuration = self.with_configuration(Configuration::snapshot).await?;
+        Ok(Submission {
+            id,
+            payload: encode(
+                INPUT_SCHEMA,
+                2,
+                &StoredPrompt {
+                    parts,
+                    configuration,
+                    max_output_tokens: Some(execution.config.max_output_tokens),
+                    max_steps: Some(execution.config.max_steps),
+                    model: Some(execution.config.model.clone()),
+                    authority: Some(CapturedAuthority {
+                        principal: execution.authority.inference.authority.principal.clone(),
+                        scope: execution.authority.inference.authority.scope.clone(),
+                    }),
+                },
+            )?,
+        })
+    }
+
+    fn prepare_input(
+        &self,
+        execution: &Execution,
+        input: &Submission,
+        history: &[Message],
+        authority: InputAuthority,
+    ) -> Result<(Master, Vec<Message>)> {
+        let mut config = execution.config.clone();
+        let (input, limit) = match input.payload.version() {
+            1 if input.payload.schema().as_str() == INPUT_SCHEMA => {
+                authority.validate(None, &execution.authority.inference.authority)?;
+                config.max_steps = 1;
+                (decode_input(input)?, None)
+            }
+            2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
+                let stored: StoredPrompt = decode_input(input)?;
+                authority.validate(
+                    stored.authority.as_ref(),
+                    &execution.authority.inference.authority,
+                )?;
+                if stored
+                    .model
+                    .as_ref()
+                    .is_some_and(|model| *model != config.model)
+                {
+                    return Err(problem(ErrorKind::Conflict, "retained_model_changed"));
+                }
+                config.max_steps = stored.max_steps.unwrap_or(1);
+                config.max_output_tokens =
+                    stored.max_output_tokens.unwrap_or(config.max_output_tokens);
+                (
+                    prompt_input(&input.id, &stored.parts)?,
+                    stored.configuration.defaults.context.max_input_tokens,
+                )
+            }
+            _ => {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "unsupported_submission_schema",
+                ));
+            }
+        };
+        let master = Master::new(
+            config,
+            execution.provider.clone(),
+            Inventory::new().snapshot(&[])?,
+            execution.authority.clone(),
+        )?
+        .with_history(history.to_vec())
+        .with_input_limit(limit);
+        Ok((master, input))
+    }
+
+    async fn kick_queue(&self, session: SessionId) {
+        if self.work.lock().await.closed {
+            return;
+        }
+        let Ok(view) = self.store.inspect(session.clone()).await else {
+            return;
+        };
+        if view.current.is_some() || view.admission_paused || view.queued.is_empty() {
+            return;
+        }
+        let Ok(turn) = TurnId::new(uuid()) else {
+            return;
+        };
+        let mut work = self.work.lock().await;
+        if work.closed || work.active.contains_key(&session) {
+            return;
+        }
+        if work.active.len() >= MAX_ACTIVE_RUNS {
+            work.defer(ReadyWork::Queue(session));
+            return;
+        }
+        // Dropping the automatic continuation ticket detaches its result
+        // channels. The registered worker still owns the selected turn.
+        let _ = self.register(&mut work, session, turn, Launch::Queued);
+    }
+
+    async fn wake_ready(&self) {
+        loop {
+            let next = {
+                let mut work = self.work.lock().await;
+                if work.closed || work.active.len() >= MAX_ACTIVE_RUNS {
+                    return;
+                }
+                work.ready.pop_front()
+            };
+            match next {
+                Some(ReadyWork::Queue(session)) => self.kick_queue(session).await,
+                Some(ReadyWork::Stop(session, turn)) => self.kick_stopped(session, turn).await,
+                None => return,
+            }
+        }
     }
 
     async fn finish_work(&self, session: &SessionId, unverified: bool) {
@@ -414,35 +733,7 @@ impl Host {
         else {
             return Ok(None);
         };
-        let stored = &view.input.payload;
-        if stored.schema().as_str() != INPUT_SCHEMA {
-            return Err(problem(
-                ErrorKind::Unsupported,
-                "unsupported_submission_schema",
-            ));
-        }
-        let same_input = match stored.version() {
-            1 => {
-                let previous: Vec<Message> = serde_json::from_slice(stored.bytes())
-                    .map_err(|_| problem(ErrorKind::InvalidState, "invalid_submission"))?;
-                let current = prompt_input(&request.id, &request.parts)?;
-                previous.len() == 1 && previous[0].content == current[0].content
-            }
-            2 => {
-                let previous: StoredPrompt = serde_json::from_slice(stored.bytes())
-                    .map_err(|_| problem(ErrorKind::InvalidState, "invalid_submission"))?;
-                previous.parts == request.parts
-            }
-            _ => {
-                return Err(problem(
-                    ErrorKind::Unsupported,
-                    "unsupported_submission_schema",
-                ));
-            }
-        };
-        if !same_input {
-            return Err(problem(ErrorKind::Conflict, "submission_input_changed"));
-        }
+        lifecycle::check_input(&view.input, &request.parts)?;
         Ok(Some(DurableSubmission {
             session: request.session.clone(),
             input: request.id.clone(),
@@ -459,17 +750,23 @@ impl Host {
         expected_session: SessionRevision,
         expected_control: ControlRevision,
     ) -> Result<ControlReceipt> {
-        self.store
-            .control(ControlRequest {
-                id: request,
-                session,
-                expected_revision: expected_session,
-                action: SessionControl::PauseAndCancel {
-                    turn,
-                    expected: expected_control,
-                },
-            })
-            .await
+        self.owned_control(move |host| async move {
+            let receipt = host
+                .store
+                .control(ControlRequest {
+                    id: request,
+                    session: session.clone(),
+                    expected_revision: expected_session,
+                    action: SessionControl::PauseAndCancel {
+                        turn: turn.clone(),
+                        expected: expected_control,
+                    },
+                })
+                .await?;
+            host.kick_stopped(session, turn).await;
+            Ok(receipt)
+        })
+        .await
     }
 
     pub async fn configuration_inspect(&self) -> Result<ConfigurationInspection> {
@@ -481,10 +778,13 @@ impl Host {
         expected: Option<Fingerprint>,
         change: SettingChange,
     ) -> Result<ConfigurationSnapshot> {
-        let admission = self.configuration_admission.clone().lock_owned().await;
-        self.with_configuration(move |configuration| {
-            let _admission = admission;
-            configuration.update(expected, change)
+        self.owned_control(move |host| async move {
+            let admission = host.configuration_admission.clone().lock_owned().await;
+            host.with_configuration(move |configuration| {
+                let _admission = admission;
+                configuration.update(expected, change)
+            })
+            .await
         })
         .await
     }
@@ -493,10 +793,13 @@ impl Host {
         &self,
         expected: Option<Fingerprint>,
     ) -> Result<ConfigurationSnapshot> {
-        let admission = self.configuration_admission.clone().lock_owned().await;
-        self.with_configuration(move |configuration| {
-            let _admission = admission;
-            configuration.reload(expected)
+        self.owned_control(move |host| async move {
+            let admission = host.configuration_admission.clone().lock_owned().await;
+            host.with_configuration(move |configuration| {
+                let _admission = admission;
+                configuration.reload(expected)
+            })
+            .await
         })
         .await
     }
@@ -525,6 +828,7 @@ impl Host {
                 .await
                 .map_err(|_| problem(ErrorKind::Uncertain, "host_shutdown_timeout"))?;
             work.closed = true;
+            self.controls.close();
             work.active
                 .iter()
                 .map(|(session, run)| {
@@ -554,7 +858,9 @@ impl Host {
                 let changed = self.changed.notified();
                 {
                     let work = self.work.lock().await;
-                    if work.active.is_empty() {
+                    if work.active.is_empty()
+                        && self.controls.available_permits() == MAX_OWNED_CONTROLS
+                    {
                         return if work.unverified {
                             Err(problem(ErrorKind::Uncertain, "host_turn_unverified"))
                         } else {
@@ -602,6 +908,19 @@ impl Host {
             .map(|HistoryRecord::Message(message)| message)
             .collect())
     }
+    async fn provider_history(
+        &self,
+        session: SessionId,
+        before_turn: Option<TurnId>,
+    ) -> Result<Vec<Message>> {
+        Ok(self
+            .store
+            .history_with(session, before_turn, grida_agent_master::history::project)
+            .await?
+            .into_iter()
+            .map(|HistoryRecord::Message(message)| message)
+            .collect())
+    }
 }
 
 impl Execution {
@@ -631,7 +950,12 @@ impl Execution {
                     options.model.clone(),
                     ModelProfile {
                         capabilities,
-                        output_limit: OutputLimitField::CompletionTokens,
+                        output_limit: match options.compatible_output_limit_field {
+                            Some(CompatibleOutputLimitField::MaxTokens) => OutputLimitField::Tokens,
+                            Some(CompatibleOutputLimitField::MaxCompletionTokens) | None => {
+                                OutputLimitField::CompletionTokens
+                            }
+                        },
                         include_usage: true,
                     },
                 )]),
@@ -688,7 +1012,7 @@ impl Execution {
             config: MasterConfig {
                 model: options.model,
                 instructions: "You are Grida Agent, a helpful assistant.".into(),
-                max_steps: 1,
+                max_steps: MAX_TURN_STEPS,
                 max_output_tokens: options.max_output_tokens,
             },
             provider,
@@ -796,7 +1120,8 @@ async fn control(
         let turn_view = store.inspect_turn(session.clone(), turn.clone()).await?;
         if matches!(turn_view.disposition, TurnDisposition::Settled)
             || (directive == ControlDirective::Cancel && turn_view.controls.cancelled)
-            || (directive == ControlDirective::Pause && turn_view.controls.paused)
+            || (directive == ControlDirective::Pause
+                && (turn_view.controls.paused || turn_view.controls.cancelled))
         {
             return Ok(());
         }
@@ -827,6 +1152,41 @@ async fn control(
         }
     }
     Err(problem(ErrorKind::Conflict, "control_revision_changed"))
+}
+
+fn require_idle(view: &SessionView) -> Result<()> {
+    if view.admission_paused {
+        return Err(problem(ErrorKind::InvalidState, "session_admission_paused"));
+    }
+    if view.current.is_some() {
+        return Err(problem(
+            ErrorKind::InvalidState,
+            "session_turn_requires_recovery",
+        ));
+    }
+    Ok(())
+}
+
+fn new_claim(
+    session: SessionId,
+    turn: TurnId,
+    revision: SessionRevision,
+    input: ChangeId,
+) -> Result<ClaimRequest> {
+    Ok(ClaimRequest {
+        id: change_id()?,
+        session,
+        expected_revision: revision,
+        selection: TurnSelection::New {
+            turn,
+            inputs: vec![input],
+        },
+    })
+}
+
+fn decode_input<T: serde::de::DeserializeOwned>(input: &Submission) -> Result<T> {
+    serde_json::from_slice(input.payload.bytes())
+        .map_err(|_| problem(ErrorKind::InvalidState, "invalid_submission"))
 }
 
 fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {

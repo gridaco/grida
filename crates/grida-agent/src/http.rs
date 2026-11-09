@@ -58,6 +58,13 @@ impl std::str::FromStr for ProviderProtocol {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CompatibleOutputLimitField {
+    MaxCompletionTokens,
+    MaxTokens,
+}
+
 #[derive(Serialize)]
 pub struct ProviderOptions {
     pub endpoint: String,
@@ -69,6 +76,8 @@ pub struct ProviderOptions {
     pub protocol: ProviderProtocol,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub credential_home: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compatible_output_limit_field: Option<CompatibleOutputLimitField>,
 }
 
 pub struct HttpTransport {
@@ -84,6 +93,11 @@ pub struct HttpTransport {
 
 impl HttpTransport {
     pub fn new(state_dir: &Path, options: &ProviderOptions) -> Result<Self> {
+        if !options.protocol.is_compatible() && options.compatible_output_limit_field.is_some() {
+            return Err(invalid(
+                "compatible_output_limit_field_requires_compatible_provider",
+            ));
+        }
         let base = provider_base(&options.endpoint)?;
         let (target, operation) = provider_route(base.clone(), options.protocol, &options.model)?;
         let source = credential_source(options, &base)?;
@@ -100,41 +114,50 @@ impl HttpTransport {
         let lineage = Fingerprint::of(&(
             "provider-lineage-v1",
             provider,
-            base.as_str().trim_end_matches('/'),
+            base.as_str().strip_suffix('/').unwrap_or(base.as_str()),
             source_identity,
         ))?;
-        let selection = Fingerprint::of(&(lineage, &options.model))?;
+        let selection = match options.compatible_output_limit_field {
+            Some(CompatibleOutputLimitField::MaxTokens) => {
+                Fingerprint::of(&(lineage, &options.model, "max_tokens"))?
+            }
+            Some(CompatibleOutputLimitField::MaxCompletionTokens) | None => {
+                Fingerprint::of(&(lineage, &options.model))?
+            }
+        };
         let credential = source.map(CapturedCredential::capture).transpose()?;
         let source = credential
             .as_ref()
             .map_or("anonymous", CapturedCredential::source_kind);
-        let binding = ProviderBinding {
-            provider: ProviderId::new(provider)?,
-            authority: AuthorityBinding {
-                principal: PrincipalId::new(format!("{provider}/{source}"))?,
-                // Live dispatch grants are independent from replay lineage.
-                binding: BindingId::new(uuid::Uuid::new_v4().to_string())?,
-                scope: ScopeId::new("configured-provider")?,
-            },
-        };
-        let replay_binding = if options.protocol == ProviderProtocol::Gemini {
-            let binding = if let Some(credential) = &credential {
+        let scope = uuid::Uuid::from_bytes(
+            lineage.bytes()[..16]
+                .try_into()
+                .expect("fingerprint prefix"),
+        );
+        let continuity = match &credential {
+            None => BindingId::new(scope.to_string())?,
+            Some(credential)
+                if cfg!(any(target_os = "linux", target_os = "macos"))
+                    || options.protocol == ProviderProtocol::Gemini =>
+            {
                 let state_dir = state_dir
                     .canonicalize()
                     .map_err(|_| problem("state_directory_unavailable"))?;
                 credential.replay_binding(&state_dir, lineage)?
-            } else {
-                let identity = uuid::Uuid::from_bytes(
-                    lineage.bytes()[..16]
-                        .try_into()
-                        .expect("fingerprint prefix"),
-                );
-                BindingId::new(identity.to_string())?
-            };
-            Some(binding)
-        } else {
-            None
+            }
+            // On a platform without protected continuity storage, a fresh
+            // environment credential can still authorize this host's work.
+            Some(_) => BindingId::new(uuid::Uuid::new_v4().to_string())?,
         };
+        let binding = ProviderBinding {
+            provider: ProviderId::new(provider)?,
+            authority: AuthorityBinding {
+                principal: PrincipalId::new(format!("{provider}/{source}/{continuity}"))?,
+                binding: BindingId::new(uuid::Uuid::new_v4().to_string())?,
+                scope: ScopeId::new(format!("provider/{scope}"))?,
+            },
+        };
+        let replay_binding = (options.protocol == ProviderProtocol::Gemini).then_some(continuity);
         let mut client = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())

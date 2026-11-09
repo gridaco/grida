@@ -2,7 +2,7 @@ use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
 use grida_agent::host::{Host, PromptPart, PromptRequest, RunResult, change_id};
-use grida_agent::{ProviderOptions, ProviderProtocol, acp};
+use grida_agent::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol, acp};
 use grida_agent_master::read_account;
 use serde::Serialize;
 use serde_json::json;
@@ -152,6 +152,12 @@ fn launch(command: Command) -> Command {
                 .help("Read the selected vendor's stored key from an explicit Grida home"),
         )
         .arg(
+            Arg::new("compatible-output-limit-field")
+                .long("compatible-output-limit-field")
+                .value_parser(["max-completion-tokens", "max-tokens"])
+                .help("Select the output-limit field for an OpenAI-compatible endpoint"),
+        )
+        .arg(
             Arg::new("max-output-tokens")
                 .long("max-output-tokens")
                 .value_name("TOKENS")
@@ -182,6 +188,13 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         return Ok(0);
     }
     let provider = ProviderOptions {
+        compatible_output_limit_field: args.get_one::<String>("compatible-output-limit-field").map(
+            |value| match value.as_str() {
+                "max-completion-tokens" => CompatibleOutputLimitField::MaxCompletionTokens,
+                "max-tokens" => CompatibleOutputLimitField::MaxTokens,
+                _ => unreachable!("validated compatible output-limit field"),
+            },
+        ),
         protocol: args
             .get_one::<String>("provider")
             .expect("provider default")

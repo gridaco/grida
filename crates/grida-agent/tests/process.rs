@@ -18,6 +18,10 @@ use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
+#[cfg(unix)]
+#[path = "process/lifecycle.rs"]
+mod lifecycle;
+
 const WAIT: Duration = Duration::from_secs(15);
 const TEST_CREDENTIAL: &str = "fixture-only-bearer-token";
 
@@ -31,7 +35,10 @@ enum Reply {
     Finished(&'static str),
     Hold(&'static str),
     Stop(&'static str),
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     GeminiSigned(&'static str),
+    #[cfg(unix)]
+    Release(&'static str, tokio::sync::oneshot::Receiver<()>),
 }
 
 impl Endpoint {
@@ -57,9 +64,16 @@ impl Endpoint {
         let url = format!("http://{}/{version}", listener.local_addr().unwrap());
         let (sent, requests) = mpsc::unbounded_channel();
         let task = tokio::spawn(async move {
+            let mut connections = tokio::task::JoinSet::new();
             for reply in replies {
                 let (stream, _) = timeout(WAIT, listener.accept()).await.unwrap().unwrap();
-                fixture_request(stream, &sent, reply, protocol, credential).await;
+                let sent = sent.clone();
+                connections.spawn(async move {
+                    fixture_request(stream, &sent, reply, protocol, credential).await;
+                });
+            }
+            while let Some(result) = connections.join_next().await {
+                result.unwrap();
             }
         });
         Self {
@@ -134,6 +148,14 @@ async fn fixture_request(
     stream.read_exact(&mut request).await.unwrap();
     sent.send(serde_json::from_slice(&request).unwrap())
         .unwrap();
+    #[cfg(unix)]
+    let reply = match reply {
+        Reply::Release(text, ready) => {
+            timeout(WAIT, ready).await.unwrap().unwrap();
+            Reply::Finished(text)
+        }
+        reply => reply,
+    };
     let hold = matches!(reply, Reply::Hold(_));
     let body = fixture_body(reply, protocol);
     let advertised_length = if hold { 1 << 20 } else { body.len() };
@@ -162,10 +184,13 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         Reply::Finished(text) => (text, Some("stop")),
         Reply::Hold(text) => (text, None),
         Reply::Stop(reason) => ("", Some(reason)),
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         Reply::GeminiSigned(text) => {
             signed = true;
             (text, Some("stop"))
         }
+        #[cfg(unix)]
+        Reply::Release(..) => unreachable!("fixture releases the response before encoding"),
     };
     let mut output = String::new();
     let mut frame = |event: Value| {
@@ -732,6 +757,7 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
         Some(ProviderOptions {
             protocol: ProviderProtocol::OpenAiCompatible,
             credential_home: None,
+            compatible_output_limit_field: None,
             endpoint: endpoint.url.clone(),
             model: ModelId::new("fixture-model").unwrap(),
             credential_env: None,
@@ -1133,6 +1159,15 @@ type SharedSocket = tokio_tungstenite::WebSocketStream<TcpStream>;
 
 #[cfg(unix)]
 async fn shared_server(state: &Path, endpoint: &str) -> (Child, String) {
+    shared_server_with_credential(state, endpoint, TEST_CREDENTIAL).await
+}
+
+#[cfg(unix)]
+async fn shared_server_with_credential(
+    state: &Path,
+    endpoint: &str,
+    credential: &str,
+) -> (Child, String) {
     let mut command = executable();
     command
         .args([
@@ -1144,6 +1179,7 @@ async fn shared_server(state: &Path, endpoint: &str) -> (Child, String) {
         ])
         .env("GRIDA_AGENT_FIXTURE_SERVER_TOKEN", SERVER_TOKEN);
     configured(&mut command, state, endpoint);
+    command.env("GRIDA_AGENT_PROCESS_TEST_KEY", credential);
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -1235,6 +1271,15 @@ fn extension_initialize() -> Value {
             "co.grida/session/submit":1,
             "co.grida/session/snapshot":1,
             "co.grida/session/stop":1,
+            "co.grida/session/enqueue":1,
+            "co.grida/session/input":1,
+            "co.grida/session/replace":1,
+            "co.grida/session/withdraw":1,
+            "co.grida/session/reorder":1,
+            "co.grida/session/resume-queue":1,
+            "co.grida/session/steer":1,
+            "co.grida/session/pause":1,
+            "co.grida/session/resume":1,
             "co.grida/config/inspect":1,
             "co.grida/config/update":1,
             "co.grida/config/reload":1
@@ -1257,6 +1302,7 @@ async fn retry_reports_a_previously_accepted_unclaimed_input_without_starting_it
     let options = || ProviderOptions {
         protocol: ProviderProtocol::OpenAiCompatible,
         credential_home: None,
+        compatible_output_limit_field: None,
         endpoint: "http://127.0.0.1:1/v1".into(),
         model: ModelId::new("fixture-model").unwrap(),
         credential_env: None,
@@ -1674,7 +1720,7 @@ async fn loopback_provider_bypasses_even_an_explicit_host_proxy() {
     let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let proxy_url = format!("http://{}", proxy.local_addr().unwrap());
     let mut command = executable();
-    command.arg("run");
+    command.args(["run", "--compatible-output-limit-field", "max-tokens"]);
     configured(
         &mut command,
         &temporary.path().join("agent-state"),
@@ -1698,10 +1744,10 @@ async fn loopback_provider_bypasses_even_an_explicit_host_proxy() {
         records(&output.stdout)[1]["account"]["text"],
         "Direct reply."
     );
-    assert_eq!(
-        endpoint.request().await["messages"][1]["content"],
-        "Use the local provider"
-    );
+    let request = endpoint.request().await;
+    assert_eq!(request["messages"][1]["content"], "Use the local provider");
+    assert_eq!(request["max_tokens"], 4096);
+    assert!(request.get("max_completion_tokens").is_none());
     endpoint.done().await;
 }
 
@@ -1740,4 +1786,42 @@ async fn reject_proxy_tunnel(proxy: TcpListener) -> String {
         .await
         .unwrap();
     handshake
+}
+
+#[tokio::test]
+async fn compatible_paths_with_different_dispatch_targets_have_distinct_session_identity() {
+    use agent_kit_core::ModelId;
+    use grida_agent::ProviderOptions;
+    use grida_agent::host::{Host, PromptPart, PromptRequest, change_id};
+
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let options = |endpoint: &str| ProviderOptions {
+        endpoint: endpoint.into(),
+        model: ModelId::new("fixture-model").unwrap(),
+        credential_env: None,
+        max_output_tokens: 1024,
+        protocol: ProviderProtocol::OpenAiCompatible,
+        credential_home: None,
+        compatible_output_limit_field: None,
+    };
+    let host = Host::open(&state, Some(options("http://127.0.0.1:1/v1"))).unwrap();
+    let session = host.new_session(workspace.path().into()).await.unwrap();
+    drop(host);
+    let host = Host::open(&state, Some(options("http://127.0.0.1:1/v1//"))).unwrap();
+    let result = host
+        .start_prompt(PromptRequest {
+            id: change_id().unwrap(),
+            session,
+            parts: vec![PromptPart::Text {
+                text: "Do not dispatch elsewhere".into(),
+            }],
+        })
+        .await;
+    let Err(error) = result else {
+        panic!("accepted a different provider route")
+    };
+    assert_eq!(error.code, "session_execution_configuration_changed");
+    host.shutdown().await.unwrap();
 }

@@ -51,7 +51,10 @@ matcher also reads static OS proxy settings on macOS and Windows. Restart the
 host to apply routing or trust changes. PAC, automatic proxy discovery, and
 interactive or integrated proxy sign-in require a compatible host transport.
 When the native matcher finds no supported proxy setting, it routes directly.
-Numeric loopback and `localhost` endpoints always bypass proxies.
+Numeric loopback and `localhost` endpoints always bypass proxies. For
+compatible endpoints that read `max_tokens`, including Ollama, pass
+`--compatible-output-limit-field max-tokens`. The default sends
+`max_completion_tokens`.
 
 Gemini retains signed model history across restarts when its protected
 credential proof still matches. A changed credential invalidates replay of
@@ -128,19 +131,27 @@ During `initialize`, a client puts value `1` under each supported
 `agentCapabilities._meta`. Each custom method prefixes its capability key
 with an underscore.
 
-| Capability                  | Behavior                                                                                                                                                                                                                                      |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `co.grida/session/submit`   | Submit `sessionId`, caller-owned `inputId`, and ACP `prompt` to an attached idle session. Receive the committed input position and its queued, claimed, or completed disposition. Retry with the same input to read its retained disposition. |
-| `co.grida/session/snapshot` | Read an attached session's revisions, queue count, and current or latest turn summary. Load the session for transcript replay.                                                                                                                |
-| `co.grida/session/stop`     | Submit `sessionId`, `turnId`, caller-owned `requestId`, `expectedSessionRevision`, and `expectedControlRevision`. The committed operation cancels that turn and pauses session admission. The exact retry returns its receipt.                |
-| `co.grida/config/inspect`   | Read the supported context setting, file revision, diagnostics, and active defaults.                                                                                                                                                          |
-| `co.grida/config/update`    | Supply `expectedRevision` and one typed set or reset operation for `context.max_input_tokens`.                                                                                                                                                |
-| `co.grida/config/reload`    | Validate and activate the file at `expectedRevision`.                                                                                                                                                                                         |
+| Capability                                        | Behavior                                                                         |
+| ------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `co.grida/session/submit`                         | Accept an identified prompt for an idle session.                                 |
+| `co.grida/session/snapshot`                       | Read revisions, ordered queue settings, and turn summaries.                      |
+| `co.grida/session/enqueue`, `input`               | Accept waiting work or read an accepted input and its settings.                  |
+| `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting work with revision checks and retained receipts.                    |
+| `co.grida/session/pause`, `resume`, `steer`       | Pause an exact turn, claim a verified suspension, or add a correction.           |
+| `co.grida/session/stop`, `resume-queue`           | Stop the current turn and pause admission, or reopen queue admission separately. |
+| `co.grida/config/inspect`, `update`, `reload`     | Read, change, or activate the host's reviewed defaults.                          |
 
-Standard `session/prompt` is the streaming path. The durable submit path
-returns acceptance independently of completion. Each input uses one path.
-An existing queued input remains queued on retry. Verified resume and queue
-advancement have separate lifecycle contracts.
+Standard `session/prompt` streams its response. Durable submission and enqueue
+acknowledge accepted input independently of completion. Exact input retries
+return retained dispositions. Exact control retries reconcile their committed
+request IDs. Read the [native client protocol](../../packages/grida-ai-agent/docs/rust-client-protocol.md)
+for field names and revision bases.
+
+Queue advancement follows verified settlement while admission is open.
+Loading a session observes retained state. Resume Queue explicitly lets
+retained waiting inputs proceed after a restart. Resume Task reuses the
+accepted model and limits and revalidates the captured provider authority.
+A changed provider credential blocks dispatch for that retained task.
 
 The host reads `config.toml` from its private state directory and retains an
 immutable defaults snapshot with each accepted input. A setting change applies

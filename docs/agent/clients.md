@@ -138,19 +138,28 @@ A capable client can opt in to individual version-1 operations through
 keys in `agentCapabilities._meta`. A custom method adds `_` before its capability
 key, such as `_co.grida/session/snapshot`.
 
-| Capability key              | Operation                                                                                                              |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `co.grida/session/submit`   | Submit an input with a client-chosen identity. Repeating the same input returns its retained position and disposition. |
-| `co.grida/session/snapshot` | Read revisions, queue count, and the current or latest turn summary.                                                   |
-| `co.grida/session/stop`     | Cancel an exact turn and pause admission, using the observed revisions and a client-chosen request identity.           |
-| `co.grida/config/inspect`   | Read the supported setting, file revision, diagnostics, and active defaults.                                           |
-| `co.grida/config/update`    | Set or reset the context-input limit using the expected file revision.                                                 |
-| `co.grida/config/reload`    | Validate and activate a manually edited configuration file.                                                            |
+| Capability key                                    | Operation                                                                        |
+| ------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `co.grida/session/submit`                         | Accept a prompt for an idle session under a client-chosen input ID.              |
+| `co.grida/session/snapshot`                       | Read revisions, waiting inputs in order, and the current or latest turn.         |
+| `co.grida/session/enqueue`, `input`               | Queue a prompt and read its retained content, settings, and disposition.         |
+| `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting inputs using the current queue revision.                            |
+| `co.grida/session/pause`, `resume`, `steer`       | Pause a turn, resume its verified suspension, or send a correction to that turn. |
+| `co.grida/session/stop`, `resume-queue`           | Stop a turn and pause queue advancement, then reopen queue admission when ready. |
+| `co.grida/config/inspect`, `update`, `reload`     | Inspect, change, or reload the host defaults.                                    |
 
-Use either ordinary `session/prompt` or durable submission for a given input.
-Ordinary prompts stream their response. Durable submission acknowledges retained
-input independently of completion. An already queued input keeps its position
-when retried.
+Use ordinary `session/prompt` for a streamed reply. Use durable submission or
+enqueue when your client needs acceptance separately from completion. Give each
+input one stable identity. A retry with the same prompt returns its retained
+position and disposition. A replacement gets a new input ID and keeps the
+original queue slot.
+
+Pause acknowledges the request first. Inspect the turn for confirmed
+suspension. Resume uses that turn's current revision and preserves its
+accepted settings. A changed provider credential can make the retained task
+unavailable for resumption. Stop pauses queue advancement, which you can
+reopen separately with Resume Queue. Opening a session after restart only
+loads its retained state.
 
 Configuration changes apply to later accepted inputs. Existing inputs retain
 their captured defaults. An explicit hard context-input cap requires supported

@@ -1,17 +1,17 @@
 # Native agent client protocol
 
-Status is a design proposal for the fresh Rust host. The client boundary uses
-**ACP first**, with negotiated extensions for product behavior the selected ACP
-version cannot express. Desktop and headless clients share this boundary. The
+The source-built native host implements **ACP first**, with negotiated
+extensions for product behavior the selected version cannot express. This
+document distinguishes the available wire contract from later Desktop and
+client integrations. The
 [core proposal](./rust-core-proposal.md#native-executable-and-headless-host)
 owns process lifetime, and the [feature catalog](../../../docs/agent/features.md)
 owns the promised behavior.
 
 ## Baseline and ownership
 
-The ACP documentation reviewed on 2026-11-09 labels v1 Latest and v2 Draft. Start with the
-current v1 contract. Pin the schema and compatible Rust SDK revision when
-implementation begins. Review v2 separately before adding or replacing a wire
+The host uses stable ACP v1 with Rust SDK `5.0.0` and schema `1.15.1`.
+Review v2 separately before adding or replacing a wire
 binding, including its changed prompt and replay semantics. Experimental
 features require their own negotiation. [ACP migration](https://agentclientprotocol.com/protocol/v2/migration).
 
@@ -28,7 +28,7 @@ the neutral core and its journals. The master keeps product strategy, and the
 client owns rendering. The wire adapter projects authorized state without
 introducing a second execution ledger.
 
-Begin with an `acp.rs` module in `grida-agent`, using the upstream SDK. A second
+The `grida-agent` ACP adapter uses the upstream SDK. A second
 independently maintained consumer can justify extracting a reusable adapter.
 The outward ACP server remains separate from an optional ACP client that
 delegates work to an external agent. Choosing this client protocol leaves the
@@ -67,9 +67,9 @@ validated capabilities with correlated results and executor-declared recovery.
 
 ## Small extension surface
 
-Use ACP's reserved extension mechanism. Proposed capability keys use `co.grida/`
-and custom methods use `_co.grida/`. The exact suffixes and schemas remain
-provisional. Descriptive hints belong in schema-supported `_meta` fields.
+The host uses ACP's reserved extension mechanism. Capability keys use
+`co.grida/` and custom methods use `_co.grida/`. Descriptive hints belong
+in schema-supported `_meta` fields.
 Required behavior has an advertised operation and explicit result. Unknown
 extensions produce a defined fallback or unavailable outcome.
 [ACP extensions](https://agentclientprotocol.com/protocol/v1/extensibility).
@@ -85,6 +85,47 @@ one broad capability. Advertise each supported operation/version, constrain its
 target, and implement it only with its feature slice. Standard transcript and
 tool content remain useful when a client omits the extensions. Grida Desktop
 negotiates the operations needed for its complete experience.
+
+### Available durable session operations
+
+The agent advertises each supported capability with value `1` in
+`agentCapabilities._meta`. A client opts in to each operation by sending its
+key with value `1` in `clientCapabilities._meta`. Calling an unnegotiated
+extension returns method not found. Attach the session through standard
+`session/new` or `session/load` before using its custom operations.
+
+A queue basis contains `sessionId`, `requestId`, and
+`expectedSessionRevision`. A task basis adds `turnId` and
+`expectedControlRevision`. Snapshot returns the ordered queue and turn
+summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
+`journalPosition`, and turn `epoch` for conditional operations.
+
+| Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submit`, `enqueue`                      | `sessionId`, `inputId`, ACP `prompt`. Submit selects idle work. Enqueue accepts waiting work. Both return `inputPosition`, `disposition`, and the `turnId` once selected. |
+| `snapshot`                               | `sessionId`. Read the bounded session summary without claiming work.                                                                                                      |
+| `input`                                  | `sessionId`, `inputId`. Read the accepted prompt, captured settings, and retained receipt.                                                                                |
+| `replace`                                | Queue basis in `queue`, `inputId`, `replacementInputId`, ACP `prompt`. Retain the slot and supersede the prior input.                                                     |
+| `withdraw`, `reorder`                    | Queue basis in `queue`, plus `inputId` or the complete ordered `inputIds` list.                                                                                           |
+| `resume-queue`                           | Flat queue basis. Reopen queue admission and schedule eligible waiting work.                                                                                              |
+| `stop`, `pause`                          | Flat task basis. Return the committed control receipt. Stop also pauses queue admission. Pause becomes verified when the turn reports `suspended`.                        |
+| `resume`                                 | Task basis in `task`, `expectedEpoch`, `expectedJournalPosition`. Claim the verified suspension and clear its task pause. Return the claimed turn summary.                |
+| `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                               |
+
+A duplicate input compares the original prompt and returns its retained
+disposition, including supersession or withdrawal. Changes reuse the caller's
+`requestId` with identical parameters and revisions to replay their receipts.
+A Resume retry resolves to the same claimed turn and its current view. A stale
+new control uses a refreshed snapshot and a fresh request identity. Late
+steering that loses the terminal race returns an explicit conflict, leaving the
+client free to keep its draft or submit another task.
+
+The host advances waiting work after verified settlement while admission is
+open. Observation stays independent of scheduling. After a restart, Resume
+Queue can wake retained waiting work, and Resume Task checks captured settings
+and current authority before reacquiring a suspended turn. A credential change
+blocks dispatch under an earlier captured authority. Question operations remain
+outside the advertised source-built set.
 
 Subagent observation has an active ACP proposal. Its initial client mutation is
 child cancellation, with direct prompt, steering, configuration, and resume
@@ -129,9 +170,8 @@ It never sends both to start the same task. RPC IDs correlate connection-local
 calls. Durable input, turn, interaction, and operation IDs retain their internal
 meaning and are exposed only as specified by the extension.
 
-Plain ACP remains useful for ordinary interactive work. Its pending prompt,
-permission, or elicitation RPC may live in the host adapter while an engine
-worker is suspended. Connection loss disposes that RPC, while retained work
+The planned question and permission adapters may hold an ordinary ACP
+prompt or interaction RPC while an engine worker is suspended. Connection loss disposes that RPC, while retained work
 follows the host lifetime contract. A capable reconnecting client receives a
 fresh delivery of the same durable interaction. Human think time requires no
 live model request or occupied worker.
@@ -156,9 +196,9 @@ explicit guarantees of the Grida profile. [V2 session setup](https://agentclient
 
 ## Transport and authority
 
-Use ACP's standard newline-delimited stdio binding first. The proposed later
-authenticated loopback WebSocket service is a Grida transport binding, with
-documented connection and origin rules. It carries the same ACP vocabulary.
+The host serves standard newline-delimited ACP over stdio. Its authenticated
+loopback WebSocket binding carries the same ACP vocabulary, with independent
+client connections and explicit local authority and origin rules.
 The reviewed standard specifies stdio, while remote transport is under review.
 [ACP transports](https://agentclientprotocol.com/protocol/v1/transports).
 
@@ -182,5 +222,7 @@ does not gain execution ownership.
   Include an oversized unterminated stdio line and too many outstanding calls.
   Reject or detach before allocating an unbounded frame or queue.
 
-These are planned checks. Source review has established a compatible direction,
-and executable interoperability remains to be demonstrated.
+Built-executable fixture tests cover standard text streaming, cancellation,
+replay, negotiated queue and task controls, stale credentials, independent
+loopback clients, and bounded stdio delivery. Desktop presentation and later
+interaction, tool, and child capabilities require their own acceptance.

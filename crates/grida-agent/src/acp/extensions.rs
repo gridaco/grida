@@ -1,17 +1,22 @@
 //! Versioned product operations layered over standard ACP.
 
+mod lifecycle;
+
 use super::{ConnectionSessions, host_error, prompt_part, unavailable};
-use crate::host::{DurableSubmission, Host, PromptRequest};
+use crate::host::{DurableSubmission, Host, InputSettings, PromptRequest};
 use agent_client_protocol::v1::Builder;
 use agent_client_protocol::v1::schema::{ContentBlock, Meta};
 use agent_client_protocol::{
     Agent, Client, Error, HandleDispatchFrom, JsonRpcRequest, JsonRpcResponse, Result,
     on_receive_request,
 };
+use agent_kit_core::history::HistoryPosition;
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{ControlRevision, JournalPosition};
 use agent_kit_core::{ChangeId, Fingerprint, SessionId, TurnId};
-use agent_kit_sessions::{InputDisposition, SessionRevision, TurnDisposition, TurnView};
+use agent_kit_sessions::{
+    ControlReceipt, InputDisposition, InputView, SessionRevision, TurnDisposition, TurnView,
+};
 use grida_agent_master::configuration::SettingChange;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -34,17 +39,19 @@ const CAPABILITIES: [&str; 6] = [
 ];
 
 pub(super) fn advertised() -> Meta {
-    CAPABILITIES
-        .into_iter()
+    capability_keys()
         .map(|key| (key.into(), 1.into()))
         .collect()
 }
 
 pub(super) fn negotiated(meta: Option<&Meta>) -> BTreeSet<&'static str> {
-    CAPABILITIES
-        .into_iter()
+    capability_keys()
         .filter(|key| meta.and_then(|meta| meta.get(*key)).and_then(Value::as_u64) == Some(1))
         .collect()
+}
+
+fn capability_keys() -> impl Iterator<Item = &'static str> {
+    CAPABILITIES.into_iter().chain(lifecycle::CAPABILITIES)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -117,6 +124,7 @@ struct SnapshotResponse {
     session_id: SessionId,
     session_revision: SessionRevision,
     queued_inputs: usize,
+    queue: Vec<QueuedInput>,
     admission_paused: bool,
     current: Option<TurnSummary>,
     latest: Option<TurnSummary>,
@@ -124,9 +132,27 @@ struct SnapshotResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct QueuedInput {
+    input_id: ChangeId,
+    input_position: u64,
+    settings: InputSettings,
+}
+
+fn queued_input(view: &InputView) -> Result<QueuedInput> {
+    Ok(QueuedInput {
+        input_id: view.input.id.clone(),
+        input_position: view.position,
+        settings: InputSettings::for_input(&view.input).map_err(host_error)?,
+    })
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TurnSummary {
     turn_id: TurnId,
+    epoch: u64,
     journal_position: JournalPosition,
+    history_position: HistoryPosition,
     control_revision: ControlRevision,
     paused: bool,
     cancelled: bool,
@@ -138,7 +164,9 @@ impl From<TurnView> for TurnSummary {
     fn from(turn: TurnView) -> Self {
         Self {
             turn_id: turn.binding.turn,
+            epoch: turn.binding.epoch,
             journal_position: turn.position,
+            history_position: turn.history_position,
             control_revision: turn.controls.revision,
             paused: turn.controls.paused,
             cancelled: turn.controls.cancelled,
@@ -149,7 +177,7 @@ impl From<TurnView> for TurnSummary {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
-#[request(method = "_co.grida/session/stop", response = StopResponse)]
+#[request(method = "_co.grida/session/stop", response = TurnControlResponse)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Stop {
     session_id: SessionId,
@@ -161,12 +189,25 @@ struct Stop {
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
 #[serde(rename_all = "camelCase")]
-struct StopResponse {
+struct TurnControlResponse {
     session_id: SessionId,
     turn_id: TurnId,
     request_id: ChangeId,
     session_revision: SessionRevision,
     journal_position: JournalPosition,
+}
+
+fn turn_receipt(receipt: ControlReceipt, turn_id: TurnId) -> Result<TurnControlResponse> {
+    let turn = receipt
+        .turn
+        .ok_or_else(|| unavailable("turn_control_receipt_missing"))?;
+    Ok(TurnControlResponse {
+        session_id: receipt.session,
+        turn_id,
+        request_id: receipt.request,
+        session_revision: receipt.revision,
+        journal_position: turn.record().position,
+    })
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -192,7 +233,12 @@ struct ConfigReload {
 pub(super) fn handlers(
     host: Arc<Host>,
     sessions: Arc<Mutex<ConnectionSessions>>,
-) -> Builder<Agent, impl HandleDispatchFrom<Client>> {
+) -> Builder<
+    Agent,
+    impl HandleDispatchFrom<Client>,
+    impl agent_client_protocol::RunWithConnectionTo<Client>,
+    impl agent_client_protocol::HandleConnectionClose<Client>,
+> {
     let submit_host = host.clone();
     let submit_sessions = sessions.clone();
     let snapshot_host = host.clone();
@@ -206,6 +252,7 @@ pub(super) fn handlers(
 
     Agent
         .v1()
+        .with_connection_builder(lifecycle::handlers(host.clone(), sessions.clone()))
         .on_receive_request(
             async move |request: Submit, responder, _| {
                 let result = async {
@@ -242,6 +289,11 @@ pub(super) fn handlers(
                         session_id: snapshot.session,
                         session_revision: snapshot.revision,
                         queued_inputs: snapshot.queued.len(),
+                        queue: snapshot
+                            .queued
+                            .iter()
+                            .map(queued_input)
+                            .collect::<Result<_>>()?,
                         admission_paused: snapshot.admission_paused,
                         current: snapshot.current.map(TurnSummary::from),
                         latest: snapshot.latest.map(TurnSummary::from),
@@ -266,16 +318,7 @@ pub(super) fn handlers(
                         )
                         .await
                         .map_err(host_error)?;
-                    let turn = receipt
-                        .turn
-                        .ok_or_else(|| unavailable("turn_control_receipt_missing"))?;
-                    Ok(StopResponse {
-                        session_id: receipt.session,
-                        turn_id: request.turn_id,
-                        request_id: receipt.request,
-                        session_revision: receipt.revision,
-                        journal_position: turn.record().position,
-                    })
+                    turn_receipt(receipt, request.turn_id)
                 }
                 .await;
                 responder.respond_with_result(result)

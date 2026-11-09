@@ -7,4 +7,4 @@ mod custody;
 pub mod host;
 mod http;
 
-pub use http::{ProviderOptions, ProviderProtocol};
+pub use http::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol};
