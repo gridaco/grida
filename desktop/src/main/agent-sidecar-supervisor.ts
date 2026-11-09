@@ -241,6 +241,17 @@ export class AgentSidecarSupervisor {
     );
   }
 
+  nativeByokSettings() {
+    return {
+      credentialHome: this.provider_home,
+      network: () =>
+        AgentNetworkHost.nativeProviderNetwork(
+          this.networkAuthority,
+          AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+        ),
+    };
+  }
+
   async nativeGatewayConnection(
     account: DesktopAccountSession,
     organizationId?: number,
@@ -783,6 +794,10 @@ export function getAgentSidecarInfo(): AgentSidecarInfo | null {
 
 export function nativeAgentEndpointNetwork(id: string, baseUrl: string) {
   return supervisor.nativeEndpointNetwork(id, baseUrl);
+}
+
+export function nativeAgentByokSettings() {
+  return supervisor.nativeByokSettings();
 }
 
 export function nativeAgentGatewayConnection(

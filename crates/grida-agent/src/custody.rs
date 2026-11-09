@@ -64,7 +64,10 @@ impl CapturedCredential {
             },
         });
         let secret = source.read()?.ok_or_else(missing)?;
-        if secret.trim().is_empty() || !secret.bytes().all(|byte| matches!(byte, b' '..=b'~')) {
+        let wire_secret = source.bearer_key(&secret);
+        if wire_secret.trim().is_empty()
+            || !wire_secret.bytes().all(|byte| matches!(byte, b' '..=b'~'))
+        {
             return Err(problem("provider_credential_invalid"));
         }
         let nonce = Uuid::new_v4();
@@ -107,7 +110,7 @@ impl CapturedCredential {
         let secret = self.current().await?;
         let mut header = match format {
             CredentialFormat::Bearer => {
-                let bearer = Zeroizing::new(format!("Bearer {}", secret.as_str()));
+                let bearer = Zeroizing::new(format!("Bearer {}", self.source.bearer_key(&secret)));
                 HeaderValue::from_str(&bearer)
             }
             CredentialFormat::ApiKey => HeaderValue::from_str(&secret),
@@ -150,6 +153,19 @@ impl CapturedCredential {
 }
 
 impl Lookup {
+    /// These stored provider keys previously used a trimmed value for Desktop
+    /// transport. Capture and continuity still compare the original bytes.
+    fn bearer_key<'a>(&self, secret: &'a str) -> &'a str {
+        match self {
+            Self::Stored { provider, .. }
+                if matches!(provider.as_str(), "openrouter" | "vercel") =>
+            {
+                secret.trim()
+            }
+            _ => secret,
+        }
+    }
+
     fn read(&self) -> Result<Option<Zeroizing<String>>> {
         Ok(match self {
             Self::Environment(name) => std::env::var(name)

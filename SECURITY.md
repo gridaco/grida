@@ -884,6 +884,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
   requires a separate custody composition. [Main's grant owner](desktop/src/main/agent-network-authority.ts)
   rotates the captured grant when the approved base changes, including a path
   change on the same origin. Retained launch profiles cannot use the new grant.
+  Built-in OpenRouter and Vercel profiles require a selected catalogue model and
+  a stored key from the supervisor's credential home. Their broker authorizes
+  only that provider's exact Chat Completions route. This launch path is limited
+  to shared custody on macOS and Linux. [Process fixtures](desktop/src/main/native-provider-selection.test.ts)
+  exercise both stored keys and refusal after credential replacement.
 - The [Desktop native chat client](desktop/src/main/native-agent-chat.ts)
   fixes the workspace context at startup and accepts session handles issued
   on that ACP connection. Controls use a host observation of the exact
@@ -3097,6 +3102,8 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [native provider HTTP dispatch](crates/grida-agent/src/http.rs),
   [supervised provider transport](crates/grida-agent/src/supervised_provider.rs),
   [private Desktop broker](desktop/src/main/native-provider-egress.ts),
+  [Desktop provider selection](desktop/src/main/native-provider-selection.ts),
+  [Desktop stored-key fixtures](desktop/src/main/native-provider-selection.test.ts),
   [provider broker fixtures](desktop/src/main/native-provider-egress.test.ts),
   [native agent custody tests](crates/grida-agent/tests/custody.rs),
   [native workspace protection](crates/grida-agent/src/workspace.rs),

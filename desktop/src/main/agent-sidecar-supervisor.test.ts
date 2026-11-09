@@ -114,7 +114,7 @@ describe("AgentSidecarSupervisor recovery", () => {
     vi.mocked(wrap).mockRejectedValueOnce(new Error("stop before spawn"));
     await expect(supervisor.start()).rejects.toThrow("stop before spawn");
     const argv = vi.mocked(wrap).mock.calls.at(-1)?.[0];
-    expect(argv).toContain("--agent=disabled");
+    expect(argv).toContain("--agent=native-chat");
     expect(argv).not.toContain("--scratch-base=");
     expect(argv).not.toContain("--skills-root=");
   });

@@ -34,6 +34,7 @@
 
 import {
   getAgentSidecarInfo,
+  nativeAgentByokSettings,
   nativeAgentEndpointNetwork,
   type AgentSidecarInfo,
 } from "./agent-sidecar-supervisor";
@@ -113,6 +114,14 @@ export namespace agentSidecarClient {
       list: transport.providers.list_endpoints,
       hasKey: transport.secrets.has,
       network: nativeAgentEndpointNetwork,
+    });
+  }
+
+  export function nativeBuiltInByok(providerId: string, modelId: string) {
+    const transport = client();
+    return NativeProviderSelection.builtInByok(providerId, modelId, {
+      ...nativeAgentByokSettings(),
+      hasKey: transport.secrets.has,
     });
   }
 

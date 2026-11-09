@@ -111,6 +111,33 @@ mod stored {
     }
 
     #[tokio::test]
+    async fn desktop_byok_trims_bearer_only_and_compares_exact_stored_bytes() {
+        let (_temp, home, store) = home();
+        for provider in ["openrouter", "vercel"] {
+            let source = || CredentialSource::Stored {
+                home: home.clone(),
+                provider: provider.into(),
+            };
+            store.set(provider, " \u{a0}fixture-key  ").unwrap();
+            let credential = CapturedCredential::capture(source()).unwrap();
+            let header = credential.header(CredentialFormat::Bearer).await.unwrap();
+            assert!(header.is_sensitive());
+            assert_eq!(header, "Bearer fixture-key");
+
+            store.set(provider, "fixture-key").unwrap();
+            assert_eq!(
+                credential.validate().await.unwrap_err().code,
+                "provider_credential_changed"
+            );
+            let current = CapturedCredential::capture(source()).unwrap();
+            assert_eq!(
+                current.header(CredentialFormat::Bearer).await.unwrap(),
+                header
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn stored_key_uses_only_selected_home_and_requires_rebinding_after_change() {
         let (_selected_temp, selected, store) = home();
         let (_other_temp, other, other_store) = home();

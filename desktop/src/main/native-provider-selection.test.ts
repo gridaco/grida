@@ -1,5 +1,10 @@
-// GRIDA-SEC-004 — configured native provider admission.
+// GRIDA-SEC-004 / GRIDA-SEC-014 — native provider admission and custody.
+import { AuthStore, SecretsStore } from "@grida/daemon/server";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { expect, it, vi } from "vitest";
+import { NativeAgentChat } from "./native-agent-chat";
 import { NativeProviderSelection } from "./native-provider-selection";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 
@@ -11,6 +16,16 @@ const config = {
   models: [{ id: "alpha" }, { id: "beta" }],
   default_model_id: "beta",
 };
+const byokModel = "openai/gpt-5.5";
+const sharedCustody =
+  process.platform === "darwin" || process.platform === "linux";
+const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
+
+async function privateHome() {
+  return await fs.mkdtemp(
+    path.join(await fs.realpath(os.tmpdir()), "grida-native-byok-")
+  );
+}
 
 function settings() {
   const dispatch = vi.fn<() => Promise<Response>>();
@@ -84,3 +99,196 @@ it("refuses missing selections, key-backed configurations and missing approval",
     "native_provider_endpoint_not_approved"
   );
 });
+
+const byokProviders = [
+  ["openrouter", "https://openrouter.ai/api/v1"],
+  ["vercel", "https://ai-gateway.vercel.sh/v1"],
+] as const;
+
+it.runIf(sharedCustody).each(byokProviders)(
+  "binds the selected %s key to its own exact generation route",
+  async (provider, endpoint) => {
+    const home = await privateHome();
+    const owner = settings();
+    try {
+      owner.hasKey.mockResolvedValue(true);
+      const selected = await NativeProviderSelection.builtInByok(
+        provider,
+        byokModel,
+        {
+          credentialHome: home,
+          hasKey: owner.hasKey,
+          network: () => owner.network(provider, endpoint),
+        }
+      );
+      expect(selected).toMatchObject({
+        provider: "openai-compatible",
+        endpoint,
+        model: byokModel,
+        credentialHome: home,
+      });
+      expect(owner.hasKey).toHaveBeenCalledExactlyOnceWith(provider);
+      const route = `${endpoint}/chat/completions`;
+      const headers = new Headers({ authorization: "Bearer fixture" });
+      for (const refused of [
+        `${route}?extra=1`,
+        `${route}/`,
+        `${endpoint}/models`,
+        provider === "openrouter"
+          ? "https://ai-gateway.vercel.sh/v1/chat/completions"
+          : "https://openrouter.ai/api/v1/chat/completions",
+        "http://127.0.0.1:11434/v1/chat/completions",
+      ])
+        expect(selected.providerNetwork.prepare(refused, headers)).toBeNull();
+      expect(selected.providerNetwork.prepare(route, new Headers())).toBeNull();
+      expect(owner.prepare).not.toHaveBeenCalled();
+      expect(selected.providerNetwork.prepare(route, headers)).toBe(
+        owner.dispatch
+      );
+      expect(owner.prepare).toHaveBeenCalledExactlyOnceWith(route, headers);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  }
+);
+
+it.runIf(sharedCustody)(
+  "refuses unsupported selection, missing key, failed custody and aliases without opening egress",
+  async () => {
+    const home = await privateHome();
+    const owner = settings();
+    const select = (
+      provider: string,
+      model = byokModel,
+      credentialHome = home
+    ) =>
+      NativeProviderSelection.builtInByok(provider, model, {
+        credentialHome,
+        hasKey: owner.hasKey,
+        network: () => owner.network(provider, base),
+      });
+    try {
+      for (const provider of ["gg", "fal", "chatgpt", "constructor", "local"])
+        await expect(select(provider)).rejects.toThrow(
+          "native_provider_byok_unavailable"
+        );
+      await expect(select("openrouter", "gpt-5.5")).rejects.toThrow(
+        "native_provider_model_unavailable"
+      );
+      expect(owner.hasKey).not.toHaveBeenCalled();
+      await expect(select("openrouter")).rejects.toThrow(
+        "native_provider_byok_key_missing"
+      );
+      owner.hasKey.mockRejectedValueOnce(new Error("storage_failed"));
+      await expect(select("openrouter")).rejects.toThrow("storage_failed");
+      owner.hasKey.mockResolvedValue(true);
+      const alias = path.join(home, "alias");
+      await fs.symlink(home, alias);
+      await expect(select("openrouter", byokModel, alias)).rejects.toThrow(
+        "native_provider_byok_home_invalid"
+      );
+      expect(owner.network).not.toHaveBeenCalled();
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  }
+);
+
+it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
+  "runs a native %s turn and refuses replacement credentials through the old launch",
+  async (provider, endpoint) => {
+    const home = await privateHome();
+    const cwd = path.join(home, "workspace");
+    const stateDirectory = path.join(home, "state");
+    const credentialHome = path.join(home, "custody");
+    const store = new SecretsStore(
+      new AuthStore(path.join(home, "legacy")),
+      credentialHome
+    );
+    const key = `${provider}-fixture-key`;
+    const dispatch = vi.fn<
+      (body: Buffer, signal: AbortSignal) => Promise<Response>
+    >(
+      async () =>
+        new Response(
+          'data: {"id":"fixture","choices":[{"index":0,"delta":{"content":"BYOK fixture answer"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+          { headers: { "content-type": "text/event-stream" } }
+        )
+    );
+    const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
+    let chat: NativeAgentChat | undefined;
+    try {
+      await fs.mkdir(cwd, { mode: 0o700 });
+      await store.set(provider, ` ${key} `);
+      const profile = await NativeProviderSelection.builtInByok(
+        provider,
+        byokModel,
+        {
+          credentialHome,
+          hasKey: (id) => store.has(id),
+          network: async () => ({ prepare }),
+        }
+      );
+      chat = await NativeAgentChat.start({
+        ...profile,
+        cwd,
+        stateDirectory,
+        resourcesPath: packaged!,
+      });
+      const session = await chat.create();
+      const first = await chat.submit(
+        session,
+        "byok-fixture-first",
+        "A fixture request"
+      );
+      await vi.waitFor(
+        async () => {
+          expect((await chat!.observe(session)).latest).toMatchObject({
+            turnId: first.turnId,
+            status: "succeeded",
+          });
+        },
+        { timeout: 4000 }
+      );
+      expect(prepare).toHaveBeenCalledTimes(1);
+      expect(prepare.mock.calls[0][0]).toBe(`${endpoint}/chat/completions`);
+      expect(prepare.mock.calls[0][1].get("authorization")).toBe(
+        `Bearer ${key}`
+      );
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(dispatch.mock.calls[0][0].toString())).toMatchObject({
+        model: byokModel,
+        stream: true,
+      });
+      const transcript = JSON.stringify(await chat.transcript(session));
+      expect(transcript).toContain("BYOK fixture answer");
+      expect(transcript).not.toContain(key);
+      await store.set(provider, key);
+      const second = await chat.submit(
+        session,
+        "byok-fixture-second",
+        "Another fixture request"
+      );
+      await vi.waitFor(
+        async () => {
+          expect((await chat!.observe(session)).latest).toMatchObject({
+            turnId: second.turnId,
+            status: "failed",
+          });
+        },
+        { timeout: 4000 }
+      );
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      await chat.close();
+      expect(
+        (
+          await fs.readFile(path.join(stateDirectory, "runtime.sqlite"))
+        ).includes(key)
+      ).toBe(false);
+    } finally {
+      await chat?.close();
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  },
+  15_000
+);
