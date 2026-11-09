@@ -1,4 +1,4 @@
-// GRIDA-SEC-004 — main-owned ACP connection to the packaged native agent.
+// GRIDA-SEC-004 / GRIDA-SEC-008 — main-owned ACP connection to the packaged agent.
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -27,6 +27,7 @@ export type NativeAgentLaunch = {
   credentialHome?: string;
   providerNetwork?: NativeProviderNetwork;
   gatewayScope?: string;
+  subscriptionScope?: string;
   workspace?: NativeWorkspaceSelection;
   capabilities?: Readonly<Record<string, 1>>;
   onSessionUpdate?: (params: unknown) => void;
@@ -106,6 +107,15 @@ export class NativeAgentProcess {
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
     if (
+      options.subscriptionScope !== undefined &&
+      (!/^[a-f0-9]{64}$/.test(options.subscriptionScope) ||
+        options.provider !== "responses" ||
+        !options.providerNetwork ||
+        options.credentialHome !== undefined ||
+        options.gatewayScope !== undefined)
+    )
+      throw new Error("native_agent_subscription_profile_invalid");
+    if (
       options.gatewayScope !== undefined &&
       (!/^[a-f0-9]{64}$/.test(options.gatewayScope) ||
         options.provider !== "openai-compatible" ||
@@ -148,7 +158,7 @@ export class NativeAgentProcess {
     const providerEgress = options.providerNetwork
       ? new NativeProviderEgress(
           options.providerNetwork,
-          options.provider,
+          options.subscriptionScope ? "chatgpt-subscription" : options.provider,
           options.endpoint,
           options.model
         )
@@ -175,6 +185,8 @@ export class NativeAgentProcess {
     if (providerEgress) args.push("--supervised-provider");
     if (options.gatewayScope)
       args.push("--supervised-gateway-scope", options.gatewayScope);
+    if (options.subscriptionScope)
+      args.push("--supervised-chatgpt-scope", options.subscriptionScope);
     if (permissionProfile)
       args.push("--permission-profile", permissionProfile.profile);
     const processOwner = new NativeAgentProcess(

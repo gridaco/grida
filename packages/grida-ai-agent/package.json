@@ -47,6 +47,16 @@
         "default": "./dist/media-server.cjs"
       }
     },
+    "./chatgpt-host": {
+      "import": {
+        "types": "./dist/chatgpt-host.d.mts",
+        "default": "./dist/chatgpt-host.mjs"
+      },
+      "require": {
+        "types": "./dist/chatgpt-host.d.cts",
+        "default": "./dist/chatgpt-host.cjs"
+      }
+    },
     "./sandbox": {
       "import": {
         "types": "./dist/sandbox/index.d.mts",

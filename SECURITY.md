@@ -1927,6 +1927,10 @@ trusted merely because it is “local.”
    strict disk reader shared by credential mutations and ignores the generic
    test environment override. Failed Responses return bounded status, request
    identity, and retry timing without upstream response bodies.
+   The private native launch carries the opaque scope and selected model.
+   Its stdio transport grants only the exact generation route and sends no
+   credentials. The in-process Desktop owner serves the same OAuth ceremony
+   and injects the selected token and account headers at the provider edge.
 6. **Session/provider identity is sticky.** A new provider-unqualified
    compatible conversation may prefer a ready ChatGPT connection. Once
    persisted, the provider/model pair is reused for continuations and queued
@@ -1980,6 +1984,14 @@ platform credential store is a separate hardening step.
   exact network grants, sidecar construction, guarded bridge, and shutdown.
 - [Desktop composition](desktop/src/sidecar/daemon.ts), [its tests](desktop/src/sidecar/daemon.test.ts), and [built media-entry isolation tests](packages/grida-ai-agent/src/media-server-isolation.test.ts) — native-provider construction is confined to the full-agent startup branch; fixed auth wire constants remain available without importing the credential manager.
 - [Full-server startup tests](packages/grida-ai-agent/src/server-startup.test.ts) — preserve the single credential-store owner and native-provider configuration while bounding chat allocation by enabled capabilities.
+- [Native subscription custody](packages/grida-ai-agent/src/chatgpt-host.ts),
+  [Desktop host adapter](desktop/src/main/native-chatgpt-host.ts),
+  [native process launcher](desktop/src/main/native-agent-process.ts),
+  [private egress](desktop/src/main/native-provider-egress.ts), and
+  [Rust subscription transport](crates/grida-agent/src/chatgpt_subscription.rs)
+  bind one private launch to an exact OAuth connection and the fixed Responses
+  route. [Process fixtures](desktop/src/main/native-provider-egress.test.ts)
+  exercise the ceremony and scoped continuation with synthetic responses.
 - `packages/grida-ai-agent/src/protocol/{chatgpt,provider-ids,endpoints}.ts`,
   `providers/{chatgpt-credentials,chatgpt,index}.ts`,
   `http/routes/chatgpt-auth.ts`, `server.ts`, `runtime/{index,run-input}.ts`,

@@ -455,7 +455,7 @@ impl Fixture {
                 model: ModelId::new("model").unwrap(),
                 instructions: instructions.into(),
                 max_steps: steps,
-                max_output_tokens: 1024,
+                max_output_tokens: Some(1024),
             },
             self.provider.clone(),
             self.inventory.clone(),
@@ -2084,6 +2084,45 @@ async fn automatic_input_budget_does_not_request_a_hard_measurement() {
             .lock()
             .unwrap()
             .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn provider_managed_output_keeps_existing_bounded_configuration_encoding() {
+    let serialized =
+        r#"{"model":"model","instructions":"Be concise","max_steps":4,"max_output_tokens":1024}"#;
+    let mut config: MasterConfig = serde_json::from_str(serialized).unwrap();
+    assert_eq!(config.max_output_tokens, Some(1024));
+    // Existing durable continuations fingerprint this serialized configuration.
+    assert_eq!(serde_json::to_string(&config).unwrap(), serialized);
+    config.max_output_tokens = None;
+    let encoded = serde_json::to_value(&config).unwrap();
+    assert!(encoded.get("max_output_tokens").is_none());
+    assert_eq!(
+        serde_json::from_value::<MasterConfig>(encoded).unwrap(),
+        config
+    );
+
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    Master::new(
+        config,
+        fixture.provider.clone(),
+        fixture.inventory.clone(),
+        MasterAuthority {
+            inference: fixture.grants(),
+            tools: BTreeMap::new(),
+        },
+    )
+    .unwrap()
+    .run(opened.turn, input())
+    .await
+    .unwrap();
+    assert_eq!(
+        fixture.provider.requests.lock().unwrap()[0].max_output_tokens,
+        None
     );
 }
 

@@ -109,6 +109,20 @@ fn command() -> Command {
                         .hide(true),
                 )
                 .arg(
+                    Arg::new("supervised-chatgpt-scope")
+                        .long("supervised-chatgpt-scope")
+                        .value_name("SCOPE")
+                        .requires("supervised-provider")
+                        .conflicts_with_all([
+                            "supervised-gateway-scope",
+                            "credential-env",
+                            "credential-home",
+                            "compatible-output-limit-field",
+                            "max-output-tokens",
+                        ])
+                        .hide(true),
+                )
+                .arg(
                     Arg::new("listen")
                         .long("listen")
                         .value_name("LOOPBACK_WS_URL")
@@ -312,8 +326,28 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     } else {
         None
     };
-    let host = match (&supervisor, gateway_scope) {
-        (Some(supervisor), Some(scope)) => {
+    let chatgpt_scope = if name == "serve" {
+        args.get_one::<String>("supervised-chatgpt-scope")
+    } else {
+        None
+    };
+    let host = match (&supervisor, gateway_scope, chatgpt_scope) {
+        (Some(supervisor), _, Some(scope)) => {
+            if provider.protocol != ProviderProtocol::Responses {
+                return Err(problem(
+                    ErrorKind::InvalidInput,
+                    "chatgpt_subscription_protocol_invalid",
+                ));
+            }
+            Host::open_supervised_chatgpt(
+                state_dir,
+                &provider.endpoint,
+                provider.model,
+                scope,
+                supervisor.clone(),
+            )?
+        }
+        (Some(supervisor), Some(scope), None) => {
             if provider.protocol != ProviderProtocol::OpenAiCompatible {
                 return Err(problem(ErrorKind::InvalidInput, "gg_protocol_invalid"));
             }
@@ -328,8 +362,10 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 supervisor.clone(),
             )?
         }
-        (Some(supervisor), None) => Host::open_supervised(state_dir, provider, supervisor.clone())?,
-        (None, _) => Host::open(state_dir, Some(provider))?,
+        (Some(supervisor), None, None) => {
+            Host::open_supervised(state_dir, provider, supervisor.clone())?
+        }
+        (None, _, _) => Host::open(state_dir, Some(provider))?,
     };
     let host = match permissions {
         Some(profile) => host.with_permission_profile(profile),

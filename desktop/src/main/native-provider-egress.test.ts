@@ -1,9 +1,16 @@
-// GRIDA-SEC-004 / GRIDA-SEC-014 — route and stream tests for the private pipe.
+// GRIDA-SEC-004 / GRIDA-SEC-008 / GRIDA-SEC-014 — private pipe fixtures.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
+import { CHATGPT_AUTH_ROUTE_PATHS } from "@grida/agent";
+import {
+  CHATGPT_CALLBACK_URIS,
+  CHATGPT_RESPONSES_URL,
+  CHATGPT_TOKEN_URL,
+} from "../chatgpt-configuration";
 import { NativeAgentProcess } from "./native-agent-process";
+import { NativeChatGptHost } from "./native-chatgpt-host";
 import {
   NativeProviderEgress,
   type NativeProviderNetwork,
@@ -133,6 +140,209 @@ it("cancels a held network exchange on pipe shutdown", async () => {
 });
 
 const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
+const subscriptionBase = CHATGPT_RESPONSES_URL.slice(0, -"/responses".length);
+
+it("restricts subscription egress to credential-free requests for the exact generation route", async () => {
+  const prepare = vi.fn<NativeProviderNetwork["prepare"]>();
+  const egress = new NativeProviderEgress(
+    { prepare },
+    "chatgpt-subscription",
+    subscriptionBase,
+    "openai/gpt-5.6-terra"
+  );
+  const expected = open({ target: CHATGPT_RESPONSES_URL });
+  expect(
+    await egress.exchange({
+      ...expected,
+      target: `${CHATGPT_RESPONSES_URL}/input_tokens`,
+    })
+  ).toEqual({ status: "unavailable" });
+  expect(
+    await egress.exchange({
+      ...expected,
+      target: `${CHATGPT_RESPONSES_URL}?changed=1`,
+    })
+  ).toEqual({ status: "unavailable" });
+  expect(
+    await egress.exchange({
+      ...expected,
+      headers: [
+        ...(expected.headers as [string, string][]),
+        ["authorization", "Bearer synthetic"],
+      ],
+    })
+  ).toEqual({ status: "unavailable" });
+  expect(prepare).not.toHaveBeenCalled();
+  expect(await egress.exchange(expected)).toEqual({ status: "accepted" });
+  egress.close();
+});
+
+it.skipIf(!resourcesPath)(
+  "runs the private subscription process with provider-managed output and retains encrypted state only within its scope",
+  async () => {
+    const root = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "grida-subscription-process-")
+    );
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const reply = "Subscription fixture reply";
+    const encrypted = "private-subscription-reasoning";
+    const events = [
+      {
+        type: "response.output_item.done",
+        output_index: 0,
+        item: {
+          type: "reasoning",
+          id: "reasoning-fixture",
+          encrypted_content: encrypted,
+          summary: [],
+        },
+      },
+      {
+        type: "response.output_text.delta",
+        item_id: "message-fixture",
+        delta: reply,
+      },
+      {
+        type: "response.output_item.done",
+        output_index: 1,
+        item: {
+          type: "message",
+          id: "message-fixture",
+          role: "assistant",
+          status: "completed",
+          content: [{ type: "output_text", text: reply, annotations: [] }],
+        },
+      },
+      {
+        type: "response.completed",
+        response: {
+          status: "completed",
+          usage: { input_tokens: 5, output_tokens: 3 },
+        },
+      },
+    ];
+    const dispatch = vi.fn<(body: Buffer) => Promise<Response>>(
+      async () =>
+        new Response(
+          events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""),
+          { headers: { "content-type": "text/event-stream" } }
+        )
+    );
+    const exchangeToken = vi.fn<(body: Buffer) => Promise<Response>>(async () =>
+      Response.json({
+        access_token: "fixture-access-token",
+        refresh_token: "fixture-refresh-token",
+        account_id: "fixture-account",
+        expires_in: 3600,
+      })
+    );
+    const prepare = vi.fn<NativeProviderNetwork["prepare"]>((target) =>
+      target === CHATGPT_TOKEN_URL
+        ? exchangeToken
+        : target === CHATGPT_RESPONSES_URL
+          ? dispatch
+          : null
+    );
+    const owner = () =>
+      new NativeChatGptHost(path.join(root, "oauth"), { prepare });
+    let host = owner();
+    const ceremony = async (route: string, body: object) => {
+      const response = await host.ceremonyRequest(route, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      expect(response.ok).toBe(true);
+      return await response.json();
+    };
+    const connect = async () => {
+      const start = await ceremony(CHATGPT_AUTH_ROUTE_PATHS.start, {
+        redirect_uri: CHATGPT_CALLBACK_URIS[0],
+      });
+      const result = await ceremony(CHATGPT_AUTH_ROUTE_PATHS.complete, {
+        attempt_id: start.attempt_id,
+        state: start.state,
+        code: "synthetic-code",
+      });
+      expect(result).toMatchObject({
+        ready: true,
+        account: { id: "fixture-account" },
+      });
+      expect(JSON.stringify(result)).not.toContain("fixture-access-token");
+    };
+    const updates: unknown[] = [];
+    const start = async () =>
+      NativeAgentProcess.start({
+        ...(await host.launch("openai/gpt-5.6-terra")),
+        resourcesPath: resourcesPath!,
+        stateDirectory: path.join(root, "state"),
+        onSessionUpdate: (value) => updates.push(value),
+      });
+    let agent: NativeAgentProcess | undefined;
+    try {
+      await connect();
+      agent = await start();
+      const { sessionId } = (await agent.request("session/new", {
+        cwd,
+        mcpServers: [],
+      })) as { sessionId: string };
+      const prompt = () =>
+        agent!.request("session/prompt", {
+          sessionId,
+          prompt: [{ type: "text", text: "A fixture question" }],
+        });
+      await expect(prompt()).resolves.toMatchObject({ stopReason: "end_turn" });
+      expect(prepare.mock.calls[0][0]).toBe(CHATGPT_TOKEN_URL);
+      expect(prepare.mock.calls[1][0]).toBe(CHATGPT_RESPONSES_URL);
+      expect(Object.fromEntries(prepare.mock.calls[1][1])).toEqual({
+        accept: "text/event-stream",
+        "content-type": "application/json",
+        authorization: "Bearer fixture-access-token",
+        "chatgpt-account-id": "fixture-account",
+        "openai-beta": "responses=experimental",
+        originator: "grida",
+      });
+      const first = JSON.parse(dispatch.mock.calls[0][0].toString());
+      expect(first).toMatchObject({
+        model: "gpt-5.6-terra",
+        stream: true,
+        store: false,
+        reasoning: { effort: "medium" },
+        include: ["reasoning.encrypted_content"],
+      });
+      expect(first).not.toHaveProperty("max_output_tokens");
+      expect(JSON.stringify(updates)).toContain(reply);
+      expect(JSON.stringify(updates)).not.toContain(encrypted);
+      expect(JSON.stringify(updates)).not.toContain("fixture-access-token");
+      await agent.close();
+
+      host = owner();
+      agent = await start();
+      await agent.request("session/load", { sessionId, cwd, mcpServers: [] });
+      await expect(prompt()).resolves.toMatchObject({ stopReason: "end_turn" });
+      expect(dispatch.mock.calls[1][0].toString()).toContain(encrypted);
+      await agent.close();
+
+      await ceremony(CHATGPT_AUTH_ROUTE_PATHS.sign_out, {});
+      await connect();
+      agent = await start();
+      await agent.request("session/load", { sessionId, cwd, mcpServers: [] });
+      await expect(prompt()).rejects.toThrow(
+        "session_execution_configuration_changed"
+      );
+      expect(dispatch).toHaveBeenCalledTimes(2);
+      expect(exchangeToken).toHaveBeenCalledTimes(2);
+    } finally {
+      try {
+        await agent?.close();
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  },
+  25_000
+);
 
 it.skipIf(!resourcesPath)(
   "runs a real native prompt through the approved broker without direct HTTP",

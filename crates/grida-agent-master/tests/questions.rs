@@ -259,7 +259,7 @@ impl Fixture {
                 model: model(),
                 instructions: "Complete the task and incorporate user answers.".into(),
                 max_steps: 5,
-                max_output_tokens: 1024,
+                max_output_tokens: Some(1024),
             },
             self.provider.clone(),
             tools,

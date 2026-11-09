@@ -429,6 +429,23 @@ impl Host {
         )
     }
 
+    // GRIDA-SEC-008 — OAuth is owned by the attached Desktop supervisor.
+    pub fn open_supervised_chatgpt(
+        state_dir: &Path,
+        endpoint: &str,
+        model: ModelId,
+        scope: &str,
+        supervisor: crate::SupervisedProvider,
+    ) -> Result<Self> {
+        let connection = Arc::new(crate::chatgpt_subscription::SupervisedChatGpt::new(
+            endpoint, &model, scope, supervisor,
+        )?);
+        Self::open_with(
+            state_dir,
+            Some(|| Execution::new_chatgpt(model, connection)),
+        )
+    }
+
     // GRIDA-SEC-006 / GRIDA-GG: provider — bind execution to the admitted scope.
     /// Embed a host with a current, invocation-owned grant and its approved
     /// transport. The transport receives no account credentials.
@@ -1205,7 +1222,7 @@ impl Host {
                 &StoredPrompt {
                     parts,
                     configuration,
-                    max_output_tokens: Some(execution.config.max_output_tokens),
+                    max_output_tokens: execution.config.max_output_tokens,
                     max_steps: Some(execution.config.max_steps),
                     model: Some(execution.config.model.clone()),
                     authority: Some(CapturedAuthority {
@@ -1290,8 +1307,7 @@ impl Host {
                     config.instructions.push_str(goals::INSTRUCTIONS);
                 }
                 config.max_steps = stored.max_steps.unwrap_or(1);
-                config.max_output_tokens =
-                    stored.max_output_tokens.unwrap_or(config.max_output_tokens);
+                config.max_output_tokens = stored.max_output_tokens.or(config.max_output_tokens);
                 let messages = if matches!(&stored.goal, Some(goals::GoalInput::Continue(_))) {
                     if !stored.parts.is_empty() {
                         return Err(problem(
@@ -1333,7 +1349,7 @@ impl Host {
                 .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?
                 .validate_capture(capture)?;
         }
-        if config.max_steps == 0 || config.max_output_tokens == 0 {
+        if config.max_steps == 0 || config.max_output_tokens == Some(0) {
             return Err(problem(ErrorKind::InvalidInput, "invalid_master_limits"));
         }
         let completion_authorized = completion_checks.is_some() && !cancellation_only;
@@ -1804,7 +1820,7 @@ impl Execution {
             configuration,
             legacy_configuration,
             options.model,
-            options.max_output_tokens,
+            Some(options.max_output_tokens),
             provider,
             binding,
             Credential::Http(transport),
@@ -1838,10 +1854,46 @@ impl Execution {
             configuration,
             configuration,
             options.model,
-            options.max_output_tokens,
+            Some(options.max_output_tokens),
             provider,
             binding,
             credential,
+        )
+    }
+
+    fn new_chatgpt(
+        model: ModelId,
+        connection: Arc<crate::chatgpt_subscription::SupervisedChatGpt>,
+    ) -> Result<Self> {
+        let configuration = Fingerprint::of(&(
+            "chatgpt-subscription-selection-v1",
+            &connection.replay_binding,
+            &model,
+        ))?;
+        let binding = connection.binding.clone();
+        let provider = Arc::new(Responses::new(
+            binding.clone(),
+            connection.replay_binding.clone(),
+            ResponsesEndpoint::Subscription,
+            BTreeMap::from([(
+                model.clone(),
+                ResponsesProfile {
+                    capabilities: text_capabilities("chatgpt-subscription")?,
+                    wire_model: connection.wire_model.clone(),
+                    reasoning_effort: Some(agent_kit_providers::ReasoningEffort::Medium),
+                },
+            )]),
+            connection.clone(),
+            PROVIDER_LIMITS,
+        )?);
+        Self::compose(
+            configuration,
+            configuration,
+            model,
+            None,
+            provider,
+            binding,
+            Credential::SupervisedChatGpt(connection),
         )
     }
 
@@ -1849,7 +1901,7 @@ impl Execution {
         configuration: Fingerprint,
         legacy_configuration: Fingerprint,
         model: ModelId,
-        max_output_tokens: u64,
+        max_output_tokens: Option<u64>,
         provider: Arc<dyn Provider>,
         binding: ProviderBinding,
         credential: Credential,
@@ -1917,6 +1969,7 @@ enum Credential {
     Http(Arc<HttpTransport>),
     Gg(Arc<GgConnection>),
     SupervisedGg(Arc<crate::gg::SupervisedGg>),
+    SupervisedChatGpt(Arc<crate::chatgpt_subscription::SupervisedChatGpt>),
 }
 
 struct ExecutionAuthority {
@@ -1944,6 +1997,7 @@ impl AuthorityValidator for ExecutionAuthority {
                 Credential::Http(transport) => transport.validate_credential().await,
                 Credential::Gg(connection) => connection.ensure_current().await,
                 Credential::SupervisedGg(connection) => connection.validate(),
+                Credential::SupervisedChatGpt(connection) => connection.validate(),
             }
         })
     }

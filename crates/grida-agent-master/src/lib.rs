@@ -41,7 +41,9 @@ pub struct MasterConfig {
     pub model: agent_kit_core::ModelId,
     pub instructions: String,
     pub max_steps: u32,
-    pub max_output_tokens: u64,
+    /// None selects the provider's own output allowance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_output_tokens: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -133,7 +135,7 @@ impl Master {
         tools: InventorySnapshot,
         authority: MasterAuthority,
     ) -> Result<Self> {
-        if config.max_steps == 0 || config.max_output_tokens == 0 {
+        if config.max_steps == 0 || config.max_output_tokens == Some(0) {
             return Err(Error::new(ErrorKind::InvalidInput, "invalid_master_limits"));
         }
         Ok(Self {
@@ -688,7 +690,7 @@ impl Master {
             model: self.config.model.clone(),
             messages,
             tools: self.tools.offers()?,
-            max_output_tokens: Some(self.config.max_output_tokens),
+            max_output_tokens: self.config.max_output_tokens,
             extension: None,
         })?;
         match self.input_limit {

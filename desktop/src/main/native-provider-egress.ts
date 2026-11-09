@@ -1,4 +1,5 @@
-// GRIDA-SEC-004 / GRIDA-SEC-014 — bounded HTTP for a selected native provider.
+// GRIDA-SEC-004 / GRIDA-SEC-008 / GRIDA-SEC-014 — bounded native provider HTTP.
+import { CHATGPT_RESPONSES_URL } from "../chatgpt-configuration";
 const UPLOAD_LIMIT = 1024 * 1024;
 const RESPONSE_LIMIT = 4 * 1024 * 1024;
 const UPLOAD_CHUNK = 64 * 1024;
@@ -6,7 +7,12 @@ const READ_CHUNK = 32 * 1024;
 const MAX_EXCHANGES = 8;
 const MAX_TIMEOUT_MS = 120_000;
 
-type Protocol = "openai-compatible" | "responses" | "anthropic" | "gemini";
+type Protocol =
+  | "openai-compatible"
+  | "responses"
+  | "anthropic"
+  | "gemini"
+  | "chatgpt-subscription";
 type Reply =
   | { status: "accepted" | "unavailable" | "interrupted" | "end" }
   | { status: "chunk"; data: string }
@@ -246,6 +252,10 @@ function providerTargets(protocol: Protocol, endpoint: string, model: string) {
   } else if (protocol === "responses") {
     routes.set(target("responses").href, "text/event-stream");
     routes.set(target("responses/input_tokens").href, "application/json");
+  } else if (protocol === "chatgpt-subscription") {
+    if (`${endpoint}/responses` !== CHATGPT_RESPONSES_URL)
+      throw new Error("native_provider_subscription_endpoint_invalid");
+    routes.set(CHATGPT_RESPONSES_URL, "text/event-stream");
   } else if (protocol === "anthropic") {
     routes.set(target("messages").href, "text/event-stream");
   } else {
@@ -266,7 +276,8 @@ function providerHeaders(protocol: Protocol, accept: string, raw: unknown) {
       : protocol === "gemini"
         ? "x-goog-api-key"
         : "authorization";
-  const allowed = new Set(["content-type", "accept", credential]);
+  const allowed = new Set(["content-type", "accept"]);
+  if (protocol !== "chatgpt-subscription") allowed.add(credential);
   if (protocol === "anthropic") allowed.add("anthropic-version");
   const headers = new Headers();
   for (const field of raw) {

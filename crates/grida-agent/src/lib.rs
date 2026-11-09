@@ -1,6 +1,7 @@
 //! Native Grida Agent composition and process adapters.
 
 pub mod acp;
+mod chatgpt_subscription;
 pub mod command;
 pub mod configuration;
 mod configuration_tools;

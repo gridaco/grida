@@ -284,7 +284,7 @@ impl Fixture {
                 model: ModelId::new("fixture-model").unwrap(),
                 instructions: "Finish the task.".into(),
                 max_steps: 4,
-                max_output_tokens: 1024,
+                max_output_tokens: Some(1024),
             },
             self.provider.clone(),
             inventory.snapshot(&[id]).unwrap(),

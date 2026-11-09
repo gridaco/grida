@@ -130,7 +130,7 @@ pub fn replacement_coverage(envelope: &Envelope) -> Result<Option<Coverage>> {
 
 pub fn summary_request(
     model: ModelId,
-    output_limit: u64,
+    output_limit: Option<u64>,
     source: Vec<Message>,
     mut omissions: SeedOmissions,
 ) -> Result<Option<(InferenceRequest, Coverage)>> {
@@ -177,7 +177,7 @@ pub fn summary_request(
             message("compaction/source", Role::User, input)?,
         ],
         tools: Vec::new(),
-        max_output_tokens: Some(output_limit.min(MAX_SUMMARY_TOKENS)),
+        max_output_tokens: output_limit.map(|limit| limit.min(MAX_SUMMARY_TOKENS)),
         extension: None,
     };
     Ok(Some((request, coverage)))
