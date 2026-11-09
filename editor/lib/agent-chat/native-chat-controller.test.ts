@@ -98,6 +98,56 @@ function fixture() {
   };
 }
 
+it("uses the readiness probe and preserves native mode through startup failure", async () => {
+  const { bridge } = fixture();
+  const availability = vi.spyOn(bridge, "available");
+  const publish = vi.fn<(state: string | null) => void>();
+  const status = vi.fn<NonNullable<DesktopNativeChat["status"]>>();
+  status
+    .mockResolvedValueOnce("native-starting")
+    .mockResolvedValueOnce("native-unavailable");
+  const stop = NativeChatController.watchReadiness(
+    { ...bridge, status },
+    publish
+  );
+  await vi.waitFor(() => {
+    expect(publish.mock.calls).toEqual([
+      ["native-starting"],
+      ["native-unavailable"],
+    ]);
+  });
+  expect(status.mock.calls).toEqual([[], [true]]);
+  expect(availability).not.toHaveBeenCalled();
+  stop();
+});
+
+it("keeps the old bridge's legacy selection and drops a disposed startup reply", async () => {
+  const { bridge } = fixture();
+  const publish = vi.fn<(state: string | null) => void>();
+  vi.spyOn(bridge, "available").mockResolvedValue(false);
+  const stopLegacy = NativeChatController.watchReadiness(bridge, publish);
+  await vi.waitFor(() =>
+    expect(publish).toHaveBeenCalledExactlyOnceWith("legacy")
+  );
+  stopLegacy();
+  publish.mockClear();
+
+  const started = Promise.withResolvers<"native-ready">();
+  const status = vi.fn<NonNullable<DesktopNativeChat["status"]>>();
+  status
+    .mockResolvedValueOnce("native-starting")
+    .mockReturnValueOnce(started.promise);
+  const stopNative = NativeChatController.watchReadiness(
+    { ...bridge, status },
+    publish
+  );
+  await vi.waitFor(() => expect(status).toHaveBeenCalledTimes(2));
+  stopNative();
+  started.resolve("native-ready");
+  await started.promise;
+  expect(publish).toHaveBeenCalledExactlyOnceWith("native-starting");
+});
+
 it("browses saved pages without opening a chat until it is selected", async () => {
   const { bridge } = fixture();
   const load = vi.spyOn(bridge, "load");

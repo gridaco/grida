@@ -9,6 +9,12 @@ export type NativeChatPage = Readonly<{
   nextCursor: string | null;
 }>;
 
+export type NativeChatReadiness =
+  | "legacy"
+  | "native-starting"
+  | "native-ready"
+  | "native-unavailable";
+
 export type NativeChatTurn = Readonly<{
   turnId: string;
   epoch: number;
@@ -92,6 +98,8 @@ export type NativeChatUpdate =
 /** Available only for a main-selected native chat in the current workspace. */
 export type DesktopNativeChat = {
   available(): Promise<boolean>;
+  /** Starts the admitted workspace when requested and native mode is selected. */
+  status?(start?: boolean): Promise<NativeChatReadiness>;
   list(cursor?: string | null): Promise<NativeChatPage>;
   create(): Promise<NativeChatAttachment>;
   load(sessionId: string): Promise<NativeChatAttachment>;

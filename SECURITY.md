@@ -910,6 +910,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   Saved-chat discovery uses the main-owned workspace and a bounded cursor.
   Its reply contains only chat IDs and the next cursor, after the same frame
   and workspace recheck. Discovery creates no chat attachment.
+  Native startup accepts only a start flag. Main resolves the workspace from
+  the admitted route and rechecks that scope before returning readiness.
+  Navigation invalidates an outstanding reply. A failed native startup reports
+  unavailability and cannot select the legacy owner.
 - The [native text observer](crates/grida-agent/src/acp/live.rs) projects
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery

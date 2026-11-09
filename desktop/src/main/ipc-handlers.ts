@@ -89,6 +89,8 @@ const mediaHost = new DesktopMediaHost({
 type RegisterIpcHandlersOptions = {
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
   resolve_native_chat?: (window: BrowserWindow) => ActiveNativeChat | null;
+  /** Present when this main process has selected native chat mode. */
+  ensure_native_chat?: (workspaceId: string) => Promise<void>;
   on_onboarding_complete?: (input: {
     window: BrowserWindow;
     workspace_id?: string;
@@ -99,12 +101,23 @@ type RegisterIpcHandlersOptions = {
 };
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
-  const nativeChat = new NativeChatIpc(EDITOR_ORIGIN, (sender) => {
+  const admittedWindow = (sender: WebContents) => {
     const window = BrowserWindow.fromWebContents(sender);
     return window && options.resolve_ipc_role(window) === "main"
-      ? (options.resolve_native_chat?.(window) ?? null)
+      ? window
       : null;
-  });
+  };
+  const nativeChat = new NativeChatIpc(
+    EDITOR_ORIGIN,
+    (sender) => {
+      const window = admittedWindow(sender);
+      return window ? (options.resolve_native_chat?.(window) ?? null) : null;
+    },
+    options.ensure_native_chat && {
+      admits: (sender) => admittedWindow(sender) !== null,
+      ensure: options.ensure_native_chat,
+    }
+  );
   /**
    * GRIDA-SEC-004 / GRIDA-SEC-005 — every native IPC invoke must pass both
    * structural URL admission and the controller-owned window/role capability
@@ -144,6 +157,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
 
   guarded(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE, (event) =>
     nativeChat.available(event)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_STATUS, (event, start?: boolean) =>
+    nativeChat.status(event, start)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_LIST, (event, cursor?: string | null) =>
     nativeChat.list(event, cursor)

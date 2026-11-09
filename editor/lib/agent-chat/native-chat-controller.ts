@@ -5,6 +5,7 @@ import type {
   NativeChatMessage,
   NativeChatObservation,
   NativeChatPage,
+  NativeChatReadiness,
   NativeChatTextUpdate,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
@@ -80,25 +81,33 @@ export class NativeChatController {
     private readonly memoryKey?: string
   ) {}
 
-  static watchAvailability(
+  static watchReadiness(
     bridge: DesktopNativeChat,
-    publish: (available: boolean | null) => void
+    publish: (state: NativeChatReadiness | null) => void
   ): () => void {
     let watching = true;
-    const probe = () => {
-      void bridge.available().then(
-        (available) => {
-          if (watching) publish(available);
-        },
-        () => {
-          if (watching) publish(null);
+    const probe = async () => {
+      try {
+        const state = bridge.status
+          ? await bridge.status()
+          : (await bridge.available())
+            ? "native-ready"
+            : "legacy";
+        if (!watching) return;
+        publish(state);
+        if (watching && state === "native-starting" && bridge.status) {
+          const ready = await bridge.status(true);
+          if (watching)
+            publish(ready === "native-ready" ? ready : "native-unavailable");
         }
-      );
+      } catch {
+        if (watching) publish(null);
+      }
     };
     // Electron rejects chat attachment while its main frame is loading.
     if (typeof document !== "undefined" && document.readyState !== "complete")
       window.addEventListener("load", probe, { once: true });
-    else probe();
+    else void probe();
     return () => {
       watching = false;
       if (typeof window !== "undefined")

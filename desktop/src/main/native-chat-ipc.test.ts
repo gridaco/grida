@@ -152,6 +152,104 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("starts only the admitted route's workspace and shares the pending start", async () => {
+    const { first, second, scopes, chat, ipc: legacy } = setup();
+    scopes.delete(first.sender);
+    await expect(legacy.status(first.event, true)).resolves.toBe("legacy");
+
+    const started = Promise.withResolvers<void>();
+    const ensure = vi.fn<(id: string) => Promise<void>>(() => started.promise);
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      (sender) => scopes.get(sender) ?? null,
+      {
+        admits: (sender) => sender === first.sender,
+        ensure,
+      }
+    );
+    await expect(ipc.status(first.event)).resolves.toBe("native-starting");
+    expect(ensure).not.toHaveBeenCalled();
+    await expect(
+      ipc.status(first.event, { id: "injected" } as unknown as boolean)
+    ).rejects.toThrow("native_chat_start_invalid");
+    await expect(ipc.status(second.event, true)).rejects.toThrow(
+      "native_chat_scope_changed"
+    );
+    await expect(
+      ipc.status(
+        {
+          ...first.event,
+          senderFrame: { ...first.frame },
+        } as unknown as IpcMainInvokeEvent,
+        true
+      )
+    ).rejects.toThrow("native_chat_scope_changed");
+    first.frame.url = `${WORKSPACE_URL}&id=injected`;
+    await expect(ipc.status(first.event, true)).rejects.toThrow(
+      "native_chat_scope_changed"
+    );
+    first.frame.url = WORKSPACE_URL;
+    const status = ipc.status(first.event, true);
+    const compatible = ipc.available(first.event);
+    await vi.waitFor(() =>
+      expect(ensure).toHaveBeenCalledExactlyOnceWith(WORKSPACE)
+    );
+    scopes.set(first.sender, { workspaceId: WORKSPACE, chat });
+    started.resolve();
+    await expect(status).resolves.toBe("native-ready");
+    await expect(compatible).resolves.toBe(true);
+    await expect(ipc.status(first.event)).resolves.toBe("native-ready");
+  });
+
+  it("reports an unavailable native startup without falling back and can retry", async () => {
+    const { first, scopes, chat } = setup();
+    scopes.delete(first.sender);
+    const ensure = vi.fn<(id: string) => Promise<void>>();
+    ensure
+      .mockRejectedValueOnce(new Error("private provider error"))
+      .mockResolvedValueOnce(undefined)
+      .mockImplementationOnce(async () => {
+        scopes.set(first.sender, { workspaceId: WORKSPACE, chat });
+      });
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      (sender) => scopes.get(sender) ?? null,
+      {
+        admits: () => true,
+        ensure,
+      }
+    );
+    await expect(ipc.status(first.event, true)).resolves.toBe(
+      "native-unavailable"
+    );
+    await expect(ipc.available(first.event)).rejects.toThrow(
+      "native_chat_unavailable"
+    );
+    await expect(ipc.status(first.event, true)).resolves.toBe("native-ready");
+  });
+
+  it("rejects a startup reply after navigation even if the frame returns to the same URL", async () => {
+    const { first, scopes, chat } = setup();
+    scopes.delete(first.sender);
+    const started = Promise.withResolvers<void>();
+    const ensure = vi.fn<(id: string) => Promise<void>>(() => started.promise);
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      (sender) => scopes.get(sender) ?? null,
+      {
+        admits: () => true,
+        ensure,
+      }
+    );
+    const old = ipc.status(first.event, true);
+    await vi.waitFor(() => expect(ensure).toHaveBeenCalledTimes(1));
+    first.contents.emit("did-navigate-in-page", {}, WORKSPACE_URL, true);
+    scopes.set(first.sender, { workspaceId: WORKSPACE, chat });
+    started.resolve();
+    await expect(old).rejects.toThrow("native_chat_scope_changed");
+    await expect(ipc.status(first.event)).resolves.toBe("native-ready");
+  });
+
   it("lists without attaching and drops replies after the admitted frame changes", async () => {
     const { ipc, first, chat, scopes } = setup();
     const load = vi.spyOn(chat, "load");

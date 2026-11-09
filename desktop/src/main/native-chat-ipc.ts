@@ -6,6 +6,7 @@ import type {
   NativeChatControlResult,
   NativeChatObservation,
   NativeChatPage,
+  NativeChatReadiness,
   NativeChatSnapshot,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
@@ -58,16 +59,88 @@ type Owner = {
   release(): void;
 };
 
+type Startup = {
+  frame: WebFrameMain;
+  workspaceId: string;
+  result: Promise<NativeChatReadiness>;
+  release(): void;
+};
+
 export class NativeChatIpc {
   private readonly owners = new Map<WebContents, Owner>();
+  private readonly startups = new WeakMap<WebContents, Startup>();
 
   constructor(
     private readonly editorOrigin: string,
-    private readonly resolve: (sender: WebContents) => ActiveNativeChat | null
+    private readonly resolve: (sender: WebContents) => ActiveNativeChat | null,
+    private readonly startup?: {
+      admits(sender: WebContents): boolean;
+      ensure(workspaceId: string): Promise<void>;
+    }
   ) {}
 
-  available(event: IpcMainInvokeEvent): boolean {
-    return this.scope(event.sender, event.senderFrame) !== null;
+  available(event: IpcMainInvokeEvent): boolean | Promise<boolean> {
+    if (!this.startup)
+      return this.scope(event.sender, event.senderFrame) !== null;
+    return this.status(event, true).then((state) => {
+      if (state !== "native-ready") throw new Error("native_chat_unavailable");
+      return true;
+    });
+  }
+
+  async status(
+    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    start = false
+  ): Promise<NativeChatReadiness> {
+    if (typeof start !== "boolean")
+      throw new Error("native_chat_start_invalid");
+    const workspaceId = this.workspaceId(sender, frame);
+    if (!frame || !workspaceId) throw new Error("native_chat_scope_changed");
+    if (this.resolve(sender)?.workspaceId === workspaceId)
+      return "native-ready";
+    const startup = this.startup;
+    if (!startup) return "legacy";
+    if (!start) return "native-starting";
+
+    const existing = this.startups.get(sender);
+    if (existing?.frame === frame && existing.workspaceId === workspaceId)
+      return existing.result;
+    existing?.release();
+
+    const requireCurrent = () => {
+      if (
+        this.startups.get(sender) !== pending ||
+        this.workspaceId(sender, frame) !== workspaceId
+      )
+        throw new Error("native_chat_scope_changed");
+    };
+    const release = () => {
+      if (this.startups.get(sender) === pending) this.startups.delete(sender);
+      stopWatching();
+    };
+    const stopWatching = watchNavigation(sender, release);
+    const pending: Startup = {
+      frame,
+      workspaceId,
+      release,
+      result: Promise.resolve()
+        .then(async () => {
+          requireCurrent();
+          try {
+            await startup.ensure(workspaceId);
+          } catch {
+            requireCurrent();
+            return "native-unavailable";
+          }
+          requireCurrent();
+          return this.resolve(sender)?.workspaceId === workspaceId
+            ? "native-ready"
+            : "native-unavailable";
+        })
+        .finally(release),
+    };
+    this.startups.set(sender, pending);
+    return pending.result;
   }
 
   async list(
@@ -311,28 +384,14 @@ export class NativeChatIpc {
       release: () => {
         if (this.owners.get(sender) !== owner) return;
         this.owners.delete(sender);
-        sender.off("did-start-navigation", navigating);
-        sender.off("did-navigate-in-page", inPage);
-        sender.off("did-navigate", owner.release);
-        sender.off("destroyed", owner.release);
-        sender.off("render-process-gone", owner.release);
+        stopWatching();
         for (const id of owner.subscriptions.keys())
           this.unsubscribeOwned(owner, id);
         owner.attachments.clear();
       },
     };
-    const navigating = (details: { isMainFrame: boolean }) => {
-      if (details.isMainFrame) owner.release();
-    };
-    const inPage = (_event: unknown, _url: string, isMainFrame: boolean) => {
-      if (isMainFrame) owner.release();
-    };
     this.owners.set(sender, owner);
-    sender.on("did-start-navigation", navigating);
-    sender.on("did-navigate-in-page", inPage);
-    sender.on("did-navigate", owner.release);
-    sender.once("destroyed", owner.release);
-    sender.once("render-process-gone", owner.release);
+    const stopWatching = watchNavigation(sender, owner.release);
     return owner;
   }
 
@@ -370,11 +429,22 @@ export class NativeChatIpc {
     sender: WebContents,
     frame: WebFrameMain | null
   ): ActiveNativeChat | null {
+    const id = this.workspaceId(sender, frame);
+    if (!id) return null;
+    const active = this.resolve(sender);
+    return active?.workspaceId === id ? active : null;
+  }
+
+  private workspaceId(
+    sender: WebContents,
+    frame: WebFrameMain | null
+  ): string | null {
     if (
       !frame ||
       sender.isDestroyed() ||
       sender.isLoadingMainFrame() ||
-      frame !== sender.mainFrame
+      frame !== sender.mainFrame ||
+      (this.startup && !this.startup.admits(sender))
     )
       return null;
     const raw = frame.url;
@@ -382,11 +452,29 @@ export class NativeChatIpc {
     const url = new URL(raw);
     if (url.pathname !== "/desktop/workspace") return null;
     const [id, duplicate] = url.searchParams.getAll("id");
-    const active = this.resolve(sender);
-    return id && duplicate === undefined && active?.workspaceId === id
-      ? active
-      : null;
+    return id && id.length <= 1024 && duplicate === undefined ? id : null;
   }
+}
+
+function watchNavigation(sender: WebContents, release: () => void): () => void {
+  const navigating = (details: { isMainFrame: boolean }) => {
+    if (details.isMainFrame) release();
+  };
+  const inPage = (_event: unknown, _url: string, isMainFrame: boolean) => {
+    if (isMainFrame) release();
+  };
+  sender.on("did-start-navigation", navigating);
+  sender.on("did-navigate-in-page", inPage);
+  sender.on("did-navigate", release);
+  sender.once("destroyed", release);
+  sender.once("render-process-gone", release);
+  return () => {
+    sender.off("did-start-navigation", navigating);
+    sender.off("did-navigate-in-page", inPage);
+    sender.off("did-navigate", release);
+    sender.off("destroyed", release);
+    sender.off("render-process-gone", release);
+  };
 }
 
 function sameActive(

@@ -122,7 +122,10 @@ import {
   findPendingApproval,
   type PendingApproval,
 } from "../shared/agent-approval";
-import type { DesktopNativeChat } from "@grida/desktop-bridge";
+import type {
+  DesktopNativeChat,
+  NativeChatReadiness,
+} from "@grida/desktop-bridge";
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 import { NativeAgentPane } from "./native-agent-pane";
 import styles from "./agent-pane.module.css";
@@ -195,25 +198,50 @@ function NativeAgentPaneGate({
   legacy: AgentPaneContentProps;
 }) {
   const params = useSearchParams();
+  const [attempt, setAttempt] = useState(0);
   const [selection, setSelection] = useState<{
     bridge: DesktopNativeChat;
-    available: boolean | null;
+    attempt: number;
+    readiness: NativeChatReadiness | null;
   }>();
   useEffect(
     () =>
-      NativeChatController.watchAvailability(bridge, (available) =>
-        setSelection({ bridge, available })
+      NativeChatController.watchReadiness(bridge, (readiness) =>
+        setSelection({ bridge, attempt, readiness })
       ),
-    [bridge]
+    [bridge, attempt]
   );
-  if (selection?.bridge !== bridge) return null;
-  if (selection.available === null)
+  const readiness =
+    selection?.bridge === bridge && selection.attempt === attempt
+      ? selection.readiness
+      : undefined;
+  if (readiness === "legacy") return <AgentPaneContent {...legacy} />;
+  if (readiness === undefined || readiness === "native-starting")
     return (
-      <div role="alert" className="px-3 py-2 text-xs text-destructive">
-        Couldn't check chat availability.
+      <div role="status" className="px-3 py-2 text-xs text-muted-foreground">
+        {readiness === "native-starting"
+          ? "Starting native chat…"
+          : "Checking chat availability…"}
       </div>
     );
-  if (!selection.available) return <AgentPaneContent {...legacy} />;
+  if (readiness !== "native-ready")
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 text-xs">
+        <span role="alert" className="text-destructive">
+          {readiness === "native-unavailable"
+            ? "Native chat is unavailable."
+            : "Couldn't check chat availability."}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onClick={() => setAttempt((current) => current + 1)}
+        >
+          Retry
+        </Button>
+      </div>
+    );
   return (
     <NativeAgentPane
       key={params.get("session")}
