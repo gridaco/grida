@@ -1,5 +1,7 @@
 //! Persistent goal policy. The session owner commits these transitions.
 
+pub mod tools;
+
 use agent_kit_core::{ChangeId, Envelope, Error, ErrorKind, OperationId, Result, SchemaId, TurnId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;

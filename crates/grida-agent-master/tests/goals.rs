@@ -371,3 +371,140 @@ fn corrupt_or_future_state_cannot_reauthorize_a_goal() {
         ErrorKind::Unsupported
     );
 }
+
+#[tokio::test]
+async fn goal_tools_are_scoped_and_a_report_only_records_a_proposal() {
+    use agent_kit_core::authority::{AuthorityBinding, GrantSelection};
+    use agent_kit_core::messages::{OutcomeStatus, ToolArguments};
+    use agent_kit_core::tools::{Inventory, InvocationContext};
+    use agent_kit_core::turn::{
+        AttemptRecord, OperationInput, OperationOutcome, OperationRecord, OperationState,
+    };
+    use agent_kit_core::{AttemptId, BindingId, CancellationToken, PrincipalId, ScopeId};
+    use grida_agent_master::goals::tools;
+    use serde_json::json;
+
+    let mut goal = goal(3, 8);
+    let basis = goal.basis().clone();
+    let work = turn("reserved-work");
+    assert!(tools::for_work(&goal, &work).is_err());
+    goal.reserve(&basis, work.clone(), limit(3)).unwrap();
+    assert!(tools::for_work(&goal, &turn("unrelated")).is_err());
+
+    let mut inventory = Inventory::new();
+    let [inspect, report] = tools::for_work(&goal, &work).unwrap();
+    let inspect_id = inspect.definition().id.clone();
+    let report_id = report.definition().id.clone();
+    inventory.insert(inspect).unwrap();
+    inventory.insert(report).unwrap();
+    let snapshot = inventory
+        .snapshot(&[inspect_id.clone(), report_id.clone()])
+        .unwrap();
+
+    let context = |id, max_output_bytes| InvocationContext {
+        attempt: AttemptId::new(id).unwrap(),
+        cancellation: CancellationToken::new(),
+        deadline: None,
+        max_output_bytes,
+    };
+    let read = snapshot
+        .prepare(
+            OperationId::new("inspect").unwrap(),
+            &inspect_id,
+            ToolArguments::Json(json!({})),
+        )
+        .unwrap();
+    let inspected = read.invoke(context("read-attempt", 64 * 1024)).await;
+    assert_eq!(inspected.status, OutcomeStatus::Succeeded);
+    let observed = inspected.structured.unwrap();
+    assert_eq!(
+        observed["objective"]["description"],
+        goal.objective().description
+    );
+    assert_eq!(observed["remaining"]["inference_steps"], 5);
+    assert!(inspected.receipt.is_none());
+
+    let claim = completion(&verified_checks());
+    let operation = OperationId::new("propose").unwrap();
+    let proposal = snapshot
+        .prepare(
+            operation.clone(),
+            &report_id,
+            ToolArguments::Json(json!({"report": claim})),
+        )
+        .unwrap();
+    let invocation = proposal.invocation().clone();
+    let tool_context = context("report-attempt", 1);
+    let attempt = tool_context.attempt.clone();
+    let result = proposal.invoke(tool_context).await;
+    assert_eq!(result.status, OutcomeStatus::Succeeded);
+    assert!(result.truncated);
+    assert_eq!(goal.status(), Status::Active);
+    assert!(goal.progress().is_none());
+    let recorded = OperationState {
+        record: OperationRecord {
+            id: operation,
+            input: OperationInput::Tool(invocation),
+            grants: GrantSelection {
+                authority: AuthorityBinding {
+                    principal: PrincipalId::new("test-host").unwrap(),
+                    binding: BindingId::new("test-binding").unwrap(),
+                    scope: ScopeId::new("test-scope").unwrap(),
+                },
+                grants: vec![],
+            },
+            origin: None,
+            source_call: None,
+        },
+        attempts: vec![AttemptRecord {
+            id: attempt,
+            outcome: Some(OperationOutcome::Tool(result)),
+            prior_outcomes: vec![],
+        }],
+        rejection: None,
+    };
+    assert_eq!(
+        tools::read_report(&recorded, &work, &basis).unwrap(),
+        Some(claim)
+    );
+    assert_eq!(
+        tools::read_report(&recorded, &turn("different-work"), &basis).unwrap(),
+        None
+    );
+    goal.set_paused(&basis, true).unwrap();
+    assert_eq!(
+        tools::read_report(&recorded, &work, goal.basis()).unwrap(),
+        None
+    );
+    assert!(tools::for_work(&goal, &work).is_err());
+}
+
+#[test]
+fn goal_report_refuses_objective_mutation_and_incomplete_criteria() {
+    use agent_kit_core::messages::ToolArguments;
+    use grida_agent_master::goals::tools;
+    use serde_json::json;
+
+    let mut goal = goal(2, 4);
+    let work = turn("reserved");
+    goal.reserve(&goal.basis().clone(), work.clone(), limit(2))
+        .unwrap();
+    let [_, report] = tools::for_work(&goal, &work).unwrap();
+    let unauthorized = ToolArguments::Json(json!({
+        "report":{"kind":"progress","summary":"Checked the output"},
+        "allowance":{"work_turns":100}
+    }));
+    assert_eq!(
+        report.validate(&unauthorized).unwrap_err().code,
+        "goal_tool_arguments_invalid"
+    );
+    let incomplete = ToolArguments::Json(json!({
+        "report":{"kind":"completion","summary":"Done","evidence":[
+            {"criterion":1,"operation":"only-one-check"}
+        ]}
+    }));
+    assert_eq!(
+        report.validate(&incomplete).unwrap_err().code,
+        "goal_report_criteria_incomplete"
+    );
+}

@@ -67,5 +67,6 @@ and cumulative work-turn and inference-step allowances. Each reservation is
 bound to its exact turn. Uncertain work retains the reserved allowance until
 reconciled. A changed goal can account for older work while rejecting its
 progress or completion proposal. Completion requires a verified evidence link
-for every criterion. The current policy and SQLite fixtures exercise these
-transitions before the host exposes goal tools or automatic continuation.
+for every criterion. `goal_inspect` reads the state captured for reserved work.
+`goal_report` records a proposal bound to the exact goal revision, turn, and
+operation. The host still supplies tool grants and automatic continuation.
