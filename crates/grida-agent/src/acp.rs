@@ -34,23 +34,37 @@ pub enum ServeError {
     Shutdown(agent_kit_core::Error),
 }
 
-pub async fn serve_stdio(host: Arc<Host>) -> std::result::Result<(), ServeError> {
-    serve(host, tokio::io::stdin(), tokio::io::stdout()).await
+pub async fn serve_stdio(
+    host: Arc<Host>,
+    provider: Option<crate::SupervisedProvider>,
+) -> std::result::Result<(), ServeError> {
+    serve(host, tokio::io::stdin(), tokio::io::stdout(), provider).await
 }
 
 async fn serve(
     host: Arc<Host>,
     input: impl AsyncRead + Unpin,
     output: impl AsyncWrite + Unpin,
+    provider: Option<crate::SupervisedProvider>,
 ) -> std::result::Result<(), ServeError> {
     let delivery = Arc::new(Delivery::new());
     let (sdk, wire) = Channel::duplex();
     let (incoming, outgoing) = wire.into_parts();
+    let read = async {
+        let result = transport::read(input, outgoing, delivery.clone()).await;
+        if let Some(provider) = &provider {
+            provider.detach();
+        }
+        result
+    };
     let result = tokio::try_join!(
-        serve_connection(host.clone(), sdk, delivery.clone(), true),
-        transport::read(input, outgoing, delivery.clone()),
-        transport::write(output, incoming, delivery),
+        serve_connection(host.clone(), sdk, delivery.clone(), true, provider.clone()),
+        read,
+        transport::write(output, incoming, delivery.clone()),
     );
+    if let Some(provider) = &provider {
+        provider.detach();
+    }
     host.shutdown().await.map_err(ServeError::Shutdown)?;
     result.map(|_| ()).map_err(ServeError::Protocol)
 }
@@ -85,6 +99,7 @@ async fn serve_connection(
     channel: Channel,
     delivery: Arc<Delivery>,
     reviewer: bool,
+    provider: Option<crate::SupervisedProvider>,
 ) -> Result<()> {
     let sessions = Arc::new(Mutex::new(ConnectionSessions::default()));
     let initialized_sessions = sessions.clone();
@@ -106,15 +121,32 @@ async fn serve_connection(
             reviewer,
         ))
         .on_receive_request(
-            async move |request: InitializeRequest, responder, _| {
+            async move |request: InitializeRequest, responder, connection| {
+                let mut advertised = extensions::advertised(reviewer);
+                if let Some(provider) = &provider {
+                    let capability = crate::supervised_provider::CAPABILITY;
+                    if request
+                        .client_capabilities
+                        .meta
+                        .as_ref()
+                        .and_then(|meta| meta.get(capability))
+                        .and_then(serde_json::Value::as_u64)
+                        != Some(1)
+                    {
+                        return responder
+                            .respond_with_error(unavailable("provider_supervisor_required"));
+                    }
+                    if let Err(error) = provider.attach(connection) {
+                        return responder.respond_with_error(host_error(error));
+                    }
+                    advertised.insert(capability.into(), 1.into());
+                }
                 initialized_sessions.lock().unwrap().negotiated =
                     extensions::negotiated(request.client_capabilities.meta.as_ref(), reviewer);
                 responder.respond(
                     InitializeResponse::new(ProtocolVersion::V1)
                         .agent_capabilities(
-                            AgentCapabilities::new()
-                                .load_session(true)
-                                .meta(extensions::advertised(reviewer)),
+                            AgentCapabilities::new().load_session(true).meta(advertised),
                         )
                         .agent_info(Implementation::new(
                             "grida-agent",

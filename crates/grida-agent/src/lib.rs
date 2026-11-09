@@ -15,10 +15,12 @@ pub mod permissions;
 pub mod process;
 pub mod scratch;
 pub mod skills;
+mod supervised_provider;
 pub mod surface_tools;
 pub mod tool_host;
 pub mod workspace;
 
 pub use http::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol};
+pub use supervised_provider::SupervisedProvider;
 
 pub use configuration_tools::ConfigurationPermission;

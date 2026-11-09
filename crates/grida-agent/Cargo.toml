@@ -14,6 +14,7 @@ agent-kit-runtime = { path = "../agent-kit-runtime" }
 agent-kit-sandbox = { path = "../agent-kit-sandbox" }
 agent-kit-sessions = { path = "../agent-kit-sessions" }
 agent-kit-store-sqlite = { path = "../agent-kit-store-sqlite" }
+base64 = "0.22"
 clap = { workspace = true, features = ["help", "usage", "error-context"] }
 futures-channel = "0.3"
 futures-util = "0.3"

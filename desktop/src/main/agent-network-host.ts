@@ -12,6 +12,7 @@ import type {
 import { AgentNetworkPolicy } from "../agent-network-policy";
 import { AgentSidecarChannel } from "../agent-sidecar-channel";
 import { AgentNetworkAuthority } from "./agent-network-authority";
+import type { NativeProviderNetwork } from "./native-provider-egress";
 
 const READY_TIMEOUT_MS = 15_000;
 const GRANT_ACK_TIMEOUT_MS = 5_000;
@@ -120,14 +121,7 @@ export class AgentNetworkHost {
     onFatal: (error: Error) => void;
     commandExecutor?: ShellExecutor;
   }): Promise<AgentNetworkHost> {
-    const networkSession = session.fromPartition(
-      // No `persist:` prefix: one app-lifetime in-memory BrowserContext reused
-      // across supervised sidecar generations. Random partitions accumulate
-      // in Electron's ContextMap until app shutdown during a crash loop.
-      "grida-agent-provider",
-      { cache: false }
-    );
-    await networkSession.setProxy({ mode: "system" });
+    const networkSession = await AgentNetworkHost.networkSession();
     return new AgentNetworkHost(
       args.input,
       args.output,
@@ -137,6 +131,46 @@ export class AgentNetworkHost {
       MAX_BUFFERED_REQUEST_BODY_BYTES,
       args.commandExecutor
     );
+  }
+
+  static async nativeProviderNetwork(
+    authority: AgentNetworkAuthority,
+    grantId: string
+  ): Promise<NativeProviderNetwork> {
+    const networkSession = await AgentNetworkHost.networkSession();
+    return {
+      prepare: (target, headers) => {
+        const approved = AgentNetworkPolicy.authorize(authority.grants(), {
+          grant_id: grantId,
+          method: "POST",
+          url: target,
+          headers: [...headers.entries()],
+        });
+        if (
+          approved.grant.lane !== "provider" ||
+          (authority.isCustomGrant(grantId) &&
+            !isExplicitEndpointHost(approved.url.hostname))
+        )
+          return null;
+        return (body, signal) =>
+          requestThroughSession(networkSession, approved.url.toString(), {
+            method: approved.method,
+            headers: approved.headers,
+            body: Uint8Array.from(body).buffer,
+            signal,
+          });
+      },
+    };
+  }
+
+  private static async networkSession(): Promise<Session> {
+    // One app-lifetime memory-only BrowserContext. Random partitions
+    // accumulate in Electron's ContextMap until app shutdown.
+    const networkSession = session.fromPartition("grida-agent-provider", {
+      cache: false,
+    });
+    await networkSession.setProxy({ mode: "system" });
+    return networkSession;
   }
 
   async bootstrap(password: string, daemonPort: number): Promise<void> {

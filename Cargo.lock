@@ -1118,6 +1118,7 @@ dependencies = [
  "agent-kit-sandbox",
  "agent-kit-sessions",
  "agent-kit-store-sqlite",
+ "base64 0.22.1",
  "clap",
  "futures-channel",
  "futures-util",

@@ -57,6 +57,14 @@ compatible endpoints that read `max_tokens`, including Ollama, pass
 `--compatible-output-limit-field max-tokens`. The default sends
 `max_completion_tokens`.
 
+A supervising host can select `serve --stdio --supervised-provider` and
+negotiate `co.grida/provider/egress` version 1 during ACP initialization.
+The native adapter still prepares the provider request and validates its
+credential. The supervisor authorizes the exact route, dispatches it, and
+streams a bounded response on the private pipe. The supervised mode has no
+direct network client. Losing the pipe after dispatch leaves the attempt
+interrupted.
+
 Responses and Gemini retain opaque model history across restarts when their
 protected credential proof still matches. A changed credential invalidates replay of
 that opaque history. The replay identity is separate from the live dispatch

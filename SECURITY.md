@@ -863,6 +863,15 @@ lazy reads, read-only mutation, and symlink escape refusal.
   keep the child under ownership through EOF shutdown. Only projected error
   codes cross the process diagnostics boundary. Renderer authorization and
   cutover are separate from this process contract.
+- [Supervised provider HTTP](crates/grida-agent/src/supervised_provider.rs)
+  and the [Desktop provider broker](desktop/src/main/native-provider-egress.ts)
+  use a negotiated capability on the same private stdio connection. The
+  broker independently checks the exact configured provider route and its
+  allowed headers. [Electron's connector](desktop/src/main/agent-network-host.ts)
+  rechecks the live network grant at dispatch, uses the dedicated
+  memory-only Chromium session, and starts one POST without following
+  redirects. Upload and pull are bounded. Cancelling the exchange or closing
+  the child aborts the request. This mode has no native direct-network fallback.
 - The [Desktop native chat client](desktop/src/main/native-agent-chat.ts)
   fixes the workspace context at startup and accepts session handles issued
   on that ACP connection. Controls use a host observation of the exact
@@ -3014,6 +3023,9 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [credential continuity store](crates/grida-auth/src/credential_continuity.rs),
   [native agent custody](crates/grida-agent/src/custody.rs),
   [native provider HTTP dispatch](crates/grida-agent/src/http.rs),
+  [supervised provider transport](crates/grida-agent/src/supervised_provider.rs),
+  [private Desktop broker](desktop/src/main/native-provider-egress.ts),
+  [provider broker fixtures](desktop/src/main/native-provider-egress.test.ts),
   [native agent custody tests](crates/grida-agent/tests/custody.rs),
   [native workspace protection](crates/grida-agent/src/workspace.rs),
   [native permission admission](crates/grida-agent/src/permissions.rs),

@@ -7,6 +7,10 @@ import {
   NativeAgentPermissions,
   type NativeWorkspaceSelection,
 } from "./native-agent-permissions";
+import {
+  NativeProviderEgress,
+  type NativeProviderNetwork,
+} from "./native-provider-egress";
 
 const FRAME_LIMIT = 1024 * 1024;
 const REQUEST_LIMIT = 16;
@@ -21,6 +25,7 @@ export type NativeAgentLaunch = {
   endpoint: string;
   model: string;
   credentialHome?: string;
+  providerNetwork?: NativeProviderNetwork;
   workspace?: NativeWorkspaceSelection;
   capabilities?: Readonly<Record<string, 1>>;
   onSessionUpdate?: (params: unknown) => void;
@@ -35,6 +40,7 @@ type Pending = {
 export class NativeAgentProcess {
   readonly permissions?: NativeAgentPermissions;
   private readonly pending = new Map<number, Pending>();
+  private readonly providerRequests = new Set<number | string>();
   private readonly buffer = Buffer.allocUnsafe(FRAME_LIMIT);
   private readonly decoder = new TextDecoder("utf-8", { fatal: true });
   private readonly exited: Promise<{
@@ -50,7 +56,8 @@ export class NativeAgentProcess {
   private constructor(
     private readonly child: ChildProcessWithoutNullStreams,
     private readonly onSessionUpdate?: (params: unknown) => void,
-    askRoots?: ReadonlyMap<string, string>
+    askRoots?: ReadonlyMap<string, string>,
+    private readonly providerEgress?: NativeProviderEgress
   ) {
     if (askRoots) {
       this.permissions = new NativeAgentPermissions(
@@ -119,9 +126,19 @@ export class NativeAgentProcess {
           options.workspace
         )
       : undefined;
-    const capabilities = permissionProfile
-      ? { ...options.capabilities, ...NativeAgentPermissions.capabilities }
-      : (options.capabilities ?? {});
+    const providerEgress = options.providerNetwork
+      ? new NativeProviderEgress(
+          options.providerNetwork,
+          options.provider,
+          options.endpoint,
+          options.model
+        )
+      : undefined;
+    const capabilities: Record<string, 1> = {
+      ...options.capabilities,
+      ...(permissionProfile ? NativeAgentPermissions.capabilities : {}),
+    };
+    if (providerEgress) capabilities[NativeProviderEgress.capability] = 1;
     const args = [
       "serve",
       "--stdio",
@@ -136,6 +153,7 @@ export class NativeAgentProcess {
     ];
     if (options.credentialHome)
       args.push("--credential-home", options.credentialHome);
+    if (providerEgress) args.push("--supervised-provider");
     if (permissionProfile)
       args.push("--permission-profile", permissionProfile.profile);
     const processOwner = new NativeAgentProcess(
@@ -146,7 +164,8 @@ export class NativeAgentProcess {
         stdio: "pipe",
       }),
       options.onSessionUpdate,
-      permissionProfile?.askRoots
+      permissionProfile?.askRoots,
+      providerEgress
     );
     try {
       const response = object(
@@ -235,6 +254,7 @@ export class NativeAgentProcess {
   }
 
   private async stop(): Promise<void> {
+    this.providerEgress?.close();
     this.child.stdin.end();
     const exit = await bounded(this.exited, SHUTDOWN_TIMEOUT_MS);
     if (exit && !this.ready) return;
@@ -290,11 +310,22 @@ export class NativeAgentProcess {
       if (message.id !== undefined) {
         if (typeof message.id !== "string" && typeof message.id !== "number")
           throw new Error("native_agent_invalid_message");
+        if (
+          message.method === NativeProviderEgress.exchangeMethod &&
+          this.ready &&
+          this.providerEgress &&
+          !this.shutdown
+        ) {
+          this.providerRequest(message.id, message.params);
+          return;
+        }
         this.write({
           jsonrpc: "2.0",
           id: message.id,
           error: { code: -32601, message: "Method not found" },
         });
+      } else if (message.method === NativeProviderEgress.cancelMethod) {
+        this.providerEgress?.cancel(message.params);
       } else if (message.method === "session/update") {
         try {
           this.onSessionUpdate?.(message.params);
@@ -333,6 +364,8 @@ export class NativeAgentProcess {
 
   private fail(error: Error): void {
     this.failure ??= error;
+    this.providerEgress?.close();
+    this.providerRequests.clear();
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
       pending.reject(this.failure);
@@ -343,6 +376,26 @@ export class NativeAgentProcess {
   private disconnect(code: string): void {
     this.fail(new Error(code));
     void this.close().catch(() => {});
+  }
+
+  private providerRequest(id: number | string, params: unknown): void {
+    if (
+      this.providerRequests.has(id) ||
+      this.providerRequests.size >= REQUEST_LIMIT
+    )
+      throw new Error("native_agent_provider_request_limit");
+    this.providerRequests.add(id);
+    void this.providerEgress!.exchange(params)
+      .then((result) => {
+        if (!this.failure && !this.shutdown)
+          this.write({ jsonrpc: "2.0", id, result });
+      })
+      .catch(() => {
+        this.disconnect("native_agent_provider_reply_failed");
+      })
+      .finally(() => {
+        this.providerRequests.delete(id);
+      });
   }
 }
 

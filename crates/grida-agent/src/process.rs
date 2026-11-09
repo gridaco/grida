@@ -60,12 +60,31 @@ pub async fn serve(
         host.shutdown().await?;
         return result;
     }
+    serve_stdio(host, None, signal).await
+}
+
+pub async fn serve_supervised(
+    host: Arc<Host>,
+    provider: crate::SupervisedProvider,
+    signal: impl Future<Output = Result<()>>,
+) -> Result<u8> {
+    serve_stdio(host, Some(provider), signal).await
+}
+
+async fn serve_stdio(
+    host: Arc<Host>,
+    provider: Option<crate::SupervisedProvider>,
+    signal: impl Future<Output = Result<()>>,
+) -> Result<u8> {
+    let supervised = provider.is_some();
     tokio::select! {
-        result = acp::serve_stdio(host.clone()) => match result {
+        result = acp::serve_stdio(host.clone(), provider) => match result {
             Ok(()) => {}
             Err(acp::ServeError::Shutdown(error)) => return Err(error),
             Err(acp::ServeError::Protocol(error)) => {
-                eprintln!("grida-agent: ACP connection ended: {error}");
+                if !supervised {
+                    eprintln!("grida-agent: ACP connection ended: {error}");
+                }
                 return Err(problem(ErrorKind::Unavailable, "acp_connection_failed"));
             }
         },

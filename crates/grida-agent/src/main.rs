@@ -91,6 +91,12 @@ fn command() -> Command {
                 .about("Serve stable Agent Client Protocol")
                 .arg(Arg::new("stdio").long("stdio").action(ArgAction::SetTrue))
                 .arg(
+                    Arg::new("supervised-provider")
+                        .long("supervised-provider")
+                        .requires("stdio")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
                     Arg::new("listen")
                         .long("listen")
                         .value_name("LOOPBACK_WS_URL")
@@ -281,12 +287,20 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             )
         })
         .transpose()?;
-    let host = Host::open(state_dir, Some(provider))?;
+    let supervisor = (name == "serve" && args.get_flag("supervised-provider"))
+        .then(grida_agent::SupervisedProvider::default);
+    let host = match &supervisor {
+        Some(supervisor) => Host::open_supervised(state_dir, provider, supervisor.clone())?,
+        None => Host::open(state_dir, Some(provider))?,
+    };
     let host = Arc::new(match permissions {
         Some(profile) => host.with_permission_profile(profile),
         None => host,
     });
     if name == "serve" {
+        if let Some(supervisor) = supervisor {
+            return process::serve_supervised(host, supervisor, process::shutdown_signal()).await;
+        }
         return process::serve(host, listener, process::shutdown_signal()).await;
     }
     process::run(

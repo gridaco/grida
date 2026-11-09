@@ -332,7 +332,18 @@ impl Host {
     pub fn open(state_dir: &Path, provider: Option<ProviderOptions>) -> Result<Self> {
         Self::open_with(
             state_dir,
-            provider.map(|options| || Execution::new(state_dir, options)),
+            provider.map(|options| || Execution::new(state_dir, options, None)),
+        )
+    }
+
+    pub fn open_supervised(
+        state_dir: &Path,
+        provider: ProviderOptions,
+        supervisor: crate::SupervisedProvider,
+    ) -> Result<Self> {
+        Self::open_with(
+            state_dir,
+            Some(|| Execution::new(state_dir, provider, Some(supervisor))),
         )
     }
 
@@ -1414,9 +1425,13 @@ impl Host {
 }
 
 impl Execution {
-    fn new(state_dir: &Path, options: ProviderOptions) -> Result<Self> {
+    fn new(
+        state_dir: &Path,
+        options: ProviderOptions,
+        supervised: Option<crate::SupervisedProvider>,
+    ) -> Result<Self> {
         let legacy_configuration = Fingerprint::of(&options)?;
-        let transport = Arc::new(HttpTransport::new(state_dir, &options)?);
+        let transport = Arc::new(HttpTransport::new(state_dir, &options, supervised)?);
         let configuration = transport.selection();
         let binding = transport.binding().clone();
         let capabilities = text_capabilities(options.protocol.as_str())?;

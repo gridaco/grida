@@ -1,6 +1,7 @@
 //! GRIDA-SEC-014 — host-owned dispatch for explicitly selected provider endpoints.
 
 use crate::custody::{CapturedCredential, CredentialFormat, CredentialSource};
+use crate::supervised_provider::SupervisedProvider;
 
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::inference::{ProviderBinding, RequestControl};
@@ -12,7 +13,9 @@ use agent_kit_providers::{
     StreamingTransport, TransportFailure, TransportOperation, TransportRequest, TransportResponse,
 };
 use futures_util::StreamExt;
-use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderName, RETRY_AFTER};
+use reqwest::header::{
+    ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue, RETRY_AFTER,
+};
 use reqwest::{Client, Url};
 use serde::Serialize;
 use std::net::{IpAddr, SocketAddr};
@@ -91,11 +94,20 @@ pub struct HttpTransport {
     credential: Option<CapturedCredential>,
     replay_binding: Option<BindingId>,
     selection: Fingerprint,
-    client: Client,
+    dispatch: Dispatch,
+}
+
+enum Dispatch {
+    Direct(Client),
+    Supervised(SupervisedProvider),
 }
 
 impl HttpTransport {
-    pub fn new(state_dir: &Path, options: &ProviderOptions) -> Result<Self> {
+    pub fn new(
+        state_dir: &Path,
+        options: &ProviderOptions,
+        supervised: Option<SupervisedProvider>,
+    ) -> Result<Self> {
         if !options.protocol.is_compatible() && options.compatible_output_limit_field.is_some() {
             return Err(invalid(
                 "compatible_output_limit_field_requires_compatible_provider",
@@ -165,32 +177,10 @@ impl HttpTransport {
             ProviderProtocol::Gemini | ProviderProtocol::Responses
         )
         .then_some(continuity);
-        let mut client = Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .retry(reqwest::retry::never())
-            .pool_max_idle_per_host(0)
-            .http1_only()
-            .http1_max_headers(64)
-            .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(REQUEST_TIMEOUT);
-        if base.host_str().is_some_and(is_loopback_host) {
-            // Loopback providers retain local routing even when the host
-            // environment or OS selects a proxy for remote providers.
-            client = client.no_proxy();
-        }
-        if base.host_str() == Some("localhost") {
-            // Resolve this spelling without relying on ambient DNS.
-            client = client.resolve_to_addrs(
-                "localhost",
-                &[
-                    SocketAddr::from(([127, 0, 0, 1], 0)),
-                    SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 0)),
-                ],
-            );
-        }
-        let client = client
-            .build()
-            .map_err(|_| problem("provider_http_client_unavailable"))?;
+        let dispatch = match supervised {
+            Some(supervised) => Dispatch::Supervised(supervised),
+            None => Dispatch::Direct(direct_client(&base)?),
+        };
         Ok(Self {
             binding,
             protocol: options.protocol,
@@ -199,7 +189,7 @@ impl HttpTransport {
             credential,
             replay_binding,
             selection,
-            client,
+            dispatch,
         })
     }
 
@@ -261,20 +251,17 @@ impl StreamingTransport for HttpTransport {
             {
                 return Err(TransportFailure::Unavailable);
             }
-            let mut outbound = self
-                .client
-                .post(target)
-                .header(CONTENT_TYPE, "application/json")
-                .header(
-                    ACCEPT,
-                    match request.operation {
-                        TransportOperation::OpenAiResponsesInputTokens => "application/json",
-                        _ => "text/event-stream",
-                    },
-                )
-                .body(request.body);
+            let mut headers = HeaderMap::new();
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            headers.insert(
+                ACCEPT,
+                HeaderValue::from_static(match request.operation {
+                    TransportOperation::OpenAiResponsesInputTokens => "application/json",
+                    _ => "text/event-stream",
+                }),
+            );
             if self.protocol == ProviderProtocol::Anthropic {
-                outbound = outbound.header("anthropic-version", "2023-06-01");
+                headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
             }
             if let Some(credential) = &self.credential {
                 let (name, format) = match self.protocol {
@@ -294,7 +281,7 @@ impl StreamingTransport for HttpTransport {
                     .header(format)
                     .await
                     .map_err(|_| TransportFailure::Unavailable)?;
-                outbound = outbound.header(name, value);
+                headers.insert(name, value);
             }
             if control.cancellation.is_cancelled()
                 || control
@@ -303,6 +290,21 @@ impl StreamingTransport for HttpTransport {
             {
                 return Err(TransportFailure::Unavailable);
             }
+            let client = match &self.dispatch {
+                Dispatch::Direct(client) => client,
+                Dispatch::Supervised(supervised) => {
+                    return supervised
+                        .send(
+                            target,
+                            headers,
+                            request.body,
+                            request.max_response_bytes,
+                            control,
+                        )
+                        .await;
+                }
+            };
+            let mut outbound = client.post(target).headers(headers).body(request.body);
             if let Some(deadline) = control.deadline {
                 outbound =
                     outbound.timeout(deadline.saturating_duration_since(std::time::Instant::now()));
@@ -383,6 +385,33 @@ impl StreamingTransport for HttpTransport {
             })
         })
     }
+}
+
+fn direct_client(base: &Url) -> Result<Client> {
+    let mut client = Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .retry(reqwest::retry::never())
+        .pool_max_idle_per_host(0)
+        .http1_only()
+        .http1_max_headers(64)
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(REQUEST_TIMEOUT);
+    if base.host_str().is_some_and(is_loopback_host) {
+        // A proxy must not intercept a loopback provider.
+        client = client.no_proxy();
+    }
+    if base.host_str() == Some("localhost") {
+        client = client.resolve_to_addrs(
+            "localhost",
+            &[
+                SocketAddr::from(([127, 0, 0, 1], 0)),
+                SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 0)),
+            ],
+        );
+    }
+    client
+        .build()
+        .map_err(|_| problem("provider_http_client_unavailable"))
 }
 
 fn credential_source(options: &ProviderOptions, base: &Url) -> Result<Option<CredentialSource>> {
@@ -529,7 +558,7 @@ mod tests {
     fn responses_can_count_only_under_the_same_fixed_api_route() {
         let state = tempfile::tempdir().unwrap();
         let transport =
-            HttpTransport::new(state.path(), &options(ProviderProtocol::Responses)).unwrap();
+            HttpTransport::new(state.path(), &options(ProviderProtocol::Responses), None).unwrap();
         assert_eq!(
             transport
                 .request_target(&TransportOperation::OpenAiResponses)
@@ -548,8 +577,12 @@ mod tests {
             transport.request_target(&TransportOperation::ChatCompletions),
             Err(TransportFailure::Unavailable)
         );
-        let compatible =
-            HttpTransport::new(state.path(), &options(ProviderProtocol::OpenAiCompatible)).unwrap();
+        let compatible = HttpTransport::new(
+            state.path(),
+            &options(ProviderProtocol::OpenAiCompatible),
+            None,
+        )
+        .unwrap();
         assert_eq!(
             compatible.request_target(&TransportOperation::OpenAiResponsesInputTokens),
             Err(TransportFailure::Unavailable)
