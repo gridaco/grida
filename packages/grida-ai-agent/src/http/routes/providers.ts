@@ -26,7 +26,7 @@ import {
 } from "../../protocol/endpoints";
 import type { EndpointProvidersStore } from "../../providers/endpoints";
 import { probeEndpointModels } from "../../providers/probe";
-import { detectClaude } from "../../agent-provider/detect";
+import type { detectClaude } from "../../agent-provider/detect";
 import type { SecretsStore } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
 import { ProviderHttp } from "../../providers/http";
@@ -46,7 +46,7 @@ export type ProvidersRoutesDeps = {
   provider_http?: ProviderHttp;
   /** Probe override for tests. Defaults to {@link probeEndpointModels}. */
   probe?: typeof probeEndpointModels;
-  /** Claude-detect override for tests. Defaults to {@link detectClaude}. */
+  /** Mount local CLI detection only when the host supplies it. */
   detect?: typeof detectClaude;
   /** Trusted host edge after an endpoint config becomes resolvable. */
   on_provider_ready?: ProviderReady.Hook;
@@ -55,7 +55,7 @@ export type ProvidersRoutesDeps = {
 export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
   const { endpoints, secrets } = deps;
   const probe = deps.probe ?? probeEndpointModels;
-  const detect = deps.detect ?? detectClaude;
+  const detect = deps.detect;
   const providerHttp = deps.provider_http ?? new ProviderHttp();
 
   app.post("/providers/endpoints/list", async (c) => {
@@ -140,11 +140,13 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
   // resolvable on the augmented PATH? Cheap filesystem probe — does NOT
   // verify login (that's surfaced by the first real run). Only the host can
   // answer: the resolver searches the machine's well-known install dirs.
-  app.post("/providers/claude/detect", (c) => {
-    const result = detect();
-    console.log(
-      `[agent-host-providers] claude detect installed=${result.installed}`
-    );
-    return c.json(result);
-  });
+  if (detect) {
+    app.post("/providers/claude/detect", (c) => {
+      const result = detect();
+      console.log(
+        `[agent-host-providers] claude detect installed=${result.installed}`
+      );
+      return c.json(result);
+    });
+  }
 }

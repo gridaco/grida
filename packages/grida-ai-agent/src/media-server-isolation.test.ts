@@ -281,6 +281,7 @@ const options = {
   password, user_data_path: path.join(base, "state"), media_root: path.join(base, "media"),
   http_access: { allowed_origins: [origin], allowed_referer_paths: ["/desktop"] },
   gg_base_url: gateway,
+  endpoint_settings: true,
   provider_http: {
     request: async (input, init) => {
       const url = String(input), headers = new Headers(init?.headers);
@@ -322,9 +323,12 @@ try {
   const handshake = await (await call(daemon, "/handshake")).json();
   assert.equal(handshake.capabilities.agent, false);
   assert.equal(handshake.capabilities.sessions, false);
+  assert.equal(handshake.capabilities.providers, true);
   assert.equal(handshake.capabilities.sound_effects, true);
   assert.equal(handshake.capabilities.music, true);
   assert.equal((await call(daemon, "/agent/run")).status, 404);
+  assert.deepEqual(await (await call(daemon, "/providers/endpoints/list")).json(), []);
+  assert.equal((await call(daemon, "/providers/claude/detect")).status, 404);
   custodyEnabled = true;
   assert.equal((await call(daemon, "/secrets/set", { provider_id: "elevenlabs", key })).status, 200);
   const sound = await call(daemon, "/audio/sound-effects/generate", { model_id: "eleven_text_to_sound_v2", prompt: "clock ticking" });

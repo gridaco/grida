@@ -183,6 +183,65 @@ describe("media-only public composition", () => {
     expect(createMediaTenant().sse_query_token_paths ?? []).toEqual([]);
   });
 
+  it("retains custom endpoint settings and keys without starting chat", async () => {
+    const { daemon, configuration, user_data_path, request } = await start({
+      endpoint_settings: true,
+    });
+    const config = {
+      id: "local-models",
+      label: "Local models",
+      base_url: "http://127.0.0.1:11434/v1",
+      models: [{ id: "fixture-model", label: "Fixture Model" }],
+    };
+    expect(
+      (await call(daemon, "/providers/endpoints/set", { config })).status
+    ).toBe(200);
+    expect(
+      (await call(daemon, "/secrets/set", { provider_id: config.id, key: KEY }))
+        .status
+    ).toBe(200);
+    expect(
+      (
+        await call(
+          daemon,
+          "/providers/endpoints/list",
+          {},
+          { authorization: "" }
+        )
+      ).status
+    ).toBe(401);
+    await daemon.stop();
+
+    const restarted = createMediaDaemon(configuration);
+    cleanups.push(() => restarted.stop());
+    await restarted.start({ listen: false });
+    const handshake = await (await call(restarted, "/handshake")).json();
+    expect(handshake.capabilities).toMatchObject({
+      providers: true,
+      agent: false,
+      sessions: false,
+      shell: false,
+    });
+    const response = await call(restarted, "/providers/endpoints/list");
+    const text = await response.text();
+    expect(JSON.parse(text)).toEqual([expect.objectContaining(config)]);
+    expect(text).not.toContain(KEY);
+    expect(
+      await (
+        await call(restarted, "/secrets/has", { provider_id: config.id })
+      ).json()
+    ).toEqual({ has: true });
+    for (const route of [
+      "/agent/run",
+      "/providers/claude/detect",
+      "/auth/chatgpt/status",
+    ]) {
+      expect((await call(restarted, route)).status).toBe(404);
+    }
+    expect(await entries(user_data_path)).not.toContain("sessions.db");
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("uses the shared secret store for real BYOK generation and path-free persistence", async () => {
     const { daemon, request, download, media_root, user_data_path } =
       await start();

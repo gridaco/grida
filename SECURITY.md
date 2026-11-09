@@ -479,7 +479,11 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
 **Endpoint providers (local LLMs, #806).** The agent tenant additionally
 serves `/providers/endpoints/*` — CRUD over user-configured
 OpenAI-compatible endpoints (Ollama preset, self-hosted gateways),
-persisted at `${userData}/endpoints.json`. The split that keeps the secrets
+persisted at `${userData}/endpoints.json`. The
+[media composition](packages/grida-ai-agent/src/media-server.ts) can mount the
+same endpoint routes through an explicit host option. That option uses the
+same transport, store, and credential allowlist without loading chat state
+or granting local CLI discovery. The split that keeps the secrets
 discipline intact: an endpoint **config** (base URL + registered model list) is
 plain readable config the renderer may list back, while an endpoint's
 optional **API key** rides the `/secrets/*` surface under the endpoint's

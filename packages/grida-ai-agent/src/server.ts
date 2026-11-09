@@ -31,6 +31,7 @@ import {
   type ShellExecutor,
 } from "@grida/daemon/server";
 import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
+import { detectClaude } from "./agent-provider/detect";
 import { registerProvidersRoutes } from "./http/routes/providers";
 import { registerAgentRoutes } from "./http/routes/agent";
 import { registerDirectoryScopesRoutes } from "./http/routes/directory-scopes";
@@ -318,6 +319,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           endpoints: endpointsStore,
           secrets: services.secrets,
           provider_http: providerHttp,
+          detect: detectClaude,
           on_provider_ready: signalProviderReady,
         });
       }

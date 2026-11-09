@@ -13,7 +13,9 @@ import {
   type DaemonTenant,
 } from "@grida/daemon/server";
 import type { ProviderHttpTransport } from "@grida/ai";
+import { registerProvidersRoutes } from "./http/routes/providers";
 import { MediaHost } from "./media-host";
+import { EndpointProvidersStore } from "./providers/endpoints";
 export type { ProviderHttpTransport };
 
 export type MediaCapabilities = Pick<
@@ -38,17 +40,29 @@ export type MediaTenantOptions = {
   provider_http?: ProviderHttpTransport;
   /** Enables the existing GG session routes and hosted media; omitted means dormant. */
   gg_base_url?: string;
+  /** Allow an authorized host to manage saved custom provider endpoints. */
+  endpoint_settings?: boolean;
 };
 
-/** Mount only media, BYOK settings and optional GG routes; no SSE token exceptions. */
+/** Mount shared media and optional provider settings without chat state. */
 export function createMediaTenant(opts: MediaTenantOptions = {}): DaemonTenant {
   return {
     register: (app, services) => {
-      const media = new MediaHost(services, opts);
+      const endpoints = opts.endpoint_settings
+        ? new EndpointProvidersStore(services.user_data_path)
+        : undefined;
+      const media = new MediaHost(services, opts, { endpoints });
       media.register(app);
+      if (endpoints) {
+        registerProvidersRoutes(app, {
+          endpoints,
+          secrets: services.secrets,
+          provider_http: media.providerHttp,
+        });
+      }
       media.start();
       return {
-        capabilities: media.capabilities,
+        capabilities: { ...media.capabilities, providers: !!endpoints },
         cleanup: () => media.dispose(),
       };
     },
@@ -66,8 +80,8 @@ export type MediaDaemonOptions = Omit<MediaTenantOptions, "capabilities"> & {
   hostname?: string;
   port?: number;
   /**
-   * Daemon file/workspace groups and media default on. Chat, sessions, endpoint
-   * providers and shell stay off; enabling them requires the full agent entry.
+   * Daemon file/workspace groups and media default on. Chat, sessions and shell
+   * stay off. Endpoint settings require a separate host opt-in.
    */
   capabilities?: Partial<
     MediaCapabilities &
@@ -96,6 +110,7 @@ export function createMediaDaemon(opts: MediaDaemonOptions): DaemonServer {
         capabilities: opts.capabilities,
         provider_http: opts.provider_http,
         gg_base_url: opts.gg_base_url,
+        endpoint_settings: opts.endpoint_settings,
       }),
     ],
   });
