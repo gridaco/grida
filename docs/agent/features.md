@@ -34,6 +34,9 @@ native implementation has no corresponding feature path.
 contract. Every rebuild entry still needs implementation and acceptance evidence.
 Deferred and Open identify an explicit scope limit or an undecided product feature.
 
+Desktop cutover starts a fresh native chat store and archives prior chat data.
+The native history features apply to conversations created by the new runtime.
+
 ## Feature catalog
 
 | Feature                      | Current Grida implementation                                                                                                                                                                                                                                                       | Rebuild contract                                                                                                                                                                                           | Behavior                                                                                                      |
