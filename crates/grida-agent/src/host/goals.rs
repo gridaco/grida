@@ -3,6 +3,7 @@
 use super::*;
 use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
 use agent_kit_core::{GrantId, ToolId};
+use agent_kit_store_sqlite::driver::{DriverControlPlan, DriverControlRequest};
 use grida_agent_master::goals::{
     Allowance, Basis, Goal, Objective, Reservation, Status, Usage, tools,
 };
@@ -15,6 +16,25 @@ pub(super) const INSTRUCTIONS: &str = "This work was explicitly reserved for a p
 pub struct GoalRequest {
     pub objective: Objective,
     pub allowance: Allowance,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum GoalAction {
+    Pause,
+    Resume,
+    Revise { objective: Objective },
+    Clear,
+}
+
+#[derive(Clone)]
+pub struct GoalControl {
+    pub id: ChangeId,
+    pub session: SessionId,
+    pub expected_revision: SessionRevision,
+    pub expected_state: DriverStateRevision,
+    pub basis: Basis,
+    pub action: GoalAction,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -139,6 +159,162 @@ impl Host {
             state_revision: view.driver_state.revision(),
             goal,
         })
+    }
+
+    /// Apply a goal control through the same owned admission/control boundary.
+    pub async fn control_goal(&self, control: GoalControl) -> Result<ControlReceipt> {
+        self.owned_control(move |host| async move { host.control_goal_owned(control).await })
+            .await
+    }
+
+    async fn control_goal_owned(&self, control: GoalControl) -> Result<ControlReceipt> {
+        let session = control.session;
+        let basis = control.basis;
+        let action = control.action;
+        let intent = encode("grida.agent.goal.control", 1, &(&basis, &action))?;
+        let decision = action.clone();
+        let receipt = self
+            .store
+            .control_driver_state(
+                DriverControlRequest {
+                    id: control.id,
+                    session: session.clone(),
+                    expected_revision: control.expected_revision,
+                    expected_state: control.expected_state,
+                    intent,
+                },
+                move |snapshot, current| {
+                    let mut goal = Goal::decode(
+                        snapshot
+                            .value()
+                            .ok_or_else(|| problem(ErrorKind::Unavailable, "goal_missing"))?,
+                    )?;
+                    if let Some(current) = current
+                        && goal
+                            .reservation()
+                            .is_none_or(|work| work.turn != current.binding.turn)
+                    {
+                        return Err(problem(
+                            ErrorKind::Conflict,
+                            "goal_control_requires_owned_turn",
+                        ));
+                    }
+                    let directive = match decision {
+                        GoalAction::Pause => {
+                            goal.set_paused(&basis, true)?;
+                            current.map(|_| ControlDirective::Pause)
+                        }
+                        GoalAction::Resume => {
+                            if let Some(current) = current {
+                                if current.disposition != TurnDisposition::Suspended
+                                    || !current.controls.paused
+                                    || current.controls.cancelled
+                                {
+                                    return Err(problem(
+                                        ErrorKind::Conflict,
+                                        "goal_turn_not_suspended",
+                                    ));
+                                }
+                                goal.resume_reserved(&basis, &current.binding.turn)?;
+                                Some(ControlDirective::Resume)
+                            } else {
+                                goal.resume_idle(&basis)?;
+                                None
+                            }
+                        }
+                        GoalAction::Revise { objective } => {
+                            goal.revise(&basis, objective)?;
+                            if current.is_some() && goal.basis() == &basis {
+                                return Err(problem(
+                                    ErrorKind::InvalidInput,
+                                    "goal_objective_unchanged",
+                                ));
+                            }
+                            current.map(|_| ControlDirective::Cancel)
+                        }
+                        GoalAction::Clear => {
+                            goal.clear(&basis)?;
+                            current.map(|_| ControlDirective::Cancel)
+                        }
+                    };
+                    Ok(DriverControlPlan {
+                        value: Some(goal.encode()?),
+                        directive,
+                    })
+                },
+            )
+            .await?;
+        match action {
+            GoalAction::Clear | GoalAction::Revise { .. } => {
+                if let Some(turn) = &receipt.turn {
+                    self.kick_stopped(session, turn.record().binding.turn.clone())
+                        .await;
+                }
+            }
+            GoalAction::Resume => self.kick_queue(session).await,
+            GoalAction::Pause => {}
+        }
+        Ok(receipt)
+    }
+
+    pub(super) async fn kick_resumed_goal(&self, view: &SessionView) {
+        if view.admission_paused {
+            return;
+        }
+        let Some(current) = view.current.as_ref().filter(|current| {
+            current.disposition == TurnDisposition::Suspended && current.controls.admits_work()
+        }) else {
+            return;
+        };
+        let Some(goal) = view
+            .driver_state
+            .value()
+            .and_then(|value| Goal::decode(value).ok())
+        else {
+            return;
+        };
+        if goal.paused()
+            || goal.status() != Status::Active
+            || goal
+                .reservation()
+                .is_none_or(|work| work.turn != current.binding.turn || &work.basis != goal.basis())
+        {
+            return;
+        }
+        let session = view.session.clone();
+        let turn = current.binding.turn.clone();
+        if !self
+            .store
+            .inspect_turn_with(session.clone(), turn.clone(), |state| {
+                Ok(state.waits().values().all(|wait| !wait.is_pending()))
+            })
+            .await
+            .unwrap_or(false)
+        {
+            return;
+        }
+        let Ok(id) = change_id() else {
+            return;
+        };
+        let claim = ClaimRequest {
+            id,
+            session: session.clone(),
+            expected_revision: view.revision,
+            selection: TurnSelection::Resume {
+                turn: turn.clone(),
+                epoch: current.binding.epoch,
+                position: current.position,
+            },
+        };
+        let mut work = self.work.lock().await;
+        if work.closed {
+            return;
+        }
+        if work.active.contains_key(&session) || work.active.len() >= MAX_ACTIVE_RUNS {
+            work.defer(ReadyWork::Queue(session));
+            return;
+        }
+        let _ = self.register(&mut work, session, turn, Launch::Resume(claim));
     }
 }
 

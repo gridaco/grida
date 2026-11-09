@@ -4,8 +4,8 @@ pub(crate) mod settlement;
 pub mod tools;
 
 use agent_kit_core::{
-    ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, Result, SchemaId, ToolCallId,
-    TurnId,
+    ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, Result, SchemaId, SessionId,
+    ToolCallId, TurnId,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -24,6 +24,21 @@ const MAX_STATE_BYTES: usize = 64 * 1024;
 pub struct Basis {
     pub goal: ChangeId,
     pub revision: u64,
+}
+
+/// A candidate continuation derived from one accounted predecessor.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Continuation {
+    pub basis: Basis,
+    pub after: TurnId,
+}
+
+impl Continuation {
+    pub fn input_id(&self, session: &SessionId) -> Result<ChangeId> {
+        let fingerprint = Fingerprint::of(&("goal-continuation-v1", session, self))?;
+        ChangeId::new(crate::hex(fingerprint))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -157,6 +172,8 @@ struct State {
     paused: bool,
     status: Status,
     progress: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_work: Option<TurnId>,
 }
 
 impl Goal {
@@ -174,6 +191,7 @@ impl Goal {
                 paused: false,
                 status: Status::Active,
                 progress: None,
+                last_work: None,
             },
         })
     }
@@ -232,6 +250,18 @@ impl Goal {
     }
     pub fn progress(&self) -> Option<&str> {
         self.state.progress.as_deref()
+    }
+
+    /// Observation supplies a candidate only. A host must still conditionally
+    /// accept and claim it under the captured session and goal revisions.
+    pub fn continuation(&self) -> Option<Continuation> {
+        if self.paused() || self.status() != Status::Active || self.reservation().is_some() {
+            return None;
+        }
+        Some(Continuation {
+            basis: self.basis().clone(),
+            after: self.state.last_work.clone()?,
+        })
     }
 
     /// Work already reserved remains unavailable until the owning turn is reconciled.
@@ -406,6 +436,7 @@ impl Goal {
             }
             WorkOutcome::NotDispatched => {
                 self.state.reservation = None;
+                self.state.last_work = Some(turn.clone());
                 if current {
                     self.state.status = Status::Blocked(Blocker::NoProgress);
                 }
@@ -417,6 +448,7 @@ impl Goal {
                 ..
             } => {
                 self.state.reservation = None;
+                self.state.last_work = Some(turn.clone());
                 self.state.spent.work_turns += 1;
                 self.state.spent.inference_steps += steps;
                 if current {

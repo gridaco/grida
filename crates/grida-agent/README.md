@@ -304,4 +304,6 @@ The embedded host can accept an explicit goal with `Host::start_goal` and read
 its state with `Host::inspect_goal`. The initial work uses the ordinary owned
 queue. Its claim and resource reservation commit together. Only the reserved
 turn sees the goal inspection and report tools. Native process clients do not
-yet have goal controls or automatic continuation.
+yet have goal controls or automatic continuation. The embedded owner can
+pause, resume, revise, or clear the exact goal. Resume reuses the suspended
+turn's allowance, and control retries preserve their original receipts.

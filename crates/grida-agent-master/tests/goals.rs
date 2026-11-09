@@ -544,3 +544,51 @@ fn explicitly_resuming_the_same_objective_keeps_the_existing_allocation() {
     assert!(goal.paused());
     assert_eq!(goal.remaining(), before);
 }
+
+#[test]
+fn continuation_identity_is_stable_across_reload_and_stale_after_goal_controls() {
+    let mut goal = goal(4, 9);
+    let first = turn("first");
+    let basis = goal.basis().clone();
+    assert!(goal.continuation().is_none());
+    goal.reserve(&basis, first.clone(), limit(3)).unwrap();
+    assert!(goal.continuation().is_none());
+    goal.account(
+        &first,
+        WorkOutcome::Settled {
+            inference_steps: 2,
+            report: Some(Report::Progress {
+                summary: "Prepared the first export".into(),
+            }),
+            verified_evidence: &BTreeSet::new(),
+        },
+    )
+    .unwrap();
+    let ticket = goal.continuation().unwrap();
+    let session = agent_kit_core::SessionId::new("conversation").unwrap();
+    let input = ticket.input_id(&session).unwrap();
+    assert_eq!(ticket.after, first);
+    assert_eq!(
+        Goal::decode(&goal.encode().unwrap())
+            .unwrap()
+            .continuation()
+            .unwrap()
+            .input_id(&session)
+            .unwrap(),
+        input
+    );
+    goal.set_paused(&basis, true).unwrap();
+    assert!(goal.continuation().is_none());
+    goal.resume_idle(&goal.basis().clone()).unwrap();
+    assert_ne!(
+        goal.continuation().unwrap().input_id(&session).unwrap(),
+        input
+    );
+    assert_eq!(
+        goal.spent(),
+        Usage {
+            work_turns: 1,
+            inference_steps: 2
+        }
+    );
+}

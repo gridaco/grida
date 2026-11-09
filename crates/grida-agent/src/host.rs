@@ -9,7 +9,7 @@ mod permissions;
 mod questions;
 mod skills;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
-pub use goals::{GoalInspection, GoalRequest, GoalView};
+pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub use images::ImageUpload;
 pub(crate) use images::is_retained_image;
@@ -1162,7 +1162,14 @@ impl Host {
         let Ok(view) = self.store.inspect(session.clone()).await else {
             return;
         };
-        if view.current.is_some() || view.admission_paused || view.queued.is_empty() {
+        if view.admission_paused {
+            return;
+        }
+        if view.current.is_some() {
+            self.kick_resumed_goal(&view).await;
+            return;
+        }
+        if view.queued.is_empty() {
             return;
         }
         let Ok(turn) = TurnId::new(uuid()) else {

@@ -246,3 +246,121 @@ async fn paused_goal_work_keeps_its_reservation_and_stop_preserves_uncertainty()
     host.shutdown().await.unwrap();
     endpoint.done().await;
 }
+
+#[tokio::test]
+async fn explicit_goal_resume_keeps_the_same_turn_and_replays_controls() {
+    use grida_agent::host::{GoalAction, GoalControl, GoalInspection};
+
+    fn action(view: &GoalInspection, id: &str, action: GoalAction) -> GoalControl {
+        GoalControl {
+            id: ChangeId::new(id).unwrap(),
+            session: view.session.clone(),
+            expected_revision: view.revision,
+            expected_state: view.state_revision,
+            basis: view.goal.as_ref().unwrap().basis.clone(),
+            action,
+        }
+    }
+    let (release, blocked) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start_with_credential(
+        vec![
+            Reply::Hold("Partial work"),
+            Reply::Release("Reopened the export", blocked),
+        ],
+        None,
+    )
+    .await;
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let host = Host::open(
+        &temporary.path().join("agent-state"),
+        Some(options(&endpoint)),
+    )
+    .unwrap();
+    let session = host.new_session(workspace.path().into()).await.unwrap();
+    host.start_goal(
+        request(&session, "resume-goal", "Prepare the export"),
+        goal(),
+    )
+    .await
+    .unwrap();
+    endpoint.request().await;
+    let before = host.inspect_goal(session.clone()).await.unwrap();
+    let original = before
+        .goal
+        .as_ref()
+        .unwrap()
+        .reservation
+        .as_ref()
+        .unwrap()
+        .clone();
+    let pause = action(&before, "pause-goal", GoalAction::Pause);
+    let paused = host.control_goal(pause.clone()).await.unwrap();
+    let suspended = timeout(WAIT, async {
+        loop {
+            let view = host.inspect(session.clone()).await.unwrap();
+            if let Some(current) = view.current
+                && current.disposition == TurnDisposition::Suspended
+            {
+                break current;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(suspended.controls.paused);
+    let paused_view = host.inspect_goal(session.clone()).await.unwrap();
+    assert!(paused_view.goal.as_ref().unwrap().paused);
+    let resume = action(&paused_view, "resume-goal-control", GoalAction::Resume);
+    let resumed = host.control_goal(resume.clone()).await.unwrap();
+    endpoint.request().await;
+    let active = host
+        .inspect(session.clone())
+        .await
+        .unwrap()
+        .current
+        .unwrap();
+    assert_eq!(active.binding.turn, original.turn);
+    assert!(active.binding.epoch > suspended.binding.epoch);
+    let resumed_goal = host
+        .inspect_goal(session.clone())
+        .await
+        .unwrap()
+        .goal
+        .unwrap();
+    let held = resumed_goal.reservation.unwrap();
+    assert_eq!(held.inference_steps, original.inference_steps);
+    assert_ne!(held.basis, original.basis);
+    assert_eq!(host.control_goal(resume.clone()).await.unwrap(), resumed);
+    let mut changed = resume;
+    changed.action = GoalAction::Clear;
+    assert_eq!(
+        host.control_goal(changed).await.unwrap_err().code,
+        "request_identity_reused"
+    );
+    release.send(()).unwrap();
+    timeout(WAIT, async {
+        while host
+            .inspect(session.clone())
+            .await
+            .unwrap()
+            .current
+            .is_some()
+        {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let finished = host.inspect_goal(session.clone()).await.unwrap();
+    let clear = action(&finished, "clear-goal", GoalAction::Clear);
+    host.control_goal(clear).await.unwrap();
+    assert_eq!(host.control_goal(pause).await.unwrap(), paused);
+    let cleared = host.inspect_goal(session).await.unwrap().goal.unwrap();
+    assert_eq!(cleared.status, Status::Cleared);
+    assert!(!cleared.paused);
+    assert_eq!(cleared.reservation.unwrap().uncertain_steps, Some(2));
+    host.shutdown().await.unwrap();
+    endpoint.done().await;
+}
