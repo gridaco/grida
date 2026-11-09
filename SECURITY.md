@@ -984,6 +984,7 @@ Today:
 - `desktop/src/main/agent-command-host.ts` and `main/sandbox/manager.ts` — main-owned finite-command execution: canonical exact-root validation, shared-scratch/secret/media-root denies, own-scratch/workspace/private-temp grants, a fixed no-network policy, fresh per-command SRT wrapping, raw spawn only after the wrapper succeeds, and terminal cleanup before abort acknowledgement. The long-lived sidecar may persist generated media; an individual model-authored command cannot read or mutate that library.
 - The native command adapter retains the authorized scope, owns cleanup across runtime cancellation, and reconciles the original attempt. [Adapter](crates/grida-agent/src/command.rs) and [tests](crates/grida-agent/tests/commands.rs).
 - The native [workspace bindings](crates/grida-agent/src/workspace.rs) and [retained input store](crates/grida-agent/src/scratch.rs) separate captured locations from current grants and enforce supplied protected roots. Working-copy receipts retain their source identity. [Workspace tests](crates/grida-agent/tests/workspace.rs) and [scratch tests](crates/grida-agent/tests/scratch.rs) exercise replacement, traversal, private publication and restart.
+- The native [read-only file adapters](crates/grida-agent/src/file_tools.rs) revalidate the turn's selected directory against current grants and protected roots. [Native path opening](crates/grida-agent/src/file_tools/native.rs) uses pinned directory handles and refuses link traversal. [File tool tests](crates/grida-agent/tests/file_tools.rs) cover grant revocation and protected files.
 - `desktop/src/main/agent-sandbox-policy.ts` — binds Desktop's strict sandbox posture: empty direct external egress, host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.
 - `desktop/src/main/agent-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; initializes the OS sandbox wrapper when supported; owns both private channels, forwards the one main-owned media-root fact, and removes direct provider hosts from the sidecar policy (Desktop deliberately withholds srt's alpha Windows backend pending a supported lifecycle).
 - `desktop/src/main/desktop-entry-window.ts` — owns the exact bridge-attached entry window and admits auxiliary native windows only while the authenticated main role is active; the Grida-account transition is additionally bound by GRIDA-SEC-005.
@@ -2866,7 +2867,9 @@ durable or discard unrelated OAuth records.
    so earlier registration cannot retain newly forbidden authority. Agent structured
    filesystem and directory-reference admission use the same topology rule before
    granting reads. Desktop's finite-command policy denies this exact directory
-   while its long-lived credential host retains custody access. No renderer can
+   while its long-lived credential host retains custody access. Native read-only
+   adapters require a current directory grant and recheck supplied protected
+   roots before opening a target and delivering results. No renderer can
    configure or remove these protections.
 
 8. **Credential continuity stays in private custody.** The native agent can
@@ -2927,6 +2930,9 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [native provider HTTP dispatch](crates/grida-agent/src/http.rs),
   [native agent custody tests](crates/grida-agent/tests/custody.rs),
   [native workspace protection](crates/grida-agent/src/workspace.rs),
+  [native file adapters](crates/grida-agent/src/file_tools.rs),
+  [native file opens](crates/grida-agent/src/file_tools/native.rs),
+  [file adapter tests](crates/grida-agent/tests/file_tools.rs),
   [private retained inputs](crates/grida-agent/src/scratch.rs),
   [workspace tests](crates/grida-agent/tests/workspace.rs),
   [retained input tests](crates/grida-agent/tests/scratch.rs),

@@ -368,6 +368,23 @@ impl FileTarget {
         self.access
     }
 
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub(crate) fn read_root<'a>(
+        &self,
+        current: &'a WorkspaceSnapshot,
+        grants: &[DirectoryGrant],
+        protected: &ProtectedRoots,
+    ) -> Result<&'a fs::File> {
+        if self.access != FileAccess::Read || !self.relative.as_os_str().is_empty() {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "workspace_read_root_required",
+            ));
+        }
+        self.revalidate(current, grants, protected)?;
+        Ok(&current.directory(&self.directory)?._pin)
+    }
+
     pub fn revalidate(
         &self,
         current: &WorkspaceSnapshot,

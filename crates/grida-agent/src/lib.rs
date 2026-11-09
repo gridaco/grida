@@ -4,6 +4,7 @@ pub mod acp;
 pub mod command;
 pub mod configuration;
 mod custody;
+pub mod file_tools;
 pub mod gg;
 pub mod host;
 mod http;

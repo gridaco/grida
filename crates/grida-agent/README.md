@@ -196,3 +196,15 @@ A recorded copy that disappears remains unavailable. Managed copy limits apply
 at admission. Executors own quotas for their separate working areas and outputs.
 These private-storage helpers currently support macOS and Linux. The native
 host's tool composition supplies their grants and lifecycle.
+
+The native library also provides the read-only `read_file`, `list_files`, and
+`search_text` adapters for macOS and Linux. They use the turn's selected
+directory and recheck current grants and protected roots before opening a
+target and before returning results. Reads accept bounded UTF-8 text files.
+Listings cover direct children, and search matches a case-sensitive literal
+within a selected subtree. A truncated result covers only part of the request.
+The adapters refuse symlinks, multiply linked files, special files, and
+cross-device paths. Linux requires kernel support for `openat2` and also
+refuses nested mounts. Cancellation and deadlines stop new filesystem work and
+result delivery. An in-flight native read may finish before its worker can exit.
+Host permission and tool offering are separate from library availability.
