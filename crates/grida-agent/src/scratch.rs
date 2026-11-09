@@ -142,6 +142,17 @@ impl ScratchScope {
             Err(unsupported())
         }
     }
+
+    /// Read and verify the retained original without creating a working copy.
+    pub fn read_retained(&self, asset: &AssetRef, maximum: usize) -> Result<Vec<u8>> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return self.inner.read_retained(asset, maximum);
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (asset, maximum);
+            Err(unsupported())
+        }
+    }
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -296,24 +307,40 @@ mod native {
             Ok(asset)
         }
 
-        pub(super) fn materialize(&mut self, asset: &AssetRef) -> Result<WorkingCopy> {
+        pub(super) fn read_retained(&self, asset: &AssetRef, maximum: usize) -> Result<Vec<u8>> {
+            let size = usize::try_from(asset.size).map_err(|_| limit())?;
+            if size > maximum || asset.size > self.limits.max_asset_bytes {
+                return Err(limit());
+            }
+            let (_, mut source) = self.open_asset(asset)?;
+            let mut bytes = Vec::with_capacity(size);
+            verify(&mut source, asset, &mut bytes)?;
+            self.validate()?;
+            Ok(bytes)
+        }
+
+        fn open_asset(&self, asset: &AssetRef) -> Result<(String, File)> {
             validate_asset(asset.version, &asset.name)?;
             if asset.owner != self.owner {
                 return Err(source_unavailable());
             }
             self.validate()?;
-            let (_, work) = self.occupancy()?;
             let key = self.asset_key(&asset.id, asset.version)?;
-            let source_name = format!("{key}.asset");
-            let work_name = working_name(&key, &asset.name);
-            let marker_name = format!("{key}.working");
             let mut source = self
                 .sources
-                .read(&source_name)?
+                .read(&format!("{key}.asset"))?
                 .ok_or_else(source_unavailable)?;
             if self.read_asset(&mut source, &key)? != *asset {
                 return Err(conflict());
             }
+            Ok((key, source))
+        }
+
+        pub(super) fn materialize(&mut self, asset: &AssetRef) -> Result<WorkingCopy> {
+            let (key, mut source) = self.open_asset(asset)?;
+            let (_, work) = self.occupancy()?;
+            let work_name = working_name(&key, &asset.name);
+            let marker_name = format!("{key}.working");
             let marker = self.sources.read(&marker_name)?;
             let existing = self.work.read(&work_name)?;
             match (marker, existing) {

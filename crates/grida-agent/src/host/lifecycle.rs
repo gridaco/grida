@@ -127,7 +127,7 @@ impl Host {
     }
 
     async fn enqueue_owned(&self, request: PromptRequest) -> Result<DurableSubmission> {
-        prompt_input(&request.id, &request.parts)?;
+        validate_prompt_parts(&request.parts)?;
         let admission = self.configuration_admission.lock().await;
         if let Some(accepted) = self.existing_submission(&request).await? {
             return Ok(accepted);
@@ -250,7 +250,7 @@ impl Host {
                 questions,
                 configuration_permission,
             } => {
-                prompt_input(&replacement, &parts)?;
+                validate_prompt_parts(&parts)?;
                 let replacement = if let Some(previous) = self
                     .store
                     .input(session.clone(), replacement.clone())
@@ -410,6 +410,7 @@ impl Host {
         expected_history: HistoryPosition,
         parts: Vec<PromptPart>,
     ) -> Result<ControlReceipt> {
+        validate_prompt_parts(&parts)?;
         if parts
             .iter()
             .any(|part| matches!(part, PromptPart::Skill { .. }))
@@ -458,13 +459,19 @@ pub(super) fn check_input(input: &Submission, parts: &[PromptPart]) -> Result<()
     }
     let same = match input.payload.version() {
         1 => {
+            if parts
+                .iter()
+                .any(|part| matches!(part, PromptPart::Image { .. }))
+            {
+                return Err(problem(ErrorKind::Conflict, "submission_input_changed"));
+            }
             let previous: Vec<Message> = decode_input(input)?;
             let current = prompt_input(&input.id, parts)?;
             previous.len() == 1 && previous[0].content == current[0].content
         }
         2 => {
             let previous: StoredPrompt = decode_input(input)?;
-            previous.goal.is_none() && previous.parts == parts
+            previous.goal.is_none() && images::same_prompt(&previous.parts, parts)
         }
         _ => {
             return Err(problem(

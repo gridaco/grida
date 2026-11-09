@@ -14,7 +14,9 @@ use futures_core::stream::BoxStream;
 pub use anthropic::Anthropic;
 pub use gemini::{Gemini, GeminiProfile};
 pub use openai::{ModelProfile, OpenAiCompatible, OutputLimitField};
-pub use responses::{ReasoningEffort, Responses, ResponsesEndpoint, ResponsesProfile};
+pub use responses::{
+    InputImageResolver, ReasoningEffort, Responses, ResponsesEndpoint, ResponsesProfile,
+};
 
 /// The bound host selects the destination and injects credentials. The body
 /// contains conversation data and deliberately has no Debug implementation.

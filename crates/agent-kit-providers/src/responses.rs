@@ -6,16 +6,17 @@ use crate::{
 };
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceRequest, InferenceRun, InputFormat,
-    InputMeasurement, MeasurementKind, ModelCapabilities, PreparedRequest, Provider,
+    InputMeasurement, MeasurementKind, Modality, ModelCapabilities, PreparedRequest, Provider,
     ProviderBinding, RequestControl,
 };
 use agent_kit_core::messages::{
-    Content, Message, MessagePhase, ProvenanceKind, ProviderState, Role,
+    Content, MediaRef, Message, MessagePhase, ProvenanceKind, ProviderState, Role,
 };
 use agent_kit_core::{
     BindingId, BoxFuture, Envelope, Error, ErrorKind, Fingerprint, ModelId, ProviderId, Result,
     SchemaId, ToolCallId, ToolId,
 };
+use base64::{Engine, engine::general_purpose::STANDARD};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -52,7 +53,11 @@ pub struct ResponsesProfile {
     pub reasoning_effort: Option<ReasoningEffort>,
 }
 
-/// Stateless Responses SSE with text and client-executed JSON functions.
+/// Resolve a host-authorized, immutable image reference to its exact bytes.
+/// This bounded local read runs only when counting or starting a request.
+pub type InputImageResolver = dyn Fn(&MediaRef, usize) -> Result<Vec<u8>> + Send + Sync;
+
+/// Stateless Responses SSE with text, optional images, and client-executed JSON functions.
 pub struct Responses {
     binding: ProviderBinding,
     replay_binding: BindingId,
@@ -60,6 +65,7 @@ pub struct Responses {
     models: BTreeMap<ModelId, ResponsesProfile>,
     transport: Arc<dyn StreamingTransport>,
     limits: StreamLimits,
+    images: Option<Arc<InputImageResolver>>,
 }
 
 impl Responses {
@@ -69,15 +75,41 @@ impl Responses {
         binding: ProviderBinding,
         replay_binding: BindingId,
         endpoint: ResponsesEndpoint,
-        mut models: BTreeMap<ModelId, ResponsesProfile>,
+        models: BTreeMap<ModelId, ResponsesProfile>,
         transport: Arc<dyn StreamingTransport>,
         limits: StreamLimits,
     ) -> Result<Self> {
+        Self::with_image_resolver(
+            binding,
+            replay_binding,
+            endpoint,
+            models,
+            transport,
+            limits,
+            None,
+        )
+    }
+
+    pub fn with_image_resolver(
+        binding: ProviderBinding,
+        replay_binding: BindingId,
+        endpoint: ResponsesEndpoint,
+        mut models: BTreeMap<ModelId, ResponsesProfile>,
+        transport: Arc<dyn StreamingTransport>,
+        limits: StreamLimits,
+        images: Option<Arc<InputImageResolver>>,
+    ) -> Result<Self> {
         limits.validate()?;
         if models.is_empty()
-            || models
-                .values()
-                .any(|profile| !text_profile(&profile.capabilities))
+            || models.values().any(|profile| {
+                let capabilities = &profile.capabilities;
+                !(text_profile(capabilities)
+                    || (images.is_some()
+                        && endpoint == ResponsesEndpoint::Api
+                        && !capabilities.text_tools
+                        && capabilities.input_modalities
+                            == [Modality::Text, Modality::Image].into_iter().collect()))
+            })
         {
             return Err(Error::new(
                 ErrorKind::Unsupported,
@@ -102,6 +134,7 @@ impl Responses {
             models,
             transport,
             limits,
+            images,
         })
     }
 
@@ -127,6 +160,7 @@ impl Responses {
         request: &InferenceRequest,
         profile: &ResponsesProfile,
         scope: &ReplayScope,
+        resolve_images: bool,
     ) -> Result<(Value, BTreeMap<String, ToolId>)> {
         if request.extension.is_some() {
             return Err(Error::new(
@@ -143,6 +177,7 @@ impl Responses {
         let mut instructions = Vec::new();
         let mut input = Vec::new();
         let mut calls = BTreeMap::new();
+        let mut image_bytes = self.limits.max_request_bytes / 4 * 3;
         for message in &request.messages {
             match message.role {
                 Role::System => {
@@ -172,7 +207,9 @@ impl Responses {
                         push_message(&mut input, message, "assistant")?;
                     }
                 }
-                Role::User => push_message(&mut input, message, "user")?,
+                Role::User => {
+                    self.push_user(&mut input, message, resolve_images, &mut image_bytes)?
+                }
                 Role::Tool => {
                     for part in &message.content {
                         let Content::ToolResult(result) = part else {
@@ -232,8 +269,9 @@ impl Responses {
         request: &InferenceRequest,
         profile: &ResponsesProfile,
         scope: &ReplayScope,
+        resolve_images: bool,
     ) -> Result<EncodedRequest> {
-        let (mut body, names) = self.encode_input(request, profile, scope)?;
+        let (mut body, names) = self.encode_input(request, profile, scope, resolve_images)?;
         body["stream"] = true.into();
         body["store"] = false.into();
         body["include"] = json!(["reasoning.encrypted_content"]);
@@ -252,6 +290,54 @@ impl Responses {
             return Err(Error::new(ErrorKind::LimitExceeded, "request_byte_limit"));
         }
         Ok(bytes)
+    }
+
+    fn push_user(
+        &self,
+        input: &mut Vec<Value>,
+        message: &Message,
+        resolve_images: bool,
+        remaining: &mut usize,
+    ) -> Result<()> {
+        if !message
+            .content
+            .iter()
+            .any(|part| matches!(part, Content::Media(_)))
+        {
+            return push_message(input, message, "user");
+        }
+        let resolver = self.images.as_ref().ok_or_else(unsupported_image)?;
+        let content = message
+            .content
+            .iter()
+            .map(|part| match part {
+                Content::Text(text) => Ok(json!({"type": "input_text", "text": text})),
+                Content::Media(media) => {
+                    if !matches!(
+                        media.media_type.as_str(),
+                        "image/png" | "image/jpeg" | "image/webp" | "image/gif"
+                    ) {
+                        return Err(unsupported_image());
+                    }
+                    let mut url = format!("data:{};base64,", media.media_type);
+                    if resolve_images {
+                        let bytes = resolver(media, *remaining)?;
+                        if bytes.is_empty() || bytes.len() > *remaining {
+                            return Err(Error::new(ErrorKind::LimitExceeded, "request_byte_limit"));
+                        }
+                        *remaining -= bytes.len();
+                        STANDARD.encode_string(&bytes, &mut url);
+                    }
+                    Ok(json!({"type": "input_image", "image_url": url, "detail": "auto"}))
+                }
+                _ => Err(Error::new(
+                    ErrorKind::Unsupported,
+                    "unsupported_conversation_content",
+                )),
+            })
+            .collect::<Result<Vec<_>>>()?;
+        input.push(json!({"type": "message", "role": "user", "content": content}));
+        Ok(())
     }
 
     fn prepared_model(&self, request: &PreparedRequest) -> Result<&ResponsesProfile> {
@@ -276,13 +362,6 @@ impl Responses {
                 FailureKind::Configuration,
             ));
         }
-        let body = (|| {
-            let profile = self.prepared_model(request)?;
-            let scope = self.scope(&request.request().model, profile);
-            let (body, _) = self.encode_input(request.request(), profile, &scope)?;
-            self.encode_body(&body)
-        })()
-        .map_err(|error| count_failure(&error.code, FailureKind::Configuration))?;
         if control.cancellation.is_cancelled() {
             return Err(count_failure("cancelled", FailureKind::Cancelled));
         }
@@ -292,6 +371,13 @@ impl Responses {
         {
             return Err(count_failure("deadline", FailureKind::Cancelled));
         }
+        let body = (|| {
+            let profile = self.prepared_model(request)?;
+            let scope = self.scope(&request.request().model, profile);
+            let (body, _) = self.encode_input(request.request(), profile, &scope, true)?;
+            self.encode_body(&body)
+        })()
+        .map_err(|error| count_failure(&error.code, FailureKind::Configuration))?;
         let maximum = self.limits.max_response_bytes.min(COUNT_RESPONSE_BYTES);
         let mut response = self
             .transport
@@ -345,7 +431,12 @@ impl Provider for Responses {
     fn prepare(&self, request: InferenceRequest) -> Result<PreparedRequest> {
         let profile = self.model(&request.model)?;
         request.validate(&profile.capabilities)?;
-        self.encode(&request, profile, &self.scope(&request.model, profile))?;
+        self.encode(
+            &request,
+            profile,
+            &self.scope(&request.model, profile),
+            false,
+        )?;
         PreparedRequest::from_validated(request, self.binding.clone(), profile.capabilities.clone())
     }
 
@@ -360,7 +451,7 @@ impl Provider for Responses {
     fn start(&self, request: PreparedRequest, control: InferenceControl) -> Result<InferenceRun> {
         let profile = self.prepared_model(&request)?;
         let scope = self.scope(&request.request().model, profile);
-        let encoded = self.encode(request.request(), profile, &scope)?;
+        let encoded = self.encode(request.request(), profile, &scope, true)?;
         let transport = Arc::clone(&self.transport);
         let limits = self.limits;
         let request = TransportRequest {
@@ -578,4 +669,8 @@ fn push_message(input: &mut Vec<Value>, message: &Message, role: &str) -> Result
 
 fn encoding_error() -> Error {
     Error::new(ErrorKind::InvalidInput, "request_encoding_failed")
+}
+
+fn unsupported_image() -> Error {
+    Error::new(ErrorKind::Unsupported, "unsupported_responses_input_image")
 }

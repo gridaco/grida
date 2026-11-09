@@ -1,4 +1,4 @@
-//! A connection-local presentation of the host's authorized text transcript.
+//! A connection-local presentation of the host's authorized transcript.
 
 use super::transport::Delivery;
 use super::unavailable;
@@ -88,6 +88,9 @@ impl Projection {
             .into_iter()
             .filter_map(|content| match content {
                 Content::Text(text) => Some(text),
+                Content::Media(media) if crate::host::is_retained_image(&media) => {
+                    Some(crate::host::RETAINED_IMAGE_LABEL.to_owned())
+                }
                 _ => None,
             })
             .collect();

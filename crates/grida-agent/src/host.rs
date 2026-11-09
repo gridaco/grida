@@ -3,6 +3,7 @@
 mod compaction;
 mod goals;
 mod history;
+mod images;
 mod lifecycle;
 mod permissions;
 mod questions;
@@ -10,6 +11,8 @@ mod skills;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use goals::{GoalInspection, GoalRequest, GoalView};
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
+pub use images::ImageUpload;
+pub(crate) use images::is_retained_image;
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use permissions::{Approvals, PendingApproval};
 pub use questions::{PendingQuestion, Questions};
@@ -62,7 +65,8 @@ use tokio::task::AbortHandle;
 const SESSION_SCHEMA: &str = "grida.agent.native.session";
 const INPUT_SCHEMA: &str = "grida.agent.native.input";
 const MAX_PROMPT_BYTES: usize = 512 * 1024;
-const MAX_PROMPT_PARTS: usize = 64;
+pub(crate) const MAX_PROMPT_PARTS: usize = 64;
+pub(crate) const RETAINED_IMAGE_LABEL: &str = "\n[Retained PNG image]\n";
 const MAX_ACTIVE_RUNS: usize = 8;
 const MAX_OWNED_CONTROLS: usize = 32;
 const MAX_READY_SESSIONS: usize = 128;
@@ -103,6 +107,7 @@ struct Execution {
     authorization: Arc<ExecutionAuthority>,
     questions: Arc<questions::QuestionAccess>,
     configuration_tools: Arc<ConfigurationAccess>,
+    images: Option<Arc<images::Images>>,
 }
 
 #[derive(Default)]
@@ -169,6 +174,13 @@ pub enum PromptPart {
     },
     Skill {
         reference: crate::skills::SkillReference,
+    },
+    #[serde(skip)]
+    Image {
+        image: ImageUpload,
+    },
+    RetainedImage {
+        asset: crate::scratch::AssetRef,
     },
 }
 
@@ -452,7 +464,7 @@ impl Host {
             questions,
             configuration_permission,
         } = request;
-        prompt_input(&id, &parts)?;
+        validate_prompt_parts(&parts)?;
         let turn = TurnId::new(uuid())?;
         let ticket = {
             let mut work = self.work.lock().await;
@@ -978,10 +990,38 @@ impl Host {
         questions: bool,
         configuration_permission: crate::ConfigurationPermission,
     ) -> Result<Submission> {
+        validate_prompt_parts(&parts)?;
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
         let permission_capture = self.capture_permissions(session, &id)?;
         let guidance = skills::capture_guidance(self.guidance_scope(session)?, &parts).await?;
+        let parts = if parts
+            .iter()
+            .any(|part| matches!(part, PromptPart::Image { .. }))
+        {
+            let images = execution
+                .images
+                .clone()
+                .ok_or_else(|| problem(ErrorKind::Unsupported, "image_input_unavailable"))?;
+            let cwd = session_configuration(session)?.cwd;
+            let session = session.session.clone();
+            let input = id.clone();
+            tokio::task::spawn_blocking(move || {
+                parts
+                    .into_iter()
+                    .map(|part| match part {
+                        PromptPart::Image { image } => Ok(PromptPart::RetainedImage {
+                            asset: images.retain(&session, &cwd, &input, image)?,
+                        }),
+                        other => Ok(other),
+                    })
+                    .collect::<Result<Vec<_>>>()
+            })
+            .await
+            .map_err(|_| problem(ErrorKind::Unavailable, "attachment_storage_unavailable"))??
+        } else {
+            parts
+        };
         Ok(Submission {
             id,
             payload: encode(
@@ -1203,7 +1243,7 @@ impl Host {
     }
 
     pub async fn submit_prompt(&self, request: PromptRequest) -> Result<DurableSubmission> {
-        prompt_input(&request.id, &request.parts)?;
+        validate_prompt_parts(&request.parts)?;
         if let Some(accepted) = self.existing_submission(&request).await? {
             return Ok(accepted);
         }
@@ -1422,6 +1462,12 @@ impl Host {
             .as_deref()
             .ok_or_else(|| problem(ErrorKind::Unavailable, "provider_configuration_required"))
     }
+
+    pub(crate) fn accepts_images(&self) -> bool {
+        self.execution
+            .as_ref()
+            .is_some_and(|execution| execution.images.is_some())
+    }
 }
 
 impl Execution {
@@ -1434,7 +1480,17 @@ impl Execution {
         let transport = Arc::new(HttpTransport::new(state_dir, &options, supervised)?);
         let configuration = transport.selection();
         let binding = transport.binding().clone();
-        let capabilities = text_capabilities(options.protocol.as_str())?;
+        let mut capabilities = text_capabilities(options.protocol.as_str())?;
+        let images = if cfg!(any(target_os = "macos", target_os = "linux"))
+            && options.protocol == ProviderProtocol::Responses
+            && options.model.as_str() == "gpt-5.4"
+        {
+            capabilities.revision = BindingId::new("responses-image-tools-v1")?;
+            capabilities.input_modalities.insert(Modality::Image);
+            Some(Arc::new(images::Images::open(state_dir)?))
+        } else {
+            None
+        };
         let provider: Arc<dyn Provider> = match options.protocol {
             ProviderProtocol::OpenAiCompatible => Arc::new(OpenAiCompatible::new(
                 binding.clone(),
@@ -1460,7 +1516,7 @@ impl Execution {
                 transport.clone(),
                 PROVIDER_LIMITS,
             )?),
-            ProviderProtocol::Responses => Arc::new(Responses::new(
+            ProviderProtocol::Responses => Arc::new(Responses::with_image_resolver(
                 binding.clone(),
                 transport.replay_binding().cloned().ok_or_else(|| {
                     problem(ErrorKind::InvalidState, "provider_replay_binding_missing")
@@ -1476,6 +1532,12 @@ impl Execution {
                 )]),
                 transport.clone(),
                 PROVIDER_LIMITS,
+                images.as_ref().map(|images| {
+                    let images = images.clone();
+                    Arc::new(move |media: &agent_kit_core::messages::MediaRef, maximum| {
+                        images.resolve(media, maximum)
+                    }) as Arc<agent_kit_providers::InputImageResolver>
+                }),
             )?),
             ProviderProtocol::Gemini => Arc::new(Gemini::new(
                 binding.clone(),
@@ -1493,7 +1555,7 @@ impl Execution {
                 PROVIDER_LIMITS,
             )?),
         };
-        Self::compose(
+        let mut execution = Self::compose(
             configuration,
             legacy_configuration,
             options.model,
@@ -1501,7 +1563,9 @@ impl Execution {
             provider,
             binding,
             Credential::Http(transport),
-        )
+        )?;
+        execution.images = images;
+        Ok(execution)
     }
 
     fn new_gg(
@@ -1592,6 +1656,7 @@ impl Execution {
             authorization,
             questions,
             configuration_tools,
+            images: None,
         })
     }
 }
@@ -1806,10 +1871,34 @@ fn decode_input<T: serde::de::DeserializeOwned>(input: &Submission) -> Result<T>
 }
 
 pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
+    let mut uploads = 0;
+    for part in parts {
+        match part {
+            PromptPart::Image { .. } => uploads += 1,
+            PromptPart::RetainedImage { .. } => {
+                return Err(problem(
+                    ErrorKind::InvalidInput,
+                    "retained_image_not_supplied",
+                ));
+            }
+            _ => {}
+        }
+    }
+    if uploads > 1 {
+        return Err(problem(ErrorKind::LimitExceeded, "image_count_limit"));
+    }
+    validate_prompt_record(parts)
+}
+
+fn validate_prompt_record(parts: &[PromptPart]) -> Result<()> {
     if parts.is_empty() || parts.len() > MAX_PROMPT_PARTS {
         return Err(problem(ErrorKind::InvalidInput, "invalid_prompt_parts"));
     }
-    let bytes = serde_json::to_vec(parts)
+    let metadata: Vec<_> = parts
+        .iter()
+        .filter(|part| !matches!(part, PromptPart::Image { .. }))
+        .collect();
+    let bytes = serde_json::to_vec(&metadata)
         .map_err(|_| problem(ErrorKind::InvalidInput, "prompt_encoding_failed"))?;
     if bytes.len() > MAX_PROMPT_BYTES {
         return Err(problem(ErrorKind::LimitExceeded, "prompt_too_large"));
@@ -1818,21 +1907,30 @@ pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
 }
 
 fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
-    validate_prompt_parts(parts)?;
+    validate_prompt_record(parts)?;
     let content = parts
         .iter()
-        .map(|part| match part {
-            PromptPart::Text { text } => Content::Text(text.clone()),
-            reference @ PromptPart::ResourceLink { .. } => {
-                // A reference is context supplied by the user. It is neither
-                // imported nor granted filesystem or network authority here.
-                Content::Text(serde_json::to_string(reference).expect("serializable reference"))
-            }
-            PromptPart::Skill { reference } => {
-                Content::Text(format!("\n\nSelected skill {}.", reference.name()))
-            }
+        .map(|part| {
+            Ok(match part {
+                PromptPart::Text { text } => Content::Text(text.clone()),
+                reference @ PromptPart::ResourceLink { .. } => {
+                    // A reference is context supplied by the user. It is neither
+                    // imported nor granted filesystem or network authority here.
+                    Content::Text(serde_json::to_string(reference).expect("serializable reference"))
+                }
+                PromptPart::Skill { reference } => {
+                    Content::Text(format!("\n\nSelected skill {}.", reference.name()))
+                }
+                PromptPart::Image { .. } => {
+                    return Err(problem(
+                        ErrorKind::InvalidInput,
+                        "image_input_requires_acceptance",
+                    ));
+                }
+                PromptPart::RetainedImage { asset } => Content::Media(images::media(asset)?),
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>>>()?;
     Ok(vec![Message {
         id: MessageId::new(format!(
             "input/{:x}",

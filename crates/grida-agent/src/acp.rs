@@ -12,7 +12,7 @@ use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::schema::{
     AgentCapabilities, CancelNotification, ContentBlock, Implementation, InitializeRequest,
     InitializeResponse, LoadSessionRequest, LoadSessionResponse, NewSessionRequest,
-    NewSessionResponse, PromptRequest as AcpPrompt, PromptResponse, StopReason,
+    NewSessionResponse, PromptCapabilities, PromptRequest as AcpPrompt, PromptResponse, StopReason,
 };
 use agent_client_protocol::{
     Agent, Channel, Error, Result, on_receive_notification, on_receive_request,
@@ -111,6 +111,7 @@ async fn serve_connection(
     let load_delivery = delivery.clone();
     let prompt_host = host.clone();
     let prompt_sessions = sessions.clone();
+    let image_intake = reviewer && host.accepts_images();
 
     Agent
         .v1()
@@ -146,7 +147,10 @@ async fn serve_connection(
                 responder.respond(
                     InitializeResponse::new(ProtocolVersion::V1)
                         .agent_capabilities(
-                            AgentCapabilities::new().load_session(true).meta(advertised),
+                            AgentCapabilities::new()
+                                .load_session(true)
+                                .prompt_capabilities(PromptCapabilities::new().image(image_intake))
+                                .meta(advertised),
                         )
                         .agent_info(Implementation::new(
                             "grida-agent",
@@ -255,11 +259,7 @@ async fn serve_connection(
                             return Err(unavailable("session_prompt_in_progress"));
                         }
                     }
-                    let parts = request
-                        .prompt
-                        .into_iter()
-                        .map(prompt_part)
-                        .collect::<Result<Vec<_>>>()?;
+                    let parts = prompt_parts(request.prompt, image_intake)?;
                     // ACP JSON-RPC IDs correlate requests on one connection. A
                     // distinct host-generated ID identifies each durable input.
                     let id = ChangeId::new(uuid::Uuid::new_v4().to_string()).map_err(host_error)?;
@@ -436,6 +436,38 @@ fn prompt_part(block: ContentBlock) -> Result<PromptPart> {
         }
         _ => Err(Error::invalid_params().data("unsupported_prompt_content")),
     }
+}
+
+fn prompt_parts(blocks: Vec<ContentBlock>, image_intake: bool) -> Result<Vec<PromptPart>> {
+    if blocks.len() > crate::host::MAX_PROMPT_PARTS {
+        return Err(Error::invalid_params().data("invalid_prompt_parts"));
+    }
+    if blocks
+        .iter()
+        .filter(|block| matches!(block, ContentBlock::Image(_)))
+        .count()
+        > 1
+    {
+        return Err(Error::invalid_params().data("image_count_limit"));
+    }
+    blocks
+        .into_iter()
+        .map(|block| match block {
+            ContentBlock::Image(image) => {
+                if !image_intake {
+                    return Err(Error::invalid_params().data("image_input_unavailable"));
+                }
+                if image.uri.is_some() {
+                    return Err(Error::invalid_params().data("image_uri_unsupported"));
+                }
+                Ok(PromptPart::Image {
+                    image: crate::host::ImageUpload::decode(&image.mime_type, &image.data)
+                        .map_err(|error| Error::invalid_params().data(error.code))?,
+                })
+            }
+            other => prompt_part(other),
+        })
+        .collect()
 }
 
 fn validate_session_setup(

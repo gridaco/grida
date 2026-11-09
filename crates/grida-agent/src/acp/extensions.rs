@@ -7,7 +7,7 @@ mod lifecycle;
 mod questions;
 mod skills;
 
-use super::{ConnectionSessions, host_error, prompt_part, unavailable};
+use super::{ConnectionSessions, host_error, prompt_part, prompt_parts, unavailable};
 use crate::host::{DurableSubmission, Host, InputSettings, PromptRequest};
 use agent_client_protocol::v1::Builder;
 use agent_client_protocol::v1::schema::{ContentBlock, Meta};
@@ -287,10 +287,15 @@ pub(super) fn handlers(
     let inspect_sessions = sessions.clone();
     let update_host = host.clone();
     let update_sessions = sessions.clone();
+    let image_intake = reviewer && host.accepts_images();
 
     Agent
         .v1()
-        .with_connection_builder(lifecycle::handlers(host.clone(), sessions.clone()))
+        .with_connection_builder(lifecycle::handlers(
+            host.clone(),
+            sessions.clone(),
+            image_intake,
+        ))
         .with_connection_builder(questions::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(approvals::handlers(
             host.clone(),
@@ -304,11 +309,7 @@ pub(super) fn handlers(
             async move |request: Submit, responder, _| {
                 let result = async {
                     require(&submit_sessions, SUBMIT, Some(&request.session_id))?;
-                    let parts = request
-                        .prompt
-                        .into_iter()
-                        .map(prompt_part)
-                        .collect::<Result<_>>()?;
+                    let parts = prompt_parts(request.prompt, image_intake)?;
                     let accepted = submit_host
                         .submit_prompt(PromptRequest {
                             id: request.input_id,

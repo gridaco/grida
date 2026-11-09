@@ -31,6 +31,14 @@ default. Use `--provider responses`, `--provider anthropic`, or
 HTTPS endpoints and loopback HTTP endpoints. When a credential is required,
 set it in an environment variable and select that variable with `--credential-env`.
 
+On macOS and Linux, private stdio ACP with `--provider responses --model gpt-5.4`
+also accepts one inline PNG up to 256 KiB per input. Supply the PNG bytes in
+the image content block. Accepted inputs keep the original in the private
+agent state directory so queued work can use it after a restart. The selected
+provider receives it when the conversation uses it. Chat history identifies
+the retained image. An unsupported, invalid, or missing image stops the
+request with an error. [OpenAI image input guide](https://developers.openai.com/api/docs/guides/images-vision)
+
 ## Run a task from a script
 
 Replace the example paths, endpoint, and model with your selected values.

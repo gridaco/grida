@@ -166,6 +166,7 @@ struct ResumeResponse {
 pub(super) fn handlers(
     host: Arc<Host>,
     sessions: Arc<Mutex<ConnectionSessions>>,
+    image_intake: bool,
 ) -> Builder<Agent, impl HandleDispatchFrom<Client>> {
     let enqueue = (host.clone(), sessions.clone());
     let input = (host.clone(), sessions.clone());
@@ -186,11 +187,7 @@ pub(super) fn handlers(
                         .enqueue(PromptRequest {
                             id: request.input_id,
                             session: request.session_id,
-                            parts: request
-                                .prompt
-                                .into_iter()
-                                .map(prompt_part)
-                                .collect::<Result<_>>()?,
+                            parts: prompt_parts(request.prompt, image_intake)?,
                             questions: questions::available(&enqueue.1),
                             configuration_permission: configuration_permission(
                                 &enqueue.1,
@@ -233,11 +230,7 @@ pub(super) fn handlers(
                     let edit = QueueEdit::Replace {
                         input: request.input_id,
                         replacement: request.replacement_input_id,
-                        parts: request
-                            .prompt
-                            .into_iter()
-                            .map(prompt_part)
-                            .collect::<Result<_>>()?,
+                        parts: prompt_parts(request.prompt, image_intake)?,
                         questions: questions::available(&replace.1),
                         configuration_permission: configuration_permission(
                             &replace.1,
@@ -395,5 +388,8 @@ fn prompt_block(part: PromptPart) -> ContentBlock {
             || format!("Selected skill {}.", reference.name()).into(),
             |uri| ContentBlock::ResourceLink(ResourceLink::new(reference.name(), uri)),
         ),
+        PromptPart::RetainedImage { .. } | PromptPart::Image { .. } => {
+            crate::host::RETAINED_IMAGE_LABEL.trim().into()
+        }
     }
 }

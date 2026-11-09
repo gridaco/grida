@@ -65,6 +65,16 @@ fn original_and_edited_working_copy_survive_restart_independently() {
     assert_eq!(reopened_work.receipt(), &receipt);
     assert_eq!(reopened_work.path(), work.path());
     assert_eq!(fs::read(reopened_work.path()).unwrap(), b"edited");
+    assert_eq!(reopened.read_retained(&asset, 8).unwrap(), b"original");
+    assert_eq!(
+        reopened.read_retained(&asset, 7).unwrap_err().kind,
+        ErrorKind::LimitExceeded
+    );
+    assert!(
+        scope(&base, "different-owner", limits())
+            .read_retained(&asset, 8)
+            .is_err()
+    );
 }
 
 #[test]
@@ -88,6 +98,8 @@ fn lost_materialized_copy_does_not_become_a_fresh_original() {
             .unwrap(),
         original
     );
+    assert!(!work.path().exists());
+    assert_eq!(reopened.read_retained(&original, 8).unwrap(), b"original");
     assert!(!work.path().exists());
 }
 

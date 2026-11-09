@@ -121,7 +121,7 @@ fn initialize() -> Value {
     request
 }
 
-struct Stdio {
+pub(super) struct Stdio {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
@@ -130,7 +130,7 @@ struct Stdio {
 
 impl Stdio {
     fn start(fixture: &Fixture, endpoint: &str) -> Self {
-        let mut child = fixture
+        let child = fixture
             .process(endpoint, "serve")
             .arg("--stdio")
             .stdin(std::process::Stdio::piped())
@@ -138,6 +138,10 @@ impl Stdio {
             .stderr(std::process::Stdio::piped())
             .spawn()
             .unwrap();
+        Self::from_child(child)
+    }
+
+    pub(super) fn from_child(mut child: Child) -> Self {
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
         Self {
@@ -148,7 +152,7 @@ impl Stdio {
         }
     }
 
-    async fn request(&mut self, method: &str, params: Value) -> Value {
+    pub(super) async fn request(&mut self, method: &str, params: Value) -> Value {
         self.id += 1;
         let id = self.id;
         let frame = json!({"jsonrpc":"2.0","id":id,"method":method,"params":params});
@@ -174,7 +178,7 @@ impl Stdio {
         .unwrap()
     }
 
-    async fn close(self) {
+    pub(super) async fn close(self) {
         let Self {
             child,
             stdin,

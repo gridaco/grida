@@ -233,6 +233,13 @@ at admission. Executors own quotas for their separate working areas and outputs.
 These private-storage helpers currently support macOS and Linux. The native
 host's tool composition supplies their grants and lifecycle.
 
+Private stdio ACP can submit a single validated PNG as part of an input when
+using the Responses `gpt-5.4` profile. The host keeps the original under the
+private state directory and stores its immutable reference with the accepted
+input. Queued input and provider context can use the original after restart.
+An unsupported profile or unavailable original produces an error for the
+whole request.
+
 The native library also provides the read-only `read_file`, `list_files`, and
 `search_text` adapters for macOS and Linux. They use the turn's selected
 directory and recheck current grants and protected roots before opening a

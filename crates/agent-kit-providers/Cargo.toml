@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 agent-kit-core = { path = "../agent-kit-core" }
+base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 serde_json.workspace = true
 futures-core = "0.3"

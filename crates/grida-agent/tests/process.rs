@@ -33,6 +33,9 @@ mod goals;
 #[cfg(unix)]
 #[path = "process/history.rs"]
 mod history;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/images.rs"]
+mod images;
 #[cfg(unix)]
 #[path = "process/lifecycle.rs"]
 mod lifecycle;
@@ -284,6 +287,12 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
     };
     match protocol {
         ProviderProtocol::Responses => {
+            if finish.is_none() {
+                frame(
+                    json!({"type":"response.output_text.delta", "item_id":"message-fixture", "delta":text}),
+                );
+                return output;
+            }
             assert_eq!(finish, Some("stop"));
             let mut index = 0;
             if signed {
@@ -1315,6 +1324,11 @@ async fn shared_server_with_profile(
         command.arg("--permission-profile").arg(profile);
     }
     command.env("GRIDA_AGENT_PROCESS_TEST_KEY", credential);
+    spawn_shared_server(command).await
+}
+
+#[cfg(unix)]
+async fn spawn_shared_server(mut command: Command) -> (Child, String) {
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())

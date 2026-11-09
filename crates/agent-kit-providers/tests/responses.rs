@@ -6,9 +6,10 @@ use agent_kit_core::inference::{
     InputMeasurement, MeasurementKind, Modality, ModelCapabilities, Provider, ProviderBinding,
 };
 use agent_kit_core::messages::{
-    Content, Message, MessagePhase, OutcomeStatus, ResultContent, Role, ToolCall, ToolResult,
+    Content, MediaRef, Message, MessagePhase, OutcomeStatus, ResultContent, Retention, Role,
+    ToolCall, ToolResult,
 };
-use agent_kit_core::{BindingId, ModelId, PrincipalId, ProviderId, ScopeId};
+use agent_kit_core::{ArtifactId, BindingId, ModelId, PrincipalId, ProviderId, ScopeId};
 use agent_kit_providers::{
     ReasoningEffort, Responses, ResponsesEndpoint, ResponsesProfile, StreamLimits,
     TransportOperation,
@@ -667,6 +668,112 @@ async fn api_counts_the_same_prepared_input_used_for_generation() {
     );
     assert_eq!(count["input"][2]["call_id"], "call_remote");
     assert_eq!(count["input"][3]["call_id"], "call_remote");
+}
+
+#[tokio::test]
+async fn prepared_image_references_are_resolved_only_for_count_and_generation() {
+    let measured = br#"{"object":"response.input_tokens","input_tokens":7}"#;
+    let transport = FixtureTransport::new([
+        Ok(response([measured.to_vec()], false)),
+        Ok(response(
+            [answer("msg_image", "A fixture."), completed(None)]
+                .into_iter()
+                .map(frame),
+            false,
+        )),
+    ]);
+    let text = adapter(transport.clone(), ResponsesEndpoint::Api, "replay", "live");
+    let mut input = request();
+    let media = MediaRef {
+        id: ArtifactId::new("fixture").unwrap(),
+        media_type: "image/png".into(),
+        locator: "opaque-reference".into(),
+        access_scope: BindingId::new("local").unwrap(),
+        retention: Retention::Retained,
+    };
+    input.messages[0]
+        .content
+        .push(Content::Media(media.clone()));
+    assert_eq!(
+        text.prepare(input.clone()).unwrap_err().code,
+        "unsupported_input_modality"
+    );
+
+    let mut capabilities = text.capabilities(&input.model).unwrap();
+    capabilities.input_modalities.insert(Modality::Image);
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let provider = Responses::with_image_resolver(
+        ProviderBinding {
+            provider: ProviderId::new("responses").unwrap(),
+            authority: AuthorityBinding {
+                principal: PrincipalId::new("principal").unwrap(),
+                binding: BindingId::new("live").unwrap(),
+                scope: ScopeId::new("chat").unwrap(),
+            },
+        },
+        BindingId::new("replay").unwrap(),
+        ResponsesEndpoint::Api,
+        [(
+            input.model.clone(),
+            ResponsesProfile {
+                capabilities,
+                wire_model: ModelId::new("wire-model").unwrap(),
+                reasoning_effort: None,
+            },
+        )]
+        .into(),
+        transport.clone(),
+        limits(),
+        Some(Arc::new({
+            let calls = calls.clone();
+            move |reference, maximum| {
+                assert_eq!(reference, &media);
+                assert!(maximum >= 5);
+                calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(b"bytes".to_vec())
+            }
+        })),
+    )
+    .unwrap();
+    let prepared = provider.prepare(input).unwrap();
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+    let recorded = serde_json::to_string(&prepared).unwrap();
+    assert!(recorded.contains("opaque-reference"));
+    assert!(!recorded.contains("Ynl0ZXM="));
+    assert_eq!(
+        provider
+            .measure_input_async(&prepared, control("image").request_control())
+            .await
+            .unwrap()
+            .tokens,
+        7
+    );
+    assert_eq!(
+        provider
+            .start(prepared, control("image"))
+            .unwrap()
+            .finish()
+            .await
+            .status,
+        InferenceStatus::Completed
+    );
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    let count: Value = {
+        let sent = transport.requests.lock().unwrap();
+        assert_eq!(
+            sent[0].0.operation,
+            TransportOperation::OpenAiResponsesInputTokens
+        );
+        serde_json::from_slice(&sent[0].0.body).unwrap()
+    };
+    let generation = body(&transport, 1);
+    assert_eq!(count["input"], generation["input"]);
+    assert_eq!(
+        count["input"][0]["content"][1],
+        json!({
+            "type": "input_image", "image_url": "data:image/png;base64,Ynl0ZXM=", "detail": "auto"
+        })
+    );
 }
 
 #[tokio::test]

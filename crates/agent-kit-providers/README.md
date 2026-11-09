@@ -25,7 +25,7 @@ credentials, and bounds the response. It validates Gemini's model against
 its registry and encodes it as a single path segment. Transport must disable
 automatic retries and redirects. Dropping the body releases its stream.
 
-Preparation performs no I/O. The adapters validate text and tool history
+Preparation performs no I/O. The adapters validate input and tool history
 before dispatch. A prepared request captures the binding and model
 capabilities. Change the supplied capability revision when wire profile
 settings change. The host owns endpoint discovery, credential custody, model
@@ -51,7 +51,11 @@ Cache-related counters retain their provider-specific meanings.
   eligible after the verified terminal response. The API profile accepts an
   explicit output-token bound. The subscription profile rejects that field,
   so a host using it must select an effective output policy before preparing
-  the request. The adapter provides protocol fixtures for both profiles.
+  the request. The API profile can also accept image references when the host
+  supplies an immutable image resolver. The resolver reads bounded bytes only
+  during authorized counting or generation. Both operations send the same
+  image content, while the prepared request keeps just the references. The
+  adapter provides protocol fixtures for both profiles.
   Subscription account setup and native host activation are separate.
   [Responses migration](https://developers.openai.com/api/docs/guides/migrate-to-responses)
 - `Anthropic` requires an explicit output-token limit and lowers leading

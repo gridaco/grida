@@ -350,7 +350,7 @@ fn queue_ids(snapshot: &Value) -> Vec<&str> {
         .collect()
 }
 
-fn queue_basis(snapshot: &Value, session: &str, request: &str) -> Value {
+pub(super) fn queue_basis(snapshot: &Value, session: &str, request: &str) -> Value {
     json!({
         "sessionId":session,"requestId":request,
         "expectedSessionRevision":snapshot["sessionRevision"],

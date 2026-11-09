@@ -180,6 +180,18 @@ new control uses a refreshed snapshot and a fresh request identity. Late
 steering that loses the terminal race returns an explicit conflict, leaving the
 client free to keep its draft or submit another task.
 
+Private stdio advertises `promptCapabilities.image` with the native GPT-5.4
+Responses profile on macOS and Linux. `session/prompt`, Submit, Enqueue, and
+Replace accept one ACP `image` block with `mimeType: "image/png"` and base64
+`data`. Its `uri` must be absent. The encoded PNG may be up to 256 KiB before
+base64 encoding. The host checks decoded image bounds, limits each chat to 16
+retained images and 2 MiB of source bytes, and rejects the full input if an
+image cannot be accepted. Readback identifies the image with a text marker.
+Only the original digest and identity are in conversation records. Resume
+verifies the exact retained bytes before dispatch. A fork or compaction can
+omit earlier image content and records that omission. Image steering, earlier
+message replacement, and shared WebSocket intake are unavailable.
+
 The host advances waiting work after verified settlement while admission is
 open. Observation stays independent of scheduling. After a restart, Resume
 Queue can wake retained waiting work, and Resume Task checks captured settings
