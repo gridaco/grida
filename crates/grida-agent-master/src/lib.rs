@@ -1,6 +1,7 @@
 //! Bounded conversational policy composed over the reusable execution runtime.
 
 pub mod configuration;
+pub mod conversation_seed;
 pub mod history;
 pub mod questions;
 pub mod usage;

@@ -24,6 +24,7 @@ use std::collections::BTreeSet;
 
 const REQUEST_SCHEMA: &str = "grida.agent.question";
 const ANSWER_SCHEMA: &str = "grida.agent.question.answer";
+pub(crate) const ANSWER_SOURCE: &str = "question_response";
 const REGISTRATION_SCHEMA: &str = "grida.agent.question.registration";
 const ANSWER_DEPENDENT: &str = "question";
 const NONBLOCKING: &str = "question_async";
@@ -177,7 +178,7 @@ pub fn prepare_answer(wait: &WaitRecord, answer: QuestionAnswer) -> Result<Prepa
                 wait.id, text,
             ))],
             provenance: Provenance {
-                source: "question_response".into(),
+                source: ANSWER_SOURCE.into(),
                 kind: ProvenanceKind::Supplied,
                 fingerprint: Some(Fingerprint::of(&(&wait.id, &envelope))?),
             },

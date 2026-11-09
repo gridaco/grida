@@ -1,5 +1,7 @@
 //! SQLite persistence for session admission and the bound execution journal.
 
+pub mod history;
+
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlReader, ControlRevision, ControlSnapshot,
@@ -23,7 +25,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -82,6 +84,22 @@ ALTER TABLE submissions ADD COLUMN withdrawn INTEGER NOT NULL DEFAULT 0 CHECK(wi
 UPDATE submissions SET queue_order=position WHERE turn_id IS NULL;
 CREATE UNIQUE INDEX submission_queue_order ON submissions(session,queue_order)
 WHERE queue_order IS NOT NULL;
+";
+
+const HISTORY_VIEWS: &str = "
+CREATE INDEX session_turn_order ON turns(session,ordinal);
+CREATE TABLE session_history_views (
+    session TEXT NOT NULL REFERENCES sessions(id),
+    view INTEGER NOT NULL CHECK(view >= 0),
+    seed BLOB,
+    seed_identity BLOB CHECK((seed IS NULL) = (seed_identity IS NULL)),
+    after_ordinal INTEGER NOT NULL CHECK(after_ordinal >= 0),
+    end_ordinal INTEGER CHECK(end_ordinal IS NULL OR end_ordinal >= after_ordinal),
+    PRIMARY KEY(session, view)
+);
+CREATE UNIQUE INDEX active_history_view ON session_history_views(session)
+WHERE end_ordinal IS NULL;
+CREATE INDEX history_view_order ON session_history_views(session,after_ordinal,view);
 ";
 
 /// One opened database authority. Clones share its connection and ownership lock.
@@ -170,15 +188,23 @@ impl SqliteStore {
                 let transaction = connection.transaction().map_err(database_error)?;
                 transaction.execute_batch(SCHEMA).map_err(database_error)?;
                 transaction
+                    .execute_batch(HISTORY_VIEWS)
+                    .map_err(database_error)?;
+                transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(database_error)?;
                 transaction.commit().map_err(database_error)?;
             }
             SCHEMA_VERSION => {}
-            1 => {
+            1 | 2 => {
                 let transaction = connection.transaction().map_err(database_error)?;
+                if version == 1 {
+                    transaction
+                        .execute_batch(UPGRADE_QUEUE)
+                        .map_err(database_error)?;
+                }
                 transaction
-                    .execute_batch(UPGRADE_QUEUE)
+                    .execute_batch(HISTORY_VIEWS)
                     .map_err(database_error)?;
                 transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
@@ -254,10 +280,10 @@ impl SqliteStore {
         .await
     }
 
-    /// Read committed history in turn creation and record append order.
+    /// Read the selected view's seed and committed local history in append order.
     ///
-    /// A `before_turn` cut excludes that turn and all subsequent turns. The
-    /// cut must identify a turn in the supplied session. Projection is bounded
+    /// A `before_turn` cut uses the view that owned that turn and excludes the
+    /// turn itself. Without a cut this reads the current view. Projection is bounded
     /// and returns `history_projection_limit` if a full result would exceed it.
     pub async fn history(
         &self,
@@ -278,63 +304,14 @@ impl SqliteStore {
         before_turn: Option<TurnId>,
         project: impl Fn(&TurnState) -> Vec<HistoryRecord> + Send + 'static,
     ) -> Result<Vec<HistoryRecord>> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
-            load_session(connection, &session)?;
-            let before = before_turn
-                .map(|turn| {
-                    connection
-                        .query_row(
-                            "SELECT ordinal FROM turns WHERE session=?1 AND id=?2",
-                            params![session.as_str(), turn.as_str()],
-                            |row| row.get::<_, i64>(0),
-                        )
-                        .optional()
-                        .map_err(database_error)?
-                        .ok_or_else(|| error(ErrorKind::InvalidInput, "turn_missing"))
-                })
-                .transpose()?;
-            let mut query = connection
-                .prepare(
-                    "SELECT id,snapshot FROM turns
-                     WHERE session=?1 AND (?2 IS NULL OR ordinal<?2)
-                     ORDER BY ordinal LIMIT ?3",
-                )
-                .map_err(database_error)?;
-            let mut rows = query
-                .query(params![session.as_str(), before, MAX_HISTORY_TURNS + 1])
-                .map_err(database_error)?;
-            let mut history = Vec::new();
-            let mut scanned_turns = 0;
-            let mut scanned_bytes = 0;
-            let mut result_bytes = 2;
-            while let Some(row) = rows.next().map_err(database_error)? {
-                let turn = TurnId::new(row.get::<_, String>(0).map_err(database_error)?)?;
-                let snapshot = row
-                    .get_ref(1)
-                    .map_err(database_error)?
-                    .as_blob()
-                    .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
-                scanned_turns += 1;
-                scanned_bytes += snapshot.len();
-                if scanned_turns > MAX_HISTORY_TURNS || scanned_bytes > MAX_HISTORY_SCAN_BYTES {
-                    return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
-                }
-                let state = decode_turn(snapshot, &session, &turn)?;
-                let records = project(&state);
-                if history.len() + records.len() > MAX_HISTORY_RECORDS {
-                    return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
-                }
-                for record in &records {
-                    result_bytes += encode(record)?.len() + usize::from(!history.is_empty());
-                    if result_bytes > MAX_HISTORY_BYTES {
-                        return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
-                    }
-                    history.push(record.clone());
-                }
-            }
-            Ok(history)
-        })
-        .await
+        let selection = before_turn.map_or(
+            history::HistorySelection::Current,
+            history::HistorySelection::BeforeTurn,
+        );
+        Ok(self
+            .retained_history_with(session, selection, project)
+            .await?
+            .into_records())
     }
 
     fn acquire(&self, request: ClaimRequest) -> BoxFuture<'_, Result<ClaimOutcome>> {
@@ -480,24 +457,7 @@ impl SessionStore for SqliteStore {
             )? {
                 return Ok(receipt);
             }
-            let exists: bool = transaction
-                .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM sessions WHERE id=?1)",
-                    [request.id.as_str()],
-                    |row| row.get(0),
-                )
-                .map_err(database_error)?;
-            if exists {
-                return Err(error(ErrorKind::Conflict, "session_exists"));
-            }
-            transaction.execute(
-                "INSERT INTO sessions(id,configuration,revision,paused,next_input) VALUES(?1,?2,0,0,0)",
-                params![request.id.as_str(), encode(&request.configuration)?],
-            ).map_err(database_error)?;
-            let receipt = SessionCreated {
-                session: request.id.clone(),
-                revision: SessionRevision(0),
-            };
+            let receipt = insert_session(&transaction, &request)?;
             save_request(
                 &transaction,
                 &request.id,
@@ -998,6 +958,26 @@ fn execute<T: Send + 'static>(
         })
         .await
         .map_err(|_| error(ErrorKind::Uncertain, "store_task_interrupted"))?
+    })
+}
+
+fn insert_session(
+    transaction: &Transaction<'_>,
+    request: &CreateSession,
+) -> Result<SessionCreated> {
+    let inserted = transaction
+        .execute(
+            "INSERT INTO sessions(id,configuration,revision,paused,next_input) VALUES(?1,?2,0,0,0)
+         ON CONFLICT(id) DO NOTHING",
+            params![request.id.as_str(), encode(&request.configuration)?],
+        )
+        .map_err(database_error)?;
+    if inserted == 0 {
+        return Err(error(ErrorKind::Conflict, "session_exists"));
+    }
+    Ok(SessionCreated {
+        session: request.id.clone(),
+        revision: SessionRevision(0),
     })
 }
 

@@ -34,6 +34,12 @@ their prepared requests. It retains published content and tool exchanges while
 the journal preserves receipt order. Hosts can use the same projection for
 preceding turns.
 
+Conversation seeds select a committed prefix for a new conversation or an
+earlier user-message revision. They carry portable conversation text, historical
+tool dispositions and source provenance. The omission ledger identifies source
+instructions, raw tool data, media and opaque provider state that did not carry
+forward. The original execution records remain available in their source view.
+
 Turn-bound question tools support immediate registration and answer-dependent
 deferral. Responses can be a suggested choice, free text, or a skip. Their
 schema and reply validation live with the tools. The host chooses which styles

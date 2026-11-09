@@ -5,14 +5,18 @@ use agent_kit_core::turn::{
     ResponseContract, TurnOutcome, WaitRecord,
 };
 use agent_kit_core::{
-    ChangeId, Envelope, ErrorKind, MessageId, Result, SchemaId, SessionId, TurnId, WaitId,
+    ChangeId, Envelope, ErrorKind, Fingerprint, MessageId, Result, SchemaId, SessionId, TurnId,
+    WaitId,
 };
 use agent_kit_sessions::{
     ClaimOutcome, ClaimRequest, ClaimedTurn, ControlRequest, CreateSession, DriverOutcome,
-    InputDisposition, RecoveryRequest, RunDisposition, SessionControl, SessionStore, Sessions,
-    Submission, TurnDisposition, TurnDriver, TurnSelection,
+    InputDisposition, RecoveryRequest, RunDisposition, SessionControl, SessionRevision,
+    SessionStore, Sessions, Submission, TurnDisposition, TurnDriver, TurnSelection,
 };
 use agent_kit_store_sqlite::SqliteStore;
+use agent_kit_store_sqlite::history::{
+    HistoryRevision, HistorySeed, HistorySelection, RetainedHistory, SeededSession,
+};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -474,7 +478,9 @@ async fn previous_schema_upgrades_without_changing_completed_or_queued_input() {
     let previous = rusqlite::Connection::open(&path).unwrap();
     previous
         .execute_batch(
-            "DROP INDEX submission_queue_order;
+            "DROP TABLE session_history_views;
+         DROP INDEX session_turn_order;
+         DROP INDEX submission_queue_order;
          ALTER TABLE submissions DROP COLUMN queue_order;
          ALTER TABLE submissions DROP COLUMN replacement_id;
          ALTER TABLE submissions DROP COLUMN withdrawn;
@@ -1733,4 +1739,583 @@ async fn stopped_turns_reject_late_answers_and_external_history() {
         assert_eq!(current.position(), state.position());
         assert!(current.waits().get(&wait).unwrap().is_pending());
     }
+}
+
+async fn current_history(store: &SqliteStore, session: SessionId) -> RetainedHistory {
+    store
+        .retained_history_with(session, HistorySelection::Current, |state| {
+            state.history().records().to_vec()
+        })
+        .await
+        .unwrap()
+}
+
+fn copy_seed(history: RetainedHistory) -> Result<HistorySeed> {
+    Ok(HistorySeed {
+        records: history.into_records(),
+        provenance: payload("fixture lineage"),
+    })
+}
+
+#[tokio::test]
+async fn fork_captures_live_source_and_retries_without_reading_it_again() {
+    let (directory, store) = store().await;
+    let input = submission("input", "source input");
+    store.submit(session(), input.clone()).await.unwrap();
+    let owner = claim(&store, "claim", vec![input.id]).await;
+    let first = history_message("first", "committed before fork");
+    let later = history_message("later", "committed after fork");
+    commit(
+        &owner,
+        "first",
+        vec![JournalAction::AppendHistory(vec![first.clone()])],
+    )
+    .await;
+    let source = store.inspect(session()).await.unwrap();
+    let destination = SessionId::new("fork").unwrap();
+    let request = SeededSession {
+        create: CreateSession {
+            id: destination.clone(),
+            request: change("fork"),
+            configuration: payload("new settings"),
+        },
+        source: session(),
+        expected_history: current_history(&store, session()).await.basis,
+        intent: Fingerprint::of(&"first").unwrap(),
+    };
+    let created = store
+        .create_seeded(
+            request.clone(),
+            |state| state.history().records().to_vec(),
+            copy_seed,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(store.inspect(session()).await.unwrap(), source);
+    commit(
+        &owner,
+        "later",
+        vec![JournalAction::AppendHistory(vec![later.clone()])],
+    )
+    .await;
+    assert_eq!(
+        store.inspect(session()).await.unwrap().revision,
+        source.revision
+    );
+    let mut stale = request.clone();
+    stale.create.id = SessionId::new("stale-fork").unwrap();
+    assert_error(
+        store
+            .create_seeded(
+                stale.clone(),
+                |state| state.history().records().to_vec(),
+                copy_seed,
+            )
+            .await,
+        ErrorKind::Conflict,
+        "history_basis_changed",
+    );
+    assert_error(
+        store.inspect(stale.create.id).await,
+        ErrorKind::InvalidInput,
+        "session_missing",
+    );
+    assert_eq!(
+        store.history(session(), None).await.unwrap(),
+        vec![first.clone(), later]
+    );
+
+    drop(owner);
+    drop(store);
+    let reopened = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    assert_eq!(
+        reopened
+            .create_seeded(
+                request.clone(),
+                |_| panic!("retry projected source"),
+                |_| panic!("retry rebuilt seed"),
+            )
+            .await
+            .unwrap(),
+        created
+    );
+    let mut changed = request;
+    changed.intent = Fingerprint::of(&"changed cut").unwrap();
+    assert_error(
+        reopened.create_seeded(changed, |_| vec![], copy_seed).await,
+        ErrorKind::Conflict,
+        "request_identity_reused",
+    );
+    let fork = reopened.inspect(destination.clone()).await.unwrap();
+    assert_eq!(fork.configuration, payload("new settings"));
+    assert!(fork.current.is_none() && fork.latest.is_none() && fork.queued.is_empty());
+    assert!(!fork.admission_paused);
+    assert_eq!(
+        reopened.history(destination.clone(), None).await.unwrap(),
+        vec![first]
+    );
+    let retained = current_history(&reopened, destination).await;
+    assert!(retained.basis.tail.is_none());
+    assert!(retained.records.is_empty());
+    assert_eq!(
+        retained.seed.unwrap().provenance,
+        payload("fixture lineage")
+    );
+}
+
+#[tokio::test]
+async fn revision_keeps_prior_turn_context_and_accepts_replacement_atomically() {
+    let (directory, store) = store().await;
+    let kept = history_message("kept", "keep");
+    let original = history_message("original", "superseded");
+    let first = finish_history_turn(&store, session(), "first", vec![kept.clone()]).await;
+    let second = finish_history_turn(&store, session(), "second", vec![original.clone()]).await;
+    let paused = store
+        .control(ControlRequest {
+            id: change("pause"),
+            session: session(),
+            expected_revision: store.inspect(session()).await.unwrap().revision,
+            action: SessionControl::PauseAdmission,
+        })
+        .await
+        .unwrap();
+    let request = HistoryRevision {
+        session: session(),
+        request: change("revise"),
+        expected_revision: paused.revision,
+        expected_history: current_history(&store, session()).await.basis,
+        intent: Fingerprint::of(&"before original").unwrap(),
+        replacement: submission("revised", "new user text"),
+    };
+    let mut duplicate = request.clone();
+    duplicate.replacement = submission("input-second", "would overwrite original input");
+    let keep_for_failure = kept.clone();
+    assert_error(
+        store
+            .revise_history(
+                duplicate,
+                |state| state.history().records().to_vec(),
+                move |_| {
+                    Ok(HistorySeed {
+                        records: vec![keep_for_failure],
+                        provenance: payload("cut"),
+                    })
+                },
+            )
+            .await,
+        ErrorKind::Conflict,
+        "input_identity_reused",
+    );
+    assert_eq!(
+        store.history(session(), None).await.unwrap(),
+        vec![kept.clone(), original.clone()]
+    );
+    assert_eq!(
+        store.inspect(session()).await.unwrap().revision,
+        paused.revision
+    );
+
+    let keep_for_seed = kept.clone();
+    let receipt = store
+        .revise_history(
+            request.clone(),
+            |state| state.history().records().to_vec(),
+            move |_| {
+                Ok(HistorySeed {
+                    records: vec![keep_for_seed],
+                    provenance: payload("cut"),
+                })
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        store
+            .submit(session(), request.replacement.clone())
+            .await
+            .unwrap(),
+        receipt.acceptance
+    );
+    let revised = store.inspect(session()).await.unwrap();
+    assert!(revised.admission_paused);
+    assert_eq!(revised.queued[0].input, request.replacement);
+    assert_eq!(
+        store.history(session(), None).await.unwrap(),
+        vec![kept.clone()]
+    );
+    assert!(
+        store
+            .history(session(), Some(first))
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        store
+            .history(session(), Some(second.clone()))
+            .await
+            .unwrap(),
+        vec![kept.clone()]
+    );
+    let old = store
+        .retained_history_with(
+            session(),
+            HistorySelection::View(SessionRevision(0)),
+            |state| state.history().records().to_vec(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(old.into_records(), vec![kept.clone(), original.clone()]);
+    assert_eq!(
+        store
+            .inspect_turn_with(session(), second, |state| {
+                assert!(state.outcome().is_some());
+                Ok(state.history().records().to_vec())
+            })
+            .await
+            .unwrap(),
+        vec![original],
+    );
+
+    let resumed = store
+        .control(ControlRequest {
+            id: change("resume"),
+            session: session(),
+            expected_revision: revised.revision,
+            action: SessionControl::ResumeAdmission,
+        })
+        .await
+        .unwrap();
+    let replacement = TurnId::new("replacement").unwrap();
+    let ClaimOutcome::Acquired(owner) = store
+        .claim(ClaimRequest {
+            id: change("claim-replacement"),
+            session: session(),
+            expected_revision: resumed.revision,
+            selection: TurnSelection::New {
+                turn: replacement.clone(),
+                inputs: vec![request.replacement.id.clone()],
+            },
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected replacement owner");
+    };
+    assert_eq!(owner.inputs, vec![request.replacement.clone()]);
+    let new = history_message("revised", "new user text");
+    commit(
+        &owner,
+        "finish-replacement",
+        vec![
+            JournalAction::AppendHistory(vec![new.clone()]),
+            JournalAction::Settle(TurnOutcome {
+                status: OutcomeStatus::Succeeded,
+                account: None,
+                evidence: vec![],
+            }),
+        ],
+    )
+    .await;
+    drop(owner);
+    drop(store);
+
+    let reopened = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    assert_eq!(
+        reopened
+            .revise_history(
+                request,
+                |_| panic!("retry projected source"),
+                |_| panic!("retry rebuilt seed"),
+            )
+            .await
+            .unwrap(),
+        receipt
+    );
+    assert_eq!(
+        reopened
+            .history(session(), Some(replacement))
+            .await
+            .unwrap(),
+        vec![kept.clone()]
+    );
+    assert_eq!(
+        reopened.history(session(), None).await.unwrap(),
+        vec![kept, new]
+    );
+}
+
+#[tokio::test]
+async fn revision_refuses_queue_and_live_ownership() {
+    let (_directory, store) = store().await;
+    let input = submission("queued", "input");
+    store.submit(session(), input.clone()).await.unwrap();
+    let mut request = HistoryRevision {
+        session: session(),
+        request: change("revision"),
+        expected_revision: store.inspect(session()).await.unwrap().revision,
+        expected_history: current_history(&store, session()).await.basis,
+        intent: Fingerprint::of(&"before").unwrap(),
+        replacement: submission("replacement", "new"),
+    };
+    assert_error(
+        store
+            .revise_history(
+                request.clone(),
+                |_| vec![],
+                |_| panic!("should refuse queue"),
+            )
+            .await,
+        ErrorKind::Conflict,
+        "history_revision_requires_empty_queue",
+    );
+    let owner = claim(&store, "claim-queued", vec![input.id]).await;
+    request.expected_revision = store.inspect(session()).await.unwrap().revision;
+    request.expected_history = current_history(&store, session()).await.basis;
+    assert_error(
+        store
+            .revise_history(request, |_| vec![], |_| panic!("should refuse ownership"))
+            .await,
+        ErrorKind::Conflict,
+        "history_revision_requires_idle",
+    );
+    drop(owner);
+}
+
+#[tokio::test]
+async fn version_two_upgrades_with_original_history_view() {
+    let (directory, store) = store().await;
+    let original = history_message("previous", "existing history");
+    finish_history_turn(&store, session(), "previous", vec![original.clone()]).await;
+    drop(store);
+    let path = directory.path().join("sessions.sqlite");
+    let previous = rusqlite::Connection::open(&path).unwrap();
+    previous
+        .execute_batch(
+            "DROP TABLE session_history_views;
+         DROP INDEX session_turn_order;
+         PRAGMA user_version=2;",
+        )
+        .unwrap();
+    drop(previous);
+    let store = SqliteStore::open(&path).unwrap();
+    let retained = current_history(&store, session()).await;
+    assert_eq!(retained.basis.view, SessionRevision(0));
+    assert!(retained.seed.is_none());
+    assert_eq!(retained.into_records(), vec![original]);
+    drop(store);
+    let reopened = rusqlite::Connection::open(&path).unwrap();
+    let version: i64 = reopened
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, 3);
+}
+
+#[tokio::test]
+async fn older_reconciliation_invalidates_a_cut_without_moving_its_tail() {
+    use agent_kit_core::authority::{AuthorityBinding, GrantSelection};
+    use agent_kit_core::inference::{
+        InferenceOutcome, InferenceRequest, InferenceStatus, Modality, ModelCapabilities,
+        PreparedRequest, ProviderBinding,
+    };
+    use agent_kit_core::turn::{OperationInput, OperationOutcome, OperationRecord, TurnState};
+    use agent_kit_core::{
+        AttemptId, BindingId, ModelId, OperationId, PrincipalId, ProviderId, ScopeId,
+    };
+
+    let (_directory, store) = store().await;
+    let input = submission("original", "first input");
+    store.submit(session(), input.clone()).await.unwrap();
+    let old = claim(&store, "original-claim", vec![input.id]).await;
+    let operation = OperationId::new("generation").unwrap();
+    let attempt = AttemptId::new("generation-attempt").unwrap();
+    let authority = AuthorityBinding {
+        principal: PrincipalId::new("fixture").unwrap(),
+        binding: BindingId::new("fixture-binding").unwrap(),
+        scope: ScopeId::new("fixture-scope").unwrap(),
+    };
+    let prepared = PreparedRequest::from_validated(
+        InferenceRequest {
+            model: ModelId::new("fixture-model").unwrap(),
+            messages: vec![],
+            tools: vec![],
+            max_output_tokens: None,
+            extension: None,
+        },
+        ProviderBinding {
+            provider: ProviderId::new("fixture-provider").unwrap(),
+            authority: authority.clone(),
+        },
+        ModelCapabilities {
+            revision: BindingId::new("fixture-capabilities").unwrap(),
+            input_modalities: [Modality::Text].into(),
+            json_tools: false,
+            text_tools: false,
+            max_output_tokens: None,
+        },
+    )
+    .unwrap();
+    let outcome = |status| {
+        OperationOutcome::Inference(InferenceOutcome {
+            status,
+            messages: vec![],
+            usage: vec![],
+            failure: None,
+            receipt: None,
+        })
+    };
+    commit(
+        &old,
+        "initial",
+        vec![
+            JournalAction::prepare(OperationRecord {
+                id: operation.clone(),
+                input: OperationInput::Inference(prepared),
+                origin: None,
+                source_call: None,
+                grants: GrantSelection {
+                    authority,
+                    grants: vec![],
+                },
+            }),
+            JournalAction::StartAttempt {
+                operation: operation.clone(),
+                attempt: attempt.clone(),
+            },
+            JournalAction::CompleteAttempt {
+                operation: operation.clone(),
+                attempt: attempt.clone(),
+                outcome: outcome(InferenceStatus::Interrupted),
+            },
+            JournalAction::Settle(TurnOutcome {
+                status: OutcomeStatus::Uncertain,
+                account: None,
+                evidence: vec![operation.clone()],
+            }),
+        ],
+    )
+    .await;
+    finish_history_turn(
+        &store,
+        session(),
+        "newer",
+        vec![history_message("newer", "latest")],
+    )
+    .await;
+    let project = |state: &TurnState| {
+        if let Some(outcome) = state
+            .operations()
+            .values()
+            .next()
+            .and_then(|op| op.outcome())
+        {
+            vec![history_message(
+                "derived",
+                if outcome.is_success() {
+                    "confirmed"
+                } else {
+                    "uncertain"
+                },
+            )]
+        } else {
+            state.history().records().to_vec()
+        }
+    };
+    let before = store
+        .retained_history_with(session(), HistorySelection::Current, project)
+        .await
+        .unwrap();
+    let revision = store.inspect(session()).await.unwrap().revision;
+    commit(
+        &old,
+        "late-evidence",
+        vec![JournalAction::ReconcileAttempt {
+            operation,
+            attempt,
+            outcome: outcome(InferenceStatus::Completed),
+        }],
+    )
+    .await;
+    let after = store
+        .retained_history_with(session(), HistorySelection::Current, project)
+        .await
+        .unwrap();
+    assert_eq!(store.inspect(session()).await.unwrap().revision, revision);
+    assert_eq!(before.basis.tail, after.basis.tail);
+    assert_ne!(before.records, after.records);
+    assert_ne!(before.basis.fingerprint, after.basis.fingerprint);
+
+    let destination = SessionId::new("stale-derived").unwrap();
+    assert_error(
+        store
+            .create_seeded(
+                SeededSession {
+                    create: CreateSession {
+                        id: destination.clone(),
+                        request: change("fork"),
+                        configuration: payload("settings"),
+                    },
+                    source: session(),
+                    expected_history: before.basis,
+                    intent: Fingerprint::of(&"older cut").unwrap(),
+                },
+                project,
+                |_| panic!("must refuse a stale projection before lowering"),
+            )
+            .await,
+        ErrorKind::Conflict,
+        "history_basis_changed",
+    );
+    assert_error(
+        store.inspect(destination).await,
+        ErrorKind::InvalidInput,
+        "session_missing",
+    );
+}
+
+#[tokio::test]
+async fn malformed_seed_creates_neither_a_session_nor_a_receipt() {
+    let (_directory, store) = store().await;
+    let destination = SessionId::new("malformed-seed").unwrap();
+    let request = SeededSession {
+        create: CreateSession {
+            id: destination.clone(),
+            request: change("seed"),
+            configuration: payload("settings"),
+        },
+        source: session(),
+        expected_history: current_history(&store, session()).await.basis,
+        intent: Fingerprint::of(&"cut").unwrap(),
+    };
+    let duplicate = history_message("duplicate", "two records share one identity");
+    assert_error(
+        store
+            .create_seeded(
+                request.clone(),
+                |_| vec![],
+                move |_| {
+                    Ok(HistorySeed {
+                        records: vec![duplicate.clone(), duplicate],
+                        provenance: payload("fixture lineage"),
+                    })
+                },
+            )
+            .await,
+        ErrorKind::Conflict,
+        "duplicate_message",
+    );
+    assert_error(
+        store.inspect(destination.clone()).await,
+        ErrorKind::InvalidInput,
+        "session_missing",
+    );
+    assert_eq!(
+        store
+            .create_seeded(request, |_| vec![], copy_seed)
+            .await
+            .unwrap()
+            .session,
+        destination
+    );
 }

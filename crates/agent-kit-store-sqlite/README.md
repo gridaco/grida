@@ -44,12 +44,25 @@ Replacement and withdrawal preserve original payloads and dispositions.
 Their controls, queue updates, and receipts commit together. Reopening upgrades
 the earlier schema transactionally while retaining completed and queued inputs.
 
-`SqliteStore::history` reads committed records in turn creation order and
-preserves their append order within each turn. An optional exclusive turn cut
-selects the history available before that turn. Projection reads the retained
-snapshots without modifying them or acquiring a turn lease. It returns an
+`SqliteStore::history` reads the active view's materialized seed and committed
+local records in append order. An exclusive turn cut selects the view that
+owned that turn and reads its history through the preceding turn. Projection
+reads the retained snapshots without modifying them or acquiring a lease. It returns an
 explicit limit error if the result exceeds 4,096 records or 8 MiB encoded, or
 the scan exceeds 4,096 turns or 128 MiB of stored snapshots.
+
+`retained_history_with` also exposes seed provenance, view identity and committed
+journal positions. A seeded session can capture the committed view of a running
+source and retain the materialized prefix independently. Revising history requires
+an idle session and an empty queue. The new view and replacement input commit in
+one transaction, preserving admission pause, previous views and turn snapshots.
+Creation and revision use a committed history basis and return their original
+receipts for exact retries.
+
+The history basis covers the view, seed and every scanned snapshot, including
+later evidence recorded for an older turn. Session inspection keeps reporting
+the latest retained execution. The selected history basis identifies the latest
+turn in that particular view when one exists.
 
 Caller-owned pure projections can inspect a committed turn or transform each
 turn's history within those bounded reads. They acquire no execution lease.
