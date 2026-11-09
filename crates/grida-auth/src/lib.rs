@@ -8,6 +8,7 @@ mod config;
 #[cfg(feature = "conformance")]
 #[doc(hidden)]
 pub mod conformance;
+mod credential_continuity;
 mod credential_lock;
 mod custody;
 mod keyring;
@@ -17,6 +18,7 @@ mod wire;
 
 pub use client::{AuthClient, GgGrant, Request, Response, Transport};
 pub use config::Config;
+pub use credential_continuity::CredentialContinuityStore;
 pub use credential_lock::CredentialLock;
 pub use custody::{Backend, StorageInfo};
 pub use providers::{Presence, ProviderStore};

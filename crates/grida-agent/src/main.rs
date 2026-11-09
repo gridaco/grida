@@ -2,7 +2,7 @@ use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
 use grida_agent::host::{Host, PromptPart, PromptRequest, RunResult, change_id};
-use grida_agent::{ProviderOptions, acp};
+use grida_agent::{ProviderOptions, ProviderProtocol, acp};
 use grida_agent_master::read_account;
 use serde::Serialize;
 use serde_json::json;
@@ -118,18 +118,38 @@ fn launch(command: Command) -> Command {
     command
         .arg(state_dir())
         .arg(
+            Arg::new("provider")
+                .long("provider")
+                .value_name("PROTOCOL")
+                .value_parser(["openai-compatible", "anthropic", "gemini"])
+                .default_value("openai-compatible"),
+        )
+        .arg(
             Arg::new("endpoint")
                 .long("endpoint")
                 .value_name("BASE_URL")
-                .help("Explicit OpenAI-compatible HTTPS base URL, or loopback HTTP for local providers")
+                .help("Explicit provider HTTPS base URL, or loopback HTTP for local providers")
                 .required(true),
         )
-        .arg(Arg::new("model").long("model").value_name("ID").required(true))
+        .arg(
+            Arg::new("model")
+                .long("model")
+                .value_name("ID")
+                .required(true),
+        )
         .arg(
             Arg::new("credential-env")
                 .long("credential-env")
                 .value_name("ENVIRONMENT_VARIABLE")
-                .help("Read the bearer credential from this host environment variable"),
+                .help("Read the provider credential from this host environment variable")
+                .conflicts_with("credential-home"),
+        )
+        .arg(
+            Arg::new("credential-home")
+                .long("credential-home")
+                .value_name("DIRECTORY")
+                .value_parser(value_parser!(PathBuf))
+                .help("Read the selected vendor's stored key from an explicit Grida home"),
         )
         .arg(
             Arg::new("max-output-tokens")
@@ -162,6 +182,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         return Ok(0);
     }
     let provider = ProviderOptions {
+        protocol: args
+            .get_one::<String>("provider")
+            .expect("provider default")
+            .parse::<ProviderProtocol>()?,
+        credential_home: args.get_one::<PathBuf>("credential-home").cloned(),
         endpoint: args
             .get_one::<String>("endpoint")
             .expect("required endpoint")

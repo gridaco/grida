@@ -4,6 +4,7 @@ use agent_client_protocol::v1::schema::{
     PromptRequest, ResourceLink, SessionNotification, SessionUpdate, StopReason,
 };
 use agent_client_protocol::{ByteStreams, Client, on_receive_notification};
+use grida_agent::ProviderProtocol;
 use serde_json::{Value, json};
 use std::path::Path;
 use std::process::Stdio;
@@ -30,6 +31,7 @@ enum Reply {
     Finished(&'static str),
     Hold(&'static str),
     Stop(&'static str),
+    GeminiSigned(&'static str),
 }
 
 impl Endpoint {
@@ -38,13 +40,26 @@ impl Endpoint {
     }
 
     async fn start_with_credential(replies: Vec<Reply>, credential: Option<&'static str>) -> Self {
+        Self::start_protocol(ProviderProtocol::OpenAiCompatible, replies, credential).await
+    }
+
+    async fn start_protocol(
+        protocol: ProviderProtocol,
+        replies: Vec<Reply>,
+        credential: Option<&'static str>,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let url = format!("http://{}/v1", listener.local_addr().unwrap());
+        let version = if protocol == ProviderProtocol::Gemini {
+            "v1beta"
+        } else {
+            "v1"
+        };
+        let url = format!("http://{}/{version}", listener.local_addr().unwrap());
         let (sent, requests) = mpsc::unbounded_channel();
         let task = tokio::spawn(async move {
             for reply in replies {
                 let (stream, _) = timeout(WAIT, listener.accept()).await.unwrap().unwrap();
-                fixture_request(stream, &sent, reply, credential).await;
+                fixture_request(stream, &sent, reply, protocol, credential).await;
             }
         });
         Self {
@@ -67,14 +82,21 @@ async fn fixture_request(
     stream: TcpStream,
     sent: &mpsc::UnboundedSender<Value>,
     reply: Reply,
+    protocol: ProviderProtocol,
     credential: Option<&str>,
 ) {
     let mut stream = BufReader::new(stream);
     let mut line = String::new();
     stream.read_line(&mut line).await.unwrap();
-    assert_eq!(line, "POST /v1/chat/completions HTTP/1.1\r\n");
+    let path = match protocol {
+        ProviderProtocol::OpenAiCompatible => "/v1/chat/completions",
+        ProviderProtocol::Anthropic => "/v1/messages",
+        ProviderProtocol::Gemini => "/v1beta/models/fixture-model:streamGenerateContent?alt=sse",
+    };
+    assert_eq!(line, format!("POST {path} HTTP/1.1\r\n"));
     let mut length = None;
     let mut authorization = None;
+    let mut anthropic_version = None;
     loop {
         line.clear();
         assert_ne!(stream.read_line(&mut line).await.unwrap(), 0);
@@ -85,36 +107,35 @@ async fn fixture_request(
         if key.eq_ignore_ascii_case("content-length") {
             length = Some(value.trim().parse::<usize>().unwrap());
         }
-        if key.eq_ignore_ascii_case("authorization") {
-            authorization = Some(value.trim().to_owned());
+        if ["authorization", "x-api-key", "x-goog-api-key"]
+            .into_iter()
+            .any(|name| key.eq_ignore_ascii_case(name))
+        {
+            assert!(authorization.is_none());
+            authorization = Some((key.to_ascii_lowercase(), value.trim().to_owned()));
+        }
+        if key.eq_ignore_ascii_case("anthropic-version") {
+            anthropic_version = Some(value.trim().to_owned());
         }
     }
     assert_eq!(
         authorization,
-        credential.map(|value| format!("Bearer {value}"))
+        credential.map(|value| match protocol {
+            ProviderProtocol::OpenAiCompatible =>
+                ("authorization".into(), format!("Bearer {value}")),
+            ProviderProtocol::Anthropic => ("x-api-key".into(), value.into()),
+            ProviderProtocol::Gemini => ("x-goog-api-key".into(), value.into()),
+        })
     );
+    if protocol == ProviderProtocol::Anthropic {
+        assert_eq!(anthropic_version.as_deref(), Some("2023-06-01"));
+    }
     let mut request = vec![0; length.unwrap()];
     stream.read_exact(&mut request).await.unwrap();
     sent.send(serde_json::from_slice(&request).unwrap())
         .unwrap();
-    let (text, finish) = match reply {
-        Reply::Finished(text) => (text, Some("stop")),
-        Reply::Hold(text) => (text, None),
-        Reply::Stop(reason) => ("", Some(reason)),
-    };
-    let delta = json!({
-        "id": "fixture-response",
-        "choices": [{"index": 0, "delta": {"role": "assistant", "content": text}, "finish_reason": null}],
-    });
-    let mut body = format!("data: {delta}\n\n");
-    if let Some(reason) = finish {
-        let stop = json!({
-            "id": "fixture-response",
-            "choices": [{"index": 0, "delta": {}, "finish_reason": reason}],
-        });
-        body.push_str(&format!("data: {stop}\n\ndata: [DONE]\n\n"));
-    }
-    let hold = finish.is_none();
+    let hold = matches!(reply, Reply::Hold(_));
+    let body = fixture_body(reply, protocol);
     let advertised_length = if hold { 1 << 20 } else { body.len() };
     let head = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {advertised_length}\r\nConnection: close\r\nX-Request-Id: fixture-request\r\n\r\n"
@@ -133,6 +154,69 @@ async fn fixture_request(
             0
         );
     }
+}
+
+fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
+    let mut signed = false;
+    let (text, finish) = match reply {
+        Reply::Finished(text) => (text, Some("stop")),
+        Reply::Hold(text) => (text, None),
+        Reply::Stop(reason) => ("", Some(reason)),
+        Reply::GeminiSigned(text) => {
+            signed = true;
+            (text, Some("stop"))
+        }
+    };
+    let mut output = String::new();
+    let mut frame = |event: Value| {
+        use std::fmt::Write as _;
+        write!(output, "data: {event}\n\n").unwrap();
+    };
+    match protocol {
+        ProviderProtocol::OpenAiCompatible => {
+            frame(json!({
+                "id": "fixture-response",
+                "choices": [{"index":0,"delta":{"role":"assistant","content":text},"finish_reason":null}],
+            }));
+            if let Some(reason) = finish {
+                frame(json!({
+                    "id": "fixture-response",
+                    "choices": [{"index":0,"delta":{},"finish_reason":reason}],
+                }));
+                output.push_str("data: [DONE]\n\n");
+            }
+        }
+        ProviderProtocol::Anthropic => {
+            assert!(finish.is_some());
+            frame(
+                json!({"type":"message_start","message":{"role":"assistant","content":[],"usage":{"input_tokens":5,"output_tokens":0}}}),
+            );
+            frame(
+                json!({"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}),
+            );
+            frame(
+                json!({"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":text}}),
+            );
+            frame(json!({"type":"content_block_stop","index":0}));
+            frame(
+                json!({"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":3}}),
+            );
+            frame(json!({"type":"message_stop"}));
+        }
+        ProviderProtocol::Gemini => {
+            assert!(finish.is_some());
+            let mut part = json!({"text":text});
+            if signed {
+                part["thoughtSignature"] = "c2lnbg==".into();
+            }
+            frame(json!({
+                "responseId":"fixture-response",
+                "candidates":[{"index":0,"content":{"role":"model","parts":[part]},"finishReason":"STOP"}],
+                "usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3},
+            }));
+        }
+    }
+    output
 }
 
 fn executable() -> Command {
@@ -646,6 +730,8 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
     let host = Host::open(
         &temporary.path().join("agent-state"),
         Some(ProviderOptions {
+            protocol: ProviderProtocol::OpenAiCompatible,
+            credential_home: None,
             endpoint: endpoint.url.clone(),
             model: ModelId::new("fixture-model").unwrap(),
             credential_env: None,
@@ -1169,6 +1255,8 @@ async fn retry_reports_a_previously_accepted_unclaimed_input_without_starting_it
     let state = temporary.path().join("agent-state");
     let workspace = TempDir::new().unwrap();
     let options = || ProviderOptions {
+        protocol: ProviderProtocol::OpenAiCompatible,
+        credential_home: None,
         endpoint: "http://127.0.0.1:1/v1".into(),
         model: ModelId::new("fixture-model").unwrap(),
         credential_env: None,
@@ -1332,4 +1420,324 @@ async fn abrupt_host_exit_retains_interrupted_turn_and_blocks_replacement() {
     ));
     endpoint.task.abort();
     let _ = endpoint.task.await;
+}
+
+#[tokio::test]
+async fn built_anthropic_host_uses_native_headers_body_and_stream() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Anthropic,
+        vec![Reply::Finished("Anthropic reply.")],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let mut command = executable();
+    command.args(["run", "--provider", "anthropic"]);
+    configured(
+        &mut command,
+        &state,
+        &endpoint.url.replace("127.0.0.1", "localhost"),
+    );
+    command
+        .arg("--cwd")
+        .arg(workspace.path())
+        .args(["--prompt", "Use the native route"]);
+    let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let output = records(&output.stdout);
+    assert_eq!(output[1]["account"]["text"], "Anthropic reply.");
+    let request = endpoint.request().await;
+    assert_eq!(request["stream"], true);
+    assert_eq!(request["max_tokens"], 4096);
+    assert_eq!(
+        request["messages"][0]["content"][0]["text"],
+        "Use the native route"
+    );
+    endpoint.done().await;
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[tokio::test]
+async fn built_gemini_host_replays_signed_history_only_for_unchanged_credentials() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Gemini,
+        vec![
+            Reply::GeminiSigned("Signed response."),
+            Reply::Finished("Continued response."),
+            Reply::Finished("Unexpected response."),
+        ],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let run = |session: Option<&str>, prompt: &str, credential: &str| {
+        let mut command = executable();
+        command.args(["run", "--provider", "gemini"]);
+        configured(&mut command, &state, &endpoint.url);
+        command
+            .env("GRIDA_AGENT_PROCESS_TEST_KEY", credential)
+            .arg("--cwd")
+            .arg(workspace.path())
+            .args(["--prompt", prompt]);
+        if let Some(session) = session {
+            command.args(["--session", session, "--max-output-tokens", "2048"]);
+        }
+        command
+    };
+    let first = timeout(WAIT, run(None, "First", TEST_CREDENTIAL).output())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let first = records(&first.stdout);
+    let session = first[0]["session_id"].as_str().unwrap();
+    assert_eq!(first[1]["account"]["text"], "Signed response.");
+    let second = timeout(WAIT, run(Some(session), "Second", TEST_CREDENTIAL).output())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        second.status.success(),
+        "{}",
+        String::from_utf8_lossy(&second.stderr)
+    );
+    assert_eq!(
+        records(&second.stdout)[1]["account"]["text"],
+        "Continued response."
+    );
+    let rotated = timeout(
+        WAIT,
+        run(Some(session), "Do not replay", "changed-fixture-token").output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(rotated.status.code(), Some(1));
+    let rotated = records(&rotated.stdout);
+    assert_eq!(
+        rotated[1]["account"]["failure"]["code"],
+        "provider_state_binding_changed"
+    );
+    let initial = endpoint.request().await;
+    assert_eq!(initial["contents"][0]["parts"][0]["text"], "First");
+    let continued = endpoint.request().await;
+    assert_eq!(
+        continued["contents"][1]["parts"][0]["thoughtSignature"],
+        "c2lnbg=="
+    );
+    assert_eq!(continued["contents"][2]["parts"][0]["text"], "Second");
+    assert_eq!(continued["generationConfig"]["maxOutputTokens"], 2048);
+    assert!(matches!(
+        endpoint.requests.try_recv(),
+        Err(mpsc::error::TryRecvError::Empty)
+    ));
+    endpoint.task.abort();
+    let _ = endpoint.task.await;
+}
+
+#[tokio::test]
+async fn stored_provider_key_cannot_be_selected_for_a_custom_destination() {
+    let temporary = TempDir::new().unwrap();
+    let credential_home = temporary.path().join("credential-home");
+    let mut command = executable();
+    let output = timeout(
+        WAIT,
+        command
+            .args(["serve", "--stdio", "--provider", "anthropic"])
+            .arg("--state-dir")
+            .arg(temporary.path().join("agent-state"))
+            .args([
+                "--endpoint",
+                "https://api.anthropic.com/unapproved",
+                "--model",
+                "fixture-model",
+            ])
+            .arg("--credential-home")
+            .arg(&credential_home)
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("stored_credential_endpoint_mismatch")
+    );
+    assert!(!credential_home.exists());
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[tokio::test]
+async fn trusted_vendor_launch_reads_its_explicit_stored_credential() {
+    let temporary = TempDir::new().unwrap();
+    let directory = temporary.path().canonicalize().unwrap();
+    let credential_home = directory.join("credential-home");
+    grida_auth::ProviderStore::new(credential_home.clone())
+        .unwrap()
+        .set("openrouter", TEST_CREDENTIAL)
+        .unwrap();
+
+    let output = timeout(
+        WAIT,
+        executable()
+            .args(["serve", "--stdio"])
+            .arg("--state-dir")
+            .arg(directory.join("agent-state"))
+            .args([
+                "--endpoint",
+                "https://openrouter.ai/api/v1",
+                "--model",
+                "fixture-model",
+            ])
+            .arg("--credential-home")
+            .arg(credential_home)
+            .stdin(Stdio::null())
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    // EOF ends the initialized host without an inference request.
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stdout.is_empty());
+    assert!(!String::from_utf8_lossy(&output.stderr).contains(TEST_CREDENTIAL));
+}
+
+#[tokio::test]
+async fn remote_https_uses_the_host_proxy_without_sending_provider_credentials_to_it() {
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let proxy_url = format!(
+        "http://proxy-user:proxy-test-secret@{}",
+        proxy.local_addr().unwrap()
+    );
+    let mut command = executable();
+    command.arg("run");
+    configured(
+        &mut command,
+        &temporary.path().join("agent-state"),
+        "https://provider.invalid/v1",
+    );
+    configure_proxy(&mut command, &proxy_url);
+    command
+        .arg("--cwd")
+        .arg(workspace.path())
+        .args(["--prompt", "Do not send this to a proxy"]);
+    let (output, handshake) = timeout(WAIT, async {
+        tokio::join!(command.output(), reject_proxy_tunnel(proxy))
+    })
+    .await
+    .unwrap();
+    let output = output.unwrap();
+    assert!(!output.status.success());
+    assert!(handshake.starts_with("CONNECT provider.invalid:443 HTTP/1.1\r\n"));
+    assert!(handshake.lines().any(|line| {
+        line.to_ascii_lowercase()
+            .starts_with("proxy-authorization: basic ")
+    }));
+    assert!(
+        !handshake
+            .lines()
+            .any(|line| line.to_ascii_lowercase().starts_with("authorization:"))
+    );
+    assert!(!handshake.contains(TEST_CREDENTIAL));
+    assert!(!handshake.contains("Do not send this to a proxy"));
+    for bytes in [output.stdout, output.stderr] {
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(!text.contains(TEST_CREDENTIAL));
+        assert!(!text.contains("proxy-test-secret"));
+    }
+}
+
+#[tokio::test]
+async fn loopback_provider_bypasses_even_an_explicit_host_proxy() {
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Finished("Direct reply.")]).await;
+    let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let proxy_url = format!("http://{}", proxy.local_addr().unwrap());
+    let mut command = executable();
+    command.arg("run");
+    configured(
+        &mut command,
+        &temporary.path().join("agent-state"),
+        &endpoint.url.replace("127.0.0.1", "localhost"),
+    );
+    configure_proxy(&mut command, &proxy_url);
+    command
+        .arg("--cwd")
+        .arg(workspace.path())
+        .args(["--prompt", "Use the local provider"]);
+    let output = tokio::select! {
+        output = timeout(WAIT, command.output()) => output.unwrap().unwrap(),
+        _ = proxy.accept() => panic!("local provider request was routed through a proxy"),
+    };
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        records(&output.stdout)[1]["account"]["text"],
+        "Direct reply."
+    );
+    assert_eq!(
+        endpoint.request().await["messages"][1]["content"],
+        "Use the local provider"
+    );
+    endpoint.done().await;
+}
+
+fn configure_proxy(command: &mut Command, proxy: &str) {
+    for name in [
+        "HTTP_PROXY",
+        "http_proxy",
+        "HTTPS_PROXY",
+        "https_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+    ] {
+        command.env(name, proxy);
+    }
+    for name in ["NO_PROXY", "no_proxy", "REQUEST_METHOD"] {
+        command.env_remove(name);
+    }
+}
+
+async fn reject_proxy_tunnel(proxy: TcpListener) -> String {
+    let (connection, _) = proxy.accept().await.unwrap();
+    let mut connection = BufReader::new(connection);
+    let mut handshake = String::new();
+    loop {
+        let mut line = String::new();
+        assert_ne!(connection.read_line(&mut line).await.unwrap(), 0);
+        if line == "\r\n" {
+            break;
+        }
+        handshake.push_str(&line);
+        assert!(handshake.len() < 16 * 1024);
+    }
+    connection
+        .get_mut()
+        .write_all(b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        .await
+        .unwrap();
+    handshake
 }

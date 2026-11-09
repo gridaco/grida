@@ -1,7 +1,7 @@
 //! Product composition and ownership for native agent turns.
 
 use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
-use crate::http::{HttpTransport, ProviderOptions};
+use crate::http::{HttpTransport, ProviderOptions, ProviderProtocol};
 use agent_kit_core::authority::{AuthorityRequest, AuthorityValidator, GrantSelection};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{Modality, ModelCapabilities, Provider};
@@ -12,7 +12,10 @@ use agent_kit_core::{
     BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, MessageId, Result,
     SchemaId, SessionId, TurnId,
 };
-use agent_kit_providers::{ModelProfile, OpenAiCompatible, OutputLimitField, StreamLimits};
+use agent_kit_providers::{
+    Anthropic, Gemini, GeminiProfile, ModelProfile, OpenAiCompatible, OutputLimitField,
+    StreamLimits,
+};
 use agent_kit_runtime::{
     AdmissionContext, ExecutionLimits, ExecutionServices, Runtime, ToolAdmission, ToolDecision,
     ToolGate, TurnUpdate,
@@ -54,6 +57,7 @@ pub struct Host {
 
 struct Execution {
     configuration: Fingerprint,
+    legacy_configuration: Fingerprint,
     runtime: Runtime,
     config: MasterConfig,
     provider: Arc<dyn Provider>,
@@ -114,6 +118,7 @@ pub struct DurableSubmission {
 struct StoredPrompt {
     parts: Vec<PromptPart>,
     configuration: ConfigurationSnapshot,
+    max_output_tokens: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -147,7 +152,10 @@ impl Host {
             .map(|_| Configuration::open(state_dir))
             .transpose()?
             .map(Arc::new);
-        let execution = provider.map(Execution::new).transpose()?.map(Arc::new);
+        let execution = provider
+            .map(|options| Execution::new(state_dir, options))
+            .transpose()?
+            .map(Arc::new);
         Ok(Self {
             store,
             execution,
@@ -172,7 +180,7 @@ impl Host {
             .create(CreateSession {
                 id: session.clone(),
                 request: change_id()?,
-                configuration: encode(SESSION_SCHEMA, 1, &configuration)?,
+                configuration: encode(SESSION_SCHEMA, 2, &configuration)?,
             })
             .await?;
         Ok(session)
@@ -271,7 +279,12 @@ impl Host {
         }
         let execution = self.execution()?;
         let view = self.store.inspect(session.clone()).await?;
-        if session_configuration(&view)?.execution != execution.configuration {
+        let expected_configuration = if view.configuration.version() == 1 {
+            execution.legacy_configuration
+        } else {
+            execution.configuration
+        };
+        if session_configuration(&view)?.execution != expected_configuration {
             return Err(problem(
                 ErrorKind::Conflict,
                 "session_execution_configuration_changed",
@@ -311,6 +324,7 @@ impl Host {
                         &StoredPrompt {
                             parts,
                             configuration,
+                            max_output_tokens: Some(execution.config.max_output_tokens),
                         },
                     )?,
                 },
@@ -591,33 +605,61 @@ impl Host {
 }
 
 impl Execution {
-    fn new(options: ProviderOptions) -> Result<Self> {
-        let configuration = Fingerprint::of(&options)?;
-        let transport = Arc::new(HttpTransport::new(&options)?);
+    fn new(state_dir: &Path, options: ProviderOptions) -> Result<Self> {
+        let legacy_configuration = Fingerprint::of(&options)?;
+        let transport = Arc::new(HttpTransport::new(state_dir, &options)?);
+        let configuration = transport.selection();
         let binding = transport.binding().clone();
-        let profile = ModelProfile {
-            capabilities: ModelCapabilities {
-                revision: BindingId::new("openai-compatible-text-v1")?,
-                input_modalities: [Modality::Text].into_iter().collect(),
-                json_tools: false,
-                text_tools: false,
-                max_output_tokens: None,
-            },
-            output_limit: OutputLimitField::CompletionTokens,
-            include_usage: true,
+        let capabilities = ModelCapabilities {
+            revision: BindingId::new(format!("{}-text-v1", options.protocol.as_str()))?,
+            input_modalities: [Modality::Text].into_iter().collect(),
+            json_tools: false,
+            text_tools: false,
+            max_output_tokens: None,
         };
-        let provider: Arc<dyn Provider> = Arc::new(OpenAiCompatible::new(
-            binding.clone(),
-            BTreeMap::from([(options.model.clone(), profile)]),
-            transport.clone(),
-            StreamLimits {
-                max_request_bytes: 1024 * 1024,
-                max_response_bytes: 4 * 1024 * 1024,
-                max_event_bytes: 256 * 1024,
-                max_tool_calls: 8,
-                max_tool_argument_bytes: 64 * 1024,
-            },
-        )?);
+        let limits = StreamLimits {
+            max_request_bytes: 1024 * 1024,
+            max_response_bytes: 4 * 1024 * 1024,
+            max_event_bytes: 256 * 1024,
+            max_tool_calls: 8,
+            max_tool_argument_bytes: 64 * 1024,
+        };
+        let provider: Arc<dyn Provider> = match options.protocol {
+            ProviderProtocol::OpenAiCompatible => Arc::new(OpenAiCompatible::new(
+                binding.clone(),
+                BTreeMap::from([(
+                    options.model.clone(),
+                    ModelProfile {
+                        capabilities,
+                        output_limit: OutputLimitField::CompletionTokens,
+                        include_usage: true,
+                    },
+                )]),
+                transport.clone(),
+                limits,
+            )?),
+            ProviderProtocol::Anthropic => Arc::new(Anthropic::new(
+                binding.clone(),
+                BTreeMap::from([(options.model.clone(), capabilities)]),
+                transport.clone(),
+                limits,
+            )?),
+            ProviderProtocol::Gemini => Arc::new(Gemini::new(
+                binding.clone(),
+                transport.replay_binding().cloned().ok_or_else(|| {
+                    problem(ErrorKind::InvalidState, "provider_replay_binding_missing")
+                })?,
+                BTreeMap::from([(
+                    options.model.clone(),
+                    GeminiProfile {
+                        capabilities,
+                        requires_tool_signatures: false,
+                    },
+                )]),
+                transport.clone(),
+                limits,
+            )?),
+        };
         let inference = GrantSelection {
             authority: binding.authority,
             grants: Vec::new(),
@@ -641,6 +683,7 @@ impl Execution {
         })?;
         Ok(Self {
             configuration,
+            legacy_configuration,
             runtime,
             config: MasterConfig {
                 model: options.model,
@@ -671,7 +714,7 @@ impl AuthorityValidator for InferenceAuthority {
                     "provider_authority_unavailable",
                 ));
             }
-            self.transport.validate_credential()
+            self.transport.validate_credential().await
         })
     }
 }
@@ -828,7 +871,7 @@ fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
 
 fn session_configuration(view: &SessionView) -> Result<SessionConfiguration> {
     let config = &view.configuration;
-    if config.schema().as_str() != SESSION_SCHEMA || config.version() != 1 {
+    if config.schema().as_str() != SESSION_SCHEMA || !matches!(config.version(), 1 | 2) {
         return Err(problem(
             ErrorKind::Unsupported,
             "unsupported_session_configuration",

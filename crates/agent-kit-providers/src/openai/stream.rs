@@ -1,6 +1,7 @@
-use super::{StreamLimits, short_identity};
-use crate::sse::Decoder;
-use crate::{StreamingTransport, TransportFailure, TransportRequest, TransportResponse};
+use crate::StreamLimits;
+use crate::wire::short_identity;
+use crate::wire::{Incoming, WireStream, classify_error};
+use crate::{StreamingTransport, TransportRequest};
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
     InferenceUpdate, MeasurementKind, ProviderEvent, UsageObservation,
@@ -8,9 +9,9 @@ use agent_kit_core::inference::{
 use agent_kit_core::messages::{
     Content, Message, Provenance, ProvenanceKind, Role, ToolArguments, ToolCall,
 };
-use agent_kit_core::{Envelope, MessageId, SchemaId, ToolCallId, ToolId};
+use agent_kit_core::{Envelope, MessageId, ToolCallId, ToolId};
 use futures_core::stream::BoxStream;
-use futures_util::{StreamExt, stream};
+use futures_util::stream;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;
@@ -25,20 +26,15 @@ pub(super) fn events(
 ) -> BoxStream<'static, ProviderEvent> {
     let source = request.binding.provider.to_string();
     let state = ResponseStream {
-        transport,
-        request: Some(request),
-        response: None,
+        wire: WireStream::new(transport, request, control.clone(), limits),
         control,
         limits,
         names,
-        decoder: Decoder::new(limits.max_event_bytes),
         updates: VecDeque::new(),
         source,
         message_id,
         response_id: None,
         receipt: None,
-        bytes_received: 0,
-        pending_limit: None,
         text: String::new(),
         refusal: String::new(),
         call_parts: BTreeMap::new(),
@@ -54,20 +50,15 @@ pub(super) fn events(
 }
 
 struct ResponseStream {
-    transport: Arc<dyn StreamingTransport>,
-    request: Option<TransportRequest>,
-    response: Option<TransportResponse>,
+    wire: WireStream,
     control: InferenceControl,
     limits: StreamLimits,
     names: BTreeMap<String, ToolId>,
-    decoder: Decoder,
     updates: VecDeque<ProviderEvent>,
     source: String,
     message_id: MessageId,
     response_id: Option<String>,
     receipt: Option<Envelope>,
-    bytes_received: usize,
-    pending_limit: Option<&'static str>,
     text: String,
     refusal: String,
     call_parts: BTreeMap<usize, CallParts>,
@@ -155,11 +146,6 @@ struct CompletionDetails {
 struct WireError {
     code: Option<serde_json::Value>,
 }
-#[derive(Deserialize)]
-struct ErrorBody {
-    error: WireError,
-}
-
 impl ResponseStream {
     async fn next(&mut self) -> Option<ProviderEvent> {
         loop {
@@ -169,77 +155,22 @@ impl ResponseStream {
             if self.finished {
                 return None;
             }
-            if let Some(request) = self.request.take() {
-                match self.transport.send(request, self.control.clone()).await {
-                    Ok(mut response) => {
-                        self.receipt = response.request_id.take().and_then(receipt);
-                        if let Some(receipt) = &self.receipt {
-                            self.updates
-                                .push_back(ProviderEvent::Receipt(receipt.clone()));
-                        }
-                        self.response = Some(response);
-                    }
-                    Err(TransportFailure::Unavailable) => self.fail(
-                        InferenceStatus::Failed,
-                        FailureKind::Transient,
-                        "transport_unavailable",
-                    ),
-                    Err(TransportFailure::Interrupted) => self.fail(
-                        InferenceStatus::Interrupted,
-                        FailureKind::Transient,
-                        "transport_interrupted",
-                    ),
+            match self.wire.next().await {
+                Incoming::Receipt(receipt) => {
+                    self.receipt = Some(receipt.clone());
+                    return Some(ProviderEvent::Receipt(receipt));
                 }
-                continue;
-            }
-            if let Some(event) = self.decoder.pop() {
-                if let Err(code) = self.event(&event) {
-                    self.fail(InferenceStatus::Interrupted, FailureKind::Protocol, code);
-                }
-                continue;
-            }
-            if let Some(code) = self.pending_limit.take() {
-                self.fail(InferenceStatus::Limited, FailureKind::OutputLimit, code);
-                continue;
-            }
-            if self
-                .response
-                .as_ref()
-                .is_some_and(|response| !(200..300).contains(&response.status))
-            {
-                let response = self
-                    .response
-                    .take()
-                    .expect("non-success response is present");
-                let failure = read_http_error(response, self.limits.max_event_bytes).await;
-                self.finish(InferenceStatus::Failed, Some(failure));
-                continue;
-            }
-            let response = self
-                .response
-                .as_mut()
-                .expect("a request establishes a response or an outcome");
-            match response.body.next().await {
-                Some(Ok(bytes)) => {
-                    let remaining = self.limits.max_response_bytes - self.bytes_received;
-                    let accepted = remaining.min(bytes.len());
-                    self.bytes_received += accepted;
-                    if self.decoder.feed(&bytes[..accepted]).is_err() {
-                        self.pending_limit = Some("event_byte_limit");
-                    } else if accepted < bytes.len() {
-                        self.pending_limit = Some("response_byte_limit");
+                Incoming::Frame(frame) => {
+                    if let Err(code) = self.event(&frame) {
+                        self.fail(InferenceStatus::Interrupted, FailureKind::Protocol, code);
                     }
                 }
-                Some(Err(_)) => self.fail(
-                    InferenceStatus::Interrupted,
-                    FailureKind::Transient,
-                    "transport_interrupted",
-                ),
-                None => self.fail(
+                Incoming::End => self.fail(
                     InferenceStatus::Interrupted,
                     FailureKind::Protocol,
                     "missing_terminal_event",
                 ),
+                Incoming::Failure(status, failure) => self.finish(status, Some(failure)),
             }
         }
     }
@@ -470,7 +401,7 @@ impl ResponseStream {
 
     fn finish(&mut self, status: InferenceStatus, failure: Option<InferenceFailure>) {
         self.finished = true;
-        self.response.take();
+        self.wire.close();
         let mut content = Vec::new();
         if !self.text.is_empty() {
             content.push(Content::Text(std::mem::take(&mut self.text)));
@@ -506,64 +437,5 @@ impl ResponseStream {
                 failure,
                 receipt: self.receipt.take(),
             }));
-    }
-}
-
-fn receipt(id: String) -> Option<Envelope> {
-    if id.is_empty()
-        || id.len() > 256
-        || !id
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
-    {
-        return None;
-    }
-    Envelope::new(
-        SchemaId::new("http.request-id").expect("constant schema"),
-        1,
-        id.into_bytes(),
-    )
-    .ok()
-}
-
-async fn read_http_error(mut response: TransportResponse, maximum: usize) -> InferenceFailure {
-    let mut bytes = Vec::new();
-    while let Some(Ok(chunk)) = response.body.next().await {
-        if chunk.len() > maximum.saturating_sub(bytes.len()) {
-            break;
-        }
-        bytes.extend_from_slice(&chunk);
-        if bytes.len() == maximum {
-            break;
-        }
-    }
-    let parsed: Option<ErrorBody> = serde_json::from_slice(&bytes).ok();
-    let code = parsed
-        .as_ref()
-        .and_then(|parsed| parsed.error.code.as_ref())
-        .and_then(serde_json::Value::as_str);
-    classify_error(response.status, code, response.retry_after_ms)
-}
-
-fn classify_error(
-    status: u16,
-    code: Option<&str>,
-    retry_after_ms: Option<u64>,
-) -> InferenceFailure {
-    let (kind, code) = match (status, code) {
-        (401 | 403, _) => (FailureKind::Authentication, "authentication_required"),
-        (_, Some("insufficient_quota" | "billing_hard_limit_reached")) => {
-            (FailureKind::Quota, "quota_exhausted")
-        }
-        (_, Some("context_length_exceeded")) => (FailureKind::ContextLimit, "context_limit"),
-        (429, _) => (FailureKind::RateLimit, "rate_limit"),
-        (408 | 500..=599, _) => (FailureKind::Transient, "provider_unavailable"),
-        (400 | 404 | 422, _) => (FailureKind::Configuration, "provider_request_rejected"),
-        _ => (FailureKind::Protocol, "provider_response_error"),
-    };
-    InferenceFailure {
-        kind,
-        code: code.into(),
-        retry_after_ms,
     }
 }

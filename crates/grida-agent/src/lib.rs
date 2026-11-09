@@ -2,7 +2,8 @@
 
 pub mod acp;
 pub mod configuration;
+mod custody;
 pub mod host;
 mod http;
 
-pub use http::ProviderOptions;
+pub use http::{ProviderOptions, ProviderProtocol};

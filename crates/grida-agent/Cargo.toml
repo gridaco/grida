@@ -17,16 +17,19 @@ clap = { workspace = true, features = ["help", "usage", "error-context"] }
 futures-channel = "0.3"
 futures-util = "0.3"
 grida-agent-master = { path = "../grida-agent-master" }
+grida-auth = { path = "../grida-auth" }
 libc = "0.2"
-reqwest = { version = "=0.13.5", default-features = false, features = ["rustls", "stream"] }
+reqwest = { version = "=0.13.5", default-features = false, features = ["rustls", "stream", "system-proxy"] }
 serde = { version = "1", features = ["derive"] }
 serde_json.workspace = true
+sha2 = "0.11"
 subtle = "2"
 tempfile = "3"
 toml_edit = "=0.25.15"
 tokio = { version = "1", features = ["io-std", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 uuid = { version = "1", features = ["v4"] }
+zeroize = "1"
 
 [dev-dependencies]
 socket2 = "0.6"

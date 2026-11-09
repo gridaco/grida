@@ -24,15 +24,45 @@ target/debug/grida-agent serve --stdio --state-dir "$GRIDA_AGENT_STATE" \
   --credential-env OPENAI_API_KEY
 ```
 
-Select an OpenAI-compatible HTTPS base URL or a numeric loopback HTTP base URL
-for a local provider. The host appends `chat/completions` to the base path.
-Omit `--credential-env` for a provider that accepts anonymous requests.
-The credential value stays in the process environment and the outbound
-authorization header. Each dispatch uses the captured host binding.
+Select a provider protocol, base URL, and model. HTTPS is accepted for remote
+providers. HTTP is limited to numeric loopback addresses or `localhost`,
+which resolves to loopback without DNS.
+
+| `--provider`                  | Base URL example                                   | Request                                                           |
+| ----------------------------- | -------------------------------------------------- | ----------------------------------------------------------------- |
+| `openai-compatible` (default) | `https://api.openai.com/v1`                        | Chat Completions with bearer authentication                       |
+| `anthropic`                   | `https://api.anthropic.com/v1`                     | Messages with API-key and version headers                         |
+| `gemini`                      | `https://generativelanguage.googleapis.com/v1beta` | Stream GenerateContent with the selected model and API-key header |
+
+Use `--credential-env NAME` to select a key from the host environment.
+Anonymous endpoints work when no credential source is selected.
+On macOS and Linux, `--credential-home DIRECTORY` uses the existing
+private Grida provider store in an explicit absolute directory. Stored keys
+are restricted to the reviewed vendor base URLs in the table and to
+`https://openrouter.ai/api/v1` and `https://ai-gateway.vercel.sh/v1` for the
+compatible protocol. Custom destinations can use an explicitly selected
+environment key. Each dispatch revalidates the captured credential and sends
+it only in the approved provider header.
+
+Remote HTTPS uses supported host proxy settings and verifies the endpoint
+with platform TLS trust. The client reads proxy configuration at startup.
+Set `HTTPS_PROXY` and `NO_PROXY` for an explicit route or exclusion. The native
+matcher also reads static OS proxy settings on macOS and Windows. Restart the
+host to apply routing or trust changes. PAC, automatic proxy discovery, and
+interactive or integrated proxy sign-in require a compatible host transport.
+When the native matcher finds no supported proxy setting, it routes directly.
+Numeric loopback and `localhost` endpoints always bypass proxies.
+
+Gemini retains signed model history across restarts when its protected
+credential proof still matches. A changed credential invalidates replay of
+that opaque history. The replay identity is separate from the live dispatch
+grant. Authenticated Gemini continuity uses the private storage supported on
+macOS and Linux.
 
 `run` reads one UTF-8 prompt from stdin or `--prompt`, with a 512 KiB
 input bound. `--session SESSION_ID` continues a settled session in its
-original workspace and launch configuration. `--deadline-ms` defaults to 120000. Stdout contains versioned JSON Lines, beginning with an `accepted`
+original workspace and provider selection. A changed output allowance
+applies to the new input. `--deadline-ms` defaults to 120000. Stdout contains versioned JSON Lines, beginning with an `accepted`
 record containing the session, turn, and input IDs. A verified terminal
 result adds a `finished` record with a disposition and any completion
 account. Diagnostics use stderr. A process signal after acceptance requests

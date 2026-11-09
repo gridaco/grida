@@ -1,54 +1,25 @@
+mod support;
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::inference::{
-    FailureKind, InferenceControl, InferenceRequest, InferenceStatus, InferenceUpdate, InputFormat,
-    Modality, ModelCapabilities, Provider, ProviderBinding, ToolOffer,
+    FailureKind, InferenceRequest, InferenceStatus, InferenceUpdate, InputFormat, Modality,
+    ModelCapabilities, Provider, ProviderBinding,
 };
 use agent_kit_core::messages::{
-    Content, MediaRef, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent,
-    Retention, Role, ToolArguments, ToolResult,
+    Content, MediaRef, OutcomeStatus, ResultContent, Retention, Role, ToolArguments, ToolResult,
 };
 use agent_kit_core::{
-    ArtifactId, AttemptId, BindingId, BoxFuture, CancellationToken, ErrorKind, Fingerprint,
-    MessageId, ModelId, PrincipalId, ProviderId, ScopeId, ToolId,
+    ArtifactId, AttemptId, BindingId, ErrorKind, ModelId, PrincipalId, ProviderId, ScopeId, ToolId,
 };
 use agent_kit_providers::{
-    ModelProfile, OpenAiCompatible, OutputLimitField, StreamLimits, StreamingTransport,
-    TransportFailure, TransportRequest, TransportResponse,
+    ModelProfile, OpenAiCompatible, OutputLimitField, StreamLimits, TransportFailure,
+    TransportOperation,
 };
-use futures_util::{StreamExt, stream};
 use serde_json::{Value, json};
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
-
-type Reply = Result<TransportResponse, TransportFailure>;
-
-struct FixtureTransport {
-    replies: Mutex<VecDeque<Reply>>,
-    requests: Mutex<Vec<(TransportRequest, InferenceControl)>>,
-}
-
-impl FixtureTransport {
-    fn new(replies: impl IntoIterator<Item = Reply>) -> Arc<Self> {
-        Arc::new(Self {
-            replies: Mutex::new(replies.into_iter().collect()),
-            requests: Mutex::new(Vec::new()),
-        })
-    }
-}
-
-impl StreamingTransport for FixtureTransport {
-    fn send(&self, request: TransportRequest, control: InferenceControl) -> BoxFuture<'_, Reply> {
-        self.requests.lock().unwrap().push((request, control));
-        let reply = self
-            .replies
-            .lock()
-            .unwrap()
-            .pop_front()
-            .expect("unexpected transport dispatch");
-        Box::pin(async { reply })
-    }
-}
+use support::{
+    FixtureTransport, control, frame, limits, message, offer, request, response, tool_request,
+};
 
 fn binding() -> ProviderBinding {
     ProviderBinding {
@@ -75,16 +46,6 @@ fn profile() -> ModelProfile {
     }
 }
 
-fn limits() -> StreamLimits {
-    StreamLimits {
-        max_request_bytes: 1 << 20,
-        max_response_bytes: 1 << 20,
-        max_event_bytes: 1 << 16,
-        max_tool_calls: 8,
-        max_tool_argument_bytes: 1 << 16,
-    }
-}
-
 fn adapter(transport: Arc<FixtureTransport>) -> OpenAiCompatible {
     configured(transport, profile(), limits())
 }
@@ -101,66 +62,6 @@ fn configured(
         limits,
     )
     .unwrap()
-}
-
-fn message(id: &str, role: Role, content: Vec<Content>) -> Message {
-    Message {
-        id: MessageId::new(id).unwrap(),
-        role,
-        phase: None,
-        content,
-        provenance: Provenance {
-            source: "fixture".into(),
-            kind: ProvenanceKind::Supplied,
-            fingerprint: None,
-        },
-    }
-}
-
-fn request() -> InferenceRequest {
-    InferenceRequest {
-        model: ModelId::new("model").unwrap(),
-        messages: vec![message(
-            "input",
-            Role::User,
-            vec![Content::Text("Respond briefly".into())],
-        )],
-        tools: vec![],
-        max_output_tokens: Some(32),
-        extension: None,
-    }
-}
-
-fn offer(id: &str) -> ToolOffer {
-    ToolOffer {
-        id: ToolId::new(id).unwrap(),
-        version: 1,
-        description: "Echo a value".into(),
-        input: InputFormat::Json(
-            json!({ "type": "object", "properties": { "value": { "type": "string" } } }),
-        ),
-        fingerprint: Fingerprint::of(&id).unwrap(),
-    }
-}
-
-fn tool_request() -> InferenceRequest {
-    InferenceRequest {
-        tools: vec![offer("echo")],
-        ..request()
-    }
-}
-
-fn control(id: &str) -> InferenceControl {
-    InferenceControl {
-        attempt: AttemptId::new(id).unwrap(),
-        cancellation: CancellationToken::new(),
-        deadline: None,
-        max_output_bytes: 1 << 20,
-    }
-}
-
-fn frame(value: Value) -> Vec<u8> {
-    format!("data: {value}\r\n\r\n").into_bytes()
 }
 
 fn choice(delta: Value, finish: Option<&str>) -> Vec<u8> {
@@ -196,21 +97,6 @@ fn function_response(arguments: [&str; 2]) -> Vec<Vec<u8>> {
     ]
 }
 
-fn response(chunks: impl IntoIterator<Item = Vec<u8>>, hold_open: bool) -> TransportResponse {
-    let chunks: Vec<_> = chunks.into_iter().map(Ok).collect();
-    let body = if hold_open {
-        stream::iter(chunks).chain(stream::pending()).boxed()
-    } else {
-        stream::iter(chunks).boxed()
-    };
-    TransportResponse {
-        status: 200,
-        request_id: Some("request_123".into()),
-        retry_after_ms: None,
-        body,
-    }
-}
-
 async fn execute(
     provider: &OpenAiCompatible,
     request: InferenceRequest,
@@ -241,7 +127,7 @@ async fn prepare_is_read_only_and_dispatch_uses_the_bound_route() {
     let (request, control) = &requests[0];
     let body: Value = serde_json::from_slice(&request.body).unwrap();
     assert_eq!(request.binding, binding());
-    assert_eq!(request.path, "chat/completions");
+    assert_eq!(request.operation, TransportOperation::ChatCompletions);
     assert_eq!(request.max_response_bytes, limits().max_response_bytes);
     assert_eq!(body["stream"], true);
     assert_eq!(body["stream_options"]["include_usage"], true);

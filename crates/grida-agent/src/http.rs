@@ -1,4 +1,6 @@
-//! Host-owned HTTP dispatch for an explicitly selected compatible endpoint.
+//! Host-owned HTTP dispatch for explicitly selected provider endpoints.
+
+use crate::custody::{CapturedCredential, CredentialFormat, CredentialSource};
 
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::inference::{InferenceControl, ProviderBinding};
@@ -7,17 +9,54 @@ use agent_kit_core::{
     ScopeId,
 };
 use agent_kit_providers::{
-    StreamingTransport, TransportFailure, TransportRequest, TransportResponse,
+    StreamingTransport, TransportFailure, TransportOperation, TransportRequest, TransportResponse,
 };
 use futures_util::StreamExt;
-use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderValue, RETRY_AFTER};
+use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderName, RETRY_AFTER};
 use reqwest::{Client, Url};
 use serde::Serialize;
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProviderProtocol {
+    #[default]
+    OpenAiCompatible,
+    Anthropic,
+    Gemini,
+}
+
+impl ProviderProtocol {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::OpenAiCompatible => "openai-compatible",
+            Self::Anthropic => "anthropic",
+            Self::Gemini => "gemini",
+        }
+    }
+
+    fn is_compatible(&self) -> bool {
+        *self == Self::OpenAiCompatible
+    }
+}
+
+impl std::str::FromStr for ProviderProtocol {
+    type Err = Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value {
+            "openai-compatible" => Ok(Self::OpenAiCompatible),
+            "anthropic" => Ok(Self::Anthropic),
+            "gemini" => Ok(Self::Gemini),
+            _ => Err(invalid("unknown_provider_protocol")),
+        }
+    }
+}
 
 #[derive(Serialize)]
 pub struct ProviderOptions {
@@ -25,57 +64,111 @@ pub struct ProviderOptions {
     pub model: ModelId,
     pub credential_env: Option<String>,
     pub max_output_tokens: u64,
+    // Preserve the launch fingerprint of existing compatible sessions.
+    #[serde(skip_serializing_if = "ProviderProtocol::is_compatible")]
+    pub protocol: ProviderProtocol,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credential_home: Option<PathBuf>,
 }
 
 pub struct HttpTransport {
     binding: ProviderBinding,
+    protocol: ProviderProtocol,
+    operation: TransportOperation,
     target: Url,
-    credential: Option<EnvironmentCredential>,
+    credential: Option<CapturedCredential>,
+    replay_binding: Option<BindingId>,
+    selection: Fingerprint,
     client: Client,
 }
 
-struct EnvironmentCredential {
-    name: String,
-    generation: Fingerprint,
-}
-
 impl HttpTransport {
-    pub fn new(options: &ProviderOptions) -> Result<Self> {
-        let target = completion_url(&options.endpoint)?;
-        let credential = options
-            .credential_env
+    pub fn new(state_dir: &Path, options: &ProviderOptions) -> Result<Self> {
+        let base = provider_base(&options.endpoint)?;
+        let (target, operation) = provider_route(base.clone(), options.protocol, &options.model)?;
+        let source = credential_source(options, &base)?;
+        let source_identity = match &source {
+            Some(CredentialSource::Environment { name }) => {
+                serde_json::json!(["environment", name])
+            }
+            Some(CredentialSource::Stored { home, provider }) => {
+                serde_json::json!(["stored", home, provider])
+            }
+            None => serde_json::json!(["anonymous"]),
+        };
+        let provider = options.protocol.as_str();
+        let lineage = Fingerprint::of(&(
+            "provider-lineage-v1",
+            provider,
+            base.as_str().trim_end_matches('/'),
+            source_identity,
+        ))?;
+        let selection = Fingerprint::of(&(lineage, &options.model))?;
+        let credential = source.map(CapturedCredential::capture).transpose()?;
+        let source = credential
             .as_ref()
-            .map(|name| EnvironmentCredential::capture(name.clone()))
-            .transpose()?;
+            .map_or("anonymous", CapturedCredential::source_kind);
         let binding = ProviderBinding {
-            provider: ProviderId::new("openai-compatible")?,
+            provider: ProviderId::new(provider)?,
             authority: AuthorityBinding {
-                principal: PrincipalId::new(if credential.is_some() {
-                    "host-environment"
-                } else {
-                    "anonymous"
-                })?,
-                // Persist an opaque generation identity. The credential and
-                // its digest remain in this host, outside the journal.
+                principal: PrincipalId::new(format!("{provider}/{source}"))?,
+                // Live dispatch grants are independent from replay lineage.
                 binding: BindingId::new(uuid::Uuid::new_v4().to_string())?,
                 scope: ScopeId::new("configured-provider")?,
             },
         };
-        let client = Client::builder()
+        let replay_binding = if options.protocol == ProviderProtocol::Gemini {
+            let binding = if let Some(credential) = &credential {
+                let state_dir = state_dir
+                    .canonicalize()
+                    .map_err(|_| problem("state_directory_unavailable"))?;
+                credential.replay_binding(&state_dir, lineage)?
+            } else {
+                let identity = uuid::Uuid::from_bytes(
+                    lineage.bytes()[..16]
+                        .try_into()
+                        .expect("fingerprint prefix"),
+                );
+                BindingId::new(identity.to_string())?
+            };
+            Some(binding)
+        } else {
+            None
+        };
+        let mut client = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())
             .pool_max_idle_per_host(0)
-            .no_proxy()
             .http1_only()
             .http1_max_headers(64)
             .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(REQUEST_TIMEOUT)
+            .timeout(REQUEST_TIMEOUT);
+        if base.host_str().is_some_and(is_loopback_host) {
+            // Loopback providers retain local routing even when the host
+            // environment or OS selects a proxy for remote providers.
+            client = client.no_proxy();
+        }
+        if base.host_str() == Some("localhost") {
+            // Resolve this spelling without relying on ambient DNS.
+            client = client.resolve_to_addrs(
+                "localhost",
+                &[
+                    SocketAddr::from(([127, 0, 0, 1], 0)),
+                    SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 0)),
+                ],
+            );
+        }
+        let client = client
             .build()
             .map_err(|_| problem("provider_http_client_unavailable"))?;
         Ok(Self {
             binding,
+            protocol: options.protocol,
+            operation,
             target,
             credential,
+            replay_binding,
+            selection,
             client,
         })
     }
@@ -84,15 +177,19 @@ impl HttpTransport {
         &self.binding
     }
 
-    pub fn validate_credential(&self) -> Result<()> {
-        self.authorization().map(|_| ())
+    pub fn selection(&self) -> Fingerprint {
+        self.selection
     }
 
-    fn authorization(&self) -> Result<Option<HeaderValue>> {
-        self.credential
-            .as_ref()
-            .map(EnvironmentCredential::read)
-            .transpose()
+    pub fn replay_binding(&self) -> Option<&BindingId> {
+        self.replay_binding.as_ref()
+    }
+
+    pub async fn validate_credential(&self) -> Result<()> {
+        if let Some(credential) = &self.credential {
+            credential.validate().await?;
+        }
+        Ok(())
     }
 }
 
@@ -103,7 +200,7 @@ impl StreamingTransport for HttpTransport {
         control: InferenceControl,
     ) -> BoxFuture<'_, std::result::Result<TransportResponse, TransportFailure>> {
         Box::pin(async move {
-            if request.binding != self.binding || request.path != "chat/completions" {
+            if request.binding != self.binding || request.operation != self.operation {
                 return Err(TransportFailure::Unavailable);
             }
             if control.cancellation.is_cancelled()
@@ -119,11 +216,33 @@ impl StreamingTransport for HttpTransport {
                 .header(CONTENT_TYPE, "application/json")
                 .header(ACCEPT, "text/event-stream")
                 .body(request.body);
-            if let Some(value) = self
-                .authorization()
-                .map_err(|_| TransportFailure::Unavailable)?
+            if self.protocol == ProviderProtocol::Anthropic {
+                outbound = outbound.header("anthropic-version", "2023-06-01");
+            }
+            if let Some(credential) = &self.credential {
+                let (name, format) = match self.protocol {
+                    ProviderProtocol::OpenAiCompatible => (AUTHORIZATION, CredentialFormat::Bearer),
+                    ProviderProtocol::Anthropic => (
+                        HeaderName::from_static("x-api-key"),
+                        CredentialFormat::ApiKey,
+                    ),
+                    ProviderProtocol::Gemini => (
+                        HeaderName::from_static("x-goog-api-key"),
+                        CredentialFormat::ApiKey,
+                    ),
+                };
+                let value = credential
+                    .header(format)
+                    .await
+                    .map_err(|_| TransportFailure::Unavailable)?;
+                outbound = outbound.header(name, value);
+            }
+            if control.cancellation.is_cancelled()
+                || control
+                    .deadline
+                    .is_some_and(|deadline| deadline <= std::time::Instant::now())
             {
-                outbound = outbound.header(AUTHORIZATION, value);
+                return Err(TransportFailure::Unavailable);
             }
             if let Some(deadline) = control.deadline {
                 outbound =
@@ -137,7 +256,10 @@ impl StreamingTransport for HttpTransport {
             let status = response.status().as_u16();
             let request_id = response
                 .headers()
-                .get("x-request-id")
+                .get(match self.protocol {
+                    ProviderProtocol::Anthropic => "request-id",
+                    ProviderProtocol::OpenAiCompatible | ProviderProtocol::Gemini => "x-request-id",
+                })
                 .and_then(|value| value.to_str().ok())
                 .filter(|value| {
                     value.len() <= 128
@@ -154,27 +276,35 @@ impl StreamingTransport for HttpTransport {
                 .and_then(|value| value.parse::<u64>().ok())
                 .and_then(|seconds| seconds.checked_mul(1000));
             let maximum = request.max_response_bytes;
-            if response
+            let body = if response
                 .content_length()
                 .is_some_and(|size| size > maximum as u64)
             {
-                return Err(TransportFailure::Interrupted);
-            }
-            let body = futures_util::stream::try_unfold(
+                // Preserve the already-observed response headers while
+                // declining to read the oversized body.
+                drop(response);
+                futures_util::stream::once(async { Err(TransportFailure::Interrupted) }).boxed()
+            } else {
+                futures_util::stream::try_unfold(
                 (
                     Box::pin(response.bytes_stream()),
                     0usize,
                     control.cancellation,
                 ),
                 move |(mut body, consumed, cancellation)| async move {
-                    let chunk = tokio::select! {
-                        _ = cancellation.cancelled() => return Err(TransportFailure::Interrupted),
-                        chunk = body.next() => chunk,
+                    let chunk = loop {
+                        let chunk = tokio::select! {
+                            _ = cancellation.cancelled() => return Err(TransportFailure::Interrupted),
+                            chunk = body.next() => chunk,
+                        };
+                        let Some(chunk) = chunk else {
+                            return Ok(None);
+                        };
+                        let chunk = chunk.map_err(|_| TransportFailure::Interrupted)?;
+                        if !chunk.is_empty() {
+                            break chunk;
+                        }
                     };
-                    let Some(chunk) = chunk else {
-                        return Ok(None);
-                    };
-                    let chunk = chunk.map_err(|_| TransportFailure::Interrupted)?;
                     let consumed = consumed
                         .checked_add(chunk.len())
                         .filter(|total| *total <= maximum)
@@ -182,7 +312,8 @@ impl StreamingTransport for HttpTransport {
                     Ok(Some((chunk.to_vec(), (body, consumed, cancellation))))
                 },
             )
-            .boxed();
+            .boxed()
+            };
             Ok(TransportResponse {
                 status,
                 request_id,
@@ -193,68 +324,116 @@ impl StreamingTransport for HttpTransport {
     }
 }
 
-impl EnvironmentCredential {
-    fn capture(name: String) -> Result<Self> {
-        if name.is_empty()
-            || name.len() > 128
-            || !name
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-        {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "invalid_credential_environment_name",
-            ));
+fn credential_source(options: &ProviderOptions, base: &Url) -> Result<Option<CredentialSource>> {
+    match (&options.credential_env, &options.credential_home) {
+        (Some(_), Some(_)) => Err(invalid("provider_credential_source_conflict")),
+        (Some(name), None) => Ok(Some(CredentialSource::Environment { name: name.clone() })),
+        (None, Some(home)) => {
+            let provider = stored_provider(options.protocol, base)
+                .ok_or_else(|| invalid("stored_credential_endpoint_mismatch"))?;
+            if !home.is_absolute() {
+                return Err(invalid("credential_home_must_be_absolute"));
+            }
+            let home = home
+                .canonicalize()
+                .map_err(|_| problem("credential_home_unavailable"))?;
+            Ok(Some(CredentialSource::Stored {
+                home,
+                provider: provider.into(),
+            }))
         }
-        let secret = credential_value(&name)?;
-        let generation = Fingerprint::of(&secret)?;
-        let credential = Self { name, generation };
-        credential.read()?;
-        Ok(credential)
-    }
-
-    fn read(&self) -> Result<HeaderValue> {
-        let secret = credential_value(&self.name)?;
-        if Fingerprint::of(&secret)? != self.generation {
-            return Err(problem("provider_credential_changed"));
-        }
-        let mut value = HeaderValue::from_str(&format!("Bearer {secret}"))
-            .map_err(|_| problem("provider_credential_invalid"))?;
-        value.set_sensitive(true);
-        Ok(value)
+        (None, None) => Ok(None),
     }
 }
 
-fn credential_value(name: &str) -> Result<String> {
-    std::env::var(name)
-        .ok()
-        .filter(|secret| !secret.is_empty() && secret.len() <= 4096)
-        .ok_or_else(|| problem("provider_credential_unavailable"))
+fn stored_provider(protocol: ProviderProtocol, base: &Url) -> Option<&'static str> {
+    if base.scheme() != "https" || base.port().is_some() {
+        return None;
+    }
+    let path = base.path().strip_suffix('/').unwrap_or(base.path());
+    match (protocol, base.host_str()?, path) {
+        (ProviderProtocol::OpenAiCompatible, "api.openai.com", "/v1") => Some("openai"),
+        (ProviderProtocol::OpenAiCompatible, "openrouter.ai", "/api/v1") => Some("openrouter"),
+        (ProviderProtocol::OpenAiCompatible, "ai-gateway.vercel.sh", "/v1") => Some("vercel"),
+        (ProviderProtocol::Anthropic, "api.anthropic.com", "/v1") => Some("anthropic"),
+        (ProviderProtocol::Gemini, "generativelanguage.googleapis.com", "/v1beta") => {
+            Some("google")
+        }
+        _ => None,
+    }
 }
 
-fn completion_url(endpoint: &str) -> Result<Url> {
-    let invalid = || Error::new(ErrorKind::InvalidInput, "invalid_provider_endpoint");
-    let mut url = Url::parse(endpoint).map_err(|_| invalid())?;
-    if url.host().is_none()
-        || !url.username().is_empty()
+fn provider_base(endpoint: &str) -> Result<Url> {
+    let invalid_endpoint = || invalid("invalid_provider_endpoint");
+    let url = Url::parse(endpoint).map_err(|_| invalid_endpoint())?;
+    let host = url.host_str().ok_or_else(invalid_endpoint)?;
+    if !url.username().is_empty()
         || url.password().is_some()
         || url.query().is_some()
         || url.fragment().is_some()
     {
-        return Err(invalid());
+        return Err(invalid_endpoint());
     }
-    let loopback = url
-        .host_str()
-        .and_then(|host| host.trim_matches(['[', ']']).parse::<IpAddr>().ok())
-        .is_some_and(|address| address.is_loopback());
-    if url.scheme() != "https" && !(url.scheme() == "http" && loopback) {
-        return Err(invalid());
+    if !(url.scheme() == "https" || (url.scheme() == "http" && is_loopback_host(host))) {
+        return Err(invalid_endpoint());
     }
-    url.path_segments_mut()
-        .map_err(|_| invalid())?
-        .pop_if_empty()
-        .extend(["chat", "completions"]);
     Ok(url)
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    host == "localhost"
+        || host
+            .trim_matches(['[', ']'])
+            .parse::<IpAddr>()
+            .is_ok_and(|address| address.to_canonical().is_loopback())
+}
+
+fn provider_route(
+    mut target: Url,
+    protocol: ProviderProtocol,
+    model: &ModelId,
+) -> Result<(Url, TransportOperation)> {
+    let mut segments = target
+        .path_segments_mut()
+        .map_err(|_| invalid("invalid_provider_endpoint"))?;
+    segments.pop_if_empty();
+    let operation = match protocol {
+        ProviderProtocol::OpenAiCompatible => {
+            segments.extend(["chat", "completions"]);
+            TransportOperation::ChatCompletions
+        }
+        ProviderProtocol::Anthropic => {
+            segments.push("messages");
+            TransportOperation::AnthropicMessages
+        }
+        ProviderProtocol::Gemini => {
+            if !model
+                .as_str()
+                .bytes()
+                .next()
+                .is_some_and(|byte| byte.is_ascii_alphanumeric())
+                || !model
+                    .as_str()
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+            {
+                return Err(invalid("invalid_gemini_model_path"));
+            }
+            segments.extend(["models", &format!("{model}:streamGenerateContent")]);
+            TransportOperation::GeminiStreamGenerateContent {
+                model: model.clone(),
+            }
+        }
+    };
+    drop(segments);
+    if protocol == ProviderProtocol::Gemini {
+        target.query_pairs_mut().append_pair("alt", "sse");
+    }
+    Ok((target, operation))
+}
+
+fn invalid(code: &'static str) -> Error {
+    Error::new(ErrorKind::InvalidInput, code)
 }
 
 fn problem(code: &'static str) -> Error {

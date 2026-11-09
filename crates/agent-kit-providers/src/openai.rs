@@ -1,16 +1,15 @@
 mod stream;
 
-use crate::{StreamingTransport, TransportRequest};
+use crate::wire::{function_name, short_identity, text_profile, tool_result};
+use crate::{StreamLimits, StreamingTransport, TransportOperation, TransportRequest};
 use agent_kit_core::inference::{
-    InferenceControl, InferenceRequest, InferenceRun, InputFormat, Modality, ModelCapabilities,
+    InferenceControl, InferenceRequest, InferenceRun, InputFormat, ModelCapabilities,
     PreparedRequest, Provider, ProviderBinding,
 };
-use agent_kit_core::messages::{Content, Message, ResultContent, Role, ToolArguments};
-use agent_kit_core::{Error, ErrorKind, Fingerprint, ModelId, Result, ToolId};
-use serde::Serialize;
+use agent_kit_core::messages::{Content, Message, Role, ToolArguments};
+use agent_kit_core::{Error, ErrorKind, ModelId, Result, ToolId};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
-use std::fmt::Write;
 use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,15 +26,6 @@ pub struct ModelProfile {
     pub include_usage: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct StreamLimits {
-    pub max_request_bytes: usize,
-    pub max_response_bytes: usize,
-    pub max_event_bytes: usize,
-    pub max_tool_calls: usize,
-    pub max_tool_argument_bytes: usize,
-}
-
 pub struct OpenAiCompatible {
     binding: ProviderBinding,
     models: BTreeMap<ModelId, ModelProfile>,
@@ -50,25 +40,11 @@ impl OpenAiCompatible {
         transport: Arc<dyn StreamingTransport>,
         limits: StreamLimits,
     ) -> Result<Self> {
-        if limits.max_request_bytes == 0
-            || limits.max_response_bytes == 0
-            || limits.max_event_bytes == 0
-            || limits.max_event_bytes > limits.max_response_bytes
-            || limits.max_tool_calls == 0
-            || limits.max_tool_argument_bytes == 0
-            || limits.max_tool_argument_bytes > limits.max_response_bytes
-        {
-            return Err(Error::new(ErrorKind::InvalidInput, "invalid_stream_limits"));
-        }
+        limits.validate()?;
         if models.is_empty()
-            || models.values().any(|model| {
-                model.capabilities.input_modalities.len() != 1
-                    || !model
-                        .capabilities
-                        .input_modalities
-                        .contains(&Modality::Text)
-                    || model.capabilities.text_tools
-            })
+            || !models
+                .values()
+                .all(|model| text_profile(&model.capabilities))
         {
             return Err(Error::new(
                 ErrorKind::Unsupported,
@@ -168,7 +144,7 @@ impl Provider for OpenAiCompatible {
         let limits = self.limits;
         let request = TransportRequest {
             binding: self.binding.clone(),
-            path: "chat/completions",
+            operation: TransportOperation::ChatCompletions,
             body: encoded.body,
             max_response_bytes: limits.max_response_bytes,
         };
@@ -204,14 +180,7 @@ fn lower_message(message: &Message, tools_supported: bool, output: &mut Vec<Valu
             let Content::ToolResult(result) = part else {
                 return Err(Error::new(ErrorKind::InvalidInput, "invalid_tool_message"));
             };
-            let mut text = Vec::new();
-            for part in &result.content {
-                let ResultContent::Text(value) = part else {
-                    return Err(Error::new(ErrorKind::Unsupported, "unsupported_tool_media"));
-                };
-                text.push(value);
-            }
-            let content = json!({ "status": result.status, "content": text, "structured": result.structured, "truncated": result.truncated });
+            let content = tool_result(result)?;
             let content = serde_json::to_string(&content)
                 .map_err(|_| Error::new(ErrorKind::InvalidInput, "tool_result_encoding_failed"))?;
             output.push(json!({ "role": "tool", "tool_call_id": short_identity("call", &result.call)?, "content": content }));
@@ -265,25 +234,4 @@ fn lower_message(message: &Message, tools_supported: bool, output: &mut Vec<Valu
     }
     output.push(encoded);
     Ok(())
-}
-
-fn function_name(tool: &ToolId) -> Result<String> {
-    let id = tool.as_str();
-    if id.len() <= 64
-        && id
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
-    {
-        return Ok(id.into());
-    }
-    short_identity("tool", tool)
-}
-
-fn short_identity(prefix: &str, value: &impl Serialize) -> Result<String> {
-    let digest = Fingerprint::of(value)?;
-    let mut name = format!("{prefix}_");
-    for byte in &digest.bytes()[..16] {
-        write!(&mut name, "{byte:02x}").expect("string formatting");
-    }
-    Ok(name)
 }

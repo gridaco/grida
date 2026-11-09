@@ -51,6 +51,10 @@ impl Decoder {
         self.events.pop_front()
     }
 
+    pub(crate) fn is_incomplete(&self) -> bool {
+        self.has_data || !self.line.is_empty()
+    }
+
     fn end_line(&mut self) {
         let mut line = self.line.as_slice();
         if std::mem::take(&mut self.first_line) {

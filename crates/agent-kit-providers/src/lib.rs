@@ -1,21 +1,34 @@
 //! Provider protocol adapters over a host-owned streaming transport.
 
+mod anthropic;
+mod gemini;
 mod openai;
 mod sse;
+mod wire;
 
-use agent_kit_core::BoxFuture;
 use agent_kit_core::inference::{InferenceControl, ProviderBinding};
+use agent_kit_core::{BoxFuture, Error, ErrorKind, ModelId, Result};
 use futures_core::stream::BoxStream;
 
-pub use openai::{ModelProfile, OpenAiCompatible, OutputLimitField, StreamLimits};
+pub use anthropic::Anthropic;
+pub use gemini::{Gemini, GeminiProfile};
+pub use openai::{ModelProfile, OpenAiCompatible, OutputLimitField};
 
 /// The bound host selects the destination and injects credentials. The body
 /// contains conversation data and deliberately has no Debug implementation.
 pub struct TransportRequest {
     pub binding: ProviderBinding,
-    pub path: &'static str,
+    pub operation: TransportOperation,
     pub body: Vec<u8>,
     pub max_response_bytes: usize,
+}
+
+/// A provider operation resolved against an approved binding by the host.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TransportOperation {
+    ChatCompletions,
+    AnthropicMessages,
+    GeminiStreamGenerateContent { model: ModelId },
 }
 
 pub struct TransportResponse {
@@ -33,13 +46,39 @@ pub enum TransportFailure {
     Interrupted,
 }
 
-/// Sends a JSON POST to the approved binding-relative path. The host applies
+/// Sends a JSON POST to the approved operation of the supplied binding. The host applies
 /// the supplied cancellation/deadline, bounds incoming data, and disables
-/// automatic retries and redirects. A dropped body releases its stream.
+/// automatic retries and redirects. Body items contain nonempty byte chunks.
+/// A dropped body releases its stream.
 pub trait StreamingTransport: Send + Sync {
     fn send(
         &self,
         request: TransportRequest,
         control: InferenceControl,
     ) -> BoxFuture<'_, std::result::Result<TransportResponse, TransportFailure>>;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StreamLimits {
+    pub max_request_bytes: usize,
+    pub max_response_bytes: usize,
+    pub max_event_bytes: usize,
+    pub max_tool_calls: usize,
+    pub max_tool_argument_bytes: usize,
+}
+
+impl StreamLimits {
+    fn validate(self) -> Result<()> {
+        if self.max_request_bytes == 0
+            || self.max_response_bytes == 0
+            || self.max_event_bytes == 0
+            || self.max_event_bytes > self.max_response_bytes
+            || self.max_tool_calls == 0
+            || self.max_tool_argument_bytes == 0
+            || self.max_tool_argument_bytes > self.max_response_bytes
+        {
+            return Err(Error::new(ErrorKind::InvalidInput, "invalid_stream_limits"));
+        }
+        Ok(())
+    }
 }

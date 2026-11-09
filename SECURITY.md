@@ -2829,6 +2829,16 @@ durable or discard unrelated OAuth records.
    while its long-lived credential host retains custody access. No renderer can
    configure or remove these protections.
 
+8. **Credential continuity stays in private custody.** The native agent can
+   persist a bounded, versioned record under its explicit private host directory.
+   Each record binds an opaque lineage to a random identity and a salted proof
+   of the credential bytes. It uses the existing native path, ACL, lock, and
+   atomic publication checks. Only the random identity crosses into replay
+   state. A different credential value rotates the identity. Malformed or
+   unsupported custody fails closed. A match establishes equality between the
+   observed values. The host establishes account identity and execution
+   authorization separately.
+
 **Limits and verification.** This is plaintext user-level custody, not encryption,
 secure erasure, provider revocation, protection from same-user code, or backup
 protection. A supported filesystem, OS, runtime and dependencies are trusted.
@@ -2863,6 +2873,9 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
 - Native implementation and synthetic cross-language verification: [crates/grida-auth/README.md](crates/grida-auth/README.md),
   [crates/grida-auth/src/conformance.rs](crates/grida-auth/src/conformance.rs),
   [crates/grida-auth/src/credential_lock.rs](crates/grida-auth/src/credential_lock.rs),
+  [credential continuity store](crates/grida-auth/src/credential_continuity.rs),
+  [native agent custody](crates/grida-agent/src/custody.rs),
+  [native agent custody tests](crates/grida-agent/tests/custody.rs),
   [crates/grida-auth/tests/process.rs](crates/grida-auth/tests/process.rs),
   [crates/grida-auth/tests/providers.rs](crates/grida-auth/tests/providers.rs),
   [scripts/cli-contracts/auth-driver.mjs](scripts/cli-contracts/auth-driver.mjs),
