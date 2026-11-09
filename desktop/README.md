@@ -136,6 +136,14 @@ verifies their architecture, names and permissions in the completed package.
 Native resource packaging and chat runtime selection have separate acceptance
 checks.
 
+The source-built native process owner accepts workspace selections from Electron
+main. On macOS and Linux it writes a private launch profile that allows reads
+in the primary workspace and asks before reading an eligible additional root.
+Main inspects the pending action and answers through its private ACP stdio
+connection. A repeat decision uses the original wait and revision basis.
+This integration supplies read-only tools. Command installation and the
+normal Desktop chat cutover have separate acceptance checks.
+
 We support macOS, Windows, and Linux distributions.
 
 [See All Releases](https://github.com/gridaco/grida/releases/latest)

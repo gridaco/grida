@@ -863,6 +863,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
   keep the child under ownership through EOF shutdown. Only projected error
   codes cross the process diagnostics boundary. Renderer authorization and
   cutover are separate from this process contract.
+- The [Desktop approval coordinator](desktop/src/main/native-agent-permissions.ts)
+  derives a read profile from main-owned workspace selection. An approval
+  answer takes a review issued by the coordinator for the exact session,
+  turn, wait, and revisions. The process owner's generic RPC methods refuse
+  raw approval answers. The typed answer uses private stdio. The [fixtures](desktop/src/main/native-agent-permissions.test.ts)
+  exercise a real native read and retry its receipt after a child restart.
 - [Native capability host](crates/grida-agent/src/tool_host.rs) and
   [its fixtures](crates/grida-agent/tests/tool_host.rs) bind a tool lease to
   a single capability and endpoint lifetime. The dispatcher checks the
@@ -2936,6 +2942,11 @@ durable or discard unrelated OAuth records.
    File tools also deny installed executables, and confined commands cannot
    write them. A session working directory only selects an exact matching
    profile. Chat input and model-editable configuration confer no grants.
+   The [Desktop launch adapter](desktop/src/main/native-agent-permissions.ts)
+   publishes owner-only profiles from canonical main-selected roots and
+   protects the native state and additional custody paths. The profile path
+   changes with its contents, so simultaneous launches with different
+   selections cannot substitute one another's scope before startup.
 
 8. **Credential continuity stays in private custody.** The native agent can
    persist a bounded, versioned record under its explicit private host directory.

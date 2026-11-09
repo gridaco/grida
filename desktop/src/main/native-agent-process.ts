@@ -3,6 +3,10 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
+import {
+  NativeAgentPermissions,
+  type NativeWorkspaceSelection,
+} from "./native-agent-permissions";
 
 const FRAME_LIMIT = 1024 * 1024;
 const REQUEST_LIMIT = 16;
@@ -17,6 +21,7 @@ export type NativeAgentLaunch = {
   endpoint: string;
   model: string;
   credentialHome?: string;
+  workspace?: NativeWorkspaceSelection;
   capabilities?: Readonly<Record<string, 1>>;
   onSessionUpdate?: (params: unknown) => void;
 };
@@ -28,6 +33,7 @@ type Pending = {
 };
 
 export class NativeAgentProcess {
+  readonly permissions?: NativeAgentPermissions;
   private readonly pending = new Map<number, Pending>();
   private readonly buffer = Buffer.allocUnsafe(FRAME_LIMIT);
   private readonly decoder = new TextDecoder("utf-8", { fatal: true });
@@ -43,8 +49,15 @@ export class NativeAgentProcess {
 
   private constructor(
     private readonly child: ChildProcessWithoutNullStreams,
-    private readonly onSessionUpdate?: (params: unknown) => void
+    private readonly onSessionUpdate?: (params: unknown) => void,
+    askRoots?: ReadonlyMap<string, string>
   ) {
+    if (askRoots) {
+      this.permissions = new NativeAgentPermissions(
+        (method, params) => this.call(method, params),
+        askRoots
+      );
+    }
     let diagnostics = "";
     this.exited = new Promise((resolve) => {
       child.once("close", (code, signal) => {
@@ -100,11 +113,20 @@ export class NativeAgentProcess {
     ) {
       throw new Error("native_agent_installation_unavailable");
     }
+    const permissionProfile = options.workspace
+      ? await NativeAgentPermissions.stage(
+          options.stateDirectory,
+          options.workspace
+        )
+      : undefined;
+    const capabilities = permissionProfile
+      ? { ...options.capabilities, ...NativeAgentPermissions.capabilities }
+      : (options.capabilities ?? {});
     const args = [
       "serve",
       "--stdio",
       "--state-dir",
-      options.stateDirectory,
+      permissionProfile?.stateDirectory ?? options.stateDirectory,
       "--provider",
       options.provider,
       "--endpoint",
@@ -114,6 +136,8 @@ export class NativeAgentProcess {
     ];
     if (options.credentialHome)
       args.push("--credential-home", options.credentialHome);
+    if (permissionProfile)
+      args.push("--permission-profile", permissionProfile.profile);
     const processOwner = new NativeAgentProcess(
       spawn(executable, args, {
         env: nativeEnvironment(),
@@ -121,7 +145,8 @@ export class NativeAgentProcess {
         windowsHide: true,
         stdio: "pipe",
       }),
-      options.onSessionUpdate
+      options.onSessionUpdate,
+      permissionProfile?.askRoots
     );
     try {
       const response = object(
@@ -129,7 +154,7 @@ export class NativeAgentProcess {
           "initialize",
           {
             protocolVersion: 1,
-            clientCapabilities: { _meta: options.capabilities ?? {} },
+            clientCapabilities: { _meta: capabilities },
           },
           START_TIMEOUT_MS
         )
@@ -141,9 +166,7 @@ export class NativeAgentProcess {
         throw new Error("native_agent_protocol_incompatible");
       }
       const advertised = object(object(response.agentCapabilities)?._meta);
-      for (const [capability, version] of Object.entries(
-        options.capabilities ?? {}
-      )) {
+      for (const [capability, version] of Object.entries(capabilities)) {
         if (advertised?.[capability] !== version)
           throw new Error("native_agent_capabilities_unavailable");
       }
@@ -156,6 +179,16 @@ export class NativeAgentProcess {
   }
 
   request(
+    method: string,
+    params: unknown,
+    timeoutMs = 130_000
+  ): Promise<unknown> {
+    if (method === NativeAgentPermissions.answerMethod)
+      return Promise.reject(new Error("native_agent_approval_requires_review"));
+    return this.call(method, params, timeoutMs);
+  }
+
+  private call(
     method: string,
     params: unknown,
     timeoutMs = 130_000
@@ -190,6 +223,8 @@ export class NativeAgentProcess {
   }
 
   notify(method: string, params: unknown): void {
+    if (method === NativeAgentPermissions.answerMethod)
+      throw new Error("native_agent_approval_requires_review");
     if (this.failure || this.shutdown)
       throw this.failure ?? new Error("native_agent_closing");
     this.write({ jsonrpc: "2.0", method, params });
